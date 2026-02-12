@@ -392,17 +392,20 @@ class SalesCompAdjustment(models.Model):
         # Existing values (preserved)
         ('property_rights', 'Property Rights'),
         ('financing', 'Financing'),
-        ('conditions_of_sale', 'Conditions of Sale'),
+        ('conditions_of_sale', 'Conditions of Sale (Legacy)'),
+        ('sale_conditions', 'Sale Conditions'),
         ('market_conditions', 'Market Conditions'),
         ('location', 'Location'),
         ('physical_condition', 'Physical Cond'),
         ('physical_age', 'Physical - Age'),
         ('physical_unit_mix', 'Physical - Unit Mix'),
+        ('physical_size', 'Physical - Size'),
+        ('physical_building_sf', 'Physical - Building SF'),
+        ('physical_stories', 'Physical - Stories'),
+        ('physical_lot_size', 'Physical - Lot Size'),
         ('economic', 'Economic'),
         ('legal', 'Legal'),
         ('other', 'Other'),
-        # Additive values
-        ('physical_size', 'Physical - Size'),
         ('physical_amenities', 'Physical - Amenities'),
     ]
 

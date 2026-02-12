@@ -72,6 +72,9 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   } = useFolderNavigation({
     propertyType: effectivePropertyType,
     analysisType: currentProject?.analysis_type,
+    analysisPerspective: currentProject?.analysis_perspective,
+    analysisPurpose: currentProject?.analysis_purpose,
+    valueAddEnabled: currentProject?.value_add_enabled ?? false,
     tileConfig: currentProject?.tile_config,
   });
 

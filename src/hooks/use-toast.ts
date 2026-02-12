@@ -1,2 +1,3 @@
-// Re-export useToast hook from components/ui/toast
+'use client';
+
 export { useToast, ToastProvider } from '@/components/ui/toast';

@@ -10,16 +10,24 @@
 
 import useSWR from 'swr'
 import { fetchJson } from '@/lib/fetchJson'
+import type { AnalysisPerspective, AnalysisPurpose } from '@/types/project-taxonomy'
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
 
 // Analysis type codes
 export type AnalysisType = 'VALUATION' | 'INVESTMENT' | 'VALUE_ADD' | 'DEVELOPMENT' | 'FEASIBILITY'
+export type AnalysisTypeConfigLookup = {
+  analysisType?: AnalysisType | null
+  analysisPerspective?: AnalysisPerspective | null
+  analysisPurpose?: AnalysisPurpose | null
+}
 
 // Analysis type configuration from API
 export interface AnalysisTypeConfig {
-  config_id: number
-  analysis_type: AnalysisType
+  config_id?: number
+  analysis_type: string
+  analysis_perspective?: AnalysisPerspective | null
+  analysis_purpose?: AnalysisPurpose | null
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -37,7 +45,9 @@ export interface AnalysisTypeConfig {
 
 // Lightweight config for lists
 export interface AnalysisTypeConfigList {
-  analysis_type: AnalysisType
+  analysis_type: string
+  analysis_perspective?: AnalysisPerspective | null
+  analysis_purpose?: AnalysisPurpose | null
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -65,6 +75,16 @@ export interface AnalysisTypeLandscaperContext {
 
 const fetcher = (url: string) => fetchJson(url)
 
+const normalizeLookup = (
+  lookup: AnalysisType | AnalysisTypeConfigLookup | null | undefined
+): AnalysisTypeConfigLookup => {
+  if (!lookup) return {}
+  if (typeof lookup === 'string') {
+    return { analysisType: lookup }
+  }
+  return lookup
+}
+
 /**
  * Fetch configuration for a specific analysis type.
  *
@@ -77,12 +97,40 @@ const fetcher = (url: string) => fetchJson(url)
  *   // Show valuation tile
  * }
  */
-export function useAnalysisTypeConfig(analysisType: AnalysisType | null | undefined) {
-  const shouldFetch = !!analysisType
+export function useAnalysisTypeConfig(
+  lookupOrType: AnalysisType | AnalysisTypeConfigLookup | null | undefined
+) {
+  const lookup = normalizeLookup(lookupOrType)
+  const analysisType = lookup.analysisType
+  const analysisPerspective = lookup.analysisPerspective
+  const analysisPurpose = lookup.analysisPurpose
+  const hasCompositeLookup = Boolean(analysisPerspective && analysisPurpose)
 
-  const { data, error, isLoading, mutate } = useSWR<AnalysisTypeConfig>(
-    shouldFetch ? `${DJANGO_API_URL}/api/config/analysis-types/${analysisType}/` : null,
-    fetcher,
+  const key = hasCompositeLookup
+    ? `/api/projects?include_inactive=true&config_lookup=1&perspective=${analysisPerspective}&purpose=${analysisPurpose}`
+    : (analysisType ? `${DJANGO_API_URL}/api/config/analysis-types/${analysisType}/` : null)
+
+  const { data, error, isLoading, mutate } = useSWR<AnalysisTypeConfig | null>(
+    key,
+    async (url: string) => {
+      if (!hasCompositeLookup) {
+        return fetchJson<AnalysisTypeConfig>(url)
+      }
+
+      const projects = await fetchJson<Array<{
+        tile_config?: AnalysisTypeConfig | null
+      }>>(url)
+      const match = projects
+        .map((project) => project.tile_config)
+        .find(
+          (config): config is AnalysisTypeConfig =>
+            Boolean(config)
+            && config.analysis_perspective === analysisPerspective
+            && config.analysis_purpose === analysisPurpose
+        )
+
+      return match ?? null
+    },
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000, // Cache for 1 minute

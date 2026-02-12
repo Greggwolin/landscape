@@ -41,6 +41,8 @@ export interface SubTab {
   projectTypes?: ProjectTypeCategory[];
   /** Optional: restrict to specific analysis types */
   analysisTypes?: AnalysisTypeCode[];
+  /** Optional: only show when value-add mode is enabled */
+  requiresValueAdd?: boolean;
 }
 
 export interface FolderTab {
@@ -68,7 +70,8 @@ interface FolderVisibilityOptions {
 function filterSubtabsByType(
   subtabs: SubTab[],
   projectType?: string,
-  analysisType?: string
+  analysisType?: string,
+  valueAddEnabled: boolean = false
 ): SubTab[] {
   const category = getProjectCategory(projectType);
   return subtabs.filter((tab) => {
@@ -83,6 +86,9 @@ function filterSubtabsByType(
       }
     } else if (tab.analysisTypes && !analysisType) {
       // If tab requires specific analysis types but none provided, hide it
+      return false;
+    }
+    if (tab.requiresValueAdd && !valueAddEnabled) {
       return false;
     }
     return true;
@@ -167,8 +173,13 @@ export function isTwoLineLabel(
 export function createFolderConfig(
   projectType?: string,
   analysisType?: string,
-  tileConfig?: AnalysisTypeTileConfig | null
+  tileConfig?: AnalysisTypeTileConfig | null,
+  _analysisPerspective?: string,
+  _analysisPurpose?: string,
+  valueAddEnabled: boolean = false
 ): FolderTabConfig {
+  void _analysisPerspective;
+  void _analysisPurpose;
   const isIncome = isIncomeProperty(projectType);
 
   const folders: FolderTab[] = [
@@ -248,11 +259,12 @@ export function createFolderConfig(
               'hotel',
               'mixed_use',
             ],
-            analysisTypes: ['VALUE_ADD'],
+            requiresValueAdd: true,
           },
         ],
         projectType,
-        analysisType
+        analysisType,
+        valueAddEnabled
       ),
     },
 
@@ -364,9 +376,19 @@ export function createFolderConfig(
 export function getFolderTabsForPropertyType(
   propertyType?: string,
   analysisType?: string,
-  tileConfig?: AnalysisTypeTileConfig | null
+  tileConfig?: AnalysisTypeTileConfig | null,
+  analysisPerspective?: string,
+  analysisPurpose?: string,
+  valueAddEnabled: boolean = false
 ): FolderTabConfig {
-  return createFolderConfig(propertyType, analysisType, tileConfig);
+  return createFolderConfig(
+    propertyType,
+    analysisType,
+    tileConfig,
+    analysisPerspective,
+    analysisPurpose,
+    valueAddEnabled
+  );
 }
 
 /**
@@ -401,9 +423,19 @@ export function getFolderById(
   folderId: string,
   projectType?: string,
   analysisType?: string,
-  tileConfig?: AnalysisTypeTileConfig | null
+  tileConfig?: AnalysisTypeTileConfig | null,
+  analysisPerspective?: string,
+  analysisPurpose?: string,
+  valueAddEnabled: boolean = false
 ): FolderTab | undefined {
-  const config = createFolderConfig(projectType, analysisType, tileConfig);
+  const config = createFolderConfig(
+    projectType,
+    analysisType,
+    tileConfig,
+    analysisPerspective,
+    analysisPurpose,
+    valueAddEnabled
+  );
   return config.folders.find((folder) => folder.id === folderId);
 }
 
@@ -426,9 +458,20 @@ export function getDefaultSubTabId(
   folderId: string,
   projectType?: string,
   analysisType?: string,
-  tileConfig?: AnalysisTypeTileConfig | null
+  tileConfig?: AnalysisTypeTileConfig | null,
+  analysisPerspective?: string,
+  analysisPurpose?: string,
+  valueAddEnabled: boolean = false
 ): string {
-  const folder = getFolderById(folderId, projectType, analysisType, tileConfig);
+  const folder = getFolderById(
+    folderId,
+    projectType,
+    analysisType,
+    tileConfig,
+    analysisPerspective,
+    analysisPurpose,
+    valueAddEnabled
+  );
   // If folder has no subtabs (like home), return empty string
   if (!folder?.subTabs.length) return '';
 
@@ -463,9 +506,20 @@ export function isValidFolderTab(
   tabId: string,
   projectType?: string,
   analysisType?: string,
-  tileConfig?: AnalysisTypeTileConfig | null
+  tileConfig?: AnalysisTypeTileConfig | null,
+  analysisPerspective?: string,
+  analysisPurpose?: string,
+  valueAddEnabled: boolean = false
 ): boolean {
-  const folder = getFolderById(folderId, projectType, analysisType, tileConfig);
+  const folder = getFolderById(
+    folderId,
+    projectType,
+    analysisType,
+    tileConfig,
+    analysisPerspective,
+    analysisPurpose,
+    valueAddEnabled
+  );
   if (!folder) return false;
   // If folder has no subtabs, any tab is "valid" (we just show the folder content)
   if (!folder.subTabs.length) return true;

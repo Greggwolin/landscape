@@ -13,7 +13,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMarketCompetitors, useCreateCompetitor, useUpdateCompetitor, useDeleteCompetitor, MarketCompetitiveProject } from '@/hooks/useMarketData';
-import { NapkinSfdPricing } from '@/components/napkin/NapkinSfdPricing';
 import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import MarketMapView from '@/app/components/Market/MarketMapView';
@@ -337,7 +336,19 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-market-row="pricing">
         {/* Left Column - SFD Pricing */}
         <div>
-          <NapkinSfdPricing projectId={projectId} showCompDetails={true} />
+          <CCard>
+            <CCardHeader>
+              <div className="d-flex align-items-center gap-2">
+                <LandscaperIcon size={18} />
+                <span className="fw-semibold">SFD Pricing</span>
+              </div>
+            </CCardHeader>
+            <CCardBody>
+              <p className="mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                Napkin pricing has been retired. Use competitive project pricing and market map data below.
+              </p>
+            </CCardBody>
+          </CCard>
         </div>
 
         {/* Right Column - Landscaper Analysis */}

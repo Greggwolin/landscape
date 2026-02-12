@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   CCard,
   CCardHeader,
@@ -80,6 +80,13 @@ interface ProjectMediaGalleryProps {
   projectName?: string;
 }
 
+interface EditorPanelLayout {
+  top: number;
+  left: number;
+  width: number;
+  minHeight: number;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Filter categories
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +134,9 @@ const ALL_CLASSIFICATIONS: Classification[] = [
   { classification_id: 14, code: 'other', name: 'Other', badge_color: 'secondary' },
 ];
 
+const TILE_MAX_WIDTH = 420;
+const TILE_HEIGHT = 270;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,6 +155,7 @@ export default function ProjectMediaGallery({
   const [scanProgress, setScanProgress] = useState('');
   const [activeEditorMediaId, setActiveEditorMediaId] = useState<number | null>(null);
   const [savingMediaId, setSavingMediaId] = useState<number | null>(null);
+  const [editorPanelLayout, setEditorPanelLayout] = useState<EditorPanelLayout | null>(null);
   const [editorStateByMediaId, setEditorStateByMediaId] = useState<
     Record<number, {
       classificationId: number | null;
@@ -152,6 +163,7 @@ export default function ProjectMediaGallery({
       otherReason: string;
     }>
   >({});
+  const tileRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // ── Data fetching ──────────────────────────────────────────────────────
 
@@ -581,10 +593,50 @@ export default function ProjectMediaGallery({
     []
   );
 
+  const computeEditorPanelLayout = useCallback((tileEl: HTMLDivElement): EditorPanelLayout => {
+    const rect = tileEl.getBoundingClientRect();
+    const viewportPadding = 12;
+    const gutter = 10;
+    const rightSpace = window.innerWidth - rect.right - gutter - viewportPadding;
+    const leftSpace = rect.left - gutter - viewportPadding;
+    const preferRight = rightSpace >= leftSpace;
+    const availableSide = Math.max(preferRight ? rightSpace : leftSpace, 220);
+    const desiredWidth = Math.round(rect.width * 1.25);
+    const panelWidth = Math.max(220, Math.min(desiredWidth, availableSide));
+    const desiredMinHeight = Math.max(430, Math.round(rect.height * 1.5));
+    const maxHeightInViewport = Math.max(320, window.innerHeight - viewportPadding * 2);
+    const panelMinHeight = Math.min(desiredMinHeight, maxHeightInViewport);
+
+    let left = preferRight
+      ? rect.right + gutter
+      : rect.left - gutter - panelWidth;
+    left = Math.max(
+      viewportPadding,
+      Math.min(left, window.innerWidth - panelWidth - viewportPadding)
+    );
+
+    const top = Math.max(
+      viewportPadding,
+      Math.min(rect.top, window.innerHeight - panelMinHeight - viewportPadding)
+    );
+
+    return {
+      top,
+      left,
+      width: panelWidth,
+      minHeight: panelMinHeight,
+    };
+  }, []);
+
   const openEditorForItem = useCallback(
-    (item: MediaItem) => {
-      const mediaId = item.media_id;
+    (mediaId: number, item: MediaItem) => {
+      const tileEl = tileRefs.current[mediaId];
       setActiveEditorMediaId(mediaId);
+      if (tileEl) {
+        setEditorPanelLayout(computeEditorPanelLayout(tileEl));
+      } else {
+        setEditorPanelLayout(null);
+      }
       setEditorStateByMediaId((prev) => ({
         ...prev,
         [mediaId]: {
@@ -594,10 +646,11 @@ export default function ProjectMediaGallery({
         },
       }));
     },
-    [getClassificationIdForItem]
+    [computeEditorPanelLayout, getClassificationIdForItem]
   );
 
   const closeEditor = useCallback((mediaId?: number) => {
+    setEditorPanelLayout(null);
     setActiveEditorMediaId((current) => {
       if (typeof mediaId === 'number') {
         return current === mediaId ? null : current;
@@ -612,6 +665,22 @@ export default function ProjectMediaGallery({
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (activeEditorMediaId == null) return;
+    const syncPanelLayout = () => {
+      const tileEl = tileRefs.current[activeEditorMediaId];
+      if (!tileEl) return;
+      setEditorPanelLayout(computeEditorPanelLayout(tileEl));
+    };
+    syncPanelLayout();
+    window.addEventListener('resize', syncPanelLayout);
+    window.addEventListener('scroll', syncPanelLayout, true);
+    return () => {
+      window.removeEventListener('resize', syncPanelLayout);
+      window.removeEventListener('scroll', syncPanelLayout, true);
+    };
+  }, [activeEditorMediaId, computeEditorPanelLayout]);
 
   useEffect(() => {
     if (activeEditorMediaId == null) return;
@@ -963,12 +1032,14 @@ export default function ProjectMediaGallery({
                 style={{
                   display: 'grid',
                   gridTemplateColumns:
-                    'repeat(auto-fill, minmax(min(100%, 630px), 1fr))',
+                    `repeat(auto-fill, minmax(min(100%, ${TILE_MAX_WIDTH}px), 1fr))`,
                   gap: '1rem',
                 }}
               >
                 {filteredItems.map((item) => {
-                  const thumbSrc = resolveImageSrc(item.thumbnail_uri || item.storage_uri);
+                  const thumbSrc = resolveImageSrc(item.storage_uri || item.thumbnail_uri);
+                  const shouldAvoidUpscale =
+                    item.width_px < TILE_MAX_WIDTH || item.height_px < TILE_HEIGHT;
                   const sourceDoc = docsById.get(String(item.doc_id));
                   const sourcePdfHref = buildSourcePdfHref(
                     sourceDoc?.storage_uri,
@@ -983,6 +1054,7 @@ export default function ProjectMediaGallery({
                   const compactHint = getCompactHint(item.ai_description);
                   const displayHint = getDisplayHint(item, compactHint);
                   const isEditorOpen = activeEditorMediaId === item.media_id;
+                  const panelIsVisible = isEditorOpen && !!editorPanelLayout;
                   const saveDisabled =
                     savingMediaId === item.media_id ||
                     (draft.discardReasonCode === 'other' && !draft.otherReason.trim());
@@ -990,10 +1062,13 @@ export default function ProjectMediaGallery({
                   return (
                     <div
                       key={item.media_id}
+                      ref={(node) => {
+                        tileRefs.current[item.media_id] = node;
+                      }}
                       style={{
                         cursor: 'default',
                         borderRadius: '4px',
-                        overflow: isEditorOpen ? 'visible' : 'hidden',
+                        overflow: 'hidden',
                         border: '1px solid var(--cui-border-color)',
                         backgroundColor: 'var(--cui-card-bg)',
                         transition: 'box-shadow 0.15s',
@@ -1013,7 +1088,7 @@ export default function ProjectMediaGallery({
                       <div
                         style={{
                           width: '100%',
-                          height: '405px',
+                          height: `${TILE_HEIGHT}px`,
                           overflow: 'visible',
                           backgroundColor: 'var(--cui-tertiary-bg)',
                           position: 'relative',
@@ -1030,7 +1105,7 @@ export default function ProjectMediaGallery({
                             justifyContent: 'center',
                             backgroundColor: 'var(--cui-tertiary-bg)',
                           }}
-                          onClick={() => openEditorForItem(item)}
+                          onClick={() => openEditorForItem(item.media_id, item)}
                         >
                           {thumbSrc ? (
                             <img
@@ -1038,9 +1113,11 @@ export default function ProjectMediaGallery({
                               alt={item.classification?.name ?? 'Media'}
                               loading="lazy"
                               style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
+                                width: shouldAvoidUpscale ? 'auto' : '100%',
+                                height: shouldAvoidUpscale ? 'auto' : '100%',
+                                maxWidth: '100%',
+                                maxHeight: '100%',
+                                objectFit: shouldAvoidUpscale ? 'contain' : 'cover',
                               }}
                             />
                           ) : (
@@ -1051,13 +1128,25 @@ export default function ProjectMediaGallery({
                         <div
                           onClick={(e) => e.stopPropagation()}
                           style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: '100%',
-                            width: '225%',
-                            minHeight: '608px',
-                            transform: isEditorOpen ? 'translateX(0)' : 'translateX(16px)',
-                            opacity: isEditorOpen ? 1 : 0,
+                            position: 'fixed',
+                            top:
+                              panelIsVisible && editorPanelLayout
+                                ? `${editorPanelLayout.top}px`
+                                : '-9999px',
+                            left:
+                              panelIsVisible && editorPanelLayout
+                                ? `${editorPanelLayout.left}px`
+                                : '-9999px',
+                            width:
+                              panelIsVisible && editorPanelLayout
+                                ? `${editorPanelLayout.width}px`
+                                : '0px',
+                            minHeight:
+                              panelIsVisible && editorPanelLayout
+                                ? `${editorPanelLayout.minHeight}px`
+                                : '0px',
+                            transform: panelIsVisible ? 'translateX(0)' : 'translateX(12px)',
+                            opacity: panelIsVisible ? 1 : 0,
                             transition: 'transform 0.2s ease, opacity 0.2s ease',
                             backgroundColor: 'var(--cui-body-bg)',
                             border: '1px solid var(--cui-border-color)',
@@ -1067,8 +1156,8 @@ export default function ProjectMediaGallery({
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '0.45rem',
-                            pointerEvents: isEditorOpen ? 'auto' : 'none',
-                            zIndex: 20,
+                            pointerEvents: panelIsVisible ? 'auto' : 'none',
+                            zIndex: 1000,
                           }}
                         >
                           <div className="d-flex align-items-start justify-content-between gap-2">

@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody, CRow, CCol, CFormLabel, CFormSelect } from '@coreui/react';
 import { useQuery } from '@tanstack/react-query';
 import MetricCard from '@/components/capitalization/MetricCard';
 import EquityPartnersTable, { type EquityPartner } from '@/components/capitalization/EquityPartnersTable';
-import NapkinWaterfallForm from '@/components/capitalization/NapkinWaterfallForm';
 import WaterfallResults, { WaterfallApiResponse } from '@/components/capitalization/WaterfallResults';
 
 type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
@@ -47,7 +46,6 @@ export default function EquityPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<WaterfallApiResponse | null>(null);
   const [waterfallType, setWaterfallType] = useState<WaterfallType>('IRR');
-  const hasRunOnce = useRef(false);
 
   const handleRun = useCallback(async () => {
     setLoading(true);
@@ -73,7 +71,6 @@ export default function EquityPage() {
 
       const json = (await res.json()) as WaterfallApiResponse;
       setData(json);
-      hasRunOnce.current = true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to calculate waterfall.';
       setError(message);
@@ -82,12 +79,6 @@ export default function EquityPage() {
       setLoading(false);
     }
   }, [projectId, waterfallType]);
-
-  const handleSaved = useCallback(() => {
-    if (hasRunOnce.current && !loading) {
-      handleRun();
-    }
-  }, [handleRun, loading]);
 
   const calculateTotalEquity = (): number => {
     return partners.reduce((sum, p) => sum + p.capitalCommitted, 0);
@@ -110,12 +101,26 @@ export default function EquityPage() {
     <div className="d-flex flex-column gap-3">
       <div className="d-flex flex-column flex-lg-row gap-3 gap-lg-4 mb-3">
         <div className="flex-fill" style={{ minWidth: 0 }}>
-          <NapkinWaterfallForm
-            projectId={projectId}
-            waterfallType={waterfallType}
-            onWaterfallTypeChange={setWaterfallType}
-            onSaved={handleSaved}
-          />
+          <CCard>
+            <CCardHeader>
+              <h5 className="mb-0">Waterfall Configuration</h5>
+            </CCardHeader>
+            <CCardBody>
+              <CFormLabel htmlFor="waterfall-type">Hurdle Method</CFormLabel>
+              <CFormSelect
+                id="waterfall-type"
+                value={waterfallType}
+                onChange={(event) => setWaterfallType(event.currentTarget.value as WaterfallType)}
+              >
+                <option value="IRR">IRR</option>
+                <option value="EM">Equity Multiple (EMx)</option>
+                <option value="IRR_EM">IRR + EMx</option>
+              </CFormSelect>
+              <p className="mb-0 mt-3" style={{ color: 'var(--cui-secondary-color)' }}>
+                Configure the waterfall method, then run the calculation from the results panel.
+              </p>
+            </CCardBody>
+          </CCard>
         </div>
         <div className="flex-fill" style={{ minWidth: 0 }}>
           <WaterfallResults

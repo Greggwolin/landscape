@@ -1,73 +1,109 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { CCloseButton, CToast, CToastBody, CToastHeader, CToaster } from '@coreui/react';
 
-interface Toast {
-  id: string;
+type ToastType = 'success' | 'error' | 'danger' | 'warning' | 'info';
+
+type ToastInput =
+  | string
+  | {
+      title?: string;
+      message?: string;
+      description?: string;
+      type?: ToastType;
+      duration?: number;
+    };
+
+type ToastContextValue = {
+  showToast: (input: ToastInput, type?: ToastType) => void;
+};
+
+type ToastItem = {
+  id: number;
+  title: string;
   message: string;
-  type: 'success' | 'error' | 'info';
-}
+  type: ToastType;
+  delay: number;
+};
 
-interface ToastContextType {
-  showToast: (message: string, type: 'success' | 'error' | 'info') => void;
-}
+const ToastContext = createContext<ToastContextValue | null>(null);
 
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
+const COLOR_MAP: Record<ToastType, 'success' | 'danger' | 'warning' | 'info'> = {
+  success: 'success',
+  error: 'danger',
+  danger: 'danger',
+  warning: 'warning',
+  info: 'info',
+};
+
+const DEFAULT_TITLES: Record<ToastType, string> = {
+  success: 'Success',
+  error: 'Error',
+  danger: 'Error',
+  warning: 'Warning',
+  info: 'Info',
+};
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info') => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
-
-    // Auto-dismiss after 3 seconds
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
+  const showToast = useCallback((input: ToastInput, type?: ToastType) => {
+    const baseType: ToastType = type || 'info';
+    const normalized =
+      typeof input === 'string'
+        ? {
+            title: DEFAULT_TITLES[baseType],
+            message: input,
+            type: baseType,
+            delay: 3500,
+          }
+        : {
+            title: input.title || DEFAULT_TITLES[input.type || baseType],
+            message: input.message || input.description || '',
+            type: input.type || baseType,
+            delay: input.duration ?? 3500,
+          };
+
+    setToasts((prev) => [
+      ...prev,
+      {
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        title: normalized.title,
+        message: normalized.message,
+        type: normalized.type,
+        delay: normalized.delay,
+      },
+    ]);
+  }, []);
+
+  const value = useMemo(() => ({ showToast }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
-      <div className="toast-container" style={{
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px'
-      }}>
-        {toasts.map(toast => (
-          <div
+      <CToaster placement="top-end" className="p-3">
+        {toasts.map((toast) => (
+          <CToast
             key={toast.id}
-            style={{
-              padding: '12px 20px',
-              borderRadius: '6px',
-              backgroundColor: toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : '#3b82f6',
-              color: 'white',
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-              minWidth: '250px',
-              animation: 'slideIn 0.3s ease-out'
-            }}
+            visible
+            autohide
+            delay={toast.delay}
+            color={COLOR_MAP[toast.type]}
+            onClose={() => removeToast(toast.id)}
           >
-            {toast.message}
-          </div>
+            <CToastHeader closeButton={false}>
+              <strong className="me-auto">{toast.title}</strong>
+              <CCloseButton onClick={() => removeToast(toast.id)} />
+            </CToastHeader>
+            <CToastBody>{toast.message}</CToastBody>
+          </CToast>
         ))}
-      </div>
-      <style jsx>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
+      </CToaster>
     </ToastContext.Provider>
   );
 }
@@ -79,3 +115,4 @@ export function useToast() {
   }
   return context;
 }
+

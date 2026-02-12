@@ -38,6 +38,16 @@ export interface ProjectTabMapProps {
 }
 
 export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', rentalComparables = [], comparableColors = {}, onMarkerClick }: ProjectTabMapProps) {
+  const subjectMarkerColor = 'dodgerblue';
+  const pendingMarkerColor = 'darkorange';
+  const defaultComparableColor = 'mediumseagreen';
+  const markerStrokeColor = 'black';
+  const contextLineColor = 'dimgray';
+  const popupAddressColor = 'var(--cui-secondary-color)';
+  const popupMetaColor = 'var(--cui-secondary-color)';
+  const popupPriceColor = 'var(--cui-body-color)';
+  const popupDistanceColor = 'var(--cui-tertiary-color)';
+
   const { data, error, isLoading, mutate } = useProjectMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
   const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
@@ -75,29 +85,29 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(() => {
     const base: Array<{ id: string; coordinates: [number, number]; color: string; label: string; popup?: string }> = data?.center
-      ? [{ id: 'subject', coordinates: data.center, color: '#2d8cf0', label: 'Subject Property' }]
+      ? [{ id: 'subject', coordinates: data.center, color: subjectMarkerColor, label: 'Subject Property' }]
       : [];
 
     if (pendingLocation) {
-      base.push({ id: 'pending', coordinates: pendingLocation, color: '#f97316', label: 'New Location' });
+      base.push({ id: 'pending', coordinates: pendingLocation, color: pendingMarkerColor, label: 'New Location' });
     }
 
     // Add rental comparable markers with property-specific colors
     rentalComparables.forEach((comp, index) => {
       if (comp.latitude && comp.longitude) {
-        const markerColor = comparableColors[comp.property_name] || '#10b981';
+        const markerColor = comparableColors[comp.property_name] || defaultComparableColor;
         base.push({
           id: `comp-${comp.comparable_id}`,
           coordinates: [comp.longitude, comp.latitude] as [number, number],
           color: markerColor,
-          stroke: '#000000', // Black outline
+          stroke: markerStrokeColor,
           label: `${index + 1}`,
           popup: `<div style="padding: 12px; min-width: 180px;">
             <div style="font-weight: 600; color: ${markerColor}; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
-            ${comp.address ? `<div style="font-size: 0.85em; color: #9ca3af; margin-bottom: 2px;">${comp.address}</div>` : ''}
-            <div style="font-size: 0.85em; color: #d1d5db;">${comp.bedrooms}BR/${comp.bathrooms}BA · ${comp.avg_sqft?.toLocaleString()} SF</div>
-            <div style="font-size: 0.95em; font-weight: 600; color: #f9fafb; margin-top: 6px;">$${Math.round(comp.asking_rent || 0).toLocaleString()}/mo</div>
-            ${comp.distance_miles ? `<div style="font-size: 0.8em; color: #6b7280; margin-top: 4px;">${comp.distance_miles} mi away</div>` : ''}
+            ${comp.address ? `<div style="font-size: 0.85em; color: ${popupAddressColor}; margin-bottom: 2px;">${comp.address}</div>` : ''}
+            <div style="font-size: 0.85em; color: ${popupMetaColor};">${comp.bedrooms}BR/${comp.bathrooms}BA · ${comp.avg_sqft?.toLocaleString()} SF</div>
+            <div style="font-size: 0.95em; font-weight: 600; color: ${popupPriceColor}; margin-top: 6px;">$${Math.round(comp.asking_rent || 0).toLocaleString()}/mo</div>
+            ${comp.distance_miles ? `<div style="font-size: 0.8em; color: ${popupDistanceColor}; margin-top: 4px;">${comp.distance_miles} mi away</div>` : ''}
           </div>`
         });
       }
@@ -126,9 +136,9 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   };
 
   const lines = useMemo(
-    () => (data?.context ? [{ id: 'context', data: data.context, color: '#666', width: 0.8 }] : []),
+    () => (data?.context ? [{ id: 'context', data: data.context, color: contextLineColor, width: 0.8 }] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data?.context ? JSON.stringify(data.context) : null]
+    [contextLineColor, data?.context ? JSON.stringify(data.context) : null]
   );
 
   const { trigger: saveLocation, isMutating: saving } = useSWRMutation(

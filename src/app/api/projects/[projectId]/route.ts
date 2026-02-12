@@ -1,6 +1,12 @@
 // /app/api/projects/[projectId]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import {
+  deriveDimensionsFromAnalysisType,
+  deriveLegacyAnalysisType,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy'
 
 type Params = { params: Promise<{ projectId: string }> }
 
@@ -9,11 +15,76 @@ export async function PATCH(req: NextRequest, context: Params) {
     const { projectId } = await context.params
     if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
 
-  const updates = await req.json()
+    const updates = await req.json()
 
-  // Allowed fields for update
-  const allowedFields = [
-    'project_name',
+    const perspective = updates.analysis_perspective as AnalysisPerspective | undefined
+    const purpose = updates.analysis_purpose as AnalysisPurpose | undefined
+    const hasPerspective = perspective !== undefined
+    const hasPurpose = purpose !== undefined
+
+    // New dimensions are authoritative during transition.
+    if (hasPerspective || hasPurpose) {
+      const existingRows = await sql<{
+        analysis_perspective: AnalysisPerspective | null
+        analysis_purpose: AnalysisPurpose | null
+        analysis_type: string | null
+        value_add_enabled: boolean | null
+      }[]>`
+        SELECT
+          analysis_perspective,
+          analysis_purpose,
+          analysis_type,
+          value_add_enabled
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+        LIMIT 1
+      `
+
+      if (!existingRows || existingRows.length === 0) {
+        return NextResponse.json(
+          { error: 'Project not found' },
+          { status: 404 }
+        )
+      }
+
+      const existing = existingRows[0]
+      const fallback = deriveDimensionsFromAnalysisType(existing.analysis_type)
+      const resolvedPerspective = perspective
+        ?? existing.analysis_perspective
+        ?? fallback.analysis_perspective
+      const resolvedPurpose = purpose
+        ?? existing.analysis_purpose
+        ?? fallback.analysis_purpose
+      const resolvedValueAdd = resolvedPerspective === 'INVESTMENT'
+        ? Boolean(updates.value_add_enabled ?? existing.value_add_enabled ?? fallback.value_add_enabled)
+        : false
+
+      updates.analysis_perspective = resolvedPerspective
+      updates.analysis_purpose = resolvedPurpose
+      updates.value_add_enabled = resolvedValueAdd
+      updates.analysis_type = deriveLegacyAnalysisType(
+        resolvedPerspective,
+        resolvedPurpose,
+        resolvedValueAdd
+      )
+    } else if (updates.value_add_enabled !== undefined) {
+      const existingRows = await sql<{
+        analysis_perspective: AnalysisPerspective | null
+      }[]>`
+        SELECT analysis_perspective
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+        LIMIT 1
+      `
+      const existingPerspective = existingRows?.[0]?.analysis_perspective
+      if (existingPerspective && existingPerspective !== 'INVESTMENT') {
+        updates.value_add_enabled = false
+      }
+    }
+
+    // Allowed fields for update
+    const allowedFields = [
+      'project_name',
       'description',
       'location_description',
       'jurisdiction_city',
@@ -25,13 +96,16 @@ export async function PATCH(req: NextRequest, context: Params) {
       'analysis_start_date',
       'analysis_end_date',
       'analysis_type',
+      'analysis_perspective',
+      'analysis_purpose',
+      'value_add_enabled',
       'location_lat',
       'location_lon',
-    'project_type_code',
-    'project_type',
-    'template_id',
-    'planning_efficiency'
-  ]
+      'project_type_code',
+      'project_type',
+      'template_id',
+      'planning_efficiency'
+    ]
 
     // Build SET clause dynamically
     const validUpdates: Record<string, unknown> = {}
@@ -121,14 +195,19 @@ export async function GET(_req: NextRequest, context: Params) {
         p.analysis_start_date,
         p.analysis_end_date,
         p.analysis_type,
+        p.analysis_perspective,
+        p.analysis_purpose,
+        p.value_add_enabled,
         p.project_type_code,
         p.project_type,
         p.template_id,
         p.planning_efficiency,
         CASE
-          WHEN c.analysis_type IS NULL THEN NULL
+          WHEN c.analysis_perspective IS NULL THEN NULL
           ELSE json_build_object(
             'analysis_type', c.analysis_type,
+            'analysis_perspective', c.analysis_perspective,
+            'analysis_purpose', c.analysis_purpose,
             'tile_valuation', c.tile_valuation,
             'tile_capitalization', c.tile_capitalization,
             'tile_returns', c.tile_returns,
@@ -140,7 +219,8 @@ export async function GET(_req: NextRequest, context: Params) {
         p.updated_at
       FROM landscape.tbl_project p
       LEFT JOIN landscape.tbl_analysis_type_config c
-        ON c.analysis_type = p.analysis_type
+        ON c.analysis_perspective = p.analysis_perspective
+        AND c.analysis_purpose = p.analysis_purpose
       WHERE p.project_id = ${projectId}::bigint
       LIMIT 1
     `

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-12T21:12:55.203474Z",
+  "generated_at": "2026-02-12T21:58:59.531650Z",
   "database": "ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech",
   "schema": "landscape",
   "tables": [
@@ -76910,14 +76910,14 @@
       "table_name": "tbl_extraction_mapping",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
+      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
     },
     {
       "object_type": "constraint",
       "table_name": "tbl_extraction_mapping",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
+      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
     },
     {
       "object_type": "constraint",
@@ -78660,14 +78660,14 @@
       "table_name": "tbl_project_inventory_columns",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
+      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
     },
     {
       "object_type": "constraint",
       "table_name": "tbl_project_inventory_columns",
       "constraint_name": "chk_data_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((data_type)::text = ANY ((ARRAY['text'::character varying, 'integer'::character varying, 'decimal'::character varying, 'boolean'::character varying, 'date'::character varying, 'json'::character varying])::text[])))"
+      "constraint_definition": "CHECK (((data_type IS NULL) OR ((data_type)::text = ANY ((ARRAY['text'::character varying, 'number'::character varying, 'currency'::character varying, 'date'::character varying, 'boolean'::character varying, 'enum'::character varying])::text[]))))"
     },
     {
       "object_type": "constraint",
@@ -79136,7 +79136,7 @@
       "table_name": "tbl_sales_comp_adjustments",
       "constraint_name": "check_adjustment_type",
       "constraint_type": "CHECK",
-      "constraint_definition": "CHECK (((adjustment_type)::text = ANY ((ARRAY['location'::character varying, 'physical_age'::character varying, 'physical_condition'::character varying, 'physical_unit_mix'::character varying, 'market_conditions'::character varying, 'financing'::character varying, 'other'::character varying])::text[])))"
+      "constraint_definition": "CHECK (((adjustment_type)::text = ANY ((ARRAY['location'::character varying, 'physical_age'::character varying, 'physical_condition'::character varying, 'physical_unit_mix'::character varying, 'physical_size'::character varying, 'physical_building_sf'::character varying, 'physical_stories'::character varying, 'physical_lot_size'::character varying, 'market_conditions'::character varying, 'financing'::character varying, 'sale_conditions'::character varying, 'property_rights'::character varying, 'other'::character varying])::text[])))"
     },
     {
       "object_type": "constraint",

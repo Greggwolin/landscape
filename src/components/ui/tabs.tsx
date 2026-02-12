@@ -1,53 +1,83 @@
-import * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
+'use client';
 
-import { cn } from "@/lib/utils"
+import React, { createContext, useContext, useMemo, useState } from 'react';
+import { CButton } from '@coreui/react';
 
-const Tabs = TabsPrimitive.Root
+type TabsContextType = {
+  value: string;
+  setValue: (value: string) => void;
+};
 
-const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
-      className
-    )}
-    {...props}
-  />
-))
-TabsList.displayName = TabsPrimitive.List.displayName
+const TabsContext = createContext<TabsContextType | null>(null);
 
-const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-      className
-    )}
-    {...props}
-  />
-))
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
+export function Tabs({
+  value,
+  defaultValue,
+  onValueChange,
+  className,
+  children,
+}: {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const [internalValue, setInternalValue] = useState(defaultValue || '');
+  const current = value ?? internalValue;
+  const setValue = (next: string) => {
+    if (value === undefined) setInternalValue(next);
+    onValueChange?.(next);
+  };
 
-const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    ref={ref}
-    className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      className
-    )}
-    {...props}
-  />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
+  const ctx = useMemo(() => ({ value: current, setValue }), [current]);
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+  return (
+    <TabsContext.Provider value={ctx}>
+      <div className={className}>{children}</div>
+    </TabsContext.Provider>
+  );
+}
+
+export function TabsList({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <div className={className}>{children}</div>;
+}
+
+export function TabsTrigger({
+  value,
+  className,
+  children,
+}: {
+  value: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const ctx = useContext(TabsContext);
+  const active = ctx?.value === value;
+  return (
+    <CButton
+      color={active ? 'primary' : 'secondary'}
+      variant={active ? undefined : 'outline'}
+      className={className}
+      onClick={() => ctx?.setValue(value)}
+      type="button"
+    >
+      {children}
+    </CButton>
+  );
+}
+
+export function TabsContent({
+  value,
+  className,
+  children,
+}: {
+  value: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const ctx = useContext(TabsContext);
+  if (ctx?.value !== value) return null;
+  return <div className={className}>{children}</div>;
+}
+

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Comp Modal v7</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg-body: #1a1d23;
+    --bg-card: #22262e;
+    --bg-input: #2d323b;
+    --bg-hdr: #1e2228;
+    --bg-calc: #1a1d23;
+    --bg-adj: #1c2028;
+    --bg-lp: #161a20;
+    --bg-lp-msg: #1e2430;
+    --border: #363b44;
+    --border-lt: #2d323b;
+    --text-1: #e8eaed;
+    --text-2: #9ca3af;
+    --text-m: #6b7280;
+    --text-lbl: #9ca3af;
+    --blue: #4a9eff;
+    --green: #34d399;
+    --red: #f87171;
+    --calc-bg: #374151;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-body); color: var(--text-1);
+    display: flex; justify-content: center; padding: 20px; min-height: 100vh;
+  }
+
+  .modal {
+    width: 960px; max-height: 95vh; background: var(--bg-card);
+    border-radius: 12px; border: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+    position: relative;
+  }
+
+  /* Header */
+  .hdr { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .hdr h2 { font-size: 17px; font-weight: 600; }
+  .badge-c { background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+  .badge-t { color: var(--text-2); font-size: 11px; font-weight: 600; padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; letter-spacing: .3px; }
+  .x-btn { margin-left: auto; background: none; border: none; color: var(--text-m); font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+  .x-btn:hover { color: var(--text-1); background: var(--bg-input); }
+
+  /* Map — full width, taller */
+  .map-area { flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  .map-canvas {
+    width: 100%; height: 280px; background: var(--bg-input);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .pin { position: absolute; display: flex; flex-direction: column; align-items: center; }
+  .pin-dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .pin-label { margin-top: 3px; font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+  .pin-comp .pin-dot { background: #ef4444; }
+  .pin-comp .pin-label { background: rgba(239,68,68,.15); color: #fca5a5; }
+  .pin-subj .pin-dot { background: var(--blue); }
+  .pin-subj .pin-label { background: rgba(74,158,255,.15); color: #93c5fd; }
+  .pin-line { position: absolute; border-top: 2px dashed rgba(255,255,255,.18); transform-origin: left center; }
+  .dist-label { position: absolute; background: rgba(0,0,0,.65); color: var(--text-2); font-size: 10px; padding: 2px 8px; border-radius: 3px; }
+
+  /* Address bar */
+  .addr-bar {
+    padding: 10px 20px; background: var(--bg-hdr); border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 170px 1fr 110px 44px 64px; gap: 10px;
+  }
+  .addr-g label { display: block; font-size: 10px; font-weight: 600; color: var(--text-m); margin-bottom: 2px; }
+  .addr-g input { width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; color: var(--text-1); font-size: 12px; font-family: inherit; outline: none; }
+  .addr-g input:focus { border-color: var(--blue); }
+
+  /* KPI */
+  .kpi { display: flex; padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--bg-hdr); flex-shrink: 0; }
+  .kpi-i { padding: 8px 12px; border-right: 1px solid var(--border); }
+  .kpi-i:last-child { border-right: none; }
+  .kpi-l { font-size: 8px; font-weight: 700; letter-spacing: .8px; color: var(--text-m); margin-bottom: 1px; }
+  .kpi-v { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi-v.g { color: var(--green); }
+  .kpi-v.r { color: var(--red); }
+
+  /* Body */
+  .body { flex: 1; overflow-y: auto; min-height: 0; position: relative; }
+  .body::-webkit-scrollbar { width: 5px; }
+  .body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Accordion */
+  .acc { border-bottom: 1px solid var(--border); position: relative; }
+  .acc-h { display: flex; align-items: center; padding: 8px 20px; background: var(--bg-hdr); cursor: pointer; user-select: none; gap: 8px; }
+  .acc-h:hover { background: var(--bg-input); }
+  .chv { color: var(--text-m); font-size: 10px; transition: transform .2s; width: 12px; text-align: center; }
+  .acc-h.open .chv { transform: rotate(90deg); }
+  .acc-t { font-size: 12px; font-weight: 700; color: var(--text-2); }
+  .acc-s { margin-left: auto; font-size: 10px; color: var(--text-m); font-variant-numeric: tabular-nums; }
+  .acc-b { padding: 12px 20px; display: none; }
+  .acc.open .acc-b { display: block; }
+
+  /* Landscaper btn */
+  .lp-btn {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--green); font-size: 10px; padding: 2px 7px;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+    font-family: inherit; margin-left: 6px; transition: all .15s;
+  }
+  .lp-btn:hover { background: rgba(52,211,153,.1); border-color: var(--green); }
+  .lp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;}50%{opacity:.3;} }
+
+  /* Field rows */
+  .fld-hdr {
+    display: grid; grid-template-columns: 120px 140px 58px 68px 1fr;
+    gap: 5px; padding: 0 0 5px 0; margin-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+    font-size: 9px; font-weight: 600; color: var(--text-m);
+  }
+  .fld-hdr span:nth-child(2),.fld-hdr span:nth-child(3),.fld-hdr span:nth-child(4) { text-align: right; }
+
+  .fld {
+    display: grid; grid-template-columns: 120px 140px 58px 68px 1fr;
+    gap: 5px; align-items: center; padding: 3px 0; min-height: 30px;
+  }
+  .fld + .fld { border-top: 1px solid var(--border-lt); }
+  .fld-label { font-size: 11px; font-weight: 600; color: var(--text-lbl); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .fld input, .fld select {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 7px; color: var(--text-1);
+    font-size: 12px; font-family: inherit; outline: none; text-align: right;
+  }
+  .fld input:focus, .fld select:focus { border-color: var(--blue); }
+  .fld select { text-align: left; }
+  /* Hide number spinners globally */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+
+  .adj-pct { background: var(--bg-adj)!important; text-align: right!important; font-variant-numeric: tabular-nums; }
+  .adj-amt { font-size: 10px; text-align: right; font-variant-numeric: tabular-nums; padding-right: 2px; white-space: nowrap; }
+  .adj-amt.neg { color: var(--red); }
+  .adj-amt.pos { color: var(--green); }
+  .adj-amt.neu { color: var(--text-m); }
+  .adj-note { background: var(--bg-adj)!important; color: var(--text-2)!important; font-style: italic; font-size: 11px!important; text-align: left!important; }
+  .adj-note::placeholder { color: var(--text-m); font-style: italic; }
+
+  .fld-total {
+    display: grid; grid-template-columns: 120px 140px 58px 68px 1fr;
+    gap: 5px; align-items: center; padding: 7px 0 2px 0;
+    margin-top: 3px; border-top: 2px solid var(--border); font-weight: 700; font-size: 11px;
+  }
+
+  .calc-d {
+    background: var(--bg-calc); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 7px; color: var(--text-2); font-size: 12px;
+    display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-b { font-size: 7px; font-weight: 600; background: var(--calc-bg); color: var(--text-m); padding: 1px 3px; border-radius: 2px; letter-spacing: .5px; flex-shrink: 0; }
+
+  .inp-pfx { display: flex; }
+  .pfx { background: var(--bg-hdr); border: 1px solid var(--border); border-right: none; border-radius: 4px 0 0 4px; padding: 4px 5px; color: var(--text-m); font-size: 12px; display: flex; align-items: center; }
+  .inp-pfx input { border-radius: 0 4px 4px 0; }
+
+  /* Contacts table */
+  .ctbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .ctbl th { text-align: left; font-size: 10px; font-weight: 600; color: var(--text-m); padding: 4px 6px; border-bottom: 1px solid var(--border); }
+  .ctbl td { padding: 5px 6px; border-bottom: 1px solid var(--border-lt); }
+  .ctbl td input {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 3px; padding: 3px 6px; color: var(--text-1); font-size: 11px; font-family: inherit; outline: none;
+  }
+  .ctbl td input:focus { border-color: var(--blue); }
+  .role-badge { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px; display: inline-block; letter-spacing: .2px; white-space: nowrap; }
+  .role-sell-broker { background: rgba(74,158,255,.12); color: #93c5fd; }
+  .role-buy-broker { background: rgba(52,211,153,.12); color: #6ee7b7; }
+  .role-buyer { background: rgba(251,191,36,.12); color: #fcd34d; }
+  .role-seller { background: rgba(248,113,113,.12); color: #fca5a5; }
+  .role-true-buyer { background: rgba(167,139,250,.12); color: #c4b5fd; }
+  .role-true-seller { background: rgba(251,146,60,.12); color: #fdba74; }
+
+  .verif-row {
+    display: grid; grid-template-columns: 120px 1fr 140px;
+    gap: 8px; align-items: center; padding: 8px 0; margin-top: 6px; border-top: 1px solid var(--border);
+  }
+  .verif-row label { font-size: 11px; font-weight: 600; color: var(--text-lbl); }
+  .verif-row select, .verif-row input {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 7px; color: var(--text-1); font-size: 12px; font-family: inherit; outline: none;
+  }
+
+  /* Metrics */
+  .mstrip { display: flex; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .mstrip-i { flex: 1; padding: 4px 8px; border-right: 1px solid var(--border); background: var(--bg-calc); }
+  .mstrip-i:last-child { border-right: none; }
+  .mstrip-l { font-size: 8px; font-weight: 700; color: var(--text-m); letter-spacing: .4px; }
+  .mstrip-v { font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* Net adj bar */
+  .net-bar { background: var(--bg-hdr); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 7px 20px; display: flex; align-items: center; gap: 18px; font-size: 11px; }
+  .nb-i { display: flex; align-items: center; gap: 5px; }
+  .nb-l { color: var(--text-m); font-size: 9px; font-weight: 700; letter-spacing: .4px; }
+  .nb-v { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* Unit mix */
+  .umt { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .umt th { text-align: left; font-size: 10px; font-weight: 600; color: var(--text-m); padding: 4px 5px; border-bottom: 1px solid var(--border); }
+  .umt th.r { text-align: right; }
+  .umt td { padding: 4px 5px; border-bottom: 1px solid var(--border-lt); }
+  .umt td.r { text-align: right; }
+  .umt td.m { color: var(--text-m); }
+  .umt tr.tot td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: none; padding-top: 5px; }
+  .del-r { color: var(--text-m); cursor: pointer; font-size: 11px; opacity: .4; }
+  .del-r:hover { opacity: 1; color: var(--red); }
+  .add-b { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 2px 8px; font-size: 10px; color: var(--blue); background: none; border: 1px dashed var(--border); border-radius: 3px; cursor: pointer; font-family: inherit; }
+  .add-b:hover { background: var(--bg-input); border-color: var(--blue); }
+
+  /* History */
+  .htbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .htbl th { text-align: left; font-size: 10px; font-weight: 600; color: var(--text-m); padding: 4px 5px; border-bottom: 1px solid var(--border); }
+  .htbl td { padding: 4px 5px; border-bottom: 1px solid var(--border-lt); }
+
+  /* Footer */
+  .ftr { padding: 10px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .btn { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid transparent; font-family: inherit; }
+  .btn-p { background: var(--blue); color: #fff; }
+  .btn-p:hover { filter: brightness(1.1); }
+  .btn-g { background: none; color: var(--text-2); border-color: var(--border); }
+  .btn-g:hover { background: var(--bg-input); }
+  .btn-d { background: none; color: var(--red); border-color: var(--red); }
+  .btn-d:hover { background: rgba(248,113,113,.1); }
+  .sp { flex: 1; }
+
+  /* Landscaper overlay */
+  .lp-overlay {
+    display: none; position: absolute; right: 16px;
+    width: 380px; max-height: 460px; background: var(--bg-lp);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    flex-direction: column; z-index: 200; overflow: hidden;
+  }
+  .lp-overlay.show { display: flex; }
+  .lp-oh { padding: 9px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 7px; background: var(--bg-hdr); flex-shrink: 0; }
+  .lp-icon { width: 20px; height: 20px; border-radius: 5px; background: linear-gradient(135deg, var(--green), var(--blue)); display: flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; flex-shrink: 0; }
+  .lp-otitle { font-size: 11px; font-weight: 700; color: var(--text-2); }
+  .lp-octx { font-size: 9px; color: var(--text-m); background: var(--bg-input); padding: 2px 5px; border-radius: 3px; }
+  .lp-oclose { margin-left: auto; background: none; border: none; color: var(--text-m); cursor: pointer; font-size: 13px; }
+  .lp-oclose:hover { color: var(--text-1); }
+  .lp-obody { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .lp-obody::-webkit-scrollbar { width: 4px; }
+  .lp-obody::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .lm { padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.55; }
+  .lm.ai { background: var(--bg-lp-msg); color: var(--text-2); border-bottom-left-radius: 2px; }
+  .lm .ml { font-size: 8px; font-weight: 700; letter-spacing: .5px; margin-bottom: 3px; color: var(--green); }
+  .la-item { display: flex; align-items: baseline; gap: 5px; padding: 2px 0; font-size: 11px; }
+  .la-f { color: var(--text-2); min-width: 90px; }
+  .la-p { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+  .la-p.neg { color: var(--red); }
+  .la-p.pos { color: var(--green); }
+  .la-p.neu { color: var(--text-m); }
+  .la-r { color: var(--text-m); font-size: 10px; font-style: italic; }
+  .la-bar { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+  .la-a { font-size: 9px; padding: 3px 8px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); cursor: pointer; font-family: inherit; }
+  .la-a:hover { border-color: var(--green); color: var(--green); }
+  .la-a.pri { background: rgba(52,211,153,.1); border-color: var(--green); color: var(--green); }
+  .la-box { margin-top:8px; padding:7px; background:rgba(52,211,153,.04); border-radius:5px; border:1px solid rgba(52,211,153,.12); }
+  .la-box-total { border-top:1px solid var(--border);margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;font-weight:700;font-size:11px; }
+  .lp-oinput { padding: 8px 12px; border-top: 1px solid var(--border); display: flex; gap: 5px; flex-shrink: 0; background: var(--bg-hdr); }
+  .lp-oinput textarea { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 5px; padding: 6px 9px; color: var(--text-1); font-size: 11px; font-family: inherit; outline: none; resize: none; min-height: 30px; }
+  .lp-oinput textarea:focus { border-color: var(--blue); }
+  .lp-oinput textarea::placeholder { color: var(--text-m); }
+  .lp-osend { background: var(--green); border: none; color: #fff; width: 30px; height: 30px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .lp-osend:hover { filter: brightness(1.1); }
+</style>
+</head>
+<body>
+
+<div class="modal">
+
+  <!-- Header -->
+  <div class="hdr">
+    <h2>Reveal Playa Vista</h2>
+    <span class="badge-c">Comp 1</span>
+    <span class="badge-t">Multifamily</span>
+    <button class="x-btn"><i class="fas fa-times"></i></button>
+  </div>
+
+  <!-- Map — full width, 280px -->
+  <div class="map-area">
+    <div class="map-canvas">
+      <div class="pin pin-subj" style="left:62%;top:55%;"><div class="pin-dot">S</div><div class="pin-label">Subject · Hawthorne</div></div>
+      <div class="pin pin-comp" style="left:30%;top:30%;"><div class="pin-dot">1</div><div class="pin-label">Comp 1 · Playa Vista</div></div>
+      <div class="pin-line" style="left:33%;top:40%;width:210px;transform:rotate(18deg);"></div>
+      <div class="dist-label" style="left:42%;top:26%;">4.2 mi NW</div>
+    </div>
+  </div>
+
+  <!-- Address -->
+  <div class="addr-bar">
+    <div class="addr-g"><label>Property Name</label><input type="text" value="Reveal Playa Vista"></div>
+    <div class="addr-g"><label>Address</label><input type="text" value="5710 Crescent Park East"></div>
+    <div class="addr-g"><label>City</label><input type="text" value="Playa Vista"></div>
+    <div class="addr-g"><label>State</label><input type="text" value="CA"></div>
+    <div class="addr-g"><label>Zip</label><input type="text" value="90094"></div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi">
+    <div class="kpi-i"><div class="kpi-l">Sale Price</div><div class="kpi-v">$122,100,000</div></div>
+    <div class="kpi-i"><div class="kpi-l">Sale Date</div><div class="kpi-v">2024-04-24</div></div>
+    <div class="kpi-i"><div class="kpi-l">$/Unit</div><div class="kpi-v">$570,561</div></div>
+    <div class="kpi-i"><div class="kpi-l">Cap Rate</div><div class="kpi-v">4.30%</div></div>
+    <div class="kpi-i"><div class="kpi-l">Net Adj</div><div class="kpi-v r">-10.0%</div></div>
+    <div class="kpi-i"><div class="kpi-l">Adj $/Unit</div><div class="kpi-v g">$513,505</div></div>
+  </div>
+
+  <!-- Body -->
+  <div class="body" id="modalBody">
+
+    <!-- ═══ Transaction ═══ -->
+    <div class="acc open">
+      <div class="acc-h open" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Transaction</span>
+        <button class="lp-btn" onclick="event.stopPropagation();showLP('lp-txn',this)"><span class="lp-dot"></span> Landscaper</button>
+        <span class="acc-s">Subtotal: 0.0% / $0</span>
+      </div>
+      <div class="acc-b">
+        <div class="fld-hdr"><span>Field</span><span style="text-align:right">Value</span><span style="text-align:right">Adj %</span><span style="text-align:right">Adj $</span><span>Notes</span></div>
+        <div class="fld">
+          <span class="fld-label">Sale Date</span>
+          <input type="date" value="2024-04-24" style="text-align:left;">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="fld">
+          <span class="fld-label">Sale Price</span>
+          <div class="inp-pfx"><span class="pfx">$</span><input type="text" value="122,100,000" style="text-align:left;"></div>
+          <span></span><span></span><span></span>
+        </div>
+        <div class="fld">
+          <span class="fld-label">Property Rights</span>
+          <select><option selected>Fee Simple</option><option>Leased Fee</option><option>Leasehold</option><option>Partial Interest</option></select>
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Financing</span>
+          <select><option selected>Conventional</option><option>Seller Financing</option><option>Assumed Debt</option><option>Cash</option></select>
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Sale Conditions</span>
+          <select><option selected>Arms Length</option><option>Short Sale</option><option>Auction</option><option>Foreclosure</option><option>1031 Exchange</option><option>Related Party</option></select>
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Market Conditions</span>
+          <div class="calc-d">Apr 2024 → Present <span class="calc-b">auto</span></div>
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="time adjustment...">
+        </div>
+        <div class="fld-total"><span class="fld-label">Subtotal</span><span></span><span class="adj-amt neu" style="text-align:right;">0.0%</span><span class="adj-amt neu">$0</span><span></span></div>
+      </div>
+    </div>
+
+    <!-- ═══ Property ═══ -->
+    <div class="acc open">
+      <div class="acc-h open" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Property</span>
+        <button class="lp-btn" onclick="event.stopPropagation();showLP('lp-prop',this)"><span class="lp-dot"></span> Landscaper</button>
+        <span class="acc-s">Subtotal: -10.0% / -$57,056</span>
+      </div>
+      <div class="acc-b">
+        <div class="fld-hdr"><span>Field</span><span style="text-align:right">Value</span><span style="text-align:right">Adj %</span><span style="text-align:right">Adj $</span><span>Notes</span></div>
+        <div class="fld">
+          <span class="fld-label">Location</span>
+          <div class="calc-d">Playa Vista → Hawthorne <span class="calc-b">vs subj</span></div>
+          <input class="adj-pct" value="-5.0%">
+          <span class="adj-amt neg">-$28,528</span>
+          <input class="adj-note" value="Premium coastal-adjacent location">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Year Built</span>
+          <input type="number" value="2003">
+          <input class="adj-pct" value="-3.0%">
+          <span class="adj-amt neg">-$17,117</span>
+          <input class="adj-note" value="Older vintage (2003 vs 2016)">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Units</span>
+          <input type="number" value="214">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Bldg SF</span>
+          <input type="text" value="220,337">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Stories</span>
+          <input type="number" value="4">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Lot Size (Acres)</span>
+          <input type="number" value="3.59" step="0.01">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Lot Size (SF)</span>
+          <div class="calc-d">156,376 <span class="calc-b">calc</span></div>
+          <span></span><span></span><span></span>
+        </div>
+        <div class="fld">
+          <span class="fld-label">Parking Spaces</span>
+          <input type="text" value="428">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="fld">
+          <span class="fld-label">Parking Ratio</span>
+          <div class="calc-d">2.00 / unit <span class="calc-b">calc</span></div>
+          <span></span><span></span><span></span>
+        </div>
+        <div class="fld">
+          <span class="fld-label">Unit Mix</span>
+          <div class="calc-d">No 3BR → Has 3BR <span class="calc-b">vs subj</span></div>
+          <input class="adj-pct" value="-2.0%">
+          <span class="adj-amt neg">-$11,411</span>
+          <input class="adj-note" value="No 3BR units">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Quality</span>
+          <input type="text" value="" placeholder="Description..." style="text-align:left;">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld">
+          <span class="fld-label">Other</span>
+          <input type="text" value="" placeholder="Description..." style="text-align:left;">
+          <input class="adj-pct" value="0.0%">
+          <span class="adj-amt neu">$0</span>
+          <input class="adj-note" placeholder="rationale...">
+        </div>
+        <div class="fld-total"><span class="fld-label">Subtotal</span><span></span><span class="adj-amt neg" style="text-align:right;">-10.0%</span><span class="adj-amt neg">-$57,056</span><span></span></div>
+        <div class="mstrip">
+          <div class="mstrip-i"><div class="mstrip-l">$/Unit</div><div class="mstrip-v">$570,561</div></div>
+          <div class="mstrip-i"><div class="mstrip-l">$/SF</div><div class="mstrip-v">$554</div></div>
+          <div class="mstrip-i"><div class="mstrip-l">Cap Rate</div><div class="mstrip-v">4.30%</div></div>
+          <div class="mstrip-i"><div class="mstrip-l">GRM</div><div class="mstrip-v">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Net Adj Bar -->
+    <div class="net-bar">
+      <div class="nb-i"><span class="nb-l">Transaction</span><span class="nb-v" style="color:var(--text-m);">0.0%</span></div>
+      <div class="nb-i"><span class="nb-l">Property</span><span class="nb-v" style="color:var(--red);">-10.0%</span></div>
+      <div class="nb-i"><span class="nb-l">Net</span><span class="nb-v" style="color:var(--red);">-10.0% / -$57,056</span></div>
+      <div style="margin-left:auto;" class="nb-i"><span class="nb-l">Adj $/Unit</span><span class="nb-v" style="color:var(--green);font-size:14px;">$513,505</span></div>
+    </div>
+
+    <!-- ═══ Unit Mix ═══ -->
+    <div class="acc open">
+      <div class="acc-h open" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Unit Mix</span>
+        <button class="lp-btn" onclick="event.stopPropagation();showLP('lp-umix',this)"><span class="lp-dot"></span> Landscaper</button>
+        <span class="acc-s">214 units · 2 types</span>
+      </div>
+      <div class="acc-b">
+        <table class="umt">
+          <thead><tr><th>Type</th><th class="r">Beds</th><th class="r">Baths</th><th class="r">#</th><th class="r">%</th><th class="r">Avg SF</th><th class="r">Rent Range</th><th class="r">$/SF</th><th class="r">Vacant</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>1BR/1BA</td><td class="r">1</td><td class="r">1.0</td><td class="r">117</td><td class="r m">54.7%</td><td class="r">750</td><td class="r">$2,100–$2,450</td><td class="r m">$3.03</td><td class="r">3</td><td><span class="del-r"><i class="fas fa-times"></i></span></td></tr>
+            <tr><td>2BR/2BA</td><td class="r">2</td><td class="r">2.0</td><td class="r">97</td><td class="r m">45.3%</td><td class="r">1,035</td><td class="r">$2,800–$3,200</td><td class="r m">$2.90</td><td class="r">2</td><td><span class="del-r"><i class="fas fa-times"></i></span></td></tr>
+            <tr class="tot"><td>Totals</td><td class="r">—</td><td class="r">—</td><td class="r">214</td><td class="r">100%</td><td class="r">879</td><td class="r">$2,100–$3,200</td><td class="r">$2.97</td><td class="r">5</td><td></td></tr>
+          </tbody>
+        </table>
+        <button class="add-b"><i class="fas fa-plus"></i> Add Unit Type</button>
+      </div>
+    </div>
+
+    <!-- ═══ Contacts & Verification ═══ -->
+    <div class="acc open">
+      <div class="acc-h open" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Contacts & Verification</span>
+        <span class="acc-s">6 contacts</span>
+      </div>
+      <div class="acc-b">
+        <table class="ctbl">
+          <thead><tr><th>Role</th><th>Name</th><th>Company</th><th>Phone</th><th>Email</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="role-badge role-sell-broker">Selling Broker</span></td>
+              <td><input type="text" value="James Chen"></td>
+              <td><input type="text" value="CBRE"></td>
+              <td><input type="text" value="(310) 555-0142"></td>
+              <td><input type="text" value="james.chen@cbre.com"></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-buy-broker">Buying Broker</span></td>
+              <td><input type="text" value="Maria Santos"></td>
+              <td><input type="text" value="Eastdil Secured"></td>
+              <td><input type="text" value="(310) 555-0287"></td>
+              <td><input type="text" value="msantos@eastdil.com"></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-buyer">Buyer</span></td>
+              <td><input type="text" value="Pacific Coast Capital"></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-true-buyer">True Buyer</span></td>
+              <td><input type="text" value="Starwood REIT"></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-seller">Seller</span></td>
+              <td><input type="text" value="Greystone Capital"></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge role-true-seller">True Seller</span></td>
+              <td><input type="text" value="Greystone Fund III LLC"></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+              <td><input type="text" value=""></td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="add-b" style="margin-top:5px;"><i class="fas fa-plus"></i> Add Contact</button>
+        <div class="verif-row">
+          <label>Confirmed By</label>
+          <select>
+            <option value="">Select source...</option>
+            <option selected>James Chen — Selling Broker (CBRE)</option>
+            <option>Maria Santos — Buying Broker (Eastdil)</option>
+            <option>Pacific Coast Capital — Buyer</option>
+            <option>Greystone Capital — Seller</option>
+            <option>Public Records</option>
+          </select>
+          <input type="date" value="2024-05-12" style="text-align:left;">
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Sale History ═══ -->
+    <div class="acc">
+      <div class="acc-h" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Sale History</span>
+        <span class="acc-s">2 prior sales</span>
+      </div>
+      <div class="acc-b">
+        <table class="htbl">
+          <thead><tr><th>Date</th><th>Price</th><th>$/Unit</th><th>Buyer</th><th>Seller</th></tr></thead>
+          <tbody>
+            <tr><td>2019-06-15</td><td>$98,500,000</td><td>$460,280</td><td>Greystone Capital</td><td>Lincoln Properties</td></tr>
+            <tr><td>2004-03-20</td><td>$42,000,000</td><td>$196,262</td><td>Lincoln Properties</td><td>Original Developer</td></tr>
+          </tbody>
+        </table>
+        <button class="add-b" style="margin-top:5px;"><i class="fas fa-plus"></i> Add Prior Sale</button>
+      </div>
+    </div>
+
+    <!-- ═══ Documents & Photos ═══ -->
+    <div class="acc">
+      <div class="acc-h" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Documents & Photos</span>
+        <span class="acc-s">0 files</span>
+      </div>
+      <div class="acc-b">
+        <div style="text-align:center;padding:16px;color:var(--text-m);border:2px dashed var(--border);border-radius:6px;">
+          <i class="fas fa-cloud-upload-alt" style="font-size:18px;margin-bottom:4px;display:block;"></i>
+          <div style="font-size:11px;">Drop files or click to upload</div>
+          <div style="font-size:10px;margin-top:3px;color:var(--blue);cursor:pointer;">Select from DMS →</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Notes ═══ -->
+    <div class="acc">
+      <div class="acc-h" onclick="tog(this)">
+        <i class="fas fa-chevron-right chv"></i>
+        <span class="acc-t">Notes</span>
+      </div>
+      <div class="acc-b">
+        <textarea style="width:100%;min-height:50px;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;padding:7px;color:var(--text-1);font-size:12px;font-family:inherit;resize:vertical;">Premium Playa Vista location, older vintage (2003) but well-maintained.</textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Landscaper overlays -->
+  <div class="lp-overlay" id="lp-txn">
+    <div class="lp-oh"><div class="lp-icon"><i class="fas fa-seedling"></i></div><span class="lp-otitle">Landscaper</span><span class="lp-octx">Transaction</span><button class="lp-oclose" onclick="hideLP()"><i class="fas fa-times"></i></button></div>
+    <div class="lp-obody">
+      <div class="lm ai">
+        <div class="ml">Landscaper</div>
+        <strong>Transaction Analysis — Comp 1</strong><br><br>
+        All transaction terms appear market-standard. One adjustment recommended:
+        <div class="la-box">
+          <div class="la-item"><span class="la-f">Property Rights</span><span class="la-p neu">0.0%</span><span class="la-r">Both Fee Simple</span></div>
+          <div class="la-item"><span class="la-f">Financing</span><span class="la-p neu">0.0%</span><span class="la-r">Conventional — market rate</span></div>
+          <div class="la-item"><span class="la-f">Sale Conditions</span><span class="la-p neu">0.0%</span><span class="la-r">Arms length confirmed by broker</span></div>
+          <div class="la-item"><span class="la-f">Market Cond.</span><span class="la-p pos">+2.0%</span><span class="la-r">10mo elapsed; LA MF values +2.4% YoY</span></div>
+          <div class="la-box-total"><span style="color:var(--text-2);">Subtotal</span><span style="color:var(--green);">+2.0% / +$11,411</span></div>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text-m);">Cap rates compressed ~15bps since sale date. CoStar LA MF index supports the time adjustment.</div>
+      </div>
+      <div class="la-bar">
+        <button class="la-a pri" onclick="hideLP()">Apply adjustments</button>
+        <button class="la-a">Explain market conditions</button>
+        <button class="la-a">Find supporting data</button>
+      </div>
+    </div>
+    <div class="lp-oinput"><textarea placeholder="Ask about transaction..."></textarea><button class="lp-osend"><i class="fas fa-paper-plane" style="font-size:10px;"></i></button></div>
+  </div>
+
+  <div class="lp-overlay" id="lp-prop">
+    <div class="lp-oh"><div class="lp-icon"><i class="fas fa-seedling"></i></div><span class="lp-otitle">Landscaper</span><span class="lp-octx">Property</span><button class="lp-oclose" onclick="hideLP()"><i class="fas fa-times"></i></button></div>
+    <div class="lp-obody">
+      <div class="lm ai">
+        <div class="ml">Landscaper</div>
+        <strong>Physical Analysis — Comp 1 vs Subject</strong><br><br>
+        <div class="la-box">
+          <div class="la-item"><span class="la-f">Location</span><span class="la-p neg">-5.0%</span><span class="la-r">Playa Vista rent $3.50/SF vs Hawthorne $2.80</span></div>
+          <div class="la-item"><span class="la-f">Age/Condition</span><span class="la-p neg">-3.0%</span><span class="la-r">21yr vs 8yr — well-maintained but dated</span></div>
+          <div class="la-item"><span class="la-f">Size (Units)</span><span class="la-p neu">0.0%</span><span class="la-r">214 vs 113 — both institutional scale</span></div>
+          <div class="la-item"><span class="la-f">Unit Mix</span><span class="la-p neg">-2.0%</span><span class="la-r">No 3BR — subject 3BR at $3,800/mo premium</span></div>
+          <div class="la-item"><span class="la-f">Stories</span><span class="la-p neu">0.0%</span><span class="la-r">4 stories — comparable</span></div>
+          <div class="la-item"><span class="la-f">Lot Size</span><span class="la-p neu">0.0%</span><span class="la-r">Proportional to unit count</span></div>
+          <div class="la-box-total"><span style="color:var(--text-2);">Subtotal</span><span style="color:var(--red);">-10.0% / -$57,056</span></div>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--text-m);">The -5% location may be conservative. Playa Vista commands 25% rent premium. Consider -7% for heavier rent weighting.</div>
+      </div>
+      <div class="la-bar">
+        <button class="la-a pri" onclick="hideLP()">Apply adjustments</button>
+        <button class="la-a">Increase location to -7%</button>
+        <button class="la-a">Pull rent comp data</button>
+        <button class="la-a">Draft narrative</button>
+      </div>
+    </div>
+    <div class="lp-oinput"><textarea placeholder="Ask about physical adjustments..."></textarea><button class="lp-osend"><i class="fas fa-paper-plane" style="font-size:10px;"></i></button></div>
+  </div>
+
+  <div class="lp-overlay" id="lp-umix">
+    <div class="lp-oh"><div class="lp-icon"><i class="fas fa-seedling"></i></div><span class="lp-otitle">Landscaper</span><span class="lp-octx">Unit Mix</span><button class="lp-oclose" onclick="hideLP()"><i class="fas fa-times"></i></button></div>
+    <div class="lp-obody">
+      <div class="lm ai">
+        <div class="ml">Landscaper</div>
+        <strong>Unit Mix Comparison</strong><br><br>
+        <strong>Comp:</strong> 55% 1BR, 45% 2BR, 0% 3BR<br>
+        <strong>Subject:</strong> 35% 1BR, 40% 2BR, 25% 3BR<br><br>
+        The 3BR absence is the key differentiator. Subject 3BR units average $3,800/mo vs $2,250 for 1BR — a 69% premium. Comp's revenue mix skews lower.<br><br>
+        <span style="font-size:10px;color:var(--text-m);">Rent data consistent with Q1 2024 CoStar Playa Vista MF averages.</span>
+      </div>
+      <div class="la-bar">
+        <button class="la-a">Compare rent/SF by type</button>
+        <button class="la-a">Pull market rents</button>
+      </div>
+    </div>
+    <div class="lp-oinput"><textarea placeholder="Ask about unit mix..."></textarea><button class="lp-osend"><i class="fas fa-paper-plane" style="font-size:10px;"></i></button></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="ftr">
+    <button class="btn btn-d">Delete</button>
+    <span class="sp"></span>
+    <button class="btn btn-g">Cancel</button>
+    <button class="btn btn-p">Save & Close</button>
+  </div>
+
+</div>
+
+<script>
+function tog(h) { h.closest('.acc').classList.toggle('open'); h.classList.toggle('open'); }
+
+function showLP(id, btnEl) {
+  document.querySelectorAll('.lp-overlay').forEach(p => p.classList.remove('show'));
+  const overlay = document.getElementById(id);
+  const body = document.getElementById('modalBody');
+  const bodyRect = body.getBoundingClientRect();
+  const btnRect = btnEl.getBoundingClientRect();
+  const topOffset = btnRect.top - bodyRect.top + body.scrollTop - 10;
+  overlay.style.top = Math.max(10, Math.min(topOffset, body.scrollHeight - 470)) + 'px';
+  overlay.classList.add('show');
+}
+
+function hideLP() { document.querySelectorAll('.lp-overlay').forEach(p => p.classList.remove('show')); }
+</script>
+
+</body>
+</html>

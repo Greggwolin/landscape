@@ -101,6 +101,8 @@ def _calculate_property_data_score(project_id: int) -> Dict[str, Any]:
                 project_name,
                 project_type_code,
                 analysis_type,
+                analysis_perspective,
+                analysis_purpose,
                 acres_gross,
                 project_address,
                 jurisdiction_city,
@@ -121,11 +123,13 @@ def _calculate_property_data_score(project_id: int) -> Dict[str, Any]:
             'project_name': row[0],
             'project_type_code': row[1],
             'analysis_type': row[2],
-            'acres_gross': row[3],
-            'project_address': row[4],
-            'jurisdiction_city': row[5],
-            'jurisdiction_state': row[6],
-            'location': row[7] is not None and row[8] is not None,
+            'analysis_perspective': row[3],
+            'analysis_purpose': row[4],
+            'acres_gross': row[5],
+            'project_address': row[6],
+            'jurisdiction_city': row[7],
+            'jurisdiction_state': row[8],
+            'location': row[9] is not None and row[10] is not None,
         }
 
         filled = sum(1 for v in fields.values() if v)

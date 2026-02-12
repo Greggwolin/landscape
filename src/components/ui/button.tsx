@@ -1,52 +1,49 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
+'use client';
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline: "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+import React from 'react';
+import { CButton } from '@coreui/react';
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+type Variant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+type Size = 'default' | 'sm' | 'lg' | 'icon';
+
+export interface ButtonProps extends React.ComponentPropsWithoutRef<typeof CButton> {
+  variant?: Variant;
+  size?: Size;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+const colorForVariant: Record<Variant, string> = {
+  default: 'primary',
+  destructive: 'danger',
+  outline: 'secondary',
+  secondary: 'secondary',
+  ghost: 'secondary',
+  link: 'link',
+};
+
+const classForSize: Record<Size, string | undefined> = {
+  default: undefined,
+  sm: 'btn-sm',
+  lg: 'btn-lg',
+  icon: 'p-1',
+};
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'default', size = 'default', className, ...props }, ref) => {
+    const coreColor = colorForVariant[variant] || 'primary';
+    const coreVariant = variant === 'outline' ? 'outline' : undefined;
+    const extraClass = [classForSize[size], className].filter(Boolean).join(' ');
+
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+      <CButton
         ref={ref}
+        color={coreColor}
+        variant={coreVariant}
+        className={extraClass || undefined}
         {...props}
       />
-    )
+    );
   }
-)
-Button.displayName = "Button"
+);
 
-export { Button, buttonVariants }
+Button.displayName = 'Button';
+

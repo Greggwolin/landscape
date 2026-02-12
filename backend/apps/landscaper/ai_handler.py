@@ -4550,11 +4550,24 @@ LANDSCAPER_TOOLS.append(ALPHA_FEEDBACK_TOOL)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def get_tools_for_context(page_context: Optional[str] = None) -> List[Dict]:
+def get_tools_for_context(
+    page_context: Optional[str] = None,
+    project_type_code: Optional[str] = None,
+    project_type: Optional[str] = None,
+    analysis_perspective: Optional[str] = None,
+    analysis_purpose: Optional[str] = None,
+) -> List[Dict]:
     """
     Legacy helper for backend services that still rely on the old context enum.
     """
-    effective_context = normalize_page_context(page_context, subtab_context=None)
+    effective_context = normalize_page_context(
+        page_context,
+        project_type_code=project_type_code,
+        project_type=project_type,
+        analysis_perspective=analysis_perspective,
+        analysis_purpose=analysis_purpose,
+        subtab_context=None,
+    )
     tool_names = get_tools_for_page(effective_context)
     filtered_tools = [
         tool for tool in LANDSCAPER_TOOLS
@@ -5188,7 +5201,9 @@ def get_landscaper_response(
         normalized_context = normalize_page_context(
             page_context,
             project_type_code=project_context.get('project_type_code'),
-            project_type=project_context.get('project_type')
+            project_type=project_context.get('project_type'),
+            analysis_perspective=project_context.get('analysis_perspective'),
+            analysis_purpose=project_context.get('analysis_purpose'),
         )
 
         if tool_executor:

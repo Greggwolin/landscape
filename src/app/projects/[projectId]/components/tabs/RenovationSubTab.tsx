@@ -7,7 +7,7 @@
  * Uses the existing ValueAddCard component with the useValueAddAssumptions hook.
  * Shows the Rental Income section below for real-time revenue preview.
  *
- * This component is only visible when analysis_type === 'VALUE_ADD'.
+ * This component is only visible when value_add_enabled is true.
  *
  * @version 1.1
  * @created 2026-02-01

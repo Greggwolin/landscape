@@ -179,9 +179,11 @@ class LoanSizingService:
         rate_pct = _to_decimal(getattr(loan, "interest_rate_pct", None))
         inflator = _to_decimal(getattr(loan, "interest_reserve_inflator", None), default=Decimal("1"))
         io_months = int(getattr(loan, "interest_only_months", 0) or 0)
-        analysis_type = (getattr(project, "analysis_type", "") or "").upper()
+        perspective = (getattr(project, "analysis_perspective", "") or "").upper()
+        purpose = (getattr(project, "analysis_purpose", "") or "").upper()
 
-        if analysis_type in {"INVESTMENT", "VALUATION"}:
+        # Income-property style reserve behavior applies to INVESTMENT perspective.
+        if perspective == "INVESTMENT":
             reserve_months = 0
         else:
             reserve_months = io_months if io_months > 0 else 12
@@ -196,6 +198,8 @@ class LoanSizingService:
                 "reserve_months": reserve_months,
                 "inflator": float(inflator),
                 "method": "TERM_IO_PERIOD",
+                "analysis_perspective": perspective or None,
+                "analysis_purpose": purpose or None,
             },
         }
 

@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext'
 
 interface AnalysisTypeTileConfig {
   analysis_type: string
+  analysis_perspective?: string | null
+  analysis_purpose?: string | null
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -31,6 +33,9 @@ interface ProjectSummary {
   project_type?: string | null
   is_active?: boolean
   analysis_type?: string | null
+  analysis_perspective?: string | null
+  analysis_purpose?: string | null
+  value_add_enabled?: boolean
   property_subtype?: string | null
   property_class?: string | null
   analysis_mode?: 'napkin' | 'developer' | null

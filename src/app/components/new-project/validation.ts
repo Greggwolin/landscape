@@ -1,8 +1,12 @@
 import { z } from 'zod'
 import type { NewProjectFormData } from './types'
 
-// New orthogonal analysis type (what the user is doing)
+import { deriveLegacyAnalysisType } from '@/types/project-taxonomy'
+
+// Legacy bridge field (derived from perspective + purpose)
 const analysisTypeEnum = z.enum(['VALUATION', 'INVESTMENT', 'VALUE_ADD', 'DEVELOPMENT', 'FEASIBILITY'])
+const analysisPerspectiveEnum = z.enum(['INVESTMENT', 'DEVELOPMENT'])
+const analysisPurposeEnum = z.enum(['VALUATION', 'UNDERWRITING'])
 // Property category (what the asset is) - cascades to property_subtype
 const propertyCategoryEnum = z.enum(['Land Development', 'Income Property'])
 const developmentTypeEnum = propertyCategoryEnum // backwards compatibility
@@ -15,7 +19,10 @@ const optionalString = (message?: string) =>
 
 export const newProjectSchema = z.object({
   // Asset classification (two orthogonal dimensions)
-  analysis_type: analysisTypeEnum, // What the user is doing
+  analysis_type: analysisTypeEnum.optional().or(z.literal('')),
+  analysis_perspective: analysisPerspectiveEnum.optional().or(z.literal('')),
+  analysis_purpose: analysisPurposeEnum.optional().or(z.literal('')),
+  value_add_enabled: z.boolean().default(false),
   property_category: propertyCategoryEnum.optional().or(z.literal('')), // What the asset is
   property_subtype: optionalString(), // Cascades from property_category
   property_class: optionalString(), // Income Property only
@@ -58,6 +65,45 @@ export const newProjectSchema = z.object({
   path_choice: z.enum(['immediate', 'extended_wizard', 'ai_extraction']).optional().or(z.literal(''))
 })
   .superRefine((data, ctx) => {
+    if (!data.analysis_perspective) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Analysis perspective is required',
+        path: ['analysis_perspective']
+      })
+    }
+
+    if (!data.analysis_purpose) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Analysis purpose is required',
+        path: ['analysis_purpose']
+      })
+    }
+
+    if (data.analysis_perspective === 'DEVELOPMENT' && data.value_add_enabled) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Value-add is only available for Investment perspective',
+        path: ['value_add_enabled']
+      })
+    }
+
+    if (data.analysis_perspective && data.analysis_purpose && !data.analysis_type) {
+      const derivedLegacyType = deriveLegacyAnalysisType(
+        data.analysis_perspective,
+        data.analysis_purpose,
+        data.value_add_enabled
+      )
+      if (!derivedLegacyType) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Unable to derive legacy analysis type',
+          path: ['analysis_type']
+        })
+      }
+    }
+
     const hasAddress =
       data.location_mode === 'address' &&
       data.street_address &&
@@ -172,7 +218,10 @@ export type NewProjectSchema = z.infer<typeof newProjectSchema>
 
 export const emptyFormDefaults: NewProjectFormData = {
   // Asset classification (two orthogonal dimensions)
-  analysis_type: '', // What the user is doing
+  analysis_type: '',
+  analysis_perspective: '',
+  analysis_purpose: '',
+  value_add_enabled: false,
   property_category: '', // What the asset is
   property_subtype: '', // Cascades from property_category
   property_class: '', // Income Property only

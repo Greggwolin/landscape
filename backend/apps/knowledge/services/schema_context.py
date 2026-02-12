@@ -64,6 +64,8 @@ def _get_project_info(project_id: int) -> Optional[Dict[str, Any]]:
                 project_name,
                 project_type_code,
                 analysis_type,
+                analysis_perspective,
+                analysis_purpose,
                 acres_gross,
                 project_address,
                 jurisdiction_city,
@@ -85,15 +87,17 @@ def _get_project_info(project_id: int) -> Optional[Dict[str, Any]]:
             'project_name': row[0],
             'project_type_code': row[1],
             'analysis_type': row[2],
-            'acres_gross': row[3],
-            'project_address': row[4],
-            'city': row[5],
-            'county': row[6],
-            'state': row[7],
-            'target_units': row[8],
-            'price_range_low': row[9],
-            'price_range_high': row[10],
-            'analysis_mode': row[11],
+            'analysis_perspective': row[3],
+            'analysis_purpose': row[4],
+            'acres_gross': row[5],
+            'project_address': row[6],
+            'city': row[7],
+            'county': row[8],
+            'state': row[9],
+            'target_units': row[10],
+            'price_range_low': row[11],
+            'price_range_high': row[12],
+            'analysis_mode': row[13],
         }
 
 
@@ -202,6 +206,10 @@ def _format_project_info(info: Dict[str, Any]) -> str:
         lines.append(f"  Type: {info['project_type_code']}")
     if info.get('analysis_type'):
         lines.append(f"  Analysis: {info['analysis_type']}")
+    if info.get('analysis_perspective'):
+        lines.append(f"  Perspective: {info['analysis_perspective']}")
+    if info.get('analysis_purpose'):
+        lines.append(f"  Purpose: {info['analysis_purpose']}")
     if info.get('analysis_mode'):
         lines.append(f"  Mode: {info['analysis_mode']}")
 

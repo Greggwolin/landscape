@@ -49,6 +49,97 @@ export const ANALYSIS_TYPE_DESCRIPTIONS: Record<AnalysisType, string> = {
 };
 
 // ============================================================================
+// New Taxonomy Dimensions (Perspective + Purpose)
+// ============================================================================
+
+export type AnalysisPerspective = 'INVESTMENT' | 'DEVELOPMENT';
+export type AnalysisPurpose = 'VALUATION' | 'UNDERWRITING';
+
+export const ANALYSIS_PERSPECTIVES: readonly AnalysisPerspective[] = [
+  'INVESTMENT',
+  'DEVELOPMENT',
+] as const;
+
+export const ANALYSIS_PURPOSES: readonly AnalysisPurpose[] = [
+  'VALUATION',
+  'UNDERWRITING',
+] as const;
+
+export const PERSPECTIVE_LABELS: Record<AnalysisPerspective, string> = {
+  INVESTMENT: 'Investment',
+  DEVELOPMENT: 'Development',
+};
+
+export const PURPOSE_LABELS: Record<AnalysisPurpose, string> = {
+  VALUATION: 'Valuation',
+  UNDERWRITING: 'Underwriting',
+};
+
+export interface AnalysisDimensions {
+  analysis_perspective: AnalysisPerspective;
+  analysis_purpose: AnalysisPurpose;
+  value_add_enabled: boolean;
+}
+
+/**
+ * Map legacy analysis_type values to new dimensions.
+ */
+export function deriveDimensionsFromAnalysisType(analysisType?: string | null): AnalysisDimensions {
+  const normalized = analysisType?.toUpperCase().trim();
+
+  switch (normalized) {
+    case 'DEVELOPMENT':
+    case 'FEASIBILITY':
+      return {
+        analysis_perspective: 'DEVELOPMENT',
+        analysis_purpose: 'UNDERWRITING',
+        value_add_enabled: false,
+      };
+    case 'VALUATION':
+      return {
+        analysis_perspective: 'INVESTMENT',
+        analysis_purpose: 'VALUATION',
+        value_add_enabled: false,
+      };
+    case 'VALUE_ADD':
+      return {
+        analysis_perspective: 'INVESTMENT',
+        analysis_purpose: 'UNDERWRITING',
+        value_add_enabled: true,
+      };
+    case 'INVESTMENT':
+    default:
+      return {
+        analysis_perspective: 'INVESTMENT',
+        analysis_purpose: 'UNDERWRITING',
+        value_add_enabled: false,
+      };
+  }
+}
+
+/**
+ * Derive legacy analysis_type from new dimensions for backward compatibility.
+ * Per migration bridge policy:
+ * - DEVELOPMENT + VALUATION maps to DEVELOPMENT (closest legacy equivalent).
+ */
+export function deriveLegacyAnalysisType(
+  analysisPerspective?: AnalysisPerspective | null,
+  analysisPurpose?: AnalysisPurpose | null,
+  valueAddEnabled: boolean = false
+): AnalysisType {
+  if (analysisPerspective === 'DEVELOPMENT') {
+    return 'DEVELOPMENT';
+  }
+  if (analysisPerspective === 'INVESTMENT' && analysisPurpose === 'VALUATION') {
+    return 'VALUATION';
+  }
+  if (analysisPerspective === 'INVESTMENT' && analysisPurpose === 'UNDERWRITING') {
+    return valueAddEnabled ? 'VALUE_ADD' : 'INVESTMENT';
+  }
+  return 'INVESTMENT';
+}
+
+// ============================================================================
 // Property Category (Top Level - What the asset is)
 // ============================================================================
 

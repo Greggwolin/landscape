@@ -4,7 +4,12 @@
  * Type definitions for project profile metadata displayed in the Project Profile tile
  */
 
-import type { AnalysisType, PropertyClass } from './project-taxonomy';
+import type {
+  AnalysisPurpose,
+  AnalysisPerspective,
+  AnalysisType,
+  PropertyClass,
+} from './project-taxonomy';
 
 // ============================================================================
 // Core Types
@@ -14,6 +19,9 @@ export interface ProjectProfile {
   project_id: number;
   project_name: string;
   analysis_type?: AnalysisType;
+  analysis_perspective?: AnalysisPerspective;
+  analysis_purpose?: AnalysisPurpose;
+  value_add_enabled?: boolean;
   property_subtype?: string;
   project_type?: string; // LAND, MF, OFF, etc. (legacy alias)
   project_type_code?: string; // LAND, MF, OFF, RET, IND, HTL, MXU
@@ -59,6 +67,9 @@ export interface MSA {
 export interface ProjectProfileFormData {
   project_name?: string;
   analysis_type: AnalysisType;
+  analysis_perspective?: AnalysisPerspective;
+  analysis_purpose?: AnalysisPurpose;
+  value_add_enabled?: boolean;
   property_type_code?: string; // LAND, MF, OFF, RET, IND, HTL, MXU
   property_subtype?: string;
   target_units?: number;
@@ -152,8 +163,9 @@ export function formatTargetUnits(units?: number | null): string {
  * - Operating projects: use calculated_units > total_units > target_units (fallback chain)
  */
 export function getUnitCount(profile: ProjectProfile): number | undefined {
-  const isDevelopment = profile.analysis_type === 'Land Development' ||
-                        profile.project_type === 'LAND';
+  const isDevelopment = profile.analysis_perspective === 'DEVELOPMENT' ||
+                        profile.project_type === 'LAND' ||
+                        profile.project_type_code === 'LAND';
 
   if (isDevelopment) {
     return profile.target_units;
@@ -169,8 +181,9 @@ export function getUnitCount(profile: ProjectProfile): number | undefined {
  * Get the appropriate label for the units field based on project type
  */
 export function getUnitsLabel(profile: ProjectProfile): string {
-  const isDevelopment = profile.analysis_type === 'Land Development' ||
-                        profile.project_type === 'LAND';
+  const isDevelopment = profile.analysis_perspective === 'DEVELOPMENT' ||
+                        profile.project_type === 'LAND' ||
+                        profile.project_type_code === 'LAND';
 
   return isDevelopment ? 'Target Units' : 'Units';
 }

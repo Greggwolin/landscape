@@ -14,8 +14,13 @@ import type { NewProjectFormData } from './new-project/types'
 import { emptyFormDefaults, newProjectSchema } from './new-project/validation'
 import { usePersistentForm, clearPersistedForm } from './new-project/usePersistentForm'
 import { generateProjectName } from './new-project/utils'
-import { Button } from '@/components/ui/button'
+import { CButton } from '@coreui/react'
 import { X } from 'lucide-react'
+import {
+  deriveLegacyAnalysisType,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy'
 
 type NewProjectModalProps = {
   isOpen: boolean
@@ -31,17 +36,29 @@ const getNumeric = (value: string) => {
 
 type SectionKey = 'asset' | 'configure' | 'location' | 'propertyData'
 
-// Analysis Type options (new orthogonal taxonomy - what the user is doing)
-const ANALYSIS_TYPE_OPTIONS = [
-  { value: 'VALUATION', label: 'Valuation', description: 'Market value opinion', icon: '📈' },
-  { value: 'INVESTMENT', label: 'Investment', description: 'Acquisition analysis', icon: '💰' },
-  { value: 'VALUE_ADD', label: 'Value-Add', description: 'Acquisition with renovation upside', icon: '🔧' },
-  { value: 'DEVELOPMENT', label: 'Development', description: 'Ground-up returns', icon: '🔨' },
-  { value: 'FEASIBILITY', label: 'Feasibility', description: 'Go/no-go decision', icon: '✅' }
+const ANALYSIS_PERSPECTIVE_OPTIONS: Array<{
+  value: AnalysisPerspective
+  label: string
+  description: string
+}> = [
+  { value: 'INVESTMENT', label: 'Investment', description: 'Buy, operate, and hold existing assets' },
+  { value: 'DEVELOPMENT', label: 'Development', description: 'Build, deliver, and monetize new supply' },
+]
+
+const ANALYSIS_PURPOSE_OPTIONS: Array<{
+  value: AnalysisPurpose
+  label: string
+  description: string
+}> = [
+  { value: 'VALUATION', label: 'Valuation', description: 'Estimate market value with appraisal workflows' },
+  { value: 'UNDERWRITING', label: 'Underwriting', description: 'Support go/no-go investment decisions' },
 ]
 
 const FIELD_SECTION_MAP: Record<string, SectionKey> = {
   analysis_type: 'asset',
+  analysis_perspective: 'asset',
+  analysis_purpose: 'asset',
+  value_add_enabled: 'asset',
   property_category: 'asset',
   development_type: 'asset',
   project_type_code: 'asset',
@@ -142,7 +159,9 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   } = form
 
   const formData = watch()
-  const analysisType = watch('analysis_type') // What the user is doing (VALUATION, INVESTMENT, etc.)
+  const analysisPerspective = watch('analysis_perspective')
+  const analysisPurpose = watch('analysis_purpose')
+  const valueAddEnabled = watch('value_add_enabled')
   const propertyCategory = watch('property_category') // What the asset is (Land Development, Income Property)
   const subtypeOptions = useMemo(() => {
     if (propertyCategory === 'Land Development') return LAND_SUBTYPE_OPTIONS
@@ -161,6 +180,25 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   const [invalidSections, setInvalidSections] = useState<SectionKey[]>([])
   const [extractedFieldKeys, setExtractedFieldKeys] = useState<Set<string>>(new Set())
   const [pendingDocuments, setPendingDocuments] = useState<File[]>([])
+
+  useEffect(() => {
+    if (analysisPerspective === 'DEVELOPMENT' && valueAddEnabled) {
+      setValue('value_add_enabled', false, { shouldDirty: true, shouldValidate: true })
+    }
+  }, [analysisPerspective, valueAddEnabled, setValue])
+
+  useEffect(() => {
+    if (!analysisPerspective || !analysisPurpose) {
+      setValue('analysis_type', '', { shouldDirty: false, shouldValidate: false })
+      return
+    }
+    const derivedType = deriveLegacyAnalysisType(
+      analysisPerspective,
+      analysisPurpose,
+      Boolean(valueAddEnabled)
+    )
+    setValue('analysis_type', derivedType, { shouldDirty: false, shouldValidate: false })
+  }, [analysisPerspective, analysisPurpose, valueAddEnabled, setValue])
 
   const assetSectionRef = useRef<HTMLDivElement>(null)
   const locationSectionRef = useRef<HTMLDivElement>(null)
@@ -292,20 +330,28 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         subtypeFromExtraction.current = true  // Prevent clearing property_subtype
         setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })
         updatedKeys.add('property_category')
-        // Default to INVESTMENT analysis type for income properties
-        if (!formData.analysis_type) {
-          setValue('analysis_type', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
-          updatedKeys.add('analysis_type')
+        // Default to Investment + Underwriting for income properties.
+        if (!formData.analysis_perspective) {
+          setValue('analysis_perspective', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_perspective')
+        }
+        if (!formData.analysis_purpose) {
+          setValue('analysis_purpose', 'UNDERWRITING', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_purpose')
         }
       } else if (landTypes.includes(subtype)) {
         console.log('[handleDocumentExtracted] Setting property_category to Land Development')
         subtypeFromExtraction.current = true  // Prevent clearing property_subtype
         setValue('property_category', 'Land Development', { shouldDirty: true, shouldValidate: true })
         updatedKeys.add('property_category')
-        // Default to DEVELOPMENT analysis type for land development
-        if (!formData.analysis_type) {
-          setValue('analysis_type', 'DEVELOPMENT', { shouldDirty: true, shouldValidate: true })
-          updatedKeys.add('analysis_type')
+        // Default to Development + Underwriting for land projects.
+        if (!formData.analysis_perspective) {
+          setValue('analysis_perspective', 'DEVELOPMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_perspective')
+        }
+        if (!formData.analysis_purpose) {
+          setValue('analysis_purpose', 'UNDERWRITING', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_purpose')
         }
       }
     } else if (fields.total_units?.value) {
@@ -316,10 +362,13 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         subtypeFromExtraction.current = true  // Prevent clearing property_subtype
         setValue('property_category', 'Income Property', { shouldDirty: true, shouldValidate: true })
         updatedKeys.add('property_category')
-        // Default to INVESTMENT analysis type for income properties
-        if (!formData.analysis_type) {
-          setValue('analysis_type', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
-          updatedKeys.add('analysis_type')
+        if (!formData.analysis_perspective) {
+          setValue('analysis_perspective', 'INVESTMENT', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_perspective')
+        }
+        if (!formData.analysis_purpose) {
+          setValue('analysis_purpose', 'UNDERWRITING', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('analysis_purpose')
         }
       }
     }
@@ -787,9 +836,16 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         return subtypeMap[data.property_subtype || ''] || 'MF'
       }
       const projectTypeCode = getProjectTypeCode()
+      const perspective = data.analysis_perspective as AnalysisPerspective
+      const purpose = data.analysis_purpose as AnalysisPurpose
+      const valueAdd = perspective === 'INVESTMENT' ? Boolean(data.value_add_enabled) : false
+      const legacyAnalysisType = deriveLegacyAnalysisType(perspective, purpose, valueAdd)
       const payload = {
         project_name: projectName,
-        analysis_type: data.analysis_type, // New orthogonal value (VALUATION, INVESTMENT, etc.)
+        analysis_type: legacyAnalysisType,
+        analysis_perspective: perspective,
+        analysis_purpose: purpose,
+        value_add_enabled: valueAdd,
         property_subtype: data.property_subtype || undefined,
         property_class: data.property_class || undefined,
         development_type: data.property_category, // Backwards compatibility
@@ -891,8 +947,8 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
           maxWidth: '80rem',
           borderRadius: 'var(--cui-card-border-radius)',
           borderColor: 'var(--cui-border-color)',
-          backgroundColor: '#ffffff',
-          color: '#0f172a',
+          backgroundColor: 'var(--cui-body-bg)',
+          color: 'var(--cui-body-color)',
           boxShadow: 'var(--cui-box-shadow-lg)',
         }}
       >
@@ -926,40 +982,86 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
             style={{ flexBasis: '60%' }}
           >
             <div className="d-flex flex-column" style={{ gap: '1rem', maxWidth: '42rem' }}>
-              {/* Analysis Type Selector (what the user is doing) */}
+              {/* Analysis Perspective + Purpose */}
               <div ref={assetSectionRef}>
                 <label className="form-label fw-medium mb-3" style={{ color: 'var(--cui-body-color)' }}>
-                  Analysis Type
+                  Analysis Perspective
                 </label>
-                <div
-                  className="w-100"
-                  style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '0.375rem' }}
-                >
-                  {ANALYSIS_TYPE_OPTIONS.map((opt) => (
+                <div className="d-flex gap-2">
+                  {ANALYSIS_PERSPECTIVE_OPTIONS.map((opt) => (
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setValue('analysis_type', opt.value as 'VALUATION' | 'INVESTMENT' | 'DEVELOPMENT' | 'FEASIBILITY', { shouldDirty: true, shouldValidate: true })}
-                      className="btn d-flex align-items-center justify-content-center gap-1 px-1 py-1 rounded"
+                      onClick={() => setValue('analysis_perspective', opt.value, { shouldDirty: true, shouldValidate: true })}
+                      className="btn flex-grow-1 px-3 py-2 rounded text-start"
                       style={{
-                        fontSize: '0.6875rem',
+                        fontSize: '0.8125rem',
                         fontWeight: 500,
                         transition: 'all 150ms ease',
-                        borderColor: analysisType === opt.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                        backgroundColor: analysisType === opt.value ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
-                        color: analysisType === opt.value ? 'var(--cui-primary-text)' : 'var(--cui-body-color)',
-                        whiteSpace: 'nowrap',
+                        borderColor: analysisPerspective === opt.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                        backgroundColor: analysisPerspective === opt.value ? 'rgba(13,110,253,0.1)' : 'var(--cui-tertiary-bg)',
+                        color: 'var(--cui-body-color)',
                       }}
                     >
-                      <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>{opt.icon}</span>
-                      <span>{opt.label}</span>
+                      <div className="fw-semibold">{opt.label}</div>
+                      <div className="small" style={{ color: 'var(--cui-secondary-color)' }}>{opt.description}</div>
                     </button>
                   ))}
                 </div>
-                {errors.analysis_type && (
+                {errors.analysis_perspective && (
                   <p className="mt-2 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
-                    {errors.analysis_type.message as string}
+                    {errors.analysis_perspective.message as string}
                   </p>
+                )}
+
+                <label className="form-label fw-medium mb-3 mt-3" style={{ color: 'var(--cui-body-color)' }}>
+                  Analysis Purpose
+                </label>
+                <div className="d-flex gap-2">
+                  {ANALYSIS_PURPOSE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setValue('analysis_purpose', opt.value, { shouldDirty: true, shouldValidate: true })}
+                      className="btn flex-grow-1 px-3 py-2 rounded text-start"
+                      style={{
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        transition: 'all 150ms ease',
+                        borderColor: analysisPurpose === opt.value ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                        backgroundColor: analysisPurpose === opt.value ? 'rgba(13,110,253,0.1)' : 'var(--cui-tertiary-bg)',
+                        color: 'var(--cui-body-color)',
+                      }}
+                    >
+                      <div className="fw-semibold">{opt.label}</div>
+                      <div className="small" style={{ color: 'var(--cui-secondary-color)' }}>{opt.description}</div>
+                    </button>
+                  ))}
+                </div>
+                {errors.analysis_purpose && (
+                  <p className="mt-2 small" style={{ color: 'var(--cui-danger)', fontSize: '0.75rem' }}>
+                    {errors.analysis_purpose.message as string}
+                  </p>
+                )}
+
+                {analysisPerspective === 'INVESTMENT' && (
+                  <div className="form-check mt-3">
+                    <input
+                      id="value_add_enabled"
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={valueAddEnabled}
+                      onChange={(event) => {
+                        setValue('value_add_enabled', event.target.checked, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor="value_add_enabled">
+                      Include renovation/value-add analysis
+                    </label>
+                  </div>
                 )}
               </div>
 
@@ -1208,7 +1310,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                 </div>
                 <LocationSection
                   form={form}
-                  analysisType={analysisType}
+                  analysisType={propertyCategory}
                   isDark={false}
                   hasError={invalidSectionSet.has('location')}
                   extractedFieldKeys={extractedFieldKeys}
@@ -1353,21 +1455,23 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
             Clear form
           </button>
           <div className="d-flex align-items-center gap-3">
-            <Button
+            <CButton
               type="button"
+              color="secondary"
               variant="ghost"
               onClick={closeModal}
               disabled={isSubmitting}
             >
               Cancel
-            </Button>
-            <Button
+            </CButton>
+            <CButton
               type="button"
+              color="primary"
               onClick={submitProject}
-              disabled={isSubmitting || !analysisType}
+              disabled={isSubmitting || !analysisPerspective || !analysisPurpose}
             >
               {isSubmitting ? 'Creating...' : 'Create Project'}
-            </Button>
+            </CButton>
           </div>
         </footer>
       </div>

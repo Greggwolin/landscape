@@ -333,10 +333,15 @@ def normalize_page_context(
     page_context: Optional[str],
     project_type_code: Optional[str] = None,
     project_type: Optional[str] = None,
+    analysis_perspective: Optional[str] = None,
+    analysis_purpose: Optional[str] = None,
     subtab_context: Optional[str] = None,
 ) -> str:
     """
     Normalize legacy folder contexts to registry keys (mf_/land_ prefixes).
+
+    analysis_perspective and analysis_purpose are accepted for forward-compatibility
+    but are not currently used for tool gating.
     """
     is_land = _is_land_project(project_type_code, project_type)
     default_home = "land_home" if is_land else "mf_home"

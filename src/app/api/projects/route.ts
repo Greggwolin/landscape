@@ -6,6 +6,7 @@
 //
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { deriveDimensionsFromAnalysisType } from '@/types/project-taxonomy'
 
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
 
@@ -28,6 +29,9 @@ type RawProjectRow = {
   project_type: string | null
   is_active?: boolean | null
   analysis_type?: string | null
+  analysis_perspective?: string | null
+  analysis_purpose?: string | null
+  value_add_enabled?: boolean
   property_subtype?: string | null
   property_class?: string | null
   analysis_mode?: string | null
@@ -42,6 +46,8 @@ type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
 type PostgresError = Error & { code?: string }
 type AnalysisTypeConfigRow = {
   analysis_type: string
+  analysis_perspective: string
+  analysis_purpose: string
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -50,6 +56,8 @@ type AnalysisTypeConfigRow = {
 
 type AnalysisTypeTileConfig = {
   analysis_type: string
+  analysis_perspective: string
+  analysis_purpose: string
   tile_valuation: boolean
   tile_capitalization: boolean
   tile_returns: boolean
@@ -84,6 +92,9 @@ const CARNEY_FALLBACK_PROJECT: RawProjectRow = {
   project_type: 'Retail Power Center',
   is_active: true,
   analysis_type: null,
+  analysis_perspective: 'INVESTMENT',
+  analysis_purpose: 'UNDERWRITING',
+  value_add_enabled: false,
   property_subtype: null,
   property_class: null,
   analysis_mode: 'napkin',
@@ -101,23 +112,39 @@ function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: s
   return match ? match[1] : null
 }
 
+function getConfigKey(
+  analysisPerspective?: string | null,
+  analysisPurpose?: string | null
+): string {
+  const perspective = analysisPerspective?.toUpperCase().trim()
+  const purpose = analysisPurpose?.toUpperCase().trim()
+  if (!perspective || !purpose) return ''
+  return `${perspective}__${purpose}`
+}
+
 async function queryAnalysisTypeConfigs(): Promise<Map<string, AnalysisTypeTileConfig>> {
   try {
     const rows = await sql<AnalysisTypeConfigRow[]>`
       SELECT
         analysis_type,
+        analysis_perspective,
+        analysis_purpose,
         tile_valuation,
         tile_capitalization,
         tile_returns,
         tile_development_budget
       FROM landscape.tbl_analysis_type_config
+      WHERE analysis_perspective IS NOT NULL
+        AND analysis_purpose IS NOT NULL
     `
 
     return new Map(
       rows.map((row) => [
-        row.analysis_type?.toUpperCase(),
+        getConfigKey(row.analysis_perspective, row.analysis_purpose),
         {
           analysis_type: row.analysis_type?.toUpperCase() ?? '',
+          analysis_perspective: row.analysis_perspective?.toUpperCase() ?? '',
+          analysis_purpose: row.analysis_purpose?.toUpperCase() ?? '',
           tile_valuation: Boolean(row.tile_valuation),
           tile_capitalization: Boolean(row.tile_capitalization),
           tile_returns: Boolean(row.tile_returns),
@@ -136,9 +163,15 @@ function attachTileConfigToProjects(
   analysisTypeConfigs: Map<string, AnalysisTypeTileConfig>
 ): RawProjectRow[] {
   return projects.map((project) => {
-    const key = project.analysis_type?.toUpperCase() ?? ''
+    const derived = deriveDimensionsFromAnalysisType(project.analysis_type)
+    const analysisPerspective = project.analysis_perspective ?? derived.analysis_perspective
+    const analysisPurpose = project.analysis_purpose ?? derived.analysis_purpose
+    const key = getConfigKey(analysisPerspective, analysisPurpose)
     return {
       ...project,
+      analysis_perspective: analysisPerspective,
+      analysis_purpose: analysisPurpose,
+      value_add_enabled: project.value_add_enabled ?? derived.value_add_enabled,
       tile_config: key ? analysisTypeConfigs.get(key) ?? null : null,
     }
   })
@@ -166,6 +199,9 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         project_type,
         is_active,
         analysis_type,
+        analysis_perspective,
+        analysis_purpose,
+        value_add_enabled,
         property_subtype,
         property_class,
         COALESCE(analysis_mode, 'napkin') AS analysis_mode,
@@ -199,6 +235,10 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         project_type,
         location_description,
         location_description AS location,
+        analysis_type,
+        analysis_perspective,
+        analysis_purpose,
+        value_add_enabled,
         NULL::numeric AS total_residential_units,
         NULL::numeric AS total_commercial_sqft,
         updated_at
@@ -210,7 +250,10 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
       ...row,
       project_type_code: null,
       is_active: true,
-      analysis_type: null,
+      analysis_type: row.analysis_type ?? null,
+      analysis_perspective: row.analysis_perspective ?? null,
+      analysis_purpose: row.analysis_purpose ?? null,
+      value_add_enabled: row.value_add_enabled ?? false,
       property_subtype: null,
       property_class: null,
       analysis_mode: 'napkin'
@@ -250,10 +293,14 @@ export async function GET(request: NextRequest) {
 
         // Normalize and filter
         const normalized = projects.map((project: RawProjectRow) => ({
+          ...deriveDimensionsFromAnalysisType(project.analysis_type),
           ...project,
           project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
           is_active: project.is_active ?? true,
           analysis_mode: project.analysis_mode ?? 'napkin',
+          analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
+          analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
+          value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
         }))
         const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
@@ -289,10 +336,14 @@ export async function GET(request: NextRequest) {
     }
 
     const normalized = rows.map((project) => ({
+      ...deriveDimensionsFromAnalysisType(project.analysis_type),
       ...project,
       project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
       is_active: project.is_active ?? true,
       analysis_mode: project.analysis_mode ?? 'napkin',
+      analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
+      analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
+      value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
     }))
     const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
@@ -362,6 +413,10 @@ export async function POST(request: NextRequest) {
       INSERT INTO landscape.tbl_project (
         project_name,
         project_type_code,
+        analysis_type,
+        analysis_perspective,
+        analysis_purpose,
+        value_add_enabled,
         description,
         location_description,
         jurisdiction_city,
@@ -374,6 +429,10 @@ export async function POST(request: NextRequest) {
       ) VALUES (
         ${body.project_name},
         ${body.project_type_code},
+        'INVESTMENT',
+        'INVESTMENT',
+        'UNDERWRITING',
+        false,
         ${body.description || null},
         ${body.location_description || null},
         ${body.jurisdiction_city || null},

@@ -78,6 +78,17 @@ export function SalesComparisonApproach({
     () => buildSubjectLocationFromProject(activeProject),
     [activeProject]
   );
+  const subjectInfo = useMemo(() => ({
+    name: activeProject?.project_name ?? 'Subject',
+    address: activeProject?.street_address ?? '',
+    city: subjectProperty?.city ?? activeProject?.jurisdiction_city ?? '',
+    state: activeProject?.jurisdiction_state ?? '',
+    lat: subjectLocation?.latitude,
+    lng: subjectLocation?.longitude,
+    yearBuilt: subjectProperty?.yearBuilt ?? undefined,
+    units: subjectProperty?.units ?? undefined,
+    buildingSf: subjectProperty?.buildingSf != null ? Number(subjectProperty.buildingSf) : undefined,
+  }), [activeProject, subjectLocation, subjectProperty]);
 
   useEffect(() => {
     let active = true;
@@ -171,6 +182,7 @@ export function SalesComparisonApproach({
         }
         allComparables={displayComparables}
         subjectLocation={subjectLocation}
+        subjectProperty={subjectInfo}
       />
 
       {/* Map Above Grid (when more than 5 comps) */}

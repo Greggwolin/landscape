@@ -12,7 +12,7 @@ import nextDynamic from 'next/dynamic';
  * This avoids refactoring existing pages - we just import and render them
  * Note: Cost Library and Benchmarks have moved to /admin routes
  */
-const ProductLibraryPage = nextDynamic(() => import('@/app/benchmarks/products/page'), {
+const ProductLibraryPage = nextDynamic(() => import('@/components/benchmarks/products/ProductLibraryPanel'), {
   ssr: false,
 });
 const TaxonomyPage = nextDynamic(() => import('@/app/settings/taxonomy/page'), {

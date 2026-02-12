@@ -42,6 +42,7 @@ interface Project {
   project_type?: string;
   property_subtype?: string;
   analysis_type?: string;
+  value_add_enabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -136,8 +137,11 @@ function ProjectContentRouter({
           // Acquisition sub-tab - ALL project types
           case 'acquisition':
             return <AcquisitionSubTab project={project} />;
-          // Renovation sub-tab - VALUE_ADD analysis type only
+          // Renovation sub-tab - value-add enabled projects only.
           case 'renovation':
+            if (!project.value_add_enabled) {
+              return <PropertyTab project={project} activeTab="details" />;
+            }
             return <RenovationSubTab project={project} />;
           // Market tab - uses MarketTab which handles both project types
           // Land Dev: Competitive housing research (Redfin, Zonda), SFD pricing, market map

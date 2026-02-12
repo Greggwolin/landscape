@@ -10,12 +10,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { geocodeLocation } from '@/lib/geocoding';
+import {
+  deriveDimensionsFromAnalysisType,
+  deriveLegacyAnalysisType,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy';
 
 export interface ProjectProfile {
   project_id: number;
   project_name: string;
   project_number?: string;
   analysis_type?: string;
+  analysis_perspective?: AnalysisPerspective;
+  analysis_purpose?: AnalysisPurpose;
+  value_add_enabled?: boolean;
   property_subtype?: string;
   project_type?: string; // LAND, MF, OFF, etc.
   project_status?: string;
@@ -59,6 +68,9 @@ export async function GET(
         p.project_id,
         p.project_name,
         p.analysis_type,
+        p.analysis_perspective,
+        p.analysis_purpose,
+        p.value_add_enabled,
         p.property_subtype,
         p.project_type,
         p.project_type_code,
@@ -124,6 +136,68 @@ export async function PATCH(
     const { projectId } = await params;
     const body = await request.json().catch(() => ({}));
 
+    const normalizePerspective = (value?: string | null): AnalysisPerspective | null => {
+      const normalized = value?.toUpperCase().trim()
+      if (normalized === 'INVESTMENT' || normalized === 'DEVELOPMENT') return normalized
+      return null
+    }
+
+    const normalizePurpose = (value?: string | null): AnalysisPurpose | null => {
+      const normalized = value?.toUpperCase().trim()
+      if (normalized === 'VALUATION' || normalized === 'UNDERWRITING') return normalized
+      return null
+    }
+
+    const hasPerspective = body.analysis_perspective !== undefined
+    const hasPurpose = body.analysis_purpose !== undefined
+    const hasValueAdd = body.value_add_enabled !== undefined
+
+    if (hasPerspective || hasPurpose || hasValueAdd) {
+      const existingRows = await sql<{
+        analysis_type: string | null
+        analysis_perspective: AnalysisPerspective | null
+        analysis_purpose: AnalysisPurpose | null
+        value_add_enabled: boolean | null
+      }[]>`
+        SELECT
+          analysis_type,
+          analysis_perspective,
+          analysis_purpose,
+          value_add_enabled
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+        LIMIT 1
+      `
+
+      if (existingRows.length === 0) {
+        return NextResponse.json(
+          { error: 'Project not found' },
+          { status: 404 }
+        )
+      }
+
+      const existing = existingRows[0]
+      const fallback = deriveDimensionsFromAnalysisType(existing.analysis_type)
+      const resolvedPerspective = normalizePerspective(body.analysis_perspective)
+        ?? existing.analysis_perspective
+        ?? fallback.analysis_perspective
+      const resolvedPurpose = normalizePurpose(body.analysis_purpose)
+        ?? existing.analysis_purpose
+        ?? fallback.analysis_purpose
+      const resolvedValueAdd = resolvedPerspective === 'INVESTMENT'
+        ? Boolean(body.value_add_enabled ?? existing.value_add_enabled ?? fallback.value_add_enabled)
+        : false
+
+      body.analysis_perspective = resolvedPerspective
+      body.analysis_purpose = resolvedPurpose
+      body.value_add_enabled = resolvedValueAdd
+      body.analysis_type = deriveLegacyAnalysisType(
+        resolvedPerspective,
+        resolvedPurpose,
+        resolvedValueAdd
+      )
+    }
+
     // Build dynamic UPDATE query for only provided fields
     const updates: string[] = [];
     const values: any[] = [];
@@ -133,6 +207,9 @@ export async function PATCH(
     const fieldMapping: Record<string, string> = {
       'project_name': 'project_name',
       'analysis_type': 'analysis_type',
+      'analysis_perspective': 'analysis_perspective',
+      'analysis_purpose': 'analysis_purpose',
+      'value_add_enabled': 'value_add_enabled',
       'property_type_code': 'project_type_code',
       'property_subtype': 'property_subtype',
       'target_units': 'target_units',
@@ -244,6 +321,9 @@ export async function PATCH(
         p.project_id,
         p.project_name,
         p.analysis_type,
+        p.analysis_perspective,
+        p.analysis_purpose,
+        p.value_add_enabled,
         p.property_subtype,
         p.project_type,
         p.project_type_code,

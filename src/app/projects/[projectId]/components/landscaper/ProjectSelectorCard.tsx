@@ -12,6 +12,7 @@ import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
+import { PERSPECTIVE_LABELS, PURPOSE_LABELS } from '@/types/project-taxonomy';
 
 interface ProjectSelectorCardProps {
   projectId: number;
@@ -133,7 +134,17 @@ export function ProjectSelectorCard({ projectId, onToggleCollapse }: ProjectSele
             <div className="grid grid-cols-2 gap-x-8 gap-y-2">
               {/* Column 1 */}
               <div className="flex flex-col gap-2">
-                <ProfileFieldRow label="Analysis Type" value={displayValue(profile?.analysis_type)} />
+                <ProfileFieldRow
+                  label="Perspective"
+                  value={displayValue(profile?.analysis_perspective ? PERSPECTIVE_LABELS[profile.analysis_perspective] : null)}
+                />
+                <ProfileFieldRow
+                  label="Purpose"
+                  value={displayValue(profile?.analysis_purpose ? PURPOSE_LABELS[profile.analysis_purpose] : null)}
+                />
+                {profile?.value_add_enabled && (
+                  <ProfileFieldRow label="Value-Add" value="Enabled" />
+                )}
                 <ProfileFieldRow label="Project Type" value={displayValue(profile?.property_subtype)} />
                 <ProfileFieldRow label="Target Units" value={profile?.target_units ? formatTargetUnits(profile.target_units) : '—'} />
                 <ProfileFieldRow label="Gross Acres" value={profile?.gross_acres ? formatGrossAcres(profile.gross_acres) : '—'} />

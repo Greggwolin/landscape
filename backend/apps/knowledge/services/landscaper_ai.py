@@ -195,35 +195,55 @@ TAB_CONTEXT = {
 }
 
 
-def _get_analysis_type_context(project_id: int) -> Optional[str]:
+def _get_analysis_context(project_id: int) -> Optional[str]:
     """
-    Get analysis-type-aware context for Landscaper.
+    Get analysis-aware context for Landscaper.
 
-    Retrieves the project's analysis_type (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
-    and returns the corresponding context instructions.
+    Lookup order:
+    1. Composite key (analysis_perspective + analysis_purpose)
+    2. Legacy analysis_type
+    3. None
 
-    Returns None if analysis type not set or config not found.
+    Returns None if no matching config row is found.
     """
     try:
-        # Get the project's analysis_type
+        # Get the project's taxonomy dimensions + legacy type
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT analysis_type FROM landscape.tbl_project WHERE project_id = %s",
+                """
+                SELECT analysis_perspective, analysis_purpose, analysis_type
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+                """,
                 [project_id]
             )
             row = cursor.fetchone()
-            if not row or not row[0]:
+            if not row:
                 return None
-            analysis_type = row[0]
 
-        # Get the analysis type configuration
-        config = AnalysisTypeConfig.objects.filter(analysis_type=analysis_type).first()
+            perspective = row[0]
+            purpose = row[1]
+            analysis_type = row[2]
+
+        config = None
+
+        # Primary lookup: new composite dimensions
+        if perspective and purpose:
+            config = AnalysisTypeConfig.objects.filter(
+                analysis_perspective=perspective,
+                analysis_purpose=purpose
+            ).first()
+
+        # Fallback lookup: legacy analysis_type
+        if not config and analysis_type:
+            config = AnalysisTypeConfig.objects.filter(analysis_type=analysis_type).first()
+
         if not config or not config.landscaper_context:
             return None
 
         return config.landscaper_context
     except Exception as e:
-        logger.warning(f"Failed to retrieve analysis type context for project {project_id}: {e}")
+        logger.warning(f"Failed to retrieve analysis context for project {project_id}: {e}")
         return None
 
 
@@ -301,8 +321,8 @@ def get_landscaper_response(
     tab_config = TAB_CONTEXT.get(active_tab, TAB_CONTEXT['home'])
     tab_context = tab_config['prompt_addition']
 
-    # 4b. Get analysis-type-specific context (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
-    analysis_type_context = _get_analysis_type_context(project_id)
+    # 4b. Get analysis-specific context (from tbl_analysis_type_config)
+    analysis_context = _get_analysis_context(project_id)
 
     # 5. Build system prompt with RAG context + project context + tab context + Entity-Fact knowledge + Analysis Type
     t0 = time.time()
@@ -311,7 +331,7 @@ def get_landscaper_response(
         project_context,
         tab_context,
         project_id,
-        analysis_type_context
+        analysis_context
     )
     print(f"[AI_TIMING] _build_system_prompt: {time.time() - t0:.2f}s (prompt len: {len(system_prompt)} chars)")
 
@@ -777,17 +797,17 @@ def _build_system_prompt(
     project_context: str = "",
     tab_context: str = "",
     project_id: Optional[int] = None,
-    analysis_type_context: Optional[str] = None
+    analysis_context: Optional[str] = None
 ) -> str:
     """
-    Build system prompt with full project context + RAG context + tab context + Entity-Fact knowledge + Analysis Type context.
+    Build system prompt with full project context + RAG context + tab context + Entity-Fact knowledge + analysis context.
 
     Args:
         rag_context: RAG context with document chunks and query results
         project_context: Full structured data context from ProjectContextService
         tab_context: Tab-specific focus instructions
         project_id: Project ID for Entity-Fact knowledge retrieval
-        analysis_type_context: Analysis-type-specific behavior context (from tbl_analysis_type_config)
+        analysis_context: Analysis-specific behavior context (from tbl_analysis_type_config)
     """
 
     sections = rag_context.to_prompt_sections()
@@ -865,13 +885,13 @@ When multiple documents are available for the same property (e.g., OM + Rent Rol
 - Map common variations (e.g., "R&M" → "Repairs & Maintenance")
 - Flag anomalously high expenses (e.g., software >$500/unit/year)"""
 
-    # ANALYSIS TYPE CONTEXT: What the user is trying to accomplish
-    if analysis_type_context and analysis_type_context.strip():
+    # ANALYSIS CONTEXT: What the user is trying to accomplish
+    if analysis_context and analysis_context.strip():
         base_prompt += f"""
 
 === ANALYSIS TYPE FOCUS ===
 
-{analysis_type_context}
+{analysis_context}
 
 Tailor your guidance to this analysis type. Emphasize the metrics, approaches, and considerations most relevant to this goal."""
 

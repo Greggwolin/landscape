@@ -13,10 +13,10 @@ type BadgeProps = PropsWithChildren<{
 }>
 
 const variantClasses: Record<BadgeVariant, string> = {
-  primary: 'bg-blue-600/80 text-blue-100 border border-blue-500/70',
-  secondary: 'bg-slate-700 text-slate-100 border border-slate-600',
-  success: 'bg-emerald-600/80 text-emerald-50 border border-emerald-500',
-  warning: 'bg-amber-600/80 text-amber-50 border border-amber-500'
+  primary: 'bg-primary-subtle text-primary-emphasis border border-primary-subtle',
+  secondary: 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+  success: 'bg-success-subtle text-success-emphasis border border-success-subtle',
+  warning: 'bg-warning-subtle text-warning-emphasis border border-warning-subtle'
 }
 
 const sizeClasses: Record<BadgeSize, string> = {

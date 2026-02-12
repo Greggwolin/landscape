@@ -51,8 +51,20 @@ class ProjectAdminForm(forms.ModelForm):
     # Analysis Type (refactored in migration 061)
     analysis_type = forms.ChoiceField(
         required=False,
-        label="Analysis Type",
-        help_text="What the user is doing: Valuation, Investment, Development, or Feasibility"
+        label="Analysis Type (deprecated)",
+        help_text="Legacy field retained for backward compatibility during taxonomy migration."
+    )
+
+    analysis_perspective = forms.ChoiceField(
+        required=True,
+        label="Analysis Perspective",
+        help_text="Required taxonomy dimension: INVESTMENT or DEVELOPMENT"
+    )
+
+    analysis_purpose = forms.ChoiceField(
+        required=True,
+        label="Analysis Purpose",
+        help_text="Required taxonomy dimension: VALUATION or UNDERWRITING"
     )
 
     property_subtype = forms.ChoiceField(
@@ -108,6 +120,14 @@ class ProjectAdminForm(forms.ModelForm):
         # Populate analysis_type choices (new orthogonal taxonomy)
         analysis_type_choices = [('', '---------')] + list(ANALYSIS_TYPE_CHOICES)
         self.fields['analysis_type'].choices = analysis_type_choices
+        self.fields['analysis_perspective'].choices = [
+            ('INVESTMENT', 'Investment'),
+            ('DEVELOPMENT', 'Development'),
+        ]
+        self.fields['analysis_purpose'].choices = [
+            ('VALUATION', 'Valuation'),
+            ('UNDERWRITING', 'Underwriting'),
+        ]
 
         # Populate property_subtype choices (simplified for admin)
         property_subtype_choices = [
@@ -154,7 +174,10 @@ class ProjectAdmin(admin.ModelAdmin):
         'project_id',
         'project_name',
         'project_type',
+        'analysis_perspective',
+        'analysis_purpose',
         'analysis_type',
+        'value_add_enabled',
         'property_subtype',
         'jurisdiction_city',
         'jurisdiction_state',
@@ -167,7 +190,10 @@ class ProjectAdmin(admin.ModelAdmin):
 
     list_filter = [
         'project_type',
+        'analysis_perspective',
+        'analysis_purpose',
         'analysis_type',
+        'value_add_enabled',
         'property_subtype',
         'property_class',
         'financial_model_type',
@@ -200,7 +226,10 @@ class ProjectAdmin(admin.ModelAdmin):
                 'project_id',
                 'project_name',
                 'project_type',
+                'analysis_perspective',
+                'analysis_purpose',
                 'analysis_type',
+                'value_add_enabled',
                 'property_subtype',
                 'property_class',
                 'financial_model_type',

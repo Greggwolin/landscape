@@ -202,6 +202,14 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
         }
         allComparables={comparables}
         subjectLocation={subjectLocation}
+        subjectProperty={{
+          name: activeProject?.project_name ?? 'Subject',
+          address: activeProject?.street_address ?? '',
+          city: activeProject?.jurisdiction_city ?? '',
+          state: activeProject?.jurisdiction_state ?? '',
+          lat: subjectLocation?.latitude,
+          lng: subjectLocation?.longitude,
+        }}
       />
     </div>
   );

@@ -1,4 +1,9 @@
-import type { AnalysisType, PropertyCategory } from '@/types/project-taxonomy'
+import type {
+  AnalysisType,
+  AnalysisPerspective,
+  AnalysisPurpose,
+  PropertyCategory,
+} from '@/types/project-taxonomy'
 
 // Re-export for backwards compatibility
 export type DevelopmentType = PropertyCategory
@@ -44,8 +49,11 @@ export interface UploadedDocument {
 
 export interface NewProjectFormData {
   // Step 1: Asset Classification (two orthogonal dimensions)
-  // What the user is doing (VALUATION, INVESTMENT, DEVELOPMENT, FEASIBILITY)
+  // Deprecated bridge field; derived from perspective + purpose.
   analysis_type: AnalysisType | ''
+  analysis_perspective: AnalysisPerspective | ''
+  analysis_purpose: AnalysisPurpose | ''
+  value_add_enabled: boolean
   // What the asset is (Land Development, Income Property)
   property_category: PropertyCategory | ''
   // Property subtype cascades from property_category

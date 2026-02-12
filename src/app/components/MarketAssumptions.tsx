@@ -180,11 +180,25 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
   }
 
   return (
-    <div className="p-4 space-y-4 bg-slate-900 min-h-screen text-white">
+    <div
+      className="p-4 min-vh-100"
+      style={{
+        display: 'grid',
+        gap: '1rem',
+        backgroundColor: 'var(--cui-body-bg)',
+        color: 'var(--cui-body-color)',
+      }}
+    >
       {/* Unified Market Factors Card */}
-      <div className="bg-slate-800 rounded border border-slate-600 overflow-hidden">
-        <div className="bg-gray-900 px-3 py-2 border-b border-slate-600 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Market Factors</h2>
+      <div
+        className="rounded border overflow-hidden"
+        style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}
+      >
+        <div
+          className="px-3 py-2 border-bottom d-flex align-items-center justify-content-between"
+          style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)' }}
+        >
+          <h2 className="text-sm fw-semibold mb-0" style={{ color: 'var(--cui-body-color)' }}>Market Factors</h2>
           <SemanticButton intent="primary-action" size="sm" onClick={onSave}>
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : 'Save'}
           </SemanticButton>

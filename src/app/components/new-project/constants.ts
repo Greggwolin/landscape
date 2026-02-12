@@ -1,15 +1,15 @@
-import type { AnalysisType, PropertyTypeOption } from './types'
+import type { PropertyTypeOption } from './types'
 import {
-  ANALYSIS_TYPES,
   LAND_DEVELOPMENT_SUBTYPES,
   INCOME_PROPERTY_SUBTYPE_GROUPS,
   PROPERTY_CLASSES,
-  type PropertySubtype
+  type PropertySubtype,
+  type PropertyCategory
 } from '@/types/project-taxonomy'
 
 // Analysis Type Options (replaces Development Type)
 export const ANALYSIS_TYPE_OPTIONS: Array<{
-  value: AnalysisType
+  value: PropertyCategory
   label: string
   description: string
 }> = [
@@ -26,7 +26,7 @@ export const ANALYSIS_TYPE_OPTIONS: Array<{
 ]
 
 // Property Subtype Options (cascades from Analysis Type)
-export const PROPERTY_SUBTYPE_OPTIONS: Record<AnalysisType, Array<{ value: PropertySubtype; label: string }>> = {
+export const PROPERTY_SUBTYPE_OPTIONS: Record<PropertyCategory, Array<{ value: PropertySubtype; label: string }>> = {
   'Land Development': LAND_DEVELOPMENT_SUBTYPES.map(subtype => ({
     value: subtype,
     label: subtype
@@ -57,7 +57,7 @@ export const INCOME_PROPERTY_GROUPED_OPTIONS = INCOME_PROPERTY_SUBTYPE_GROUPS.ma
 
 // DEPRECATED - Keeping for backwards compatibility during migration
 export const DEVELOPMENT_TYPE_OPTIONS = ANALYSIS_TYPE_OPTIONS
-export const PROPERTY_TYPE_OPTIONS: Record<AnalysisType, PropertyTypeOption[]> = {
+export const PROPERTY_TYPE_OPTIONS: Record<PropertyCategory, PropertyTypeOption[]> = {
   'Land Development': [
     { value: 'Master Planned Community', label: 'Master Planned Community' },
     { value: 'Subdivision', label: 'Subdivision' },

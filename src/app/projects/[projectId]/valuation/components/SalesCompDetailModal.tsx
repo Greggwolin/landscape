@@ -1,7 +1,9 @@
 'use client';
 
 import {
-  type ChangeEvent,
+  type CSSProperties,
+  type MutableRefObject,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -9,170 +11,170 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import Map, {
-  Marker,
-  MapLayerMouseEvent,
-  MarkerDragEvent,
-  MapRef,
-  NavigationControl,
-} from 'react-map-gl/maplibre';
+import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/maplibre';
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
+import CIcon from '@coreui/icons-react';
+import { cilCloudUpload } from '@coreui/icons';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type {
-  SalesComparable,
-  SalesComparableForm,
-  SalesCompAdjustment,
-  AdjustmentType,
-} from '@/types/valuation';
 import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
 import {
-  getSalesComparable,
   createSalesComparable,
-  updateSalesComparable,
   deleteSalesComparable,
-  addAdjustment,
-  deleteAdjustment,
-  updateUserAdjustment,
+  getSalesComparable,
+  updateSalesComparable,
 } from '@/lib/api/valuation';
-
-import { COMP_MARKER_COLORS, getCompMarkerColor } from '@/lib/valuation/compMarkerUtils';
+import type {
+  AdjustmentType,
+  SalesCompAdjustment,
+  SalesCompContact,
+  SalesCompHistory,
+  SalesCompUnitMixRow,
+  SalesComparable,
+  SalesComparableForm,
+} from '@/types/valuation';
+import styles from './SalesCompDetailModal.module.css';
 
 const MAP_STYLE = getEsriHybridStyle();
-const PHOENIX_LOCATION = { latitude: 33.4484, longitude: -112.074 };
+const DASH = '–';
 
-// ---------------------------------------------------------------------------
-// Types & helpers
-// ---------------------------------------------------------------------------
+type OverlaySection = 'transaction' | 'property' | 'unit_mix';
+type AccordionSection =
+  | 'transaction'
+  | 'property'
+  | 'unit_mix'
+  | 'contacts'
+  | 'history'
+  | 'documents'
+  | 'notes';
+
+const BASE_CONTACT_ROLES: SalesCompContact['role'][] = [
+  'selling_broker',
+  'buying_broker',
+  'buyer',
+  'true_buyer',
+  'seller',
+  'true_seller',
+];
+
+const ROLE_LABEL: Record<SalesCompContact['role'], string> = {
+  selling_broker: 'Selling Broker',
+  buying_broker: 'Buying Broker',
+  buyer: 'Buyer',
+  true_buyer: 'True Buyer',
+  seller: 'Seller',
+  true_seller: 'True Seller',
+};
+
+const TRANSACTION_ADJUSTMENT_TYPES: AdjustmentType[] = [
+  'property_rights',
+  'financing',
+  'sale_conditions',
+  'market_conditions',
+];
+
+const PROPERTY_ADJUSTMENT_TYPES: AdjustmentType[] = [
+  'location',
+  'physical_age',
+  'physical_size',
+  'physical_building_sf',
+  'physical_stories',
+  'physical_lot_size',
+  'physical_unit_mix',
+  'physical_condition',
+  'other',
+];
+
+const ALL_MODAL_ADJUSTMENT_TYPES: AdjustmentType[] = [
+  ...TRANSACTION_ADJUSTMENT_TYPES,
+  ...PROPERTY_ADJUSTMENT_TYPES,
+];
+
+const PROPERTY_RIGHTS_OPTIONS = ['Fee Simple', 'Leased Fee', 'Leasehold', 'Partial Interest'];
+const FINANCING_OPTIONS = ['Conventional', 'Seller Financing', 'Assumed Debt', 'Cash'];
+const SALE_CONDITIONS_OPTIONS = [
+  'Arms Length',
+  'Short Sale',
+  'Auction',
+  'Foreclosure',
+  '1031 Exchange',
+  'Related Party',
+];
+
+interface SubjectInfo {
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  lat?: number;
+  lng?: number;
+  yearBuilt?: number;
+  units?: number;
+  buildingSf?: number;
+  stories?: number;
+  lotSizeAcres?: number;
+}
 
 interface SalesCompDetailModalProps {
   projectId: number;
   comparableId?: number;
-  propertyType: string;
+  propertyType?: string;
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
   compNumber?: number;
   allComparables?: SalesComparable[];
   subjectLocation?: { latitude: number; longitude: number } | null;
+  subjectProperty?: SubjectInfo;
 }
 
-type TabKey = 'overview' | 'property' | 'adjustments' | 'history' | 'documents';
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'property', label: 'Property' },
-  { key: 'adjustments', label: 'Adjustments' },
-  { key: 'history', label: 'History' },
-  { key: 'documents', label: 'Documents' },
-];
-
-const ADJUSTMENT_TYPES: { value: AdjustmentType; label: string }[] = [
-  { value: 'property_rights', label: 'Property Rights' },
-  { value: 'financing', label: 'Financing' },
-  { value: 'conditions_of_sale', label: 'Conditions of Sale' },
-  { value: 'market_conditions', label: 'Market Conditions' },
-  { value: 'location', label: 'Location' },
-  { value: 'physical_condition', label: 'Physical Condition' },
-  { value: 'physical_age', label: 'Age / Condition' },
-  { value: 'physical_unit_mix', label: 'Unit Mix' },
-  { value: 'economic', label: 'Economic' },
-  { value: 'legal', label: 'Legal' },
-  { value: 'other', label: 'Other' },
-];
-
-const SALE_CONDITIONS_OPTIONS = [
-  { value: 'ARMS_LENGTH', label: 'Arms Length' },
-  { value: 'SHORT_SALE', label: 'Short Sale' },
-  { value: 'AUCTION', label: 'Auction' },
-  { value: 'ESTATE_SALE', label: 'Estate/Probate Sale' },
-  { value: 'FORECLOSURE', label: 'Foreclosure/REO' },
-  { value: 'RELATED_PARTY', label: 'Related Party' },
-  { value: 'EXCHANGE_1031', label: '1031 Exchange' },
-  { value: 'ASSEMBLAGE', label: 'Assemblage' },
-  { value: 'EXCESS_LAND', label: 'Excess Land Sale' },
-  { value: 'PARTIAL_INTEREST', label: 'Partial Interest' },
-  { value: 'OTHER', label: 'Other' },
-];
-
-const PROPERTY_RIGHTS_OPTIONS = [
-  { value: 'FEE_SIMPLE', label: 'Fee Simple' },
-  { value: 'LEASED_FEE', label: 'Leased Fee' },
-  { value: 'LEASEHOLD', label: 'Leasehold' },
-  { value: 'PARTIAL_INTEREST', label: 'Partial Interest' },
-  { value: 'LIFE_ESTATE', label: 'Life Estate' },
-  { value: 'EASEMENT', label: 'Easement' },
-  { value: 'OTHER', label: 'Other' },
-];
-
-interface HistoryEntry {
-  date: string;
-  event: string;
-  price: string;
-  notes: string;
+interface AdjustmentFormRow {
+  adjustment_id?: number;
+  adjustment_type: AdjustmentType;
+  adjustment_pct: number | null;
+  adjustment_amount?: number | null;
+  user_notes?: string;
+  justification?: string;
+  subject_value?: string;
+  comp_value?: string;
+  landscaper_analysis?: string;
+  ai_accepted?: boolean;
+  confidence_score?: number | null;
 }
 
-const parseNum = (v: string): number | null => {
-  const t = v.trim();
-  if (!t) return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : null;
-};
+interface UnitMixFormRow {
+  unit_type: string;
+  bed_count: string;
+  bath_count: string;
+  unit_count: string;
+  unit_pct: string;
+  avg_unit_sf: string;
+  asking_rent_min: string;
+  asking_rent_max: string;
+  asking_rent_per_sf_min: string;
+  vacant_units: string;
+}
 
-const truncCoord = (v: number) => Math.round(v * 1e7) / 1e7;
+interface ContactFormRow {
+  role: SalesCompContact['role'];
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
+  is_verification_source: boolean;
+  verification_date: string;
+  sort_order: number;
+}
 
-/** Safely coerce API values (may arrive as string from Django DecimalField) to number. */
-const toNum = (v: number | string | null | undefined): number | null => {
-  if (v == null || v === '') return null;
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  return isNaN(n) ? null : n;
-};
+interface HistoryFormRow {
+  sale_date: string;
+  sale_price: string;
+  price_per_unit: string;
+  buyer_name: string;
+  seller_name: string;
+}
 
-const toIntString = (v: number | string | null | undefined): string => {
-  const n = toNum(v);
-  if (n == null) return '';
-  return String(Math.round(n));
-};
-
-const fmtDollar = (v: number | string | null | undefined): string => {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  if (isNaN(n)) return '—';
-  return `$${Math.round(n).toLocaleString('en-US')}`;
-};
-
-const fmtInt = (v: number | string | null | undefined): string => {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  if (isNaN(n)) return '—';
-  return Math.round(n).toLocaleString('en-US');
-};
-
-const fmtPct = (v: number | string | null | undefined, decimals = 2): string => {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  if (isNaN(n)) return '—';
-  const pct = Math.abs(n) < 1 ? n * 100 : n;
-  return `${pct.toFixed(decimals)}%`;
-};
-
-const fmtYear = (v: number | string | null | undefined): string => {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseInt(v, 10) : v;
-  if (isNaN(n)) return '—';
-  return String(n);
-};
-
-const fmtMultiplier = (v: number | string | null | undefined): string => {
-  if (v == null || v === '') return '—';
-  const n = typeof v === 'string' ? parseFloat(v) : v;
-  if (isNaN(n)) return '—';
-  return n.toFixed(2);
-};
-
-// ---------------------------------------------------------------------------
-// Form state shape — string-based for inputs
-// ---------------------------------------------------------------------------
-
-interface FormFields {
+interface SalesCompFormValues {
+  property_type: string;
   property_name: string;
   address: string;
   city: string;
@@ -180,124 +182,370 @@ interface FormFields {
   zip: string;
   latitude: string;
   longitude: string;
+
   sale_date: string;
   sale_price: string;
-  notes: string;
-  // Land-specific
-  land_area_sf: string;
-  zoning: string;
-  entitlements: string;
-  // MF / improved-specific
+  cap_rate: string;
+  property_rights: string;
+  financing_type: string;
+  sale_conditions: string;
+
   year_built: string;
   units: string;
   building_sf: string;
-  cap_rate: string;
-  grm: string;
-  // Land extras
-  highest_best_use: string;
-  topography: string;
-  shape: string;
-  frontage_ft: string;
-  access: string;
-  utilities: string;
-  flood_zone: string;
-  environmental: string;
-  soil_conditions: string;
-  // MF extras
   stories: string;
+  land_area_acres: string;
   parking_spaces: string;
-  parking_ratio: string;
-  amenities: string;
-  condition: string;
-  construction_type: string;
-  // Office / retail
-  nra: string;
-  floors: string;
-  building_class: string;
-  occupancy_pct: string;
-  anchor_tenant: string;
-  // Transaction
-  buyer_name: string;
-  buyer_type: string;
-  seller_name: string;
-  seller_type: string;
-  sale_conditions: string;
-  property_rights: string;
-  sale_type: string;
-  verification_status: string;
+  quality: string;
+  property_other: string;
+  zoning: string;
+  entitlements: string;
+
+  notes: string;
+
+  verification_source: string;
+  verification_date: string;
+
+  adjustments: AdjustmentFormRow[];
+  unit_mix: UnitMixFormRow[];
+  contacts: ContactFormRow[];
+  history: HistoryFormRow[];
 }
 
-const emptyForm: FormFields = {
-  property_name: '', address: '', city: '', state: '', zip: '',
-  latitude: '', longitude: '',
-  sale_date: '', sale_price: '', notes: '',
-  land_area_sf: '', zoning: '', entitlements: '',
-  year_built: '', units: '', building_sf: '', cap_rate: '', grm: '',
-  highest_best_use: '', topography: '', shape: '', frontage_ft: '',
-  access: '', utilities: '', flood_zone: '', environmental: '', soil_conditions: '',
-  stories: '', parking_spaces: '', parking_ratio: '', amenities: '',
-  condition: '', construction_type: '',
-  nra: '', floors: '', building_class: '', occupancy_pct: '', anchor_tenant: '',
-  buyer_name: '', buyer_type: '', seller_name: '', seller_type: '',
-  sale_conditions: '', property_rights: '',
-  sale_type: '', verification_status: '',
+const OVERLAY_RECOMMENDATIONS: Record<OverlaySection, {
+  title: string;
+  rows: Array<{ type: AdjustmentType; pct: number; rationale: string }>;
+  actions: string[];
+}> = {
+  transaction: {
+    title: 'Transaction Factors',
+    rows: [
+      {
+        type: 'property_rights',
+        pct: 1.5,
+        rationale: 'Comp rights appear broader than subject rights package.',
+      },
+      {
+        type: 'financing',
+        pct: -0.75,
+        rationale: 'Debt terms were more favorable than current market debt costs.',
+      },
+      {
+        type: 'sale_conditions',
+        pct: 0.5,
+        rationale: 'Buyer motivation indicates above-market urgency premium.',
+      },
+    ],
+    actions: ['Apply adjustments', 'Open transaction comps', 'Refresh market timing'],
+  },
+  property: {
+    title: 'Property Factors',
+    rows: [
+      {
+        type: 'location',
+        pct: -2.0,
+        rationale: 'Subject micro-location outperforms comp trade area rent growth.',
+      },
+      {
+        type: 'physical_age',
+        pct: 1.25,
+        rationale: 'Comp effective age is older versus subject lifecycle profile.',
+      },
+      {
+        type: 'physical_condition',
+        pct: 0.75,
+        rationale: 'Observed renovation quality lags subject target finish level.',
+      },
+    ],
+    actions: ['Apply adjustments', 'Compare condition photos', 'Save as baseline'],
+  },
+  unit_mix: {
+    title: 'Unit Mix Factors',
+    rows: [
+      {
+        type: 'physical_unit_mix',
+        pct: 1.1,
+        rationale: 'Comp mix skews to smaller units with weaker per-unit rent depth.',
+      },
+      {
+        type: 'physical_size',
+        pct: -0.8,
+        rationale: 'Per-unit size discount observed versus subject unit plan average.',
+      },
+    ],
+    actions: ['Apply adjustments', 'Normalize rent roll', 'Export mix analysis'],
+  },
 };
 
-function buildFormFromComp(comp: SalesComparable): FormFields {
-  const extra = (comp.extra_data ?? {}) as Record<string, unknown>;
+function toNumber(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const raw = value.trim();
+  if (!raw) return null;
+  const parsed = Number(raw.replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toFixedOrDash(value: number | null, decimals = 1, withSign = true): string {
+  if (value == null || value === 0) return DASH;
+  const sign = value > 0 && withSign ? '+' : '';
+  return `${sign}${value.toFixed(decimals)}%`;
+}
+
+function formatCurrency(value: number | null, signed = false): string {
+  if (value == null || value === 0) return DASH;
+  const abs = Math.abs(value);
+  const rendered = abs.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (!signed) {
+    return `$${rendered}`;
+  }
+  return `${value < 0 ? '-' : '+'}$${rendered}`;
+}
+
+function formatNumber(value: number | null, decimals = 0): string {
+  if (value == null || value === 0) return DASH;
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function formatPercent(value: number | null, decimals = 2): string {
+  if (value == null || value === 0) return DASH;
+  return `${value.toFixed(decimals)}%`;
+}
+
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const radiusMiles = 3958.7613;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return radiusMiles * c;
+}
+
+function normalizeAdjustmentType(type: string): AdjustmentType {
+  if (type === 'conditions_of_sale') return 'sale_conditions';
+  return type as AdjustmentType;
+}
+
+function createDefaultAdjustments(): AdjustmentFormRow[] {
+  return ALL_MODAL_ADJUSTMENT_TYPES.map((adjustment_type) => ({
+    adjustment_type,
+    adjustment_pct: null,
+    user_notes: '',
+    justification: '',
+    ai_accepted: false,
+  }));
+}
+
+function createDefaultContacts(): ContactFormRow[] {
+  return BASE_CONTACT_ROLES.map((role, idx) => ({
+    role,
+    name: '',
+    company: '',
+    phone: '',
+    email: '',
+    is_verification_source: false,
+    verification_date: '',
+    sort_order: idx,
+  }));
+}
+
+function createEmptyUnitMixRow(): UnitMixFormRow {
   return {
-    property_name: comp.property_name ?? '',
-    address: comp.address ?? '',
-    city: comp.city ?? '',
-    state: comp.state ?? '',
-    zip: comp.zip ?? '',
-    latitude: comp.latitude?.toString() ?? '',
-    longitude: comp.longitude?.toString() ?? '',
-    sale_date: comp.sale_date ?? '',
-    sale_price: comp.sale_price?.toString() ?? '',
-    notes: comp.notes ?? '',
-    land_area_sf: comp.land_area_sf?.toString() ?? '',
-    zoning: comp.zoning ?? '',
-    entitlements: comp.entitlements ?? '',
-    year_built: toIntString(comp.year_built),
-    units: toIntString(comp.units),
-    building_sf: toIntString(comp.building_sf),
-    cap_rate: comp.cap_rate?.toString() ?? '',
-    grm: comp.grm?.toString() ?? '',
-    highest_best_use: (extra.highest_best_use as string) ?? '',
-    topography: (extra.topography as string) ?? '',
-    shape: (extra.shape as string) ?? '',
-    frontage_ft: (extra.frontage_ft as string) ?? '',
-    access: (extra.access as string) ?? '',
-    utilities: (extra.utilities as string) ?? '',
-    flood_zone: (extra.flood_zone as string) ?? '',
-    environmental: (extra.environmental as string) ?? '',
-    soil_conditions: (extra.soil_conditions as string) ?? '',
-    stories: (extra.stories as string) ?? '',
-    parking_spaces: (extra.parking_spaces as string) ?? '',
-    parking_ratio: (extra.parking_ratio as string) ?? '',
-    amenities: (extra.amenities as string) ?? '',
-    condition: (extra.condition as string) ?? '',
-    construction_type: (extra.construction_type as string) ?? '',
-    nra: (extra.nra as string) ?? '',
-    floors: (extra.floors as string) ?? '',
-    building_class: (extra.building_class as string) ?? '',
-    occupancy_pct: (extra.occupancy_pct as string) ?? '',
-    anchor_tenant: (extra.anchor_tenant as string) ?? '',
-    buyer_name: (extra.buyer_name as string) ?? '',
-    buyer_type: (extra.buyer_type as string) ?? '',
-    seller_name: (extra.seller_name as string) ?? '',
-    seller_type: (extra.seller_type as string) ?? '',
-    sale_conditions: comp.sale_conditions ?? '',
-    property_rights: comp.property_rights ?? '',
-    sale_type: (extra.sale_type as string) ?? '',
-    verification_status: (extra.verification_status as string) ?? '',
+    unit_type: '',
+    bed_count: '',
+    bath_count: '',
+    unit_count: '',
+    unit_pct: '',
+    avg_unit_sf: '',
+    asking_rent_min: '',
+    asking_rent_max: '',
+    asking_rent_per_sf_min: '',
+    vacant_units: '',
   };
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function createEmptyHistoryRow(): HistoryFormRow {
+  return {
+    sale_date: '',
+    sale_price: '',
+    price_per_unit: '',
+    buyer_name: '',
+    seller_name: '',
+  };
+}
+
+function roleClassName(role: SalesCompContact['role']): string {
+  switch (role) {
+    case 'selling_broker':
+      return styles.roleSellingBroker;
+    case 'buying_broker':
+      return styles.roleBuyingBroker;
+    case 'buyer':
+      return styles.roleBuyer;
+    case 'true_buyer':
+      return styles.roleTrueBuyer;
+    case 'seller':
+      return styles.roleSeller;
+    case 'true_seller':
+      return styles.roleTrueSeller;
+    default:
+      return '';
+  }
+}
+
+function formatContactSource(contact: ContactFormRow): string {
+  const name = contact.name.trim() || '(Unnamed)';
+  const role = ROLE_LABEL[contact.role];
+  const company = contact.company.trim();
+  return `${name} — ${role}${company ? ` (${company})` : ''}`;
+}
+
+function combineClassNames(...classes: Array<string | false | undefined>): string {
+  return classes.filter(Boolean).join(' ');
+}
+
+function signedValueClass(value: number | null): string {
+  if (value == null || value === 0) return styles.valueNeutral;
+  return value > 0 ? styles.valuePositive : styles.valueNegative;
+}
+
+function readString(value: unknown): string {
+  if (value == null) return '';
+  return String(value);
+}
+
+function formatMonthYear(value: string): string {
+  if (!value) return 'Apr 2024';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Apr 2024';
+  return parsed.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function formatPropertyTypeLabel(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) return 'Multifamily';
+  return normalized
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function ensureRoleRows(contacts: ContactFormRow[]): ContactFormRow[] {
+  const next = [...contacts];
+  BASE_CONTACT_ROLES.forEach((role) => {
+    if (!next.some((row) => row.role === role)) {
+      next.push({
+        role,
+        name: '',
+        company: '',
+        phone: '',
+        email: '',
+        is_verification_source: false,
+        verification_date: '',
+        sort_order: next.length,
+      });
+    }
+  });
+  return next
+    .map((row, index) => ({ ...row, sort_order: row.sort_order ?? index }))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+}
+
+function AdjPercentInput({
+  value,
+  onCommit,
+}: {
+  value: number | null;
+  onCommit: (next: number | null) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(value == null || value === 0 ? '' : String(value));
+    }
+  }, [focused, value]);
+
+  return (
+    <input
+      type="text"
+      className={styles.adjInput}
+      value={focused ? draft : toFixedOrDash(value, 1, true)}
+      onFocus={() => {
+        setFocused(true);
+        if (value == null || value === 0) {
+          setDraft('');
+        }
+      }}
+      onChange={(event) => {
+        setDraft(event.target.value);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const parsed = toNumber(draft.replace('%', '').replace('+', '').trim());
+        if (parsed == null || parsed === 0) {
+          onCommit(null);
+          return;
+        }
+        onCommit(parsed);
+      }}
+    />
+  );
+}
+
+function DashNumericInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+  textEnd = true,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  className?: string;
+  textEnd?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  useEffect(() => {
+    if (!focused) {
+      const numeric = toNumber(value);
+      setDraft(numeric == null || numeric === 0 ? '' : value);
+    }
+  }, [focused, value]);
+
+  return (
+    <input
+      type="text"
+      className={combineClassNames('form-control form-control-sm', styles.smallControl, className)}
+      style={textEnd ? ({ textAlign: 'right' } as CSSProperties) : undefined}
+      value={focused ? draft : toNumber(value) == null || toNumber(value) === 0 ? DASH : value}
+      placeholder={placeholder}
+      onFocus={() => {
+        setFocused(true);
+        setDraft(toNumber(value) == null || toNumber(value) === 0 ? '' : value);
+      }}
+      onChange={(event) => {
+        setDraft(event.target.value);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        const parsed = toNumber(draft);
+        onChange(parsed == null || parsed === 0 ? '' : draft.replace(/,/g, ''));
+      }}
+    />
+  );
+}
 
 export function SalesCompDetailModal({
   projectId,
@@ -307,531 +555,1497 @@ export function SalesCompDetailModal({
   onClose,
   onSaved,
   compNumber,
-  allComparables,
-  subjectLocation: subjectLocProp,
+  subjectLocation,
+  subjectProperty,
 }: SalesCompDetailModalProps) {
   const isEditMode = comparableId != null;
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  const [form, setForm] = useState<FormFields>({ ...emptyForm });
-  const [adjustments, setAdjustments] = useState<SalesCompAdjustment[]>([]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const mapRef = useRef<MapRef | null>(null);
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
+  const overlayTriggerRefs: MutableRefObject<Record<OverlaySection, HTMLButtonElement | null>> = useRef({
+    transaction: null,
+    property: null,
+    unit_mix: null,
+  });
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const initialDataRef = useRef<string>('');
-  const mapRef = useRef<MapRef | null>(null);
+  const [activeOverlay, setActiveOverlay] = useState<OverlaySection | null>(null);
+  const [overlayTop, setOverlayTop] = useState(12);
+  const [overlayMessage, setOverlayMessage] = useState('');
+  const [accordionOpen, setAccordionOpen] = useState<Record<AccordionSection, boolean>>({
+    transaction: true,
+    property: true,
+    unit_mix: true,
+    contacts: true,
+    history: false,
+    documents: false,
+    notes: false,
+  });
+  const [linePixels, setLinePixels] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
-  const subjectLoc = useMemo(
-    () => subjectLocProp ?? PHOENIX_LOCATION,
-    [subjectLocProp]
-  );
+  const {
+    control,
+    register,
+    reset,
+    setValue,
+    getValues,
+    handleSubmit,
+  } = useForm<SalesCompFormValues>({
+    defaultValues: {
+      property_type: (propertyType ?? 'MULTIFAMILY').toUpperCase(),
+      property_name: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
+      latitude: '',
+      longitude: '',
+      sale_date: '',
+      sale_price: '',
+      cap_rate: '',
+      property_rights: '',
+      financing_type: '',
+      sale_conditions: '',
+      year_built: '',
+      units: '',
+      building_sf: '',
+      stories: '',
+      land_area_acres: '',
+      parking_spaces: '',
+      quality: '',
+      property_other: '',
+      zoning: '',
+      entitlements: '',
+      notes: '',
+      verification_source: '',
+      verification_date: '',
+      adjustments: createDefaultAdjustments(),
+      unit_mix: [],
+      contacts: createDefaultContacts(),
+      history: [],
+    },
+  });
 
-  const pType = propertyType?.toUpperCase() ?? '';
-  const isLand = pType === 'LAND';
-  const isMF = pType === 'MULTIFAMILY' || pType === 'MF';
-  const isOffice = pType === 'OFFICE' || pType === 'OFF';
-  const isRetail = pType === 'RETAIL' || pType === 'RET';
+  const unitMixArray = useFieldArray({ control, name: 'unit_mix' });
+  const contactsArray = useFieldArray({ control, name: 'contacts' });
+  const historyArray = useFieldArray({ control, name: 'history' });
 
-  // ---- Data fetching ----
+  const watchedPropertyType = (useWatch({ control, name: 'property_type' }) || 'MULTIFAMILY').toUpperCase();
+  const watchedPropertyName = useWatch({ control, name: 'property_name' }) || '';
+  const watchedSalePrice = useWatch({ control, name: 'sale_price' }) || '';
+  const watchedCapRate = useWatch({ control, name: 'cap_rate' }) || '';
+  const watchedUnits = useWatch({ control, name: 'units' }) || '';
+  const watchedBuildingSf = useWatch({ control, name: 'building_sf' }) || '';
+  const watchedSaleDate = useWatch({ control, name: 'sale_date' }) || '';
+  const watchedLandAreaAcres = useWatch({ control, name: 'land_area_acres' }) || '';
+  const watchedCity = useWatch({ control, name: 'city' }) || '';
+  const watchedParkingSpaces = useWatch({ control, name: 'parking_spaces' }) || '';
+  const watchedUnitMix = useWatch({ control, name: 'unit_mix' }) || [];
+  const watchedContacts = useWatch({ control, name: 'contacts' }) || [];
+  const watchedAdjustments = useWatch({ control, name: 'adjustments' }) || [];
+  const watchedVerificationSource = useWatch({ control, name: 'verification_source' }) || '';
+  const watchedVerificationDate = useWatch({ control, name: 'verification_date' }) || '';
+  const watchedLatitude = useWatch({ control, name: 'latitude' }) || '';
+  const watchedLongitude = useWatch({ control, name: 'longitude' }) || '';
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setActiveTab('overview');
-    setDeleteConfirm(false);
-    setDirty(false);
+  const salePriceNum = useMemo(() => toNumber(watchedSalePrice), [watchedSalePrice]);
+  const capRateNum = useMemo(() => toNumber(watchedCapRate), [watchedCapRate]);
+  const unitsNum = useMemo(() => toNumber(watchedUnits), [watchedUnits]);
+  const buildingSfNum = useMemo(() => toNumber(watchedBuildingSf), [watchedBuildingSf]);
+  const landAreaAcresNum = useMemo(() => toNumber(watchedLandAreaAcres), [watchedLandAreaAcres]);
 
-    if (isEditMode) {
-      setLoading(true);
-      getSalesComparable(projectId, comparableId!)
-        .then((comp) => {
-          const f = buildFormFromComp(comp);
-          const extra = (comp.extra_data ?? {}) as Record<string, unknown>;
-          const historyRows = Array.isArray(extra.history) ? (extra.history as HistoryEntry[]) : [];
-          setForm(f);
-          setHistory(historyRows);
-          initialDataRef.current = JSON.stringify({ form: f, history: historyRows });
-          setDirty(false);
-          setAdjustments(comp.adjustments ?? []);
-        })
-        .catch((err) => {
-          console.error('Failed to load comparable:', err);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      const f = { ...emptyForm, latitude: subjectLoc.latitude.toString(), longitude: subjectLoc.longitude.toString() };
-      setForm(f);
-      setAdjustments([]);
-      setHistory([]);
-      initialDataRef.current = JSON.stringify({ form: f, history: [] as HistoryEntry[] });
-      setDirty(false);
+  const isLand = watchedPropertyType === 'LAND';
+
+  const subject = useMemo<SubjectInfo | null>(() => {
+    if (subjectProperty) return subjectProperty;
+    if (subjectLocation?.latitude != null && subjectLocation?.longitude != null) {
+      return {
+        name: 'Subject',
+        address: '',
+        city: '',
+        state: '',
+        lat: subjectLocation.latitude,
+        lng: subjectLocation.longitude,
+      };
     }
-  }, [isOpen, isEditMode, comparableId, projectId, subjectLoc]);
+    return null;
+  }, [subjectLocation, subjectProperty]);
 
-  useEffect(() => {
-    if (!isOpen || !initialDataRef.current) return;
-    setDirty(JSON.stringify({ form, history }) !== initialDataRef.current);
-  }, [isOpen, form, history]);
+  const compCoords = useMemo(() => {
+    const lat = toNumber(watchedLatitude);
+    const lng = toNumber(watchedLongitude);
+    if (lat == null || lng == null) return null;
+    return { lat, lng };
+  }, [watchedLatitude, watchedLongitude]);
 
-  // ---- Close with dirty-state confirmation ----
+  const subjectCoords = useMemo(() => {
+    if (!subject || subject.lat == null || subject.lng == null) return null;
+    return { lat: subject.lat, lng: subject.lng };
+  }, [subject]);
 
-  const handleCloseAttempt = useCallback(() => {
-    if (dirty) {
-      const shouldClose = window.confirm('You have unsaved changes. Close without saving?');
-      if (!shouldClose) return;
-    }
-    onClose();
-  }, [dirty, onClose]);
+  const unitMixStats = useMemo(() => {
+    const totalUnits = watchedUnitMix.reduce((sum, row) => sum + (toNumber(row.unit_count) ?? 0), 0);
+    const typeCount = watchedUnitMix.filter((row) => row.unit_type.trim()).length;
+    return { totalUnits, typeCount };
+  }, [watchedUnitMix]);
 
-  // ---- Escape key ----
+  const unitMixSummary = useMemo(() => {
+    if (unitMixStats.totalUnits === 0 && unitMixStats.typeCount === 0) return DASH;
+    return `${unitMixStats.typeCount} types / ${formatNumber(unitMixStats.totalUnits)} units`;
+  }, [unitMixStats]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleCloseAttempt();
+  const unitMixHeaderSummary = useMemo(() => {
+    return `${unitMixStats.totalUnits.toLocaleString('en-US')} units · ${unitMixStats.typeCount} types`;
+  }, [unitMixStats]);
+
+  const getAdjustment = useCallback((type: AdjustmentType): AdjustmentFormRow => {
+    const found = watchedAdjustments.find((row) => normalizeAdjustmentType(row.adjustment_type) === type);
+    return found ?? {
+      adjustment_type: type,
+      adjustment_pct: null,
+      user_notes: '',
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isOpen, handleCloseAttempt]);
+  }, [watchedAdjustments]);
 
-  // ---- Input helpers ----
-
-  const handleInput = useCallback((field: keyof FormFields) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    }, []);
-
-  const handleSalePriceChange = useCallback((rawValue: string) => {
-    const cleaned = rawValue.replace(/[^0-9.]/g, '');
-    const [whole = '', ...rest] = cleaned.split('.');
-    const nextValue = rest.length > 0 ? `${whole}.${rest.join('')}` : whole;
-    setForm((prev) => ({ ...prev, sale_price: nextValue }));
-  }, []);
-
-  // ---- Map marker ----
-
-  const markerLat = parseNum(form.latitude) ?? subjectLoc.latitude;
-  const markerLng = parseNum(form.longitude) ?? subjectLoc.longitude;
-  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
-
-  const handleMapMouseDown = useCallback((e: MapLayerMouseEvent) => {
-    mouseDownPos.current = { x: e.point.x, y: e.point.y };
-  }, []);
-
-  const handleMapClick = useCallback((e: MapLayerMouseEvent) => {
-    if (mouseDownPos.current) {
-      const dx = e.point.x - mouseDownPos.current.x;
-      const dy = e.point.y - mouseDownPos.current.y;
-      if (dx * dx + dy * dy > 25) return;
+  const setAdjustmentValue = useCallback((type: AdjustmentType, patch: Partial<AdjustmentFormRow>) => {
+    const current = getValues('adjustments') || [];
+    const next = [...current];
+    const idx = next.findIndex((row) => normalizeAdjustmentType(row.adjustment_type) === type);
+    if (idx === -1) {
+      next.push({
+        adjustment_type: type,
+        adjustment_pct: null,
+        user_notes: '',
+        ...patch,
+      });
+    } else {
+      next[idx] = {
+        ...next[idx],
+        ...patch,
+        adjustment_type: type,
+      };
     }
-    const lat = truncCoord(e.lngLat.lat);
-    const lng = truncCoord(e.lngLat.lng);
-    setForm((prev) => ({ ...prev, latitude: lat.toString(), longitude: lng.toString() }));
-  }, []);
+    setValue('adjustments', next, { shouldDirty: true });
+  }, [getValues, setValue]);
 
-  const handleMarkerDrag = useCallback((e: MarkerDragEvent) => {
-    const lat = truncCoord(e.lngLat.lat);
-    const lng = truncCoord(e.lngLat.lng);
-    setForm((prev) => ({ ...prev, latitude: lat.toString(), longitude: lng.toString() }));
-  }, []);
+  const transactionSubtotalPct = useMemo(() => {
+    return TRANSACTION_ADJUSTMENT_TYPES.reduce(
+      (sum, type) => sum + (getAdjustment(type).adjustment_pct ?? 0),
+      0,
+    );
+  }, [getAdjustment]);
 
-  // ---- Calculated metrics ----
+  const propertySubtotalPct = useMemo(() => {
+    return PROPERTY_ADJUSTMENT_TYPES.reduce(
+      (sum, type) => sum + (getAdjustment(type).adjustment_pct ?? 0),
+      0,
+    );
+  }, [getAdjustment]);
 
-  const salePrice = parseNum(form.sale_price);
-  const landSf = parseNum(form.land_area_sf);
-  const landAcres = landSf != null ? landSf / 43560 : null;
-  const landPricePerSf = salePrice != null && landSf ? salePrice / landSf : null;
-  const landPricePerAcre = salePrice != null && landAcres ? salePrice / landAcres : null;
-  const unitsNumRaw = parseNum(form.units);
-  const unitsNum = unitsNumRaw != null ? Math.round(unitsNumRaw) : null;
-  const bldgSfRaw = parseNum(form.building_sf);
-  const bldgSf = bldgSfRaw != null ? Math.round(bldgSfRaw) : null;
-  const yearBuiltRaw = parseNum(form.year_built);
-  const yearBuilt = yearBuiltRaw != null ? Math.round(yearBuiltRaw) : null;
-  const pricePerUnit = salePrice != null && unitsNum ? salePrice / unitsNum : null;
-  const pricePerSf = salePrice != null && bldgSf ? salePrice / bldgSf : null;
-  const capRateValue = toNum(form.cap_rate);
-  const grmValue = toNum(form.grm);
+  const transactionSubtotalAmt = useMemo(() => {
+    if (salePriceNum == null) return null;
+    return salePriceNum * (transactionSubtotalPct / 100);
+  }, [salePriceNum, transactionSubtotalPct]);
 
-  const netAdjPct = adjustments.reduce((sum, a) => {
-    const pct = a.user_adjustment_pct ?? a.adjustment_pct ?? 0;
-    return sum + pct;
-  }, 0);
-  const grossAdjPct = adjustments.reduce((sum, a) => {
-    const pct = a.user_adjustment_pct ?? a.adjustment_pct ?? 0;
-    return sum + Math.abs(pct);
-  }, 0);
-  const netAdjAmt = salePrice != null ? salePrice * (netAdjPct / 100) : null;
-  const adjustedPrice = salePrice != null ? salePrice + (netAdjAmt ?? 0) : null;
+  const propertySubtotalAmt = useMemo(() => {
+    if (salePriceNum == null) return null;
+    return salePriceNum * (propertySubtotalPct / 100);
+  }, [propertySubtotalPct, salePriceNum]);
 
-  // Key KPI metric based on property type
-  const keyMetricLabel = isLand ? '$/SF' : isMF ? '$/Unit' : '$/SF';
-  const keyMetricValue = isLand ? landPricePerSf : isMF ? pricePerUnit : pricePerSf;
+  const netAdjPct = transactionSubtotalPct + propertySubtotalPct;
+  const netAdjAmt = salePriceNum == null ? null : salePriceNum * (netAdjPct / 100);
 
-  // ---- Build payload ----
+  const pricePerUnit = useMemo(() => {
+    if (salePriceNum == null || unitsNum == null || unitsNum === 0) return null;
+    return salePriceNum / unitsNum;
+  }, [salePriceNum, unitsNum]);
 
-  const buildPayload = useCallback((): SalesComparableForm => {
-    const extra: Record<string, unknown> = {};
-    // Store extended fields in extra_data
-    const extFields: (keyof FormFields)[] = [
-      'highest_best_use', 'topography', 'shape', 'frontage_ft', 'access',
-      'utilities', 'flood_zone', 'environmental', 'soil_conditions',
-      'stories', 'parking_spaces', 'parking_ratio', 'amenities',
-      'condition', 'construction_type',
-      'nra', 'floors', 'building_class', 'occupancy_pct', 'anchor_tenant',
-      'buyer_name', 'buyer_type', 'seller_name', 'seller_type',
-      'sale_type', 'verification_status',
-    ];
-    for (const k of extFields) {
-      if (form[k]) extra[k] = form[k];
+  const pricePerSf = useMemo(() => {
+    if (salePriceNum == null || buildingSfNum == null || buildingSfNum === 0) return null;
+    return salePriceNum / buildingSfNum;
+  }, [buildingSfNum, salePriceNum]);
+
+  const adjPricePerUnit = useMemo(() => {
+    if (pricePerUnit == null) return null;
+    return pricePerUnit * (1 + netAdjPct / 100);
+  }, [netAdjPct, pricePerUnit]);
+
+  const marketConditionText = useMemo(() => `${formatMonthYear(watchedSaleDate)} → Present`, [watchedSaleDate]);
+
+  const locationComparison = useMemo(() => {
+    const compCity = watchedCity || 'Comp City';
+    const subjCity = subject?.city || 'Subject City';
+    return `${subjCity} → ${compCity}`;
+  }, [subject?.city, watchedCity]);
+
+  const lotSizeSf = useMemo(() => {
+    if (landAreaAcresNum == null) return null;
+    return landAreaAcresNum * 43560;
+  }, [landAreaAcresNum]);
+
+  const parkingRatio = useMemo(() => {
+    const parkingSpaces = toNumber(watchedParkingSpaces);
+    if (parkingSpaces == null || unitsNum == null || unitsNum === 0) return null;
+    return parkingSpaces / unitsNum;
+  }, [unitsNum, watchedParkingSpaces]);
+
+  const distanceMiles = useMemo(() => {
+    if (!compCoords || !subjectCoords) return null;
+    return haversineMiles(subjectCoords.lat, subjectCoords.lng, compCoords.lat, compCoords.lng);
+  }, [compCoords, subjectCoords]);
+
+  const updateLineProjection = useCallback(() => {
+    if (!mapRef.current || !compCoords || !subjectCoords) {
+      setLinePixels(null);
+      return;
     }
-    if (history.length > 0) extra.history = history;
+    const start = mapRef.current.project([subjectCoords.lng, subjectCoords.lat]);
+    const end = mapRef.current.project([compCoords.lng, compCoords.lat]);
+    setLinePixels({ x1: start.x, y1: start.y, x2: end.x, y2: end.y });
+  }, [compCoords, subjectCoords]);
 
-    const payload: Record<string, unknown> = {
+  const positionOverlay = useCallback((section: OverlaySection) => {
+    const bodyRect = modalBodyRef.current?.getBoundingClientRect();
+    const triggerRect = overlayTriggerRefs.current[section]?.getBoundingClientRect();
+    if (!bodyRect || !triggerRect) {
+      setOverlayTop(12);
+      return;
+    }
+    const scrollTop = modalBodyRef.current?.scrollTop ?? 0;
+    const rawTop = triggerRect.top - bodyRect.top + scrollTop - 10;
+    const maxTop = Math.max(12, (modalBodyRef.current?.scrollHeight ?? 0) - 470);
+    setOverlayTop(Math.max(10, Math.min(rawTop, maxTop)));
+  }, []);
+
+  const openOverlay = useCallback((section: OverlaySection) => {
+    setActiveOverlay((prev) => (prev === section ? null : section));
+    setTimeout(() => positionOverlay(section), 0);
+  }, [positionOverlay]);
+
+  useEffect(() => {
+    if (!activeOverlay) return;
+    positionOverlay(activeOverlay);
+  }, [activeOverlay, positionOverlay]);
+
+  useEffect(() => {
+    updateLineProjection();
+  }, [updateLineProjection]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const setDefaults = (override?: Partial<SalesCompFormValues>) => {
+      const defaults: SalesCompFormValues = {
+        property_type: (propertyType ?? 'MULTIFAMILY').toUpperCase(),
+        property_name: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+        latitude: subjectCoords?.lat != null ? String(subjectCoords.lat) : '',
+        longitude: subjectCoords?.lng != null ? String(subjectCoords.lng) : '',
+        sale_date: '',
+        sale_price: '',
+        cap_rate: '',
+        property_rights: '',
+        financing_type: '',
+        sale_conditions: '',
+        year_built: '',
+        units: '',
+        building_sf: '',
+        stories: '',
+        land_area_acres: '',
+        parking_spaces: '',
+        quality: '',
+        property_other: '',
+        zoning: '',
+        entitlements: '',
+        notes: '',
+        verification_source: '',
+        verification_date: '',
+        adjustments: createDefaultAdjustments(),
+        unit_mix: [],
+        contacts: createDefaultContacts(),
+        history: [],
+        ...override,
+      };
+      reset(defaults);
+      setAccordionOpen({
+        transaction: true,
+        property: true,
+        unit_mix: true,
+        contacts: true,
+        history: false,
+        documents: false,
+        notes: false,
+      });
+      setActiveOverlay(null);
+      setOverlayMessage('');
+    };
+
+    if (!isEditMode) {
+      setDefaults();
+      return;
+    }
+
+    setLoading(true);
+    getSalesComparable(projectId, comparableId)
+      .then((comp) => {
+        const extra = (comp.extra_data ?? {}) as Record<string, unknown>;
+
+        const existingAdjustments = (comp.adjustments ?? []).map((item) => ({
+          adjustment_id: item.adjustment_id,
+          adjustment_type: normalizeAdjustmentType(item.adjustment_type),
+          adjustment_pct: item.user_adjustment_pct ?? item.adjustment_pct,
+          adjustment_amount: item.adjustment_amount,
+          user_notes: item.user_notes ?? '',
+          justification: item.justification ?? '',
+          subject_value: item.subject_value ?? '',
+          comp_value: item.comp_value ?? '',
+          landscaper_analysis: item.landscaper_analysis ?? '',
+          ai_accepted: item.ai_accepted,
+          confidence_score: item.confidence_score ?? null,
+        }));
+
+        const adjustmentMap = new globalThis.Map<AdjustmentType, AdjustmentFormRow>();
+        createDefaultAdjustments().forEach((row) => {
+          adjustmentMap.set(row.adjustment_type, row);
+        });
+        existingAdjustments.forEach((row) => {
+          adjustmentMap.set(row.adjustment_type, {
+            ...adjustmentMap.get(row.adjustment_type),
+            ...row,
+          });
+        });
+
+        const contacts = ensureRoleRows(
+          (comp.contacts ?? []).map((contact, index) => ({
+            role: contact.role,
+            name: readString(contact.name),
+            company: readString(contact.company),
+            phone: readString(contact.phone),
+            email: readString(contact.email),
+            is_verification_source: Boolean(contact.is_verification_source),
+            verification_date: readString(contact.verification_date),
+            sort_order: contact.sort_order ?? index,
+          })),
+        );
+
+        const unitMixRows = Array.isArray(comp.unit_mix)
+          ? (comp.unit_mix as SalesCompUnitMixRow[]).map((row) => ({
+              unit_type: readString(row.unit_type),
+              bed_count: readString(row.bed_count),
+              bath_count: readString(row.bath_count),
+              unit_count: readString(row.unit_count),
+              unit_pct: readString(row.unit_pct),
+              avg_unit_sf: readString(row.avg_unit_sf),
+              asking_rent_min: readString(row.asking_rent_min),
+              asking_rent_max: readString(row.asking_rent_max),
+              asking_rent_per_sf_min: readString(row.asking_rent_per_sf_min),
+              vacant_units: readString(row.vacant_units),
+            }))
+          : [];
+
+        const historyRows = (comp.history ?? []).map((row: SalesCompHistory) => ({
+          sale_date: readString(row.sale_date),
+          sale_price: readString(row.sale_price),
+          price_per_unit: readString(row.price_per_unit),
+          buyer_name: readString(row.buyer_name),
+          seller_name: readString(row.seller_name),
+        }));
+
+        setDefaults({
+          property_type: (comp.property_type || propertyType || 'MULTIFAMILY').toUpperCase(),
+          property_name: readString(comp.property_name),
+          address: readString(comp.address),
+          city: readString(comp.city),
+          state: readString(comp.state),
+          zip: readString(comp.zip),
+          latitude: readString(comp.latitude),
+          longitude: readString(comp.longitude),
+          sale_date: readString(comp.sale_date),
+          sale_price: readString(comp.sale_price),
+          cap_rate: readString(comp.cap_rate),
+          property_rights: readString(comp.property_rights),
+          financing_type: readString((comp as unknown as Record<string, unknown>).financing_type),
+          sale_conditions: readString(comp.sale_conditions),
+          year_built: readString(comp.year_built),
+          units: readString(comp.units),
+          building_sf: readString(comp.building_sf),
+          stories: readString((comp as unknown as Record<string, unknown>).num_floors ?? extra.stories),
+          land_area_acres: readString(comp.land_area_acres),
+          parking_spaces: readString((comp as unknown as Record<string, unknown>).parking_spaces ?? extra.parking_spaces),
+          quality: readString(extra.quality),
+          property_other: readString(extra.property_other),
+          zoning: readString(comp.zoning),
+          entitlements: readString(comp.entitlements),
+          notes: readString(comp.notes),
+          verification_source: readString(comp.verification_source),
+          verification_date: readString(comp.verification_date),
+          adjustments: Array.from(adjustmentMap.values()),
+          unit_mix: unitMixRows,
+          contacts,
+          history: historyRows,
+        });
+      })
+      .catch((error) => {
+        console.error('Failed to load sales comparable detail:', error);
+      })
+      .finally(() => setLoading(false));
+  }, [
+    comparableId,
+    isEditMode,
+    isOpen,
+    projectId,
+    propertyType,
+    reset,
+    subjectCoords?.lat,
+    subjectCoords?.lng,
+  ]);
+
+  const onSelectVerificationSource = useCallback((nextValue: string) => {
+    const currentContacts = getValues('contacts') || [];
+    if (nextValue === 'public_records') {
+      setValue('verification_source', 'Public Records', { shouldDirty: true });
+      setValue(
+        'contacts',
+        currentContacts.map((contact) => ({
+          ...contact,
+          is_verification_source: false,
+        })),
+        { shouldDirty: true },
+      );
+      return;
+    }
+
+    if (nextValue.startsWith('contact-')) {
+      const index = Number(nextValue.split('-')[1]);
+      if (Number.isNaN(index) || !currentContacts[index]) return;
+      const selected = currentContacts[index];
+      setValue('verification_source', formatContactSource(selected), { shouldDirty: true });
+      setValue(
+        'contacts',
+        currentContacts.map((contact, idx) => ({
+          ...contact,
+          is_verification_source: idx === index,
+          verification_date: idx === index ? watchedVerificationDate : contact.verification_date,
+        })),
+        { shouldDirty: true },
+      );
+    }
+  }, [getValues, setValue, watchedVerificationDate]);
+
+  const verificationSelectValue = useMemo(() => {
+    if (watchedVerificationSource === 'Public Records') return 'public_records';
+    const flaggedIndex = watchedContacts.findIndex(
+      (contact) => contact.is_verification_source && contact.name.trim().length > 0,
+    );
+    if (flaggedIndex >= 0) return `contact-${flaggedIndex}`;
+
+    const matchedIndex = watchedContacts.findIndex(
+      (contact) => formatContactSource(contact) === watchedVerificationSource,
+    );
+    if (matchedIndex >= 0) return `contact-${matchedIndex}`;
+
+    if (watchedVerificationSource) return 'custom';
+    return '';
+  }, [watchedContacts, watchedVerificationSource]);
+
+  const verificationSourceOptions = useMemo(() => {
+    return watchedContacts
+      .map((contact, index) => ({ contact, index }))
+      .filter(({ contact }) => contact.name.trim().length > 0)
+      .map(({ contact, index }) => ({
+        value: `contact-${index}`,
+        label: formatContactSource(contact),
+      }));
+  }, [watchedContacts]);
+
+  const applyOverlayAdjustments = useCallback((section: OverlaySection) => {
+    const recommendation = OVERLAY_RECOMMENDATIONS[section];
+    recommendation.rows.forEach((row) => {
+      setAdjustmentValue(row.type, {
+        adjustment_pct: row.pct,
+        user_notes: row.rationale,
+      });
+    });
+    setActiveOverlay(null);
+  }, [setAdjustmentValue]);
+
+  const buildPayload = useCallback((values: SalesCompFormValues): SalesComparableForm => {
+    const serializedAdjustments = values.adjustments
+      .map((row) => ({
+        ...row,
+        adjustment_pct: row.adjustment_pct,
+      }))
+      .filter((row) => {
+        return (
+          row.adjustment_pct != null ||
+          Boolean(row.user_notes?.trim()) ||
+          Boolean(row.justification?.trim()) ||
+          Boolean(row.ai_accepted)
+        );
+      })
+      .map((row) => ({
+        adjustment_type: row.adjustment_type,
+        adjustment_pct: row.adjustment_pct,
+        adjustment_amount: salePriceNum == null || row.adjustment_pct == null
+          ? null
+          : salePriceNum * (row.adjustment_pct / 100),
+        user_notes: row.user_notes || null,
+        justification: row.justification || null,
+        subject_value: row.subject_value || null,
+        comp_value: row.comp_value || null,
+        landscaper_analysis: row.landscaper_analysis || null,
+        ai_accepted: Boolean(row.ai_accepted),
+        confidence_score: row.confidence_score ?? null,
+      }));
+
+    const serializedUnitMix = values.unit_mix
+      .map((row) => ({
+        unit_type: row.unit_type || null,
+        bed_count: toNumber(row.bed_count),
+        bath_count: toNumber(row.bath_count),
+        unit_count: toNumber(row.unit_count) ?? 0,
+        unit_pct: toNumber(row.unit_pct),
+        avg_unit_sf: toNumber(row.avg_unit_sf),
+        asking_rent_min: toNumber(row.asking_rent_min),
+        asking_rent_max: toNumber(row.asking_rent_max),
+        asking_rent_per_sf_min: toNumber(row.asking_rent_per_sf_min),
+        vacant_units: toNumber(row.vacant_units) ?? 0,
+      }))
+      .filter((row) => row.unit_type || row.unit_count > 0);
+
+    const serializedContacts = values.contacts
+      .map((row, idx) => ({
+        role: row.role,
+        name: row.name.trim() || null,
+        company: row.company.trim() || null,
+        phone: row.phone.trim() || null,
+        email: row.email.trim() || null,
+        is_verification_source: Boolean(row.is_verification_source),
+        verification_date: row.is_verification_source
+          ? values.verification_date || row.verification_date || null
+          : null,
+        sort_order: row.sort_order ?? idx,
+      }))
+      .filter((row) => row.name || row.company || row.phone || row.email || BASE_CONTACT_ROLES.includes(row.role));
+
+    const serializedHistory = values.history
+      .map((row) => ({
+        sale_date: row.sale_date || null,
+        sale_price: toNumber(row.sale_price),
+        price_per_unit: toNumber(row.price_per_unit),
+        buyer_name: row.buyer_name.trim() || null,
+        seller_name: row.seller_name.trim() || null,
+      }))
+      .filter((row) => row.sale_date || row.sale_price != null || row.buyer_name || row.seller_name);
+
+    const payload: SalesComparableForm = {
       project_id: projectId,
-      property_type: propertyType?.toUpperCase() || null,
-      property_name: form.property_name || null,
-      address: form.address || null,
-      city: form.city || null,
-      state: form.state || null,
-      zip: form.zip || null,
-      sale_date: form.sale_date || null,
-      sale_price: salePrice,
-      latitude: parseNum(form.latitude) != null ? truncCoord(parseNum(form.latitude)!) : null,
-      longitude: parseNum(form.longitude) != null ? truncCoord(parseNum(form.longitude)!) : null,
-      notes: form.notes || null,
-      extra_data: Object.keys(extra).length > 0 ? extra : null,
-      sale_conditions: form.sale_conditions || null,
-      property_rights: form.property_rights || null,
-    };
+      property_type: values.property_type || null,
+      comp_number: compNumber ?? null,
+      property_name: values.property_name || null,
+      address: values.address || null,
+      city: values.city || null,
+      state: values.state || null,
+      zip: values.zip || null,
+      latitude: toNumber(values.latitude),
+      longitude: toNumber(values.longitude),
+      sale_date: values.sale_date || null,
+      sale_price: toNumber(values.sale_price),
+      cap_rate: toNumber(values.cap_rate),
+      sale_conditions: values.sale_conditions || null,
+      property_rights: values.property_rights || null,
+      verification_source: values.verification_source || null,
+      verification_date: values.verification_date || null,
+      year_built: toNumber(values.year_built),
+      units: toNumber(values.units),
+      building_sf: toNumber(values.building_sf),
+      land_area_acres: toNumber(values.land_area_acres),
+      land_area_sf: lotSizeSf,
+      zoning: values.zoning || null,
+      entitlements: values.entitlements || null,
+      notes: values.notes || null,
+      adjustments: serializedAdjustments,
+      unit_mix: serializedUnitMix,
+      contacts: serializedContacts,
+      history: serializedHistory,
+      extra_data: {
+        stories: toNumber(values.stories),
+        parking_spaces: toNumber(values.parking_spaces),
+        quality: values.quality || null,
+        property_other: values.property_other || null,
+      },
+    } as SalesComparableForm;
 
-    if (isLand) {
-      payload.land_area_sf = landSf;
-      payload.land_area_acres = landAcres;
-      payload.zoning = form.zoning || null;
-      payload.entitlements = form.entitlements || null;
-      payload.units = landAcres;
-      payload.building_sf = form.zoning || null;
-    } else {
-      payload.year_built = yearBuilt;
-      payload.units = unitsNum;
-      payload.building_sf = bldgSf;
-    }
+    (payload as unknown as Record<string, unknown>).financing_type = values.financing_type || null;
+    (payload as unknown as Record<string, unknown>).num_floors = toNumber(values.stories);
+    (payload as unknown as Record<string, unknown>).parking_spaces = toNumber(values.parking_spaces);
 
-    return payload as unknown as SalesComparableForm;
-  }, [form, history, projectId, propertyType, isLand, salePrice, landSf, landAcres, unitsNum, bldgSf, yearBuilt]);
+    return payload;
+  }, [compNumber, lotSizeSf, projectId, salePriceNum]);
 
-  // ---- Save ----
-
-  const handleSave = async () => {
+  const onSubmit = handleSubmit(async (values) => {
     setSaving(true);
     try {
-      const payload = buildPayload();
-      if (isEditMode) {
-        await updateSalesComparable(projectId, comparableId!, payload);
+      const payload = buildPayload(values);
+      if (isEditMode && comparableId != null) {
+        await updateSalesComparable(projectId, comparableId, payload);
       } else {
         await createSalesComparable(projectId, payload);
       }
       onSaved();
       onClose();
-    } catch (err) {
-      console.error('Save failed:', err);
-      alert(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } catch (error) {
+      console.error('Failed to save comparable detail modal:', error);
+      alert(`Save failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
-  };
+  });
 
-  // ---- Delete ----
+  const onDelete = useCallback(async () => {
+    if (!isEditMode || comparableId == null) return;
+    const confirmed = window.confirm('Delete this comparable? This action cannot be undone.');
+    if (!confirmed) return;
 
-  const handleDelete = async () => {
-    if (!isEditMode) return;
     try {
-      await deleteSalesComparable(projectId, comparableId!);
+      await deleteSalesComparable(projectId, comparableId);
       onSaved();
       onClose();
-    } catch (err) {
-      console.error('Delete failed:', err);
-      alert(`Delete failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } catch (error) {
+      console.error('Failed to delete comparable:', error);
+      alert(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  };
+  }, [comparableId, isEditMode, onClose, onSaved, projectId]);
 
-  // ---- Adjustments CRUD ----
-
-  const handleAddAdjustment = async (type: AdjustmentType) => {
-    if (!isEditMode) return;
-    try {
-      const result = await addAdjustment(projectId, comparableId!, {
-        adjustment_type: type,
-        adjustment_pct: 0,
-        justification: '',
-      });
-      setAdjustments(result.adjustments ?? []);
-    } catch (err) {
-      console.error('Add adjustment failed:', err);
-    }
-  };
-
-  const handleUpdateAdjustment = async (adjId: number, pct: number | null, notes?: string) => {
-    try {
-      await updateUserAdjustment(adjId, {
-        user_adjustment_pct: pct,
-        user_notes: notes,
-      });
-      // Re-fetch comp to get updated adjustments
-      if (isEditMode) {
-        const comp = await getSalesComparable(projectId, comparableId!);
-        setAdjustments(comp.adjustments ?? []);
-      }
-    } catch (err) {
-      console.error('Update adjustment failed:', err);
-    }
-  };
-
-  const handleDeleteAdjustment = async (adjId: number) => {
-    try {
-      await deleteAdjustment(adjId);
-      setAdjustments((prev) => prev.filter((a) => a.adjustment_id !== adjId));
-    } catch (err) {
-      console.error('Delete adjustment failed:', err);
-    }
-  };
-
-  // ---- History ----
-
-  const handleAddHistory = () => {
-    setHistory((prev) => [...prev, { date: '', event: 'Sale', price: '', notes: '' }]);
-  };
-
-  const handleHistoryChange = (idx: number, field: keyof HistoryEntry, value: string) => {
-    setHistory((prev) => prev.map((h, i) => (i === idx ? { ...h, [field]: value } : h)));
-  };
-
-  const handleDeleteHistory = (idx: number) => {
-    setHistory((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // ---- Render helpers ----
-
-  const inputCls = 'form-control form-control-sm';
-  const selectCls = 'form-select form-select-sm';
-  const readOnlyStyle = { background: 'var(--cui-tertiary-bg)' };
-  const labelCls = 'form-label mb-0 small';
+  const contactsCount = watchedContacts.length;
+  const historyCount = historyArray.fields.length;
+  const propertyTypeLabel = formatPropertyTypeLabel(watchedPropertyType || propertyType || 'MULTIFAMILY');
 
   if (!isOpen) return null;
 
-  // ===========================================================================
-  // RENDER — portaled to document.body to escape ancestor stacking contexts
-  // ===========================================================================
-
-  const modalContent = (
+  const modal = (
     <>
-      {/* Backdrop — clicking this closes the modal */}
-      <div
-        className="modal-backdrop fade show"
-        style={{ zIndex: 1050 }}
-        onClick={handleCloseAttempt}
-      />
-      {/* Modal wrapper — fully inline-styled, NO CoreUI .modal class */}
-      <div
-        style={{
-          display: 'block',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          zIndex: 1055,
-          overflowX: 'hidden',
-          overflowY: 'auto',
-        }}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div
-          className="modal-dialog modal-dialog-scrollable"
-          style={{ maxWidth: 1080, pointerEvents: 'auto' }}
-        >
-          <div
-            className="card mb-0"
-            style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}
-          >
-            {/* ============= HEADER ============= */}
-            <div
-              className="card-header d-flex align-items-center justify-content-between"
-              style={{ backgroundColor: 'var(--cui-card-header-bg)' }}
-            >
+      <div className="modal-backdrop fade show" onClick={onClose} />
+      <div className={styles.modalRoot} role="dialog" aria-modal="true">
+        <div className={combineClassNames('modal-dialog modal-dialog-scrollable', styles.modalDialog)}>
+          <div className={combineClassNames(styles.modalContent, 'salesCompDetailModal')}>
+            <div className={combineClassNames('d-flex align-items-center justify-content-between', styles.header)}>
               <div className="d-flex align-items-center gap-2">
-                <h5 className="mb-0" style={{ color: 'var(--cui-body-color)' }}>
-                  {form.property_name || (isEditMode ? 'Edit Comparable' : 'New Comparable')}
-                </h5>
-                {compNumber != null && (
-                  <span
-                    className="badge"
-                    style={{
-                      backgroundColor: getCompMarkerColor(compNumber).bg,
-                      color: getCompMarkerColor(compNumber).text,
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    Comp {compNumber}
-                  </span>
-                )}
-                <span
-                  className="badge"
-                  style={{ backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-body-color)', fontSize: '0.7rem' }}
-                >
-                  {pType || 'UNKNOWN'}
+                <h5 className={styles.headerTitle}>{watchedPropertyName || (isEditMode ? 'Edit Comparable' : 'New Comparable')}</h5>
+                {compNumber != null && <span className="badge bg-danger">Comp {compNumber}</span>}
+                <span className={combineClassNames('badge', styles.badgeOutline)}>
+                  {propertyTypeLabel}
                 </span>
               </div>
-              <button type="button" className="btn-close" onClick={handleCloseAttempt} />
+              <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
             </div>
 
-            {/* ============= KPI STRIP ============= */}
-            <div
-              className="d-flex align-items-center gap-3 px-3 py-2"
-              style={{
-                borderBottom: '1px solid var(--cui-border-color)',
-                backgroundColor: 'var(--cui-secondary-bg)',
-                fontSize: '0.8rem',
-              }}
-            >
-              <KpiChip label="Sale Price" value={fmtDollar(salePrice)} />
-              <KpiChip label="Sale Date" value={form.sale_date || '—'} />
-              <KpiChip label={keyMetricLabel} value={fmtDollar(keyMetricValue)} />
-              <KpiChip label="Net Adj %" value={fmtPct(netAdjPct)} />
-              <KpiChip label="Adjusted Price" value={fmtDollar(adjustedPrice)} highlight />
-            </div>
-
-            {/* ============= TABS ============= */}
-            <div
-              className="px-3 pt-2"
-              style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
-            >
-              <ul className="nav nav-tabs" style={{ borderBottom: 'none', marginBottom: -1 }}>
-                {TABS.map((tab) => (
-                  <li className="nav-item" key={tab.key}>
-                    <button
-                      type="button"
-                      className={`nav-link${activeTab === tab.key ? ' active' : ''}`}
-                      onClick={() => setActiveTab(tab.key)}
-                      style={{
-                        color: activeTab === tab.key ? 'var(--cui-primary)' : 'var(--cui-body-color)',
-                        backgroundColor: activeTab === tab.key ? 'var(--cui-card-bg)' : 'transparent',
-                        borderColor: activeTab === tab.key ? 'var(--cui-border-color) var(--cui-border-color) var(--cui-card-bg)' : 'transparent',
-                        fontSize: '0.8rem',
-                        fontWeight: activeTab === tab.key ? 600 : 400,
-                      }}
-                    >
-                      {tab.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* ============= TAB CONTENT ============= */}
-            <div className="card-body" style={{ maxHeight: '60vh', overflowY: 'auto', backgroundColor: 'var(--cui-card-bg)' }}>
+            <div ref={modalBodyRef} className={styles.body}>
               {loading ? (
-                <div className="text-center py-5" style={{ color: 'var(--cui-secondary-color)' }}>
-                  Loading comparable data...
+                <div className={combineClassNames('py-5 text-center small', styles.mutedText)}>
+                  Loading comparable detail...
                 </div>
               ) : (
                 <>
-                  {activeTab === 'overview' && (
-                    <OverviewTab
-                      form={form} handleInput={handleInput}
-                      handleSalePriceChange={handleSalePriceChange}
-                      isLand={isLand}
-                      landPricePerSf={landPricePerSf}
-                      pricePerUnit={pricePerUnit} pricePerSf={pricePerSf}
-                      capRateValue={capRateValue} grmValue={grmValue}
-                      markerLat={markerLat} markerLng={markerLng}
-                      subjectLoc={subjectLoc} compNumber={compNumber}
-                      allComparables={allComparables}
-                      mapRef={mapRef}
-                      handleMapMouseDown={handleMapMouseDown}
-                      handleMapClick={handleMapClick}
-                      handleMarkerDrag={handleMarkerDrag}
-                      inputCls={inputCls} selectCls={selectCls} labelCls={labelCls}
+                  <div className={styles.mapCard}>
+                    {compCoords && subjectCoords ? (
+                      <div className={styles.mapFrame}>
+                        <Map
+                          ref={mapRef}
+                          mapStyle={MAP_STYLE}
+                          initialViewState={{
+                            latitude: (compCoords.lat + subjectCoords.lat) / 2,
+                            longitude: (compCoords.lng + subjectCoords.lng) / 2,
+                            zoom: 11,
+                          }}
+                          onMove={() => updateLineProjection()}
+                          onResize={() => updateLineProjection()}
+                          onLoad={() => updateLineProjection()}
+                          style={{ width: '100%', height: '100%' }}
+                          scrollZoom={false}
+                        >
+                          <NavigationControl position="bottom-right" />
+                          <Marker latitude={subjectCoords.lat} longitude={subjectCoords.lng}>
+                            <div className="d-flex flex-column align-items-center">
+                              <div className={combineClassNames(styles.pin, styles.pinSubject)}>S</div>
+                              <div className={styles.pinLabel}>
+                                {subject?.name || 'Subject'} {subject?.city ? `• ${subject.city}` : ''}
+                              </div>
+                            </div>
+                          </Marker>
+                          <Marker latitude={compCoords.lat} longitude={compCoords.lng}>
+                            <div className="d-flex flex-column align-items-center">
+                              <div className={combineClassNames(styles.pin, styles.pinComp)}>{compNumber ?? 1}</div>
+                              <div className={styles.pinLabel}>
+                                {(watchedPropertyName || 'Comparable').toString()} {watchedCity ? `• ${watchedCity}` : ''}
+                              </div>
+                            </div>
+                          </Marker>
+                        </Map>
+
+                        {linePixels && (
+                          <div className={styles.mapLineLayer}>
+                            <svg width="100%" height="100%">
+                              <line
+                                x1={linePixels.x1}
+                                y1={linePixels.y1}
+                                x2={linePixels.x2}
+                                y2={linePixels.y2}
+                                stroke="var(--cui-info)"
+                                strokeDasharray="6 5"
+                                strokeWidth="2"
+                              />
+                            </svg>
+                            <div
+                              className={styles.mapDistanceChip}
+                              style={{
+                                left: `${(linePixels.x1 + linePixels.x2) / 2}px`,
+                                top: `${(linePixels.y1 + linePixels.y2) / 2}px`,
+                              }}
+                            >
+                              {distanceMiles == null ? DASH : `${distanceMiles.toFixed(2)} mi`}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={styles.mapPlaceholder}>Map will populate when address is geocoded</div>
+                    )}
+                  </div>
+
+                  <div className={styles.addressBar}>
+                    <div className={styles.addressGrid}>
+                      <div>
+                        <label className={styles.fieldLabel}>Property Name</label>
+                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('property_name')} />
+                      </div>
+                      <div>
+                        <label className={styles.fieldLabel}>Address</label>
+                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('address')} />
+                      </div>
+                      <div>
+                        <label className={styles.fieldLabel}>City</label>
+                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('city')} />
+                      </div>
+                      <div>
+                        <label className={styles.fieldLabel}>State</label>
+                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('state')} />
+                      </div>
+                      <div>
+                        <label className={styles.fieldLabel}>Zip</label>
+                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('zip')} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.kpiStrip}>
+                    <KpiItem title="Sale Price" value={formatCurrency(salePriceNum)} />
+                    <KpiItem title="Sale Date" value={watchedSaleDate || DASH} />
+                    <KpiItem title="$/Unit" value={formatCurrency(pricePerUnit)} />
+                    <KpiItem title="Cap Rate" value={formatPercent(capRateNum)} />
+                    <KpiItem title="Net Adj" value={toFixedOrDash(netAdjPct)} className={signedValueClass(netAdjPct)} />
+                    <KpiItem title="Adj $/Unit" value={formatCurrency(adjPricePerUnit)} className={signedValueClass(adjPricePerUnit)} />
+                  </div>
+
+                  <Section
+                    title="Transaction"
+                    open={accordionOpen.transaction}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, transaction: !prev.transaction }))}
+                    headerMeta={`Subtotal: ${toFixedOrDash(transactionSubtotalPct)} / ${formatCurrency(transactionSubtotalAmt, true)}`}
+                    landscaperButton={
+                      <button
+                        ref={(node) => {
+                          overlayTriggerRefs.current.transaction = node;
+                        }}
+                        type="button"
+                        className={styles.landscaperBtn}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openOverlay('transaction');
+                        }}
+                      >
+                        <span className={styles.pulseDot} />Landscaper
+                      </button>
+                    }
+                  >
+                    <div className={styles.fieldGridHeader}>
+                      <div>Field</div>
+                      <div>Value</div>
+                      <div className="text-end">Adj %</div>
+                      <div className="text-end">Adj $</div>
+                      <div>Notes</div>
+                    </div>
+
+                    <div className={styles.fieldGridRow}>
+                      <div className={styles.fieldName}>Sale Date</div>
+                      <div>
+                        <input type="date" className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('sale_date')} />
+                      </div>
+                      <div />
+                      <div />
+                      <div />
+                    </div>
+
+                    <div className={styles.fieldGridRow}>
+                      <div className={styles.fieldName}>Sale Price</div>
+                      <div>
+                        <div className={styles.inputPrefix}>
+                          <span className={styles.prefix}>$</span>
+                          <Controller
+                            control={control}
+                            name="sale_price"
+                            render={({ field }) => (
+                              <DashNumericInput
+                                value={field.value}
+                                onChange={field.onChange}
+                                textEnd={false}
+                                className={styles.prefixedInput}
+                              />
+                            )}
+                          />
+                        </div>
+                      </div>
+                      <div />
+                      <div />
+                      <div />
+                    </div>
+
+                    <AdjustmentRow
+                      label="Property Rights"
+                      valueNode={
+                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('property_rights')}>
+                          <option value="">Select</option>
+                          {PROPERTY_RIGHTS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      }
+                      adjustment={getAdjustment('property_rights')}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('property_rights').adjustment_pct ?? 0) / 100)}
+                      onPctChange={(nextPct) => setAdjustmentValue('property_rights', { adjustment_pct: nextPct })}
+                      onNotesChange={(nextNotes) => setAdjustmentValue('property_rights', { user_notes: nextNotes })}
                     />
-                  )}
-                  {activeTab === 'property' && (
-                    <PropertyTab
-                      form={form} handleInput={handleInput}
-                      isLand={isLand} isMF={isMF} isOffice={isOffice} isRetail={isRetail}
-                      inputCls={inputCls} selectCls={selectCls} labelCls={labelCls}
+
+                    <AdjustmentRow
+                      label="Financing"
+                      valueNode={
+                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('financing_type')}>
+                          <option value="">Select</option>
+                          {FINANCING_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      }
+                      adjustment={getAdjustment('financing')}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('financing').adjustment_pct ?? 0) / 100)}
+                      onPctChange={(nextPct) => setAdjustmentValue('financing', { adjustment_pct: nextPct })}
+                      onNotesChange={(nextNotes) => setAdjustmentValue('financing', { user_notes: nextNotes })}
                     />
-                  )}
-                  {activeTab === 'adjustments' && (
-                    <AdjustmentsTab
-                      adjustments={adjustments}
-                      salePrice={salePrice}
-                      isEditMode={isEditMode}
-                      netAdjPct={netAdjPct}
-                      grossAdjPct={grossAdjPct}
-                      netAdjAmt={netAdjAmt}
-                      adjustedPrice={adjustedPrice}
-                      onAdd={handleAddAdjustment}
-                      onUpdate={handleUpdateAdjustment}
-                      onDelete={handleDeleteAdjustment}
-                      inputCls={inputCls} selectCls={selectCls} labelCls={labelCls}
+
+                    <AdjustmentRow
+                      label="Sale Conditions"
+                      valueNode={
+                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('sale_conditions')}>
+                          <option value="">Select</option>
+                          {SALE_CONDITIONS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      }
+                      adjustment={getAdjustment('sale_conditions')}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('sale_conditions').adjustment_pct ?? 0) / 100)}
+                      onPctChange={(nextPct) => setAdjustmentValue('sale_conditions', { adjustment_pct: nextPct })}
+                      onNotesChange={(nextNotes) => setAdjustmentValue('sale_conditions', { user_notes: nextNotes })}
                     />
-                  )}
-                  {activeTab === 'history' && (
-                    <HistoryTab
-                      entries={history}
-                      onAdd={handleAddHistory}
-                      onChange={handleHistoryChange}
-                      onDelete={handleDeleteHistory}
-                      inputCls={inputCls} selectCls={selectCls} labelCls={labelCls}
+
+                    <AdjustmentRow
+                      label="Market Conditions"
+                      valueNode={<CalculatedBadgeValue value={marketConditionText} badge="AUTO" />}
+                      adjustment={getAdjustment('market_conditions')}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('market_conditions').adjustment_pct ?? 0) / 100)}
+                      onPctChange={(nextPct) => setAdjustmentValue('market_conditions', { adjustment_pct: nextPct })}
+                      onNotesChange={(nextNotes) => setAdjustmentValue('market_conditions', { user_notes: nextNotes })}
                     />
+
+                    <div className={styles.fieldGridSubtotal}>
+                      <div>Subtotal</div>
+                      <div />
+                      <div className="text-end">{toFixedOrDash(transactionSubtotalPct)}</div>
+                      <div className="text-end">{formatCurrency(transactionSubtotalAmt, true)}</div>
+                      <div />
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Property"
+                    open={accordionOpen.property}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, property: !prev.property }))}
+                    headerMeta={`Subtotal: ${toFixedOrDash(propertySubtotalPct)} / ${formatCurrency(propertySubtotalAmt, true)}`}
+                    landscaperButton={
+                      <button
+                        ref={(node) => {
+                          overlayTriggerRefs.current.property = node;
+                        }}
+                        type="button"
+                        className={styles.landscaperBtn}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openOverlay('property');
+                        }}
+                      >
+                        <span className={styles.pulseDot} />Landscaper
+                      </button>
+                    }
+                  >
+                    <div className={styles.fieldGridHeader}>
+                      <div>Field</div>
+                      <div>Value</div>
+                      <div className="text-end">Adj %</div>
+                      <div className="text-end">Adj $</div>
+                      <div>Notes</div>
+                    </div>
+
+                    <AdjustmentRow
+                      label="Location"
+                      valueNode={<CalculatedBadgeValue value={locationComparison} badge="VS SUBJ" />}
+                      adjustment={getAdjustment('location')}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('location').adjustment_pct ?? 0) / 100)}
+                      onPctChange={(nextPct) => setAdjustmentValue('location', { adjustment_pct: nextPct })}
+                      onNotesChange={(nextNotes) => setAdjustmentValue('location', { user_notes: nextNotes })}
+                    />
+
+                    {!isLand ? (
+                      <>
+                        <AdjustmentRow
+                          label="Year Built"
+                          valueNode={
+                            <Controller
+                              control={control}
+                              name="year_built"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                              )}
+                            />
+                          }
+                          adjustment={getAdjustment('physical_age')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_age').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_age', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_age', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Units"
+                          valueNode={
+                            <Controller
+                              control={control}
+                              name="units"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                              )}
+                            />
+                          }
+                          adjustment={getAdjustment('physical_size')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_size').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_size', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_size', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Bldg SF"
+                          valueNode={
+                            <Controller
+                              control={control}
+                              name="building_sf"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                              )}
+                            />
+                          }
+                          adjustment={getAdjustment('physical_building_sf')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_building_sf').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_building_sf', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_building_sf', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Stories"
+                          valueNode={
+                            <Controller
+                              control={control}
+                              name="stories"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                              )}
+                            />
+                          }
+                          adjustment={getAdjustment('physical_stories')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_stories').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_stories', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_stories', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Lot Size (Acres)"
+                          valueNode={
+                            <Controller
+                              control={control}
+                              name="land_area_acres"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                              )}
+                            />
+                          }
+                          adjustment={getAdjustment('physical_lot_size')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_lot_size').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_lot_size', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_lot_size', { user_notes: nextNotes })}
+                        />
+
+                        <div className={styles.fieldGridRow}>
+                          <div className={styles.fieldName}>Lot Size (SF)</div>
+                          <div>
+                            <CalculatedBadgeValue value={formatNumber(lotSizeSf)} badge="CALC" />
+                          </div>
+                          <div />
+                          <div className={combineClassNames(styles.adjAmount, styles.valueNeutral)}>{DASH}</div>
+                          <div />
+                        </div>
+
+                        <div className={styles.fieldGridRow}>
+                          <div className={styles.fieldName}>Parking Spaces</div>
+                          <div className={styles.parkingInputWrap}>
+                            <Controller
+                              control={control}
+                              name="parking_spaces"
+                              render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} className={styles.parkingInput} />
+                              )}
+                            />
+                          </div>
+                          <div />
+                          <div />
+                          <div />
+                        </div>
+
+                        <div className={styles.fieldGridRow}>
+                          <div className={styles.fieldName}>Parking Ratio</div>
+                          <div>
+                            <CalculatedBadgeValue value={parkingRatio == null ? DASH : `${parkingRatio.toFixed(2)} / unit`} badge="CALC" />
+                          </div>
+                          <div />
+                          <div />
+                          <div />
+                        </div>
+
+                        <AdjustmentRow
+                          label="Unit Mix"
+                          valueNode={<CalculatedBadgeValue value={unitMixSummary} badge="VS SUBJ" />}
+                          adjustment={getAdjustment('physical_unit_mix')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_unit_mix').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_unit_mix', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_unit_mix', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Quality"
+                          valueNode={<input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('quality')} />}
+                          adjustment={getAdjustment('physical_condition')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_condition').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('physical_condition', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('physical_condition', { user_notes: nextNotes })}
+                        />
+
+                        <AdjustmentRow
+                          label="Other"
+                          valueNode={<input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('property_other')} />}
+                          adjustment={getAdjustment('other')}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('other').adjustment_pct ?? 0) / 100)}
+                          onPctChange={(nextPct) => setAdjustmentValue('other', { adjustment_pct: nextPct })}
+                          onNotesChange={(nextNotes) => setAdjustmentValue('other', { user_notes: nextNotes })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div className={styles.fieldGridRow}>
+                          <div className={styles.fieldName}>Zoning</div>
+                          <div>
+                            <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('zoning')} />
+                          </div>
+                          <div />
+                          <div className={styles.adjAmount}>{DASH}</div>
+                          <div />
+                        </div>
+
+                        <div className={styles.fieldGridRow}>
+                          <div className={styles.fieldName}>Entitlements</div>
+                          <div>
+                            <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('entitlements')} />
+                          </div>
+                          <div />
+                          <div className={styles.adjAmount}>{DASH}</div>
+                          <div />
+                        </div>
+                      </>
+                    )}
+
+                    <div className={styles.fieldGridSubtotal}>
+                      <div>Subtotal</div>
+                      <div />
+                      <div className="text-end">{toFixedOrDash(propertySubtotalPct)}</div>
+                      <div className="text-end">{formatCurrency(propertySubtotalAmt, true)}</div>
+                      <div />
+                    </div>
+
+                    <div className={styles.metricsStrip}>
+                      <MetricCard label="$/Unit" value={formatCurrency(pricePerUnit)} />
+                      <MetricCard label="$/SF" value={formatCurrency(pricePerSf)} />
+                      <MetricCard label="Cap Rate" value={formatPercent(capRateNum)} />
+                      <MetricCard label="GRM" value={DASH} />
+                      {/* GRM requires gross_income which is not on comp schema yet */}
+                    </div>
+                  </Section>
+
+                  <div className={styles.netBar}>
+                    <NetCell label="Transaction" value={toFixedOrDash(transactionSubtotalPct)} className={signedValueClass(transactionSubtotalPct)} />
+                    <NetCell label="Property" value={toFixedOrDash(propertySubtotalPct)} className={signedValueClass(propertySubtotalPct)} />
+                    <NetCell label="Net" value={toFixedOrDash(netAdjPct)} className={signedValueClass(netAdjPct)} />
+                    <NetCell label="Adj $/Unit" value={formatCurrency(adjPricePerUnit)} className={signedValueClass(adjPricePerUnit)} />
+                  </div>
+
+                  <Section
+                    title="Unit Mix"
+                    open={accordionOpen.unit_mix}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, unit_mix: !prev.unit_mix }))}
+                    headerMeta={unitMixHeaderSummary}
+                    landscaperButton={
+                      <button
+                        ref={(node) => {
+                          overlayTriggerRefs.current.unit_mix = node;
+                        }}
+                        type="button"
+                        className={styles.landscaperBtn}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openOverlay('unit_mix');
+                        }}
+                      >
+                        <span className={styles.pulseDot} />Landscaper
+                      </button>
+                    }
+                  >
+                    <div className={styles.tableWrap}>
+                      <table className={styles.compTable}>
+                        <thead>
+                          <tr>
+                            <th>Type</th>
+                            <th>Beds</th>
+                            <th>Baths</th>
+                            <th>#</th>
+                            <th>%</th>
+                            <th>Avg SF</th>
+                            <th>Rent Range</th>
+                            <th>$/SF</th>
+                            <th>Vacant</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {unitMixArray.fields.map((field, index) => (
+                            <tr key={field.id}>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`unit_mix.${index}.unit_type`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bed_count`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bath_count`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_count`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_pct`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.avg_unit_sf`)} /></td>
+                              <td>
+                                <div className="d-flex align-items-center gap-1">
+                                  <input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_min`)} />
+                                  <span className={styles.sectionMeta}>-</span>
+                                  <input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_max`)} />
+                                </div>
+                              </td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_per_sf_min`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.vacant_units`)} /></td>
+                              <td>
+                                <button type="button" className="btn btn-ghost-secondary btn-sm" onClick={() => unitMixArray.remove(index)}>×</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {unitMixArray.fields.length === 0 && (
+                            <tr>
+                              <td colSpan={10} className={combineClassNames('text-center', styles.mutedText)}>
+                                No unit mix rows yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={10}>Totals: {unitMixSummary}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                    <div className="mt-2">
+                      <button type="button" className={styles.addRowBtn} onClick={() => unitMixArray.append(createEmptyUnitMixRow())}>
+                        Add Unit Type
+                      </button>
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Contacts & Verification"
+                    open={accordionOpen.contacts}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, contacts: !prev.contacts }))}
+                    headerMeta={`${contactsCount} contacts`}
+                  >
+                    <div className={styles.tableWrap}>
+                      <table className={styles.compTable}>
+                        <thead>
+                          <tr>
+                            <th>Role</th>
+                            <th>Name</th>
+                            <th>Company</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {contactsArray.fields.map((field, index) => (
+                            <tr key={field.id}>
+                              <td>
+                                <span className={combineClassNames(styles.roleBadge, roleClassName(watchedContacts[index]?.role ?? 'buyer'))}>
+                                  {ROLE_LABEL[watchedContacts[index]?.role ?? 'buyer']}
+                                </span>
+                              </td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.name`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.company`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.phone`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.email`)} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        className={styles.addRowBtn}
+                        onClick={() => contactsArray.append({
+                          role: 'buyer',
+                          name: '',
+                          company: '',
+                          phone: '',
+                          email: '',
+                          is_verification_source: false,
+                          verification_date: '',
+                          sort_order: contactsArray.fields.length,
+                        })}
+                      >
+                        Add Contact
+                      </button>
+                    </div>
+
+                    <div className={styles.verificationBlock}>
+                      <div className={styles.verificationGrid}>
+                        <div className={styles.fieldLabel}>Confirmed By</div>
+                        <select
+                          className={combineClassNames('form-select form-select-sm', styles.smallControl)}
+                          value={verificationSelectValue}
+                          onChange={(event) => onSelectVerificationSource(event.target.value)}
+                        >
+                          <option value="">Select source</option>
+                          {verificationSourceOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                          <option value="public_records">Public Records</option>
+                          {verificationSelectValue === 'custom' && (
+                            <option value="custom">{watchedVerificationSource}</option>
+                          )}
+                        </select>
+                        <Controller
+                          control={control}
+                          name="verification_date"
+                          render={({ field }) => (
+                            <input
+                              type="date"
+                              className={combineClassNames('form-control form-control-sm', styles.smallControl)}
+                              value={field.value}
+                              onChange={(event) => {
+                                field.onChange(event.target.value);
+                                const currentContacts = getValues('contacts') || [];
+                                setValue(
+                                  'contacts',
+                                  currentContacts.map((contact) =>
+                                    contact.is_verification_source
+                                      ? { ...contact, verification_date: event.target.value }
+                                      : contact,
+                                  ),
+                                  { shouldDirty: true },
+                                );
+                              }}
+                            />
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Sale History"
+                    open={accordionOpen.history}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, history: !prev.history }))}
+                    headerMeta={`${historyCount} prior sales`}
+                  >
+                    <div className={styles.tableWrap}>
+                      <table className={styles.compTable}>
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Price</th>
+                            <th>$/Unit</th>
+                            <th>Buyer</th>
+                            <th>Seller</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyArray.fields.map((field, index) => (
+                            <tr key={field.id}>
+                              <td><input type="date" className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.sale_date`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`history.${index}.sale_price`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`history.${index}.price_per_unit`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.buyer_name`)} /></td>
+                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.seller_name`)} /></td>
+                              <td><button type="button" className="btn btn-ghost-secondary btn-sm" onClick={() => historyArray.remove(index)}>×</button></td>
+                            </tr>
+                          ))}
+                          {historyArray.fields.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className={combineClassNames('text-center', styles.mutedText)}>
+                                No prior sale records.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-2">
+                      <button type="button" className={styles.addRowBtn} onClick={() => historyArray.append(createEmptyHistoryRow())}>
+                        Add Prior Sale
+                      </button>
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Documents & Photos"
+                    open={accordionOpen.documents}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, documents: !prev.documents }))}
+                    headerMeta="0 files"
+                  >
+                    <div className={styles.docDropzone}>
+                      <div>
+                        <CIcon icon={cilCloudUpload} className={styles.docIcon} />
+                        <div className={styles.docText}>Drop files or click to upload</div>
+                        <button
+                          type="button"
+                          className={styles.docDmsLink}
+                          onClick={() => { /* DMS modal integration — future */ }}
+                        >
+                          Select from DMS →
+                        </button>
+                      </div>
+                    </div>
+                  </Section>
+
+                  <Section
+                    title="Notes"
+                    open={accordionOpen.notes}
+                    onToggle={() => setAccordionOpen((prev) => ({ ...prev, notes: !prev.notes }))}
+                  >
+                    <textarea className={combineClassNames('form-control form-control-sm', styles.notesArea)} {...register('notes')} />
+                  </Section>
+
+                  {activeOverlay && (
+                    <div className={styles.overlayPanel} style={{ top: `${overlayTop}px` }}>
+                      <div className={combineClassNames('d-flex align-items-center justify-content-between', styles.overlayHeader)}>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className={styles.overlayIcon}><span className={styles.pulseDot} /></span>
+                          <span className={styles.overlayTitle}>Landscaper</span>
+                          <span className={styles.overlayContext}>{OVERLAY_RECOMMENDATIONS[activeOverlay].title}</span>
+                        </div>
+                        <button type="button" className="btn-close btn-sm" onClick={() => setActiveOverlay(null)} />
+                      </div>
+
+                      <div className={styles.overlayBody}>
+                        <div className={combineClassNames('small mb-2', styles.mutedText)}>
+                          Recommended adjustments based on current comp profile and subject context.
+                        </div>
+
+                        {OVERLAY_RECOMMENDATIONS[activeOverlay].rows.map((row) => (
+                          <div key={row.type} className={styles.overlaySuggestion}>
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span className="fw-semibold small">{row.type.replace(/_/g, ' ')}</span>
+                              <span className="small fw-semibold">{toFixedOrDash(row.pct, 1)}</span>
+                            </div>
+                            <div className="small">{row.rationale}</div>
+                          </div>
+                        ))}
+
+                        <div className="small fw-semibold mb-1">Action chips</div>
+                        <div className={styles.overlayActions}>
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            onClick={() => applyOverlayAdjustments(activeOverlay)}
+                          >
+                            Apply adjustments
+                          </button>
+                          {OVERLAY_RECOMMENDATIONS[activeOverlay].actions
+                            .filter((action) => action !== 'Apply adjustments')
+                            .map((action) => (
+                              <span key={action} className={styles.actionChip}>{action}</span>
+                            ))}
+                        </div>
+                      </div>
+
+                      <div className={styles.overlayFooter}>
+                        <div className={combineClassNames('small mb-1', styles.mutedText)}>Prompt</div>
+                        <textarea
+                          className={combineClassNames('form-control form-control-sm mb-2', styles.notesArea)}
+                          value={overlayMessage}
+                          onChange={(event) => setOverlayMessage(event.target.value)}
+                        />
+                        <div className="d-flex justify-content-end">
+                          <button type="button" className="btn btn-success btn-sm" onClick={() => setOverlayMessage('')}>
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  {activeTab === 'documents' && <DocumentsTab />}
                 </>
               )}
             </div>
 
-            {/* ============= FOOTER ============= */}
-            <div
-              className="card-footer d-flex justify-content-between align-items-center"
-              style={{ backgroundColor: 'var(--cui-card-header-bg)', borderColor: 'var(--cui-border-color)' }}
-            >
+            <div className={combineClassNames('d-flex align-items-center justify-content-between', styles.footer)}>
               <div>
-                {isEditMode && !deleteConfirm && (
-                  <button
-                    type="button"
-                    className="btn btn-outline-danger btn-sm"
-                    onClick={() => setDeleteConfirm(true)}
-                  >
+                {isEditMode && (
+                  <button type="button" className="btn btn-outline-danger btn-sm" onClick={onDelete}>
                     Delete
                   </button>
                 )}
-                {isEditMode && deleteConfirm && (
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="small" style={{ color: 'var(--cui-danger)' }}>
-                      Are you sure?
-                    </span>
-                    <button type="button" className="btn btn-danger btn-sm" onClick={handleDelete}>
-                      Yes, Delete
-                    </button>
-                    <button type="button" className="btn btn-ghost-secondary btn-sm" onClick={() => setDeleteConfirm(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                )}
               </div>
-              <div className="d-flex gap-2">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={handleCloseAttempt}>
+              <div className="d-flex align-items-center gap-2">
+                <button type="button" className="btn btn-ghost-secondary btn-sm" onClick={onClose}>
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSave}
-                  disabled={saving}
-                >
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => onSubmit()} disabled={saving}>
                   {saving ? 'Saving...' : 'Save & Close'}
                 </button>
               </div>
@@ -842,799 +2056,107 @@ export function SalesCompDetailModal({
     </>
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(modal, document.body);
 }
 
-// ===========================================================================
-// KPI Chip
-// ===========================================================================
-
-function KpiChip({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Section({
+  title,
+  open,
+  onToggle,
+  children,
+  headerMeta,
+  landscaperButton,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+  headerMeta?: string;
+  landscaperButton?: ReactNode;
+}) {
   return (
-    <div className="d-flex flex-column" style={{ minWidth: 0 }}>
-      <span
-        className="text-uppercase"
-        style={{ fontSize: '0.6rem', color: 'var(--cui-secondary-color)', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}
+    <section className={combineClassNames(styles.section, open && styles.sectionOpen)}>
+      <button
+        type="button"
+        className={combineClassNames('d-flex align-items-center', styles.sectionHeader, open && styles.sectionHeaderOpen)}
+        onClick={onToggle}
       >
-        {label}
-      </span>
-      <span
-        className="fw-semibold"
-        style={{
-          fontSize: '0.85rem',
-          color: highlight ? 'var(--cui-primary)' : 'var(--cui-body-color)',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {value || '—'}
-      </span>
-    </div>
+        <span className={combineClassNames('d-flex align-items-center gap-2', styles.sectionHeading)}>
+          <span className={combineClassNames(styles.chevron, open && styles.chevronOpen)}>▸</span>
+          <span className={styles.sectionName}>{title}</span>
+          {landscaperButton}
+        </span>
+        {headerMeta && <span className={styles.sectionMeta}>{headerMeta}</span>}
+      </button>
+      {open && <div className={styles.sectionBody}>{children}</div>}
+    </section>
   );
 }
 
-function CalculatedValue({ value }: { value: string }) {
+function KpiItem({ title, value, className }: { title: string; value: string; className?: string }) {
   return (
-    <div
-      className="d-flex align-items-center justify-content-between rounded px-2 py-1"
-      style={{
-        border: '1px solid var(--cui-border-color)',
-        backgroundColor: 'var(--cui-tertiary-bg)',
-        minHeight: 31,
-      }}
-    >
-      <span style={{ color: 'var(--cui-body-color)', fontStyle: 'italic', fontSize: '0.8rem' }}>{value}</span>
-      <span className="badge border" style={{ fontSize: '0.6rem', color: 'var(--cui-secondary-color)' }}>calc</span>
+    <div className={styles.kpiItem}>
+      <div className={styles.kpiTitle}>{title}</div>
+      <div className={combineClassNames(styles.kpiValue, className)}>{value || DASH}</div>
     </div>
   );
 }
 
-// ===========================================================================
-// OVERVIEW TAB
-// ===========================================================================
-
-function OverviewTab({
-  form, handleInput, handleSalePriceChange,
-  isLand,
-  landPricePerSf, pricePerUnit, pricePerSf, capRateValue, grmValue,
-  markerLat, markerLng, subjectLoc, compNumber,
-  allComparables,
-  mapRef,
-  handleMapMouseDown, handleMapClick, handleMarkerDrag,
-  inputCls, selectCls, labelCls,
-}: {
-  form: FormFields;
-  handleInput: (field: keyof FormFields) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-  handleSalePriceChange: (value: string) => void;
-  isLand: boolean;
-  landPricePerSf: number | null;
-  pricePerUnit: number | null; pricePerSf: number | null;
-  capRateValue: number | null; grmValue: number | null;
-  markerLat: number; markerLng: number;
-  subjectLoc: { latitude: number; longitude: number };
-  compNumber?: number;
-  allComparables?: SalesComparable[];
-  mapRef: React.MutableRefObject<MapRef | null>;
-  handleMapMouseDown: (e: MapLayerMouseEvent) => void;
-  handleMapClick: (e: MapLayerMouseEvent) => void;
-  handleMarkerDrag: (e: MarkerDragEvent) => void;
-  inputCls: string; selectCls: string; labelCls: string;
-}) {
-  const [isPriceFocused, setIsPriceFocused] = useState(false);
-
-  const salePriceInputValue = useMemo(() => {
-    if (isPriceFocused) return form.sale_price;
-    const n = toNum(form.sale_price);
-    return n == null ? '' : Math.round(n).toLocaleString('en-US');
-  }, [form.sale_price, isPriceFocused]);
-
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="row g-3">
-      {/* ---- LEFT COLUMN: Transaction + Metrics ---- */}
-      <div className="col-7">
-        <h6 className="small fw-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>Transaction</h6>
-        <div className="d-flex gap-2 mb-2 flex-wrap">
-          <div style={{ flex: '0 0 180px' }}>
-            <label className={labelCls}>Sale Date *</label>
-            <input type="date" className={inputCls} value={form.sale_date} onChange={handleInput('sale_date')} />
-          </div>
-          <div style={{ flex: '0 0 180px' }}>
-            <label className={labelCls}>Sale Price *</label>
-            <div className="input-group input-group-sm">
-              <span className="input-group-text">$</span>
-              <input
-                type="text"
-                className="form-control"
-                value={salePriceInputValue}
-                onFocus={() => setIsPriceFocused(true)}
-                onBlur={() => setIsPriceFocused(false)}
-                onChange={(e) => handleSalePriceChange(e.target.value)}
-                inputMode="decimal"
-              />
-            </div>
-          </div>
-          <div style={{ flex: '1 1 auto' }}>
-            <label className={labelCls}>Sale Conditions</label>
-            <select className={selectCls} value={form.sale_conditions} onChange={handleInput('sale_conditions')}>
-              <option value="">Select...</option>
-              {SALE_CONDITIONS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <div className="d-flex gap-2 mb-2 flex-wrap">
-          <div style={{ flex: '1 1 260px' }}>
-            <label className={labelCls}>Property Rights</label>
-            <select className={selectCls} value={form.property_rights} onChange={handleInput('property_rights')}>
-              <option value="">Select...</option>
-              {PROPERTY_RIGHTS_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ flex: '1 1 260px' }}>
-            <label className={labelCls}>Verification</label>
-            <input type="text" className={inputCls} value={form.verification_status} onChange={handleInput('verification_status')} placeholder="Confirmed, Unconfirmed" />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-6">
-            <label className={labelCls}>Buyer Name</label>
-            <input type="text" className={inputCls} value={form.buyer_name} onChange={handleInput('buyer_name')} />
-          </div>
-          <div className="col-6">
-            <label className={labelCls}>Buyer Type</label>
-            <input type="text" className={inputCls} value={form.buyer_type} onChange={handleInput('buyer_type')} />
-          </div>
-        </div>
-        <div className="row g-2 mb-3">
-          <div className="col-6">
-            <label className={labelCls}>Seller Name</label>
-            <input type="text" className={inputCls} value={form.seller_name} onChange={handleInput('seller_name')} />
-          </div>
-          <div className="col-6">
-            <label className={labelCls}>Seller Type</label>
-            <input type="text" className={inputCls} value={form.seller_type} onChange={handleInput('seller_type')} />
-          </div>
-        </div>
-
-        {/* Metrics section */}
-        <h6 className="small fw-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>Metrics</h6>
-        <div className="row g-2 mb-2">
-          <div className="col-3">
-            <label className={labelCls}>$/Unit</label>
-            <CalculatedValue value={fmtDollar(pricePerUnit)} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>$/SF</label>
-            <CalculatedValue value={fmtDollar(isLand ? landPricePerSf : pricePerSf)} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Cap Rate %</label>
-            <CalculatedValue value={fmtPct(capRateValue)} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>GRM</label>
-            <CalculatedValue value={fmtMultiplier(grmValue)} />
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="mb-0">
-          <label className={labelCls}>Notes</label>
-          <textarea className={`${inputCls}`} rows={2} value={form.notes} onChange={handleInput('notes')} />
-        </div>
-      </div>
-
-      {/* ---- RIGHT COLUMN: Location + Map ---- */}
-      <div className="col-5">
-        <h6 className="small fw-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>Location</h6>
-        <div className="row g-2 mb-2">
-          <div className="col-12">
-            <label className={labelCls}>Property Name *</label>
-            <input type="text" className={inputCls} value={form.property_name} onChange={handleInput('property_name')} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-12">
-            <label className={labelCls}>Address</label>
-            <input type="text" className={inputCls} value={form.address} onChange={handleInput('address')} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-5">
-            <label className={labelCls}>City</label>
-            <input type="text" className={inputCls} value={form.city} onChange={handleInput('city')} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>State</label>
-            <input type="text" className={inputCls} value={form.state} onChange={handleInput('state')} />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Zip</label>
-            <input type="text" className={inputCls} value={form.zip} onChange={handleInput('zip')} />
-          </div>
-        </div>
-        {/* Map */}
-        <div style={{ height: 320, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--cui-border-color)' }}>
-          <Map
-            ref={mapRef}
-            mapStyle={MAP_STYLE}
-            initialViewState={{
-              latitude: markerLat,
-              longitude: markerLng,
-              zoom: 11,
-            }}
-            style={{ width: '100%', height: '100%' }}
-            scrollZoom={false}
-            onMouseDown={handleMapMouseDown}
-            onClick={handleMapClick}
-          >
-            <NavigationControl position="bottom-right" />
-            {/* Subject marker */}
-            <Marker longitude={subjectLoc.longitude} latitude={subjectLoc.latitude} offset={[0, -10]}>
-              <div style={{ color: '#0d6efd', fontSize: 20 }}>&#9733;</div>
-            </Marker>
-            {/* All other comps (faded) */}
-            {allComparables?.filter((c) => c.latitude && c.longitude).map((c, i) => {
-              const cn = c.comp_number ?? i + 1;
-              const { bg, text } = getCompMarkerColor(cn);
-              return (
-                <Marker key={c.comparable_id} longitude={Number(c.longitude)} latitude={Number(c.latitude)} offset={[0, -14]}>
-                  <div
-                    style={{
-                      width: 22, height: 22, borderRadius: '50%',
-                      backgroundColor: bg, border: '2px solid #000',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: text, fontSize: 10, fontWeight: 700, opacity: 0.5,
-                    }}
-                  >
-                    {cn}
-                  </div>
-                </Marker>
-              );
-            })}
-            {/* Current comp marker (draggable) */}
-            <Marker
-              longitude={markerLng}
-              latitude={markerLat}
-              draggable
-              onDragEnd={handleMarkerDrag}
-              offset={[0, -14]}
-            >
-              <div
-                style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  backgroundColor: getCompMarkerColor(compNumber ?? 1).bg,
-                  border: '2.5px solid #000',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: getCompMarkerColor(compNumber ?? 1).text,
-                  fontSize: 12, fontWeight: 700, cursor: 'grab',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                }}
-              >
-                {compNumber ?? '?'}
-              </div>
-            </Marker>
-          </Map>
-        </div>
-      </div>
+    <div className={styles.metricCard}>
+      <div className={styles.metricTitle}>{label}</div>
+      <div className={styles.metricValue}>{value}</div>
     </div>
   );
 }
 
-// ===========================================================================
-// PROPERTY TAB
-// ===========================================================================
+function NetCell({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={styles.netCell}>
+      <div className={styles.netLabel}>{label}</div>
+      <div className={combineClassNames(styles.netValue, className)}>{value || DASH}</div>
+    </div>
+  );
+}
 
-function PropertyTab({
-  form, handleInput,
-  isLand, isMF, isOffice, isRetail,
-  inputCls, selectCls, labelCls,
+function CalculatedBadgeValue({ value, badge }: { value: string; badge: string }) {
+  return (
+    <div className={styles.calcValue}>
+      <span>{value}</span>
+      <span className={styles.calcBadge}>{badge}</span>
+    </div>
+  );
+}
+
+function AdjustmentRow({
+  label,
+  valueNode,
+  adjustment,
+  adjustmentAmount,
+  onPctChange,
+  onNotesChange,
 }: {
-  form: FormFields;
-  handleInput: (field: keyof FormFields) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-  isLand: boolean; isMF: boolean; isOffice: boolean; isRetail: boolean;
-  inputCls: string; selectCls: string; labelCls: string;
+  label: string;
+  valueNode: ReactNode;
+  adjustment: AdjustmentFormRow;
+  adjustmentAmount: number | null;
+  onPctChange: (nextPct: number | null) => void;
+  onNotesChange: (nextNote: string) => void;
 }) {
-  const capRateValue = toNum(form.cap_rate);
-  const grmValue = toNum(form.grm);
-
-  if (isLand) {
-    return (
+  return (
+    <div className={styles.fieldGridRow}>
+      <div className={styles.fieldName}>{label}</div>
+      <div>{valueNode}</div>
       <div>
-        <h6 className="small fw-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Land Details</h6>
-        <div className="row g-2 mb-2">
-          <div className="col-4">
-            <label className={labelCls}>Zoning</label>
-            <input type="text" className={inputCls} value={form.zoning} onChange={handleInput('zoning')} />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Entitlements</label>
-            <input type="text" className={inputCls} value={form.entitlements} onChange={handleInput('entitlements')} placeholder="Entitled, Unentitled, etc." />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Highest & Best Use</label>
-            <input type="text" className={inputCls} value={form.highest_best_use} onChange={handleInput('highest_best_use')} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-4">
-            <label className={labelCls}>Topography</label>
-            <input type="text" className={inputCls} value={form.topography} onChange={handleInput('topography')} placeholder="Level, Rolling, Hilly" />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Shape</label>
-            <input type="text" className={inputCls} value={form.shape} onChange={handleInput('shape')} placeholder="Regular, Irregular" />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Frontage (ft)</label>
-            <input type="number" className={inputCls} value={form.frontage_ft} onChange={handleInput('frontage_ft')} min={0} step="any" />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-4">
-            <label className={labelCls}>Access</label>
-            <input type="text" className={inputCls} value={form.access} onChange={handleInput('access')} placeholder="Paved road, dirt road, etc." />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Utilities</label>
-            <input type="text" className={inputCls} value={form.utilities} onChange={handleInput('utilities')} placeholder="All public, partial, none" />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Flood Zone</label>
-            <input type="text" className={inputCls} value={form.flood_zone} onChange={handleInput('flood_zone')} placeholder="X, A, AE, etc." />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-4">
-            <label className={labelCls}>Environmental Status</label>
-            <input type="text" className={inputCls} value={form.environmental} onChange={handleInput('environmental')} placeholder="Clean, Phase I, Phase II" />
-          </div>
-          <div className="col-4">
-            <label className={labelCls}>Soil Conditions</label>
-            <input type="text" className={inputCls} value={form.soil_conditions} onChange={handleInput('soil_conditions')} />
-          </div>
-          <div className="col-4" />
-        </div>
-        <div className="mb-0">
-          <label className={labelCls}>Notes</label>
-          <textarea className={inputCls} rows={3} value={form.notes} onChange={handleInput('notes')} />
-        </div>
+        <AdjPercentInput value={adjustment.adjustment_pct} onCommit={onPctChange} />
       </div>
-    );
-  }
-
-  if (isMF) {
-    return (
+      <div className={combineClassNames(styles.adjAmount, signedValueClass(adjustmentAmount))}>{formatCurrency(adjustmentAmount, true)}</div>
       <div>
-        <h6 className="small fw-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Multifamily Details</h6>
-        <div className="row g-2 mb-2">
-          <div className="col-3">
-            <label className={labelCls}>Units</label>
-            <input type="number" className={inputCls} value={form.units} onChange={handleInput('units')} min={0} step={1} title={fmtInt(form.units)} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Stories</label>
-            <input type="number" className={inputCls} value={form.stories} onChange={handleInput('stories')} min={0} step={1} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Building SF</label>
-            <input type="number" className={inputCls} value={form.building_sf} onChange={handleInput('building_sf')} min={0} step={1} title={fmtInt(form.building_sf)} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Year Built</label>
-            <input type="number" className={inputCls} value={form.year_built} onChange={handleInput('year_built')} min={1800} max={2100} step={1} title={fmtYear(form.year_built)} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-3">
-            <label className={labelCls}>Parking Spaces</label>
-            <input type="number" className={inputCls} value={form.parking_spaces} onChange={handleInput('parking_spaces')} min={0} step={1} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Parking Ratio</label>
-            <input type="text" className={inputCls} value={form.parking_ratio} onChange={handleInput('parking_ratio')} placeholder="e.g. 1.5:1" />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Condition</label>
-            <input type="text" className={inputCls} value={form.condition} onChange={handleInput('condition')} placeholder="Good, Fair, Poor" />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Construction Type</label>
-            <input type="text" className={inputCls} value={form.construction_type} onChange={handleInput('construction_type')} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-12">
-            <label className={labelCls}>Amenities</label>
-            <input type="text" className={inputCls} value={form.amenities} onChange={handleInput('amenities')} placeholder="Pool, gym, laundry, etc." />
-          </div>
-        </div>
-        <div className="mb-0">
-          <label className={labelCls}>Notes</label>
-          <textarea className={inputCls} rows={3} value={form.notes} onChange={handleInput('notes')} />
-        </div>
-      </div>
-    );
-  }
-
-  if (isOffice || isRetail) {
-    return (
-      <div>
-        <h6 className="small fw-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
-          {isOffice ? 'Office' : 'Retail'} Details
-        </h6>
-        <div className="row g-2 mb-2">
-          <div className="col-3">
-            <label className={labelCls}>NRA (SF)</label>
-            <input type="number" className={inputCls} value={form.nra} onChange={handleInput('nra')} min={0} step="any" />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Floors</label>
-            <input type="number" className={inputCls} value={form.floors} onChange={handleInput('floors')} min={0} step={1} />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Building Class</label>
-            <select className={selectCls} value={form.building_class} onChange={handleInput('building_class')}>
-              <option value="">—</option>
-              <option value="A">Class A</option>
-              <option value="B">Class B</option>
-              <option value="C">Class C</option>
-            </select>
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Year Built</label>
-            <input type="number" className={inputCls} value={form.year_built} onChange={handleInput('year_built')} min={1800} max={2100} step={1} title={fmtYear(form.year_built)} />
-          </div>
-        </div>
-        <div className="row g-2 mb-2">
-          <div className="col-3">
-            <label className={labelCls}>Parking Ratio</label>
-            <input type="text" className={inputCls} value={form.parking_ratio} onChange={handleInput('parking_ratio')} placeholder="e.g. 4:1000" />
-          </div>
-          <div className="col-3">
-            <label className={labelCls}>Occupancy %</label>
-            <input type="number" className={inputCls} value={form.occupancy_pct} onChange={handleInput('occupancy_pct')} min={0} max={100} step="0.1" />
-          </div>
-          <div className="col-6">
-            <label className={labelCls}>Anchor Tenant</label>
-            <input type="text" className={inputCls} value={form.anchor_tenant} onChange={handleInput('anchor_tenant')} />
-          </div>
-        </div>
-        <div className="mb-0">
-          <label className={labelCls}>Notes</label>
-          <textarea className={inputCls} rows={3} value={form.notes} onChange={handleInput('notes')} />
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback: generic property fields
-  return (
-    <div>
-      <h6 className="small fw-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Property Details</h6>
-      <div className="row g-2 mb-2">
-        <div className="col-3">
-          <label className={labelCls}>Year Built</label>
-          <input type="number" className={inputCls} value={form.year_built} onChange={handleInput('year_built')} min={1800} max={2100} step={1} title={fmtYear(form.year_built)} />
-        </div>
-        <div className="col-3">
-          <label className={labelCls}>Units</label>
-          <input type="number" className={inputCls} value={form.units} onChange={handleInput('units')} min={0} step={1} title={fmtInt(form.units)} />
-        </div>
-        <div className="col-3">
-          <label className={labelCls}>Bldg SF</label>
-          <input type="number" className={inputCls} value={form.building_sf} onChange={handleInput('building_sf')} min={0} step={1} title={fmtInt(form.building_sf)} />
-        </div>
-        <div className="col-3">
-          <label className={labelCls}>Land SF</label>
-          <input type="number" className={inputCls} value={form.land_area_sf} onChange={handleInput('land_area_sf')} min={0} step="any" />
-        </div>
-      </div>
-      <div className="row g-2 mb-2">
-        <div className="col-4">
-          <label className={labelCls}>Cap Rate %</label>
-          <CalculatedValue value={fmtPct(capRateValue)} />
-        </div>
-        <div className="col-4">
-          <label className={labelCls}>GRM</label>
-          <CalculatedValue value={fmtMultiplier(grmValue)} />
-        </div>
-        <div className="col-4">
-          <label className={labelCls}>Zoning</label>
-          <input type="text" className={inputCls} value={form.zoning} onChange={handleInput('zoning')} />
-        </div>
-      </div>
-      <div className="mb-0">
-        <label className={labelCls}>Notes</label>
-        <textarea className={inputCls} rows={3} value={form.notes} onChange={handleInput('notes')} />
-      </div>
-    </div>
-  );
-}
-
-// ===========================================================================
-// ADJUSTMENTS TAB
-// ===========================================================================
-
-function AdjustmentsTab({
-  adjustments, salePrice, isEditMode,
-  netAdjPct, grossAdjPct, netAdjAmt, adjustedPrice,
-  onAdd, onUpdate, onDelete,
-  inputCls, selectCls, labelCls,
-}: {
-  adjustments: SalesCompAdjustment[];
-  salePrice: number | null;
-  isEditMode: boolean;
-  netAdjPct: number;
-  grossAdjPct: number;
-  netAdjAmt: number | null;
-  adjustedPrice: number | null;
-  onAdd: (type: AdjustmentType) => Promise<void>;
-  onUpdate: (adjId: number, pct: number | null, notes?: string) => Promise<void>;
-  onDelete: (adjId: number) => Promise<void>;
-  inputCls: string; selectCls: string; labelCls: string;
-}) {
-  const [newAdjType, setNewAdjType] = useState<AdjustmentType>('location');
-
-  return (
-    <div>
-      {!isEditMode ? (
-        <div className="text-center py-4" style={{ color: 'var(--cui-secondary-color)' }}>
-          Save the comparable first to manage adjustments.
-        </div>
-      ) : (
-        <>
-          {/* Adjustment table */}
-          <table className="table table-sm mb-3" style={{ fontSize: '0.8rem' }}>
-            <thead>
-              <tr style={{ borderColor: 'var(--cui-border-color)' }}>
-                <th style={{ color: 'var(--cui-body-color)', width: '30%' }}>Factor</th>
-                <th style={{ color: 'var(--cui-body-color)', width: '15%', textAlign: 'right' }}>Adj %</th>
-                <th style={{ color: 'var(--cui-body-color)', width: '20%', textAlign: 'right' }}>Adj $</th>
-                <th style={{ color: 'var(--cui-body-color)', width: '30%' }}>Justification</th>
-                <th style={{ width: '5%' }} />
-              </tr>
-            </thead>
-            <tbody>
-              {adjustments.map((adj) => {
-                const pct = adj.user_adjustment_pct ?? adj.adjustment_pct ?? 0;
-                const amt = salePrice != null ? salePrice * (pct / 100) : 0;
-                return (
-                  <tr key={adj.adjustment_id} style={{ borderColor: 'var(--cui-border-color)' }}>
-                    <td style={{ color: 'var(--cui-body-color)', verticalAlign: 'middle' }}>
-                      {adj.adjustment_type_display || adj.adjustment_type}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        className={inputCls}
-                        style={{ width: 80, textAlign: 'right' }}
-                        value={adj.user_adjustment_pct ?? adj.adjustment_pct ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value.trim() === '' ? null : Number(e.target.value);
-                          onUpdate(adj.adjustment_id, v);
-                        }}
-                        step="0.1"
-                      />
-                    </td>
-                    <td style={{ color: 'var(--cui-body-color)', textAlign: 'right', verticalAlign: 'middle' }}>
-                      {fmtDollar(amt)}
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        className={inputCls}
-                        value={adj.user_notes ?? adj.justification ?? ''}
-                        onChange={(e) => {
-                          onUpdate(adj.adjustment_id, adj.user_adjustment_pct ?? adj.adjustment_pct, e.target.value);
-                        }}
-                        placeholder="Justification..."
-                      />
-                    </td>
-                    <td style={{ verticalAlign: 'middle' }}>
-                      <button
-                        type="button"
-                        className="btn btn-ghost-secondary btn-sm p-0"
-                        onClick={() => onDelete(adj.adjustment_id)}
-                        title="Remove"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {adjustments.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center py-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                    No adjustments yet. Add one below.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderColor: 'var(--cui-border-color)', fontWeight: 600 }}>
-                <td style={{ color: 'var(--cui-body-color)' }}>Net Adjustment</td>
-                <td style={{ color: 'var(--cui-body-color)', textAlign: 'right' }}>{fmtPct(netAdjPct)}</td>
-                <td style={{ color: 'var(--cui-body-color)', textAlign: 'right' }}>{fmtDollar(netAdjAmt)}</td>
-                <td colSpan={2} />
-              </tr>
-              <tr style={{ borderColor: 'var(--cui-border-color)' }}>
-                <td style={{ color: 'var(--cui-secondary-color)' }}>Gross Adjustment</td>
-                <td style={{ color: 'var(--cui-secondary-color)', textAlign: 'right' }}>{fmtPct(grossAdjPct)}</td>
-                <td colSpan={3} />
-              </tr>
-              <tr style={{ borderColor: 'var(--cui-border-color)', fontWeight: 700 }}>
-                <td style={{ color: 'var(--cui-primary)' }}>Adjusted Sale Price</td>
-                <td />
-                <td style={{ color: 'var(--cui-primary)', textAlign: 'right', fontSize: '0.9rem' }}>{fmtDollar(adjustedPrice)}</td>
-                <td colSpan={2} />
-              </tr>
-            </tfoot>
-          </table>
-
-          {/* Add adjustment */}
-          <div className="d-flex align-items-center gap-2 mb-4">
-            <select
-              className={selectCls}
-              style={{ width: 200 }}
-              value={newAdjType}
-              onChange={(e) => setNewAdjType(e.target.value as AdjustmentType)}
-            >
-              {ADJUSTMENT_TYPES.map((at) => (
-                <option key={at.value} value={at.value}>{at.label}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => onAdd(newAdjType)}
-            >
-              Add Adjustment
-            </button>
-          </div>
-
-          {/* Landscaper Analysis Panel */}
-          <div
-            className="p-3 rounded"
-            style={{
-              background: 'rgba(88, 86, 214, 0.06)',
-              border: '1px solid rgba(88, 86, 214, 0.15)',
-            }}
-          >
-            <h6 className="small fw-semibold mb-2" style={{ color: 'var(--cui-primary)' }}>
-              Landscaper Analysis
-            </h6>
-            {adjustments.some((a) => a.justification) ? (
-              <div style={{ fontSize: '0.8rem', color: 'var(--cui-body-color)' }}>
-                {adjustments.filter((a) => a.justification).map((a) => (
-                  <div key={a.adjustment_id} className="mb-1">
-                    <span className="fw-semibold">{a.adjustment_type_display || a.adjustment_type}:</span>{' '}
-                    {a.justification}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
-                No AI analysis available. Landscaper will analyze adjustments when document extraction is complete.
-              </p>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ===========================================================================
-// HISTORY TAB
-// ===========================================================================
-
-function HistoryTab({
-  entries, onAdd, onChange, onDelete,
-  inputCls, selectCls, labelCls,
-}: {
-  entries: HistoryEntry[];
-  onAdd: () => void;
-  onChange: (idx: number, field: keyof HistoryEntry, value: string) => void;
-  onDelete: (idx: number) => void;
-  inputCls: string; selectCls: string; labelCls: string;
-}) {
-  const eventOptions = ['Sale', 'Listing', 'Financing', 'Renovation', 'Assessment'];
-
-  return (
-    <div>
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h6 className="small fw-semibold mb-0" style={{ color: 'var(--cui-body-color)' }}>Prior Sales & Events</h6>
-        <button type="button" className="btn btn-primary btn-sm" onClick={onAdd}>
-          Add Entry
-        </button>
-      </div>
-
-      {entries.length === 0 ? (
-        <div className="text-center py-4" style={{ color: 'var(--cui-secondary-color)' }}>
-          No history entries. Click "Add Entry" to record prior sales or events.
-        </div>
-      ) : (
-        <table className="table table-sm" style={{ fontSize: '0.8rem' }}>
-          <thead>
-            <tr style={{ borderColor: 'var(--cui-border-color)' }}>
-              <th style={{ color: 'var(--cui-body-color)', width: '20%' }}>Date</th>
-              <th style={{ color: 'var(--cui-body-color)', width: '20%' }}>Event</th>
-              <th style={{ color: 'var(--cui-body-color)', width: '20%' }}>Price</th>
-              <th style={{ color: 'var(--cui-body-color)', width: '35%' }}>Notes</th>
-              <th style={{ width: '5%' }} />
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, idx) => (
-              <tr key={idx} style={{ borderColor: 'var(--cui-border-color)' }}>
-                <td>
-                  <input type="date" className={inputCls} value={entry.date} onChange={(e) => onChange(idx, 'date', e.target.value)} />
-                </td>
-                <td>
-                  <select className={selectCls} value={entry.event} onChange={(e) => onChange(idx, 'event', e.target.value)}>
-                    {eventOptions.map((ev) => (
-                      <option key={ev} value={ev}>{ev}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input type="number" className={inputCls} value={entry.price} onChange={(e) => onChange(idx, 'price', e.target.value)} min={0} step="any" />
-                </td>
-                <td>
-                  <input type="text" className={inputCls} value={entry.notes} onChange={(e) => onChange(idx, 'notes', e.target.value)} />
-                </td>
-                <td>
-                  <button type="button" className="btn btn-ghost-secondary btn-sm p-0" onClick={() => onDelete(idx)} title="Remove">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
-
-// ===========================================================================
-// DOCUMENTS TAB (skeleton)
-// ===========================================================================
-
-function DocumentsTab() {
-  return (
-    <div>
-      <h6 className="small fw-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>Documents</h6>
-      <div
-        className="d-flex align-items-center justify-content-center rounded mb-3"
-        style={{
-          height: 120,
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          border: '2px dashed var(--cui-border-color)',
-          color: 'var(--cui-secondary-color)',
-          cursor: 'pointer',
-        }}
-      >
-        <div className="text-center">
-          <div style={{ fontSize: 28, marginBottom: 4, opacity: 0.5 }}>&#128196;</div>
-          <div className="small">Drop documents here or click to upload</div>
-          <div className="small" style={{ opacity: 0.6 }}>DMS integration coming in a future sprint</div>
-        </div>
-      </div>
-      <div className="mb-0">
-        <label className="form-label mb-1 small" style={{ color: 'var(--cui-body-color)' }}>Notes / References</label>
-        <textarea
-          className="form-control form-control-sm"
-          rows={4}
-          placeholder="Paste document links, notes, or references here..."
+        <input
+          className={styles.notesInput}
+          value={adjustment.user_notes ?? ''}
+          onChange={(event) => onNotesChange(event.target.value)}
         />
       </div>
     </div>

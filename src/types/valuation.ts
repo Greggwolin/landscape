@@ -28,7 +28,8 @@ export type AdjustmentType =
   // Transaction Adjustments
   | 'property_rights'
   | 'financing'
-  | 'conditions_of_sale'
+  | 'conditions_of_sale' // legacy value kept for backward compatibility
+  | 'sale_conditions'
   | 'market_conditions'
   | 'other'
   // Property Rights Adjustments
@@ -36,6 +37,10 @@ export type AdjustmentType =
   | 'physical_condition'
   | 'physical_age'
   | 'physical_unit_mix'
+  | 'physical_size'
+  | 'physical_building_sf'
+  | 'physical_stories'
+  | 'physical_lot_size'
   | 'economic'
   | 'legal';
 
@@ -48,7 +53,7 @@ export const ADJUSTMENT_CATEGORIES: Record<AdjustmentCategory, {
 }> = {
   transaction: {
     label: 'Transaction',
-    types: ['property_rights', 'financing', 'conditions_of_sale', 'market_conditions', 'other']
+    types: ['property_rights', 'financing', 'sale_conditions', 'market_conditions', 'other']
   },
   property_rights: {
     label: 'Property rights',
@@ -85,6 +90,57 @@ export interface SalesCompAdjustment {
   created_at: string;
 }
 
+export interface SalesCompContact {
+  contact_id?: number;
+  role: 'selling_broker' | 'buying_broker' | 'buyer' | 'true_buyer' | 'seller' | 'true_seller';
+  name?: string | null;
+  company?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_verification_source?: boolean;
+  verification_date?: string | null;
+  sort_order?: number;
+}
+
+export interface SalesCompUnitMixRow {
+  unit_mix_id?: number;
+  bed_count?: number | null;
+  bath_count?: number | null;
+  unit_type?: string | null;
+  unit_count?: number | null;
+  unit_pct?: number | null;
+  avg_unit_sf?: number | null;
+  total_sf?: number | null;
+  asking_rent_min?: number | null;
+  asking_rent_max?: number | null;
+  asking_rent_per_sf_min?: number | null;
+  asking_rent_per_sf_max?: number | null;
+  effective_rent_min?: number | null;
+  effective_rent_max?: number | null;
+  effective_rent_per_sf_min?: number | null;
+  effective_rent_per_sf_max?: number | null;
+  vacant_units?: number | null;
+  concession_pct?: number | null;
+  monthly_discount?: number | null;
+  one_time_concession?: number | null;
+  is_rent_regulated?: boolean | null;
+  rent_type?: string | null;
+}
+
+export interface SalesCompHistory {
+  history_id?: number;
+  sale_date?: string | null;
+  sale_price?: number | null;
+  price_per_sf?: number | null;
+  price_per_unit?: number | null;
+  buyer_name?: string | null;
+  seller_name?: string | null;
+  sale_type?: string | null;
+  document_number?: string | null;
+  is_arms_length?: boolean | null;
+  notes?: string | null;
+}
+
 export interface SalesComparable {
   comparable_id: number;
   project_id: number;
@@ -99,6 +155,8 @@ export interface SalesComparable {
   sale_price: number | null;
   sale_conditions?: string | null;
   property_rights?: string | null;
+  verification_source?: string | null;
+  verification_date?: string | null;
   price_per_unit: number | null;
   price_per_sf: number | null;
   price_per_acre?: number | null;
@@ -114,7 +172,9 @@ export interface SalesComparable {
   distance_from_subject: string | null;
   latitude: number | null;
   longitude: number | null;
-  unit_mix: UnitMix | null;
+  unit_mix: SalesCompUnitMixRow[] | UnitMix | null;
+  history?: SalesCompHistory[];
+  contacts?: SalesCompContact[];
   notes: string | null;
   adjustments: SalesCompAdjustment[];
   ai_suggestions: AIAdjustmentSuggestion[];
@@ -377,6 +437,8 @@ export interface SalesComparableForm {
   sale_price?: number | null;
   sale_conditions?: string | null;
   property_rights?: string | null;
+  verification_source?: string | null;
+  verification_date?: string | null;
   price_per_unit?: number | null;
   price_per_sf?: number | null;
   price_per_acre?: number | null;
@@ -392,7 +454,10 @@ export interface SalesComparableForm {
   distance_from_subject?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  unit_mix?: UnitMix | null;
+  unit_mix?: SalesCompUnitMixRow[] | UnitMix | null;
+  history?: SalesCompHistory[] | null;
+  contacts?: SalesCompContact[] | null;
+  adjustments?: Partial<SalesCompAdjustment>[] | null;
   notes?: string | null;
 }
 

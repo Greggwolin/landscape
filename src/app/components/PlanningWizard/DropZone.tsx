@@ -30,22 +30,28 @@ const DropZone: React.FC<DropZoneProps> = ({
 
   const getDropZoneStyle = () => {
     if (isOver && canDrop) {
-      return 'border-blue-400 bg-blue-50'
+      return {
+        borderColor: 'var(--cui-primary)',
+        backgroundColor: 'var(--cui-primary-bg-subtle)',
+      }
     }
     if (canDrop) {
-      return 'border-blue-300 bg-blue-25'
+      return {
+        borderColor: 'var(--cui-primary-border-subtle)',
+        backgroundColor: 'var(--cui-secondary-bg)',
+      }
     }
-    return 'border-gray-300'
+    return {
+      borderColor: 'var(--cui-border-color)',
+      backgroundColor: 'transparent',
+    }
   }
 
   return (
     <div
       ref={drop}
-      className={`
-        border-2 border-solid rounded-lg transition-colors duration-200
-        ${getDropZoneStyle()}
-        ${className}
-      `}
+      className={`border-2 border-solid rounded-3 transition-colors duration-200 ${className}`}
+      style={getDropZoneStyle()}
     >
       {children}
     </div>

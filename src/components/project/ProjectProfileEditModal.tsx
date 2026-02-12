@@ -29,7 +29,17 @@ import useSWR from 'swr';
 import { fetchJson } from '@/lib/fetchJson';
 import type { ProjectProfile, ProjectProfileFormData, MSA } from '@/types/project-profile';
 import { OWNERSHIP_TYPES, validateTargetUnits, validateGrossAcres } from '@/types/project-profile';
-import { ANALYSIS_TYPES, ANALYSIS_TYPE_LABELS, type AnalysisType } from '@/types/project-taxonomy';
+import {
+  ANALYSIS_PERSPECTIVES,
+  ANALYSIS_PURPOSES,
+  PERSPECTIVE_LABELS,
+  PURPOSE_LABELS,
+  deriveLegacyAnalysisType,
+  deriveDimensionsFromAnalysisType,
+  type AnalysisType,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy';
 
 const toInputDate = (value?: string | null) => {
   if (!value) return '';
@@ -74,8 +84,16 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
   onSaveSuccess
 }) => {
   const buildFormState = (current: ProjectProfile): ProjectProfileFormData => ({
+    ...(deriveDimensionsFromAnalysisType(current.analysis_type) || {}),
     project_name: current.project_name,
     analysis_type: (current.analysis_type || 'DEVELOPMENT') as AnalysisType,
+    analysis_perspective: current.analysis_perspective || deriveDimensionsFromAnalysisType(current.analysis_type).analysis_perspective,
+    analysis_purpose: current.analysis_purpose || deriveDimensionsFromAnalysisType(current.analysis_type).analysis_purpose,
+    value_add_enabled: Boolean(
+      current.analysis_perspective === 'INVESTMENT'
+        ? current.value_add_enabled ?? deriveDimensionsFromAnalysisType(current.analysis_type).value_add_enabled
+        : false
+    ),
     property_type_code: current.project_type_code || current.project_type || undefined,
     property_subtype: current.property_subtype,
     target_units: current.target_units,
@@ -147,7 +165,13 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
   }, [isOpen, profile]);
 
   const handleInputChange = (field: keyof ProjectProfileFormData, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value } as ProjectProfileFormData
+      if (field === 'analysis_perspective' && value !== 'INVESTMENT') {
+        next.value_add_enabled = false
+      }
+      return next
+    });
     if (errors[field]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -172,8 +196,16 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
       newErrors.project_name = 'Project Name is required';
     }
 
-    if (!formData.analysis_type) {
-      newErrors.analysis_type = 'Analysis Type is required';
+    if (!formData.analysis_perspective) {
+      newErrors.analysis_perspective = 'Analysis perspective is required';
+    }
+
+    if (!formData.analysis_purpose) {
+      newErrors.analysis_purpose = 'Analysis purpose is required';
+    }
+
+    if (formData.analysis_perspective !== 'INVESTMENT' && formData.value_add_enabled) {
+      newErrors.value_add_enabled = 'Value-add is only allowed for Investment perspective';
     }
 
     if (formData.target_units !== undefined && formData.target_units !== null) {
@@ -206,6 +238,15 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
         }
       }
     });
+
+    const perspective = payload.analysis_perspective as AnalysisPerspective | undefined
+    const purpose = payload.analysis_purpose as AnalysisPurpose | undefined
+    if (perspective && purpose) {
+      const valueAddEnabled = perspective === 'INVESTMENT' ? Boolean(payload.value_add_enabled) : false
+      payload.value_add_enabled = valueAddEnabled
+      payload.analysis_type = deriveLegacyAnalysisType(perspective, purpose, valueAddEnabled)
+    }
+
     return payload;
   };
 
@@ -236,6 +277,9 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
       if (payload.analysis_end_date !== undefined)
         corePayload.analysis_end_date = payload.analysis_end_date;
       if (payload.analysis_type !== undefined) corePayload.analysis_type = payload.analysis_type;
+      if (payload.analysis_perspective !== undefined) corePayload.analysis_perspective = payload.analysis_perspective;
+      if (payload.analysis_purpose !== undefined) corePayload.analysis_purpose = payload.analysis_purpose;
+      if (payload.value_add_enabled !== undefined) corePayload.value_add_enabled = payload.value_add_enabled;
       if (Object.keys(corePayload).length > 0) {
         const coreResponse = await fetch(`/api/projects/${projectId}`, {
           method: 'PATCH',
@@ -291,31 +335,73 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               )}
             </CCol>
             <CCol xs={12} className="profile-col-r1-analysis">
-              <CFormSelect
-                id="analysis_type"
-                floatingLabel={
-                  <>
-                    Analysis Type <span className="text-danger">*</span>
-                  </>
-                }
-                value={formData.analysis_type || ''}
-                onChange={(e) =>
-                  handleInputChange('analysis_type', e.target.value as AnalysisType)
-                }
-                invalid={!!errors.analysis_type}
-                className="text-start"
-                placeholder=" "
-              >
-                <option value="" disabled hidden></option>
-                {ANALYSIS_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {ANALYSIS_TYPE_LABELS[type]}
-                  </option>
-                ))}
-              </CFormSelect>
-              {errors.analysis_type && (
-                <div className="invalid-feedback d-block">{errors.analysis_type}</div>
-              )}
+              <div className="d-flex flex-column gap-2">
+                <CFormSelect
+                  id="analysis_perspective"
+                  floatingLabel={
+                    <>
+                      Perspective <span className="text-danger">*</span>
+                    </>
+                  }
+                  value={formData.analysis_perspective || ''}
+                  onChange={(e) =>
+                    handleInputChange('analysis_perspective', e.target.value as AnalysisPerspective)
+                  }
+                  invalid={!!errors.analysis_perspective}
+                  className="text-start"
+                  placeholder=" "
+                >
+                  <option value="" disabled hidden></option>
+                  {ANALYSIS_PERSPECTIVES.map((value) => (
+                    <option key={value} value={value}>
+                      {PERSPECTIVE_LABELS[value]}
+                    </option>
+                  ))}
+                </CFormSelect>
+                {errors.analysis_perspective && (
+                  <div className="invalid-feedback d-block">{errors.analysis_perspective}</div>
+                )}
+
+                <CFormSelect
+                  id="analysis_purpose"
+                  floatingLabel={
+                    <>
+                      Purpose <span className="text-danger">*</span>
+                    </>
+                  }
+                  value={formData.analysis_purpose || ''}
+                  onChange={(e) =>
+                    handleInputChange('analysis_purpose', e.target.value as AnalysisPurpose)
+                  }
+                  invalid={!!errors.analysis_purpose}
+                  className="text-start"
+                  placeholder=" "
+                >
+                  <option value="" disabled hidden></option>
+                  {ANALYSIS_PURPOSES.map((value) => (
+                    <option key={value} value={value}>
+                      {PURPOSE_LABELS[value]}
+                    </option>
+                  ))}
+                </CFormSelect>
+                {errors.analysis_purpose && (
+                  <div className="invalid-feedback d-block">{errors.analysis_purpose}</div>
+                )}
+
+                {formData.analysis_perspective === 'INVESTMENT' && (
+                  <label className="d-flex align-items-center gap-2 small">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.value_add_enabled)}
+                      onChange={(e) => handleInputChange('value_add_enabled', e.target.checked)}
+                    />
+                    Include value-add analysis
+                  </label>
+                )}
+                {errors.value_add_enabled && (
+                  <div className="invalid-feedback d-block">{errors.value_add_enabled}</div>
+                )}
+              </div>
             </CCol>
             <CCol xs={12} className="profile-col-r1-price">
               <CFormFloating>

@@ -606,7 +606,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   if (loading) {
     return (
       <div className="p-4 flex items-center justify-center">
-        <div className="text-gray-400">Loading planning data...</div>
+        <div style={{ color: 'var(--cui-secondary-color)' }}>Loading planning data...</div>
       </div>
     );
   }

@@ -284,6 +284,7 @@ class AnalysisTypeConfigViewSet(viewsets.ReadOnlyModelViewSet):
     Endpoints:
     - GET /api/config/analysis-types/ - List all configs
     - GET /api/config/analysis-types/{analysis_type}/ - Get single config
+    - GET /api/config/analysis-types/by-dimensions/?perspective=...&purpose=... - Get config by composite key
     - GET /api/config/analysis-types/{analysis_type}/tiles/ - Get visible tiles
     - GET /api/config/analysis-types/{analysis_type}/landscaper_context/ - Get Landscaper hints
     """
@@ -297,6 +298,36 @@ class AnalysisTypeConfigViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action == 'list':
             return AnalysisTypeConfigListSerializer
         return AnalysisTypeConfigSerializer
+
+    @action(detail=False, methods=['get'], url_path='by-dimensions')
+    def by_dimensions(self, request):
+        """
+        GET /api/config/analysis-types/by-dimensions/?perspective=INVESTMENT&purpose=UNDERWRITING
+
+        Returns config row matched by (analysis_perspective, analysis_purpose).
+        """
+        perspective = (request.query_params.get('perspective') or '').strip().upper()
+        purpose = (request.query_params.get('purpose') or '').strip().upper()
+
+        if not perspective or not purpose:
+            return Response(
+                {'error': 'perspective and purpose required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        config = AnalysisTypeConfig.objects.filter(
+            analysis_perspective=perspective,
+            analysis_purpose=purpose,
+        ).first()
+
+        if not config:
+            return Response(
+                {'error': 'Config not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = self.get_serializer(config)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def tiles(self, request, analysis_type=None):

@@ -1,0 +1,505 @@
+src/app/components/AI/DocumentReview.tsx	1	src/app/ai-document-review/page.tsx
+src/app/components/Admin/CategoryTree.tsx	1	src/app/admin/preferences/components/UnitCostCategoryManager.tsx
+src/app/components/Admin/LandUseInputTable.tsx	0	
+src/app/components/Admin/LandUseInputTableTanStack.tsx	0	
+src/app/components/Admin/LandUseManagement.tsx	0	
+src/app/components/AdminNavBar.tsx	4	src/app/admin/benchmarks/page.tsx;src/app/admin/changelog/page.tsx;src/app/admin/feedback/page.tsx;src/app/admin/preferences/page.tsx
+src/app/components/Budget/BudgetContainerView.tsx	0	
+src/app/components/Budget/BudgetContent.tsx	0	
+src/app/components/Budget/BudgetGrid.tsx	2	src/app/budget-grid/page.tsx;src/app/components/Budget/BudgetGridLight.tsx
+src/app/components/Budget/BudgetGridDark.tsx	2	src/app/budget-grid-v2/page.tsx;src/app/components/Budget/BudgetGridDarkWrapper.tsx
+src/app/components/Budget/BudgetGridDarkWrapper.tsx	0	
+src/app/components/Budget/BudgetGridLight.tsx	0	
+src/app/components/BudgetGridWithDependencies.tsx	0	
+src/app/components/ContainerManagement/ProjectSetupWizard.tsx	1	src/app/projects/setup/page.tsx
+src/app/components/CoreUIThemeProvider.tsx	1	src/app/layout.tsx
+src/app/components/DVLTimeSeries.tsx	1	src/app/components/MarketAssumptions.tsx
+src/app/components/DependencyConfigPanel.tsx	0	
+src/app/components/DevStatus/DevStatus.tsx	1	src/app/dev-status/page.tsx
+src/app/components/DirectionalIcon.tsx	0	
+src/app/components/Documentation/MarkdownViewer.tsx	1	src/app/documentation/page.tsx
+src/app/components/Documents/DocumentManagement.tsx	0	
+src/app/components/DynamicBreadcrumb.tsx	1	src/app/breadcrumb-demo/page.tsx
+src/app/components/FilterableSelect.tsx	0	
+src/app/components/Form.tsx	0	
+src/app/components/GIS/AssessorDataMapping.tsx	0	
+src/app/components/GIS/GISSetupWorkflow.tsx	0	
+src/app/components/GIS/PlanNavigation.tsx	1	src/app/components/GIS/GISSetupWorkflow.tsx
+src/app/components/GIS/ProjectBoundarySetup.tsx	1	src/app/components/GIS/GISSetupWorkflow.tsx
+src/app/components/GIS/ProjectDocumentUploads.tsx	1	src/app/components/GIS/GISSetupWorkflow.tsx
+src/app/components/GIS/PropertyPackageUpload.tsx	0	
+src/app/components/Glossary/ZoningGlossaryAdmin.tsx	0	
+src/app/components/GrowthRates-Original.tsx	0	
+src/app/components/GrowthRates.tsx	1	src/app/growthrates/page.tsx
+src/app/components/Header.tsx	2	src/app/_archive/property/[id]/page.tsx;src/app/prototypes-multifam/page.tsx
+src/app/components/Home/HomeOverview.tsx	0	
+src/app/components/Home/UnderConstruction.tsx	0	
+src/app/components/Illustrations.tsx	0	
+src/app/components/LandUse/InlineTaxonomySelector.tsx	1	src/app/components/PlanningWizard/ProjectCanvas.tsx
+src/app/components/LandUse/LandUseCanvas.tsx	1	src/app/components/LandUse/LandUseSchema.tsx
+src/app/components/LandUse/LandUseDetails.tsx	1	src/app/components/LandUse/LandUseCanvas.tsx
+src/app/components/LandUse/LandUseMatchWizard.tsx	1	src/app/components/LandUse/LandUseSchema.tsx
+src/app/components/LandUse/LandUseSchema.tsx	0	
+src/app/components/LandUse/SimpleTaxonomySelector.tsx	2	src/app/components/PlanningWizard/ParcelTile.tsx;src/app/components/PlanningWizard/ProjectCanvas.tsx
+src/app/components/LandUse/TaxonomySelector.tsx	1	src/app/components/PlanningWizard/forms/ParcelForm.tsx
+src/app/components/LandscaperChatModal.tsx	1	src/app/_archive/projects-landscaper/page.tsx
+src/app/components/Link.tsx	26	src/app/_archive/projects-development/layout.tsx;src/app/_archive/projects-overview/page.tsx;src/app/_archive/projects-planning/layout.tsx;src/app/admin/benchmarks/page.tsx;src/app/budget-grid/page.tsx;src/app/components/AdminNavBar.tsx;src/app/components/DynamicBreadcrumb.tsx;src/app/components/Navigation.tsx;src/app/components/TopNavigationBar.tsx;src/app/components/layout/vertical/FooterContent.tsx;src/app/components/layout/vertical/NavbarContent.tsx;src/app/components/layout/vertical/Navigation.tsx;src/app/components/navigation/SandboxDropdown.tsx;src/app/components/navigation/UserMenuDropdown.tsx;src/app/forgot-password/page.tsx;src/app/login/LoginForm.tsx;src/app/projects/[projectId]/components/landscaper/AgentSidebar.tsx;src/app/projects/[projectId]/components/landscaper/StatusCard.tsx;src/app/prototypes-multifam/page.tsx;src/app/prototypes/[prototypeId]/page.tsx;src/app/prototypes/page.tsx;src/app/register/page.tsx;src/app/reset-password/page.tsx;src/components/dms/list/DocumentTable.tsx;src/components/dms/preview/DocumentPreview.tsx;src/prototypes/remote/CoreUIShellPlaceholder.tsx
+src/app/components/MapLibre/GISMap.tsx	2	src/app/components/GIS/PlanNavigation.tsx;src/app/components/GIS/ProjectBoundarySetup.tsx
+src/app/components/MapView.tsx	1	src/app/_archive/projects-overview/page.tsx
+src/app/components/Market/MarketAssumptions.tsx	3	src/app/components/MarketAssumptionsComparison.tsx;src/app/lease/[id]/page.tsx;src/app/market-assumptions/page.tsx
+src/app/components/Market/MarketMapView.tsx	2	src/app/_archive/projects-planning/market/page.tsx;src/app/projects/[projectId]/components/tabs/MarketTab.tsx
+src/app/components/MarketAssumptions.tsx	4	src/app/components/Market/MarketAssumptions.tsx;src/app/components/MarketAssumptionsComparison.tsx;src/app/lease/[id]/page.tsx;src/app/market-assumptions/page.tsx
+src/app/components/MarketAssumptionsComparison.tsx	0	
+src/app/components/MarketAssumptionsMUI.tsx	0	
+src/app/components/MarketAssumptionsNative.tsx	1	src/app/components/MarketAssumptionsComparison.tsx
+src/app/components/Migration/TaxonomyMigration.tsx	0	
+src/app/components/Navigation.tsx	5	src/app/_archive/projects-overview/page.tsx;src/app/_archive/projects-valuation/page.tsx;src/app/documentation/page.tsx;src/app/prototypes-multifam/page.tsx;src/app/prototypes/multifam/rent-roll-inputs/page.tsx
+src/app/components/NavigationLayout.tsx	1	src/app/layout.tsx
+src/app/components/NewProject/BasicInfoStep.tsx	0	
+src/app/components/NewProject/PropertyTypeStep.tsx	0	
+src/app/components/NewProject/TemplateStep.tsx	0	
+src/app/components/NewProjectButton.tsx	0	
+src/app/components/NewProjectModal.tsx	4	src/app/components/NewProjectButton.tsx;src/app/dashboard/page.tsx;src/app/dms/page.tsx;src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
+src/app/components/OpExHierarchy.tsx	2	src/app/_archive/projects-opex-accounts/page.tsx;src/app/projects/[projectId]/components/tabs/OperationsTab.tsx
+src/app/components/Planning/CollapsibleSection.tsx	7	src/app/components/Planning/PlanningContent.tsx;src/components/acquisition/AcquisitionAccordion.tsx;src/components/analysis/cashflow/CashFlowAnalysisTab.tsx;src/components/analysis/validation/ValidationReport.tsx;src/components/budget/FiltersAccordion.tsx;src/components/feasibility/MarketDataContent.tsx;src/components/sales/SalesContent.tsx
+src/app/components/Planning/PlanningContent.tsx	4	src/app/_archive/projects-planning/land-use/page.tsx;src/app/planning/page.tsx;src/app/projects/[projectId]/components/tabs/PlanningTab.tsx;src/app/projects/[projectId]/project/planning/page.tsx
+src/app/components/Planning/PlanningOverviewControls.tsx	1	src/app/components/Planning/PlanningContent.tsx
+src/app/components/PlanningWizard/AddContainerModal.tsx	1	src/app/components/PlanningWizard/ContainerTreeView.tsx
+src/app/components/PlanningWizard/ConfirmDeleteDialog.tsx	0	
+src/app/components/PlanningWizard/ContainerTreeView.tsx	1	src/app/components/PlanningWizard/PlanningWizard.tsx
+src/app/components/PlanningWizard/DraggableContainerNode.tsx	1	src/app/components/PlanningWizard/ContainerTreeView.tsx
+src/app/components/PlanningWizard/DraggableTile.tsx	1	src/app/components/PlanningWizard/Sidebar.tsx
+src/app/components/PlanningWizard/DropZone.tsx	4	src/app/components/PlanningWizard/PhaseCanvas.tsx;src/app/components/PlanningWizard/PhaseCanvasInline.tsx;src/app/components/PlanningWizard/ProjectCanvas.tsx;src/app/components/PlanningWizard/ProjectCanvasInline.tsx
+src/app/components/PlanningWizard/NavigationTiles.tsx	2	src/app/components/PlanningWizard/PhaseCanvas.tsx;src/app/components/PlanningWizard/PhaseCanvasInline.tsx
+src/app/components/PlanningWizard/ParcelTile.tsx	1	src/app/components/PlanningWizard/PhaseCanvas.tsx
+src/app/components/PlanningWizard/PhaseCanvas.tsx	1	src/app/components/PlanningWizard/PlanningWizard.tsx
+src/app/components/PlanningWizard/PhaseCanvasInline.tsx	1	src/app/components/PlanningWizard/PlanningWizardInline.tsx
+src/app/components/PlanningWizard/PlanningWizard.tsx	0	
+src/app/components/PlanningWizard/PlanningWizardInline.tsx	0	
+src/app/components/PlanningWizard/ProjectCanvas.tsx	1	src/app/components/PlanningWizard/PlanningWizard.tsx
+src/app/components/PlanningWizard/ProjectCanvasInline.tsx	1	src/app/components/PlanningWizard/PlanningWizardInline.tsx
+src/app/components/PlanningWizard/Sidebar.tsx	0	
+src/app/components/PlanningWizard/cards/AreaDetailCard.tsx	0	
+src/app/components/PlanningWizard/cards/ParcelDetailCard.tsx	2	src/app/components/Planning/PlanningContent.tsx;src/app/components/PlanningWizard/PlanningWizardInline.tsx
+src/app/components/PlanningWizard/cards/PhaseDetailCard.tsx	0	
+src/app/components/PlanningWizard/forms/AreaForm.tsx	1	src/app/components/PlanningWizard/PlanningWizardInline.tsx
+src/app/components/PlanningWizard/forms/ParcelForm.tsx	2	src/app/components/PlanningWizard/PhaseCanvas.tsx;src/app/components/PlanningWizard/PhaseCanvasInline.tsx
+src/app/components/PlanningWizard/forms/PhaseForm.tsx	1	src/app/components/PlanningWizard/PlanningWizardInline.tsx
+src/app/components/PreferencesContextBar.tsx	1	src/app/preferences/layout.tsx
+src/app/components/ProjectContextBar.tsx	1	src/app/components/Header.tsx
+src/app/components/ProjectProvider.tsx	5	src/app/_archive/property/[id]/page.tsx;src/app/documentation/page.tsx;src/app/layout.tsx;src/app/prototypes-multifam/page.tsx;src/app/prototypes/multifam/rent-roll-inputs/page.tsx
+src/app/components/Providers.tsx	0	
+src/app/components/QueryProvider.tsx	1	src/app/layout.tsx
+src/app/components/Setup/ProjectStructureChoice.tsx	1	src/app/components/GIS/GISSetupWorkflow.tsx
+src/app/components/Setup/ProjectTaxonomyWizard.tsx	0	
+src/app/components/StyleCatalog/BadgeIntentsSection.tsx	1	src/app/components/StyleCatalog/StyleCatalogContent.tsx
+src/app/components/StyleCatalog/ButtonIntentsSection.tsx	1	src/app/components/StyleCatalog/StyleCatalogContent.tsx
+src/app/components/StyleCatalog/CardHeadersSection.tsx	1	src/app/components/StyleCatalog/StyleCatalogContent.tsx
+src/app/components/StyleCatalog/NavTabsSection.tsx	1	src/app/components/StyleCatalog/StyleCatalogContent.tsx
+src/app/components/StyleCatalog/PropertyTypeTokensSection.tsx	1	src/app/components/StyleCatalog/StyleCatalogContent.tsx
+src/app/components/StyleCatalog/StyleCatalogContent.tsx	1	src/components/admin/PreferencesPanel.tsx
+src/app/components/TaxonomySelector/TaxonomySelector.tsx	1	src/app/components/PlanningWizard/forms/ParcelForm.tsx
+src/app/components/ThemeRegistry.tsx	1	src/app/layout.tsx
+src/app/components/ThemeSwitcher.tsx	0	
+src/app/components/ThemeToggle.tsx	2	src/app/components/Navigation.tsx;src/app/test-coreui/page.tsx
+src/app/components/TimelineVisualization.tsx	0	
+src/app/components/TopNavigationBar.tsx	2	src/app/components/Header.tsx;src/app/components/NavigationLayout.tsx
+src/app/components/UniversalInventory/UniversalInventoryTable.tsx	1	src/app/inventory/page.tsx
+src/app/components/assumptions/AssumptionBasket.tsx	1	src/app/projects/[projectId]/assumptions/page.tsx
+src/app/components/assumptions/FieldGroup.tsx	2	src/app/components/assumptions/AssumptionBasket.tsx;src/components/budget/config/fieldGroups.ts
+src/app/components/assumptions/FieldRenderer.tsx	2	src/app/components/assumptions/FieldGroup.tsx;src/components/budget/custom/ExpandableDetailsRow.tsx
+src/app/components/assumptions/HelpTooltip.tsx	1	src/app/components/assumptions/FieldRenderer.tsx
+src/app/components/card-statistics/Vertical.tsx	0	
+src/app/components/dashboard/DashboardMap.tsx	1	src/app/dashboard/page.tsx
+src/app/components/dashboard/TriageModal.tsx	2	src/app/dashboard/page.tsx;src/app/dms/page.tsx
+src/app/components/dashboard/UserTile.tsx	0	
+src/app/components/layout/shared/Logo.tsx	1	src/app/components/layout/vertical/Navigation.tsx
+src/app/components/layout/shared/ModeDropdown.tsx	1	src/app/components/layout/vertical/NavbarContent.tsx
+src/app/components/layout/shared/UserDropdown.tsx	1	src/app/components/layout/vertical/NavbarContent.tsx
+src/app/components/layout/vertical/Footer.tsx	0	
+src/app/components/layout/vertical/FooterContent.tsx	1	src/app/components/layout/vertical/Footer.tsx
+src/app/components/layout/vertical/NavToggle.tsx	1	src/app/components/layout/vertical/NavbarContent.tsx
+src/app/components/layout/vertical/Navbar.tsx	0	
+src/app/components/layout/vertical/NavbarContent.tsx	1	src/app/components/layout/vertical/Navbar.tsx
+src/app/components/layout/vertical/Navigation.tsx	5	src/app/_archive/projects-overview/page.tsx;src/app/_archive/projects-valuation/page.tsx;src/app/documentation/page.tsx;src/app/prototypes-multifam/page.tsx;src/app/prototypes/multifam/rent-roll-inputs/page.tsx
+src/app/components/layout/vertical/VerticalMenu.tsx	1	src/app/components/layout/vertical/Navigation.tsx
+src/app/components/navigation/SandboxDropdown.tsx	0	
+src/app/components/navigation/SettingsDropdown.tsx	0	
+src/app/components/navigation/UserMenuDropdown.tsx	1	src/app/components/TopNavigationBar.tsx
+src/app/components/new-project/AIDocumentPrompt.tsx	0	
+src/app/components/new-project/AssetTypeSection.tsx	0	
+src/app/components/new-project/Badge.tsx	5	src/app/components/layout/shared/UserDropdown.tsx;src/app/components/new-project/PathCard.tsx;src/app/components/new-project/ProjectSummaryPreview.tsx;src/app/documents/review/page.tsx;src/components/budget/IncompleteCategoriesReminder.tsx
+src/app/components/new-project/ConfigureSection.tsx	0	
+src/app/components/new-project/FloatingLabelInput.tsx	0	
+src/app/components/new-project/LandscaperPanel.tsx	3	src/app/projects/[projectId]/ProjectLayoutClient.tsx;src/components/benchmarks/BenchmarksFlyout.tsx;src/components/napkin/NapkinAnalysisPage.tsx
+src/app/components/new-project/LocationSection.tsx	1	src/app/components/NewProjectModal.tsx
+src/app/components/new-project/MapPinSelector.tsx	0	
+src/app/components/new-project/PathCard.tsx	0	
+src/app/components/new-project/ProjectSummaryPreview.tsx	1	src/app/components/new-project/ConfigureSection.tsx
+src/app/components/new-project/PropertyDataSection.tsx	1	src/app/components/NewProjectModal.tsx
+src/app/components/theme/ModeChanger.tsx	2	src/app/components/theme/index.tsx;src/themes/current/index.tsx
+src/components/DebugMount.tsx	0	
+src/components/IssueReporter/IssueReporterButton.tsx	0	
+src/components/IssueReporter/IssueReporterContext.tsx	1	src/components/IssueReporter/IssueReporterProvider.tsx
+src/components/IssueReporter/IssueReporterDialog.tsx	1	src/components/IssueReporter/IssueReporterProvider.tsx
+src/components/IssueReporter/IssueReporterProvider.tsx	1	src/app/layout.tsx
+src/components/Onboarding/DocumentUploadModal.tsx	1	src/components/Onboarding/OnboardingChat.tsx
+src/components/Onboarding/OnboardingChat.tsx	1	src/app/onboarding/page.tsx
+src/components/Onboarding/OnboardingSurvey.tsx	1	src/app/onboarding/page.tsx
+src/components/acquisition/AcquisitionAccordion.tsx	0	
+src/components/acquisition/AcquisitionHeaderCard.tsx	0	
+src/components/acquisition/AcquisitionLedgerGrid.tsx	3	src/app/_archive/projects-acquisition/page.tsx;src/app/projects/[projectId]/components/tabs/AcquisitionSubTab.tsx;src/components/acquisition/AcquisitionAccordion.tsx
+src/components/acquisition/AcquisitionReconciliation.tsx	0	
+src/components/acquisition/NapkinAcquisitionAccordion.tsx	0	
+src/components/admin/AdminModal.tsx	1	src/app/components/NavigationLayout.tsx
+src/components/admin/BenchmarksPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/ColorSwatch.tsx	0	
+src/components/admin/ColorTableRow.tsx	0	
+src/components/admin/CostLibraryPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/DMSAdminPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/ExportButton.tsx	12	src/app/_archive/projects-analysis/market-data/page.tsx;src/app/_archive/projects-analysis/sensitivity/page.tsx;src/app/_archive/projects-capitalization/operations/page.tsx;src/app/_archive/projects-development/budget/page.tsx;src/app/_archive/projects-planning/budget/page.tsx;src/app/_archive/projects-sales-marketing/page.tsx;src/app/projects/[projectId]/capitalization/debt/page.tsx;src/app/projects/[projectId]/components/tabs/FeasibilityTab.tsx;src/app/projects/[projectId]/components/tabs/PlanningTab.tsx;src/app/projects/[projectId]/project/budget/page.tsx;src/app/projects/[projectId]/project/planning/page.tsx;src/components/sales/SalesContent.tsx
+src/components/admin/ExtractionMappingAdmin.tsx	0	
+src/components/admin/LandscaperAdminPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/PicklistEditor.tsx	1	src/components/admin/SystemPicklistsAccordion.tsx
+src/components/admin/PicklistItemModal.tsx	1	src/components/admin/SystemPicklistsAccordion.tsx
+src/components/admin/PreferencesPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/ReportConfiguratorPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/admin/ReportTemplateCard.tsx	1	src/components/admin/ReportConfiguratorPanel.tsx
+src/components/admin/ReportTemplateEditorModal.tsx	2	src/components/admin/ExportButton.tsx;src/components/admin/ReportConfiguratorPanel.tsx
+src/components/admin/SystemPicklistsAccordion.tsx	0	
+src/components/admin/UserManagementPanel.tsx	1	src/components/admin/AdminModal.tsx
+src/components/alpha/AlphaAssistantFlyout.tsx	1	src/app/projects/[projectId]/ProjectLayoutClient.tsx
+src/components/alpha/AlphaAssistantModal.tsx	0	
+src/components/alpha/AlphaFeedbackForm.tsx	0	
+src/components/alpha/AlphaLandscaperChat.tsx	1	src/components/alpha/AlphaAssistantModal.tsx
+src/components/alpha/FeedbackLog.tsx	1	src/components/alpha/AlphaAssistantFlyout.tsx
+src/components/alpha/HelpContentPanel.tsx	1	src/components/alpha/AlphaAssistantModal.tsx
+src/components/alpha/HelpFeedbackAgent.tsx	1	src/components/alpha/AlphaAssistantFlyout.tsx
+src/components/analysis/SfCompsTile.tsx	1	src/components/feasibility/MarketDataContent.tsx
+src/components/analysis/cashflow/CashFlowAnalysisTab.tsx	1	src/app/projects/[projectId]/components/tabs/FeasibilityTab.tsx
+src/components/analysis/cashflow/CashFlowPhaseTable.tsx	0	
+src/components/analysis/cashflow/CashFlowSummaryMetrics.tsx	1	src/components/analysis/cashflow/CashFlowAnalysisTab.tsx
+src/components/analysis/cashflow/CashFlowTable.tsx	1	src/components/analysis/cashflow/CashFlowAnalysisTab.tsx
+src/components/analysis/cashflow/CostGranularityToggle.tsx	1	src/components/analysis/cashflow/CashFlowAnalysisTab.tsx
+src/components/analysis/cashflow/TimeScaleSelector.tsx	1	src/components/analysis/cashflow/CashFlowAnalysisTab.tsx
+src/components/analysis/shared/CashFlowGrid.tsx	1	src/components/valuation/income-approach/DCFView.tsx
+src/components/analysis/validation/ValidationReport.tsx	1	src/app/_archive/projects-validation/page.tsx
+src/components/auth/ProtectedRoute.tsx	4	src/app/admin/changelog/page.tsx;src/app/admin/feedback/page.tsx;src/app/admin/users/page.tsx;src/app/settings/profile/page.tsx
+src/components/benchmarks/AISuggestionsSection.tsx	1	src/components/benchmarks/LandscaperPanel.tsx
+src/components/benchmarks/AddBenchmarkModal.tsx	2	src/app/admin/benchmarks/page.tsx;src/components/admin/BenchmarksPanel.tsx
+src/components/benchmarks/BenchmarkAccordion.tsx	2	src/app/admin/benchmarks/page.tsx;src/components/admin/BenchmarksPanel.tsx
+src/components/benchmarks/BenchmarksFlyout.tsx	0	
+src/components/benchmarks/GrowthRateCategoryPanel.tsx	2	src/app/admin/benchmarks/page.tsx;src/components/admin/BenchmarksPanel.tsx
+src/components/benchmarks/GrowthRateStepEditor.tsx	0	
+src/components/benchmarks/GrowthRateWizard.tsx	0	
+src/components/benchmarks/LandscaperPanel.tsx	3	src/app/projects/[projectId]/ProjectLayoutClient.tsx;src/components/benchmarks/BenchmarksFlyout.tsx;src/components/napkin/NapkinAnalysisPage.tsx
+src/components/benchmarks/absorption/AbsorptionVelocityPanel.tsx	1	src/app/admin/benchmarks/page.tsx
+src/components/benchmarks/products/ProductLibraryPanel.tsx	1	src/app/benchmarks/products/page.tsx
+src/components/benchmarks/unit-costs/InlineEditableCategoryCell.tsx	1	src/app/benchmarks/unit-costs/page.tsx
+src/components/benchmarks/unit-costs/InlineEditableCell.tsx	1	src/app/benchmarks/unit-costs/page.tsx
+src/components/benchmarks/unit-costs/InlineEditableUOMCell.tsx	1	src/app/benchmarks/unit-costs/page.tsx
+src/components/benchmarks/unit-costs/UnitCostTemplateModal.tsx	1	src/app/benchmarks/unit-costs/page.tsx
+src/components/benchmarks/unit-costs/UnitCostsPanel.tsx	1	src/app/admin/benchmarks/cost-library/page.tsx
+src/components/budget/BasicBudgetTable.tsx	0	
+src/components/budget/BudgetContainer.tsx	1	src/app/projects/[projectId]/components/tabs/BudgetTab.tsx
+src/components/budget/BudgetDataGrid.tsx	1	src/components/budget/BudgetGridTab.tsx
+src/components/budget/BudgetGanttGrid.tsx	0	
+src/components/budget/BudgetGridTab.tsx	4	src/app/_archive/projects-development/budget/page.tsx;src/app/_archive/projects-planning/budget/page.tsx;src/app/projects/[projectId]/budget/page.tsx;src/components/budget/BudgetContainer.tsx
+src/components/budget/BudgetHealthWidget.tsx	0	
+src/components/budget/BudgetItemModal.tsx	0	
+src/components/budget/BudgetItemModalV2.tsx	0	
+src/components/budget/CategoryCascadingDropdown.tsx	1	src/components/budget/BudgetItemModal.tsx
+src/components/budget/CategoryTemplateManager.tsx	1	src/app/settings/budget-categories/page.tsx
+src/components/budget/CategoryTreeManager.tsx	3	src/app/settings/budget-categories/page.tsx;src/components/budget/CostCategoriesTab.tsx;src/components/budget/TemplateEditorModal.tsx
+src/components/budget/ColumnDefinitions.tsx	0	
+src/components/budget/CostCategoriesTab.tsx	0	
+src/components/budget/CreateTemplateModal.tsx	1	src/components/budget/CostCategoriesTab.tsx
+src/components/budget/CustomColumns.tsx	0	
+src/components/budget/EditConfirmationDialog.tsx	0	
+src/components/budget/FiltersAccordion.tsx	1	src/components/budget/BudgetGridTab.tsx
+src/components/budget/GanttChart.tsx	0	
+src/components/budget/GanttEditModal.tsx	0	
+src/components/budget/IncompleteCategoriesReminder.tsx	1	src/components/budget/BudgetGridTab.tsx
+src/components/budget/ModeSelector.tsx	0	
+src/components/budget/QuickAddCategoryModal.tsx	1	src/components/budget/BudgetGridTab.tsx
+src/components/budget/ReconciliationModal.tsx	0	
+src/components/budget/SimpleBudgetGrid.tsx	0	
+src/components/budget/TemplateEditorModal.tsx	1	src/components/budget/CostCategoriesTab.tsx
+src/components/budget/TimelineChartPeriods.tsx	0	
+src/components/budget/TimelineTab.tsx	1	src/components/budget/BudgetContainer.tsx
+src/components/budget/VarianceAlertModal.tsx	0	
+src/components/budget/VarianceWarningBadge.tsx	0	
+src/components/budget/custom/BudgetGridWithTimeline.tsx	1	src/app/projects/[projectId]/project/budget/page.tsx
+src/components/budget/custom/CategoryEditorRow.tsx	1	src/components/budget/BudgetDataGrid.tsx
+src/components/budget/custom/ColoredDotIndicator.tsx	2	src/components/budget/ColumnDefinitions.tsx;src/components/budget/custom/EditableCell.tsx
+src/components/budget/custom/ColumnChooser.tsx	1	src/components/budget/custom/BudgetGridWithTimeline.tsx
+src/components/budget/custom/DataGrid.tsx	3	src/app/components/Archive/PlanningContentGrid.tsx;src/components/budget/SimpleBudgetGrid.tsx;src/components/budget/custom/BudgetGridWithTimeline.tsx
+src/components/budget/custom/EditableCategoryCell.tsx	0	
+src/components/budget/custom/EditableCell.tsx	1	src/components/budget/ColumnDefinitions.tsx
+src/components/budget/custom/ExpandableDetailsRow.tsx	1	src/components/budget/BudgetDataGrid.tsx
+src/components/budget/custom/GroupRow.tsx	1	src/components/budget/BudgetDataGrid.tsx
+src/components/budget/custom/PhaseCell.tsx	1	src/components/budget/ColumnDefinitions.tsx
+src/components/budget/custom/TimelineChart.tsx	1	src/components/budget/custom/BudgetGridWithTimeline.tsx
+src/components/budget/fields/FieldRenderer.tsx	2	src/app/components/assumptions/FieldGroup.tsx;src/components/budget/custom/ExpandableDetailsRow.tsx
+src/components/budget/tiles/CostControlsTile.tsx	1	src/components/budget/custom/ExpandableDetailsRow.tsx
+src/components/budget/tiles/TimingEscalationTile.tsx	1	src/components/budget/custom/ExpandableDetailsRow.tsx
+src/components/capitalization/CapitalizationSubNav.tsx	0	
+src/components/capitalization/DebtFacilitiesTable.tsx	0	
+src/components/capitalization/DebtFacilityModal.tsx	0	
+src/components/capitalization/DeveloperFeeModal.tsx	0	
+src/components/capitalization/DeveloperFeesTable.tsx	0	
+src/components/capitalization/DrawScheduleTable.tsx	0	
+src/components/capitalization/EquityPartnersTable.tsx	0	
+src/components/capitalization/LeveragedCashFlow.tsx	1	src/app/projects/[projectId]/capitalization/debt/page.tsx
+src/components/capitalization/LoanBudgetModal.tsx	2	src/components/capitalization/LeveragedCashFlow.tsx;src/components/capitalization/LoanCard.tsx
+src/components/capitalization/LoanCard.tsx	1	src/app/projects/[projectId]/capitalization/debt/page.tsx
+src/components/capitalization/LoanScheduleGrid.tsx	2	src/components/capitalization/LoanCard.tsx;src/components/capitalization/LoanScheduleModal.tsx
+src/components/capitalization/LoanScheduleModal.tsx	0	
+src/components/capitalization/ManagementOverheadTable.tsx	0	
+src/components/capitalization/MetricCard.tsx	3	src/app/_archive/projects-capitalization/operations/page.tsx;src/app/projects/[projectId]/capitalization/equity/page.tsx;src/app/projects/[projectId]/project/summary/page.tsx
+src/components/capitalization/NapkinWaterfallForm.tsx	2	src/app/projects/[projectId]/capitalization/equity/page.tsx;src/app/projects/[projectId]/napkin/waterfall/page.tsx
+src/components/capitalization/OverheadItemModal.tsx	0	
+src/components/capitalization/PartnerSummaryCards.tsx	0	
+src/components/capitalization/PendingRenoOffsetModal.tsx	1	src/components/capitalization/LeveragedCashFlow.tsx
+src/components/capitalization/WaterfallDistributionTable.tsx	0	
+src/components/capitalization/WaterfallResults.tsx	0	
+src/components/capitalization/WaterfallStructureTable.tsx	0	
+src/components/changelog/ChangelogModal.tsx	1	src/components/changelog/VersionBadge.tsx
+src/components/changelog/VersionBadge.tsx	4	src/app/_archive/components-studio/StudioProjectBar.tsx;src/app/projects/[projectId]/components/ActiveProjectBar.tsx;src/app/projects/[projectId]/valuation/components/NarrativeCanvas.tsx;src/app/projects/[projectId]/valuation/components/VersionHistoryDropdown.tsx
+src/components/common/UOMSelect.tsx	2	src/components/budget/BudgetItemModalV2.tsx;src/components/budget/ColumnDefinitions.tsx
+src/components/contacts/ContactDetailPanel.tsx	1	src/app/contacts/page.tsx
+src/components/contacts/ContactModal.tsx	1	src/app/contacts/page.tsx
+src/components/contacts/ContactTypeahead.tsx	2	src/components/contacts/RelationshipManager.tsx;src/components/projects/contacts/ProjectContactsSection.tsx
+src/components/contacts/RelationshipManager.tsx	0	
+src/components/copilot/CopilotProvider.tsx	0	
+src/components/dashboard/CompletenessBar.tsx	2	src/components/dashboard/CompletenessModal.tsx;src/components/dashboard/ProjectTable.tsx
+src/components/dashboard/CompletenessModal.tsx	1	src/components/dashboard/ProjectTable.tsx
+src/components/dashboard/DashboardChat.tsx	0	
+src/components/dashboard/ProjectTable.tsx	0	
+src/components/diligence/DiligenceBlocks.tsx	1	src/app/diligence/page.tsx
+src/components/dms/DMSView.tsx	4	src/app/projects/[projectId]/components/landscaper/StudioPanel.tsx;src/app/projects/[projectId]/components/tabs/DocumentsTab.tsx;src/app/projects/[projectId]/documents/page.tsx;src/app/projects/[projectId]/project/dms/page.tsx
+src/components/dms/MediaBadgeChips.tsx	1	src/components/dms/filters/AccordionFilters.tsx
+src/components/dms/MediaDetailView.tsx	0	
+src/components/dms/ProcessingStatus.tsx	0	
+src/components/dms/ProjectMediaGallery.tsx	1	src/app/projects/[projectId]/components/tabs/DocumentsTab.tsx
+src/components/dms/admin/AttrBuilder.tsx	0	
+src/components/dms/admin/TemplateDesigner.tsx	0	
+src/components/dms/filters/AccordionFilters.tsx	0	
+src/components/dms/filters/DocTypeFilters.tsx	1	src/app/dms/page.tsx
+src/components/dms/filters/ProjectSelector.tsx	1	src/app/dms/page.tsx
+src/components/dms/filters/SmartFilterBuilder.tsx	0	
+src/components/dms/folders/FolderEditor.tsx	0	
+src/components/dms/folders/FolderTree.tsx	0	
+src/components/dms/list/ColumnChooser.tsx	1	src/components/budget/custom/BudgetGridWithTimeline.tsx
+src/components/dms/list/DocumentAccordion.tsx	1	src/components/dms/list/DocumentTable.tsx
+src/components/dms/list/DocumentTable.tsx	1	src/app/dms/page.tsx
+src/components/dms/list/PlatformKnowledgeAccordion.tsx	1	src/components/dms/list/PlatformKnowledgeTable.tsx
+src/components/dms/list/PlatformKnowledgeTable.tsx	1	src/app/dms/page.tsx
+src/components/dms/modals/DeleteConfirmModal.tsx	5	src/app/dms/page.tsx;src/components/dms/DMSView.tsx;src/components/dms/preview/DocumentPreview.tsx;src/components/dms/views/DocumentPreviewPanel.tsx;src/components/dms/views/FilterDetailView.tsx
+src/components/dms/modals/DocumentChatModal.tsx	2	src/components/dms/views/DocumentPreviewPanel.tsx;src/components/dms/views/FilterDetailView.tsx
+src/components/dms/modals/MediaCard.tsx	0	
+src/components/dms/modals/MediaPickerModal.tsx	3	src/app/projects/[projectId]/valuation/components/ComparableCard.tsx;src/app/projects/[projectId]/valuation/components/ComparablesGrid.tsx;src/components/project/ProjectPhotosModal.tsx
+src/components/dms/modals/MediaPreviewModal.tsx	2	src/components/dms/DMSView.tsx;src/components/landscaper/LandscaperPanel.tsx
+src/components/dms/modals/PlatformKnowledgeChatModal.tsx	0	
+src/components/dms/modals/PlatformKnowledgeModal.tsx	0	
+src/components/dms/modals/RenameModal.tsx	4	src/components/dms/DMSView.tsx;src/components/dms/preview/DocumentPreview.tsx;src/components/dms/views/DocumentPreviewPanel.tsx;src/components/dms/views/FilterDetailView.tsx
+src/components/dms/modals/UploadCollisionModal.tsx	0	
+src/components/dms/panels/DmsLandscaperPanel.tsx	1	src/app/dms/page.tsx
+src/components/dms/preview/DocumentPreview.tsx	0	
+src/components/dms/preview/PlatformKnowledgePreview.tsx	0	
+src/components/dms/profile/DocCard.tsx	0	
+src/components/dms/profile/PlatformKnowledgeProfileForm.tsx	1	src/components/dms/preview/PlatformKnowledgePreview.tsx
+src/components/dms/profile/ProfileForm.tsx	3	src/components/dms/DMSView.tsx;src/components/dms/preview/DocumentPreview.tsx;src/components/dms/views/DocumentPreviewPanel.tsx
+src/components/dms/profile/TagInput.tsx	1	src/components/dms/profile/ProfileForm.tsx
+src/components/dms/profile/VersionTimeline.tsx	0	
+src/components/dms/search/Facets.tsx	1	src/app/components/Documents/DocumentManagement.tsx
+src/components/dms/search/HighlightedText.tsx	0	
+src/components/dms/search/ResultsTable.tsx	1	src/app/components/Documents/DocumentManagement.tsx
+src/components/dms/search/SearchBox.tsx	1	src/app/components/Documents/DocumentManagement.tsx
+src/components/dms/shared/DMSLayout.tsx	1	src/app/dms/page.tsx
+src/components/dms/upload/Dropzone.tsx	2	src/app/components/Documents/DocumentManagement.tsx;src/app/components/GIS/ProjectDocumentUploads.tsx
+src/components/dms/upload/Queue.tsx	1	src/app/components/Documents/DocumentManagement.tsx
+src/components/dms/views/DocumentPreviewPanel.tsx	2	src/components/dms/DMSView.tsx;src/components/dms/views/FilterDetailView.tsx
+src/components/dms/views/FilterDetailView.tsx	0	
+src/components/documents/CorrectionModal.tsx	1	src/app/documents/review/page.tsx
+src/components/extraction/StagingModal.tsx	2	src/app/prototypes/multifam/rent-roll-inputs/page.tsx;src/app/rent-roll/page.tsx
+src/components/feasibility/ComparableModal.tsx	1	src/components/feasibility/MarketDataContent.tsx
+src/components/feasibility/ComparablesTable.tsx	0	
+src/components/feasibility/FeasibilitySubNav.tsx	2	src/app/_archive/projects-analysis/market-data/page.tsx;src/app/_archive/projects-analysis/sensitivity/page.tsx
+src/components/feasibility/MarketDataContent.tsx	1	src/app/_archive/projects-analysis/market-data/page.tsx
+src/components/feasibility/SensitivityAnalysisContent.tsx	1	src/app/_archive/projects-analysis/sensitivity/page.tsx
+src/components/icons/LandscaperIcon.tsx	6	src/app/_archive/components-studio/CollapsedLandscaperStrip.tsx;src/app/components/new-project/LandscaperPanel.tsx;src/app/projects/[projectId]/components/tabs/MarketTab.tsx;src/components/landscaper/CollapsedLandscaperStrip.tsx;src/components/landscaper/LandscaperChat.tsx;src/components/landscaper/LandscaperChatThreaded.tsx
+src/components/ingestion/DocumentCard.tsx	1	src/components/ingestion/DocumentIngestion.tsx
+src/components/ingestion/DocumentIngestion.tsx	1	src/app/ingestion/page.tsx
+src/components/ingestion/IngestionChat.tsx	1	src/components/ingestion/DocumentIngestion.tsx
+src/components/ingestion/MilestoneBar.tsx	1	src/components/ingestion/DocumentIngestion.tsx
+src/components/ingestion/PropertyOverview.tsx	1	src/components/ingestion/DocumentIngestion.tsx
+src/components/landscaper/ActivityFeed.tsx	3	src/app/dashboard/page.tsx;src/app/projects/[projectId]/project/summary/page.tsx;src/components/landscaper/LandscaperPanel.tsx
+src/components/landscaper/ActivityFeedItem.tsx	1	src/components/landscaper/ActivityFeed.tsx
+src/components/landscaper/AdditionalDataFoundPanel.tsx	0	
+src/components/landscaper/AdviceAdherencePanel.tsx	1	src/app/components/LandscaperChatModal.tsx
+src/components/landscaper/CalculatedFieldRow.tsx	0	
+src/components/landscaper/ChatInterface.tsx	1	src/app/components/LandscaperChatModal.tsx
+src/components/landscaper/ChatMessageBubble.tsx	4	src/app/projects/[projectId]/components/landscaper/AgentChat.tsx;src/components/landscaper/ChatInterface.tsx;src/components/landscaper/LandscaperChat.tsx;src/components/landscaper/LandscaperChatThreaded.tsx
+src/components/landscaper/CollapsedLandscaperStrip.tsx	2	src/app/dashboard/page.tsx;src/app/projects/[projectId]/ProjectLayoutClient.tsx
+src/components/landscaper/CreateDynamicColumnModal.tsx	1	src/components/landscaper/FieldMappingInterface.tsx
+src/components/landscaper/DataTableModal.tsx	0	
+src/components/landscaper/ExtractionFieldRow.tsx	1	src/components/landscaper/ExtractionReviewModal.tsx
+src/components/landscaper/ExtractionReviewModal.tsx	1	src/components/landscaper/LandscaperPanel.tsx
+src/components/landscaper/ExtractionValidation.tsx	0	
+src/components/landscaper/FieldMappingInterface.tsx	1	src/components/landscaper/LandscaperPanel.tsx
+src/components/landscaper/LandscaperChat.tsx	1	src/app/dashboard/page.tsx
+src/components/landscaper/LandscaperChatThreaded.tsx	1	src/components/landscaper/LandscaperPanel.tsx
+src/components/landscaper/LandscaperPanel.tsx	3	src/app/projects/[projectId]/ProjectLayoutClient.tsx;src/components/benchmarks/BenchmarksFlyout.tsx;src/components/napkin/NapkinAnalysisPage.tsx
+src/components/landscaper/LandscaperProgress.tsx	3	src/components/landscaper/ChatInterface.tsx;src/components/landscaper/LandscaperChat.tsx;src/components/landscaper/LandscaperChatThreaded.tsx
+src/components/landscaper/MediaSummaryCard.tsx	1	src/components/landscaper/ChatMessageBubble.tsx
+src/components/landscaper/MutationProposalCard.tsx	1	src/components/landscaper/ChatMessageBubble.tsx
+src/components/landscaper/RentRollUpdateReviewModal.tsx	0	
+src/components/landscaper/ThreadList.tsx	1	src/components/landscaper/LandscaperChatThreaded.tsx
+src/components/landscaper/UnitMixAccordion.tsx	1	src/components/landscaper/ExtractionReviewModal.tsx
+src/components/landscaper/VarianceItem.tsx	1	src/components/landscaper/AdviceAdherencePanel.tsx
+src/components/location-intelligence/AddPointPopover.tsx	0	
+src/components/location-intelligence/DemographicsPanel.tsx	0	
+src/components/location-intelligence/LocationMap.tsx	0	
+src/components/location-intelligence/MapLayerToggle.tsx	0	
+src/components/map-tab/DrawToolbar.tsx	0	
+src/components/map-tab/FeatureModal.tsx	0	
+src/components/map-tab/LayerPanel.tsx	0	
+src/components/map-tab/LeafletGISView.tsx	1	src/components/map-tab/MapTab.tsx
+src/components/map-tab/MapCanvas.tsx	0	
+src/components/map-tab/MapTab.tsx	1	src/app/projects/[projectId]/ProjectContentRouter.tsx
+src/components/map/MapOblique.tsx	4	src/app/components/dashboard/DashboardMap.tsx;src/components/map/ProjectTabMap.tsx;src/components/map/PropertyTabMapWithComps.tsx;src/components/map/ValuationSalesCompMap.tsx
+src/components/map/ProjectTabMap.tsx	6	src/app/_archive/projects-overview/page.tsx;src/app/projects/[projectId]/components/landscaper/ProjectDetailsContent.tsx;src/app/projects/[projectId]/components/landscaper/ProjectSelectorCard.tsx;src/app/projects/[projectId]/components/property/PropertyPage.tsx;src/app/projects/[projectId]/components/tabs/ProjectTab.tsx;src/app/prototypes/multifam/rent-roll-inputs/page.tsx
+src/components/map/PropertyTabMapWithComps.tsx	0	
+src/components/map/ValuationSalesCompMap.tsx	1	src/app/projects/[projectId]/valuation/components/SalesComparisonApproach.tsx
+src/components/market/AddCompetitorModal.tsx	1	src/components/market/CompetitiveProjectsPanel.tsx
+src/components/market/CompetitiveProjectsPanel.tsx	0	
+src/components/napkin/CommercialPanel.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/CompDetailsSection.tsx	1	src/components/napkin/NapkinSfdPricing.tsx
+src/components/napkin/InfrastructurePanel.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/LandscaperPanel.tsx	3	src/app/projects/[projectId]/ProjectLayoutClient.tsx;src/components/benchmarks/BenchmarksFlyout.tsx;src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/MdrPanel.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/NapkinAnalysisPage.tsx	1	src/app/projects/[projectId]/napkin/page.tsx
+src/components/napkin/NapkinAttachedPricing.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/NapkinCompsMap.tsx	2	src/components/napkin/NapkinAttachedPricing.tsx;src/components/napkin/NapkinSfdPricing.tsx
+src/components/napkin/NapkinSfdPricing.tsx	3	src/app/_archive/projects-planning/market/page.tsx;src/app/projects/[projectId]/components/tabs/MarketTab.tsx;src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/PromoteModal.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/RlvSummaryCard.tsx	1	src/components/napkin/NapkinAnalysisPage.tsx
+src/components/napkin/SfdPricingPanel.tsx	0	
+src/components/navigation/FolderTabs.tsx	1	src/app/projects/[projectId]/ProjectLayoutClient.tsx
+src/components/navigation/ProjectSelectorCard.tsx	0	
+src/components/operations/AddButton.tsx	5	src/components/operations/DraggableOpexSection.tsx;src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OtherIncomeSection.tsx;src/components/operations/RentalIncomeSection.tsx;src/components/operations/VacancyDeductionsSection.tsx
+src/components/operations/DetailSummaryToggle.tsx	6	src/components/operations/DraggableOpexSection.tsx;src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OperatingStatement.tsx;src/components/operations/OtherIncomeSection.tsx;src/components/operations/RentalIncomeSection.tsx;src/components/operations/VacancyDeductionsSection.tsx
+src/components/operations/DraggableOpexSection.tsx	0	
+src/components/operations/EGISubtotalBar.tsx	0	
+src/components/operations/EvidenceCell.tsx	3	src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OtherIncomeSection.tsx;src/components/operations/VacancyDeductionsSection.tsx
+src/components/operations/GrowthBadge.tsx	2	src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OtherIncomeSection.tsx
+src/components/operations/InputCell.tsx	7	src/components/operations/DraggableOpexSection.tsx;src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OperatingIncomeCard.tsx;src/components/operations/OperatingStatement.tsx;src/components/operations/OtherIncomeSection.tsx;src/components/operations/VacancyDeductionsSection.tsx;src/components/operations/ValueAddAccordion.tsx
+src/components/operations/InventoryStatsPanel.tsx	1	src/app/components/OpExHierarchy.tsx
+src/components/operations/ItemNameEditor.tsx	1	src/components/operations/OperatingStatement.tsx
+src/components/operations/NOITotalBar.tsx	0	
+src/components/operations/OpExModeSelector.tsx	1	src/app/components/OpExHierarchy.tsx
+src/components/operations/OperatingExpensesSection.tsx	0	
+src/components/operations/OperatingIncomeCard.tsx	0	
+src/components/operations/OperatingStatement.tsx	0	
+src/components/operations/OperationsHeader.tsx	0	
+src/components/operations/OtherIncomeSection.tsx	0	
+src/components/operations/RentalIncomeSection.tsx	1	src/app/projects/[projectId]/components/tabs/RenovationSubTab.tsx
+src/components/operations/SectionCard.tsx	6	src/components/operations/DraggableOpexSection.tsx;src/components/operations/OperatingExpensesSection.tsx;src/components/operations/OperatingIncomeCard.tsx;src/components/operations/OtherIncomeSection.tsx;src/components/operations/RentalIncomeSection.tsx;src/components/operations/VacancyDeductionsSection.tsx
+src/components/operations/SummaryBar.tsx	0	
+src/components/operations/VacancyDeductionsSection.tsx	0	
+src/components/operations/ValueAddAccordion.tsx	0	
+src/components/operations/ValueAddCard.tsx	1	src/app/projects/[projectId]/components/tabs/RenovationSubTab.tsx
+src/components/operations/ValueAddToggle.tsx	0	
+src/components/phases/PhaseTransition.tsx	1	src/app/phases/page.tsx
+src/components/project/ActivityFeed.tsx	3	src/app/dashboard/page.tsx;src/app/projects/[projectId]/project/summary/page.tsx;src/components/landscaper/LandscaperPanel.tsx
+src/components/project/GranularityIndicators.tsx	1	src/app/projects/[projectId]/project/summary/page.tsx
+src/components/project/MetricCard.tsx	3	src/app/_archive/projects-capitalization/operations/page.tsx;src/app/projects/[projectId]/capitalization/equity/page.tsx;src/app/projects/[projectId]/project/summary/page.tsx
+src/components/project/MilestoneTimeline.tsx	1	src/app/projects/[projectId]/project/summary/page.tsx
+src/components/project/ProfileField.tsx	1	src/components/project/ProjectProfileTile.tsx
+src/components/project/ProjectDates.tsx	1	src/app/projects/[projectId]/settings/page.tsx
+src/components/project/ProjectLandUseLabels.tsx	1	src/app/projects/[projectId]/settings/page.tsx
+src/components/project/ProjectPhotosModal.tsx	1	src/components/project/ProjectProfileTile.tsx
+src/components/project/ProjectProfileEditModal.tsx	3	src/app/projects/[projectId]/components/landscaper/ProjectDetailsContent.tsx;src/app/projects/[projectId]/components/landscaper/ProjectSelectorCard.tsx;src/components/project/ProjectProfileTile.tsx
+src/components/project/ProjectProfileTile.tsx	1	src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
+src/components/project/ProjectSubNav.tsx	5	src/app/projects/[projectId]/project/budget/page.tsx;src/app/projects/[projectId]/project/dms/page.tsx;src/app/projects/[projectId]/project/planning/page.tsx;src/app/projects/[projectId]/project/sales/page.tsx;src/app/projects/[projectId]/project/summary/page.tsx
+src/components/projects/InflationRateDisplay.tsx	0	
+src/components/projects/LifecycleTileNav.tsx	0	
+src/components/projects/contacts/AddContactModal.tsx	1	src/components/projects/contacts/ContactsSection.tsx
+src/components/projects/contacts/ContactCard.tsx	1	src/components/projects/contacts/ContactRoleCard.tsx
+src/components/projects/contacts/ContactRoleCard.tsx	1	src/components/projects/contacts/ContactsSection.tsx
+src/components/projects/contacts/ContactsSection.tsx	1	src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
+src/components/projects/contacts/ProjectContactsSection.tsx	0	
+src/components/projects/onboarding/ModelReadinessDisplay.tsx	1	src/components/projects/onboarding/NewProjectChannelTabs.tsx
+src/components/projects/onboarding/NewProjectChannelTabs.tsx	1	src/components/projects/onboarding/NewProjectOnboardingModal.tsx
+src/components/projects/onboarding/NewProjectChat.tsx	1	src/components/projects/onboarding/NewProjectOnboardingModal.tsx
+src/components/projects/onboarding/NewProjectDropZone.tsx	2	src/app/components/new-project/LandscaperPanel.tsx;src/components/projects/onboarding/NewProjectChat.tsx
+src/components/projects/onboarding/NewProjectFieldTable.tsx	1	src/components/projects/onboarding/NewProjectOnboardingModal.tsx
+src/components/projects/onboarding/NewProjectOnboardingModal.tsx	0	
+src/components/projects/onboarding/SimplifiedChannelView.tsx	1	src/components/projects/onboarding/NewProjectChannelTabs.tsx
+src/components/property/CompetitiveMarketCharts.tsx	1	src/app/projects/[projectId]/components/tabs/PropertyTab.tsx
+src/components/reports/ExtractionFilterPills.tsx	1	src/components/reports/ExtractionHistoryReport.tsx
+src/components/reports/ExtractionHistoryPanel.tsx	0	
+src/components/reports/ExtractionHistoryReport.tsx	1	src/app/projects/[projectId]/components/tabs/ReportsTab.tsx
+src/components/reports/PropertySummaryView.tsx	2	src/app/projects/[projectId]/components/tabs/ReportsTab.tsx;src/app/reports/page.tsx
+src/components/sales/AnnualInventoryGauge.tsx	1	src/components/sales/SalesContent.tsx
+src/components/sales/CreateSalePhaseModal.tsx	1	src/components/sales/ParcelSalesTable.tsx
+src/components/sales/FilterSidebar.tsx	1	src/components/sales/SaleTransactionDetails.tsx
+src/components/sales/ParcelSalesTable.tsx	1	src/components/sales/SalesContent.tsx
+src/components/sales/PhaseTiles.tsx	1	src/components/sales/SalesContent.tsx
+src/components/sales/PricingTable.tsx	1	src/components/sales/SalesContent.tsx
+src/components/sales/SaleCalculationModal.tsx	1	src/components/sales/ParcelSalesTable.tsx
+src/components/sales/SaleDetailForm.tsx	0	
+src/components/sales/SaleTransactionDetails.tsx	1	src/components/sales/SalesContent.tsx
+src/components/sales/SalesContent.tsx	3	src/app/_archive/projects-sales-marketing/page.tsx;src/app/projects/[projectId]/components/tabs/SalesTab.tsx;src/app/projects/[projectId]/project/sales/page.tsx
+src/components/sales/SaveBenchmarkModal.tsx	1	src/components/sales/SaleCalculationModal.tsx
+src/components/sales/TransactionColumn.tsx	1	src/components/sales/TransactionGrid.tsx
+src/components/sales/TransactionGrid.tsx	1	src/components/sales/SaleTransactionDetails.tsx
+src/components/scenarios/ScenarioChipManager.tsx	0	
+src/components/scenarios/ScenarioComparison.tsx	0	
+src/components/shared/AccordionSection.tsx	0	
+src/components/shared/AreaTiles.tsx	1	src/components/sales/SalesContent.tsx
+src/components/shared/EntityMediaDisplay.tsx	2	src/app/projects/[projectId]/valuation/components/ComparableCard.tsx;src/app/projects/[projectId]/valuation/components/ComparablesGrid.tsx
+src/components/shared/ModeToggle.tsx	2	src/app/_archive/projects-opex/page.tsx;src/app/prototypes/multifam/rent-roll-inputs/components/PageHeader.tsx
+src/components/taxonomy/FamilyDetails.tsx	1	src/app/settings/taxonomy/page.tsx
+src/components/taxonomy/FamilyTree.tsx	1	src/app/settings/taxonomy/page.tsx
+src/components/taxonomy/ProductsList.tsx	1	src/app/settings/taxonomy/page.tsx
+src/components/ui/DropZoneWrapper.tsx	1	src/app/projects/[projectId]/ProjectLayoutClient.tsx
+src/components/ui/ModeChip.tsx	0	
+src/components/ui/PageHeader.tsx	1	src/app/prototypes/multifam/rent-roll-inputs/page.tsx
+src/components/ui/SemanticCategoryChip.tsx	1	src/components/benchmarks/unit-costs/UnitCostsPanel.tsx
+src/components/ui/alert.tsx	0	
+src/components/ui/badge.tsx	0	
+src/components/ui/button.tsx	0	
+src/components/ui/card.tsx	0	
+src/components/ui/dialog.tsx	0	
+src/components/ui/input.tsx	0	
+src/components/ui/label.tsx	0	
+src/components/ui/landscape/DataTable.tsx	0	
+src/components/ui/landscape/LandscapeButton.tsx	21	src/app/_archive/projects-opex/page.tsx;src/app/admin/benchmarks/page.tsx;src/app/admin/preferences/page.tsx;src/app/components/LandUse/LandUseDetails.tsx;src/app/components/PlanningWizard/ProjectCanvasInline.tsx;src/app/components/dashboard/TriageModal.tsx;src/app/dashboard/page.tsx;src/app/projects/[projectId]/valuation/components/AdjustmentAnalysisPanel.tsx;src/app/projects/[projectId]/valuation/components/AdjustmentMatrix.tsx;src/app/projects/[projectId]/valuation/components/ComparableCard.tsx;src/app/projects/[projectId]/valuation/components/ComparablesGrid.tsx;src/app/projects/[projectId]/valuation/components/LandscaperChatPanel.tsx;src/app/projects/[projectId]/valuation/components/SalesComparisonApproach.tsx;src/components/admin/ExportButton.tsx;src/components/admin/LandscaperAdminPanel.tsx;src/components/admin/PreferencesPanel.tsx;src/components/admin/ReportConfiguratorPanel.tsx;src/components/admin/ReportTemplateCard.tsx;src/components/admin/ReportTemplateEditorModal.tsx;src/components/budget/BudgetDataGrid.tsx;src/components/budget/fields/FieldRenderer.tsx
+src/components/ui/landscape/PropertyTypeBadge.tsx	6	src/app/components/ProjectContextBar.tsx;src/app/components/StyleCatalog/PropertyTypeTokensSection.tsx;src/app/dashboard/page.tsx;src/components/admin/PicklistEditor.tsx;src/components/budget/CategoryTemplateManager.tsx;src/components/dashboard/ProjectTable.tsx
+src/components/ui/landscape/SemanticBadge.tsx	23	src/app/admin/preferences/components/AddCategoryModal.tsx;src/app/admin/preferences/components/CategoryDetailPanel.tsx;src/app/admin/preferences/components/UOMRow.tsx;src/app/components/Admin/LandUseInputTable.tsx;src/app/components/StyleCatalog/BadgeIntentsSection.tsx;src/app/contacts/page.tsx;src/app/projects/[projectId]/components/property/FloorPlanMatrix.tsx;src/app/projects/[projectId]/components/property/PhysicalDescription.tsx;src/app/projects/[projectId]/components/property/RentRoll.tsx;src/components/acquisition/AcquisitionLedgerGrid.tsx;src/components/admin/LandscaperAdminPanel.tsx;src/components/budget/custom/EditableCell.tsx;src/components/budget/custom/GroupRow.tsx;src/components/contacts/ContactModal.tsx;src/components/dms/modals/DocumentChatModal.tsx;src/components/landscaper/AdviceAdherencePanel.tsx;src/components/landscaper/ExtractionValidation.tsx;src/components/market/CompetitiveProjectsPanel.tsx;src/components/napkin/CommercialPanel.tsx;src/components/napkin/MdrPanel.tsx;src/components/napkin/NapkinAttachedPricing.tsx;src/components/napkin/NapkinSfdPricing.tsx;src/components/napkin/SfdPricingPanel.tsx
+src/components/ui/landscape/SemanticButton.tsx	61	src/app/admin/preferences/components/AddUOMRow.tsx;src/app/admin/preferences/components/DeleteUOMModal.tsx;src/app/admin/preferences/components/UOMRow.tsx;src/app/admin/preferences/components/UOMTable.tsx;src/app/components/Admin/CategoryTree.tsx;src/app/components/Admin/LandUseManagement.tsx;src/app/components/Market/MarketAssumptions.tsx;src/app/components/MarketAssumptions.tsx;src/app/components/MarketFactors/index.tsx;src/app/components/StyleCatalog/ButtonIntentsSection.tsx;src/app/contacts/page.tsx;src/app/growthratedetail/page.tsx;src/app/projects/[projectId]/valuation/components/LandscaperReviewFlyout.tsx;src/app/projects/[projectId]/valuation/components/NarrativeCanvas.tsx;src/app/settings/contact-roles/page.tsx;src/components/acquisition/AcquisitionAccordion.tsx;src/components/acquisition/AcquisitionHeaderCard.tsx;src/components/acquisition/AcquisitionLedgerGrid.tsx;src/components/admin/ExtractionMappingAdmin.tsx;src/components/admin/PicklistItemModal.tsx;src/components/admin/SystemPicklistsAccordion.tsx;src/components/alpha/AlphaLandscaperChat.tsx;src/components/alpha/HelpFeedbackAgent.tsx;src/components/budget/BudgetGridTab.tsx;src/components/budget/BudgetHealthWidget.tsx;src/components/budget/BudgetItemModal.tsx;src/components/budget/BudgetItemModalV2.tsx;src/components/budget/CategoryTemplateManager.tsx;src/components/budget/CategoryTreeManager.tsx;src/components/budget/ColumnDefinitions.tsx;src/components/budget/CostCategoriesTab.tsx;src/components/budget/CreateTemplateModal.tsx;src/components/budget/EditConfirmationDialog.tsx;src/components/budget/GanttEditModal.tsx;src/components/budget/ModeSelector.tsx;src/components/budget/ReconciliationModal.tsx;src/components/budget/TemplateEditorModal.tsx;src/components/budget/VarianceAlertModal.tsx;src/components/budget/custom/CategoryEditorRow.tsx;src/components/budget/custom/EditableCategoryCell.tsx;src/components/budget/custom/GroupRow.tsx;src/components/capitalization/DeveloperFeeModal.tsx;src/components/capitalization/OverheadItemModal.tsx;src/components/contacts/ContactDetailPanel.tsx;src/components/contacts/ContactModal.tsx;src/components/dms/modals/DeleteConfirmModal.tsx;src/components/dms/modals/RenameModal.tsx;src/components/dms/modals/UploadCollisionModal.tsx;src/components/landscaper/ExtractionReviewModal.tsx;src/components/landscaper/ExtractionValidation.tsx;src/components/napkin/PromoteModal.tsx;src/components/napkin/SfdPricingPanel.tsx;src/components/project/ProjectProfileEditModal.tsx;src/components/projects/contacts/ProjectContactsSection.tsx;src/components/sales/CreateSalePhaseModal.tsx;src/components/sales/FilterSidebar.tsx;src/components/sales/ParcelSalesTable.tsx;src/components/sales/PricingTable.tsx;src/components/sales/SaleDetailForm.tsx;src/components/sales/SaleTransactionDetails.tsx;src/components/sales/TransactionColumn.tsx
+src/components/ui/landscape/SemanticCategoryChip.tsx	1	src/components/benchmarks/unit-costs/UnitCostsPanel.tsx
+src/components/ui/landscape/StatusChip.tsx	0	
+src/components/ui/radio-group.tsx	0	
+src/components/ui/select.tsx	0	
+src/components/ui/sheet.tsx	0	
+src/components/ui/table.tsx	0	
+src/components/ui/tabs.tsx	0	
+src/components/ui/textarea.tsx	0	
+src/components/ui/toast.tsx	0	
+src/components/valuation/DcfSummarySection.tsx	0	
+src/components/valuation/PendingRenoOffsetModal.tsx	1	src/components/capitalization/LeveragedCashFlow.tsx
+src/components/valuation/UnifiedAssumptionsPanel.tsx	1	src/app/projects/[projectId]/components/tabs/FeasibilityTab.tsx
+src/components/valuation/assumptions/DcfParametersSection.tsx	0	
+src/components/valuation/assumptions/GrowthRateSelect.tsx	3	src/components/valuation/assumptions/LandDevCostsSection.tsx;src/components/valuation/assumptions/LandDevInflationSection.tsx;src/components/valuation/assumptions/LandDevRevenueSection.tsx
+src/components/valuation/assumptions/LandDevCostsSection.tsx	0	
+src/components/valuation/assumptions/LandDevInflationSection.tsx	0	
+src/components/valuation/assumptions/LandDevRevenueSection.tsx	0	
+src/components/valuation/assumptions/ResultsSection.tsx	0	
+src/components/valuation/income-approach/AssumptionsPanel.tsx	0	
+src/components/valuation/income-approach/DCFView.tsx	1	src/app/projects/[projectId]/components/tabs/IncomeApproachContent.tsx
+src/components/valuation/income-approach/DirectCapView.tsx	0	
+src/components/valuation/income-approach/SensitivityMatrix.tsx	1	src/components/valuation/income-approach/DirectCapView.tsx
+src/components/valuation/income-approach/ValueTiles.tsx	0	

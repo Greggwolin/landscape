@@ -148,6 +148,9 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
                 'project_type_code': project.project_type_code,
+                'analysis_perspective': getattr(project, 'analysis_perspective', None),
+                'analysis_purpose': getattr(project, 'analysis_purpose', None),
+                'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
                 'project_details': {
                     'address': getattr(project, 'address', None),
                     'city': getattr(project, 'city', None),
@@ -1274,6 +1277,9 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
                 'project_type_code': project.project_type_code,
+                'analysis_perspective': getattr(project, 'analysis_perspective', None),
+                'analysis_purpose': getattr(project, 'analysis_purpose', None),
+                'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
                 'project_details': {
                     'address': getattr(project, 'address', None),
                     'city': getattr(project, 'city', None),
@@ -1430,6 +1436,9 @@ class GlobalChatViewSet(viewsets.ViewSet):
                 'project_name': 'Global Context',
                 'project_type': None,
                 'project_type_code': None,
+                'analysis_perspective': None,
+                'analysis_purpose': None,
+                'value_add_enabled': False,
                 'is_global': True,
                 'page_context': page_context,
             }

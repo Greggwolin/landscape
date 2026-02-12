@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import {
+  deriveDimensionsFromAnalysisType,
+  deriveLegacyAnalysisType,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy'
 
 type MinimalProjectRequest = {
   project_name: string
   analysis_type?: string
+  analysis_perspective?: string
+  analysis_purpose?: string
+  value_add_enabled?: boolean
   development_type?: string
   project_type_code: string
   property_subtype?: string
@@ -22,6 +31,22 @@ type MinimalProjectRequest = {
   gross_sf?: number | null
   analysis_start_date?: string | null
   asking_price?: number | null
+}
+
+const normalizePerspective = (value?: string | null): AnalysisPerspective | null => {
+  const normalized = value?.toUpperCase().trim()
+  if (normalized === 'INVESTMENT' || normalized === 'DEVELOPMENT') {
+    return normalized
+  }
+  return null
+}
+
+const normalizePurpose = (value?: string | null): AnalysisPurpose | null => {
+  const normalized = value?.toUpperCase().trim()
+  if (normalized === 'VALUATION' || normalized === 'UNDERWRITING') {
+    return normalized
+  }
+  return null
 }
 
 const convertToAcres = (value: number | null | undefined, unit: MinimalProjectRequest['site_area_unit']): number | null => {
@@ -68,6 +93,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const legacyDerived = deriveDimensionsFromAnalysisType(body.analysis_type)
+    const analysisPerspective = normalizePerspective(body.analysis_perspective) ?? legacyDerived.analysis_perspective
+    const analysisPurpose = normalizePurpose(body.analysis_purpose) ?? legacyDerived.analysis_purpose
+    const valueAddEnabled = analysisPerspective === 'INVESTMENT'
+      ? Boolean(body.value_add_enabled ?? legacyDerived.value_add_enabled)
+      : false
+    const legacyAnalysisType = deriveLegacyAnalysisType(
+      analysisPerspective,
+      analysisPurpose,
+      valueAddEnabled
+    )
+
     const acresGross = convertToAcres(body.site_area ?? null, body.site_area_unit)
     const locationDescription = buildLocationDescription(body)
     const latitude = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null
@@ -99,12 +136,18 @@ export async function POST(request: NextRequest) {
       project_name: string
       project_type_code: string | null
       analysis_mode: string
+      analysis_perspective: AnalysisPerspective
+      analysis_purpose: AnalysisPurpose
+      value_add_enabled: boolean
     }[]>`
       INSERT INTO landscape.tbl_project (
         project_name,
         project_type_code,
         project_type,
         analysis_type,
+        analysis_perspective,
+        analysis_purpose,
+        value_add_enabled,
         property_subtype,
         property_class,
         street_address,
@@ -130,7 +173,10 @@ export async function POST(request: NextRequest) {
         ${body.project_name},
         ${body.project_type_code},
         ${body.property_subtype || body.development_type || null},
-        ${body.analysis_type || null},
+        ${legacyAnalysisType},
+        ${analysisPerspective},
+        ${analysisPurpose},
+        ${valueAddEnabled},
         ${body.property_subtype || null},
         ${body.property_class || null},
         ${streetAddress},
@@ -153,7 +199,14 @@ export async function POST(request: NextRequest) {
         NOW(),
         NOW()
       )
-      RETURNING project_id, project_name, project_type_code, analysis_mode
+      RETURNING
+        project_id,
+        project_name,
+        project_type_code,
+        analysis_mode,
+        analysis_perspective,
+        analysis_purpose,
+        value_add_enabled
     `
 
     if (inserted.length === 0) {

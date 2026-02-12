@@ -19,6 +19,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
 import ProjectPhotosModal from './ProjectPhotosModal';
 import { useQuery } from '@tanstack/react-query';
+import { PERSPECTIVE_LABELS, PURPOSE_LABELS } from '@/types/project-taxonomy';
 
 // Acquisition price summary types
 interface AcquisitionPriceSummary {
@@ -216,9 +217,27 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
         <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
           <div className="d-flex flex-column">
             <ProfileField
-              label="Analysis Type"
-              value={profile.analysis_type}
+              label="Analysis Perspective"
+              value={
+                profile.analysis_perspective
+                  ? PERSPECTIVE_LABELS[profile.analysis_perspective]
+                  : undefined
+              }
             />
+            <ProfileField
+              label="Analysis Purpose"
+              value={
+                profile.analysis_purpose
+                  ? PURPOSE_LABELS[profile.analysis_purpose]
+                  : undefined
+              }
+            />
+            {profile.value_add_enabled && (
+              <ProfileField
+                label="Value-Add"
+                value="Enabled"
+              />
+            )}
             <ProfileField
               label="Project Type"
               value={profile.property_subtype}

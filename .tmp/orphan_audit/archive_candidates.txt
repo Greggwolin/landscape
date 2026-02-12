@@ -1,0 +1,2 @@
+src/components/budget/BudgetItemModalV2.tsx
+src/components/location-intelligence/DemographicsPanel.tsx

@@ -103,6 +103,9 @@ class ProjectContextService:
                     p.jurisdiction_state as state,
                     p.jurisdiction_county as county,
                     p.analysis_type,
+                    p.analysis_perspective,
+                    p.analysis_purpose,
+                    p.value_add_enabled,
                     p.project_type_code,
                     p.acres_gross as gross_acres,
                     p.target_units,
@@ -139,6 +142,14 @@ class ProjectContextService:
         prop_type = data.get('project_type_code') or data.get('analysis_type')
         if prop_type:
             lines.append(f"Property Type: {prop_type}")
+        if data.get('analysis_type'):
+            lines.append(f"Analysis Type (Legacy): {data['analysis_type']}")
+        if data.get('analysis_perspective'):
+            lines.append(f"Analysis Perspective: {data['analysis_perspective']}")
+        if data.get('analysis_purpose'):
+            lines.append(f"Analysis Purpose: {data['analysis_purpose']}")
+        if data.get('value_add_enabled'):
+            lines.append("Value Add Enabled: Yes")
         if data.get('analysis_mode'):
             lines.append(f"Analysis Mode: {data['analysis_mode']}")
 

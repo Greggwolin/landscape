@@ -1,0 +1,11 @@
+src/app/components/Navigation.tsx
+src/app/components/PlanningWizard/Sidebar.tsx
+src/app/components/TopNavigationBar.tsx
+src/app/components/navigation/SandboxDropdown.tsx
+src/app/components/navigation/SettingsDropdown.tsx
+src/app/components/navigation/UserMenuDropdown.tsx
+src/app/components/navigation/constants.ts
+src/components/capitalization/CapitalizationSubNav.tsx
+src/components/feasibility/FeasibilitySubNav.tsx
+src/components/project/ProjectSubNav.tsx
+src/components/sales/FilterSidebar.tsx

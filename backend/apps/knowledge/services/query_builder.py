@@ -172,6 +172,8 @@ QUERY_TEMPLATES = {
                 project_name,
                 project_type_code,
                 analysis_type,
+                analysis_perspective,
+                analysis_purpose,
                 acres_gross,
                 project_address,
                 jurisdiction_city,
@@ -615,6 +617,10 @@ def _format_project_details(results: Dict[str, Any]) -> str:
         lines.append(f"- Type: {row['project_type_code']}")
     if row.get('analysis_type'):
         lines.append(f"- Analysis: {row['analysis_type']}")
+    if row.get('analysis_perspective'):
+        lines.append(f"- Perspective: {row['analysis_perspective']}")
+    if row.get('analysis_purpose'):
+        lines.append(f"- Purpose: {row['analysis_purpose']}")
     if row.get('analysis_mode'):
         lines.append(f"- Mode: {row['analysis_mode']}")
 

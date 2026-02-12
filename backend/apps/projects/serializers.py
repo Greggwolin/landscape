@@ -5,13 +5,9 @@ Converts Django ORM models to/from JSON for the REST API.
 """
 
 from rest_framework import serializers
-from .models import Project, AnalysisTypeConfig, ANALYSIS_TYPE_CHOICES
+from .models import Project, AnalysisTypeConfig
 from .primary_measure import sync_primary_measure_on_legacy_update
 from .models_user import UserPreference
-
-
-# Valid analysis type codes
-VALID_ANALYSIS_TYPES = [code for code, _ in ANALYSIS_TYPE_CHOICES]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -21,21 +17,18 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     market_velocity_annual = serializers.IntegerField(required=False, allow_null=True)
     velocity_override_reason = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    analysis_type = serializers.ChoiceField(
-        choices=ANALYSIS_TYPE_CHOICES,
+    analysis_type = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
-        help_text="Analysis type: VALUATION, INVESTMENT, DEVELOPMENT, or FEASIBILITY"
+        help_text="Deprecated legacy analysis type. Preserved for transition compatibility."
     )
-    analysis_perspective = serializers.ChoiceField(
-        choices=[('INVESTMENT', 'Investment'), ('DEVELOPMENT', 'Development')],
+    analysis_perspective = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True
     )
-    analysis_purpose = serializers.ChoiceField(
-        choices=[('VALUATION', 'Valuation'), ('UNDERWRITING', 'Underwriting')],
+    analysis_purpose = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True
@@ -54,12 +47,22 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     def validate_analysis_type(self, value):
-        """Validate analysis_type is one of the new codes."""
-        if value and value not in VALID_ANALYSIS_TYPES:
+        """Legacy pass-through: normalize casing but do not enforce enum restrictions."""
+        return value.upper() if value else value
+
+    def validate_analysis_perspective(self, value):
+        if value and value.upper() not in ('INVESTMENT', 'DEVELOPMENT'):
             raise serializers.ValidationError(
-                f"Invalid analysis_type '{value}'. Must be one of: {', '.join(VALID_ANALYSIS_TYPES)}"
+                f"Invalid analysis_perspective '{value}'. Must be INVESTMENT or DEVELOPMENT."
             )
-        return value
+        return value.upper() if value else value
+
+    def validate_analysis_purpose(self, value):
+        if value and value.upper() not in ('VALUATION', 'UNDERWRITING'):
+            raise serializers.ValidationError(
+                f"Invalid analysis_purpose '{value}'. Must be VALUATION or UNDERWRITING."
+            )
+        return value.upper() if value else value
 
     def create(self, validated_data):
         instance = super().create(validated_data)

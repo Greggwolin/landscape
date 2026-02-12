@@ -27,8 +27,13 @@ import { VersionBadge } from '@/components/changelog';
 import {
   getPropertyTypeTokenRef,
   getPropertyTypeLabel,
-  getAnalysisTypeBadgeRef,
 } from '@/config/propertyTypeTokens';
+import {
+  PERSPECTIVE_LABELS,
+  PURPOSE_LABELS,
+  type AnalysisPerspective,
+  type AnalysisPurpose,
+} from '@/types/project-taxonomy';
 
 interface ActiveProjectBarProps {
   projectId: number;
@@ -68,8 +73,10 @@ export function ActiveProjectBar({
   const ptLabelSource = ptCandidates.find((v) => !!v) || ptMatch;
   const ptLabel = getPropertyTypeLabel(ptLabelSource);
 
-  // Resolve analysis type badge
-  const analysisRef = getAnalysisTypeBadgeRef(project?.analysis_type);
+  const perspective = project?.analysis_perspective?.toUpperCase() as AnalysisPerspective | undefined;
+  const purpose = project?.analysis_purpose?.toUpperCase() as AnalysisPurpose | undefined;
+  const perspectiveLabel = perspective ? PERSPECTIVE_LABELS[perspective] : null;
+  const purposeLabel = purpose ? PURPOSE_LABELS[purpose] : null;
 
   return (
     <div
@@ -148,13 +155,23 @@ export function ActiveProjectBar({
         </span>
       )}
 
-      {/* Analysis Type Badge */}
-      {analysisRef && (
+      {/* Perspective badge */}
+      {perspectiveLabel && (
         <CBadge
-          color={analysisRef.color}
+          color="info"
           style={{ fontSize: '0.75rem', borderRadius: '4px' }}
         >
-          {analysisRef.label}
+          {perspectiveLabel}
+        </CBadge>
+      )}
+
+      {/* Purpose badge */}
+      {purposeLabel && (
+        <CBadge
+          color="primary"
+          style={{ fontSize: '0.75rem', borderRadius: '4px' }}
+        >
+          {purposeLabel}
         </CBadge>
       )}
 
