@@ -1,0 +1,223 @@
+{
+  "db_available": true,
+  "db_error": null,
+  "django_migrations": {
+    "acquisition": {
+      "count": 2,
+      "files": [
+        "0001_add_goes_hard_and_conditional_fields",
+        "0002_initial"
+      ],
+      "latest": "0002_initial"
+    },
+    "documents": {
+      "count": 4,
+      "files": [
+        "0001_initial",
+        "0002_alter_dmsextractqueue_options",
+        "0003_add_extraction_commit_snapshot",
+        "0004_alter_extractioncommitsnapshot_committed_by"
+      ],
+      "latest": "0004_alter_extractioncommitsnapshot_committed_by"
+    },
+    "dynamic": {
+      "count": 1,
+      "files": [
+        "0001_add_dynamic_columns"
+      ],
+      "latest": "0001_add_dynamic_columns"
+    },
+    "feedback": {
+      "count": 2,
+      "files": [
+        "0001_initial",
+        "0002_extend_feedback_add_changelog"
+      ],
+      "latest": "0002_extend_feedback_add_changelog"
+    },
+    "financial": {
+      "count": 8,
+      "files": [
+        "0001_add_vendor_contact_id",
+        "0022_add_vertical_construction_categories",
+        "0044_loan_revolver_fields",
+        "0045_lotbank_project_fields",
+        "0046_loan_sizing_budget_columns",
+        "0047_sales_comps_property_rights_and_constraint",
+        "0048_add_sales_comp_contacts",
+        "0049_expand_adjustment_type_constraint"
+      ],
+      "latest": "0049_expand_adjustment_type_constraint"
+    },
+    "knowledge": {
+      "count": 8,
+      "files": [
+        "0001_initial",
+        "0002_doc_processing_queue",
+        "0003_add_opex_benchmark",
+        "0004_add_chunk_metadata",
+        "0004_add_page_count_to_platform_knowledge",
+        "0005_create_alpha_feedback_table",
+        "0006_merge_20260130_2117",
+        "0007_add_extraction_job"
+      ],
+      "latest": "0007_add_extraction_job"
+    },
+    "landscaper": {
+      "count": 1,
+      "files": [
+        "0001_initial"
+      ],
+      "latest": "0001_initial"
+    },
+    "market_intel": {
+      "count": 1,
+      "files": [
+        "0001_unified_market_intelligence_schema"
+      ],
+      "latest": "0001_unified_market_intelligence_schema"
+    },
+    "projects": {
+      "count": 6,
+      "files": [
+        "0001_initial",
+        "0002_add_vendor_contact_id",
+        "0002_userpreference",
+        "0003_merge_0002_add_vendor_contact_id_0002_userpreference",
+        "0004_add_rbac_fields",
+        "0005_taxonomy_perspective_purpose"
+      ],
+      "latest": "0005_taxonomy_perspective_purpose"
+    },
+    "reports": {
+      "count": 1,
+      "files": [
+        "0001_initial"
+      ],
+      "latest": "0001_initial"
+    },
+    "sales_absorption": {
+      "count": 4,
+      "files": [
+        "0001_initial",
+        "0002_set_global_benchmarks",
+        "0003_add_basis_to_sale_benchmarks",
+        "0004_initial"
+      ],
+      "latest": "0004_initial"
+    },
+    "users": {
+      "count": 2,
+      "files": [
+        "0001_initial",
+        "0002_userlandscaperprofile"
+      ],
+      "latest": "0002_userlandscaperprofile"
+    },
+    "valuation": {
+      "count": 2,
+      "files": [
+        "0001_initial",
+        "0002_add_cost_approach_land_metadata"
+      ],
+      "latest": "0002_add_cost_approach_land_metadata"
+    }
+  },
+  "generated_at": "2026-02-13T10:54:34.179797",
+  "latest_sql": "20260215_add_assumption_snapshots.sql",
+  "sql_migrations": [
+    "001_financial_engine_schema.sql",
+    "001_phase1_parallel_population.sql",
+    "002_dependencies_revenue_finance.sql",
+    "002a_fix_dependency_views.sql",
+    "006_lease_management.sql",
+    "007_add_budget_timing_columns.sql",
+    "008_add_multifamily_units.sql",
+    "009_dms_media_assets.sql",
+    "009_phase2_container_queries.sql",
+    "010_media_classification_intent.sql",
+    "010_phase3_container_indexes.sql",
+    "011_phase4_drop_legacy_pe.sql",
+    "012_container_crud_constraints.sql",
+    "013_add_template_id_to_project.sql",
+    "014_unit_costs_and_products.sql",
+    "014_unit_costs_and_products_final.sql",
+    "014_unit_costs_and_products_fixed.sql",
+    "015_add_budget_period_fields.sql",
+    "015_unit_costs_and_products_api.sql",
+    "016_absorption_velocity_benchmarks.sql",
+    "016_cleanup_project7_containers.sql",
+    "016_cleanup_project7_containers_v2.sql",
+    "017_unit_cost_template_extensions.sql",
+    "018_land_dev_opex_calculations.sql",
+    "019_land_dev_opex_accounts.sql",
+    "020_land_dev_opex_calculation_function.sql",
+    "022_fix_budget_grid_view_unit_cost_categories.sql",
+    "023_add_activity_and_new_category_columns.sql",
+    "024_rename_lifecycle_stage_to_activity.sql",
+    "025_rename_container_to_division.sql",
+    "026_phase4_category_system_cutover.sql",
+    "027_add_acquisition_event_fields.sql",
+    "028_uom_usage_contexts.sql",
+    "029_create_system_picklist.sql",
+    "030_add_uom_sort_order.sql",
+    "031_fix_picklist_codes_match_constraints.sql",
+    "032_fix_invalid_project_type_codes.sql",
+    "037_add_landscaper_activity.sql",
+    "038_create_field_catalog.sql",
+    "039_picklist_display_and_subtypes.sql",
+    "040_multifamily_adapter_tables.sql",
+    "041_extraction_mapping_system.sql",
+    "042_cost_category_unification.sql",
+    "042_create_project_map_features.sql",
+    "043_create_operations_user_inputs.sql",
+    "044_add_parcel_id_fk_indexes.sql",
+    "045_add_missing_fk_indexes.sql",
+    "046_drop_duplicate_indexes.sql",
+    "046_income_approach_enhancements.sql",
+    "047_dms_versioning_and_soft_delete.sql",
+    "048_pending_mutations_and_audit.sql",
+    "050_update_project_contacts_view.sql",
+    "051_remove_county_default.sql",
+    "052_backfill_opex_parent_category.sql",
+    "053_create_cabinet.sql",
+    "054_create_contact_role.sql",
+    "055_create_contact.sql",
+    "056_create_contact_relationship.sql",
+    "057_create_project_contact.sql",
+    "058_alter_project_doc_add_cabinet.sql",
+    "059_migrate_existing_contacts.sql",
+    "060_hbu_analysis_tables.sql",
+    "061_analysis_type_refactor.sql",
+    "062_hbu_analysis_tables.sql",
+    "063_property_attributes.sql",
+    "064_property_attributes_seed.sql",
+    "069_narrative_versioning.sql",
+    "070_add_rbac_fields.sql",
+    "071_landscaper_chat_threads.sql",
+    "071_landscaper_chat_threads.up.sql",
+    "072_add_opex_source_column.sql",
+    "073_opex_category_mapping.sql",
+    "074_unified_dcf_analysis.sql",
+    "075_add_value_add_analysis_type.sql",
+    "076_add_acquisition_category_columns.up.sql",
+    "078_acquisition_data_cleanup_and_categories.sql",
+    "079_acquisition_price_summary_view.sql",
+    "080_add_unit_extra_data.sql",
+    "081_media_discard_and_dedup.sql",
+    "082_document_tables.sql",
+    "20251203_add_inflation_settings.sql",
+    "20251223_add_active_opex_discriminator.sql",
+    "20251223_add_statement_discriminator.sql",
+    "20251223_opex_category_restructure.sql",
+    "2026-02-11_extend_sales_comparables_costar_parity.sql",
+    "20260115_add_value_add_assumptions.sql",
+    "20260116_value_add_v2.sql",
+    "20260126_create_location_intelligence_schema.sql",
+    "20260205_fix_mv_doc_search_soft_delete.sql",
+    "20260208_mv_doc_search_media_columns.sql",
+    "20260209_unit_type_cleanup.sql",
+    "20260214_create_scenario_log.sql",
+    "20260215_add_assumption_snapshots.sql"
+  ]
+}

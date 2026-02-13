@@ -22,6 +22,8 @@
     "db:validate:glossary": "node scripts/validate-glossary-zoning.mjs",
     "db:validate:schema": "node scripts/validate-database-schema.mjs",
     "db:audit:apis": "node scripts/audit-apis.mjs",
+    "context:generate": "bash scripts/generate-daily-context.sh",
+    "context:diff": "python3 scripts/diff_context.py",
     "generate:types": "node scripts/generate-types.mjs",
     "normalize:chats": "node scripts/normalize-ai-chats.mjs",
     "db:seed:growth-rates": "node scripts/seed-growth-rates.mjs",
