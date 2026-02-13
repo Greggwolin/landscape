@@ -1,0 +1,114 @@
+#!/bin/bash
+# Usage: ./scripts/generate-daily-context.sh
+# Generates daily codebase context files for AI assistant synchronization.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUTPUT_DIR="$REPO_ROOT/docs/daily-context"
+CURRENT_DIR="$OUTPUT_DIR/current"
+HISTORY_DIR="$OUTPUT_DIR/history"
+TODAY="$(date +%Y-%m-%d)"
+TIMESTAMP="$(date +"%Y-%m-%d %H:%M:%S %Z")"
+
+if [[ ! -f "$REPO_ROOT/package.json" || ! -d "$REPO_ROOT/backend" || ! -d "$REPO_ROOT/src" ]]; then
+  echo "Error: Could not verify repository root at $REPO_ROOT"
+  exit 1
+fi
+
+if [[ "$PWD" != "$REPO_ROOT" ]]; then
+  echo "Switching to repo root: $REPO_ROOT"
+fi
+cd "$REPO_ROOT"
+
+mkdir -p "$CURRENT_DIR" "$HISTORY_DIR"
+
+# Archive previous current output snapshot
+shopt -s dotglob nullglob
+current_files=("$CURRENT_DIR"/*)
+if [[ ${#current_files[@]} -gt 0 ]]; then
+  EXISTING_DATE=""
+  for file in "${current_files[@]}"; do
+    base="$(basename "$file")"
+    if [[ "$base" =~ ([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+      EXISTING_DATE="${BASH_REMATCH[1]}"
+      break
+    fi
+  done
+  if [[ -z "$EXISTING_DATE" ]]; then
+    EXISTING_DATE="$(date -r "${current_files[0]}" +%Y-%m-%d 2>/dev/null || date +%Y-%m-%d)"
+  fi
+
+  ARCHIVE_DIR="$HISTORY_DIR/$EXISTING_DATE"
+  mkdir -p "$ARCHIVE_DIR"
+  mv "${current_files[@]}" "$ARCHIVE_DIR"/
+  echo "Archived previous current snapshot to: $ARCHIVE_DIR"
+else
+  echo "No existing current snapshot to archive."
+fi
+shopt -u dotglob nullglob
+
+# Pick Python interpreter (prefer backend venv)
+PYTHON_BIN="python3"
+if [[ -x "$REPO_ROOT/backend/venv/bin/python" ]]; then
+  PYTHON_BIN="$REPO_ROOT/backend/venv/bin/python"
+fi
+
+echo "Using Python: $PYTHON_BIN"
+
+CODEBASE_AUDIT_FILE="$CURRENT_DIR/CODEBASE_AUDIT_${TODAY}.md"
+SCHEMA_EXPORT_FILE="$CURRENT_DIR/SCHEMA_EXPORT_${TODAY}.md"
+MIGRATION_STATUS_FILE="$CURRENT_DIR/MIGRATION_STATUS_${TODAY}.md"
+CONTEXT_DIFF_FILE="$CURRENT_DIR/CONTEXT_DIFF_${TODAY}.md"
+
+AUDIT_SNAPSHOT_FILE="$CURRENT_DIR/AUDIT_SNAPSHOT_${TODAY}.json"
+SCHEMA_SNAPSHOT_FILE="$CURRENT_DIR/SCHEMA_SNAPSHOT_${TODAY}.json"
+MIGRATION_SNAPSHOT_FILE="$CURRENT_DIR/MIGRATION_SNAPSHOT_${TODAY}.json"
+
+echo "Generating CODEBASE_AUDIT..."
+"$PYTHON_BIN" "$REPO_ROOT/scripts/audit_codebase.py" \
+  --repo-root "$REPO_ROOT" \
+  --output "$CODEBASE_AUDIT_FILE" \
+  --json-out "$AUDIT_SNAPSHOT_FILE"
+
+echo "Generating SCHEMA_EXPORT..."
+"$PYTHON_BIN" "$REPO_ROOT/scripts/export_schema.py" \
+  --repo-root "$REPO_ROOT" \
+  --output "$SCHEMA_EXPORT_FILE" \
+  --json-out "$SCHEMA_SNAPSHOT_FILE"
+
+echo "Generating MIGRATION_STATUS..."
+"$PYTHON_BIN" "$REPO_ROOT/scripts/generate_migration_status.py" \
+  --repo-root "$REPO_ROOT" \
+  --output "$MIGRATION_STATUS_FILE" \
+  --json-out "$MIGRATION_SNAPSHOT_FILE"
+
+echo "Generating CONTEXT_DIFF..."
+"$PYTHON_BIN" "$REPO_ROOT/scripts/diff_context.py" \
+  --repo-root "$REPO_ROOT" \
+  --current-dir "$CURRENT_DIR" \
+  --history-dir "$HISTORY_DIR" \
+  --today "$TODAY" \
+  --output "$CONTEXT_DIFF_FILE"
+
+echo "$TIMESTAMP" > "$OUTPUT_DIR/.last-run"
+
+# Delete history directories older than 30 days and report count
+prune_dirs=()
+while IFS= read -r old_dir; do
+  prune_dirs+=("$old_dir")
+done < <(find "$HISTORY_DIR" -maxdepth 1 -type d -name "20*" -mtime +30)
+
+for old_dir in "${prune_dirs[@]:-}"; do
+  [[ -n "$old_dir" ]] && rm -rf "$old_dir"
+done
+
+echo "Pruned ${#prune_dirs[@]} history snapshots older than 30 days."
+
+echo ""
+echo "Daily context generation complete:"
+echo "- $CODEBASE_AUDIT_FILE"
+echo "- $SCHEMA_EXPORT_FILE"
+echo "- $MIGRATION_STATUS_FILE"
+echo "- $CONTEXT_DIFF_FILE"
+echo "- Last run marker: $OUTPUT_DIR/.last-run"
