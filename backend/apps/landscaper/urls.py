@@ -18,6 +18,10 @@ from .views import (
     # Global chat (non-project contexts)
     GlobalChatViewSet,
 )
+from .views_scenario import (
+    ScenarioLogListCreateView,
+    ScenarioLogDetailView,
+)
 
 # Project-scoped endpoints
 urlpatterns = [
@@ -228,5 +232,23 @@ urlpatterns = [
             'post': 'create',
         }),
         name='landscaper-global-chat'
+    ),
+
+    # ========================================================================
+    # Scenario Log Endpoints (What-If Scenario Management)
+    # ========================================================================
+
+    # List/Create scenarios for a project
+    path(
+        'landscaper/projects/<int:project_id>/scenarios/',
+        ScenarioLogListCreateView.as_view(),
+        name='landscaper-scenarios'
+    ),
+
+    # Detail/Update/Delete a specific scenario
+    path(
+        'landscaper/projects/<int:project_id>/scenarios/<int:scenario_log_id>/',
+        ScenarioLogDetailView.as_view(),
+        name='landscaper-scenario-detail'
     ),
 ]

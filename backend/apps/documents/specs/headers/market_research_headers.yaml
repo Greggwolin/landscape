@@ -1,0 +1,135 @@
+# Market research canonical header mappings
+# Market research tables are heterogeneous — these cover common patterns
+# from brokerage reports (Newmark, CBRE, JLL, Cushman, Marcus & Millichap)
+
+market_research_headers:
+  metric:
+    - "Metric"
+    - "Indicator"
+    - "Category"
+    - "Property Type"
+    - "Measure"
+    - "Description"
+    - "Item"
+
+  value:
+    - "Value"
+    - "Amount"
+    - "Volume"
+    - "Total"
+    - "Result"
+    - "Figure"
+
+  period:
+    - "Period"
+    - "Quarter"
+    - "Year"
+    - "Date"
+    - "Q1"
+    - "Q2"
+    - "Q3"
+    - "Q4"
+    - "YTD"
+    - "As Of"
+
+  yoy_change:
+    - "YoY Change"
+    - "YoY"
+    - "Year-over-Year"
+    - "Change"
+    - "% Change"
+    - "Growth"
+    - "Annual Change"
+
+  market:
+    - "Market"
+    - "MSA"
+    - "Metro"
+    - "Metropolitan Area"
+    - "Region"
+
+  submarket:
+    - "Submarket"
+    - "Sub-Market"
+    - "Neighborhood"
+    - "Area"
+    - "District"
+
+  property_type:
+    - "Property Type"
+    - "Asset Class"
+    - "Sector"
+    - "Type"
+    - "Product Type"
+
+  vacancy_rate:
+    - "Vacancy"
+    - "Vacancy Rate"
+    - "Vac Rate"
+    - "Vacancy %"
+
+  cap_rate:
+    - "Cap Rate"
+    - "Capitalization Rate"
+    - "Cap"
+
+  absorption:
+    - "Absorption"
+    - "Net Absorption"
+    - "Gross Absorption"
+    - "Units Absorbed"
+
+  rent:
+    - "Rent"
+    - "Asking Rent"
+    - "Effective Rent"
+    - "Average Rent"
+    - "Avg Rent"
+    - "Rent/SF"
+    - "Rent PSF"
+
+  inventory:
+    - "Inventory"
+    - "Total Units"
+    - "Total SF"
+    - "Total Stock"
+    - "Supply"
+
+  deliveries:
+    - "Deliveries"
+    - "New Supply"
+    - "Completions"
+    - "Units Delivered"
+    - "New Construction"
+
+  under_construction:
+    - "Under Construction"
+    - "Pipeline"
+    - "In Progress"
+    - "Planned"
+
+  price:
+    - "Price"
+    - "Sale Price"
+    - "Price/Unit"
+    - "Price/SF"
+    - "Avg Price"
+    - "Price PSF"
+
+  volume:
+    - "Volume"
+    - "Sales Volume"
+    - "Transaction Volume"
+    - "Dollar Volume"
+    - "Investment Volume"
+
+  source:
+    - "Source"
+    - "Data Source"
+    - "Provider"
+
+  notes:
+    - "Notes"
+    - "Comments"
+    - "Footnote"
+    - "Note"

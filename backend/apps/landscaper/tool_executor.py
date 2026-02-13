@@ -10339,6 +10339,7 @@ def execute_tool(
     project_id: int,
     source_message_id: Optional[str] = None,
     propose_only: bool = True,
+    thread_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Execute a tool call from Claude using the registry pattern.
@@ -10383,6 +10384,7 @@ def execute_tool(
             project_id=project_id,
             propose_only=propose_only,
             source_message_id=source_message_id,
+            thread_id=thread_id,
         )
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
@@ -12262,3 +12264,10 @@ def handle_log_alpha_feedback(
             'success': False,
             'error': f"Failed to log feedback: {str(e)}"
         }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# External tool modules (auto-register via @register_tool on import)
+# ─────────────────────────────────────────────────────────────────────────────
+from .tools import whatif_tools  # noqa: E402, F401
+from .tools import scenario_tools  # noqa: E402, F401

@@ -1,0 +1,57 @@
+# Market research validation rules
+# Light validation — market research tables are highly variable
+
+fields:
+  metric:
+    data_type: string
+    required: false
+
+  value:
+    data_type: string
+    required: false
+
+  vacancy_rate:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 100
+
+  cap_rate:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 30
+
+  rent:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 100000
+
+  absorption:
+    data_type: number
+    required: false
+
+  inventory:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: 0
+        max: 10000000
+
+  yoy_change:
+    data_type: number
+    required: false
+    confidence_rules:
+      - type: range_check
+        min: -100
+        max: 1000
+
+rules: []

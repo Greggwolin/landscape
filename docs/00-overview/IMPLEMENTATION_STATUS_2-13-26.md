@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-11
-**Version:** 3.9
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + Rich Schema Refresh)
+**Last Updated:** 2026-02-13
+**Version:** 4.0
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Rich Schema Refresh)
 
 ---
 
@@ -9,17 +9,32 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Rich Schema Export Refresh (February 11, 2026)**
+### 🆕 **Latest Update: Rich Schema Export Refresh (February 12, 2026)**
 
 **Schema Documentation Synced to Live Database**
 
-Refreshed the canonical rich schema snapshot to reflect live Neon DB state as of February 11, 2026.
+Refreshed the canonical rich schema snapshot to reflect live Neon DB state as of February 12, 2026.
 
-- ✅ **New export generated** - `docs/schema/landscape_rich_schema_2026-02-11.json`
-- ✅ **Current object counts captured** - 334 tables, 41 views, 1121 indexes, 956 constraints, 363 foreign keys, 61 triggers, 995 routines
-- ✅ **Delta vs prior snapshot (2026-02-09)** - +1 index (`core_doc_media.idx_doc_media_hash`), no table/view removals
+- ✅ **New export generated** - `docs/schema/landscape_rich_schema_2026-02-12.json`
+- ✅ **Current object counts captured** - 353 tables, 42 views, 1176 indexes, 1000 constraints, 377 foreign keys, 61 triggers, 995 routines
+- ✅ **Delta vs prior snapshot (2026-02-11)** - +19 tables, +1 view, +55 indexes, +44 constraints, +14 foreign keys
 - ✅ **Export command verified** - `./scripts/export_schema.sh --verbose`
-- 📁 **Location:** `docs/schema/landscape_rich_schema_2026-02-11.json`
+- 📁 **Location:** `docs/schema/landscape_rich_schema_2026-02-12.json`
+
+### 🆕 **Latest Update: Planning Surface Simplification + Market Research Extraction (February 13, 2026)**
+
+**PlanningWizard Moved to Archive + New Market Analysis Document Pipeline**
+
+Codebase cleanup and document-intelligence upgrades landed together:
+
+- ✅ **PlanningWizard archive migration** - Removed legacy `src/app/components/PlanningWizard/*` from active tree and moved 17 files to `src/app/_archive/components/PlanningWizard/`
+- ✅ **PlanningContent simplification** - Removed sidecar `ParcelDetailCard` integration and related legacy wizard mappings from `src/app/components/Planning/PlanningContent.tsx`
+- ✅ **Market research extractor added** - New `MarketResearchExtractor` with PDF/Excel/CSV support at `backend/apps/documents/extractors/market_research.py`
+- ✅ **Classifier integration** - `document_classifier.py` now extracts `market_analysis` sections in multi-section documents
+- ✅ **Table-aware text extraction** - `text_extraction.py` now augments PDF text with `pdfplumber` table captures marked as `[TABLE ...]`
+- ✅ **Table-preserving chunking** - `chunking.py` now preserves table blocks during cleaning to improve downstream retrieval quality
+- ✅ **Cross-project knowledge search** - `embedding_storage.py` now includes global (`project_id IS NULL`) chunks in similarity retrieval
+- 📁 **Related files:** `backend/apps/documents/specs/headers/market_research_headers.yaml`, `backend/apps/documents/specs/validators/market_research_v1.yaml`
 
 ### 🆕 **Latest Update: Landscaper Stability & Rent Roll Visibility (February 10, 2026)**
 
@@ -351,7 +366,7 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-02-11)
+## Current State Snapshot (2026-02-13)
 
 ### 🆕 Latest Updates
 

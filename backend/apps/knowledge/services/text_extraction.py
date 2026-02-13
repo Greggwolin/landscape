@@ -15,6 +15,13 @@ try:
 except ImportError:
     HAS_PYMUPDF = False
 
+# PDF table extraction
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
+
 # DOCX extraction
 try:
     from docx import Document as DocxDocument
@@ -133,18 +140,68 @@ def _extract_pdf(file_path: str) -> Optional[str]:
 
 
 def _extract_pdf_with_page_count(file_path: str) -> Tuple[Optional[str], Optional[int]]:
-    """Extract text and page count from PDF using PyMuPDF."""
+    """Extract text and page count from PDF using PyMuPDF + pdfplumber for tables."""
     if not HAS_PYMUPDF:
         raise ImportError("PyMuPDF (fitz) not installed. Run: pip install PyMuPDF")
 
     text_parts = []
+    page_count = 0
+
+    # Step 1: Extract text with PyMuPDF (good for prose)
     with fitz.open(file_path) as doc:
         page_count = len(doc)
         for page in doc:
             text_parts.append(page.get_text())
 
+    # Step 2: Extract tables with pdfplumber and append to page text
+    if HAS_PDFPLUMBER:
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                for page_idx, page in enumerate(pdf.pages):
+                    table_text = _extract_tables_from_page(page, page_idx)
+                    if table_text and page_idx < len(text_parts):
+                        text_parts[page_idx] = text_parts[page_idx] + "\n\n" + table_text
+        except Exception:
+            pass  # Fall back to PyMuPDF-only text
+
     text = "\n\n".join(text_parts).strip() or None
     return text, page_count
+
+
+def _extract_tables_from_page(page, page_idx: int) -> Optional[str]:
+    """Extract tables from a single PDF page using pdfplumber and format as text."""
+    try:
+        tables = page.extract_tables()
+        if not tables:
+            return None
+
+        table_texts = []
+        for table_idx, table in enumerate(tables):
+            if not table or len(table) < 2:
+                continue
+
+            # Filter out rows that are completely empty
+            filtered_rows = []
+            for row in table:
+                if row and any(cell and str(cell).strip() for cell in row):
+                    filtered_rows.append(row)
+
+            if len(filtered_rows) < 2:
+                continue
+
+            # Format as pipe-delimited table with markers
+            lines = [f"[TABLE page={page_idx + 1} table={table_idx + 1}]"]
+
+            for row in filtered_rows:
+                cells = [str(cell).strip() if cell else '' for cell in row]
+                lines.append(' | '.join(cells))
+
+            lines.append("[/TABLE]")
+            table_texts.append('\n'.join(lines))
+
+        return '\n\n'.join(table_texts) if table_texts else None
+    except Exception:
+        return None
 
 
 def _extract_docx(file_path: str) -> Optional[str]:

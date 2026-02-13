@@ -1277,6 +1277,7 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 'project_name': project.project_name,
                 'project_type': project.project_type or 'Unknown',
                 'project_type_code': project.project_type_code,
+                'thread_id': str(thread.id),
                 'analysis_perspective': getattr(project, 'analysis_perspective', None),
                 'analysis_purpose': getattr(project, 'analysis_purpose', None),
                 'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
@@ -1299,9 +1300,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 max_results=3
             )
 
-            # Create tool executor bound to this project
+            # Create tool executor bound to this project and thread
             def tool_executor_fn(tool_name, tool_input, project_id=None):
-                return execute_tool(tool_name, tool_input, project_id or project.project_id)
+                return execute_tool(
+                    tool_name, tool_input,
+                    project_id or project.project_id,
+                    thread_id=str(thread.id),
+                )
 
             # Generate AI response with context-aware tool filtering
             ai_response = get_landscaper_response(

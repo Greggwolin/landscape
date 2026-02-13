@@ -1,10 +1,8 @@
 // app/components/Planning/PlanningContent.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import useSWR from 'swr'
-import ParcelDetailCard from '../PlanningWizard/cards/ParcelDetailCard'
 import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { fetchJson } from '@/lib/fetchJson'
-import type { Parcel as WizardParcel, Phase as WizardPhase, Area as WizardArea } from '../PlanningWizard/PlanningWizard'
 import PlanningOverviewControls from './PlanningOverviewControls'
 import CollapsibleSection from './CollapsibleSection'
 
@@ -39,23 +37,6 @@ interface Phase {
   status: string;
   description?: string;
   label?: string;
-}
-
-type ParcelDetailUpdates = {
-  acres: number;
-  units: number;
-  product?: string | null;
-  frontage?: number | null;
-  landUse?: string;
-  actualLanduseCode?: string;
-  type_code?: string;
-  family_name?: string;
-}
-
-type DetailContext = {
-  parcel: WizardParcel;
-  phase: WizardPhase;
-  area: WizardArea;
 }
 
 type Props = { projectId?: number | null }
@@ -171,10 +152,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
       stats: getAreaStats(areaNo)
     }))
   }, [areaDisplayByNumber, parcels, level1Label, getAreaStats])
-
-  // Sidecard state for parcel detail (wizard card embedded on this page)
-  const [detailOpen, setDetailOpen] = useState(false)
-  const [detailCtx, setDetailCtx] = useState<DetailContext | null>(null)
 
   // Area filtering state - now supports multiple selections
   const [selectedAreaFilters, setSelectedAreaFilters] = useState<number[]>([])
@@ -551,48 +528,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
     return parcel.family_name || 'Unknown'
   }
 
-  const openDetailForParcel = (p: Parcel) => {
-    // Map Overview parcel to Wizard types (minimal fields used by card)
-    const [, pStr] = String(p.phase_name).split('.')
-    const areaNo = Number(p.area_no)
-    const phaseNo = Number(pStr)
-    const area: WizardArea = {
-      id: `area-${areaNo}`,
-      name: `${level1Label} ${areaNo}`,
-      phases: [],
-      areaDbId: 0,
-      areaNo
-    }
-    const phase: WizardPhase = {
-      id: `phase-${areaNo}-${phaseNo}`,
-      name: `${level2Label} ${areaNo}.${phaseNo}`,
-      parcels: [],
-      phaseDbId: 0,
-      areaId: area.id,
-      areaNo,
-      phaseNo
-    }
-    const landUseOptions = ['MDR','HDR','LDR','MHDR','C','MU','OS'] as const
-    type KnownLandUse = typeof landUseOptions[number]
-    const landUse = landUseOptions.includes(p.usecode as KnownLandUse) ? (p.usecode as KnownLandUse) : 'MDR'
-    const parcel: WizardParcel = {
-      id: `parcel-db-${p.parcel_id}`,
-      name: `Parcel: ${p.parcel_name}`,
-      landUse,
-      acres: Number(p.acres ?? 0),
-      units: Number(p.units ?? 0),
-      product: p.product ?? '',
-      efficiency: Number(p.efficiency ?? 0),
-      frontage: p.frontfeet ?? 0,
-      dbId: p.parcel_id,
-      areaNo,
-      phaseNo,
-      familyName: p.family_name,
-      subtypeName: p.type_code,
-      landuseCode: p.usecode,
-    }
-    setDetailCtx({ parcel, phase, area })
-    setDetailOpen(true)
+  const openDetailForParcel = (_p: Parcel) => {
+    // PlanningWizard sidecard is archived; detail panel interaction removed.
   }
 
   if (parcelsError || phasesError) {
@@ -721,42 +658,11 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             >
               Import PDF
             </button>
-            <button
-              onClick={() => {
-                // JX116: Open blank flyout immediately, no phase selection required
-                // User fills Area/Phase within the flyout
-                setDetailCtx({
-                  parcel: {
-                    id: 'new-parcel',
-                    name: '',
-                    landUse: 'MDR',
-                    acres: 0,
-                    units: 0,
-                    efficiency: 0.85,
-                    frontage: 0,
-                    dbId: 0,
-                    areaNo: 0,
-                    phaseNo: 0
-                  },
-                  phase: { id: 'new-phase', name: '', parcels: [], phaseDbId: 0, areaId: '', areaNo: 0, phaseNo: 0 },
-                  area: { id: 'new-area', name: '', phases: [], areaDbId: 0, areaNo: 0 }
-                })
-                setDetailOpen(true)
-              }}
-              className="px-2.5 py-1 text-xs font-medium rounded"
-              style={{
-                backgroundColor: 'var(--cui-primary)',
-                color: 'white',
-                border: 'none'
-              }}
-            >
-              + Add {level3Label}
-            </button>
           </>
         }
       >
-        <div className={detailOpen ? 'p-4 grid grid-cols-3 gap-4' : 'p-4'}>
-          <div className={detailOpen ? 'col-span-2' : ''}>
+        <div className="p-4">
+          <div>
           <table className="w-full text-sm">
             <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <tr>
@@ -791,76 +697,6 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
             </tbody>
           </table>
           </div>
-          {detailOpen && detailCtx && (
-            <div className="col-span-1">
-              <ParcelDetailCard
-                parcel={detailCtx.parcel}
-                phase={detailCtx.phase}
-                area={detailCtx.area}
-                isOpen={true}
-                onSave={async (_areaId, _phaseId, _parcelId, updates: ParcelDetailUpdates) => {
-                  try {
-                    const payload: Record<string, unknown> = {
-                      acres: updates.acres,
-                      units: updates.units,
-                      frontfeet: updates.frontage ?? null
-                    }
-
-                    // Add type_code and family_name if provided
-                    if (updates.type_code) {
-                      payload.type_code = updates.type_code
-                    }
-                    if (updates.family_name) {
-                      payload.family_name = updates.family_name
-                    }
-
-                    // Add product if provided
-                    if (updates.product !== undefined) {
-                      payload.lot_product = updates.product || null
-                    }
-
-                    // Use actualLanduseCode (the real land use code) instead of landUse (planning type)
-                    if (updates.actualLanduseCode && updates.actualLanduseCode.trim() !== '') {
-                      payload.landuse_code = updates.actualLanduseCode
-
-                      // Check if this is a residential land use code to determine if product should be kept
-                      const isResidential = ['SFD', 'BTR', 'SFA', 'CONDO', 'MF', 'HDR', 'MHDR', 'MDR', 'MLDR'].includes(updates.actualLanduseCode)
-                      if (isResidential) {
-                        // Keep product for residential uses
-                        if (updates.product !== undefined) {
-                          payload.lot_product = updates.product ?? null
-                        }
-                      } else {
-                        // Clear product for non-residential uses (Commercial, Industrial, etc.)
-                        payload.lot_product = null
-                      }
-                    }
-
-                    console.log('💾 PATCH payload being sent:', payload)
-                    const response = await fetch(`/api/parcels/${detailCtx.parcel.dbId}`, {
-                      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(payload)
-                    })
-
-                    if (response.ok) {
-                      // Refresh data from server to ensure consistency
-                      await mutateParcels()
-                      await mutatePhases()
-
-                      // Broadcast data change event for other components
-                      try {
-                        window.dispatchEvent(new CustomEvent('dataChanged', {
-                          detail: { entity: 'parcel', id: detailCtx.parcel.dbId, projectId }
-                        }))
-                      } catch {}
-                    }
-                  } catch (e) { console.error('Save via sidecard failed', e) }
-                }}
-                onClose={() => setDetailOpen(false)}
-                planningEfficiency={planningEfficiency}
-              />
-            </div>
-          )}
         </div>
       </CollapsibleSection>
 

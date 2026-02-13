@@ -445,7 +445,7 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 - Inline editing triggers `onInlineCommit` to call `/api/budget/gantt/items/{factId}` (see hook).
 - Timeline toggle shows `TimelineChart`; `TimelineTab` placeholder describes future Gantt layout.
 
-### Planning (`/planning`, `/projects/[projectId]?tab=planning`)
+### Planning (`/planning`, `/projects/[projectId]?folder=property&tab=land-use`)
 **Purpose:** Manage Areas/Phases/Parcels for land development projects.
 
 **Layout:**
@@ -453,8 +453,9 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 - Project tab version shares the same component when property type code is `DEV`, otherwise displays a message.
 
 **Key Components:**
-- `PlanningContent` (`src/app/components/Planning/PlanningContent.tsx:1`): orchestrates parcel/phase fetching via SWR, area cards, filtering, editing modals, and integration with `PlanningWizard` components.
-- `PlanningOverviewControls`, `CollapsibleSection`, `ParcelDetailCard`, etc.
+- `PlanningContent` (`src/app/components/Planning/PlanningContent.tsx:1`): orchestrates parcel/phase fetching via SWR, area cards, filtering, and inline editing interactions for active planning workflows.
+- `PlanningOverviewControls`, `CollapsibleSection`.
+- Legacy `PlanningWizard` components are now archived under `src/app/_archive/components/PlanningWizard/` and are not part of the active planning runtime.
 
 **Data Sources:** `/api/parcels?project_id=`, `/api/phases?project_id=`, `useProjectConfig` for naming, `window` events for cross-component refresh.
 

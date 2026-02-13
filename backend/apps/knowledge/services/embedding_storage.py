@@ -108,7 +108,7 @@ def search_similar(
                     1 - (ke.embedding <=> %s::vector) as similarity
                 FROM landscape.knowledge_embeddings ke
                 JOIN landscape.core_doc d ON ke.source_id = d.doc_id
-                WHERE d.project_id = %s
+                WHERE (d.project_id = %s OR d.project_id IS NULL)
                   AND ke.source_type = 'document_chunk'
                   AND 1 - (ke.embedding <=> %s::vector) >= %s
                 ORDER BY ke.embedding <=> %s::vector

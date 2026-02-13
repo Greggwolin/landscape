@@ -103,11 +103,31 @@ def chunk_text(
 
 
 def _clean_text(text: str) -> str:
-    """Clean and normalize text."""
-    # Normalize whitespace
+    """Clean and normalize text, preserving table formatting."""
+    # Extract [TABLE]...[/TABLE] blocks before cleaning
+    table_placeholder = '\x00TABLE_{}\x00'
+    table_blocks = []
+    table_pattern = re.compile(r'\[TABLE[^\]]*\].*?\[/TABLE\]', re.DOTALL)
+
+    def _save_table(match):
+        idx = len(table_blocks)
+        # Clean up table block: collapse excessive blank lines but keep structure
+        block = match.group(0)
+        block = re.sub(r'\n{3,}', '\n', block)
+        table_blocks.append(block)
+        return table_placeholder.format(idx)
+
+    text = table_pattern.sub(_save_table, text)
+
+    # Normalize whitespace in non-table text
     text = re.sub(r'\s+', ' ', text)
     # Remove excessive newlines
     text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Restore table blocks
+    for idx, block in enumerate(table_blocks):
+        text = text.replace(table_placeholder.format(idx), '\n' + block + '\n')
+
     return text.strip()
 
 

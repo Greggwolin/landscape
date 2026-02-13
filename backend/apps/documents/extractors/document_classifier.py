@@ -269,7 +269,7 @@ class DocumentSectionDetector:
             sections[classification].append(page_num)
 
         # Second pass: interpolate gaps in multi-page sections
-        for doc_type in ['rent_roll', 'operating_statement', 'parcel_table']:
+        for doc_type in ['rent_roll', 'operating_statement', 'parcel_table', 'market_analysis']:
             pages = sections[doc_type]
             if len(pages) < 2:
                 continue
@@ -537,6 +537,7 @@ Respond with ONLY valid JSON, no other text."""
         from .rentroll import RentRollExtractor
         from .operating import OperatingExtractor
         from .parcel_table import ParcelTableExtractor
+        from .market_research import MarketResearchExtractor
 
         results = {}
 
@@ -588,6 +589,23 @@ Respond with ONLY valid JSON, no other text."""
                 logger.error(f"Parcel table extraction failed: {e}", exc_info=True)
                 results['parcel_table'] = {
                     "pages": sections['parcel_table'],
+                    "error": str(e)
+                }
+
+        # Extract market analysis tables
+        if sections.get('market_analysis'):
+            logger.info(f"Extracting market analysis from pages {sections['market_analysis']}")
+            extractor = MarketResearchExtractor()
+            try:
+                data = extractor.extract_from_pages(pdf_path, sections['market_analysis'])
+                results['market_analysis'] = {
+                    "pages": sections['market_analysis'],
+                    "extracted_data": data
+                }
+            except Exception as e:
+                logger.error(f"Market analysis extraction failed: {e}", exc_info=True)
+                results['market_analysis'] = {
+                    "pages": sections['market_analysis'],
                     "error": str(e)
                 }
 

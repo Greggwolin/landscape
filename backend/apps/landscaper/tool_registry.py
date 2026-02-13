@@ -35,7 +35,29 @@ EXTRACTION_TOOLS = [
     "confirm_column_mapping",
 ]
 
-# Tier 3: Admin/Config tools - only in admin context
+# Tier 3: What-If tools - available on valuation, capitalization, and reports pages
+WHATIF_TOOLS = [
+    "whatif_compute",
+    "whatif_compound",
+    "whatif_reset",
+    "whatif_attribute",
+    "whatif_status",
+    # Phase 3: Scenario management
+    "scenario_save",
+    "scenario_load",
+    "scenario_log_query",
+]
+
+# Pages that get what-if tools
+WHATIF_PAGES = {
+    "mf_valuation",
+    "mf_capitalization",
+    "land_valuation",
+    "land_capitalization",
+    "reports",
+}
+
+# Tier 4: Admin/Config tools - only in admin context
 ADMIN_TOOLS = [
     "get_measures",
     "update_measure",
@@ -402,6 +424,10 @@ def get_tools_for_page(
     # Add page-specific tools
     if page_context in PAGE_TOOLS:
         tools.update(PAGE_TOOLS[page_context])
+
+    # Add what-if tools on valuation/capitalization/reports pages
+    if page_context in WHATIF_PAGES:
+        tools.update(WHATIF_TOOLS)
 
     # Add extraction tools if on Documents page or document mentioned
     if include_extraction or page_context == "documents":

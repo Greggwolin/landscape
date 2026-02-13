@@ -16,171 +16,171 @@ import { Z_INDEX } from './constants';
  * Shows different options based on auth status and user role.
  */
 export default function UserMenuDropdown() {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const { user, isAuthenticated, logout, isLoading } = useAuth();
+ const [isOpen, setIsOpen] = useState(false);
+ const dropdownRef = useRef<HTMLDivElement>(null);
+ const { user, isAuthenticated, logout, isLoading } = useAuth();
 
-  useOutsideClick(dropdownRef, () => setIsOpen(false));
+ useOutsideClick(dropdownRef, () => setIsOpen(false));
 
-  const handleLogout = () => {
-    setIsOpen(false);
-    logout();
-  };
+ const handleLogout = () => {
+ setIsOpen(false);
+ logout();
+ };
 
-  const closeMenu = () => setIsOpen(false);
+ const closeMenu = () => setIsOpen(false);
 
-  // Get display name for the button
-  const getDisplayName = () => {
-    if (!user) return 'Sign In';
-    if (user.first_name) return user.first_name;
-    return user.username;
-  };
+ // Get display name for the button
+ const getDisplayName = () => {
+ if (!user) return 'Sign In';
+ if (user.first_name) return user.first_name;
+ return user.username;
+ };
 
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        aria-label="User menu"
-        className="d-flex align-items-center gap-2 px-3 py-2 rounded font-medium text-sm transition-colors"
-        style={{
-          backgroundColor: '#6366F1',
-          color: '#FFFFFF',
-          border: 'none',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#4F46E5';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#6366F1';
-        }}
-      >
-        <CIcon icon={cilUser} />
-        {getDisplayName()}
-      </button>
+ return (
+ <div className="relative" ref={dropdownRef}>
+ <button
+ type="button"
+ onClick={() => setIsOpen((prev) => !prev)}
+ aria-haspopup="true"
+ aria-expanded={isOpen}
+ aria-label="User menu"
+ className="d-flex align-items-center gap-2 px-3 py-2 rounded font-medium text-sm transition-colors"
+ style={{
+ backgroundColor: 'var(--cui-primary)',
+ color: 'var(--cui-body-color)',
+ border: 'none',
+ }}
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--cui-primary)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--cui-primary)';
+ }}
+ >
+ <CIcon icon={cilUser} />
+ {getDisplayName()}
+ </button>
 
-      {isOpen && (
-        <div
-          className="absolute right-0 mt-2 w-64 rounded-md border shadow-lg"
-          style={{
-            backgroundColor: 'var(--cui-body-bg)',
-            borderColor: 'var(--cui-border-color)',
-            zIndex: Z_INDEX.DROPDOWN,
-          }}
-        >
-          {isLoading ? (
-            <div className="py-4 text-center">
-              <div className="animate-spin inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full text-blue-500" />
-            </div>
-          ) : isAuthenticated && user ? (
-            <>
-              {/* User Info Header */}
-              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
-                <p className="text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>
-                  {user.first_name && user.last_name
-                    ? `${user.first_name} ${user.last_name}`
-                    : user.username}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                  {user.email}
-                </p>
-              </div>
+ {isOpen && (
+ <div
+ className="absolute right-0 mt-2 w-64 rounded-md border shadow-lg"
+ style={{
+ backgroundColor: 'var(--cui-body-bg)',
+ borderColor: 'var(--cui-border-color)',
+ zIndex: Z_INDEX.DROPDOWN,
+ }}
+ >
+ {isLoading ? (
+ <div className="py-4 text-center">
+ <div className="animate-spin inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full text-blue-500" />
+ </div>
+ ) : isAuthenticated && user ? (
+ <>
+ {/* User Info Header */}
+ <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+ <p className="text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>
+ {user.first_name && user.last_name
+ ? `${user.first_name} ${user.last_name}`
+ : user.username}
+ </p>
+ <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+ {user.email}
+ </p>
+ </div>
 
-              {/* Menu Items */}
-              <div className="py-2">
-                <Link
-                  href="/settings/profile"
-                  onClick={closeMenu}
-                  className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
-                  style={{ color: 'var(--cui-body-color)' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <User className="h-4 w-4" />
-                  Profile Settings
-                </Link>
+ {/* Menu Items */}
+ <div className="py-2">
+ <Link
+ href="/settings/profile"
+ onClick={closeMenu}
+ className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
+ style={{ color: 'var(--cui-body-color)' }}
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'transparent';
+ }}
+ >
+ <User className="h-4 w-4" />
+ Profile Settings
+ </Link>
 
-                {/* Admin Only: User Management */}
-                {user.is_staff && (
-                  <Link
-                    href="/admin/users"
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
-                    style={{ color: 'var(--cui-body-color)' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <Shield className="h-4 w-4" />
-                    User Management
-                  </Link>
-                )}
-              </div>
+ {/* Admin Only: User Management */}
+ {user.is_staff && (
+ <Link
+ href="/admin/users"
+ onClick={closeMenu}
+ className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
+ style={{ color: 'var(--cui-body-color)' }}
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'transparent';
+ }}
+ >
+ <Shield className="h-4 w-4" />
+ User Management
+ </Link>
+ )}
+ </div>
 
-              {/* Logout */}
-              <div className="py-2 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors text-red-400"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </button>
-              </div>
-            </>
-          ) : (
-            /* Not Authenticated */
-            <div className="py-2">
-              <Link
-                href="/login"
-                onClick={closeMenu}
-                className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
-                style={{ color: 'var(--cui-body-color)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <User className="h-4 w-4" />
-                Sign In
-              </Link>
-              <Link
-                href="/register"
-                onClick={closeMenu}
-                className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
-                style={{ color: 'var(--cui-body-color)' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <CIcon icon={cilUser} className="h-4 w-4" />
-                Create Account
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+ {/* Logout */}
+ <div className="py-2 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
+ <button
+ type="button"
+ onClick={handleLogout}
+ className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors text-red-400"
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'transparent';
+ }}
+ >
+ <LogOut className="h-4 w-4" />
+ Sign Out
+ </button>
+ </div>
+ </>
+ ) : (
+ /* Not Authenticated */
+ <div className="py-2">
+ <Link
+ href="/login"
+ onClick={closeMenu}
+ className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
+ style={{ color: 'var(--cui-body-color)' }}
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'transparent';
+ }}
+ >
+ <User className="h-4 w-4" />
+ Sign In
+ </Link>
+ <Link
+ href="/register"
+ onClick={closeMenu}
+ className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
+ style={{ color: 'var(--cui-body-color)' }}
+ onMouseEnter={(e) => {
+ e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
+ }}
+ onMouseLeave={(e) => {
+ e.currentTarget.style.backgroundColor = 'transparent';
+ }}
+ >
+ <CIcon icon={cilUser} className="h-4 w-4" />
+ Create Account
+ </Link>
+ </div>
+ )}
+ </div>
+ )}
+ </div>
+ );
 }

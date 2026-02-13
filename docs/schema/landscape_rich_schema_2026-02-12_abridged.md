@@ -1,6 +1,6 @@
 # Landscape Rich Schema (Abridged) - 2026-02-12
 
-- Generated at: 2026-02-12T17:15:45.014698Z
+- Generated at: 2026-02-12T21:58:59.531650Z
 - Database host: ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech
 - Schema: landscape
 - Source JSON: `docs/schema/landscape_rich_schema_2026-02-12.json`
@@ -10,11 +10,11 @@
 
 | Object | Count |
 |---|---:|
-| tables | 352 |
+| tables | 353 |
 | views | 42 |
-| indexes | 1174 |
-| constraints | 995 |
-| foreign_keys | 376 |
+| indexes | 1176 |
+| constraints | 1000 |
+| foreign_keys | 377 |
 | triggers | 61 |
 | routines | 995 |
 
@@ -22,15 +22,15 @@
 
 Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 
-- Tables: 334 -> 352 (+18)
+- Tables: 334 -> 353 (+19)
 - Views: 41 -> 42 (+1)
-- Indexes: 1121 -> 1174 (+53)
-- Constraints: 956 -> 995 (+39)
-- Foreign keys: 363 -> 376 (+13)
+- Indexes: 1121 -> 1176 (+55)
+- Constraints: 956 -> 1000 (+44)
+- Foreign_keys: 363 -> 377 (+14)
 - Triggers: 61 -> 61 (+0)
 - Routines: 995 -> 995 (+0)
 
-- Added tables (18): `lkp_building_class`, `lkp_buyer_seller_type`, `lkp_price_status`, `lkp_sale_type`, `tbl_sales_comp_history`, `tbl_sales_comp_hospitality`, `tbl_sales_comp_industrial`, `tbl_sales_comp_land`, `tbl_sales_comp_manufactured`, `tbl_sales_comp_market_conditions`, `tbl_sales_comp_office`, `tbl_sales_comp_retail`, `tbl_sales_comp_self_storage`, `tbl_sales_comp_specialty_housing`, `tbl_sales_comp_storage_unit_mix`, `tbl_sales_comp_tenants`, `tbl_sales_comp_unit_mix`, `v_sales_comparables_full`
+- Added tables (19): `lkp_building_class`, `lkp_buyer_seller_type`, `lkp_price_status`, `lkp_sale_type`, `tbl_sales_comp_contacts`, `tbl_sales_comp_history`, `tbl_sales_comp_hospitality`, `tbl_sales_comp_industrial`, `tbl_sales_comp_land`, `tbl_sales_comp_manufactured`, `tbl_sales_comp_market_conditions`, `tbl_sales_comp_office`, `tbl_sales_comp_retail`, `tbl_sales_comp_self_storage`, `tbl_sales_comp_specialty_housing`, `tbl_sales_comp_storage_unit_mix`, `tbl_sales_comp_tenants`, `tbl_sales_comp_unit_mix`, `v_sales_comparables_full`
 - Removed tables (0): none
 - Added views (1): `v_sales_comparables_full`
 - Removed views (0): none
@@ -39,7 +39,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 
 | Prefix | Tables | Columns |
 |---|---:|---:|
-| tbl_ | 176 | 3422 |
+| tbl_ | 177 | 3438 |
 | core_ | 35 | 367 |
 | vw_ | 30 | 548 |
 | lu_ | 13 | 104 |
@@ -82,7 +82,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 
 ## Tables by Prefix
 
-### tbl_ (176 tables)
+### tbl_ (177 tables)
 
 | Table | Columns | FK Count | Index Count |
 |---|---:|---:|---:|
@@ -93,7 +93,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | tbl_additional_income | 8 | 1 | 3 |
 | tbl_ai_adjustment_suggestions | 9 | 1 | 4 |
 | tbl_alpha_feedback | 9 | 0 | 4 |
-| tbl_analysis_type_config | 15 | 0 | 3 |
+| tbl_analysis_type_config | 16 | 0 | 3 |
 | tbl_approval | 5 | 1 | 1 |
 | tbl_area | 4 | 1 | 2 |
 | tbl_assumptionrule | 4 | 0 | 1 |
@@ -198,7 +198,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | tbl_platform_knowledge | 24 | 0 | 4 |
 | tbl_platform_knowledge_chapters | 14 | 1 | 4 |
 | tbl_platform_knowledge_chunks | 14 | 2 | 5 |
-| tbl_project | 131 | 5 | 14 |
+| tbl_project | 133 | 5 | 14 |
 | tbl_project_assumption | 13 | 2 | 5 |
 | tbl_project_config | 19 | 1 | 3 |
 | tbl_project_contact | 9 | 3 | 7 |
@@ -227,6 +227,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | tbl_sale_phases | 9 | 1 | 2 |
 | tbl_sale_settlement | 29 | 2 | 8 |
 | tbl_sales_comp_adjustments | 20 | 1 | 2 |
+| tbl_sales_comp_contacts | 12 | 1 | 2 |
 | tbl_sales_comp_history | 13 | 1 | 3 |
 | tbl_sales_comp_hospitality | 27 | 1 | 4 |
 | tbl_sales_comp_industrial | 27 | 1 | 3 |
@@ -240,7 +241,7 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | tbl_sales_comp_storage_unit_mix | 13 | 1 | 2 |
 | tbl_sales_comp_tenants | 27 | 1 | 4 |
 | tbl_sales_comp_unit_mix | 25 | 1 | 3 |
-| tbl_sales_comparables | 124 | 1 | 9 |
+| tbl_sales_comparables | 125 | 1 | 9 |
 | tbl_scenario | 19 | 3 | 5 |
 | tbl_scenario_comparison | 9 | 1 | 2 |
 | tbl_security_deposit | 29 | 1 | 3 |
@@ -639,8 +640,8 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | Rank | Table | Columns |
 |---:|---|---:|
 | 1 | v_sales_comparables_full | 137 |
-| 2 | tbl_project | 131 |
-| 3 | tbl_sales_comparables | 124 |
+| 2 | tbl_project | 133 |
+| 3 | tbl_sales_comparables | 125 |
 | 4 | mkt_new_home_project | 101 |
 | 5 | vw_mkt_current_projects | 101 |
 | 6 | tbl_loan | 85 |
@@ -751,14 +752,3 @@ Compared against `docs/schema/landscape_rich_schema_2026-02-11.json`.
 | vw_revenue_timeline |
 | vw_zoning_glossary_export |
 
-## Routine Type Summary
-
-| Routine Type | Count |
-|---|---:|
-| aggregate | 26 |
-| function | 969 |
-
-## Notes
-
-- Full object SQL definitions are in `docs/schema/landscape_rich_schema_2026-02-12.md`.
-- This abridged version intentionally omits full SQL bodies for views/routines and full per-column metadata to keep size lower.

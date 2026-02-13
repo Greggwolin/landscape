@@ -4481,7 +4481,189 @@ Use this to determine what income analyses to offer the user.""",
             "properties": {},
             "required": []
         }
-    }
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # WHAT-IF / SCENARIO TOOLS
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "whatif_compute",
+        "description": """Run a what-if scenario computation WITHOUT changing the database.
+Use when the user asks "what if...", "what happens if...", "what would X be if...",
+"show me the impact of...", "run the numbers with...", or any hypothetical question.
+
+Returns baseline metrics, computed metrics with the override applied, and deltas.
+Multiple what-if calls in the same session compound automatically.
+
+IMPORTANT: Default to this tool over update_project_field when the user's intent
+is exploratory rather than a definitive change. If ambiguous, use whatif_compute.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "description": "The assumption field to override (e.g., vacancy_loss_pct, discount_rate, sale_price, cost_inflation_rate)"
+                },
+                "table": {
+                    "type": "string",
+                    "description": "Source table (e.g., tbl_project, tbl_dcf_analysis, tbl_parcel_sale_assumption). Optional if field name is unambiguous."
+                },
+                "new_value": {
+                    "type": "number",
+                    "description": "The hypothetical value to test. Use decimal form for percentages (e.g., 0.08 for 8%)."
+                },
+                "label": {
+                    "type": "string",
+                    "description": "Human-readable label (e.g., 'Vacancy Rate', 'Discount Rate')"
+                },
+                "unit": {
+                    "type": "string",
+                    "description": "Value unit: pct, currency, ratio, integer, months, years",
+                    "enum": ["pct", "currency", "ratio", "integer", "months", "years", "number"]
+                },
+                "record_id": {
+                    "type": "string",
+                    "description": "Row-level PK if the override targets a specific record (e.g., a specific parcel). Omit for project-level assumptions."
+                }
+            },
+            "required": ["field", "new_value"]
+        }
+    },
+    {
+        "name": "whatif_compound",
+        "description": """Add another assumption override to the current what-if session.
+Stacks on top of existing overrides. Use when the user adds a second (or third, etc.)
+hypothetical change: "now also change X to Y", "and what if we also...".
+
+Same parameters and behavior as whatif_compute, but explicitly signals compounding.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "field": {"type": "string", "description": "The assumption field to override"},
+                "table": {"type": "string", "description": "Source table (optional)"},
+                "new_value": {"type": "number", "description": "The hypothetical value"},
+                "label": {"type": "string", "description": "Human-readable label"},
+                "unit": {"type": "string", "enum": ["pct", "currency", "ratio", "integer", "months", "years", "number"]},
+                "record_id": {"type": "string", "description": "Row-level PK (optional)"}
+            },
+            "required": ["field", "new_value"]
+        }
+    },
+    {
+        "name": "whatif_reset",
+        "description": """Reset the what-if session. If field is provided, removes only that override.
+If no field, removes ALL overrides and returns to baseline.
+Use when user says "reset", "start over", "go back to baseline", "remove the vacancy change".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string",
+                    "description": "Specific field to reset (optional). Omit to reset ALL overrides."
+                },
+                "table": {"type": "string", "description": "Table for the field (optional)"},
+                "record_id": {"type": "string", "description": "Row PK (optional)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "whatif_attribute",
+        "description": """Decompose the compound what-if impact into per-assumption contributions.
+Use when the user asks "what's driving the change?", "break it down", "which change matters most?",
+"what's the impact of just the vacancy change?".
+
+Requires at least 2 active overrides. Returns marginal delta for each override.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "whatif_status",
+        "description": """Check the current what-if session state. Returns active overrides,
+baseline metrics, and computed metrics. Use to remind yourself of the current state
+before responding to the user.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+
+    # ─── Phase 3: Scenario Management Tools ─────────────────────────────
+    {
+        "name": "scenario_save",
+        "description": """Save the current what-if session as a named scenario.
+Use when the user says "save this scenario", "name this as...", "keep this for later",
+or wants to preserve their current what-if exploration. Requires an active what-if session.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_name": {
+                    "type": "string",
+                    "description": "Name for the scenario (e.g., 'Conservative Case', 'High Growth')"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description of the scenario"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional tags for categorization (e.g., ['optimistic', 'growth'])"
+                }
+            },
+            "required": ["scenario_name"]
+        }
+    },
+    {
+        "name": "scenario_load",
+        "description": """Load a previously saved scenario into the active what-if session.
+Replays saved overrides against the CURRENT database state and recomputes metrics.
+Use when the user says "load the conservative case", "go back to scenario X",
+or "pull up the one I saved earlier".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_log_id": {
+                    "type": "integer",
+                    "description": "The ID of the saved scenario to load (from scenario_log_query results)"
+                }
+            },
+            "required": ["scenario_log_id"]
+        }
+    },
+    {
+        "name": "scenario_log_query",
+        "description": """List saved scenarios for this project.
+Use when the user asks "what scenarios have I saved?", "show me my scenarios",
+"what cases did I explore?", or needs to find a scenario ID before loading one.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["saved", "committed", "explored", "all"],
+                    "description": "Filter by status. Default: 'saved'"
+                },
+                "tag": {
+                    "type": "string",
+                    "description": "Filter by tag"
+                },
+                "search": {
+                    "type": "string",
+                    "description": "Search in scenario name and description"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 20, max 50)"
+                }
+            },
+            "required": []
+        }
+    },
 ]
 
 # Add cabinet-based contact tools
@@ -4756,6 +4938,42 @@ ANALYSIS RESPONSES:
 - Use bullet points for lists
 - Format currency as $X,XXX and percentages as X.X%
 - Keep under 200 words unless detailed analysis is requested
+
+WHAT-IF MODE (SHADOW COMPUTATION):
+When the user asks hypothetical questions like "what if...", "what happens if...",
+"what would X be if...", "show me the impact of...", "try changing...", or
+"run the numbers with...", use the whatif_compute tool instead of update tools.
+This runs calculations without changing the database.
+
+Key behaviors:
+- Default to what-if mode when user intent is ambiguous (safer than writing to DB)
+- What-if changes compound by default across messages in the same session
+- Always restate the active assumptions at the start of what-if responses:
+  "Assuming vacancy at 8% and rent growth at 4%: IRR is 7.2%, NPV is $1.2M."
+- Use whatif_compound for additional changes in the same session
+- Use whatif_attribute when asked to break down or decompose the impact
+- Use whatif_reset when asked to start over or remove specific changes
+- Use whatif_status to check current state before responding
+
+Direct mutation triggers (use update tools, NOT what-if):
+- "Set X to Y", "Change X to Y", "Update the...", "Make that change"
+- "Commit that", "Go ahead", "Apply those changes"
+
+When an active what-if session exists and the user says "commit" or "apply",
+tell them: "I'll apply these changes to the database." Then use the
+standard update tools (update_project_field, update_cashflow_assumption, etc.)
+to write the values.
+
+SCENARIO MANAGEMENT:
+- When the user says "save this", "name this scenario", "keep this for later" →
+  use scenario_save with a descriptive name
+- When the user asks "what scenarios have I saved?", "show my scenarios" →
+  use scenario_log_query
+- When the user says "load X", "pull up the conservative case" →
+  use scenario_log_query first to find the ID, then scenario_load
+- Loading a scenario replays its overrides against the CURRENT database,
+  so deltas may differ from when it was originally saved
+- After loading a scenario, the user can compound additional changes on top
 """
 
 
@@ -5172,6 +5390,46 @@ def get_landscaper_response(
     if page_context and page_context.lower() == "alpha_assistant":
         full_system += ALPHA_ASSISTANT_PROMPT_ADDITION
         logger.info("Alpha Assistant behavioral guidance added to system prompt")
+
+    # Inject active what-if shadow state if present
+    thread_id = project_context.get('thread_id')
+    if thread_id:
+        try:
+            from .services import whatif_storage
+            shadow_data = whatif_storage.load_shadow_from_db(thread_id)
+            if shadow_data:
+                overrides = shadow_data.get('overrides', {})
+                computed = shadow_data.get('computed_results', {})
+                baseline = shadow_data.get('baseline_snapshot', {})
+                override_count = len(overrides)
+                if override_count > 0:
+                    override_lines = []
+                    for key, ov in overrides.items():
+                        label = ov.get('label', ov.get('field', key))
+                        orig = ov.get('original_value', '?')
+                        new_val = ov.get('override_value', '?')
+                        unit = ov.get('unit', '')
+                        override_lines.append(
+                            f"  - {label}: {orig} → {new_val}{(' ' + unit) if unit else ''}"
+                        )
+                    shadow_block = (
+                        f"\n\n<whatif_shadow_state>\n"
+                        f"ACTIVE WHAT-IF SESSION ({override_count} override{'s' if override_count != 1 else ''}):\n"
+                        + "\n".join(override_lines)
+                    )
+                    # Add computed deltas if available
+                    delta = computed.get('delta', {})
+                    if delta:
+                        shadow_block += "\n\nComputed impact vs baseline:"
+                        for metric, val in delta.items():
+                            if isinstance(val, (int, float)) and val != 0:
+                                sign = '+' if val > 0 else ''
+                                shadow_block += f"\n  - {metric}: {sign}{val}"
+                    shadow_block += "\n</whatif_shadow_state>"
+                    full_system += shadow_block
+                    logger.info(f"What-if shadow state injected ({override_count} overrides)")
+        except Exception as e:
+            logger.warning(f"Failed to load what-if shadow state: {e}")
 
     # Try Claude API first
     client = _get_anthropic_client()
