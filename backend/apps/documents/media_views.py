@@ -2,6 +2,10 @@
 
 import json
 import logging
+from urllib.parse import urlparse
+
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db import connection
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -1106,16 +1110,13 @@ def reset_document_media(request, doc_id):
     POST /api/dms/documents/{doc_id}/media/reset/
 
     Deletes all core_doc_media records for a document, removes files from
-    disk, and resets the document's media scan status.
+    configured storage, and resets the document's media scan status.
     """
-    import shutil
-    from pathlib import Path
 
     try:
-        # Get project_id for file path
         with connection.cursor() as c:
             c.execute("""
-                SELECT project_id FROM landscape.core_doc
+                SELECT doc_id FROM landscape.core_doc
                 WHERE doc_id = %s AND deleted_at IS NULL
             """, [doc_id])
             row = c.fetchone()
@@ -1126,7 +1127,47 @@ def reset_document_media(request, doc_id):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        project_id = row[0]
+        def extract_storage_key(uri: str) -> str:
+            if not uri:
+                return ''
+            if uri.startswith(('http://', 'https://')):
+                parsed = urlparse(uri)
+                key = parsed.path.lstrip('/')
+            else:
+                key = uri.lstrip('/')
+            media_prefix = (getattr(settings, 'MEDIA_URL', '') or '').strip('/')
+            if media_prefix and key.startswith(f"{media_prefix}/"):
+                key = key[len(media_prefix) + 1:]
+            return key
+
+        # Delete backing files from storage before deleting DB records.
+        with connection.cursor() as c:
+            c.execute("""
+                SELECT storage_uri, thumbnail_uri
+                FROM landscape.core_doc_media
+                WHERE doc_id = %s
+            """, [doc_id])
+            file_rows = c.fetchall()
+
+        delete_attempts = set()
+        for storage_uri, thumbnail_uri in file_rows:
+            if storage_uri:
+                delete_attempts.add(extract_storage_key(storage_uri))
+            if thumbnail_uri:
+                delete_attempts.add(extract_storage_key(thumbnail_uri))
+
+        deleted_files = 0
+        for key in delete_attempts:
+            if not key:
+                continue
+            try:
+                default_storage.delete(key)
+                deleted_files += 1
+            except Exception:
+                logger.warning(
+                    f"[doc_id={doc_id}] Failed to delete stored media object: {key}",
+                    exc_info=True,
+                )
 
         # Delete media records
         with connection.cursor() as c:
@@ -1146,21 +1187,16 @@ def reset_document_media(request, doc_id):
                 WHERE doc_id = %s
             """, [doc_id])
 
-        # Remove files from disk
-        base_media = getattr(settings, 'MEDIA_ROOT', None)
-        if not base_media:
-            base_media = str(settings.BASE_DIR / 'media')
-        media_dir = Path(base_media) / 'media_assets' / str(project_id) / str(doc_id)
-        if media_dir.exists():
-            shutil.rmtree(str(media_dir), ignore_errors=True)
-            logger.info(f"[doc_id={doc_id}] Removed media directory: {media_dir}")
-
-        logger.info(f"[doc_id={doc_id}] Reset complete — deleted {deleted_count} media records")
+        logger.info(
+            f"[doc_id={doc_id}] Reset complete — deleted {deleted_count} media records, "
+            f"{deleted_files} stored objects"
+        )
 
         return Response({
             'reset': True,
             'doc_id': doc_id,
             'deleted_count': deleted_count,
+            'deleted_files': deleted_files,
         })
 
     except Exception as e:

@@ -4664,6 +4664,212 @@ Use when the user asks "what scenarios have I saved?", "show me my scenarios",
             "required": []
         }
     },
+
+    # ─── Phase 4: Commit + Undo Tools ────────────────────────────────────
+    {
+        "name": "whatif_commit",
+        "description": """Commit ALL active what-if overrides to the actual database.
+This writes every override in the current shadow session to the real tables.
+The operation is atomic — all succeed or all roll back.
+Use when the user says "apply all changes", "commit everything", "go ahead and make those changes",
+or confirms they want to write all what-if values to the database.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "whatif_commit_selective",
+        "description": """Commit specific overrides to the database while keeping others in shadow.
+Use when the user says "just apply the vacancy change" or "commit only X and Y".
+Non-committed overrides remain in the active shadow for continued exploration.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "fields": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of override keys to commit (from whatif_status output)"
+                }
+            },
+            "required": ["fields"]
+        }
+    },
+    {
+        "name": "whatif_undo",
+        "description": """Undo a previously committed scenario by restoring original values.
+Before restoring, verifies each field's current DB value matches the committed value.
+If someone changed a field manually since the commit, that field is blocked from undo.
+Use when the user says "undo the last commit", "revert those changes", or "roll back".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_log_id": {
+                    "type": "integer",
+                    "description": "ID of the committed scenario to undo (from scenario_log_query)"
+                }
+            },
+            "required": ["scenario_log_id"]
+        }
+    },
+
+    # ─── Phase 5: Scenario Operations Tools ──────────────────────────────
+    {
+        "name": "scenario_replay",
+        "description": """Replay a saved scenario against the current database state.
+Creates a fresh shadow with current baseline, applies saved overrides, and recomputes.
+Deltas reflect impact on current state, which may differ from the original save.
+Use when user says "replay the conservative case", "re-run scenario X against current data".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_log_id": {
+                    "type": "integer",
+                    "description": "ID of the scenario to replay"
+                }
+            },
+            "required": ["scenario_log_id"]
+        }
+    },
+    {
+        "name": "scenario_compare",
+        "description": """Compare two saved scenarios side-by-side.
+Replays both against current DB independently, then shows baseline, A metrics, B metrics,
+and all pairwise deltas. Use when user says "compare Conservative and Aggressive",
+"how do these two scenarios stack up?".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_id_a": {
+                    "type": "integer",
+                    "description": "ID of the first scenario"
+                },
+                "scenario_id_b": {
+                    "type": "integer",
+                    "description": "ID of the second scenario"
+                }
+            },
+            "required": ["scenario_id_a", "scenario_id_b"]
+        }
+    },
+    {
+        "name": "scenario_diff",
+        "description": """Diff a saved scenario against the current database.
+Shows which overrides still differ from current DB values and which have been absorbed
+(DB now matches the override). Use when user asks "what's changed since I saved this?",
+"is this scenario still relevant?".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_log_id": {
+                    "type": "integer",
+                    "description": "ID of the scenario to diff"
+                }
+            },
+            "required": ["scenario_log_id"]
+        }
+    },
+    {
+        "name": "scenario_branch",
+        "description": """Create a new scenario branching from an existing one.
+Copies the parent's overrides into a new saved scenario that can be modified independently.
+Use when user says "branch from Conservative as Ultra-Conservative",
+"fork this scenario", "make a copy of scenario X".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "parent_scenario_id": {
+                    "type": "integer",
+                    "description": "ID of the parent scenario to branch from"
+                },
+                "scenario_name": {
+                    "type": "string",
+                    "description": "Name for the new branch"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description"
+                }
+            },
+            "required": ["parent_scenario_id", "scenario_name"]
+        }
+    },
+    {
+        "name": "scenario_apply_cross_project",
+        "description": """Apply rate/percentage overrides from a scenario to another project.
+Only transferable fields (vacancy rates, cap rates, growth rates, discount rates) are applied.
+Absolute values (prices, costs, dollar amounts) are skipped because they are project-specific.
+Use when user says "apply this scenario to project 42", "use these rates on another project".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scenario_log_id": {
+                    "type": "integer",
+                    "description": "ID of the source scenario"
+                },
+                "target_project_id": {
+                    "type": "integer",
+                    "description": "ID of the project to apply overrides to"
+                }
+            },
+            "required": ["scenario_log_id", "target_project_id"]
+        }
+    },
+    # =========================================================================
+    # Phase 6: Custom Instructions + KPI Definitions (2 tools)
+    # =========================================================================
+    {
+        "name": "get_kpi_definitions",
+        "description": """Get the user's saved "results" KPI definitions for the current project type.
+Returns the ordered list of KPIs that define what "results" means when the user says
+"what are the results if..." or "show me results". If no custom definitions exist,
+returns defaults (IRR, Equity Multiple, Total Profit, etc.).
+Use this BEFORE answering any results-related what-if question.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_type_code": {
+                    "type": "string",
+                    "enum": ["LAND", "MF", "OFF", "RET", "IND", "HTL", "MXU"],
+                    "description": "Project type code. Omit to auto-detect from current project."
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "update_kpi_definitions",
+        "description": """Add or remove a KPI from the user's saved "results" definition.
+Use when the user says "add cash-on-cash to my results" (action='add')
+or "remove DSCR from my results" (action='remove').
+After a temporary mid-conversation KPI addition, offer to save it permanently
+by calling this tool with the user's confirmation.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["add", "remove"],
+                    "description": "'add' to add/reactivate, 'remove' to deactivate"
+                },
+                "kpi_key": {
+                    "type": "string",
+                    "description": "Machine key (e.g., 'cash_on_cash', 'irr', 'dscr', 'noi')"
+                },
+                "display_label": {
+                    "type": "string",
+                    "description": "Human-readable label (e.g., 'Cash-on-Cash Return'). Required for 'add'."
+                },
+                "project_type_code": {
+                    "type": "string",
+                    "enum": ["LAND", "MF", "OFF", "RET", "IND", "HTL", "MXU"],
+                    "description": "Project type code. Omit to auto-detect."
+                }
+            },
+            "required": ["action", "kpi_key"]
+        }
+    },
 ]
 
 # Add cabinet-based contact tools
@@ -4974,6 +5180,30 @@ SCENARIO MANAGEMENT:
 - Loading a scenario replays its overrides against the CURRENT database,
   so deltas may differ from when it was originally saved
 - After loading a scenario, the user can compound additional changes on top
+
+COMMIT + UNDO:
+- When the user says "apply all", "commit everything", "make those changes" →
+  use whatif_commit to write ALL overrides to the database
+- When the user says "just apply the vacancy change", "commit only X" →
+  use whatif_commit_selective with the specific field keys
+- After a selective commit, remaining overrides stay in the shadow for continued exploration
+- When the user says "undo", "revert", "roll back" →
+  use scenario_log_query to find the committed scenario, then whatif_undo
+- Undo has a safety guard: if a field was changed manually after the commit,
+  that field cannot be undone. Explain this to the user if it occurs.
+- IMPORTANT: Before committing, always confirm with the user what will be written.
+  Summarize the overrides and ask for confirmation.
+
+RESULTS KPI DEFINITIONS:
+- When the user says "what are the results", "show me results", or asks a what-if
+  question that expects result metrics, call get_kpi_definitions first to know which
+  KPIs to return. The user's saved KPI set defines what "results" means for this project.
+- Return ALL active KPIs from the definition, not just the specific metric they mentioned.
+- If the user says "add X to my results" mid-conversation:
+  1. Temporarily include that KPI in this session's results
+  2. Ask: "Want me to add [X] to your saved Results definition for [project type] projects?"
+  3. If they confirm, call update_kpi_definitions with action='add'
+- If the user says "remove X from results" → call update_kpi_definitions with action='remove'
 """
 
 
@@ -5430,6 +5660,58 @@ def get_landscaper_response(
                     logger.info(f"What-if shadow state injected ({override_count} overrides)")
         except Exception as e:
             logger.warning(f"Failed to load what-if shadow state: {e}")
+
+    # Inject custom instructions (Phase 6: user-level + project-level)
+    try:
+        from django.db import connection as _db_conn
+        project_id = project_context.get('project_id')
+        _user_id = 1  # Default until auth is wired up
+
+        with _db_conn.cursor() as _cursor:
+            if project_id:
+                # Get both user-level (project_id IS NULL) and project-level instructions
+                _cursor.execute("""
+                    SELECT instruction_type, instruction_text, project_id
+                    FROM tbl_landscaper_instructions
+                    WHERE user_id = %s AND is_active = true
+                      AND (project_id IS NULL OR project_id = %s)
+                    ORDER BY CASE WHEN project_id IS NULL THEN 0 ELSE 1 END,
+                             created_at
+                """, [_user_id, project_id])
+            else:
+                # Only user-level instructions
+                _cursor.execute("""
+                    SELECT instruction_type, instruction_text, project_id
+                    FROM tbl_landscaper_instructions
+                    WHERE user_id = %s AND is_active = true
+                      AND project_id IS NULL
+                    ORDER BY created_at
+                """, [_user_id])
+
+            _instr_rows = _cursor.fetchall()
+
+        if _instr_rows:
+            user_instructions = []
+            project_instructions = []
+            for _itype, _itext, _ipid in _instr_rows:
+                if _ipid is None:
+                    user_instructions.append(f"  [{_itype}] {_itext}")
+                else:
+                    project_instructions.append(f"  [{_itype}] {_itext}")
+
+            instr_block = "\n\n<custom_instructions>"
+            if user_instructions:
+                instr_block += "\nUser preferences:\n" + "\n".join(user_instructions)
+            if project_instructions:
+                instr_block += "\nProject-specific instructions:\n" + "\n".join(project_instructions)
+            instr_block += "\n</custom_instructions>"
+            full_system += instr_block
+            logger.info(
+                f"Custom instructions injected ({len(user_instructions)} user, "
+                f"{len(project_instructions)} project)"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to load custom instructions: {e}")
 
     # Try Claude API first
     client = _get_anthropic_client()

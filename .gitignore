@@ -141,3 +141,4 @@ tmp_*
 test-results/
 .next_stale*
 .next_stale_*
+landscape_rich_schema_*.json

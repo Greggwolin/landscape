@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
-
 from pathlib import Path
 import sys
 from decouple import config, Csv
@@ -54,6 +53,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_extensions",
     "drf_spectacular",
+    "storages",
 
     # Project apps (Phase 3 Complete - All apps registered)
     "apps.projects",
@@ -174,8 +174,39 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Media files (uploaded documents, extracted images)
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+R2_ACCESS_KEY_ID = config('R2_ACCESS_KEY_ID', default='')
+R2_SECRET_ACCESS_KEY = config('R2_SECRET_ACCESS_KEY', default='')
+R2_BUCKET_NAME = config('R2_BUCKET_NAME', default='landscape-media')
+R2_ENDPOINT_URL = config('R2_ENDPOINT_URL', default='')
+R2_PUBLIC_URL = config('R2_PUBLIC_URL', default='')
+
+if R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and R2_ENDPOINT_URL:
+    storage_options = {
+        "access_key": R2_ACCESS_KEY_ID,
+        "secret_key": R2_SECRET_ACCESS_KEY,
+        "bucket_name": R2_BUCKET_NAME,
+        "endpoint_url": R2_ENDPOINT_URL,
+        "default_acl": "public-read",
+        "querystring_auth": False,
+        "file_overwrite": False,
+        "region_name": "auto",
+    }
+    if R2_PUBLIC_URL:
+        storage_options["custom_domain"] = R2_PUBLIC_URL.replace("https://", "").replace("http://", "")
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": storage_options,
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+    MEDIA_URL = f"{R2_PUBLIC_URL.rstrip('/')}/" if R2_PUBLIC_URL else "/media/"
+else:
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

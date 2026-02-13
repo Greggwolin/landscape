@@ -2,12 +2,13 @@
 
 import { PropertySummaryView } from '@/components/reports/PropertySummaryView';
 import { ScenarioHistoryPanel } from '@/components/landscaper/ScenarioHistoryPanel';
+import { LandscaperInstructionsPanel } from '@/components/landscaper/LandscaperInstructionsPanel';
 import { useState } from 'react';
 import { CButton, CButtonGroup, CCard, CCardBody, CNav, CNavItem, CNavLink, CTabContent, CTabPane } from '@coreui/react';
 
 export default function ReportsPage() {
   const [scenario, setScenario] = useState<'current' | 'proforma'>('current');
-  const [activeTab, setActiveTab] = useState<'reports' | 'scenarios'>('reports');
+  const [activeTab, setActiveTab] = useState<'reports' | 'scenarios' | 'instructions'>('reports');
   const propertyId = '17'; // 14105 Chadron Ave
 
   return (
@@ -38,6 +39,15 @@ export default function ReportsPage() {
             style={{ cursor: 'pointer' }}
           >
             Scenario History
+          </CNavLink>
+        </CNavItem>
+        <CNavItem>
+          <CNavLink
+            active={activeTab === 'instructions'}
+            onClick={() => setActiveTab('instructions')}
+            style={{ cursor: 'pointer' }}
+          >
+            Landscaper Settings
           </CNavLink>
         </CNavItem>
       </CNav>
@@ -79,6 +89,11 @@ export default function ReportsPage() {
         {/* Scenario History Tab */}
         <CTabPane visible={activeTab === 'scenarios'}>
           <ScenarioHistoryPanel projectId={propertyId} />
+        </CTabPane>
+
+        {/* Landscaper Settings Tab */}
+        <CTabPane visible={activeTab === 'instructions'}>
+          <LandscaperInstructionsPanel projectId={propertyId} />
         </CTabPane>
       </CTabContent>
     </div>

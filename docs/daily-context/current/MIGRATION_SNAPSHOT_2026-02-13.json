@@ -123,7 +123,7 @@
       "latest": "0002_add_cost_approach_land_metadata"
     }
   },
-  "generated_at": "2026-02-13T11:45:39.231442",
+  "generated_at": "2026-02-13T12:04:09.314967",
   "latest_sql": "20260215_add_assumption_snapshots.sql",
   "sql_migrations": [
     "001_financial_engine_schema.sql",

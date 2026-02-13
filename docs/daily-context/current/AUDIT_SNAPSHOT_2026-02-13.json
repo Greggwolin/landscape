@@ -6916,7 +6916,7 @@
       "view": "ValuationSummaryViewSet"
     }
   ],
-  "generated_at": "2026-02-13T18:45:22.897713",
+  "generated_at": "2026-02-13T19:03:50.578356",
   "next_routes": [
     {
       "file": "src/app/api/absorption/[id]/route.ts",
@@ -12346,11 +12346,18 @@
       "size": "1153"
     },
     {
+      "component": "ScenarioCompareView",
+      "file": "src/components/landscaper/ScenarioCompareView.tsx",
+      "imports": "\u2014",
+      "modified": "2026-02-13",
+      "size": "242"
+    },
+    {
       "component": "ScenarioHistoryPanel",
       "file": "src/components/landscaper/ScenarioHistoryPanel.tsx",
       "imports": "\u2014",
       "modified": "2026-02-13",
-      "size": "322"
+      "size": "366"
     },
     {
       "component": "ScenarioSaveModal",
@@ -15184,10 +15191,10 @@
       "size": 1344
     },
     {
-      "hash": "73d22ba2a57d03bfdaa907458e8c89b71758bf30",
-      "lines": 5783,
+      "hash": "610eb3b30097de8cb47c7ed014da3fa81b48cf95",
+      "lines": 5948,
       "path": "backend/apps/landscaper/ai_handler.py",
-      "size": 269257
+      "size": 276464
     },
     {
       "hash": "d09be5dad3fa4109199dec38deaec65e6ddb0044",
@@ -15316,10 +15323,16 @@
       "size": 10774
     },
     {
-      "hash": "e32258fbf6af0304ebb3a1866d73ac865bc88c45",
-      "lines": 862,
+      "hash": "b0f8c96b28b3eed2a9546c3c76c48b4e3254bc3a",
+      "lines": 472,
+      "path": "backend/apps/landscaper/services/whatif_commit_service.py",
+      "size": 15925
+    },
+    {
+      "hash": "85f35bbaee581f8ca666559766ea1e8adc8a1838",
+      "lines": 1104,
       "path": "backend/apps/landscaper/services/whatif_engine.py",
-      "size": 34956
+      "size": 43856
     },
     {
       "hash": "99618aa744a32bf145d36e39842d1f2f1e25e88c",
@@ -15346,16 +15359,16 @@
       "size": 60
     },
     {
-      "hash": "b22c26a52bc71f990279b493f135b91e4cd80b8f",
-      "lines": 12273,
+      "hash": "fd340e882bd5764455a06c20ec7f584657b2a06e",
+      "lines": 12275,
       "path": "backend/apps/landscaper/tool_executor.py",
-      "size": 488265
+      "size": 488382
     },
     {
-      "hash": "d6b8cee195fb229f3370821cec839fd21c088b0e",
-      "lines": 458,
+      "hash": "e05cc9f2beef64cf4b0db7f8dcf91c007dfb2f74",
+      "lines": 468,
       "path": "backend/apps/landscaper/tool_registry.py",
-      "size": 13424
+      "size": 13686
     },
     {
       "hash": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
@@ -15364,10 +15377,22 @@
       "size": 0
     },
     {
+      "hash": "e2c6adbb6c6d20ff7e89d3870dac0073ffb478b3",
+      "lines": 396,
+      "path": "backend/apps/landscaper/tools/scenario_ops_tools.py",
+      "size": 14562
+    },
+    {
       "hash": "701e55ba685cc4e73713d1ce01b3090b2d08b5a1",
       "lines": 347,
       "path": "backend/apps/landscaper/tools/scenario_tools.py",
       "size": 11656
+    },
+    {
+      "hash": "161c01c6d7a57070fb111e0327d9ce641d1baffe",
+      "lines": 131,
+      "path": "backend/apps/landscaper/tools/whatif_commit_tools.py",
+      "size": 4379
     },
     {
       "hash": "72acc564e58bd25d5000f110a449de526896a8e5",
@@ -17932,10 +17957,10 @@
       "size": 1983
     },
     {
-      "hash": "e55b01af65abf4362324b9b7e1103bebec20c3cc",
-      "lines": 114,
+      "hash": "ce1a4b0baf32a4c0aec2af26b04fe3f80e323246",
+      "lines": 120,
       "path": "scripts/generate-daily-context.sh",
-      "size": 3580
+      "size": 3823
     },
     {
       "hash": "5a05bf311e38bb7d5c0405f9c596374a3f6957ee",
@@ -45448,10 +45473,16 @@
       "size": 40231
     },
     {
-      "hash": "78be86edbd16082ea292415fb1325ea639a0bd4b",
-      "lines": 322,
+      "hash": "503dc0c6d095cfc691d13072efade50554e7faeb",
+      "lines": 242,
+      "path": "src/components/landscaper/ScenarioCompareView.tsx",
+      "size": 8215
+    },
+    {
+      "hash": "99dc65c0d75173cc885a2c55eecae49d0a40b25f",
+      "lines": 366,
       "path": "src/components/landscaper/ScenarioHistoryPanel.tsx",
-      "size": 9578
+      "size": 10941
     },
     {
       "hash": "16141464fccde7614053cbfc6fdbad172c0e4353",

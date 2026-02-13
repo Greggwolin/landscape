@@ -1,13 +1,13 @@
 ## Summary
-- **Generated:** 2026-02-13 11:45:18 
+- **Generated:** 2026-02-13 12:03:43 
 - **Git Branch:** main
-- **Last Commit:** 19f4657 — "Merge daily context generator pipeline" (2026-02-13 11:45:04 -0700)
-- **Frontend Files:** 1407 (.tsx: 585, .ts: 689, .css: 56, other: 77)
-- **Backend Files:** 1274 (.py: 515, other: 759)
+- **Last Commit:** 7ca7267 — "Daily context baseline: 2026-02-13" (2026-02-13 11:45:47 -0700)
+- **Frontend Files:** 1408 (.tsx: 586, .ts: 689, .css: 56, other: 77)
+- **Backend Files:** 1277 (.py: 518, other: 759)
 - **Database Tables:** 314
 - **Next.js API Routes:** 397
 - **Django API Endpoints:** 810
-- **React Components:** 526
+- **React Components:** 527
 - **Custom Hooks:** 132
 - **Django Apps:** 23
 
@@ -1671,7 +1671,8 @@
 | MediaSummaryCard | src/components/landscaper/MediaSummaryCard.tsx | 104 | 2026-02-08 | CoreUI |
 | MutationProposalCard | src/components/landscaper/MutationProposalCard.tsx | 347 | 2026-01-11 | CoreUI |
 | RentRollUpdateReviewModal | src/components/landscaper/RentRollUpdateReviewModal.tsx | 1153 | 2026-02-05 | CoreUI |
-| ScenarioHistoryPanel | src/components/landscaper/ScenarioHistoryPanel.tsx | 322 | 2026-02-13 | — |
+| ScenarioCompareView | src/components/landscaper/ScenarioCompareView.tsx | 242 | 2026-02-13 | — |
+| ScenarioHistoryPanel | src/components/landscaper/ScenarioHistoryPanel.tsx | 366 | 2026-02-13 | — |
 | ScenarioSaveModal | src/components/landscaper/ScenarioSaveModal.tsx | 123 | 2026-02-13 | — |
 | SnapshotButton | src/components/landscaper/SnapshotButton.tsx | 63 | 2026-02-13 | CoreUI |
 | ThreadList | src/components/landscaper/ThreadList.tsx | 321 | 2026-02-08 | CoreUI |
@@ -2059,7 +2060,7 @@
 - **Serializers:** ActivityItemCreateSerializer, ActivityItemSerializer, AssumptionSnapshotSerializer, ChatMessageCreateSerializer, ChatMessageSerializer, ChatThreadCreateSerializer, ChatThreadDetailSerializer, ChatThreadSerializer, ChatThreadUpdateSerializer, ExtractionLogReviewSerializer, ExtractionLogSerializer, ExtractionMappingCreateSerializer, ExtractionMappingSerializer, LandscaperAdviceSerializer, Meta, ScenarioLogCreateSerializer, ScenarioLogSerializer, ThreadMessageCreateSerializer, ThreadMessageSerializer, VarianceItemSerializer (20 serializers)
 - **URLs:** 26 patterns
 - **Migrations:** 1 (latest: 0001_initial.py)
-- **Total Lines:** 31,602
+- **Total Lines:** 33,020
 - **Last Modified:** 2026-02-13
 ### landuse
 - **Models:** Family, InventoryItem, LotProduct, Type (4 models)

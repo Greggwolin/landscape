@@ -1,7 +1,7 @@
 # Migration Status
 
 ## Summary
-- **Generated:** 2026-02-13 11:45:39 
+- **Generated:** 2026-02-13 12:04:09 
 - **Total SQL Migrations:** 93
 - **Latest Migration:** `migrations/20260215_add_assumption_snapshots.sql` (2026-02-13)
 

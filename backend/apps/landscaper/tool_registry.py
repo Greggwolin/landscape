@@ -46,6 +46,19 @@ WHATIF_TOOLS = [
     "scenario_save",
     "scenario_load",
     "scenario_log_query",
+    # Phase 4: Commit + Undo
+    "whatif_commit",
+    "whatif_commit_selective",
+    "whatif_undo",
+    # Phase 5: Scenario operations
+    "scenario_replay",
+    "scenario_compare",
+    "scenario_diff",
+    "scenario_branch",
+    "scenario_apply_cross_project",
+    # Phase 6: KPI definitions
+    "get_kpi_definitions",
+    "update_kpi_definitions",
 ]
 
 # Pages that get what-if tools

@@ -8,6 +8,7 @@ Two operational modes:
   - extract  (extract_media):   Actually extract images, store files, create 'extracted' records
 """
 import hashlib
+import io
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ from typing import Optional
 import fitz  # PyMuPDF
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import connection
 from PIL import Image
@@ -147,7 +149,7 @@ class MediaExtractionService:
                       media_ids: list[int] = None,
                       extract_all: bool = False) -> list[dict]:
         """
-        Extract images from a PDF and store them to disk.
+        Extract images from a PDF and store them via configured Django storage.
 
         Args:
             doc_id: core_doc.doc_id
@@ -462,25 +464,18 @@ class MediaExtractionService:
                 return {'media_id': media_id, 'status': 'skipped', 'reason': 'duplicate'}
             seen_hashes.add(image_hash)
 
-        # Build output paths (relative to media_root)
-        rel_dir = f"{project_id}/{doc_id}/embedded"
-        output_dir = self.media_root / rel_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         filename = f"{media_id}.{ext}"
-        output_path = output_dir / filename
-        output_path.write_bytes(image_bytes)
+        storage_key = f"media_assets/{project_id}/{doc_id}/embedded/{filename}"
+        saved_storage_path = self._save_media_file(image_bytes, storage_key)
+        storage_uri = self._get_public_url(saved_storage_path)
 
-        storage_uri = f"media_assets/{rel_dir}/{filename}"
-
-        # Generate thumbnail
-        thumb_rel_dir = f"{project_id}/{doc_id}/thumbnails"
-        thumb_dir = self.media_root / thumb_rel_dir
-        thumb_dir.mkdir(parents=True, exist_ok=True)
-        thumb_filename = f"{media_id}_thumb.jpg"
-        thumb_path = thumb_dir / thumb_filename
-        self._generate_thumbnail(str(output_path), str(thumb_path))
-        thumbnail_uri = f"media_assets/{thumb_rel_dir}/{thumb_filename}"
+        thumbnail_uri = ''
+        thumb_bytes = self._generate_thumbnail_bytes(image_bytes)
+        if thumb_bytes:
+            thumb_filename = f"{media_id}_thumb.jpg"
+            thumb_key = f"media_assets/{project_id}/{doc_id}/thumbnails/{thumb_filename}"
+            saved_thumb_path = self._save_media_file(thumb_bytes, thumb_key)
+            thumbnail_uri = self._get_public_url(saved_thumb_path)
 
         file_size = len(image_bytes)
 
@@ -545,25 +540,18 @@ class MediaExtractionService:
                 return {'media_id': media_id, 'status': 'skipped', 'reason': 'duplicate'}
             seen_hashes.add(image_hash)
 
-        # Build output paths
-        rel_dir = f"{project_id}/{doc_id}/pages"
-        output_dir = self.media_root / rel_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         filename = f"page_{page_num}.png"
-        output_path = output_dir / filename
-        output_path.write_bytes(image_bytes)
+        storage_key = f"media_assets/{project_id}/{doc_id}/pages/{filename}"
+        saved_storage_path = self._save_media_file(image_bytes, storage_key)
+        storage_uri = self._get_public_url(saved_storage_path)
 
-        storage_uri = f"media_assets/{rel_dir}/{filename}"
-
-        # Generate thumbnail
-        thumb_rel_dir = f"{project_id}/{doc_id}/thumbnails"
-        thumb_dir = self.media_root / thumb_rel_dir
-        thumb_dir.mkdir(parents=True, exist_ok=True)
-        thumb_filename = f"{media_id}_thumb.jpg"
-        thumb_path = thumb_dir / thumb_filename
-        self._generate_thumbnail(str(output_path), str(thumb_path))
-        thumbnail_uri = f"media_assets/{thumb_rel_dir}/{thumb_filename}"
+        thumbnail_uri = ''
+        thumb_bytes = self._generate_thumbnail_bytes(image_bytes)
+        if thumb_bytes:
+            thumb_filename = f"{media_id}_thumb.jpg"
+            thumb_key = f"media_assets/{project_id}/{doc_id}/thumbnails/{thumb_filename}"
+            saved_thumb_path = self._save_media_file(thumb_bytes, thumb_key)
+            thumbnail_uri = self._get_public_url(saved_thumb_path)
 
         file_size = len(image_bytes)
 
@@ -599,19 +587,20 @@ class MediaExtractionService:
     # ------------------------------------------------------------------ #
     #  INTERNAL: _generate_thumbnail
     # ------------------------------------------------------------------ #
-    def _generate_thumbnail(self, image_path: str, thumb_path: str) -> str:
-        """Generate a JPEG thumbnail from an image file."""
+    def _generate_thumbnail_bytes(self, image_bytes: bytes) -> Optional[bytes]:
+        """Generate JPEG thumbnail bytes from source image bytes."""
         try:
-            with Image.open(image_path) as img:
+            with Image.open(io.BytesIO(image_bytes)) as img:
                 img.thumbnail(self.THUMB_MAX_SIZE, Image.LANCZOS)
                 # Convert to RGB if necessary (e.g., RGBA, P mode)
                 if img.mode not in ('RGB', 'L'):
                     img = img.convert('RGB')
-                img.save(thumb_path, 'JPEG', quality=self.THUMB_QUALITY)
-            return thumb_path
+                out = io.BytesIO()
+                img.save(out, 'JPEG', quality=self.THUMB_QUALITY)
+            return out.getvalue()
         except Exception:
-            logger.exception(f"Thumbnail generation failed for {image_path}")
-            return ''
+            logger.exception("Thumbnail generation failed")
+            return None
 
     # ------------------------------------------------------------------ #
     #  INTERNAL: _is_page_capture_candidate
@@ -857,22 +846,19 @@ class MediaExtractionService:
         """Create a media record for a directly-uploaded image file."""
         # Determine dimensions by downloading and opening
         width, height, file_size = None, None, None
+        image_bytes = None
         tmp = self._download_to_temp(file_path)
         if tmp:
             try:
+                with open(tmp, 'rb') as f:
+                    image_bytes = f.read()
                 with Image.open(tmp) as img:
                     width, height = img.size
-                file_size = os.path.getsize(tmp)
-
-                # Generate thumbnail
-                thumb_rel_dir = f"{project_id}/{doc_id}/thumbnails"
-                thumb_dir = self.media_root / thumb_rel_dir
-                thumb_dir.mkdir(parents=True, exist_ok=True)
-
-                # We'll need the media_id first, so create record, then update
+                file_size = len(image_bytes)
             finally:
                 os.unlink(tmp)
 
+        public_storage_uri = self._to_public_uri(file_path)
         with connection.cursor() as c:
             c.execute("""
                 INSERT INTO landscape.core_doc_media
@@ -881,25 +867,18 @@ class MediaExtractionService:
                      asset_name, status, created_at, updated_at)
                 VALUES (%s, %s, 'upload', %s, %s, %s, %s, %s, 'Uploaded image', 'extracted', NOW(), NOW())
                 RETURNING media_id
-            """, [doc_id, project_id, file_path, mime_type, width, height, file_size])
+            """, [doc_id, project_id, public_storage_uri, mime_type, width, height, file_size])
             row = c.fetchone()
 
-        if row and tmp:
+        if row and image_bytes:
             media_id = row[0]
-            # Generate thumbnail from re-download
-            tmp2 = self._download_to_temp(file_path)
-            if tmp2:
-                try:
-                    thumb_rel_dir = f"{project_id}/{doc_id}/thumbnails"
-                    thumb_dir = self.media_root / thumb_rel_dir
-                    thumb_dir.mkdir(parents=True, exist_ok=True)
-                    thumb_filename = f"{media_id}_thumb.jpg"
-                    thumb_path = thumb_dir / thumb_filename
-                    self._generate_thumbnail(tmp2, str(thumb_path))
-                    thumbnail_uri = f"media_assets/{thumb_rel_dir}/{thumb_filename}"
-                    self._update_media_record(media_id=media_id, thumbnail_uri=thumbnail_uri)
-                finally:
-                    os.unlink(tmp2)
+            thumb_bytes = self._generate_thumbnail_bytes(image_bytes)
+            if thumb_bytes:
+                thumb_filename = f"{media_id}_thumb.jpg"
+                thumb_key = f"media_assets/{project_id}/{doc_id}/thumbnails/{thumb_filename}"
+                saved_thumb_path = self._save_media_file(thumb_bytes, thumb_key)
+                thumbnail_uri = self._get_public_url(saved_thumb_path)
+                self._update_media_record(media_id=media_id, thumbnail_uri=thumbnail_uri)
 
     def _update_scan_json(self, doc_id: int):
         """Rebuild media_scan_json from current core_doc_media records."""
@@ -939,6 +918,22 @@ class MediaExtractionService:
     # ------------------------------------------------------------------ #
     #  FILE HELPERS
     # ------------------------------------------------------------------ #
+    def _save_media_file(self, file_bytes: bytes, relative_path: str) -> str:
+        """Save media bytes to configured storage backend and return storage path."""
+        return default_storage.save(relative_path, ContentFile(file_bytes))
+
+    def _get_public_url(self, storage_path: str) -> str:
+        """Resolve a public URL for a stored object path."""
+        return default_storage.url(storage_path)
+
+    def _to_public_uri(self, storage_uri: str) -> str:
+        """Return absolute URI when possible while preserving existing absolute URIs."""
+        if not storage_uri:
+            return ''
+        if storage_uri.startswith(('http://', 'https://')):
+            return storage_uri
+        return self._get_public_url(storage_uri)
+
     def _download_to_temp(self, storage_uri: str) -> Optional[str]:
         """
         Download a file to a temp path. Handles both URLs and local storage paths.

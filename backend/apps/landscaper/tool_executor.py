@@ -12271,3 +12271,6 @@ def handle_log_alpha_feedback(
 # ─────────────────────────────────────────────────────────────────────────────
 from .tools import whatif_tools  # noqa: E402, F401
 from .tools import scenario_tools  # noqa: E402, F401
+from .tools import whatif_commit_tools  # noqa: E402, F401
+from .tools import scenario_ops_tools  # noqa: E402, F401
+from .tools import kpi_tools  # noqa: E402, F401

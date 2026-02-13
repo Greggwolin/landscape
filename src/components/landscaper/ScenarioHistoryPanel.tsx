@@ -55,6 +55,7 @@ export function ScenarioHistoryPanel({
   const [statusFilter, setStatusFilter] = useState('saved');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [branchTarget, setBranchTarget] = useState<Scenario | null>(null);
 
   const fetchScenarios = useCallback(async () => {
     setLoading(true);
@@ -121,6 +122,33 @@ export function ScenarioHistoryPanel({
     if (!result.success) {
       throw new Error(result.error || 'Save failed');
     }
+    fetchScenarios();
+  };
+
+  const handleBranch = async (data: {
+    scenario_name: string;
+    description: string;
+    tags: string[];
+  }) => {
+    if (!branchTarget) return;
+    const res = await fetch(
+      `${API_BASE}/api/landscaper/projects/${projectId}/scenarios/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario_name: data.scenario_name,
+          description: data.description || `Branched from "${branchTarget.scenario_name}"`,
+          tags: data.tags,
+          source: 'user_manual',
+        }),
+      },
+    );
+    const result = await res.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Branch failed');
+    }
+    setBranchTarget(null);
     fetchScenarios();
   };
 
@@ -299,6 +327,14 @@ export function ScenarioHistoryPanel({
                 </CButton>
               )}
               <CButton
+                color="secondary"
+                size="sm"
+                variant="outline"
+                onClick={() => setBranchTarget(scenario)}
+              >
+                Branch
+              </CButton>
+              <CButton
                 color="danger"
                 size="sm"
                 variant="ghost"
@@ -316,6 +352,14 @@ export function ScenarioHistoryPanel({
         isOpen={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         onSave={handleSnapshotSave}
+      />
+
+      {/* Branch modal */}
+      <ScenarioSaveModal
+        isOpen={branchTarget !== null}
+        onClose={() => setBranchTarget(null)}
+        onSave={handleBranch}
+        defaultName={branchTarget ? `${branchTarget.scenario_name || 'Scenario'} (branch)` : ''}
       />
     </div>
   );

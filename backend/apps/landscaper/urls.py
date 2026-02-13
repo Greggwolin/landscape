@@ -22,6 +22,13 @@ from .views_scenario import (
     ScenarioLogListCreateView,
     ScenarioLogDetailView,
 )
+from .views_instructions import (
+    InstructionListCreateView,
+    InstructionDetailView,
+    KpiDefinitionListCreateView,
+    KpiDefinitionDetailView,
+    KpiDefinitionByTypeView,
+)
 
 # Project-scoped endpoints
 urlpatterns = [
@@ -250,5 +257,48 @@ urlpatterns = [
         'landscaper/projects/<int:project_id>/scenarios/<int:scenario_log_id>/',
         ScenarioLogDetailView.as_view(),
         name='landscaper-scenario-detail'
+    ),
+
+    # ========================================================================
+    # Custom Instructions Endpoints (Phase 6)
+    # ========================================================================
+
+    # List/Create instructions
+    path(
+        'landscaper/instructions/',
+        InstructionListCreateView.as_view(),
+        name='landscaper-instructions'
+    ),
+
+    # Update/Delete a specific instruction
+    path(
+        'landscaper/instructions/<int:instruction_id>/',
+        InstructionDetailView.as_view(),
+        name='landscaper-instruction-detail'
+    ),
+
+    # ========================================================================
+    # KPI Definition Endpoints (Phase 6)
+    # ========================================================================
+
+    # List/Create KPI definitions
+    path(
+        'landscaper/kpi-definitions/',
+        KpiDefinitionListCreateView.as_view(),
+        name='landscaper-kpi-definitions'
+    ),
+
+    # Update/Delete a specific KPI definition
+    path(
+        'landscaper/kpi-definitions/<int:kpi_id>/',
+        KpiDefinitionDetailView.as_view(),
+        name='landscaper-kpi-definition-detail'
+    ),
+
+    # Get KPIs by project type (convenience endpoint)
+    path(
+        'landscaper/kpi-definitions/by-type/<str:type_code>/',
+        KpiDefinitionByTypeView.as_view(),
+        name='landscaper-kpi-definitions-by-type'
     ),
 ]

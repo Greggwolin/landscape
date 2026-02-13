@@ -860,3 +860,245 @@ class WhatIfEngine:
             return float(value)
         except (ValueError, TypeError):
             return default
+
+    # ------------------------------------------------------------------
+    # Phase 5: Scenario Operations
+    # ------------------------------------------------------------------
+
+    def replay_scenario(
+        self,
+        scenario_data: Dict[str, Any],
+        thread_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Replay saved overrides against the CURRENT database state.
+
+        Creates a fresh shadow with current baseline, applies saved overrides,
+        and computes metrics. Deltas reflect impact on current state, not
+        the historical baseline from when the scenario was originally saved.
+
+        Returns the same format as compute_shadow_metrics() plus replay metadata.
+        """
+        saved_overrides = scenario_data.get('overrides', {})
+        if not saved_overrides:
+            return {
+                'success': True,
+                'message': 'Scenario has no overrides (baseline checkpoint).',
+                'overrides_replayed': 0,
+            }
+
+        shadow = self.create_shadow(thread_id)
+
+        skipped = []
+        for key, ov_data in saved_overrides.items():
+            try:
+                shadow = self.apply_override(
+                    shadow,
+                    field=ov_data.get('field', ''),
+                    table=ov_data.get('table', ''),
+                    new_value=ov_data.get('override_value'),
+                    label=ov_data.get('label', ''),
+                    unit=ov_data.get('unit', ''),
+                    record_id=ov_data.get('record_id'),
+                )
+            except Exception as e:
+                skipped.append({'key': key, 'error': str(e)})
+
+        results = self.compute_shadow_metrics(shadow)
+
+        return {
+            'success': True,
+            'overrides_replayed': len(saved_overrides) - len(skipped),
+            'skipped': skipped,
+            'shadow': shadow,
+            **results,
+        }
+
+    def compare_scenarios(
+        self,
+        scenario_data_a: Dict[str, Any],
+        scenario_data_b: Dict[str, Any],
+        name_a: str = 'Scenario A',
+        name_b: str = 'Scenario B',
+    ) -> Dict[str, Any]:
+        """
+        Compare two scenarios side-by-side.
+
+        Replays each scenario's overrides against the current DB independently,
+        then produces a comparison with baseline, A metrics, B metrics, and deltas.
+        """
+        # Get current baseline
+        project_type = self._get_project_type()
+        baseline_assumptions = self._load_all_assumptions(project_type)
+        baseline_metrics = self._compute_metrics(baseline_assumptions, project_type)
+
+        # Compute scenario A metrics
+        metrics_a = self._replay_and_compute(
+            baseline_assumptions, scenario_data_a, project_type
+        )
+
+        # Compute scenario B metrics
+        metrics_b = self._replay_and_compute(
+            baseline_assumptions, scenario_data_b, project_type
+        )
+
+        # Compute deltas
+        delta_a_vs_baseline = self._compute_deltas(baseline_metrics, metrics_a)
+        delta_b_vs_baseline = self._compute_deltas(baseline_metrics, metrics_b)
+        delta_a_vs_b = self._compute_deltas(metrics_a, metrics_b)
+
+        # Build override summaries
+        overrides_a = scenario_data_a.get('overrides', {})
+        overrides_b = scenario_data_b.get('overrides', {})
+        summary_a = [
+            {
+                'field': ov.get('field'),
+                'label': ov.get('label', ov.get('field')),
+                'value': ov.get('override_value'),
+                'unit': ov.get('unit', ''),
+            }
+            for ov in overrides_a.values()
+        ]
+        summary_b = [
+            {
+                'field': ov.get('field'),
+                'label': ov.get('label', ov.get('field')),
+                'value': ov.get('override_value'),
+                'unit': ov.get('unit', ''),
+            }
+            for ov in overrides_b.values()
+        ]
+
+        return {
+            'baseline': baseline_metrics,
+            name_a: {
+                'metrics': metrics_a,
+                'delta_vs_baseline': delta_a_vs_baseline,
+                'overrides': summary_a,
+                'overrides_count': len(overrides_a),
+            },
+            name_b: {
+                'metrics': metrics_b,
+                'delta_vs_baseline': delta_b_vs_baseline,
+                'overrides': summary_b,
+                'overrides_count': len(overrides_b),
+            },
+            'delta_a_vs_b': delta_a_vs_b,
+        }
+
+    def diff_scenario(
+        self,
+        scenario_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Diff a saved scenario against the current database state.
+
+        Shows which overrides would still be different from current DB values
+        and which have been absorbed (i.e., the DB already matches the override).
+        """
+        overrides = scenario_data.get('overrides', {})
+        if not overrides:
+            return {'still_different': [], 'absorbed': [], 'total': 0}
+
+        still_different = []
+        absorbed = []
+
+        for key, ov_data in overrides.items():
+            field = ov_data.get('field', '')
+            table = ov_data.get('table', '')
+            record_id = ov_data.get('record_id')
+            override_value = ov_data.get('override_value')
+            original_value = ov_data.get('original_value')
+
+            # Read current DB value
+            current = self._read_field_value(table, field, record_id)
+
+            entry = {
+                'key': key,
+                'field': field,
+                'label': ov_data.get('label', field),
+                'original_value': original_value,
+                'override_value': override_value,
+                'current_db_value': current,
+            }
+
+            if self._values_roughly_equal(current, override_value):
+                entry['status'] = 'absorbed'
+                absorbed.append(entry)
+            else:
+                entry['status'] = 'different'
+                still_different.append(entry)
+
+        return {
+            'still_different': still_different,
+            'absorbed': absorbed,
+            'total': len(overrides),
+            'different_count': len(still_different),
+            'absorbed_count': len(absorbed),
+        }
+
+    def _replay_and_compute(
+        self,
+        baseline_assumptions: Dict[str, Any],
+        scenario_data: Dict[str, Any],
+        project_type: str,
+    ) -> Dict[str, Any]:
+        """Replay overrides onto baseline assumptions and compute metrics."""
+        patched = copy.deepcopy(baseline_assumptions)
+        overrides = scenario_data.get('overrides', {})
+        for key, ov_data in overrides.items():
+            override = Override(**ov_data) if isinstance(ov_data, dict) else ov_data
+            self._apply_single_override(patched, override)
+        return self._compute_metrics(patched, project_type)
+
+    def _read_field_value(
+        self,
+        table: str,
+        field: str,
+        record_id: Optional[str] = None,
+    ) -> Any:
+        """Read a single field value from the database."""
+        try:
+            with connection.cursor() as cursor:
+                if record_id:
+                    # Try PK-based lookup
+                    pk_map = {
+                        'tbl_parcel': 'parcel_id',
+                        'tbl_phase': 'phase_id',
+                        'tbl_operating_expenses': 'opex_id',
+                    }
+                    pk_field = pk_map.get(table)
+                    if pk_field:
+                        cursor.execute(f"""
+                            SELECT {field} FROM landscape.{table}
+                            WHERE {pk_field} = %s LIMIT 1
+                        """, [record_id])
+                    else:
+                        cursor.execute(f"""
+                            SELECT {field} FROM landscape.{table}
+                            WHERE project_id = %s LIMIT 1
+                        """, [self.project_id])
+                else:
+                    # Project-scoped lookup
+                    lookup = 'project_id'
+                    cursor.execute(f"""
+                        SELECT {field} FROM landscape.{table}
+                        WHERE {lookup} = %s LIMIT 1
+                    """, [self.project_id])
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except Exception as e:
+            logger.warning(f"_read_field_value {table}.{field}: {e}")
+            return None
+
+    @staticmethod
+    def _values_roughly_equal(a: Any, b: Any) -> bool:
+        """Compare two values allowing for float/Decimal imprecision."""
+        if a is None and b is None:
+            return True
+        if a is None or b is None:
+            return False
+        try:
+            return abs(float(a) - float(b)) < 1e-8
+        except (ValueError, TypeError):
+            return str(a).strip() == str(b).strip()
