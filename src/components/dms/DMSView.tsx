@@ -17,6 +17,24 @@ interface DMSViewProps {
   projectType?: string | null;
 }
 
+async function parseJsonSafely<T>(response: Response, context: string): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  const raw = await response.text();
+  if (!raw) return {} as T;
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: expected JSON, received ${contentType || 'unknown'} (${response.status}). ${preview}`);
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: invalid JSON response (${response.status}). ${preview}`);
+  }
+}
+
 export default function DMSView({
   projectId,
   projectName,
@@ -75,7 +93,10 @@ export default function DMSView({
 
       let docTypeOptions: string[] = [];
       if (docTypesResponse.ok) {
-        const data = await docTypesResponse.json();
+        const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
+          docTypesResponse,
+          'dms/templates/doc-types'
+        );
         docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
       }
 
@@ -83,7 +104,11 @@ export default function DMSView({
         throw new Error('Failed to fetch filter counts');
       }
 
-      const { doc_type_counts } = await countsResponse.json();
+      const countsPayload = await parseJsonSafely<{ doc_type_counts?: Array<{ doc_type: string; count: number }> }>(
+        countsResponse,
+        'dms/filters/counts'
+      );
+      const { doc_type_counts } = countsPayload;
       const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(doc_type_counts)
         ? doc_type_counts
         : [];
@@ -97,7 +122,10 @@ export default function DMSView({
           valuationParams.set('project_type', 'valuation');
           const valuationResponse = await fetch(`/api/dms/templates/doc-types?${valuationParams.toString()}`);
           if (valuationResponse.ok) {
-            const valuationData = await valuationResponse.json();
+            const valuationData = await parseJsonSafely<{ doc_type_options?: string[] }>(
+              valuationResponse,
+              'dms/templates/doc-types valuation fallback'
+            );
             const valuationOptions = Array.isArray(valuationData.doc_type_options) ? valuationData.doc_type_options : [];
             if (valuationOptions.length > 0) {
               docTypeOptions = valuationOptions;
@@ -188,7 +216,7 @@ export default function DMSView({
         throw new Error('Failed to fetch documents');
       }
 
-      const data = await response.json();
+      const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
 
       setAllFilters((prev) =>
         prev.map((f) =>
@@ -237,7 +265,10 @@ export default function DMSView({
         `/api/dms/search?project_id=${projectId}&include_deleted=true&deleted_only=true&limit=100`
       );
       if (response.ok) {
-        const data = await response.json();
+        const data = await parseJsonSafely<{ results?: DMSDocument[]; totalHits?: number }>(
+          response,
+          'dms/search trash'
+        );
         setTrashedDocuments(data.results || []);
         setTrashCount(data.totalHits || data.results?.length || 0);
       }
@@ -297,7 +328,7 @@ export default function DMSView({
           { method: 'DELETE' }
         );
         if (!response.ok) {
-          const data = await response.json();
+          const data = await parseJsonSafely<{ error?: string }>(response, 'dms/delete');
           errors.push(`${doc.doc_name}: ${data.error || 'Delete failed'}`);
         }
       } catch (error) {
@@ -325,7 +356,7 @@ export default function DMSView({
           { method: 'POST' }
         );
         if (!response.ok) {
-          const data = await response.json();
+          const data = await parseJsonSafely<{ error?: string }>(response, 'dms/restore');
           errors.push(`${doc.doc_name}: ${data.error || 'Restore failed'}`);
         }
       } catch (error) {
@@ -354,7 +385,7 @@ export default function DMSView({
           { method: 'DELETE' }
         );
         if (!response.ok) {
-          const data = await response.json();
+          const data = await parseJsonSafely<{ error?: string }>(response, 'dms/permanent-delete');
           errors.push(`${doc.doc_name}: ${data.error || 'Permanent delete failed'}`);
         }
       } catch (error) {
@@ -385,7 +416,7 @@ export default function DMSView({
     );
 
     if (!response.ok) {
-      const data = await response.json();
+      const data = await parseJsonSafely<{ error?: string }>(response, 'dms/rename');
       throw new Error(data.error || 'Failed to rename document');
     }
 

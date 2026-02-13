@@ -26,6 +26,24 @@ interface DocTypeFiltersProps {
   workspaceId?: number;
 }
 
+async function parseJsonSafely<T>(response: Response, context: string): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  const raw = await response.text();
+  if (!raw) return {} as T;
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: expected JSON, received ${contentType || 'unknown'} (${response.status}). ${preview}`);
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: invalid JSON response (${response.status}). ${preview}`);
+  }
+}
+
 export default function DocTypeFilters({
   projectId,
   selectedDocType,
@@ -68,8 +86,13 @@ export default function DocTypeFilters({
           fetch('/api/platform-knowledge?limit=0&offset=0')
         ]);
         if (!response.ok) throw new Error('Failed to fetch global filters');
-        const data = await response.json();
-        const platformData = platformResponse.ok ? await platformResponse.json() : { totalHits: 0 };
+        const data = await parseJsonSafely<{ facets?: { doc_type?: Record<string, number | string> } }>(
+          response,
+          'dms/search global filters'
+        );
+        const platformData = platformResponse.ok
+          ? await parseJsonSafely<{ totalHits?: number }>(platformResponse, 'platform-knowledge global filters')
+          : { totalHits: 0 };
         const facetDocTypes = data?.facets?.doc_type || {};
         const docTypeEntries = Object.entries(facetDocTypes)
           .filter(([docType]) => docType && docType !== 'null')
@@ -91,12 +114,18 @@ export default function DocTypeFilters({
 
       let docTypeOptions: string[] = [];
       if (docTypesResponse.ok) {
-        const data = await docTypesResponse.json();
+        const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
+          docTypesResponse,
+          'dms/templates/doc-types filters'
+        );
         docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
       }
 
       if (!countsResponse.ok) throw new Error('Failed to fetch filter counts');
-      const countsData = await countsResponse.json();
+      const countsData = await parseJsonSafely<{ doc_type_counts?: Array<{ doc_type: string; count: number }>; smart_filters?: any[] }>(
+        countsResponse,
+        'dms/filters/counts filters'
+      );
       const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(countsData.doc_type_counts)
         ? countsData.doc_type_counts
         : [];
@@ -120,7 +149,9 @@ export default function DocTypeFilters({
           count: count ?? 0
         }));
 
-      const platformData = platformResponse.ok ? await platformResponse.json() : { totalHits: 0 };
+      const platformData = platformResponse.ok
+        ? await parseJsonSafely<{ totalHits?: number }>(platformResponse, 'platform-knowledge filters')
+        : { totalHits: 0 };
       setDocTypes(applyPlatformKnowledge([...templateFilters, ...extraFilters], platformData.totalHits || 0));
       setSmartFilters(
         Array.isArray(countsData.smart_filters)

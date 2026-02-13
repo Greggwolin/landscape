@@ -22,6 +22,24 @@ import PlatformKnowledgeModal, { type PlatformKnowledgeMetadata } from '@/compon
 const PLATFORM_KNOWLEDGE_DOC_TYPE = 'Platform Knowledge';
 const LANDSCAPER_COLLAPSE_KEY = 'landscape-dms-landscaper-collapsed';
 
+async function parseJsonSafely<T>(response: Response, context: string): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  const raw = await response.text();
+  if (!raw) return {} as T;
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: expected JSON, received ${contentType || 'unknown'} (${response.status}). ${preview}`);
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: invalid JSON response (${response.status}). ${preview}`);
+  }
+}
+
 function normalizeDocument(doc: any): DMSDocument {
   return {
     ...doc,
@@ -80,7 +98,7 @@ function DMSPageContent() {
       try {
         const response = await fetch('/api/projects');
         if (!response.ok) throw new Error('Failed to load projects');
-        const data = await response.json();
+        const data = await parseJsonSafely<ProjectSummary[]>(response, 'projects');
         setProjects(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Global DMS project load error:', error);
@@ -128,7 +146,7 @@ function DMSPageContent() {
 
       const response = await fetch(`/api/dms/search?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch documents');
-      const data = await response.json();
+      const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
       const normalized = Array.isArray(data.results)
         ? data.results.map(normalizeDocument)
         : [];
@@ -164,7 +182,10 @@ function DMSPageContent() {
       if (query.trim()) params.set('q', query.trim());
       const response = await fetch(`/api/platform-knowledge?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch platform knowledge');
-      const data = await response.json();
+      const data = await parseJsonSafely<{ results?: PlatformKnowledgeDocument[] }>(
+        response,
+        'platform-knowledge'
+      );
       setPlatformDocuments(Array.isArray(data.results) ? data.results : []);
       return Array.isArray(data.results) ? data.results : [];
     } catch (error) {
@@ -185,7 +206,10 @@ function DMSPageContent() {
       if (searchQuery.trim()) params.set('q', searchQuery.trim());
       const response = await fetch(`/api/dms/search?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch doc type counts');
-      const data = await response.json();
+      const data = await parseJsonSafely<{ facets?: { doc_type?: Record<string, number | string> } }>(
+        response,
+        'dms/search facets'
+      );
       const facets = data?.facets?.doc_type || {};
       const counts = Object.entries(facets).map(([doc_type, count]) => ({
         doc_type,
@@ -320,7 +344,7 @@ function DMSPageContent() {
           { method: 'DELETE' }
         );
         if (!response.ok) {
-          const data = await response.json();
+          const data = await parseJsonSafely<{ error?: string }>(response, 'dms/delete');
           errors.push(`${doc.doc_name}: ${data.error || 'Delete failed'}`);
         }
       } catch (error) {
@@ -381,7 +405,7 @@ function DMSPageContent() {
         method: 'POST',
         body: formData
       });
-      const data = await response.json();
+      const data = await parseJsonSafely<Record<string, any>>(response, 'platform-knowledge/analyze');
       if (!response.ok) {
         throw new Error(data.error || 'Analysis failed');
       }
@@ -445,7 +469,7 @@ function DMSPageContent() {
           description: knowledgeAnalysis
         })
       });
-      const data = await response.json();
+      const data = await parseJsonSafely<Record<string, any>>(response, 'platform-knowledge/ingest');
       if (!response.ok) {
         throw new Error(data.error || 'Ingestion failed');
       }

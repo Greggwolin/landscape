@@ -286,33 +286,70 @@ function toNumber(value: string | number | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function toFixedOrDash(value: number | null, decimals = 1, withSign = true): string {
-  if (value == null || value === 0) return DASH;
-  const sign = value > 0 && withSign ? '+' : '';
-  return `${sign}${value.toFixed(decimals)}%`;
+function toFixedOrDash(value: number | string | null | undefined, decimals = 1, withSign = true): string {
+  const numeric = toNumber(value);
+  if (numeric == null || numeric === 0) return DASH;
+  const sign = numeric > 0 && withSign ? '+' : '';
+  return `${sign}${numeric.toFixed(decimals)}%`;
 }
 
-function formatCurrency(value: number | null, signed = false): string {
-  if (value == null || value === 0) return DASH;
-  const abs = Math.abs(value);
-  const rendered = abs.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (!signed) {
-    return `$${rendered}`;
-  }
-  return `${value < 0 ? '-' : '+'}$${rendered}`;
+const fmt = {
+  currency(value: number | string | null | undefined, signed = false): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    });
+    const abs = Math.abs(numeric);
+    if (!signed) return formatter.format(abs);
+    return `${numeric < 0 ? '-' : '+'}${formatter.format(abs)}`;
+  },
+  integer(value: number | string | null | undefined): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(numeric);
+  },
+  decimal(value: number | string | null | undefined, digits = 2): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(numeric);
+  },
+  pct(value: number | string | null | undefined, digits = 2): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    return `${numeric.toFixed(digits)}%`;
+  },
+  capRate(value: number | string | null | undefined): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    return `${(numeric * 100).toFixed(2)}%`;
+  },
+  sf(value: number | string | null | undefined): string {
+    return this.integer(value);
+  },
+  perUnit(price: number | string | null | undefined, units: number | string | null | undefined): string {
+    const priceNumeric = toNumber(price);
+    const unitsNumeric = toNumber(units);
+    if (priceNumeric == null || unitsNumeric == null || unitsNumeric === 0) return DASH;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(priceNumeric / unitsNumeric);
+  },
+};
+
+function formatCurrency(value: number | string | null | undefined, signed = false): string {
+  return fmt.currency(value, signed);
 }
 
-function formatNumber(value: number | null, decimals = 0): string {
-  if (value == null || value === 0) return DASH;
-  return value.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function formatPercent(value: number | null, decimals = 2): string {
-  if (value == null || value === 0) return DASH;
-  return `${value.toFixed(decimals)}%`;
+function formatNumber(value: number | string | null | undefined, decimals = 0): string {
+  return decimals === 0 ? fmt.integer(value) : fmt.decimal(value, decimals);
 }
 
 function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -507,33 +544,45 @@ function DashNumericInput({
   placeholder,
   className,
   textEnd = true,
+  formatMode = 'integer',
+  decimalDigits = 2,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
   className?: string;
   textEnd?: boolean;
+  formatMode?: 'integer' | 'decimal' | 'raw';
+  decimalDigits?: number;
 }) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState('');
 
+  const displayValue = useMemo(() => {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    if (formatMode === 'decimal') return fmt.decimal(numeric, decimalDigits);
+    if (formatMode === 'raw') return value;
+    return fmt.integer(numeric);
+  }, [decimalDigits, formatMode, value]);
+
   useEffect(() => {
     if (!focused) {
       const numeric = toNumber(value);
-      setDraft(numeric == null || numeric === 0 ? '' : value);
+      setDraft(numeric == null || numeric === 0 ? '' : String(numeric));
     }
   }, [focused, value]);
 
   return (
     <input
       type="text"
-      className={combineClassNames('form-control form-control-sm', styles.smallControl, className)}
+      className={combineClassNames('form-control', styles.smallControl, className)}
       style={textEnd ? ({ textAlign: 'right' } as CSSProperties) : undefined}
-      value={focused ? draft : toNumber(value) == null || toNumber(value) === 0 ? DASH : value}
+      value={focused ? draft : displayValue}
       placeholder={placeholder}
       onFocus={() => {
         setFocused(true);
-        setDraft(toNumber(value) == null || toNumber(value) === 0 ? '' : value);
+        setDraft(toNumber(value) == null || toNumber(value) === 0 ? '' : String(toNumber(value)));
       }}
       onChange={(event) => {
         setDraft(event.target.value);
@@ -541,7 +590,19 @@ function DashNumericInput({
       onBlur={() => {
         setFocused(false);
         const parsed = toNumber(draft);
-        onChange(parsed == null || parsed === 0 ? '' : draft.replace(/,/g, ''));
+        if (parsed == null || parsed === 0) {
+          onChange('');
+          return;
+        }
+        if (formatMode === 'decimal') {
+          onChange(String(parsed));
+          return;
+        }
+        if (formatMode === 'raw') {
+          onChange(draft.replace(/,/g, ''));
+          return;
+        }
+        onChange(String(Math.round(parsed)));
       }}
     />
   );
@@ -603,9 +664,9 @@ export function SalesCompDetailModal({
       sale_date: '',
       sale_price: '',
       cap_rate: '',
-      property_rights: '',
-      financing_type: '',
-      sale_conditions: '',
+      property_rights: 'Fee Simple',
+      financing_type: 'Conventional',
+      sale_conditions: 'Arms Length',
       year_built: '',
       units: '',
       building_sf: '',
@@ -730,14 +791,14 @@ export function SalesCompDetailModal({
 
   const transactionSubtotalPct = useMemo(() => {
     return TRANSACTION_ADJUSTMENT_TYPES.reduce(
-      (sum, type) => sum + (getAdjustment(type).adjustment_pct ?? 0),
+      (sum, type) => sum + (toNumber(getAdjustment(type).adjustment_pct) ?? 0),
       0,
     );
   }, [getAdjustment]);
 
   const propertySubtotalPct = useMemo(() => {
     return PROPERTY_ADJUSTMENT_TYPES.reduce(
-      (sum, type) => sum + (getAdjustment(type).adjustment_pct ?? 0),
+      (sum, type) => sum + (toNumber(getAdjustment(type).adjustment_pct) ?? 0),
       0,
     );
   }, [getAdjustment]);
@@ -770,13 +831,9 @@ export function SalesCompDetailModal({
     return pricePerUnit * (1 + netAdjPct / 100);
   }, [netAdjPct, pricePerUnit]);
 
-  const marketConditionText = useMemo(() => `${formatMonthYear(watchedSaleDate)} → Present`, [watchedSaleDate]);
+  const marketConditionText = useMemo(() => formatMonthYear(watchedSaleDate), [watchedSaleDate]);
 
-  const locationComparison = useMemo(() => {
-    const compCity = watchedCity || 'Comp City';
-    const subjCity = subject?.city || 'Subject City';
-    return `${subjCity} → ${compCity}`;
-  }, [subject?.city, watchedCity]);
+  const locationDisplay = useMemo(() => watchedCity || 'Comp City', [watchedCity]);
 
   const lotSizeSf = useMemo(() => {
     if (landAreaAcresNum == null) return null;
@@ -847,9 +904,9 @@ export function SalesCompDetailModal({
         sale_date: '',
         sale_price: '',
         cap_rate: '',
-        property_rights: '',
-        financing_type: '',
-        sale_conditions: '',
+        property_rights: 'Fee Simple',
+        financing_type: 'Conventional',
+        sale_conditions: 'Arms Length',
         year_built: '',
         units: '',
         building_sf: '',
@@ -896,8 +953,10 @@ export function SalesCompDetailModal({
         const existingAdjustments = (comp.adjustments ?? []).map((item) => ({
           adjustment_id: item.adjustment_id,
           adjustment_type: normalizeAdjustmentType(item.adjustment_type),
-          adjustment_pct: item.user_adjustment_pct ?? item.adjustment_pct,
-          adjustment_amount: item.adjustment_amount,
+          adjustment_pct:
+            toNumber(item.user_adjustment_pct as number | string | null | undefined) ??
+            toNumber(item.adjustment_pct as number | string | null | undefined),
+          adjustment_amount: toNumber(item.adjustment_amount as number | string | null | undefined),
           user_notes: item.user_notes ?? '',
           justification: item.justification ?? '',
           subject_value: item.subject_value ?? '',
@@ -966,9 +1025,9 @@ export function SalesCompDetailModal({
           sale_date: readString(comp.sale_date),
           sale_price: readString(comp.sale_price),
           cap_rate: readString(comp.cap_rate),
-          property_rights: readString(comp.property_rights),
-          financing_type: readString((comp as unknown as Record<string, unknown>).financing_type),
-          sale_conditions: readString(comp.sale_conditions),
+          property_rights: readString(comp.property_rights) || 'Fee Simple',
+          financing_type: readString((comp as unknown as Record<string, unknown>).financing_type) || 'Conventional',
+          sale_conditions: readString(comp.sale_conditions) || 'Arms Length',
           year_built: readString(comp.year_built),
           units: readString(comp.units),
           building_sf: readString(comp.building_sf),
@@ -1086,12 +1145,14 @@ export function SalesCompDetailModal({
           Boolean(row.ai_accepted)
         );
       })
-      .map((row) => ({
+      .map((row) => {
+        const normalizedPct = toNumber(row.adjustment_pct);
+        return {
         adjustment_type: row.adjustment_type,
-        adjustment_pct: row.adjustment_pct,
-        adjustment_amount: salePriceNum == null || row.adjustment_pct == null
+        adjustment_pct: normalizedPct,
+        adjustment_amount: salePriceNum == null || normalizedPct == null
           ? null
-          : salePriceNum * (row.adjustment_pct / 100),
+          : salePriceNum * (normalizedPct / 100),
         user_notes: row.user_notes || null,
         justification: row.justification || null,
         subject_value: row.subject_value || null,
@@ -1099,7 +1160,8 @@ export function SalesCompDetailModal({
         landscaper_analysis: row.landscaper_analysis || null,
         ai_accepted: Boolean(row.ai_accepted),
         confidence_score: row.confidence_score ?? null,
-      }));
+      };
+      });
 
     const serializedUnitMix = values.unit_mix
       .map((row) => ({
@@ -1243,6 +1305,106 @@ export function SalesCompDetailModal({
               <button type="button" className="btn-close" onClick={onClose} aria-label="Close" />
             </div>
 
+            <div className={styles.mapCard}>
+              {compCoords && subjectCoords ? (
+                <div className={styles.mapFrame}>
+                  <Map
+                    ref={mapRef}
+                    mapStyle={MAP_STYLE}
+                    initialViewState={{
+                      latitude: (compCoords.lat + subjectCoords.lat) / 2,
+                      longitude: (compCoords.lng + subjectCoords.lng) / 2,
+                      zoom: 11,
+                    }}
+                    onMove={() => updateLineProjection()}
+                    onResize={() => updateLineProjection()}
+                    onLoad={() => updateLineProjection()}
+                    style={{ width: '100%', height: '100%' }}
+                    scrollZoom={false}
+                  >
+                    <NavigationControl position="bottom-right" />
+                    <Marker latitude={subjectCoords.lat} longitude={subjectCoords.lng}>
+                      <div className="d-flex flex-column align-items-center">
+                        <div className={combineClassNames(styles.pin, styles.pinSubject)}>S</div>
+                        <div className={styles.pinLabel}>
+                          {subject?.name || 'Subject'} {subject?.city ? `• ${subject.city}` : ''}
+                        </div>
+                      </div>
+                    </Marker>
+                    <Marker latitude={compCoords.lat} longitude={compCoords.lng}>
+                      <div className="d-flex flex-column align-items-center">
+                        <div className={combineClassNames(styles.pin, styles.pinComp)}>{compNumber ?? 1}</div>
+                        <div className={styles.pinLabel}>
+                          {(watchedPropertyName || 'Comparable').toString()} {watchedCity ? `• ${watchedCity}` : ''}
+                        </div>
+                      </div>
+                    </Marker>
+                  </Map>
+
+                  {linePixels && (
+                    <div className={styles.mapLineLayer}>
+                      <svg width="100%" height="100%">
+                        <line
+                          x1={linePixels.x1}
+                          y1={linePixels.y1}
+                          x2={linePixels.x2}
+                          y2={linePixels.y2}
+                          stroke="var(--cui-info)"
+                          strokeDasharray="6 5"
+                          strokeWidth="2"
+                        />
+                      </svg>
+                      <div
+                        className={styles.mapDistanceChip}
+                        style={{
+                          left: `${(linePixels.x1 + linePixels.x2) / 2}px`,
+                          top: `${(linePixels.y1 + linePixels.y2) / 2}px`,
+                        }}
+                      >
+                        {distanceMiles == null ? DASH : `${distanceMiles.toFixed(2)} mi`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.mapPlaceholder}>Map will populate when address is geocoded</div>
+              )}
+            </div>
+
+            <div className={styles.addressBar}>
+              <div className={styles.addressGrid}>
+                <div>
+                  <label className={styles.fieldLabel}>Property Name</label>
+                  <input className={combineClassNames('form-control', styles.smallControl)} {...register('property_name')} />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>Address</label>
+                  <input className={combineClassNames('form-control', styles.smallControl)} {...register('address')} />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>City</label>
+                  <input className={combineClassNames('form-control', styles.smallControl)} {...register('city')} />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>State</label>
+                  <input className={combineClassNames('form-control', styles.smallControl)} {...register('state')} />
+                </div>
+                <div>
+                  <label className={styles.fieldLabel}>Zip</label>
+                  <input className={combineClassNames('form-control', styles.smallControl)} {...register('zip')} />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.kpiStrip}>
+              <KpiItem title="Sale Price" value={formatCurrency(salePriceNum)} />
+              <KpiItem title="Sale Date" value={watchedSaleDate || DASH} />
+              <KpiItem title="$/Unit" value={fmt.perUnit(salePriceNum, unitsNum)} />
+              <KpiItem title="Cap Rate" value={fmt.capRate(capRateNum)} />
+              <KpiItem title="Net Adj" value={toFixedOrDash(netAdjPct)} className={signedValueClass(netAdjPct)} />
+              <KpiItem title="Adj $/Unit" value={formatCurrency(adjPricePerUnit)} className={signedValueClass(adjPricePerUnit)} />
+            </div>
+
             <div ref={modalBodyRef} className={styles.body}>
               {loading ? (
                 <div className={combineClassNames('py-5 text-center small', styles.mutedText)}>
@@ -1250,106 +1412,6 @@ export function SalesCompDetailModal({
                 </div>
               ) : (
                 <>
-                  <div className={styles.mapCard}>
-                    {compCoords && subjectCoords ? (
-                      <div className={styles.mapFrame}>
-                        <Map
-                          ref={mapRef}
-                          mapStyle={MAP_STYLE}
-                          initialViewState={{
-                            latitude: (compCoords.lat + subjectCoords.lat) / 2,
-                            longitude: (compCoords.lng + subjectCoords.lng) / 2,
-                            zoom: 11,
-                          }}
-                          onMove={() => updateLineProjection()}
-                          onResize={() => updateLineProjection()}
-                          onLoad={() => updateLineProjection()}
-                          style={{ width: '100%', height: '100%' }}
-                          scrollZoom={false}
-                        >
-                          <NavigationControl position="bottom-right" />
-                          <Marker latitude={subjectCoords.lat} longitude={subjectCoords.lng}>
-                            <div className="d-flex flex-column align-items-center">
-                              <div className={combineClassNames(styles.pin, styles.pinSubject)}>S</div>
-                              <div className={styles.pinLabel}>
-                                {subject?.name || 'Subject'} {subject?.city ? `• ${subject.city}` : ''}
-                              </div>
-                            </div>
-                          </Marker>
-                          <Marker latitude={compCoords.lat} longitude={compCoords.lng}>
-                            <div className="d-flex flex-column align-items-center">
-                              <div className={combineClassNames(styles.pin, styles.pinComp)}>{compNumber ?? 1}</div>
-                              <div className={styles.pinLabel}>
-                                {(watchedPropertyName || 'Comparable').toString()} {watchedCity ? `• ${watchedCity}` : ''}
-                              </div>
-                            </div>
-                          </Marker>
-                        </Map>
-
-                        {linePixels && (
-                          <div className={styles.mapLineLayer}>
-                            <svg width="100%" height="100%">
-                              <line
-                                x1={linePixels.x1}
-                                y1={linePixels.y1}
-                                x2={linePixels.x2}
-                                y2={linePixels.y2}
-                                stroke="var(--cui-info)"
-                                strokeDasharray="6 5"
-                                strokeWidth="2"
-                              />
-                            </svg>
-                            <div
-                              className={styles.mapDistanceChip}
-                              style={{
-                                left: `${(linePixels.x1 + linePixels.x2) / 2}px`,
-                                top: `${(linePixels.y1 + linePixels.y2) / 2}px`,
-                              }}
-                            >
-                              {distanceMiles == null ? DASH : `${distanceMiles.toFixed(2)} mi`}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className={styles.mapPlaceholder}>Map will populate when address is geocoded</div>
-                    )}
-                  </div>
-
-                  <div className={styles.addressBar}>
-                    <div className={styles.addressGrid}>
-                      <div>
-                        <label className={styles.fieldLabel}>Property Name</label>
-                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('property_name')} />
-                      </div>
-                      <div>
-                        <label className={styles.fieldLabel}>Address</label>
-                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('address')} />
-                      </div>
-                      <div>
-                        <label className={styles.fieldLabel}>City</label>
-                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('city')} />
-                      </div>
-                      <div>
-                        <label className={styles.fieldLabel}>State</label>
-                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('state')} />
-                      </div>
-                      <div>
-                        <label className={styles.fieldLabel}>Zip</label>
-                        <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('zip')} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.kpiStrip}>
-                    <KpiItem title="Sale Price" value={formatCurrency(salePriceNum)} />
-                    <KpiItem title="Sale Date" value={watchedSaleDate || DASH} />
-                    <KpiItem title="$/Unit" value={formatCurrency(pricePerUnit)} />
-                    <KpiItem title="Cap Rate" value={formatPercent(capRateNum)} />
-                    <KpiItem title="Net Adj" value={toFixedOrDash(netAdjPct)} className={signedValueClass(netAdjPct)} />
-                    <KpiItem title="Adj $/Unit" value={formatCurrency(adjPricePerUnit)} className={signedValueClass(adjPricePerUnit)} />
-                  </div>
-
                   <Section
                     title="Transaction"
                     open={accordionOpen.transaction}
@@ -1382,7 +1444,7 @@ export function SalesCompDetailModal({
                     <div className={styles.fieldGridRow}>
                       <div className={styles.fieldName}>Sale Date</div>
                       <div>
-                        <input type="date" className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('sale_date')} />
+                        <input type="date" className={combineClassNames('form-control', styles.smallControl)} {...register('sale_date')} />
                       </div>
                       <div />
                       <div />
@@ -1403,6 +1465,7 @@ export function SalesCompDetailModal({
                                 onChange={field.onChange}
                                 textEnd={false}
                                 className={styles.prefixedInput}
+                                formatMode="integer"
                               />
                             )}
                           />
@@ -1416,8 +1479,7 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Property Rights"
                       valueNode={
-                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('property_rights')}>
-                          <option value="">Select</option>
+                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('property_rights')}>
                           {PROPERTY_RIGHTS_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
@@ -1432,8 +1494,7 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Financing"
                       valueNode={
-                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('financing_type')}>
-                          <option value="">Select</option>
+                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('financing_type')}>
                           {FINANCING_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
@@ -1448,8 +1509,7 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Sale Conditions"
                       valueNode={
-                        <select className={combineClassNames('form-select form-select-sm', styles.smallControl)} {...register('sale_conditions')}>
-                          <option value="">Select</option>
+                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('sale_conditions')}>
                           {SALE_CONDITIONS_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
@@ -1510,7 +1570,7 @@ export function SalesCompDetailModal({
 
                     <AdjustmentRow
                       label="Location"
-                      valueNode={<CalculatedBadgeValue value={locationComparison} badge="VS SUBJ" />}
+                      valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('city')} />}
                       adjustment={getAdjustment('location')}
                       adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('location').adjustment_pct ?? 0) / 100)}
                       onPctChange={(nextPct) => setAdjustmentValue('location', { adjustment_pct: nextPct })}
@@ -1526,7 +1586,7 @@ export function SalesCompDetailModal({
                               control={control}
                               name="year_built"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="integer" />
                               )}
                             />
                           }
@@ -1543,7 +1603,7 @@ export function SalesCompDetailModal({
                               control={control}
                               name="units"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="integer" />
                               )}
                             />
                           }
@@ -1560,7 +1620,7 @@ export function SalesCompDetailModal({
                               control={control}
                               name="building_sf"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="integer" />
                               )}
                             />
                           }
@@ -1577,7 +1637,7 @@ export function SalesCompDetailModal({
                               control={control}
                               name="stories"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="integer" />
                               )}
                             />
                           }
@@ -1594,7 +1654,7 @@ export function SalesCompDetailModal({
                               control={control}
                               name="land_area_acres"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} />
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="decimal" decimalDigits={2} />
                               )}
                             />
                           }
@@ -1607,7 +1667,7 @@ export function SalesCompDetailModal({
                         <div className={styles.fieldGridRow}>
                           <div className={styles.fieldName}>Lot Size (SF)</div>
                           <div>
-                            <CalculatedBadgeValue value={formatNumber(lotSizeSf)} badge="CALC" />
+                            <CalculatedBadgeValue value={fmt.sf(lotSizeSf)} badge="CALC" />
                           </div>
                           <div />
                           <div className={combineClassNames(styles.adjAmount, styles.valueNeutral)}>{DASH}</div>
@@ -1621,7 +1681,12 @@ export function SalesCompDetailModal({
                               control={control}
                               name="parking_spaces"
                               render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} className={styles.parkingInput} />
+                                <DashNumericInput
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  className={styles.parkingInput}
+                                  formatMode="integer"
+                                />
                               )}
                             />
                           </div>
@@ -1651,7 +1716,7 @@ export function SalesCompDetailModal({
 
                         <AdjustmentRow
                           label="Quality"
-                          valueNode={<input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('quality')} />}
+                          valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('quality')} />}
                           adjustment={getAdjustment('physical_condition')}
                           adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_condition').adjustment_pct ?? 0) / 100)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_condition', { adjustment_pct: nextPct })}
@@ -1660,7 +1725,7 @@ export function SalesCompDetailModal({
 
                         <AdjustmentRow
                           label="Other"
-                          valueNode={<input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('property_other')} />}
+                          valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('property_other')} />}
                           adjustment={getAdjustment('other')}
                           adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('other').adjustment_pct ?? 0) / 100)}
                           onPctChange={(nextPct) => setAdjustmentValue('other', { adjustment_pct: nextPct })}
@@ -1672,7 +1737,7 @@ export function SalesCompDetailModal({
                         <div className={styles.fieldGridRow}>
                           <div className={styles.fieldName}>Zoning</div>
                           <div>
-                            <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('zoning')} />
+                            <input className={combineClassNames('form-control', styles.smallControl)} {...register('zoning')} />
                           </div>
                           <div />
                           <div className={styles.adjAmount}>{DASH}</div>
@@ -1682,7 +1747,7 @@ export function SalesCompDetailModal({
                         <div className={styles.fieldGridRow}>
                           <div className={styles.fieldName}>Entitlements</div>
                           <div>
-                            <input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register('entitlements')} />
+                            <input className={combineClassNames('form-control', styles.smallControl)} {...register('entitlements')} />
                           </div>
                           <div />
                           <div className={styles.adjAmount}>{DASH}</div>
@@ -1702,7 +1767,7 @@ export function SalesCompDetailModal({
                     <div className={styles.metricsStrip}>
                       <MetricCard label="$/Unit" value={formatCurrency(pricePerUnit)} />
                       <MetricCard label="$/SF" value={formatCurrency(pricePerSf)} />
-                      <MetricCard label="Cap Rate" value={formatPercent(capRateNum)} />
+                      <MetricCard label="Cap Rate" value={fmt.capRate(capRateNum)} />
                       <MetricCard label="GRM" value={DASH} />
                       {/* GRM requires gross_income which is not on comp schema yet */}
                     </div>
@@ -1755,21 +1820,21 @@ export function SalesCompDetailModal({
                         <tbody>
                           {unitMixArray.fields.map((field, index) => (
                             <tr key={field.id}>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`unit_mix.${index}.unit_type`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bed_count`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bath_count`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_count`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_pct`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.avg_unit_sf`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`unit_mix.${index}.unit_type`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bed_count`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.bath_count`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_count`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.unit_pct`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.avg_unit_sf`)} /></td>
                               <td>
                                 <div className="d-flex align-items-center gap-1">
-                                  <input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_min`)} />
+                                  <input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_min`)} />
                                   <span className={styles.sectionMeta}>-</span>
-                                  <input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_max`)} />
+                                  <input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_max`)} />
                                 </div>
                               </td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_per_sf_min`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.vacant_units`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.asking_rent_per_sf_min`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl, 'text-end')} {...register(`unit_mix.${index}.vacant_units`)} /></td>
                               <td>
                                 <button type="button" className="btn btn-ghost-secondary btn-sm" onClick={() => unitMixArray.remove(index)}>×</button>
                               </td>
@@ -1818,14 +1883,21 @@ export function SalesCompDetailModal({
                           {contactsArray.fields.map((field, index) => (
                             <tr key={field.id}>
                               <td>
-                                <span className={combineClassNames(styles.roleBadge, roleClassName(watchedContacts[index]?.role ?? 'buyer'))}>
-                                  {ROLE_LABEL[watchedContacts[index]?.role ?? 'buyer']}
-                                </span>
+                                <select
+                                  className={combineClassNames('form-select', styles.smallControl)}
+                                  {...register(`contacts.${index}.role`)}
+                                >
+                                  {BASE_CONTACT_ROLES.map((role) => (
+                                    <option key={role} value={role}>
+                                      {ROLE_LABEL[role]}
+                                    </option>
+                                  ))}
+                                </select>
                               </td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.name`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.company`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.phone`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`contacts.${index}.email`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`contacts.${index}.name`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`contacts.${index}.company`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`contacts.${index}.phone`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`contacts.${index}.email`)} /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -1855,7 +1927,7 @@ export function SalesCompDetailModal({
                       <div className={styles.verificationGrid}>
                         <div className={styles.fieldLabel}>Confirmed By</div>
                         <select
-                          className={combineClassNames('form-select form-select-sm', styles.smallControl)}
+                          className={combineClassNames('form-select', styles.smallControl)}
                           value={verificationSelectValue}
                           onChange={(event) => onSelectVerificationSource(event.target.value)}
                         >
@@ -1874,7 +1946,7 @@ export function SalesCompDetailModal({
                           render={({ field }) => (
                             <input
                               type="date"
-                              className={combineClassNames('form-control form-control-sm', styles.smallControl)}
+                              className={combineClassNames('form-control', styles.smallControl)}
                               value={field.value}
                               onChange={(event) => {
                                 field.onChange(event.target.value);
@@ -1917,11 +1989,27 @@ export function SalesCompDetailModal({
                         <tbody>
                           {historyArray.fields.map((field, index) => (
                             <tr key={field.id}>
-                              <td><input type="date" className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.sale_date`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`history.${index}.sale_price`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl, 'text-end')} {...register(`history.${index}.price_per_unit`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.buyer_name`)} /></td>
-                              <td><input className={combineClassNames('form-control form-control-sm', styles.smallControl)} {...register(`history.${index}.seller_name`)} /></td>
+                              <td><input type="date" className={combineClassNames('form-control', styles.smallControl)} {...register(`history.${index}.sale_date`)} /></td>
+                              <td>
+                                <Controller
+                                  control={control}
+                                  name={`history.${index}.sale_price`}
+                                  render={({ field: rowField }) => (
+                                    <DashNumericInput value={rowField.value} onChange={rowField.onChange} formatMode="integer" />
+                                  )}
+                                />
+                              </td>
+                              <td>
+                                <Controller
+                                  control={control}
+                                  name={`history.${index}.price_per_unit`}
+                                  render={({ field: rowField }) => (
+                                    <DashNumericInput value={rowField.value} onChange={rowField.onChange} formatMode="integer" />
+                                  )}
+                                />
+                              </td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`history.${index}.buyer_name`)} /></td>
+                              <td><input className={combineClassNames('form-control', styles.smallControl)} {...register(`history.${index}.seller_name`)} /></td>
                               <td><button type="button" className="btn btn-ghost-secondary btn-sm" onClick={() => historyArray.remove(index)}>×</button></td>
                             </tr>
                           ))}
@@ -1968,7 +2056,7 @@ export function SalesCompDetailModal({
                     open={accordionOpen.notes}
                     onToggle={() => setAccordionOpen((prev) => ({ ...prev, notes: !prev.notes }))}
                   >
-                    <textarea className={combineClassNames('form-control form-control-sm', styles.notesArea)} {...register('notes')} />
+                    <textarea className={combineClassNames('form-control', styles.notesArea)} {...register('notes')} />
                   </Section>
 
                   {activeOverlay && (
@@ -2017,7 +2105,7 @@ export function SalesCompDetailModal({
                       <div className={styles.overlayFooter}>
                         <div className={combineClassNames('small mb-1', styles.mutedText)}>Prompt</div>
                         <textarea
-                          className={combineClassNames('form-control form-control-sm mb-2', styles.notesArea)}
+                          className={combineClassNames('form-control mb-2', styles.notesArea)}
                           value={overlayMessage}
                           onChange={(event) => setOverlayMessage(event.target.value)}
                         />
@@ -2075,11 +2163,18 @@ function Section({
   landscaperButton?: ReactNode;
 }) {
   return (
-    <section className={combineClassNames(styles.section, open && styles.sectionOpen)}>
-      <button
-        type="button"
-        className={combineClassNames('d-flex align-items-center', styles.sectionHeader, open && styles.sectionHeaderOpen)}
+    <section className={combineClassNames('card mb-2', styles.section, open && styles.sectionOpen)}>
+      <div
+        role="button"
+        tabIndex={0}
+        className={combineClassNames('card-header d-flex align-items-center', styles.sectionHeader, open && styles.sectionHeaderOpen)}
         onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onToggle();
+          }
+        }}
       >
         <span className={combineClassNames('d-flex align-items-center gap-2', styles.sectionHeading)}>
           <span className={combineClassNames(styles.chevron, open && styles.chevronOpen)}>▸</span>
@@ -2087,8 +2182,8 @@ function Section({
           {landscaperButton}
         </span>
         {headerMeta && <span className={styles.sectionMeta}>{headerMeta}</span>}
-      </button>
-      {open && <div className={styles.sectionBody}>{children}</div>}
+      </div>
+      {open && <div className={combineClassNames('card-body', styles.sectionBody)}>{children}</div>}
     </section>
   );
 }
@@ -2120,11 +2215,11 @@ function NetCell({ label, value, className }: { label: string; value: string; cl
   );
 }
 
-function CalculatedBadgeValue({ value, badge }: { value: string; badge: string }) {
+function CalculatedBadgeValue({ value, badge }: { value: string; badge?: string }) {
   return (
     <div className={styles.calcValue}>
       <span>{value}</span>
-      <span className={styles.calcBadge}>{badge}</span>
+      {badge ? <span className={styles.calcBadge}>{badge}</span> : null}
     </div>
   );
 }
