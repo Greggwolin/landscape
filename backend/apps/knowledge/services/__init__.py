@@ -86,6 +86,12 @@ from .conflict_resolver import (
     compare_unit_counts,
 )
 
+# Subtype Classification
+from .subtype_classifier import (
+    DocumentSubtypeClassifier,
+    SubtypeResult,
+)
+
 # OpEx Utilities
 from .opex_utils import (
     normalize_expense_label,
@@ -136,6 +142,9 @@ __all__ = [
     'apply_conflict_resolutions',
     'compare_rent_totals',
     'compare_unit_counts',
+    # Subtype Classification
+    'DocumentSubtypeClassifier',
+    'SubtypeResult',
     # OpEx Utilities
     'normalize_expense_label',
     'strip_gl_code',

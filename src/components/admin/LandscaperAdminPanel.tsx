@@ -26,17 +26,17 @@ interface LandscaperSection {
 
 const LANDSCAPER_SECTIONS: LandscaperSection[] = [
   {
-    key: 'extraction_mappings',
-    label: 'AI Extraction Mappings',
-    description: 'Configure field mappings for AI document extraction',
-    icon: <Sparkles size={18} />,
-    available: true
-  },
-  {
     key: 'knowledge_library',
     label: 'Knowledge Library',
     description: 'Search, browse, and manage Landscaper\u2019s document knowledge base',
     icon: <BookOpen size={18} />,
+    available: true
+  },
+  {
+    key: 'extraction_mappings',
+    label: 'AI Extraction Mappings',
+    description: 'Configure field mappings for AI document extraction',
+    icon: <Sparkles size={18} />,
     available: true
   },
   {
@@ -63,7 +63,7 @@ const LANDSCAPER_SECTIONS: LandscaperSection[] = [
 ];
 
 export default function LandscaperAdminPanel() {
-  const [expandedSection, setExpandedSection] = useState<string | null>('extraction_mappings');
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const toggleSection = (key: string, available: boolean) => {
     if (!available) return;

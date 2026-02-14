@@ -19,6 +19,7 @@ interface DocumentPreviewPanelProps {
   document: DMSDocument;
   onClose: () => void;
   onDocumentChange?: () => void;
+  folderDocType?: string;
 }
 
 export default function DocumentPreviewPanel({
@@ -26,6 +27,7 @@ export default function DocumentPreviewPanel({
   document: doc,
   onClose,
   onDocumentChange,
+  folderDocType,
 }: DocumentPreviewPanelProps) {
   const [showChatModal, setShowChatModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
@@ -157,9 +159,9 @@ export default function DocumentPreviewPanel({
           <ProfileForm
             docId={parseInt(doc.doc_id)}
             projectId={projectId}
-            docType={doc.doc_type || undefined}
+            docType={doc.doc_type || folderDocType || undefined}
             initialProfile={{
-              doc_type: doc.doc_type || '',
+              doc_type: doc.doc_type || folderDocType || '',
               description: description || '',
               tags: doc.tags || [],
               doc_date: doc.doc_date || '',

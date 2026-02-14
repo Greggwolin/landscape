@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { CSpinner } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilSend, cilLightbulb, cilBook, cilCog, cilList } from '@coreui/icons';
 import SourceToggle, { type SourceFilter } from './SourceToggle';
 import FilterColumns, { type Facets, type ActiveFilters } from './FilterColumns';
 import CounterBar from './CounterBar';
 import UploadDropZone from './UploadDropZone';
 import DocResultCard, { type DocResult } from './DocResultCard';
-import DocumentChatModal from '@/components/dms/modals/DocumentChatModal';
 import './knowledge-library.css';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -42,9 +43,13 @@ export default function KnowledgeLibraryPanel() {
   const [documents, setDocuments] = useState<DocResult[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
 
-  // Document preview state
-  const [previewDocId, setPreviewDocId] = useState<number | null>(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
+  // Inline accordion expansion state
+  const [expandedDocId, setExpandedDocId] = useState<number | null>(null);
+
+  // Chat state for the inline accordion
+  interface ChatMessage { role: 'user' | 'assistant'; content: string; timestamp: Date; }
+  const [chatHistories, setChatHistories] = useState<Record<number, ChatMessage[]>>({});
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const fetchFacets = useCallback(async (
     currentSource: SourceFilter,
@@ -218,9 +223,94 @@ export default function KnowledgeLibraryPanel() {
   };
 
   const handlePreview = (docId: number) => {
-    setPreviewDocId(docId);
-    setPreviewVisible(true);
+    // Open the actual document file (PDF, etc.) in a new tab
+    const doc = documents.find((d) => d.doc_id === docId);
+    if (!doc) return;
+    const uri = doc.storage_uri || '';
+
+    if (uri.includes('utfs.io')) {
+      // Real UploadThing URL — open directly
+      window.open(uri, '_blank');
+    } else if (uri.startsWith('http') && !uri.includes('placeholder.local')) {
+      // Other real URL (e.g., S3, CDN)
+      window.open(uri, '_blank');
+    } else if (uri && !uri.startsWith('http') && !uri.startsWith('/Users/')) {
+      // Relative path (e.g., /media/uploads/...) — prepend Django URL
+      window.open(`${DJANGO_API_URL}${uri}`, '_blank');
+    } else {
+      // Placeholder, local filesystem path, or missing — no browser-accessible file
+      alert(`No file available for preview.\n\nThis document ("${doc.name}") does not have a browser-accessible file URL. Re-upload the document to enable preview.`);
+    }
   };
+
+  const handleRowClick = (docId: number) => {
+    setExpandedDocId((prev) => (prev === docId ? null : docId));
+  };
+
+  const handleSendMessage = useCallback(async (docId: number, projectId: number, message: string, documentKey?: string | null) => {
+    const userMessage: ChatMessage = { role: 'user', content: message, timestamp: new Date() };
+    setChatHistories((prev) => ({
+      ...prev,
+      [docId]: [...(prev[docId] || []), userMessage],
+    }));
+    setIsChatLoading(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const tokens = localStorage.getItem('auth_tokens');
+        const accessToken = tokens ? JSON.parse(tokens).access : null;
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+      } catch { /* best-effort */ }
+
+      // Route to the correct chat endpoint based on document type:
+      // - Platform Knowledge (negative doc_id + document_key) → /api/platform-knowledge/{key}/chat
+      // - Core doc (positive doc_id + project_id) → /api/projects/{pid}/dms/docs/{did}/chat
+      const isPlatformKnowledge = docId < 0 && documentKey;
+      const chatUrl = isPlatformKnowledge
+        ? `/api/platform-knowledge/${documentKey}/chat`
+        : `/api/projects/${projectId}/dms/docs/${docId}/chat`;
+
+      const response = await fetch(chatUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Chat request failed');
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: data.content || data.response || data.answer || 'No response received',
+        timestamp: new Date(),
+      };
+      setChatHistories((prev) => ({
+        ...prev,
+        [docId]: [...(prev[docId] || []), assistantMessage],
+      }));
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to get response'}`,
+        timestamp: new Date(),
+      };
+      setChatHistories((prev) => ({
+        ...prev,
+        [docId]: [...(prev[docId] || []), errorMessage],
+      }));
+    } finally {
+      setIsChatLoading(false);
+    }
+  }, []);
+
+  const handleQuickAction = useCallback((docId: number, projectId: number, action: string, documentKey?: string | null) => {
+    const prompts: Record<string, string> = {
+      summarize: 'Please provide a concise summary of this document, highlighting the main points and key takeaways.',
+      key_points: 'What are the key points and important details in this document?',
+      extract_data: 'What key data points, numbers, dates, or financial figures can you extract from this document?',
+      qa_prep: 'What questions might someone ask about this document and what are the answers based on its content?',
+    };
+    handleSendMessage(docId, projectId, prompts[action], documentKey);
+  }, [handleSendMessage]);
 
   const handleUploadComplete = () => {
     void fetchFacets(source, activeFilters);
@@ -285,15 +375,30 @@ export default function KnowledgeLibraryPanel() {
               </button>
             </div>
             <div className="kl-doc-list-scroll">
-              {documents.map((doc) => (
-                <DocResultCard
-                  key={doc.doc_id}
-                  doc={doc}
-                  isSelected={selectedDocs.has(doc.doc_id)}
-                  onToggleSelect={handleToggleSelect}
-                  onPreview={handlePreview}
-                />
-              ))}
+              {documents.map((doc) => {
+                const isExpanded = expandedDocId === doc.doc_id;
+                return (
+                  <React.Fragment key={doc.doc_id}>
+                    <DocResultCard
+                      doc={doc}
+                      isSelected={selectedDocs.has(doc.doc_id)}
+                      isExpanded={isExpanded}
+                      onToggleSelect={handleToggleSelect}
+                      onPreview={handlePreview}
+                      onRowClick={handleRowClick}
+                    />
+                    {isExpanded && (
+                      <KLAccordionPanel
+                        doc={doc}
+                        chatHistory={chatHistories[doc.doc_id] || []}
+                        isChatLoading={isChatLoading}
+                        onSendMessage={(msg) => handleSendMessage(doc.doc_id, doc.project_id ?? 0, msg, doc.document_key)}
+                        onQuickAction={(action) => handleQuickAction(doc.doc_id, doc.project_id ?? 0, action, doc.document_key)}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </div>
             {totalCount > MAX_AUTO_DOCS && (
               <div className="kl-doc-list-overflow">
@@ -314,25 +419,170 @@ export default function KnowledgeLibraryPanel() {
         onUploadComplete={handleUploadComplete}
       />
 
-      {/* Document Chat Modal */}
-      {previewDocId != null && (() => {
-        const previewDoc = documents.find((d) => d.doc_id === previewDocId);
-        return (
-          <DocumentChatModal
-            visible={previewVisible}
-            onClose={() => {
-              setPreviewVisible(false);
-              setPreviewDocId(null);
-            }}
-            projectId={0}
-            document={{
-              doc_id: previewDocId,
-              filename: previewDoc?.name || `Document ${previewDocId}`,
-              version_number: 1,
-            }}
-          />
-        );
-      })()}
+    </div>
+  );
+}
+
+
+/* ─── Inline Accordion Panel (Quick Actions + Chat) ─── */
+interface ChatMsg { role: 'user' | 'assistant'; content: string; timestamp: Date; }
+
+interface KLAccordionPanelProps {
+  doc: DocResult;
+  chatHistory: ChatMsg[];
+  isChatLoading: boolean;
+  onSendMessage: (message: string) => Promise<void>;
+  onQuickAction: (action: string) => void;
+}
+
+function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQuickAction }: KLAccordionPanelProps) {
+  const [inputValue, setInputValue] = React.useState('');
+  const [isSending, setIsSending] = React.useState(false);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Scroll so the clicked card + accordion panel are visible within the scroll container
+  React.useEffect(() => {
+    // Double-rAF ensures DOM has painted the expanded panel before we measure
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = panelRef.current;
+        if (!el) return;
+        // Find the scroll container (.kl-doc-list-scroll)
+        const scrollContainer = el.closest('.kl-doc-list-scroll') as HTMLElement | null;
+        const card = el.previousElementSibling as HTMLElement | null;
+        if (scrollContainer && card) {
+          // Scroll the card to the top of the scroll container so
+          // both card header and accordion panel below it are visible
+          const cardTop = card.offsetTop;
+          scrollContainer.scrollTo({ top: cardTop, behavior: 'smooth' });
+        } else {
+          // Fallback: scroll the panel itself into view
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    });
+  }, []);
+
+  React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatHistory]);
+  React.useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isSending) return;
+    const message = inputValue.trim();
+    setInputValue('');
+    setIsSending(true);
+    try { await onSendMessage(message); } finally { setIsSending(false); }
+  };
+
+  const busy = isSending || isChatLoading;
+
+  const quickActions = [
+    { key: 'summarize', label: 'Summarize', icon: cilLightbulb, color: 'var(--cui-warning)' },
+    { key: 'key_points', label: 'Key points', icon: cilList, color: 'var(--cui-success)' },
+    { key: 'extract_data', label: 'Extract data', icon: cilBook, color: 'var(--cui-primary)' },
+    { key: 'qa_prep', label: 'Q&A prep', icon: cilCog, color: 'var(--cui-info)' },
+  ];
+
+  return (
+    <div ref={panelRef} className="kl-accordion-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="kl-accordion-inner">
+        {/* Left panel — Quick Actions */}
+        <div className="kl-accordion-sidebar">
+          <div className="kl-accordion-sidebar-title">Quick Actions</div>
+          {quickActions.map((qa) => (
+            <button
+              key={qa.key}
+              type="button"
+              className="kl-accordion-action-btn"
+              disabled={busy}
+              onClick={() => onQuickAction(qa.key)}
+              style={{ opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer' }}
+            >
+              <CIcon icon={qa.icon} style={{ width: 16, height: 16, color: qa.color }} />
+              <span>{qa.label}</span>
+            </button>
+          ))}
+          <div className="kl-accordion-chatting-with">
+            <div style={{ fontSize: '11px', color: 'var(--cui-tertiary-color)' }}>Chatting with:</div>
+            <div
+              style={{ fontSize: '12px', fontWeight: 500, color: 'var(--cui-secondary-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              title={doc.name}
+            >
+              {doc.name}
+            </div>
+          </div>
+        </div>
+
+        {/* Right panel — Chat */}
+        <div className="kl-accordion-chat">
+          <div className="kl-accordion-messages">
+            {chatHistory.length === 0 ? (
+              <div className="kl-accordion-empty">
+                <span style={{ fontSize: '30px', marginBottom: '8px' }}>💬</span>
+                <p style={{ fontSize: '14px', margin: 0 }}>Ask Landscaper about this document</p>
+                <p style={{ fontSize: '12px', marginTop: '4px', margin: 0 }}>or use a quick action to get started</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {chatHistory.map((msg, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                    <div
+                      style={{
+                        maxWidth: '80%', borderRadius: '8px', padding: '8px 12px', fontSize: '14px',
+                        backgroundColor: msg.role === 'user' ? 'var(--cui-primary)' : 'var(--cui-body-bg)',
+                        color: msg.role === 'user' ? '#fff' : 'var(--cui-body-color)',
+                        border: msg.role === 'user' ? 'none' : '1px solid var(--cui-border-color)',
+                      }}
+                    >
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                      <div style={{ fontSize: '11px', marginTop: '4px', color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--cui-secondary-color)' }}>
+                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {busy && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '12px' }}>
+                <div style={{ backgroundColor: 'var(--cui-body-bg)', border: '1px solid var(--cui-border-color)', borderRadius: '8px', padding: '8px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--cui-secondary-color)' }}>
+                    <CSpinner size="sm" />
+                    <span>Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="kl-accordion-input-area">
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask about this document..."
+                disabled={busy}
+                className="kl-accordion-input"
+                style={{ opacity: busy ? 0.5 : 1 }}
+              />
+              <button
+                type="submit"
+                disabled={!inputValue.trim() || busy}
+                className="kl-accordion-send-btn"
+                style={{ opacity: (!inputValue.trim() || busy) ? 0.5 : 1, cursor: (!inputValue.trim() || busy) ? 'not-allowed' : 'pointer' }}
+              >
+                <CIcon icon={cilSend} style={{ width: 16, height: 16 }} />
+                <span>Send</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

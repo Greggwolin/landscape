@@ -21,10 +21,12 @@ import {
   CModalFooter,
   CFormLabel,
   CFormTextarea,
+  CTooltip,
 } from '@coreui/react';
 import { SemanticButton } from '@/components/ui/landscape';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilPencil, cilChartLine, cilTrash } from '@coreui/icons';
+import { CircleHelp } from 'lucide-react';
 import useSWR from 'swr';
 
 type ExtractionMapping = {
@@ -41,10 +43,10 @@ type ExtractionMapping = {
   overwrite_existing: boolean;
   is_active: boolean;
   is_system: boolean;
+  applicable_tags: string[];
   notes: string | null;
   created_at: string;
   updated_at: string;
-  // Stats fields (optional)
   times_extracted?: number;
   projects_used?: number;
   documents_processed?: number;
@@ -66,23 +68,32 @@ type TargetTableCount = {
   active_count: number;
 };
 
-const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  OM: 'Offering Memorandum',
-  RENT_ROLL: 'Rent Roll',
-  T12: 'T12 / Operating Statement',
-  APPRAISAL: 'Appraisal',
-  LOAN_DOC: 'Loan Documents',
-  PSA: 'Purchase Agreement',
-  PCR: 'Property Condition Report',
-  ENVIRONMENTAL: 'Environmental Report',
-  SURVEY: 'Survey / Plat',
-  ZONING: 'Zoning Letter',
-  TAX_BILL: 'Tax Bill / Assessment',
-  INSURANCE: 'Insurance Policy',
-  MARKET_STUDY: 'Market Study',
-  DEV_BUDGET: 'Development Budget',
-  PROFORMA: 'Proforma / Cash Flow',
+// Badge color mapping for template-derived doc types
+const DOC_TYPE_BADGE_COLORS: Record<string, string> = {
+  'Offering': 'primary',
+  'Property Data': 'success',
+  'Operations': 'info',
+  'Market Data': 'warning',
+  'Diligence': 'dark',
+  'Agreements': 'primary',
+  'Leases': 'info',
+  'Title & Survey': 'secondary',
+  'Correspondence': 'secondary',
+  'Accounting': 'warning',
+  'Misc': 'secondary',
 };
+
+// Generate a consistent color for unknown doc types
+function getDocTypeBadgeColor(docType: string): string {
+  if (DOC_TYPE_BADGE_COLORS[docType]) return DOC_TYPE_BADGE_COLORS[docType];
+  // Hash-based fallback
+  const colors = ['primary', 'success', 'info', 'warning', 'dark'];
+  let hash = 0;
+  for (let i = 0; i < docType.length; i++) {
+    hash = docType.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
 
 const CONFIDENCE_COLORS: Record<string, string> = {
   High: 'success',
@@ -113,6 +124,17 @@ const CONFIDENCE_OPTIONS = [
   { value: 'Low', label: 'Low' },
 ];
 
+// Column header tooltips
+const COLUMN_TOOLTIPS: Record<string, string> = {
+  Active: 'Toggle extraction on/off. Does not affect existing data.',
+  'Doc Type': 'Document category this mapping applies to. Set in DMS Admin > Templates.',
+  Pattern: 'The label Landscaper searches for. Aliases shown below.',
+  Target: 'Database destination: table.field',
+  Type: 'Expected data type for validation and conversion.',
+  Confidence: 'High = auto-write, Medium = write + flag, Low = report only.',
+  Actions: 'Edit mapping details. System mappings can\'t be deleted.',
+};
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function ExtractionMappingAdmin() {
@@ -128,9 +150,10 @@ export function ExtractionMappingAdmin() {
 
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [editingMapping, setEditingMapping] = useState<ExtractionMapping | null>(null);
   const [formData, setFormData] = useState({
-    document_type: 'OM',
+    document_type: '',
     source_pattern: '',
     source_aliases: '',
     target_table: '',
@@ -141,6 +164,7 @@ export function ExtractionMappingAdmin() {
     auto_write: true,
     overwrite_existing: false,
     is_active: true,
+    applicable_tags: '',
     notes: '',
   });
 
@@ -159,7 +183,7 @@ export function ExtractionMappingAdmin() {
 
   const { data: mappingsData, isLoading, mutate } = useSWR(mappingsUrl, fetcher);
 
-  // Fetch document types and tables for filters
+  // Fetch document types and tables for filters (from unified endpoint)
   const { data: docTypesData } = useSWR<{ document_types: DocumentTypeCount[] }>(
     `${DJANGO_API}/api/landscaper/mappings/document-types/`,
     fetcher
@@ -169,12 +193,17 @@ export function ExtractionMappingAdmin() {
     fetcher
   );
 
+  // Doc type options for the form dropdown (derived from the unified endpoint)
+  const docTypeOptions = useMemo(() => {
+    if (!docTypesData?.document_types) return [];
+    return docTypesData.document_types.map((dt) => dt.document_type).sort();
+  }, [docTypesData]);
+
   // Memoize filtered mappings (client-side filtering when showStats is on)
   const filteredMappings = useMemo(() => {
     if (!mappingsData?.mappings) return [];
     let result = mappingsData.mappings as ExtractionMapping[];
 
-    // Apply client-side filters when using stats endpoint
     if (showStats) {
       if (documentTypeFilter) {
         result = result.filter((m) => m.document_type === documentTypeFilter);
@@ -205,7 +234,7 @@ export function ExtractionMappingAdmin() {
   const handleAdd = () => {
     setEditingMapping(null);
     setFormData({
-      document_type: 'OM',
+      document_type: docTypeOptions[0] || '',
       source_pattern: '',
       source_aliases: '',
       target_table: '',
@@ -216,6 +245,7 @@ export function ExtractionMappingAdmin() {
       auto_write: true,
       overwrite_existing: false,
       is_active: true,
+      applicable_tags: '',
       notes: '',
     });
     setIsEditModalOpen(true);
@@ -235,6 +265,7 @@ export function ExtractionMappingAdmin() {
       auto_write: mapping.auto_write,
       overwrite_existing: mapping.overwrite_existing,
       is_active: mapping.is_active,
+      applicable_tags: (mapping.applicable_tags || []).join(', '),
       notes: mapping.notes || '',
     });
     setIsEditModalOpen(true);
@@ -244,6 +275,10 @@ export function ExtractionMappingAdmin() {
     const payload = {
       ...formData,
       source_aliases: formData.source_aliases
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s),
+      applicable_tags: formData.applicable_tags
         .split(',')
         .map((s) => s.trim())
         .filter((s) => s),
@@ -297,6 +332,18 @@ export function ExtractionMappingAdmin() {
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Render a column header with tooltip
+  const HeaderWithTooltip = ({ label, width }: { label: string; width?: string }) => (
+    <CTableHeaderCell style={width ? { width } : undefined}>
+      <CTooltip content={COLUMN_TOOLTIPS[label] || ''} placement="top">
+        <span className="d-inline-flex align-items-center gap-1" style={{ cursor: 'help' }}>
+          {label}
+          <CircleHelp size={12} style={{ opacity: 0.5 }} />
+        </span>
+      </CTooltip>
+    </CTableHeaderCell>
+  );
+
   return (
     <div className="p-0">
       {/* Filters Row */}
@@ -319,7 +366,7 @@ export function ExtractionMappingAdmin() {
           <option value="">All Doc Types</option>
           {docTypesData?.document_types?.map((dt) => (
             <option key={dt.document_type} value={dt.document_type}>
-              {DOCUMENT_TYPE_LABELS[dt.document_type] || dt.document_type} ({dt.count})
+              {dt.document_type} ({dt.count})
             </option>
           ))}
         </CFormSelect>
@@ -363,6 +410,16 @@ export function ExtractionMappingAdmin() {
 
         <div className="ms-auto d-flex gap-2">
           <CButton
+            color="secondary"
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsHelpModalOpen(true)}
+            title="Help"
+          >
+            <CircleHelp size={16} />
+          </CButton>
+
+          <CButton
             color={showStats ? 'primary' : 'secondary'}
             variant="ghost"
             size="sm"
@@ -383,7 +440,7 @@ export function ExtractionMappingAdmin() {
       {/* Results Count */}
       <div className="text-muted small mb-2">
         {filteredMappings.length} mapping{filteredMappings.length !== 1 ? 's' : ''}
-        {documentTypeFilter && ` in ${DOCUMENT_TYPE_LABELS[documentTypeFilter] || documentTypeFilter}`}
+        {documentTypeFilter && ` in ${documentTypeFilter}`}
       </div>
 
       {/* Mappings Table */}
@@ -396,19 +453,19 @@ export function ExtractionMappingAdmin() {
           <CTable small striped hover>
             <CTableHead className="sticky-top bg-body">
               <CTableRow>
-                <CTableHeaderCell style={{ width: '50px' }}>Active</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '100px' }}>Doc Type</CTableHeaderCell>
-                <CTableHeaderCell>Pattern</CTableHeaderCell>
-                <CTableHeaderCell>Target</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '80px' }}>Type</CTableHeaderCell>
-                <CTableHeaderCell style={{ width: '80px' }}>Confidence</CTableHeaderCell>
+                <HeaderWithTooltip label="Active" width="50px" />
+                <HeaderWithTooltip label="Doc Type" width="120px" />
+                <HeaderWithTooltip label="Pattern" />
+                <HeaderWithTooltip label="Target" />
+                <HeaderWithTooltip label="Type" width="80px" />
+                <HeaderWithTooltip label="Confidence" width="80px" />
                 {showStats && (
                   <>
                     <CTableHeaderCell style={{ width: '60px' }}>Used</CTableHeaderCell>
                     <CTableHeaderCell style={{ width: '80px' }}>Write Rate</CTableHeaderCell>
                   </>
                 )}
-                <CTableHeaderCell style={{ width: '80px' }}>Actions</CTableHeaderCell>
+                <HeaderWithTooltip label="Actions" width="80px" />
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -422,7 +479,11 @@ export function ExtractionMappingAdmin() {
                     />
                   </CTableDataCell>
                   <CTableDataCell>
-                    <CBadge color="secondary" className="text-truncate" style={{ maxWidth: '90px' }}>
+                    <CBadge
+                      color={getDocTypeBadgeColor(mapping.document_type)}
+                      className="text-truncate"
+                      style={{ maxWidth: '110px' }}
+                    >
                       {mapping.document_type}
                     </CBadge>
                   </CTableDataCell>
@@ -505,9 +566,10 @@ export function ExtractionMappingAdmin() {
                 value={formData.document_type}
                 onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
               >
-                {Object.entries(DOCUMENT_TYPE_LABELS).map(([code, label]) => (
-                  <option key={code} value={code}>
-                    {label}
+                <option value="">Select doc type</option>
+                {docTypeOptions.map((dt) => (
+                  <option key={dt} value={dt}>
+                    {dt}
                   </option>
                 ))}
               </CFormSelect>
@@ -592,6 +654,18 @@ export function ExtractionMappingAdmin() {
             </div>
 
             <div className="col-12">
+              <CFormLabel>Applicable Tags (comma-separated, optional)</CFormLabel>
+              <CFormInput
+                value={formData.applicable_tags}
+                onChange={(e) => setFormData({ ...formData, applicable_tags: e.target.value })}
+                placeholder="e.g., Appraisal, LIHTC (empty = applies to all docs of this type)"
+              />
+              <div className="text-muted small mt-1">
+                When set, this mapping only fires for documents with matching tags.
+              </div>
+            </div>
+
+            <div className="col-12">
               <CFormLabel>Notes</CFormLabel>
               <CFormTextarea
                 value={formData.notes}
@@ -636,6 +710,128 @@ export function ExtractionMappingAdmin() {
           <SemanticButton intent="primary-action" onClick={handleSave}>
             {editingMapping ? 'Update' : 'Create'}
           </SemanticButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Help Modal */}
+      <CModal visible={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} size="lg" scrollable>
+        <CModalHeader>
+          <CModalTitle>Understanding AI Extraction Mappings</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div className="d-flex flex-column gap-4">
+            {/* Section 1 */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>What This Panel Does</h6>
+              <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                Extraction mappings tell Landscaper how to read your documents. When you upload a document
+                &mdash; an offering memo, appraisal, rent roll, or operating statement &mdash; Landscaper
+                scans it for specific patterns (like &ldquo;Cap Rate&rdquo; or &ldquo;Annual Premium&rdquo;)
+                and writes the extracted values to the correct fields in your project.
+              </p>
+              <p className="small mb-0 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                This panel shows all active mappings and lets you customize how Landscaper interprets
+                documents. Changes here affect ALL future document extractions across your workspace.
+              </p>
+            </div>
+
+            {/* Section 2: Column Definitions */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Column Definitions</h6>
+              <table className="table table-sm small" style={{ color: 'var(--cui-body-color)' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '120px' }}>Column</th>
+                    <th>What It Means</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="fw-medium">Active</td>
+                    <td>Toggle on/off. Inactive mappings are skipped during extraction. Turning off a mapping does NOT delete previously extracted data.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Doc Type</td>
+                    <td>Which type of document this mapping applies to (e.g., Property Data, Offering, Accounting). Doc Types come from your DMS template configuration.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Pattern</td>
+                    <td>The label or phrase Landscaper looks for in documents. &ldquo;Also:&rdquo; shows aliases &mdash; alternative phrasings that match the same concept.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Target</td>
+                    <td>The database table and field where the extracted value is written. Format: table_name.field_name.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Type</td>
+                    <td>The data type for validation: decimal, text, integer, date, boolean. Landscaper converts extracted text to this type before writing.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Confidence</td>
+                    <td>How aggressively Landscaper writes this value. High = auto-writes without review. Medium = writes but flags for review. Low = reports but doesn&apos;t write.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Actions</td>
+                    <td>Edit opens the mapping editor. System mappings can be edited but not deleted. Custom mappings you create can be deleted.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Section 3: Impact */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Impact of Changes</h6>
+              <dl className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                <dt>Adding a mapping</dt>
+                <dd className="mb-2">Creates a new extraction rule. Next time Landscaper processes a document of that Doc Type, it will look for your pattern. Existing documents are NOT re-processed automatically.</dd>
+
+                <dt>Editing a mapping</dt>
+                <dd className="mb-2">Changes take effect on the next document extraction. Previously extracted data is not retroactively updated.</dd>
+
+                <dt>Deleting a mapping</dt>
+                <dd className="mb-2">Removes the extraction rule. Previously extracted data remains in your project. System mappings cannot be deleted, only deactivated.</dd>
+
+                <dt>Changing Confidence</dt>
+                <dd className="mb-2">Raising confidence from Medium to High means Landscaper will auto-write without flagging for review. Lowering gives you more control.</dd>
+
+                <dt>Deactivating a mapping</dt>
+                <dd className="mb-0">Equivalent to a soft delete. The mapping is preserved but ignored during extraction. Reactivate anytime.</dd>
+              </dl>
+            </div>
+
+            {/* Section 4: Tags */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Tags &amp; Filtering</h6>
+              <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                Tags on your documents help Landscaper apply the right mappings. When a mapping has
+                associated tags (like &ldquo;Appraisal&rdquo; or &ldquo;LIHTC&rdquo;), it only fires for documents
+                with matching tags. Mappings without tags apply to all documents of that Doc Type.
+              </p>
+              <p className="small mb-0 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                You can add tags to documents in the Document Profile editor. Landscaper will suggest
+                tags automatically during document upload based on content analysis.
+              </p>
+            </div>
+
+            {/* Section 5: Tips */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Tips</h6>
+              <ul className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                <li>Use the search bar and filters to find specific mappings quickly.</li>
+                <li>Check the Stats button for extraction success rates and common failures.</li>
+                <li>If Landscaper consistently misreads a field, edit the Pattern&apos;s aliases to include the phrasing your documents use.</li>
+                <li>Start with Medium confidence for new mappings until you&apos;ve verified accuracy, then promote to High.</li>
+              </ul>
+            </div>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <p className="small mb-0 me-auto" style={{ color: 'var(--cui-secondary-color)' }}>
+            Need help? Ask Landscaper &mdash; it can explain any mapping in detail and suggest new ones based on your documents.
+          </p>
+          <CButton color="primary" onClick={() => setIsHelpModalOpen(false)}>
+            Got it
+          </CButton>
         </CModalFooter>
       </CModal>
     </div>

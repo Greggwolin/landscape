@@ -274,6 +274,7 @@ class ExtractionMappingSerializer(serializers.ModelSerializer):
             'overwrite_existing',
             'is_active',
             'is_system',
+            'applicable_tags',
             'notes',
             'created_at',
             'updated_at',
@@ -306,6 +307,7 @@ class ExtractionMappingCreateSerializer(serializers.ModelSerializer):
             'auto_write',
             'overwrite_existing',
             'is_active',
+            'applicable_tags',
             'notes',
         ]
 

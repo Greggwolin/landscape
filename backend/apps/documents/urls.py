@@ -33,6 +33,14 @@ from .media_views import (
 )
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
+from .tag_views import (
+    tag_list,
+    tag_detail,
+    tag_suggest,
+    document_tags,
+    project_doc_types,
+    project_doc_type_detail,
+)
 
 router = DefaultRouter()
 router.register(r'documents', DocumentViewSet, basename='document')
@@ -69,4 +77,13 @@ urlpatterns = [
     path('media/links/<int:link_id>/', delete_media_link, name='delete_media_link'),
     path('media/links/reorder/', reorder_media_links, name='reorder_media_links'),
     path('media/available/', available_media, name='available_media'),
+    # Tag management endpoints
+    path('tags/', tag_list, name='dms_tag_list'),
+    path('tags/<int:tag_id>/', tag_detail, name='dms_tag_detail'),
+    path('tags/suggest/', tag_suggest, name='dms_tag_suggest'),
+    path('documents/<int:doc_id>/tags/', document_tags, name='dms_document_tags'),
+    path('documents/<int:doc_id>/tags/<int:tag_id>/', document_tags, name='dms_document_tag_remove'),
+    # Project doc type overrides
+    path('projects/<int:project_id>/doc-types/', project_doc_types, name='dms_project_doc_types'),
+    path('projects/<int:project_id>/doc-types/<int:pk>/', project_doc_type_detail, name='dms_project_doc_type_detail'),
 ]

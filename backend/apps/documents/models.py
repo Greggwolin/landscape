@@ -210,6 +210,74 @@ class AICorrectionLog(models.Model):
         return f"Correction {self.correction_id} - {self.field_path}"
 
 
+class DmsDocTag(models.Model):
+    """Document tag for flexible categorization. Maps to landscape.dms_doc_tags"""
+
+    tag_id = models.AutoField(primary_key=True)
+    tag_name = models.CharField(max_length=100)
+    workspace_id = models.BigIntegerField(null=True, blank=True)
+    usage_count = models.IntegerField(default=0)
+    created_by = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'dms_doc_tags'
+        ordering = ['-usage_count', 'tag_name']
+        unique_together = [['tag_name', 'workspace_id']]
+
+    def __str__(self):
+        return self.tag_name
+
+
+class DmsDocTagAssignment(models.Model):
+    """Links tags to documents. Maps to landscape.dms_doc_tag_assignments"""
+
+    doc_id = models.BigIntegerField()
+    tag = models.ForeignKey(
+        DmsDocTag,
+        on_delete=models.CASCADE,
+        db_column='tag_id',
+        related_name='assignments'
+    )
+    assigned_by = models.IntegerField(null=True, blank=True)
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'dms_doc_tag_assignments'
+        unique_together = [['doc_id', 'tag']]
+
+    def __str__(self):
+        return f"Doc {self.doc_id} -> {self.tag.tag_name}"
+
+
+class DmsProjectDocType(models.Model):
+    """Project-level custom doc type filter overrides. Maps to landscape.dms_project_doc_types"""
+
+    id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='custom_doc_types'
+    )
+    doc_type_name = models.CharField(max_length=100)
+    display_order = models.IntegerField(default=0)
+    is_from_template = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'dms_project_doc_types'
+        ordering = ['display_order', 'doc_type_name']
+        unique_together = [['project', 'doc_type_name']]
+
+    def __str__(self):
+        return f"{self.project_id}: {self.doc_type_name}"
+
+
 class ExtractionCommitSnapshot(models.Model):
     """Snapshot of data before extraction commit, enables rollback."""
 

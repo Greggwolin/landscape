@@ -495,23 +495,10 @@ class ExtractionMapping(models.Model):
     Maps to landscape.tbl_extraction_mapping table.
     """
 
-    DOCUMENT_TYPE_CHOICES = [
-        ('OM', 'Offering Memorandum'),
-        ('RENT_ROLL', 'Rent Roll'),
-        ('T12', 'T12 / Operating Statement'),
-        ('APPRAISAL', 'Appraisal'),
-        ('LOAN_DOC', 'Loan Documents'),
-        ('PSA', 'Purchase Agreement'),
-        ('PCR', 'Property Condition Report'),
-        ('ENVIRONMENTAL', 'Environmental Report'),
-        ('SURVEY', 'Survey / Plat'),
-        ('ZONING', 'Zoning Letter'),
-        ('TAX_BILL', 'Tax Bill / Assessment'),
-        ('INSURANCE', 'Insurance Policy'),
-        ('MARKET_STUDY', 'Market Study'),
-        ('DEV_BUDGET', 'Development Budget'),
-        ('PROFORMA', 'Proforma / Cash Flow'),
-    ]
+    # Document types now derive from DMS templates instead of hardcoded values.
+    # Kept as a reference for the standard vocabulary:
+    # Offering, Property Data, Operations, Market Data, Diligence,
+    # Agreements, Leases, Title & Survey, Correspondence, Accounting, Misc
 
     CONFIDENCE_CHOICES = [
         ('High', 'High'),
@@ -538,11 +525,10 @@ class ExtractionMapping(models.Model):
 
     mapping_id = models.AutoField(primary_key=True)
 
-    # Document classification
+    # Document classification — values now derive from DMS templates
     document_type = models.CharField(
         max_length=50,
-        choices=DOCUMENT_TYPE_CHOICES,
-        help_text='Type of document this mapping applies to'
+        help_text='Type of document this mapping applies to (from DMS templates)'
     )
 
     # Source pattern
@@ -596,6 +582,13 @@ class ExtractionMapping(models.Model):
     overwrite_existing = models.BooleanField(
         default=False,
         help_text='Overwrite existing values when extracting'
+    )
+
+    # Tag-based filtering
+    applicable_tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='When set, mapping only fires for documents with matching tags. Empty = all docs of this Doc Type.'
     )
 
     # Admin

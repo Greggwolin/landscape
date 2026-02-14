@@ -5,7 +5,9 @@ import { CButton } from '@coreui/react';
 
 export interface DocResult {
   doc_id: number;
+  document_key?: string | null;   // Platform Knowledge slug — used for chat routing
   name: string;
+  project_id: number | null;
   project_name: string | null;
   doc_type: string;
   format: string;
@@ -14,13 +16,16 @@ export interface DocResult {
   modified_at: string | null;
   relevance_score: number;
   snippet: string;
+  storage_uri: string | null;
 }
 
 interface DocResultCardProps {
   doc: DocResult;
   isSelected: boolean;
+  isExpanded?: boolean;
   onToggleSelect: (docId: number) => void;
   onPreview: (docId: number) => void;
+  onRowClick?: (docId: number) => void;
 }
 
 const FORMAT_ICONS: Record<string, string> = {
@@ -55,8 +60,10 @@ function formatSize(bytes: number | null): string {
 export default function DocResultCard({
   doc,
   isSelected,
+  isExpanded = false,
   onToggleSelect,
   onPreview,
+  onRowClick,
 }: DocResultCardProps) {
   const icon = FORMAT_ICONS[doc.format] || FORMAT_ICONS.OTHER;
   const metaParts = [
@@ -67,7 +74,11 @@ export default function DocResultCard({
   ].filter(Boolean);
 
   return (
-    <div className="kl-doc-card">
+    <div
+      className={`kl-doc-card${isExpanded ? ' kl-doc-card-expanded' : ''}`}
+      onClick={() => onRowClick?.(doc.doc_id)}
+      style={{ cursor: onRowClick ? 'pointer' : undefined }}
+    >
       <input
         type="checkbox"
         checked={isSelected}
@@ -85,7 +96,10 @@ export default function DocResultCard({
           color="primary"
           variant="ghost"
           size="sm"
-          onClick={() => onPreview(doc.doc_id)}
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onPreview(doc.doc_id);
+          }}
           style={{ fontSize: '0.75rem' }}
         >
           Preview

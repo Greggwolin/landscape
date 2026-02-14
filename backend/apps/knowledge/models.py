@@ -1231,3 +1231,36 @@ class DocGeoTag(models.Model):
 
     def __str__(self):
         return f"Doc {self.doc_id}: {self.geo_level}={self.geo_value} ({self.geo_source})"
+
+
+class AIDocumentSubtype(models.Model):
+    """
+    Property/document subtypes used by DocumentSubtypeClassifier.
+
+    Each subtype defines detection patterns, priority fields, and
+    special instructions that customize extraction behavior.
+    The subtype classifier bridges to the user-facing tag system
+    via dms_doc_tags.subtype_code.
+    """
+
+    subtype_id = models.AutoField(primary_key=True)
+    subtype_code = models.CharField(max_length=50, unique=True)
+    subtype_name = models.CharField(max_length=100)
+    property_type = models.CharField(max_length=20, default='multifamily')
+    description = models.TextField(blank=True, null=True)
+    detection_patterns = models.JSONField(default=list)
+    priority_fields = models.JSONField(default=list)
+    skip_fields = models.JSONField(default=list)
+    special_instructions = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'ai_document_subtypes'
+        verbose_name = 'AI Document Subtype'
+        verbose_name_plural = 'AI Document Subtypes'
+
+    def __str__(self):
+        return f"{self.subtype_name} ({self.subtype_code})"
