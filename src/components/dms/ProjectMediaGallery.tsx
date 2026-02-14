@@ -73,6 +73,18 @@ interface DocListItem {
  storage_uri?: string | null;
  mime_type?: string;
  media_scan_status?: string | null;
+ media_scan_json?: {
+ total_detected?: number | string;
+ total_extracted?: number | string;
+ } | null;
+}
+
+interface ProcessingDocProgress {
+ doc_id: string;
+ doc_name: string;
+ status: string;
+ detected: number;
+ extracted: number;
 }
 
 interface ProjectMediaGalleryProps {
@@ -136,6 +148,28 @@ const ALL_CLASSIFICATIONS: Classification[] = [
 
 const TILE_MAX_WIDTH = 420;
 const TILE_HEIGHT = 270;
+const TERMINAL_MEDIA_STATUSES = new Set(['classified', 'complete']);
+const ACTIVE_MEDIA_STATUSES = new Set([
+ 'scanning',
+ 'extracting',
+ 'classifying',
+ 'scanned',
+]);
+
+const normalizeScanStatus = (status: string | null | undefined): string =>
+ (status || '').toLowerCase();
+
+const isTerminalScanStatus = (status: string | null | undefined): boolean =>
+ TERMINAL_MEDIA_STATUSES.has(normalizeScanStatus(status));
+
+const isActiveScanStatus = (status: string | null | undefined): boolean =>
+ ACTIVE_MEDIA_STATUSES.has(normalizeScanStatus(status));
+
+const formatScanStatus = (status: string | null | undefined): string => {
+ const normalized = normalizeScanStatus(status);
+ if (!normalized) return 'Processing';
+ return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -167,23 +201,25 @@ export default function ProjectMediaGallery({
 
  // ── Data fetching ──────────────────────────────────────────────────────
 
- // Fetch project documents list
- const { data: docsData } = useQuery<{ results: DocListItem[] }>({
+ // Fetch project documents list + poll status while processing
+ const { data: docsData = [] } = useQuery<DocListItem[]>({
  queryKey: ['project-docs-for-scan', projectId],
  queryFn: async () => {
- const res = await fetch(
- `/api/dms/search?project_id=${projectId}&limit=200`
- );
+ const res = await fetch(`/api/dms/docs?project_id=${projectId}&limit=200`);
  if (!res.ok) throw new Error('Failed to load documents');
- return res.json();
+ const payload = await res.json();
+ if (Array.isArray(payload?.docs)) return payload.docs;
+ if (Array.isArray(payload?.results)) return payload.results;
+ return [];
  },
  enabled: !!projectId,
+ refetchInterval: 5000,
  });
 
  // All PDFs in the project
  const allPDFs = useMemo(() => {
- if (!docsData?.results) return [];
- return docsData.results.filter(
+ if (!docsData) return [];
+ return docsData.filter(
  (d) =>
  d.file_name?.toLowerCase().endsWith('.pdf') ||
  d.doc_name?.toLowerCase().endsWith('.pdf') ||
@@ -195,33 +231,102 @@ export default function ProjectMediaGallery({
 
  const docsById = useMemo(() => {
  const map = new Map<string, DocListItem>();
- for (const doc of docsData?.results || []) {
+ for (const doc of docsData || []) {
  map.set(String(doc.doc_id), doc);
  }
  return map;
  }, [docsData]);
 
- // PDFs that have been scanned (have media records to show)
+ // PDFs with media states that can contribute visible gallery items
  const scannedDocIds = useMemo(() => {
  return allPDFs
  .filter(
  (d) =>
- d.media_scan_status === 'scanned' ||
- d.media_scan_status === 'classified' ||
- d.media_scan_status === 'complete'
+ isActiveScanStatus(d.media_scan_status) ||
+ isTerminalScanStatus(d.media_scan_status)
  )
  .map((d) => d.doc_id);
  }, [allPDFs]);
 
- // PDFs not yet scanned (for"Scan New")
+ // PDFs not yet processed (for "Scan New")
  const unscannedPDFs = useMemo(() => {
  return allPDFs.filter(
- (d) =>
- !d.media_scan_status ||
- d.media_scan_status === 'pending' ||
- d.media_scan_status === 'error'
+ (d) => {
+ const status = normalizeScanStatus(d.media_scan_status);
+ return !status || status === 'unscanned' || status === 'pending' || status === 'error';
+ }
  );
  }, [allPDFs]);
+
+ const processingDocs = useMemo(
+ () => allPDFs.filter((d) => isActiveScanStatus(d.media_scan_status)),
+ [allPDFs]
+ );
+ const hasActiveProcessing = processingDocs.length > 0;
+ const isPipelineBusy = scanning || hasActiveProcessing;
+
+ const processingDocProgressKey = useMemo(
+ () => processingDocs.map((doc) => String(doc.doc_id)).join(','),
+ [processingDocs]
+ );
+
+ const { data: processingDocProgress = {} } = useQuery<Record<string, ProcessingDocProgress>>({
+ queryKey: ['project-processing-progress', projectId, processingDocProgressKey],
+ queryFn: async () => {
+ const entries = await Promise.all(
+ processingDocs.map(async (doc) => {
+ const docId = String(doc.doc_id);
+ const fallbackDetected = Number(doc.media_scan_json?.total_detected ?? 0) || 0;
+ const fallbackExtracted = Number(doc.media_scan_json?.total_extracted ?? 0) || 0;
+ try {
+ const res = await fetch(`${djangoBaseUrl}/api/dms/documents/${docId}/media/`);
+ if (!res.ok) {
+ return [
+ docId,
+ {
+ doc_id: docId,
+ doc_name: doc.doc_name || doc.file_name || `Document ${docId}`,
+ status: normalizeScanStatus(doc.media_scan_status),
+ detected: fallbackDetected,
+ extracted: fallbackExtracted,
+ },
+ ] as const;
+ }
+ const data: DocMediaResponse = await res.json();
+ const items = data.items || [];
+ const extracted = items.filter(
+ (item) => item.status !== 'pending' && !!item.storage_uri
+ ).length;
+ const detected = items.length;
+ return [
+ docId,
+ {
+ doc_id: docId,
+ doc_name: doc.doc_name || doc.file_name || data.doc_name || `Document ${docId}`,
+ status: normalizeScanStatus(data.media_scan_status || doc.media_scan_status),
+ detected: Math.max(detected, fallbackDetected),
+ extracted: Math.max(extracted, fallbackExtracted),
+ },
+ ] as const;
+ } catch {
+ return [
+ docId,
+ {
+ doc_id: docId,
+ doc_name: doc.doc_name || doc.file_name || `Document ${docId}`,
+ status: normalizeScanStatus(doc.media_scan_status),
+ detected: fallbackDetected,
+ extracted: fallbackExtracted,
+ },
+ ] as const;
+ }
+ })
+ );
+ return Object.fromEntries(entries);
+ },
+ enabled: processingDocs.length > 0,
+ refetchInterval: 5000,
+ });
 
  // Fetch media items for all scanned documents
  const {
@@ -255,6 +360,7 @@ export default function ProjectMediaGallery({
  return results;
  },
  enabled: scannedDocIds.length > 0,
+ refetchInterval: isPipelineBusy ? 5000 : false,
  });
 
  // Fetch discard reasons for inline discard controls
@@ -318,6 +424,52 @@ export default function ProjectMediaGallery({
  }
  return counts;
  }, [mediaItems]);
+
+ const processingRows = useMemo(() => {
+ return processingDocs.map((doc) => {
+ const docId = String(doc.doc_id);
+ const fallbackDetected = Number(doc.media_scan_json?.total_detected ?? 0) || 0;
+ const fallbackExtracted = Number(doc.media_scan_json?.total_extracted ?? 0) || 0;
+ const progress = processingDocProgress[docId];
+ return {
+ doc_id: docId,
+ doc_name: doc.doc_name || doc.file_name || `Document ${docId}`,
+ status: progress?.status || normalizeScanStatus(doc.media_scan_status),
+ detected: progress?.detected ?? fallbackDetected,
+ extracted: progress?.extracted ?? fallbackExtracted,
+ };
+ });
+ }, [processingDocs, processingDocProgress]);
+
+ const aggregateDetected = useMemo(
+ () => processingRows.reduce((sum, row) => sum + row.detected, 0),
+ [processingRows]
+ );
+ const aggregateExtracted = useMemo(
+ () => processingRows.reduce((sum, row) => sum + Math.min(row.extracted, row.detected || row.extracted), 0),
+ [processingRows]
+ );
+ const aggregateProgressPct = aggregateDetected > 0
+ ? Math.max(0, Math.min(100, (aggregateExtracted / aggregateDetected) * 100))
+ : null;
+ const showProcessingIndicator = isPipelineBusy;
+
+ const wasProcessingRef = useRef(false);
+ useEffect(() => {
+ if (hasActiveProcessing) {
+ wasProcessingRef.current = true;
+ return;
+ }
+ if (!wasProcessingRef.current) return;
+ wasProcessingRef.current = false;
+ queryClient.invalidateQueries({
+ queryKey: ['project-docs-for-scan', projectId],
+ });
+ queryClient.invalidateQueries({
+ queryKey: ['project-all-media', projectId],
+ });
+ refetchMedia();
+ }, [hasActiveProcessing, projectId, queryClient, refetchMedia]);
 
  // ── Pipeline helper ──────────────────────────────────────────────────
  // Runs scan → extract → classify → auto-confirm for a list of docs
@@ -407,6 +559,7 @@ export default function ProjectMediaGallery({
  // Only scans PDFs that haven't been scanned yet
 
  const handleScanNew = useCallback(async () => {
+ if (isPipelineBusy) return;
  if (unscannedPDFs.length === 0) return;
  setScanning(true);
  setScanProgress('Preparing scan...');
@@ -425,13 +578,22 @@ export default function ProjectMediaGallery({
  setScanning(false);
  setScanProgress('');
  }
- }, [unscannedPDFs, runPipelineForDocs, refetchMedia, queryClient, projectId]);
+ }, [isPipelineBusy, unscannedPDFs, runPipelineForDocs, refetchMedia, queryClient, projectId]);
 
  // ── Rescan All action ────────────────────────────────────────────────
  // Resets all documents and re-runs full pipeline
 
- const handleRescanAll = useCallback(async () => {
+ const handleRescanAll = useCallback(async (force = false) => {
  if (allPDFs.length === 0) return;
+
+ if (hasActiveProcessing && !force) return;
+ if (hasActiveProcessing && force) {
+ const confirmed = window.confirm(
+ 'Extraction is still running. Rescanning will restart from scratch. Continue?'
+ );
+ if (!confirmed) return;
+ }
+
  setScanning(true);
  setScanProgress('Resetting media...');
 
@@ -465,7 +627,16 @@ export default function ProjectMediaGallery({
  setScanning(false);
  setScanProgress('');
  }
- }, [allPDFs, scannedDocIds, djangoBaseUrl, runPipelineForDocs, refetchMedia, queryClient, projectId]);
+ }, [
+ allPDFs,
+ hasActiveProcessing,
+ scannedDocIds,
+ djangoBaseUrl,
+ runPipelineForDocs,
+ refetchMedia,
+ queryClient,
+ projectId,
+ ]);
 
  // ── Single-item reclassify ───────────────────────────────────────────
 
@@ -863,7 +1034,7 @@ export default function ProjectMediaGallery({
  className="d-flex gap-2"
  onClick={(e) => e.stopPropagation()}
  >
- {hasAnyPDFs && !scanning && (
+ {hasAnyPDFs && !isPipelineBusy && (
  <CDropdown variant="btn-group">
  <CDropdownToggle
  color="primary"
@@ -876,15 +1047,34 @@ export default function ProjectMediaGallery({
  </CDropdownToggle>
  <CDropdownMenu>
  {hasUnscannedPDFs && (
- <CDropdownItem onClick={handleScanNew}>
+ <CDropdownItem onClick={() => void handleScanNew()}>
  Scan New PDFs ({unscannedPDFs.length})
  </CDropdownItem>
  )}
- <CDropdownItem onClick={handleRescanAll}>
+ <CDropdownItem onClick={() => void handleRescanAll(false)}>
  Rescan All PDFs ({allPDFs.length})
  </CDropdownItem>
  </CDropdownMenu>
  </CDropdown>
+ )}
+ {hasAnyPDFs && isPipelineBusy && (
+ <div className="d-flex align-items-center gap-2">
+ <span
+ className="d-flex align-items-center text-body-secondary"
+ style={{ fontSize: '0.82rem' }}
+ >
+ <CSpinner size="sm" className="me-2" />
+ Extraction in progress...
+ </span>
+ <button
+ type="button"
+ className="btn btn-outline-danger btn-sm"
+ style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+ onClick={() => void handleRescanAll(true)}
+ >
+ Force Rescan
+ </button>
+ </div>
  )}
  </div>
  </CCardHeader>
@@ -907,22 +1097,80 @@ export default function ProjectMediaGallery({
  </div>
  )}
 
- {/* Scanning progress */}
- {scanning && (
+ {/* Processing progress */}
+ {showProcessingIndicator && (
  <div
- className="d-flex align-items-center justify-content-center flex-column"
- style={{ minHeight: '120px' }}
+ className="mb-3 p-3 rounded border"
+ style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}
  >
- <CSpinner size="sm" className="mb-2" />
- <span style={{ fontSize: '0.85rem', color: 'var(--cui-primary)' }}>
- {scanProgress}
+ <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+ <div className="d-flex align-items-center">
+ <CSpinner size="sm" className="me-2" />
+ <span className="fw-semibold" style={{ fontSize: '0.88rem' }}>
+ Media processing in progress
  </span>
+ </div>
+ <span className="text-body-secondary" style={{ fontSize: '0.8rem' }}>
+ {aggregateDetected > 0
+ ? `${aggregateExtracted} of ${aggregateDetected} extracted`
+ : 'Preparing extraction...'}
+ </span>
+ </div>
+ {scanProgress && (
+ <div
+ className="text-body-secondary mb-2"
+ style={{ fontSize: '0.78rem' }}
+ >
+ {scanProgress}
+ </div>
+ )}
+ <div
+ className="progress mb-2"
+ role="progressbar"
+ aria-label="Media extraction progress"
+ aria-valuemin={0}
+ aria-valuemax={100}
+ aria-valuenow={aggregateProgressPct ?? undefined}
+ style={{ height: '8px' }}
+ >
+ <div
+ className={`progress-bar ${aggregateProgressPct == null ? 'progress-bar-striped progress-bar-animated' : ''}`}
+ style={{ width: `${aggregateProgressPct ?? 100}%` }}
+ />
+ </div>
+ {processingRows.length > 0 ? (
+ <div className="d-flex flex-column gap-1">
+ {processingRows.map((row) => {
+ const extracted = row.detected > 0
+ ? Math.min(row.extracted, row.detected)
+ : row.extracted;
+ const progressText = row.detected > 0
+ ? `(${extracted} of ${row.detected})`
+ : '(processing...)';
+ return (
+ <div
+ key={row.doc_id}
+ className="d-flex align-items-center justify-content-between gap-2 text-body-secondary"
+ style={{ fontSize: '0.76rem' }}
+ >
+ <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+ {row.doc_name}: {formatScanStatus(row.status)} {progressText}
+ </span>
+ </div>
+ );
+ })}
+ </div>
+ ) : (
+ <div className="text-body-secondary" style={{ fontSize: '0.76rem' }}>
+ Waiting for document status updates...
+ </div>
+ )}
  </div>
  )}
 
  {/* Empty state — no media, but scannable PDFs exist */}
  {!mediaLoading &&
- !scanning &&
+ !isPipelineBusy &&
  !hasMedia &&
  hasUnscannedPDFs && (
  <div
@@ -951,7 +1199,7 @@ export default function ProjectMediaGallery({
  and plans.
  </div>
  <button
- onClick={handleScanNew}
+ onClick={() => void handleScanNew()}
  className="px-4 py-2 rounded text-white border-0"
  style={{
  backgroundColor: 'var(--cui-primary)',
@@ -966,7 +1214,6 @@ export default function ProjectMediaGallery({
 
  {/* Empty state — no PDFs at all */}
  {!mediaLoading &&
- !scanning &&
  !hasMedia &&
  !hasAnyPDFs && (
  <div
@@ -986,8 +1233,26 @@ export default function ProjectMediaGallery({
  </div>
  )}
 
+ {/* Empty state — pipeline active, media not yet available */}
+ {!mediaLoading && !hasMedia && isPipelineBusy && (
+ <div
+ className="d-flex flex-column align-items-center justify-content-center text-center"
+ style={{ minHeight: '120px' }}
+ >
+ <div
+ style={{
+ color: 'var(--cui-secondary-color)',
+ fontSize: '0.85rem',
+ maxWidth: '420px',
+ }}
+ >
+ Extraction is running. Images will appear here automatically as each document finishes.
+ </div>
+ </div>
+ )}
+
  {/* ── Gallery grid view ── */}
- {!mediaLoading && !scanning && hasMedia && (
+ {!mediaLoading && hasMedia && (
  <>
  {/* Filter bar */}
  <div

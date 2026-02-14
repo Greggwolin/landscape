@@ -3,7 +3,17 @@ Knowledge API URLs
 """
 
 from django.urls import path
-from .views import session_views, extraction_views, status_views, chat_views, platform_knowledge_views, benchmark_views, alpha_views
+from .views import (
+    session_views,
+    extraction_views,
+    status_views,
+    chat_views,
+    platform_knowledge_views,
+    benchmark_views,
+    alpha_views,
+    source_registry_views,
+    knowledge_library_views,
+)
 
 urlpatterns = [
     # Session management
@@ -71,6 +81,10 @@ urlpatterns = [
     # Document-scoped chat endpoint
     path('projects/<int:project_id>/docs/<int:doc_id>/chat/', chat_views.document_chat, name='knowledge_doc_chat'),
     # Platform knowledge ingestion endpoints
+    path('sources/', source_registry_views.knowledge_sources, name='knowledge_sources'),
+    path('sources/search/', source_registry_views.knowledge_source_search, name='knowledge_source_search'),
+    path('sources/match/', source_registry_views.knowledge_source_match, name='knowledge_source_match'),
+    path('sources/<int:source_id>/', source_registry_views.knowledge_source_detail, name='knowledge_source_detail'),
     path('platform/analyze/', platform_knowledge_views.analyze_platform_document, name='platform_knowledge_analyze'),
     path('platform/ingest/', platform_knowledge_views.ingest_platform_document, name='platform_knowledge_ingest'),
     path('platform/query/', platform_knowledge_views.query_platform_knowledge, name='platform_knowledge_query'),
@@ -85,4 +99,10 @@ urlpatterns = [
     path('benchmarks/summary/', benchmark_views.get_expense_summary, name='benchmark_summary'),
     path('benchmarks/search/', benchmark_views.search_benchmarks, name='benchmark_search'),
     path('benchmarks/trend/', benchmark_views.get_category_trend, name='benchmark_trend'),
+
+    # Knowledge Library endpoints
+    path('library/facets/', knowledge_library_views.knowledge_library_facets, name='knowledge_library_facets'),
+    path('library/search/', knowledge_library_views.knowledge_library_search, name='knowledge_library_search'),
+    path('library/batch-download/', knowledge_library_views.knowledge_library_batch_download, name='knowledge_library_batch_download'),
+    path('library/upload/', knowledge_library_views.knowledge_library_upload, name='knowledge_library_upload'),
 ]

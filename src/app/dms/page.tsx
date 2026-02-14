@@ -421,7 +421,14 @@ function DMSPageContent() {
       setKnowledgeMetadata({
         knowledge_domain: suggestions.knowledge_domain || 'Other',
         property_types: suggestions.property_types || ['All'],
-        source: suggestions.source || 'Other',
+        source: suggestions.source || '',
+        source_id: suggestions.source_id ?? null,
+        source_confidence: suggestions.source_confidence ?? null,
+        source_evidence: suggestions.source_evidence || null,
+        source_match_status: suggestions.source_match_status || null,
+        referenced_sources: Array.isArray(suggestions.referenced_sources)
+          ? suggestions.referenced_sources
+          : [],
         year: suggestions.year ?? null,
         geographic_scope: suggestions.geographic_scope || 'National',
         supersedes: ''
@@ -463,6 +470,8 @@ function DMSPageContent() {
           knowledge_domain: mapDomainToValue(values.knowledge_domain),
           property_types: values.property_types,
           source: values.source,
+          source_id: values.source_id ?? null,
+          referenced_sources: values.referenced_sources || [],
           year: values.year,
           geographic_scope: values.geographic_scope,
           supersedes: values.supersedes,

@@ -59,6 +59,9 @@ WHATIF_TOOLS = [
     # Phase 6: KPI definitions
     "get_kpi_definitions",
     "update_kpi_definitions",
+    # Phase 7: Investment Committee
+    "ic_start_session",
+    "ic_challenge_next",
 ]
 
 # Pages that get what-if tools
@@ -68,6 +71,7 @@ WHATIF_PAGES = {
     "land_valuation",
     "land_capitalization",
     "reports",
+    "investment_committee",
 }
 
 # Tier 4: Admin/Config tools - only in admin context
@@ -338,6 +342,20 @@ PAGE_TOOLS = {
         "get_picklist_values",
         "get_budget_categories",
     ],
+
+    # -------------------------------------------------------------------------
+    # INVESTMENT COMMITTEE PAGE (Phase 7)
+    # -------------------------------------------------------------------------
+    "investment_committee": [
+        # IC gets valuation tools + scenario tools via WHATIF_TOOLS
+        # Plus cash flow and KPI access for results tabs
+        "get_cashflow_results",
+        "compute_cashflow_expression",
+        "get_market_assumptions",
+        "update_market_assumptions",
+        "get_unit_types",
+        "get_budget_items",
+    ],
 }
 
 
@@ -405,6 +423,8 @@ def normalize_page_context(
         return "land_schedule"
     if ctx in ("reports", "document", "documents", "map", "alpha_assistant"):
         return ctx if ctx in PAGE_TOOLS else ("documents" if ctx == "document" else ctx)
+    if ctx in ("investment_committee", "ic", "ic_review"):
+        return "investment_committee"
 
     return default_home
 

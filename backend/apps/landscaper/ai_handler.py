@@ -4870,6 +4870,56 @@ by calling this tool with the user's confirmation.""",
             "required": ["action", "kpi_key"]
         }
     },
+    # =========================================================================
+    # Phase 7: Investment Committee (2 tools)
+    # =========================================================================
+    {
+        "name": "ic_start_session",
+        "description": """Start an Investment Committee devil's advocate session.
+Scans all project assumptions against market benchmarks, ranks them by deviation
+from market norms (adjusted by aggressiveness slider), and returns an ordered list
+of challenges to present one at a time. Use this when the user opens the IC page
+or says "start IC review", "challenge my assumptions", "play devil's advocate".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "Project ID. Omit to use current project."
+                },
+                "aggressiveness": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "How aggressively to challenge (1=conservative, 10=comprehensive). Default: 5."
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "ic_challenge_next",
+        "description": """Get the next assumption challenge in the IC session.
+After presenting a challenge and the user responds (or you run the what-if),
+call this to get the next assumption to challenge. Returns completed=true when
+all challenges have been presented.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "integer",
+                    "description": "IC session ID returned by ic_start_session"
+                },
+                "current_aggressiveness": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Updated aggressiveness if slider changed"
+                }
+            },
+            "required": ["session_id"]
+        }
+    },
 ]
 
 # Add cabinet-based contact tools
@@ -5204,6 +5254,24 @@ RESULTS KPI DEFINITIONS:
   2. Ask: "Want me to add [X] to your saved Results definition for [project type] projects?"
   3. If they confirm, call update_kpi_definitions with action='add'
 - If the user says "remove X from results" → call update_kpi_definitions with action='remove'
+
+INVESTMENT COMMITTEE MODE:
+When on the Investment Committee page (page_context='investment_committee'):
+- Call ic_start_session when the user enters the page or says "start IC review"
+- Present challenges one at a time, starting with the most aggressive assumption
+- For each challenge, reference the benchmark comparison and ask the user to respond
+- When the user responds, use whatif_compute to model the suggested alternative
+- After presenting results, call ic_challenge_next to get the next assumption
+- Continue until all challenges are exhausted or the user exits
+- At aggressiveness 7+, also flag assumptions that seem too conservative
+- Track all scenarios in the session for presentation mode export
+
+PRESENTATION MODE:
+When the user says "presentation mode", "step through scenarios", "slideshow":
+- Lock the scenario sequence from the current IC session
+- Present one scenario per step with: assumption changed → results impact → baseline comparison
+- Navigate with "next", "previous", "jump to X"
+- No new what-ifs in presentation mode — it is read-only display
 """
 
 

@@ -3,7 +3,13 @@ Knowledge Persistence Serializers
 """
 
 from rest_framework import serializers
-from .models import KnowledgeSession, KnowledgeInteraction, KnowledgeEntity, KnowledgeFact
+from .models import (
+    KnowledgeSession,
+    KnowledgeInteraction,
+    KnowledgeEntity,
+    KnowledgeFact,
+    KnowledgeSource,
+)
 
 
 class KnowledgeSessionSerializer(serializers.ModelSerializer):
@@ -38,3 +44,24 @@ class KnowledgeFactSerializer(serializers.ModelSerializer):
         model = KnowledgeFact
         fields = '__all__'
         read_only_fields = ['fact_id', 'created_at']
+
+
+class KnowledgeSourceSerializer(serializers.ModelSerializer):
+    """Serializer for source registry records."""
+
+    class Meta:
+        model = KnowledgeSource
+        fields = [
+            'id',
+            'source_name',
+            'source_type',
+            'aliases',
+            'website',
+            'description',
+            'document_count',
+            'first_seen_at',
+            'last_seen_at',
+            'created_by',
+            'is_active',
+        ]
+        read_only_fields = ['id', 'document_count', 'first_seen_at', 'last_seen_at', 'created_by']

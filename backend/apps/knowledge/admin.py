@@ -5,7 +5,7 @@ Django Admin for Knowledge Models
 from django.contrib import admin
 from .models import (
     KnowledgeEntity, KnowledgeFact, KnowledgeSession,
-    KnowledgeInteraction, KnowledgeEmbedding, KnowledgeInsight
+    KnowledgeInteraction, KnowledgeEmbedding, KnowledgeInsight, KnowledgeSource
 )
 
 
@@ -88,3 +88,11 @@ class KnowledgeInsightAdmin(admin.ModelAdmin):
     list_filter = ('insight_type', 'severity', 'acknowledged', 'created_at')
     search_fields = ('insight_title', 'insight_description')
     readonly_fields = ('insight_id', 'created_at')
+
+
+@admin.register(KnowledgeSource)
+class KnowledgeSourceAdmin(admin.ModelAdmin):
+    list_display = ('source_name', 'source_type', 'document_count', 'is_active', 'last_seen_at')
+    list_filter = ('source_type', 'is_active')
+    search_fields = ('source_name',)
+    readonly_fields = ('document_count', 'first_seen_at', 'last_seen_at')

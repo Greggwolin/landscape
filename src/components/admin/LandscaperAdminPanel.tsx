@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Sparkles, History, MessageSquare, Settings2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Sparkles, History, MessageSquare, Settings2, BookOpen } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
 
 // Dynamically import components to avoid SSR issues
 const ExtractionMappingAdmin = dynamic(
   () => import('@/components/admin/ExtractionMappingAdmin').then((mod) => mod.ExtractionMappingAdmin),
+  { ssr: false }
+);
+
+const KnowledgeLibraryPanel = dynamic(
+  () => import('@/components/admin/knowledge-library/KnowledgeLibraryPanel'),
   { ssr: false }
 );
 
@@ -25,6 +30,13 @@ const LANDSCAPER_SECTIONS: LandscaperSection[] = [
     label: 'AI Extraction Mappings',
     description: 'Configure field mappings for AI document extraction',
     icon: <Sparkles size={18} />,
+    available: true
+  },
+  {
+    key: 'knowledge_library',
+    label: 'Knowledge Library',
+    description: 'Search, browse, and manage Landscaper\u2019s document knowledge base',
+    icon: <BookOpen size={18} />,
     available: true
   },
   {
@@ -133,6 +145,7 @@ export default function LandscaperAdminPanel() {
                 {isExpanded && section.available && (
                   <div className="p-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                     {section.key === 'extraction_mappings' && <ExtractionMappingAdmin />}
+                    {section.key === 'knowledge_library' && <KnowledgeLibraryPanel />}
                   </div>
                 )}
               </div>

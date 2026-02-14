@@ -1,0 +1,110 @@
+'use client';
+
+import { useState, useCallback } from 'react';
+
+interface AggressivenessSliderProps {
+  value: number;
+  onChange: (value: number) => void;
+}
+
+const LEVEL_LABELS: Record<number, string> = {
+  1: 'Very Conservative',
+  2: 'Conservative',
+  3: 'Conservative',
+  4: 'Moderate',
+  5: 'Moderate',
+  6: 'Moderate',
+  7: 'Aggressive',
+  8: 'Aggressive',
+  9: 'Very Aggressive',
+  10: 'Comprehensive',
+};
+
+const LEVEL_COLORS: Record<number, string> = {
+  1: '#22c55e',
+  2: '#4ade80',
+  3: '#86efac',
+  4: '#fbbf24',
+  5: '#f59e0b',
+  6: '#f97316',
+  7: '#ef4444',
+  8: '#dc2626',
+  9: '#b91c1c',
+  10: '#991b1b',
+};
+
+export function AggressivenessSlider({ value, onChange }: AggressivenessSliderProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(parseInt(e.target.value, 10));
+    },
+    [onChange]
+  );
+
+  const color = LEVEL_COLORS[value] || '#f59e0b';
+  const label = LEVEL_LABELS[value] || 'Moderate';
+  const percentage = ((value - 1) / 9) * 100;
+
+  return (
+    <div className="d-flex align-items-center gap-3" style={{ minWidth: 320 }}>
+      <span className="text-body-secondary" style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+        Challenge Level:
+      </span>
+      <div className="flex-grow-1 position-relative">
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={value}
+          onChange={handleChange}
+          onMouseDown={() => setIsDragging(true)}
+          onMouseUp={() => setIsDragging(false)}
+          className="form-range"
+          style={{
+            width: '100%',
+            accentColor: color,
+          }}
+        />
+        {/* Track fill indicator */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -2,
+            left: 0,
+            width: `${percentage}%`,
+            height: 3,
+            backgroundColor: color,
+            borderRadius: 2,
+            transition: isDragging ? 'none' : 'width 0.2s ease',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
+      <div
+        className="d-flex align-items-center gap-2"
+        style={{ minWidth: 140 }}
+      >
+        <span
+          className="fw-bold"
+          style={{
+            fontSize: '1.1rem',
+            color,
+            minWidth: 28,
+            textAlign: 'center',
+          }}
+        >
+          {value}
+        </span>
+        <span
+          className="text-body-secondary"
+          style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+        >
+          {label}
+        </span>
+      </div>
+    </div>
+  );
+}

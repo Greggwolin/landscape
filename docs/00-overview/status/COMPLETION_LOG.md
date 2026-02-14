@@ -10,6 +10,12 @@ Historical record of feature and migration completions. For current implementati
 
 | Date | Milestone | Notes |
 |------|-----------|-------|
+| 2026-02-13 | Knowledge Library Integration | Landscaper admin panel Knowledge Library with 5-column cascading faceted filters, progressive search fallback, batch download, drag-and-drop upload, doc_geo_tag table, 4 Django API endpoints, 7 React components |
+| 2026-02-13 | Cloudflare R2 Media Storage | Configured R2 storage for document media, fixed build issues |
+| 2026-02-13 | Investment Committee Challenge Mode | IC Devil's Advocate tools for Landscaper, scenario-based challenge sessions |
+| 2026-02-13 | Knowledge Source Registry | Source registry CRUD for platform knowledge publishers, search/match endpoints |
+| 2026-02-11 | Conversational Column Mapping | Moved rent roll column mapping from modal UI into Landscaper AI chat with two new tools |
+| 2026-02-10 | Landscaper Stability & Rent Roll Visibility | Tool hang fix (truncation, loop limits, batch SQL), extraction truncation fix, dynamic columns, auto-refresh |
 | 2026-02-08 | Folder-Tabs UI Overhaul | 25+ legacy pages archived, ProjectContentRouter, ActiveProjectBar, media system (picker/preview/card/classification), location intelligence expansion, property type tokens, Landscaper chat enhancements, income property cashflow service |
 | 2026-02-06 | Debt UI Consolidation (Parts 1-3) | Loan Schedule Grid, Loan Schedule Modal, Leveraged Cash Flow, Django serializer fixes, legacy route cleanup |
 | 2026-02-05 | Rent Roll Extraction Improvements | Async processing, direct Excel parsing, tenant name fix, cancel extraction |

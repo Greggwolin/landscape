@@ -23,6 +23,22 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Knowledge Library Integration (Feb 13, 2026)',
+      path: '/docs/09-session-notes/2026-02-13-knowledge-library-integration.md',
+      category: 'AI',
+      description: 'Knowledge Library panel in Landscaper admin — 5-column cascading faceted filters, progressive search fallback (6 levels), doc_geo_tag geographic tagging, batch download, drag-and-drop upload, 4 Django API endpoints, 7 React components',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-02-13'
+    },
+    {
+      title: 'Conversational Column Mapping (Feb 11, 2026)',
+      path: '/docs/09-session-notes/2026-02-11-conversational-column-mapping.md',
+      category: 'AI',
+      description: 'Moved rent roll column mapping from modal UI into Landscaper AI chat — two new tools (analyze_rent_roll_columns, confirm_column_mapping), shared service extraction, AI-native workflow',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-02-11'
+    },
+    {
       title: 'Landscaper Stability & Rent Roll Visibility (Feb 10, 2026)',
       path: '/docs/09-session-notes/2026-02-10-landscaper-stability-and-rent-roll-visibility.md',
       category: 'AI',

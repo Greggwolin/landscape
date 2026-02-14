@@ -539,6 +539,57 @@ class KnowledgeInsight(models.Model):
 # Foundational reference documents for Landscaper AI - NOT USER FACING
 # =============================================================================
 
+class KnowledgeSource(models.Model):
+    """Canonical source registry for platform knowledge publishers."""
+
+    class SourceType(models.TextChoices):
+        PUBLISHER = 'publisher', 'Publisher'
+        BROKERAGE = 'brokerage', 'Brokerage'
+        GOVERNMENT = 'government', 'Government'
+        ACADEMIC = 'academic', 'Academic'
+        TRADE_ASSOCIATION = 'trade_association', 'Trade Association'
+        DATA_PROVIDER = 'data_provider', 'Data Provider'
+        OTHER = 'other', 'Other'
+
+    source_name = models.CharField(max_length=200, unique=True)
+    source_type = models.CharField(
+        max_length=50,
+        choices=SourceType.choices,
+        default=SourceType.OTHER,
+    )
+    aliases = models.JSONField(default=list)
+    website = models.CharField(max_length=500, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    document_count = models.IntegerField(default=0)
+    first_seen_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    created_by = models.CharField(max_length=100, default='system')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_knowledge_source'
+        ordering = ['source_name']
+        constraints = [
+            models.CheckConstraint(
+                name='tbl_knowledge_source_type_chk',
+                check=models.Q(
+                    source_type__in=[
+                        'publisher',
+                        'brokerage',
+                        'government',
+                        'academic',
+                        'trade_association',
+                        'data_provider',
+                        'other',
+                    ]
+                ),
+            ),
+        ]
+
+    def __str__(self):
+        return self.source_name
+
+
 class PlatformKnowledge(models.Model):
     """
     Foundational reference documents for Landscaper AI.
@@ -576,6 +627,14 @@ class PlatformKnowledge(models.Model):
     subtitle = models.CharField(max_length=500, blank=True, null=True)
     edition = models.CharField(max_length=50, blank=True, null=True)
     publisher = models.CharField(max_length=255, blank=True, null=True)
+    source = models.ForeignKey(
+        KnowledgeSource,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='platform_documents',
+        db_column='source_id',
+    )
     publication_year = models.IntegerField(blank=True, null=True)
     isbn = models.CharField(max_length=20, blank=True, null=True)
 
@@ -593,6 +652,7 @@ class PlatformKnowledge(models.Model):
     file_path = models.CharField(max_length=500, blank=True, null=True)
     file_hash = models.CharField(max_length=64, blank=True, null=True)
     file_size_bytes = models.BigIntegerField(blank=True, null=True)
+    metadata = models.JSONField(default=dict, blank=True)
 
     ingestion_status = models.CharField(
         max_length=50,
@@ -1123,3 +1183,51 @@ class ExtractionJob(models.Model):
     def is_active(self) -> bool:
         """Check if job is still running."""
         return self.status in (self.Status.QUEUED, self.Status.PROCESSING)
+
+
+class DocGeoTag(models.Model):
+    """
+    Independent geographic tagging for documents.
+    Documents can have geo tags inferred from their project,
+    extracted by AI, or manually assigned by users.
+    """
+
+    GEO_LEVEL_CHOICES = [
+        ('country', 'Country'),
+        ('region', 'Region'),
+        ('state', 'State'),
+        ('msa', 'MSA'),
+        ('county', 'County'),
+        ('city', 'City'),
+    ]
+
+    GEO_SOURCE_CHOICES = [
+        ('inferred', 'Inferred from Project'),
+        ('ai_extracted', 'AI Extracted'),
+        ('user_assigned', 'User Assigned'),
+    ]
+
+    doc_geo_tag_id = models.AutoField(primary_key=True)
+    doc_id = models.IntegerField(db_index=True)
+    geo_level = models.CharField(max_length=20, choices=GEO_LEVEL_CHOICES)
+    geo_value = models.CharField(max_length=100)
+    geo_source = models.CharField(
+        max_length=20,
+        choices=GEO_SOURCE_CHOICES,
+        default='inferred'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'doc_geo_tag'
+        unique_together = [('doc_id', 'geo_level', 'geo_value')]
+        indexes = [
+            models.Index(fields=['doc_id']),
+            models.Index(fields=['geo_level', 'geo_value']),
+        ]
+        verbose_name = 'Document Geo Tag'
+        verbose_name_plural = 'Document Geo Tags'
+
+    def __str__(self):
+        return f"Doc {self.doc_id}: {self.geo_level}={self.geo_value} ({self.geo_source})"

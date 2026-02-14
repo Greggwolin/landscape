@@ -79,11 +79,13 @@ export interface PlatformKnowledgeDocument {
   subtitle?: string | null;
   edition?: string | null;
   publisher?: string | null;
+  source_id?: number | null;
   publication_year?: number | null;
   page_count?: number | null;
   knowledge_domain?: string | null;
   property_types?: string[] | null;
   description?: string | null;
+  metadata?: Record<string, unknown> | null;
   ingestion_status?: string | null;
   chunk_count?: number | null;
   file_path?: string | null;

@@ -2,7 +2,7 @@ import json
 import logging
 import math
 import re
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from django.db import connection, transaction
 from django.http import JsonResponse
@@ -11,11 +11,16 @@ from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from ..models import PlatformKnowledge, PlatformKnowledgeChunk
+from ..models import KnowledgeSource, PlatformKnowledge, PlatformKnowledgeChunk
+from ..services.platform_source_analysis import analyze_publisher_and_references
 from ..services.text_extraction import extract_text_from_url, extract_text_and_page_count_from_url
 from ..services.chunking import chunk_text, DEFAULT_CHUNK_SIZE
 from ..services.embedding_service import generate_embedding
 from ..services.platform_knowledge_retriever import get_platform_knowledge_retriever
+from ..services.source_registry_service import (
+    match_source_name,
+    refresh_source_document_counts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +35,25 @@ PROPERTY_TYPE_KEYWORDS = {
 }
 
 SOURCE_KEYWORDS = {
+    'cbre': 'CBRE',
+    'colliers': 'Colliers',
+    'cushman': 'Cushman & Wakefield',
+    'jll': 'JLL',
+    'newmark': 'Newmark',
+    'berkadia': 'Berkadia',
+    'eastdil': 'Eastdil Secured',
+    'walker dunlop': 'Walker & Dunlop',
+    'walker & dunlop': 'Walker & Dunlop',
     'irem': 'IREM',
     'appraisal institute': 'Appraisal Institute',
-    'uspap': 'USPAP',
-    'naa': 'NAA',
-    'boma': 'BOMA',
-    'internal': 'Internal',
+    'costar': 'CoStar',
+    'realpage': 'RealPage',
+    'yardi': 'Yardi',
+    'federal reserve': 'Federal Reserve',
+    'freddie mac': 'Freddie Mac',
+    'fannie mae': 'Fannie Mae',
+    'hud': 'HUD',
+    'census bureau': 'Census Bureau',
 }
 
 DOMAIN_KEYWORDS = [
@@ -48,11 +66,11 @@ DOMAIN_KEYWORDS = [
 
 
 def _infer_source(text: str, filename: str) -> str:
-    haystack = f"{filename} {text}".lower()
+    haystack = f"{filename} {text[:8000]}".lower()
     for keyword, source in SOURCE_KEYWORDS.items():
         if keyword in haystack:
             return source
-    return 'Other'
+    return ''
 
 
 def _infer_domain(text: str, filename: str) -> str:
@@ -85,13 +103,61 @@ def _infer_year(text: str, filename: str) -> Optional[int]:
     return None
 
 
-def _build_analysis(filename: str, domain: str, source: str, property_types: List[str]) -> str:
+def _build_analysis(
+    filename: str,
+    domain: str,
+    source: str,
+    property_types: List[str],
+    source_evidence: str = '',
+    referenced_sources: Optional[List[str]] = None,
+) -> str:
+    referenced_sources = referenced_sources or []
     types = ', '.join(property_types) if property_types else 'multiple property types'
     domain_label = domain.replace('_', ' ')
-    return (
-        f'"{filename}" appears to reference {domain_label} guidance from {source} '
-        f'covering {types.lower()}.'
+    publisher_label = source or 'not confidently identified'
+    summary = (
+        f'"{filename}" is categorized as {domain_label} content for {types.lower()}. '
+        f'Publisher signal: {publisher_label}.'
     )
+    if source_evidence:
+        summary += f' Evidence: {source_evidence}'
+    if referenced_sources:
+        summary += f" Referenced sources: {', '.join(referenced_sources[:5])}."
+    return summary
+
+
+def _resolve_source_suggestion(source_name: str) -> Dict[str, Any]:
+    cleaned = (source_name or '').strip()
+    if not cleaned:
+        return {
+            'source_id': None,
+            'source_name': '',
+            'match_status': 'none',
+            'match_type': 'none',
+            'match_confidence': 0.0,
+            'create_suggestion': None,
+        }
+
+    match = match_source_name(cleaned, min_confidence=0.82)
+    matched_source = match.get('source')
+    if match.get('matched') and matched_source:
+        return {
+            'source_id': matched_source.id,
+            'source_name': matched_source.source_name,
+            'match_status': 'matched',
+            'match_type': match.get('match_type') or 'source_exact',
+            'match_confidence': float(match.get('confidence') or 0.0),
+            'create_suggestion': None,
+        }
+
+    return {
+        'source_id': None,
+        'source_name': cleaned,
+        'match_status': 'suggest_create',
+        'match_type': match.get('match_type') or 'no_match',
+        'match_confidence': float(match.get('confidence') or 0.0),
+        'create_suggestion': match.get('create_suggestion') or {'name': cleaned},
+    }
 
 
 def _ensure_unique_key(base_key: str) -> str:
@@ -133,10 +199,41 @@ def analyze_platform_document(request):
         text = text or ''
 
         domain = _infer_domain(text, doc_name)
-        source = _infer_source(text, doc_name)
         property_types = _infer_property_types(text, doc_name)
         year = _infer_year(text, doc_name)
-        analysis = _build_analysis(doc_name, domain, source, property_types)
+        source_analysis = analyze_publisher_and_references(doc_name, text)
+        suggested_source = source_analysis.get('suggested_source') or {}
+        referenced_sources = source_analysis.get('referenced_sources') or []
+
+        raw_source_name = (
+            str(suggested_source.get('name')).strip()
+            if isinstance(suggested_source, dict) and suggested_source.get('name')
+            else ''
+        )
+        if not raw_source_name:
+            raw_source_name = _infer_source(text, doc_name)
+
+        source_resolution = _resolve_source_suggestion(raw_source_name)
+        ai_source_confidence = (
+            float(suggested_source.get('confidence') or 0.0)
+            if isinstance(suggested_source, dict)
+            else 0.0
+        )
+        source_confidence = ai_source_confidence or source_resolution['match_confidence']
+        source_evidence = (
+            str(suggested_source.get('evidence') or '').strip()
+            if isinstance(suggested_source, dict)
+            else ''
+        )
+
+        analysis = _build_analysis(
+            doc_name,
+            domain,
+            source_resolution['source_name'],
+            property_types,
+            source_evidence=source_evidence,
+            referenced_sources=referenced_sources,
+        )
         estimated_chunks = max(1, math.ceil(len(text) / DEFAULT_CHUNK_SIZE)) if text else 1
 
         return JsonResponse({
@@ -145,10 +242,28 @@ def analyze_platform_document(request):
             'suggestions': {
                 'knowledge_domain': domain,
                 'property_types': property_types,
-                'source': source,
+                'source': source_resolution['source_name'],
+                'source_id': source_resolution['source_id'],
+                'source_confidence': source_confidence,
+                'source_evidence': source_evidence,
+                'source_match_status': source_resolution['match_status'],
+                'source_match_type': source_resolution['match_type'],
+                'source_match_confidence': source_resolution['match_confidence'],
+                'source_create_suggestion': source_resolution['create_suggestion'],
+                'suggested_source': {
+                    'name': source_resolution['source_name'] or raw_source_name,
+                    'confidence': source_confidence,
+                    'evidence': source_evidence,
+                    'source_id': source_resolution['source_id'],
+                    'matched': bool(source_resolution['source_id']),
+                    'match_status': source_resolution['match_status'],
+                    'match_type': source_resolution['match_type'],
+                },
+                'referenced_sources': referenced_sources,
                 'year': year,
                 'geographic_scope': 'National'
             },
+            'referenced_sources': referenced_sources,
             'estimated_chunks': estimated_chunks,
             'warning': error
         })
@@ -171,6 +286,43 @@ def ingest_platform_document(request):
         if not storage_uri:
             return JsonResponse({'error': 'storage_uri is required'}, status=400)
 
+        requested_source_id = data.get('source_id')
+        requested_source_name = (data.get('source') or '').strip()
+        resolved_source: Optional[KnowledgeSource] = None
+        publisher_value = requested_source_name or None
+
+        if requested_source_id is not None:
+            try:
+                resolved_source = KnowledgeSource.objects.get(
+                    id=int(requested_source_id),
+                    is_active=True,
+                )
+                publisher_value = resolved_source.source_name
+            except (TypeError, ValueError):
+                return JsonResponse({'error': 'source_id must be an integer'}, status=400)
+            except KnowledgeSource.DoesNotExist:
+                return JsonResponse({'error': 'source_id not found'}, status=400)
+        elif requested_source_name:
+            source_match = match_source_name(requested_source_name, min_confidence=0.82)
+            if source_match.get('matched') and source_match.get('source'):
+                resolved_source = source_match['source']
+                publisher_value = resolved_source.source_name
+
+        referenced_sources = data.get('referenced_sources')
+        if not isinstance(referenced_sources, list):
+            referenced_sources = []
+        referenced_sources = [
+            str(value).strip()
+            for value in referenced_sources
+            if isinstance(value, str) and str(value).strip()
+        ]
+
+        metadata_payload = data.get('metadata')
+        if not isinstance(metadata_payload, dict):
+            metadata_payload = {}
+        if referenced_sources:
+            metadata_payload['referenced_sources'] = referenced_sources
+
         base_title = doc_name.rsplit('.', 1)[0]
         document_key = _ensure_unique_key(slugify(base_title)[:90])
 
@@ -179,11 +331,13 @@ def ingest_platform_document(request):
             title=base_title,
             subtitle=data.get('geographic_scope'),
             edition=data.get('edition'),
-            publisher=data.get('source'),
+            publisher=publisher_value,
+            source=resolved_source,
             publication_year=data.get('year'),
             knowledge_domain=data.get('knowledge_domain') or 'other',
             property_types=data.get('property_types') or [],
             description=data.get('description'),
+            metadata=metadata_payload,
             total_chapters=0,
             total_pages=None,
             file_path=storage_uri,
@@ -199,12 +353,14 @@ def ingest_platform_document(request):
             if page_count is not None:
                 doc.page_count = page_count
             doc.save(update_fields=['ingestion_status', 'page_count'])
+            refresh_source_document_counts()
             return JsonResponse({'error': error or 'No text extracted'}, status=500)
 
         chunks = chunk_text(text)
         if not chunks:
             doc.ingestion_status = PlatformKnowledge.IngestionStatus.FAILED
             doc.save(update_fields=['ingestion_status'])
+            refresh_source_document_counts()
             return JsonResponse({'error': 'No chunks generated'}, status=500)
 
         with transaction.atomic():
@@ -229,10 +385,14 @@ def ingest_platform_document(request):
         doc.page_count = page_count
         doc.save(update_fields=['ingestion_status', 'last_indexed_at', 'chunk_count', 'page_count'])
 
+        refresh_source_document_counts()
+
         return JsonResponse({
             'success': True,
             'document_key': doc.document_key,
-            'chunk_count': doc.chunk_count
+            'chunk_count': doc.chunk_count,
+            'source_id': doc.source_id,
+            'publisher': doc.publisher,
         })
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
@@ -374,25 +534,44 @@ def update_platform_knowledge(request, document_key: str):
         # Update allowed fields
         allowed_fields = [
             'title', 'publisher', 'publication_year', 'knowledge_domain',
-            'property_types', 'subtitle', 'description'
+            'property_types', 'subtitle', 'description', 'metadata'
         ]
 
         for field in allowed_fields:
             if field in data:
+                if field == 'metadata' and not isinstance(data[field], dict):
+                    return JsonResponse({'error': 'metadata must be an object'}, status=400)
                 setattr(doc, field, data[field])
 
+        if 'source_id' in data:
+            source_id = data.get('source_id')
+            if source_id in (None, ''):
+                doc.source = None
+            else:
+                try:
+                    source_obj = KnowledgeSource.objects.get(id=int(source_id), is_active=True)
+                except (TypeError, ValueError):
+                    return JsonResponse({'error': 'source_id must be an integer'}, status=400)
+                except KnowledgeSource.DoesNotExist:
+                    return JsonResponse({'error': 'source_id not found'}, status=400)
+                doc.source = source_obj
+                doc.publisher = source_obj.source_name
+
         doc.save()
+        refresh_source_document_counts()
 
         return JsonResponse({
             'success': True,
             'document_key': doc.document_key,
             'title': doc.title,
             'publisher': doc.publisher,
+            'source_id': doc.source_id,
             'publication_year': doc.publication_year,
             'knowledge_domain': doc.knowledge_domain,
             'property_types': doc.property_types,
             'subtitle': doc.subtitle,
             'description': doc.description,
+            'metadata': doc.metadata,
         })
 
     except json.JSONDecodeError:

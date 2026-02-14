@@ -1,221 +1,530 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CModal, CModalBody, CModalFooter, CModalHeader, CModalTitle } from '@coreui/react';
 
 const DOMAIN_OPTIONS = [
- 'Operating Expenses',
- 'Valuation Methodology',
- 'Market Data',
- 'Legal/Regulatory',
- 'Cost Estimation',
- 'Other'
+  'Operating Expenses',
+  'Valuation Methodology',
+  'Market Data',
+  'Legal/Regulatory',
+  'Cost Estimation',
+  'Other'
 ];
 
 const PROPERTY_TYPE_OPTIONS = [
- 'Multifamily',
- 'Retail',
- 'Office',
- 'Industrial',
- 'Land Development',
- 'All'
-];
-
-const SOURCE_OPTIONS = [
- 'IREM',
- 'Appraisal Institute',
- 'USPAP',
- 'NAA',
- 'BOMA',
- 'Internal',
- 'Other'
+  'Multifamily',
+  'Retail',
+  'Office',
+  'Industrial',
+  'Land Development',
+  'All'
 ];
 
 const GEO_SCOPE_OPTIONS = [
- 'National',
- 'Regional',
- 'State',
- 'MSA/Metro',
- 'Local'
+  'National',
+  'Regional',
+  'State',
+  'MSA/Metro',
+  'Local'
 ];
 
+const SOURCE_TYPE_OPTIONS = [
+  { value: 'publisher', label: 'Publisher' },
+  { value: 'brokerage', label: 'Brokerage' },
+  { value: 'government', label: 'Government' },
+  { value: 'academic', label: 'Academic' },
+  { value: 'trade_association', label: 'Trade Association' },
+  { value: 'data_provider', label: 'Data Provider' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+type SourceTypeValue = (typeof SOURCE_TYPE_OPTIONS)[number]['value'];
+
+interface KnowledgeSourceOption {
+  id: number;
+  source_name: string;
+  source_type: SourceTypeValue;
+  aliases: string[];
+  document_count: number;
+  is_active: boolean;
+}
+
 export interface PlatformKnowledgeMetadata {
- knowledge_domain: string;
- property_types: string[];
- source: string;
- year?: number | null;
- geographic_scope: string;
- supersedes?: string;
+  knowledge_domain: string;
+  property_types: string[];
+  source: string;
+  source_id?: number | null;
+  source_type?: SourceTypeValue | null;
+  source_confidence?: number | null;
+  source_evidence?: string | null;
+  source_match_status?: string | null;
+  referenced_sources?: string[];
+  year?: number | null;
+  geographic_scope: string;
+  supersedes?: string;
 }
 
 interface PlatformKnowledgeModalProps {
- visible: boolean;
- fileName: string;
- analysis: string;
- estimatedChunks?: number | null;
- initialValues: PlatformKnowledgeMetadata;
- onClose: () => void;
- onConfirm: (values: PlatformKnowledgeMetadata) => void;
- isSubmitting?: boolean;
+  visible: boolean;
+  fileName: string;
+  analysis: string;
+  estimatedChunks?: number | null;
+  initialValues: PlatformKnowledgeMetadata;
+  onClose: () => void;
+  onConfirm: (values: PlatformKnowledgeMetadata) => void;
+  isSubmitting?: boolean;
 }
 
 export default function PlatformKnowledgeModal({
- visible,
- fileName,
- analysis,
- estimatedChunks,
- initialValues,
- onClose,
- onConfirm,
- isSubmitting = false
+  visible,
+  fileName,
+  analysis,
+  estimatedChunks,
+  initialValues,
+  onClose,
+  onConfirm,
+  isSubmitting = false
 }: PlatformKnowledgeModalProps) {
- const [formValues, setFormValues] = useState<PlatformKnowledgeMetadata>(initialValues);
+  const [formValues, setFormValues] = useState<PlatformKnowledgeMetadata>(initialValues);
+  const [sourceQuery, setSourceQuery] = useState(initialValues.source || '');
+  const [sources, setSources] = useState<KnowledgeSourceOption[]>([]);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  const [isLoadingSources, setIsLoadingSources] = useState(false);
+  const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
+  const [showAddSourceForm, setShowAddSourceForm] = useState(false);
+  const [newSourceName, setNewSourceName] = useState('');
+  const [newSourceType, setNewSourceType] = useState<SourceTypeValue>('other');
+  const [isCreatingSource, setIsCreatingSource] = useState(false);
+  const [createSourceError, setCreateSourceError] = useState<string | null>(null);
+  const sourceBoxRef = useRef<HTMLDivElement | null>(null);
 
- useEffect(() => {
- setFormValues(initialValues);
- }, [initialValues]);
+  useEffect(() => {
+    setFormValues(initialValues);
+    setSourceQuery(initialValues.source || '');
+    setShowAddSourceForm(false);
+    setCreateSourceError(null);
+  }, [initialValues]);
 
- const yearValue = useMemo(() => (formValues.year ? String(formValues.year) : ''), [formValues.year]);
+  useEffect(() => {
+    if (!visible) return;
 
- return (
- <CModal visible={visible} onClose={onClose} size="lg" alignment="center">
- <CModalHeader>
- <CModalTitle>Catalog Platform Knowledge</CModalTitle>
- </CModalHeader>
- <CModalBody className="space-y-4">
- <div className="text-sm font-medium">{fileName}</div>
+    const loadSources = async () => {
+      setIsLoadingSources(true);
+      setSourcesError(null);
+      try {
+        const response = await fetch('/api/platform-knowledge/sources');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load sources');
+        }
 
- <div className="rounded-lg border border bg-body-tertiary p-3 text-sm text-body-secondary">
- <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">Landscaper Analysis</div>
- {analysis}
- </div>
+        const results = Array.isArray(data.results) ? data.results : [];
+        setSources(results);
+      } catch (error) {
+        setSources([]);
+        setSourcesError(error instanceof Error ? error.message : 'Failed to load sources');
+      } finally {
+        setIsLoadingSources(false);
+      }
+    };
 
- <div className="rounded-lg border border p-3">
- <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">Suggested Cataloging</div>
+    void loadSources();
+  }, [visible]);
 
- <div className="grid grid-cols-1 gap-3">
- <div>
- <label className="text-xs font-medium text-body-secondary">Knowledge Domain</label>
- <select
- className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
- value={formValues.knowledge_domain}
- onChange={(event) => setFormValues((prev) => ({ ...prev, knowledge_domain: event.target.value }))}
- >
- {DOMAIN_OPTIONS.map((option) => (
- <option key={option} value={option}>
- {option}
- </option>
- ))}
- </select>
- </div>
+  useEffect(() => {
+    if (!isSourceMenuOpen) return;
 
- <div>
- <label className="text-xs font-medium text-body-secondary">Property Types</label>
- <div className="mt-2 flex flex-wrap gap-3">
- {PROPERTY_TYPE_OPTIONS.map((option) => (
- <label key={option} className="flex items-center gap-2 text-xs text-body-secondary">
- <input
- type="checkbox"
- checked={formValues.property_types.includes(option)}
- onChange={(event) => {
- setFormValues((prev) => {
- const next = new Set(prev.property_types);
- if (event.target.checked) {
- next.add(option);
- } else {
- next.delete(option);
- }
- return { ...prev, property_types: Array.from(next) };
- });
- }}
- />
- {option}
- </label>
- ))}
- </div>
- </div>
+    const onMouseDown = (event: MouseEvent) => {
+      if (!sourceBoxRef.current) return;
+      if (sourceBoxRef.current.contains(event.target as Node)) return;
+      setIsSourceMenuOpen(false);
+    };
 
- <div className="grid grid-cols-2 gap-3">
- <div>
- <label className="text-xs font-medium text-body-secondary">Source</label>
- <select
- className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
- value={formValues.source}
- onChange={(event) => setFormValues((prev) => ({ ...prev, source: event.target.value }))}
- >
- {SOURCE_OPTIONS.map((option) => (
- <option key={option} value={option}>
- {option}
- </option>
- ))}
- </select>
- </div>
- <div>
- <label className="text-xs font-medium text-body-secondary">Year</label>
- <input
- type="text"
- className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
- value={yearValue}
- onChange={(event) => {
- const nextValue = event.target.value.replace(/[^\d]/g, '');
- setFormValues((prev) => ({
- ...prev,
- year: nextValue ? parseInt(nextValue, 10) : null
- }));
- }}
- />
- </div>
- </div>
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [isSourceMenuOpen]);
 
- <div>
- <label className="text-xs font-medium text-body-secondary">Geographic Scope</label>
- <select
- className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
- value={formValues.geographic_scope}
- onChange={(event) => setFormValues((prev) => ({ ...prev, geographic_scope: event.target.value }))}
- >
- {GEO_SCOPE_OPTIONS.map((option) => (
- <option key={option} value={option}>
- {option}
- </option>
- ))}
- </select>
- </div>
+  const yearValue = useMemo(() => (formValues.year ? String(formValues.year) : ''), [formValues.year]);
 
- <div>
- <label className="text-xs font-medium text-body-secondary">Supersedes (optional)</label>
- <input
- type="text"
- className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
- value={formValues.supersedes || ''}
- onChange={(event) => setFormValues((prev) => ({ ...prev, supersedes: event.target.value }))}
- />
- </div>
- </div>
- </div>
+  const filteredSources = useMemo(() => {
+    const q = sourceQuery.trim().toLowerCase();
+    if (!q) return sources;
 
- <div className="text-xs text-body-tertiary">
- Ready to index: This document will be split into approximately {estimatedChunks ?? '—'} searchable sections.
- </div>
- </CModalBody>
- <CModalFooter>
- <button
- type="button"
- onClick={onClose}
- className="px-4 py-2 text-sm rounded-md border border"
- disabled={isSubmitting}
- >
- Cancel
- </button>
- <button
- type="button"
- onClick={() => onConfirm(formValues)}
- className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white disabled:opacity-60"
- disabled={isSubmitting}
- >
- {isSubmitting ? 'Processing...' : 'Confirm & Process'}
- </button>
- </CModalFooter>
- </CModal>
- );
+    const scored = sources
+      .map((source) => {
+        const name = source.source_name.toLowerCase();
+        const aliases = Array.isArray(source.aliases) ? source.aliases : [];
+
+        let score = 0;
+        if (name === q) score = Math.max(score, 1);
+        if (name.startsWith(q)) score = Math.max(score, 0.98);
+        if (name.includes(q)) score = Math.max(score, 0.95);
+
+        for (const alias of aliases) {
+          const aliasLower = alias.toLowerCase();
+          if (aliasLower === q) score = Math.max(score, 0.99);
+          if (aliasLower.startsWith(q)) score = Math.max(score, 0.96);
+          if (aliasLower.includes(q)) score = Math.max(score, 0.94);
+        }
+
+        return { source, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.source.source_name.localeCompare(b.source.source_name));
+
+    return scored.map((item) => item.source);
+  }, [sourceQuery, sources]);
+
+  const hasExactMatch = useMemo(() => {
+    const q = sourceQuery.trim().toLowerCase();
+    if (!q) return false;
+    return sources.some((source) => {
+      if (source.source_name.toLowerCase() === q) return true;
+      const aliases = Array.isArray(source.aliases) ? source.aliases : [];
+      return aliases.some((alias) => alias.toLowerCase() === q);
+    });
+  }, [sourceQuery, sources]);
+
+  const aiSuggestionBadge = useMemo(() => {
+    const suggestedName = (initialValues.source || '').trim().toLowerCase();
+    const currentName = sourceQuery.trim().toLowerCase();
+    if (!suggestedName || !currentName || suggestedName !== currentName) return null;
+    if (initialValues.source_confidence == null) return null;
+    const pct = Math.round(Math.max(0, Math.min(1, initialValues.source_confidence)) * 100);
+    return `AI Suggested (${pct}%)`;
+  }, [initialValues.source, initialValues.source_confidence, sourceQuery]);
+
+  const handleSelectSource = (source: KnowledgeSourceOption) => {
+    setFormValues((prev) => ({
+      ...prev,
+      source: source.source_name,
+      source_id: source.id,
+      source_type: source.source_type,
+    }));
+    setSourceQuery(source.source_name);
+    setIsSourceMenuOpen(false);
+    setShowAddSourceForm(false);
+    setCreateSourceError(null);
+  };
+
+  const handleAddNewSource = () => {
+    const proposedName = sourceQuery.trim();
+    setNewSourceName(proposedName);
+    setNewSourceType('other');
+    setShowAddSourceForm(true);
+    setCreateSourceError(null);
+    setIsSourceMenuOpen(false);
+  };
+
+  const handleCreateSource = async () => {
+    const sourceName = newSourceName.trim();
+    if (!sourceName) {
+      setCreateSourceError('Source name is required');
+      return;
+    }
+
+    setIsCreatingSource(true);
+    setCreateSourceError(null);
+
+    try {
+      const response = await fetch('/api/platform-knowledge/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_name: sourceName,
+          source_type: newSourceType,
+          aliases: [],
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 409 && data.existing_source) {
+        const existing = data.existing_source as KnowledgeSourceOption;
+        setSources((prev) => {
+          if (prev.some((item) => item.id === existing.id)) return prev;
+          return [...prev, existing].sort((a, b) => a.source_name.localeCompare(b.source_name));
+        });
+        handleSelectSource(existing);
+        setShowAddSourceForm(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create source');
+      }
+
+      const created = data.result as KnowledgeSourceOption;
+      setSources((prev) => [...prev, created].sort((a, b) => a.source_name.localeCompare(b.source_name)));
+      handleSelectSource(created);
+      setShowAddSourceForm(false);
+    } catch (error) {
+      setCreateSourceError(error instanceof Error ? error.message : 'Failed to create source');
+    } finally {
+      setIsCreatingSource(false);
+    }
+  };
+
+  return (
+    <CModal visible={visible} onClose={onClose} size="lg" alignment="center">
+      <CModalHeader>
+        <CModalTitle>Catalog Platform Knowledge</CModalTitle>
+      </CModalHeader>
+      <CModalBody className="space-y-4">
+        <div className="text-sm font-medium">{fileName}</div>
+
+        <div className="rounded-lg border border bg-body-tertiary p-3 text-sm text-body-secondary">
+          <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">Landscaper Analysis</div>
+          {analysis}
+        </div>
+
+        <div className="rounded-lg border border p-3">
+          <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">Suggested Cataloging</div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label className="text-xs font-medium text-body-secondary">Knowledge Domain</label>
+              <select
+                className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                value={formValues.knowledge_domain}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, knowledge_domain: event.target.value }))}
+              >
+                {DOMAIN_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-body-secondary">Property Types</label>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {PROPERTY_TYPE_OPTIONS.map((option) => (
+                  <label key={option} className="flex items-center gap-2 text-xs text-body-secondary">
+                    <input
+                      type="checkbox"
+                      checked={formValues.property_types.includes(option)}
+                      onChange={(event) => {
+                        setFormValues((prev) => {
+                          const next = new Set(prev.property_types);
+                          if (event.target.checked) {
+                            next.add(option);
+                          } else {
+                            next.delete(option);
+                          }
+                          return { ...prev, property_types: Array.from(next) };
+                        });
+                      }}
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div ref={sourceBoxRef} className="relative">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-body-secondary">Source</label>
+                  {aiSuggestionBadge && (
+                    <span
+                      className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700"
+                      title={initialValues.source_evidence || 'Suggested by Landscaper analysis'}
+                    >
+                      {aiSuggestionBadge}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                  value={sourceQuery}
+                  placeholder="Search or add source"
+                  onFocus={() => setIsSourceMenuOpen(true)}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setSourceQuery(next);
+                    setFormValues((prev) => ({
+                      ...prev,
+                      source: next,
+                      source_id: null,
+                      source_type: null,
+                    }));
+                    setShowAddSourceForm(false);
+                    setIsSourceMenuOpen(true);
+                    setCreateSourceError(null);
+                  }}
+                />
+
+                {isSourceMenuOpen && (
+                  <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border bg-body shadow-lg">
+                    {isLoadingSources && (
+                      <div className="px-3 py-2 text-xs text-body-tertiary">Loading sources...</div>
+                    )}
+                    {!isLoadingSources && filteredSources.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-body-tertiary">No matching sources</div>
+                    )}
+                    {!isLoadingSources && filteredSources.map((source) => (
+                      <button
+                        key={source.id}
+                        type="button"
+                        onClick={() => handleSelectSource(source)}
+                        className="w-full border-0 bg-transparent px-3 py-2 text-left text-sm hover:bg-body-tertiary"
+                      >
+                        <div className="font-medium text-body">{source.source_name}</div>
+                        <div className="text-xs text-body-tertiary">{source.source_type.replace('_', ' ')}</div>
+                      </button>
+                    ))}
+                    {!isLoadingSources && sourceQuery.trim() && !hasExactMatch && (
+                      <button
+                        type="button"
+                        onClick={handleAddNewSource}
+                        className="w-full border-0 border-t bg-transparent px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50"
+                      >
+                        Add new source...
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {sourcesError && (
+                  <div className="mt-1 text-xs text-red-600">{sourcesError}</div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-body-secondary">Year</label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                  value={yearValue}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.replace(/[^\d]/g, '');
+                    setFormValues((prev) => ({
+                      ...prev,
+                      year: nextValue ? parseInt(nextValue, 10) : null
+                    }));
+                  }}
+                />
+              </div>
+            </div>
+
+            {showAddSourceForm && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-blue-800">Add New Source</div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs font-medium text-body-secondary">Source Name</label>
+                    <input
+                      type="text"
+                      className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                      value={newSourceName}
+                      onChange={(event) => setNewSourceName(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-body-secondary">Source Type</label>
+                    <select
+                      className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                      value={newSourceType}
+                      onChange={(event) => setNewSourceType(event.target.value as SourceTypeValue)}
+                    >
+                      {SOURCE_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {createSourceError && (
+                  <div className="mt-2 text-xs text-red-700">{createSourceError}</div>
+                )}
+
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border px-3 py-1.5 text-xs"
+                    onClick={() => {
+                      setShowAddSourceForm(false);
+                      setCreateSourceError(null);
+                    }}
+                    disabled={isCreatingSource}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-xs text-white disabled:opacity-60"
+                    onClick={() => {
+                      void handleCreateSource();
+                    }}
+                    disabled={isCreatingSource}
+                  >
+                    {isCreatingSource ? 'Saving...' : 'Save Source'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-medium text-body-secondary">Geographic Scope</label>
+              <select
+                className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                value={formValues.geographic_scope}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, geographic_scope: event.target.value }))}
+              >
+                {GEO_SCOPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-body-secondary">Supersedes (optional)</label>
+              <input
+                type="text"
+                className="mt-1 w-full rounded-md border border bg-body px-3 py-2 text-sm"
+                value={formValues.supersedes || ''}
+                onChange={(event) => setFormValues((prev) => ({ ...prev, supersedes: event.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="text-xs text-body-tertiary">
+          Ready to index: This document will be split into approximately {estimatedChunks ?? '—'} searchable sections.
+        </div>
+      </CModalBody>
+      <CModalFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-sm rounded-md border border"
+          disabled={isSubmitting}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onConfirm({
+              ...formValues,
+              source: sourceQuery.trim(),
+              source_id: formValues.source_id ?? null,
+            })
+          }
+          className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white disabled:opacity-60"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Processing...' : 'Confirm & Process'}
+        </button>
+      </CModalFooter>
+    </CModal>
+  );
 }
