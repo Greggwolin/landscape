@@ -196,8 +196,13 @@ export default function KnowledgeLibraryPanel() {
     });
   };
 
+  // Download notification state
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+
   const handleDownloadSelected = async () => {
     if (selectedDocs.size === 0) return;
+
+    setDownloadNotice('Preparing download...');
 
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/knowledge/library/batch-download/`, {
@@ -206,7 +211,15 @@ export default function KnowledgeLibraryPanel() {
         body: JSON.stringify({ doc_ids: Array.from(selectedDocs) }),
       });
 
-      if (!response.ok) throw new Error('Download failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error((errData as { error?: string }).error || 'Download failed');
+      }
+
+      // Read download stats from response headers
+      const included = parseInt(response.headers.get('X-Download-Included') || '0', 10);
+      const skipped = parseInt(response.headers.get('X-Download-Skipped') || '0', 10);
+      const total = parseInt(response.headers.get('X-Download-Total') || '0', 10);
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -217,8 +230,18 @@ export default function KnowledgeLibraryPanel() {
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
+
+      // Show result notification
+      if (skipped > 0) {
+        setDownloadNotice(`Downloaded ${included} of ${total} files. ${skipped} file${skipped !== 1 ? 's were' : ' was'} not available.`);
+      } else {
+        setDownloadNotice(`Downloaded ${included} file${included !== 1 ? 's' : ''} successfully.`);
+      }
+      setTimeout(() => setDownloadNotice(null), 5000);
     } catch (error) {
       console.error('Batch download error:', error);
+      setDownloadNotice(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setDownloadNotice(null), 5000);
     }
   };
 
@@ -355,6 +378,23 @@ export default function KnowledgeLibraryPanel() {
         onDownloadSelected={() => void handleDownloadSelected()}
         onClearFilters={handleClearFilters}
       />
+
+      {/* Download / Upload Notification */}
+      {downloadNotice && (
+        <div
+          style={{
+            padding: '8px 16px',
+            margin: '0 0 8px',
+            borderRadius: '6px',
+            fontSize: '0.85rem',
+            backgroundColor: downloadNotice.includes('failed') ? 'var(--cui-danger-bg-subtle, #f8d7da)' : 'var(--cui-success-bg-subtle, #d1e7dd)',
+            color: downloadNotice.includes('failed') ? 'var(--cui-danger, #dc3545)' : 'var(--cui-success, #198754)',
+            border: `1px solid ${downloadNotice.includes('failed') ? 'var(--cui-danger-border-subtle, #f5c2c7)' : 'var(--cui-success-border-subtle, #badbcc)'}`,
+          }}
+        >
+          {downloadNotice}
+        </div>
+      )}
 
       {/* Auto-populated Document List */}
       <div className="kl-doc-list">

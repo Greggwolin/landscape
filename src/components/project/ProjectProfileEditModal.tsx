@@ -520,7 +520,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
 
           {/* Row 4: Address + City + County + State + Zip */}
           <CRow className="mb-2">
-            <CCol md={4}>
+            <CCol xs={12} className="profile-col-r4-address">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -535,7 +535,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-city">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -550,7 +550,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-county">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -565,7 +565,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-state">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -580,7 +580,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-zip">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -764,6 +764,32 @@ const floatingStyles = (
         flex: 0 0 25%;
         max-width: 25%;
         width: 25%;
+      }
+
+      .project-profile-floating .profile-col-r4-address {
+        flex: 0 0 40%;
+        max-width: 40%;
+        width: 40%;
+      }
+      .project-profile-floating .profile-col-r4-city {
+        flex: 0 0 18%;
+        max-width: 18%;
+        width: 18%;
+      }
+      .project-profile-floating .profile-col-r4-county {
+        flex: 0 0 18%;
+        max-width: 18%;
+        width: 18%;
+      }
+      .project-profile-floating .profile-col-r4-state {
+        flex: 0 0 8%;
+        max-width: 8%;
+        width: 8%;
+      }
+      .project-profile-floating .profile-col-r4-zip {
+        flex: 0 0 16%;
+        max-width: 16%;
+        width: 16%;
       }
 
       .project-profile-floating .profile-col-r3-ownership {
