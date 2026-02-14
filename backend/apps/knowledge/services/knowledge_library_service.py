@@ -3,12 +3,23 @@ Knowledge Library Service
 
 Provides faceted search, progressive fallback search, and document management
 for the Knowledge Library panel in the Landscaper admin.
+
+Note: tbl_platform_knowledge is a separate entity (books/publications) with no
+FK to core_doc. The 'platform' source filter uses project_id IS NULL to identify
+non-project documents. Future: bridge table linking platform knowledge to core_doc.
 """
 
 import logging
 from django.db import connection
 
 logger = logging.getLogger(__name__)
+
+# Common FROM/JOIN clause used by all facet queries
+_BASE_FROM = """
+    FROM core_doc d
+    LEFT JOIN tbl_project p ON d.project_id = p.project_id
+    LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
+"""
 
 
 def get_faceted_counts(source='all', geo=None, property_type=None, format_filter=None,
@@ -18,7 +29,6 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
 
     - OR logic within a dimension (e.g., geo=["Arizona", "California"] means AZ OR CA)
     - AND logic across dimensions (e.g., geo=["Arizona"] AND property_type=["Multifamily"])
-    - Zero-count facet values are still returned (frontend dims them)
     """
     geo = geo or []
     property_type = property_type or []
@@ -26,165 +36,17 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
     doc_type = doc_type or []
     project_id = project_id or []
 
+    base_where = "d.deleted_at IS NULL"
+
     with connection.cursor() as cursor:
-        # Build base WHERE clause for source filtering
-        base_where = "d.deleted_at IS NULL"
-
-        if source == 'user':
-            base_where += " AND d.project_id IS NOT NULL"
-        elif source == 'platform':
-            base_where += " AND pk.pk_id IS NOT NULL"
-
-        # Build filter conditions for each dimension
-        params = []
-
-        def build_dimension_filter(exclude_dimension):
-            """Build WHERE clause excluding one dimension for cross-filter counting."""
-            conditions = [base_where]
-
-            if exclude_dimension != 'geo' and geo:
-                placeholders = ', '.join(['%s'] * len(geo))
-                conditions.append(f"gt.geo_value IN ({placeholders})")
-                params.extend(geo)
-
-            if exclude_dimension != 'property_type' and property_type:
-                placeholders = ', '.join(['%s'] * len(property_type))
-                conditions.append(f"p.project_type_code IN ({placeholders})")
-                params.extend(property_type)
-
-            if exclude_dimension != 'format' and format_filter:
-                placeholders = ', '.join(['%s'] * len(format_filter))
-                conditions.append(f"UPPER(COALESCE("
-                                  f"CASE WHEN d.mime_type LIKE '%%pdf%%' THEN 'PDF' "
-                                  f"WHEN d.mime_type LIKE '%%sheet%%' OR d.mime_type LIKE '%%excel%%' THEN 'XLSX' "
-                                  f"WHEN d.mime_type LIKE '%%word%%' OR d.mime_type LIKE '%%document%%' THEN 'DOCX' "
-                                  f"WHEN d.mime_type LIKE '%%image%%' THEN 'IMAGE' "
-                                  f"WHEN d.mime_type LIKE '%%csv%%' THEN 'CSV' "
-                                  f"ELSE 'OTHER' END, 'OTHER')) IN ({placeholders})")
-                params.extend([f.upper() for f in format_filter])
-
-            if exclude_dimension != 'doc_type' and doc_type:
-                placeholders = ', '.join(['%s'] * len(doc_type))
-                conditions.append(f"COALESCE(d.doc_type, 'Uncategorized') IN ({placeholders})")
-                params.extend(doc_type)
-
-            if exclude_dimension != 'project' and project_id:
-                placeholders = ', '.join(['%s'] * len(project_id))
-                conditions.append(f"d.project_id IN ({placeholders})")
-                params.extend([int(pid) for pid in project_id])
-
-            return ' AND '.join(conditions)
-
-        # Get total count with all filters applied
-        all_filter_where = build_dimension_filter(None)
-        total_sql = f"""
-            SELECT COUNT(DISTINCT d.doc_id)
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.doc_id
-            WHERE {all_filter_where}
-        """
-
-        # Geography facet (excluding geo filter for cross-counting)
-        params_geo = []
-        geo_where = build_dimension_filter('geo')
-        geo_sql = f"""
-            SELECT gt2.geo_value, gt2.geo_level, COUNT(DISTINCT d.doc_id) as cnt
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
-            JOIN doc_geo_tag gt2 ON d.doc_id = gt2.doc_id
-            WHERE {geo_where}
-            GROUP BY gt2.geo_value, gt2.geo_level
-            ORDER BY cnt DESC
-        """
-
-        # Property type facet
-        params_pt = []
-        pt_where = build_dimension_filter('property_type')
-        pt_sql = f"""
-            SELECT p2.project_type_code, COUNT(DISTINCT d.doc_id) as cnt
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
-            JOIN tbl_project p2 ON d.project_id = p2.project_id
-            WHERE {pt_where}
-            GROUP BY p2.project_type_code
-            ORDER BY cnt DESC
-        """
-
-        # Format facet
-        params_fmt = []
-        fmt_where = build_dimension_filter('format')
-        fmt_sql = f"""
-            SELECT
-                CASE
-                    WHEN d.mime_type LIKE '%%pdf%%' THEN 'PDF'
-                    WHEN d.mime_type LIKE '%%sheet%%' OR d.mime_type LIKE '%%excel%%' THEN 'XLSX'
-                    WHEN d.mime_type LIKE '%%word%%' OR d.mime_type LIKE '%%document%%' THEN 'DOCX'
-                    WHEN d.mime_type LIKE '%%image%%' THEN 'IMAGE'
-                    WHEN d.mime_type LIKE '%%csv%%' THEN 'CSV'
-                    ELSE 'OTHER'
-                END as fmt,
-                COUNT(DISTINCT d.doc_id) as cnt
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
-            WHERE {fmt_where}
-            GROUP BY fmt
-            ORDER BY cnt DESC
-        """
-
-        # Doc type facet
-        params_dt = []
-        dt_where = build_dimension_filter('doc_type')
-        dt_sql = f"""
-            SELECT COALESCE(d.doc_type, 'Uncategorized') as dtype, COUNT(DISTINCT d.doc_id) as cnt
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
-            WHERE {dt_where}
-            GROUP BY dtype
-            ORDER BY cnt DESC
-        """
-
-        # Project facet
-        params_proj = []
-        proj_where = build_dimension_filter('project')
-        proj_sql = f"""
-            SELECT p2.project_id, p2.project_name, COUNT(DISTINCT d.doc_id) as cnt
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
-            JOIN tbl_project p2 ON d.project_id = p2.project_id
-            WHERE {proj_where}
-            GROUP BY p2.project_id, p2.project_name
-            ORDER BY cnt DESC
-        """
-
-        # Execute all queries
-        # Note: We rebuild params for each query since build_dimension_filter
-        # appends to the shared params list. In practice, we should build each independently.
-        # For simplicity, we'll execute them individually.
-
         try:
             # Total count
-            params_total = []
             total_where_clean = _build_where(base_where, source, geo, property_type,
                                               format_filter, doc_type, project_id,
                                               exclude=None)
             cursor.execute(f"""
                 SELECT COUNT(DISTINCT d.doc_id)
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 WHERE {total_where_clean[0]}
             """, total_where_clean[1])
             total_count = cursor.fetchone()[0]
@@ -195,10 +57,7 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
                                             exclude='geo')
             cursor.execute(f"""
                 SELECT gt2.geo_value, gt2.geo_level, COUNT(DISTINCT d.doc_id) as cnt
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 JOIN doc_geo_tag gt2 ON d.doc_id = gt2.doc_id
                 WHERE {geo_facet_where[0]}
                 GROUP BY gt2.geo_value, gt2.geo_level
@@ -213,12 +72,10 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
                                            exclude='property_type')
             cursor.execute(f"""
                 SELECT p2.project_type_code, COUNT(DISTINCT d.doc_id) as cnt
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 JOIN tbl_project p2 ON d.project_id = p2.project_id
                 WHERE {pt_facet_where[0]}
+                AND p2.project_type_code IS NOT NULL
                 GROUP BY p2.project_type_code
                 ORDER BY cnt DESC
             """, pt_facet_where[1])
@@ -240,10 +97,7 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
                         ELSE 'OTHER'
                     END as fmt,
                     COUNT(DISTINCT d.doc_id) as cnt
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 WHERE {fmt_facet_where[0]}
                 GROUP BY fmt
                 ORDER BY cnt DESC
@@ -257,10 +111,7 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
                                            exclude='doc_type')
             cursor.execute(f"""
                 SELECT COALESCE(d.doc_type, 'Uncategorized') as dtype, COUNT(DISTINCT d.doc_id) as cnt
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 WHERE {dt_facet_where[0]}
                 GROUP BY dtype
                 ORDER BY cnt DESC
@@ -274,10 +125,7 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
                                              exclude='project')
             cursor.execute(f"""
                 SELECT p2.project_id, p2.project_name, COUNT(DISTINCT d.doc_id) as cnt
-                FROM core_doc d
-                LEFT JOIN tbl_project p ON d.project_id = p.project_id
-                LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-                LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+                {_BASE_FROM}
                 JOIN tbl_project p2 ON d.project_id = p2.project_id
                 WHERE {proj_facet_where[0]}
                 GROUP BY p2.project_id, p2.project_name
@@ -298,7 +146,7 @@ def get_faceted_counts(source='all', geo=None, property_type=None, format_filter
             }
 
         except Exception as e:
-            logger.error(f"Error fetching faceted counts: {e}")
+            logger.error(f"Error fetching faceted counts: {e}", exc_info=True)
             return {
                 'total_count': 0,
                 'facets': {
@@ -320,10 +168,11 @@ def _build_where(base_where, source, geo, property_type, format_filter,
     conditions = [base_where]
     params = []
 
+    # Source filtering — user docs have project_id, platform docs don't
     if source == 'user':
         conditions.append("d.project_id IS NOT NULL")
     elif source == 'platform':
-        conditions.append("pk.pk_id IS NOT NULL")
+        conditions.append("d.project_id IS NULL")
 
     if exclude != 'geo' and geo:
         placeholders = ', '.join(['%s'] * len(geo))
@@ -454,10 +303,7 @@ def _execute_search(query, source, geo, property_type, format_filter,
                 d.file_size_bytes,
                 d.created_at,
                 d.updated_at
-            FROM core_doc d
-            LEFT JOIN tbl_project p ON d.project_id = p.project_id
-            LEFT JOIN doc_geo_tag gt ON d.doc_id = gt.doc_id
-            LEFT JOIN tbl_platform_knowledge pk ON d.doc_id = pk.pk_id
+            {_BASE_FROM}
             LEFT JOIN core_doc_text dt ON d.doc_id = dt.doc_id
             WHERE {where_clause}
             ORDER BY d.updated_at DESC
@@ -494,5 +340,5 @@ def _execute_search(query, source, geo, property_type, format_filter,
             return results
 
         except Exception as e:
-            logger.error(f"Error searching documents: {e}")
+            logger.error(f"Error searching documents: {e}", exc_info=True)
             return []

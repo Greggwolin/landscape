@@ -38,6 +38,7 @@ interface ColumnConfig {
   items: FacetItem[];
   getLabel: (item: FacetItem) => string;
   getValue: (item: FacetItem) => string;
+  getKey: (item: FacetItem) => string;
 }
 
 export default function FilterColumns({ facets, activeFilters, onToggleFilter }: FilterColumnsProps) {
@@ -46,8 +47,9 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
       title: 'Geography',
       dimension: 'geo',
       items: facets.geography,
-      getLabel: (item) => item.value,
+      getLabel: (item) => `${item.value} (${item.level})`,
       getValue: (item) => item.value,
+      getKey: (item) => `${item.level}_${item.value}`,
     },
     {
       title: 'Property Type',
@@ -55,6 +57,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
       items: facets.property_type,
       getLabel: (item) => item.value,
       getValue: (item) => item.value,
+      getKey: (item) => `pt_${item.value}`,
     },
     {
       title: 'Format',
@@ -62,6 +65,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
       items: facets.format,
       getLabel: (item) => item.value,
       getValue: (item) => item.value,
+      getKey: (item) => `fmt_${item.value}`,
     },
     {
       title: 'Document Type',
@@ -69,6 +73,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
       items: facets.doc_type,
       getLabel: (item) => item.value,
       getValue: (item) => item.value,
+      getKey: (item) => `dt_${item.value}`,
     },
     {
       title: 'Project',
@@ -76,12 +81,13 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
       items: facets.project,
       getLabel: (item) => item.name || item.value,
       getValue: (item) => item.id != null ? String(item.id) : item.value,
+      getKey: (item) => `proj_${item.id != null ? item.id : item.value}`,
     },
   ];
 
   return (
     <div className="kl-filter-columns">
-      {columns.map(({ title, dimension, items, getLabel, getValue }) => {
+      {columns.map(({ title, dimension, items, getLabel, getValue, getKey }) => {
         const activeValues = activeFilters[dimension];
         const availableCount = items.filter((i) => i.count > 0).length;
 
@@ -105,7 +111,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
 
                   return (
                     <button
-                      key={value}
+                      key={getKey(item)}
                       className={`kl-filter-chip${isActive ? ' active' : ''}${isDimmed ? ' dimmed' : ''}`}
                       onClick={() => onToggleFilter(dimension, value)}
                       disabled={isDimmed}

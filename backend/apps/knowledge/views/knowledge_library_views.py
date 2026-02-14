@@ -36,12 +36,13 @@ def knowledge_library_facets(request):
     GET /api/knowledge-library/facets/
 
     Returns faceted filter counts with cascading AND/OR logic.
-    Query params: source, geo[], property_type[], format[], doc_type[], project_id[]
+    Query params: source, geo[], property_type[], fmt[], doc_type[], project_id[]
+    Note: 'fmt' (not 'format') avoids collision with DRF's ?format= content negotiation param.
     """
     source = request.query_params.get('source', 'all')
     geo = request.query_params.getlist('geo')
     property_type = request.query_params.getlist('property_type')
-    format_filter = request.query_params.getlist('format')
+    format_filter = request.query_params.getlist('fmt')
     doc_type = request.query_params.getlist('doc_type')
     project_id = request.query_params.getlist('project_id')
 
@@ -70,11 +71,13 @@ def knowledge_library_search(request):
     query = body.get('query', '')
     filters = body.get('filters', {})
     fallback_level = body.get('fallback_level', 0)
+    limit = min(int(body.get('limit', 20)), 100)  # Cap at 100
 
     result = search_documents(
         query=query,
         filters=filters,
         fallback_level=fallback_level,
+        limit=limit,
     )
 
     return Response(result)

@@ -290,6 +290,74 @@
   flex-shrink: 0;
 }
 
+/* Auto-populated Document List */
+.kl-doc-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.kl-doc-list-header {
+  padding: 6px 12px;
+  background-color: var(--cui-tertiary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.kl-doc-list-header .kl-select-all-row {
+  width: 100%;
+  background: none;
+  border: none;
+  margin-top: 0;
+}
+
+.kl-doc-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.kl-doc-list-scroll .kl-doc-card {
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+}
+
+.kl-doc-list-scroll .kl-doc-card:last-child {
+  border-bottom: 0;
+}
+
+.kl-doc-list-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--cui-secondary-color);
+  font-size: 0.85rem;
+}
+
+.kl-doc-list-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--cui-secondary-color);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.kl-doc-list-overflow {
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--cui-secondary-color);
+  background-color: var(--cui-tertiary-bg);
+  border-top: 1px solid var(--cui-border-color);
+}
+
 /* Upload Drop Zone */
 .kl-dropzone {
   display: flex;

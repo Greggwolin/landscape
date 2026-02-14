@@ -5,12 +5,13 @@ import { CSpinner } from '@coreui/react';
 import SourceToggle, { type SourceFilter } from './SourceToggle';
 import FilterColumns, { type Facets, type ActiveFilters } from './FilterColumns';
 import CounterBar from './CounterBar';
-import KnowledgeChatPanel from './KnowledgeChatPanel';
 import UploadDropZone from './UploadDropZone';
+import DocResultCard, { type DocResult } from './DocResultCard';
 import DocumentChatModal from '@/components/dms/modals/DocumentChatModal';
 import './knowledge-library.css';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+const MAX_AUTO_DOCS = 50;
 
 const EMPTY_FACETS: Facets = {
   geography: [],
@@ -37,6 +38,10 @@ export default function KnowledgeLibraryPanel() {
   const [isLoadingFacets, setIsLoadingFacets] = useState(true);
   const [selectedDocs, setSelectedDocs] = useState<Set<number>>(new Set());
 
+  // Auto-populated document list state
+  const [documents, setDocuments] = useState<DocResult[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+
   // Document preview state
   const [previewDocId, setPreviewDocId] = useState<number | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -51,7 +56,7 @@ export default function KnowledgeLibraryPanel() {
       params.append('source', currentSource);
       currentFilters.geo.forEach((v) => params.append('geo', v));
       currentFilters.property_type.forEach((v) => params.append('property_type', v));
-      currentFilters.format.forEach((v) => params.append('format', v));
+      currentFilters.format.forEach((v) => params.append('fmt', v));
       currentFilters.doc_type.forEach((v) => params.append('doc_type', v));
       currentFilters.project_id.forEach((v) => params.append('project_id', v));
 
@@ -70,6 +75,42 @@ export default function KnowledgeLibraryPanel() {
       setTotalCount(0);
     } finally {
       setIsLoadingFacets(false);
+    }
+  }, []);
+
+  const fetchDocuments = useCallback(async (
+    currentSource: SourceFilter,
+    currentFilters: ActiveFilters,
+  ) => {
+    setIsLoadingDocs(true);
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/knowledge/library/search/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: '',
+          filters: {
+            source: currentSource,
+            geo: currentFilters.geo,
+            property_type: currentFilters.property_type,
+            format: currentFilters.format,
+            doc_type: currentFilters.doc_type,
+            project_id: currentFilters.project_id,
+          },
+          fallback_level: 0,
+          limit: MAX_AUTO_DOCS,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch documents');
+
+      const data = await response.json();
+      setDocuments(data.results || []);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      setDocuments([]);
+    } finally {
+      setIsLoadingDocs(false);
     }
   }, []);
 
@@ -100,13 +141,15 @@ export default function KnowledgeLibraryPanel() {
   // Initial load
   useEffect(() => {
     void fetchFacets(source, activeFilters);
+    void fetchDocuments(source, activeFilters);
     void fetchSourceCounts();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch facets when filters change
+  // Re-fetch facets and documents when filters change
   useEffect(() => {
     void fetchFacets(source, activeFilters);
-  }, [source, activeFilters, fetchFacets]);
+    void fetchDocuments(source, activeFilters);
+  }, [source, activeFilters, fetchFacets, fetchDocuments]);
 
   const handleSourceChange = (newSource: SourceFilter) => {
     setSource(newSource);
@@ -181,7 +224,12 @@ export default function KnowledgeLibraryPanel() {
 
   const handleUploadComplete = () => {
     void fetchFacets(source, activeFilters);
+    void fetchDocuments(source, activeFilters);
     void fetchSourceCounts();
+  };
+
+  const handleSelectAllVisible = () => {
+    handleSelectAll(documents.map((d) => d.doc_id));
   };
 
   return (
@@ -218,17 +266,47 @@ export default function KnowledgeLibraryPanel() {
         onClearFilters={handleClearFilters}
       />
 
-      {/* Chat Panel */}
-      <KnowledgeChatPanel
-        activeFilters={activeFilters}
-        source={source}
-        totalCount={totalCount}
-        selectedDocs={selectedDocs}
-        onToggleSelect={handleToggleSelect}
-        onPreview={handlePreview}
-        onSelectAll={handleSelectAll}
-        djangoApiUrl={DJANGO_API_URL}
-      />
+      {/* Auto-populated Document List */}
+      <div className="kl-doc-list">
+        {isLoadingDocs ? (
+          <div className="kl-doc-list-loading">
+            <CSpinner size="sm" />
+            <span>Loading documents...</span>
+          </div>
+        ) : documents.length > 0 ? (
+          <>
+            <div className="kl-doc-list-header">
+              <button
+                type="button"
+                className="kl-select-all-row"
+                onClick={handleSelectAllVisible}
+              >
+                Select all {documents.length} visible
+              </button>
+            </div>
+            <div className="kl-doc-list-scroll">
+              {documents.map((doc) => (
+                <DocResultCard
+                  key={doc.doc_id}
+                  doc={doc}
+                  isSelected={selectedDocs.has(doc.doc_id)}
+                  onToggleSelect={handleToggleSelect}
+                  onPreview={handlePreview}
+                />
+              ))}
+            </div>
+            {totalCount > MAX_AUTO_DOCS && (
+              <div className="kl-doc-list-overflow">
+                Showing {documents.length} of {totalCount} documents — use filters to narrow results
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="kl-doc-list-empty">
+            No documents match the current filters
+          </div>
+        )}
+      </div>
 
       {/* Upload Drop Zone */}
       <UploadDropZone
@@ -236,22 +314,25 @@ export default function KnowledgeLibraryPanel() {
         onUploadComplete={handleUploadComplete}
       />
 
-      {/* Document Preview Modal */}
-      {previewDocId != null && (
-        <DocumentChatModal
-          visible={previewVisible}
-          onClose={() => {
-            setPreviewVisible(false);
-            setPreviewDocId(null);
-          }}
-          projectId={0}
-          document={{
-            doc_id: previewDocId,
-            filename: `Document ${previewDocId}`,
-            version_number: 1,
-          }}
-        />
-      )}
+      {/* Document Chat Modal */}
+      {previewDocId != null && (() => {
+        const previewDoc = documents.find((d) => d.doc_id === previewDocId);
+        return (
+          <DocumentChatModal
+            visible={previewVisible}
+            onClose={() => {
+              setPreviewVisible(false);
+              setPreviewDocId(null);
+            }}
+            projectId={0}
+            document={{
+              doc_id: previewDocId,
+              filename: previewDoc?.name || `Document ${previewDocId}`,
+              version_number: 1,
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
