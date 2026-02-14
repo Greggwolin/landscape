@@ -359,7 +359,7 @@ function QueueTab({ onSelectExtraction }: { onSelectExtraction: (extraction: Ext
                 <p className="text-sm">Upload documents to the DMS to start extracting data for review</p>
               </div>
               <Button
-                onClick={() => window.location.href = '/dms?tab=upload'}
+                onClick={() => window.location.href = '/dashboard'}
                 className="mx-auto"
               >
                 Upload Documents

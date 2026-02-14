@@ -112,7 +112,6 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     {
       title: 'Documents',
       items: [
-        { id: 'dms', label: 'Document Library', href: '/dms', icon: 'cilFolder' },
         { id: 'dms-admin', label: 'DMS Admin', href: '/admin/dms/templates', icon: 'cilSettings' }
       ],
       isCollapsible: false

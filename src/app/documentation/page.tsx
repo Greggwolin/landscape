@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'DMS, Extraction & Doc Tags (Feb 14, 2026)',
+      path: '/docs/09-session-notes/2026-02-14-dms-extraction-doctype-tags.md',
+      category: 'AI',
+      description: 'Extraction Mapping doc type alignment (145 remapped), Document Tag System & Subtype Classifier (13 seeded subtypes, auto-tag at 0.6 confidence), global /dms route removal, doc chat fallback for unembedded docs',
+      icon: <FileText className="w-5 h-5" />,
+      lastModified: '2026-02-14'
+    },
+    {
       title: 'Knowledge Library Integration (Feb 13, 2026)',
       path: '/docs/09-session-notes/2026-02-13-knowledge-library-integration.md',
       category: 'AI',
@@ -402,9 +410,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status v3.7 — Folder-Tabs UI Overhaul (Feb 8), Debt UI Consolidation, Rent Roll Extraction, Python migration, and all prior phases',
+      description: 'Complete financial engine implementation status — DMS/Extraction/Tags (Feb 14), Knowledge Library (Feb 13), Folder-Tabs UI Overhaul (Feb 8), Debt UI Consolidation, and all prior phases',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-02-08'
+      lastModified: '2026-02-14'
     },
     {
       title: 'CRE Implementation Summary',

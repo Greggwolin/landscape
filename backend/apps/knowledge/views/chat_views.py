@@ -16,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from ..services.rag_retrieval import RAGRetriever
 from ..services.landscaper_ai import get_landscaper_response
 from ..services.query_builder import QueryBuilder
+from ..services.global_knowledge import retrieve_global_context
 from ..contracts import (
     ChatResponse,
     ChatHistoryResponse,
@@ -194,6 +195,18 @@ def _send_message(request, project_id: int) -> JsonResponse:
         timings['rag_retrieval'] = time.time() - t0
         print(f"[TIMING] rag_retrieval: {timings['rag_retrieval']:.2f}s (chunks: {len(rag_context.get('chunks', []))})")
 
+        # Tier 2: Global knowledge (cross-project data, platform knowledge)
+        t0 = time.time()
+        global_context = retrieve_global_context(
+            query=user_message,
+            current_project_id=project_id
+        )
+        timings['global_knowledge'] = time.time() - t0
+        print(f"[TIMING] global_knowledge: {timings['global_knowledge']:.2f}s "
+              f"(projects={global_context.get('project_summaries_used', 0)}, "
+              f"docs={global_context.get('global_doc_chunks_used', 0)}, "
+              f"platform={global_context.get('platform_chunks_used', 0)})")
+
         t0 = time.time()
         ai_response = get_landscaper_response(
             user_message=user_message,
@@ -202,7 +215,8 @@ def _send_message(request, project_id: int) -> JsonResponse:
             db_context=db_context,
             rag_context=rag_context,
             active_tab=active_tab,
-            page_context=page_context  # Pass for context-aware tool filtering
+            page_context=page_context,  # Pass for context-aware tool filtering
+            global_context=global_context  # Tier 2: cross-project + platform knowledge
         )
         timings['ai_response'] = time.time() - t0
         print(f"[TIMING] get_landscaper_response: {timings['ai_response']:.2f}s")
@@ -352,6 +366,24 @@ def document_chat(request, project_id: int, doc_id: int):
                         'similarity': float(row[3])
                     })
 
+        # Fallback: if no embeddings, try to load raw extracted text from core_doc_text
+        fallback_text = ""
+        if not relevant_chunks:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT LEFT(extracted_text, 12000)
+                        FROM landscape.core_doc_text
+                        WHERE doc_id = %s
+                        AND extracted_text IS NOT NULL
+                        AND LENGTH(extracted_text) > 0
+                    """, [doc_id])
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        fallback_text = row[0]
+            except Exception:
+                pass
+
         # Get extracted facts for this document (from doc_extracted_facts if table exists)
         extracted_facts = []
         try:
@@ -403,6 +435,9 @@ def document_chat(request, project_id: int, doc_id: int):
             "relevant_chunks": relevant_chunks,
         }
 
+        # Determine if we have any content to work with
+        has_content = bool(relevant_chunks) or bool(extracted_facts) or bool(fallback_text)
+
         # Create document-specific system prompt addition
         doc_system_context = f"""
 You are Landscaper, assisting with a SPECIFIC document: "{doc.doc_name}" (Version {doc.version_no}, Type: {doc.doc_type}).
@@ -415,14 +450,23 @@ Formatting instructions:
 - Use short labeled lines and indentation for hierarchy.
 
 """
-        if facts_text:
-            doc_system_context += f"""Extracted facts from this document:
+        if not has_content:
+            doc_system_context += """NOTE: This document has not been text-extracted or processed yet. No content is available to analyze.
+Tell the user: "This document hasn't been text-extracted yet. To enable document analysis, process it through the Knowledge Library or re-upload it. Once processed, I'll be able to summarize, extract data, and answer questions about its content."
+"""
+        else:
+            if facts_text:
+                doc_system_context += f"""Extracted facts from this document:
 {facts_text}
 
 """
-        if chunks_text:
-            doc_system_context += f"""Relevant passages from this document:
+            if chunks_text:
+                doc_system_context += f"""Relevant passages from this document:
 {chunks_text}
+"""
+            if fallback_text and not chunks_text:
+                doc_system_context += f"""Full document text (raw extraction):
+{fallback_text}
 """
 
         # Get AI response with document context

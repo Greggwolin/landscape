@@ -632,18 +632,6 @@ export default function DMSView({
                 </div>
                 <div className="d-flex gap-2" onClick={(e) => e.stopPropagation()}>
                   <a
-                    href="/dms"
-                    className="px-3 py-1 rounded border transition-colors"
-                    style={{
-                      borderColor: 'var(--cui-border-color)',
-                      color: 'var(--cui-primary)',
-                      fontSize: '0.85rem',
-                      textDecoration: 'none'
-                    }}
-                  >
-                    Open Global DMS
-                  </a>
-                  <a
                     href={`/projects/${projectId}/documents?tab=upload`}
                     className="px-3 py-1 rounded text-white"
                     style={{ backgroundColor: 'var(--cui-primary)', fontSize: '0.85rem', textDecoration: 'none' }}

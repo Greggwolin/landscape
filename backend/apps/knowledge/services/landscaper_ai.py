@@ -255,7 +255,8 @@ def get_landscaper_response(
     db_context: Optional[Dict[str, Any]] = None,
     rag_context: Optional[Dict[str, Any]] = None,
     active_tab: str = 'home',
-    page_context: Optional[str] = None
+    page_context: Optional[str] = None,
+    global_context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Get RAG-enhanced response from Landscaper AI.
@@ -267,6 +268,8 @@ def get_landscaper_response(
         max_context_chunks: Max document chunks to include
         page_context: Optional UI context for tool filtering (e.g., 'cashflow', 'budget').
                       If provided, only tools relevant to that context will be available.
+        global_context: Optional Tier 2 global knowledge context (cross-project data,
+                        platform knowledge, document excerpts from other projects).
 
     Returns:
         Dict with 'content', 'metadata', 'context_used'
@@ -324,14 +327,15 @@ def get_landscaper_response(
     # 4b. Get analysis-specific context (from tbl_analysis_type_config)
     analysis_context = _get_analysis_context(project_id)
 
-    # 5. Build system prompt with RAG context + project context + tab context + Entity-Fact knowledge + Analysis Type
+    # 5. Build system prompt with RAG context + project context + tab context + Entity-Fact knowledge + Analysis Type + Global knowledge
     t0 = time.time()
     system_prompt = _build_system_prompt(
         rag_context_obj,
         project_context,
         tab_context,
         project_id,
-        analysis_context
+        analysis_context,
+        global_context=global_context
     )
     print(f"[AI_TIMING] _build_system_prompt: {time.time() - t0:.2f}s (prompt len: {len(system_prompt)} chars)")
 
@@ -797,10 +801,11 @@ def _build_system_prompt(
     project_context: str = "",
     tab_context: str = "",
     project_id: Optional[int] = None,
-    analysis_context: Optional[str] = None
+    analysis_context: Optional[str] = None,
+    global_context: Optional[Dict[str, Any]] = None
 ) -> str:
     """
-    Build system prompt with full project context + RAG context + tab context + Entity-Fact knowledge + analysis context.
+    Build system prompt with full project context + RAG context + tab context + Entity-Fact knowledge + analysis context + global knowledge.
 
     Args:
         rag_context: RAG context with document chunks and query results
@@ -808,6 +813,7 @@ def _build_system_prompt(
         tab_context: Tab-specific focus instructions
         project_id: Project ID for Entity-Fact knowledge retrieval
         analysis_context: Analysis-specific behavior context (from tbl_analysis_type_config)
+        global_context: Tier 2 global knowledge (cross-project data, platform knowledge)
     """
 
     sections = rag_context.to_prompt_sections()
@@ -955,6 +961,19 @@ When referencing document content, cite the specific document name."""
 === AVAILABLE DATA TYPES ===
 
 {sections['schema_context']}"""
+
+    # GLOBAL KNOWLEDGE (Tier 2): Cross-project data, platform knowledge, and document excerpts from other projects
+    if global_context and global_context.get('text'):
+        base_prompt += f"""
+
+=== GLOBAL KNOWLEDGE (from other projects and platform references) ===
+
+You have access to knowledge from ALL of the user's projects and platform reference documents.
+The data below comes from OUTSIDE the current project context. When using it, always cite which project or document it comes from.
+
+{global_context['text']}
+
+IMPORTANT: When referencing data from another project, always specify which project it came from (e.g., "According to the Peoria Meadows project..." or "From the IREM reference...")."""
 
     # Citation guidance
     citation_hint = rag_context.get_citation_hint() if hasattr(rag_context, 'get_citation_hint') else ""
