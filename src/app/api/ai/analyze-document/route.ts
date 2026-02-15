@@ -18,6 +18,9 @@ import {
   isDocumentProcessed
 } from '@/lib/ai/extraction-persistence';
 
+// Allow up to 300 seconds for AI analysis of large documents (up to 50MB)
+export const maxDuration = 300;
+
 export interface DocumentAnalysisResult {
   success: boolean;
   filename: string;

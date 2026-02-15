@@ -776,6 +776,15 @@ def extract_document_batched(request, doc_id: int):
     if not project_id:
         return JsonResponse({'success': False, 'error': 'project_id is required'}, status=400)
 
+    # Validate project_id is a valid integer
+    try:
+        project_id_int = int(project_id)
+    except (ValueError, TypeError):
+        return JsonResponse(
+            {'success': False, 'error': 'Invalid project_id — must be an integer'},
+            status=400
+        )
+
     batches = body.get('batches')  # Optional list of batch names
     property_type = body.get('property_type', 'multifamily')
 
@@ -784,16 +793,23 @@ def extract_document_batched(request, doc_id: int):
     if hasattr(request, 'user') and hasattr(request.user, 'id'):
         user_id = request.user.id
 
-    result = do_extract_batched(
-        project_id=int(project_id),
-        doc_id=int(doc_id),
-        batches=batches,
-        property_type=property_type,
-        user_id=user_id
-    )
+    try:
+        result = do_extract_batched(
+            project_id=project_id_int,
+            doc_id=int(doc_id),
+            batches=batches,
+            property_type=property_type,
+            user_id=user_id
+        )
 
-    status = 200 if result.get('success') else 400
-    return JsonResponse(result, status=status)
+        status = 200 if result.get('success') else 400
+        return JsonResponse(result, status=status)
+    except Exception as e:
+        logger.exception(f"Extraction failed for doc_id={doc_id}, project_id={project_id}: {e}")
+        return JsonResponse(
+            {'success': False, 'error': f'Extraction failed: {str(e)}'},
+            status=500
+        )
 
 
 @csrf_exempt
@@ -822,14 +838,26 @@ def extract_project_v3(request, project_id: int):
     doc_ids = body.get('doc_ids')
     high_extractability_only = body.get('high_extractability_only', True)
 
-    extractor = RegistryBasedExtractor(int(project_id), property_type)
+    try:
+        extractor = RegistryBasedExtractor(int(project_id), property_type)
 
-    result = extractor.extract_from_project(
-        doc_ids=doc_ids,
-        high_extractability_only=high_extractability_only
-    )
+        result = extractor.extract_from_project(
+            doc_ids=doc_ids,
+            high_extractability_only=high_extractability_only
+        )
 
-    return JsonResponse(result)
+        return JsonResponse(result)
+    except (ValueError, TypeError) as e:
+        return JsonResponse(
+            {'success': False, 'error': f'Invalid project_id: {str(e)}'},
+            status=400
+        )
+    except Exception as e:
+        logger.exception(f"Project extraction failed for project_id={project_id}: {e}")
+        return JsonResponse(
+            {'success': False, 'error': f'Extraction failed: {str(e)}'},
+            status=500
+        )
 
 
 @csrf_exempt
