@@ -362,29 +362,85 @@ Django uses DRF serializers with consistent envelope:
 
 ---
 
-## Active Development Areas
+## Alpha Readiness Assessment (Audited 2026-02-15)
 
-### Current Focus (as of last update)
+### Target Workflow: MF Appraiser Valuation
 
-1. **Waterfall engine** - Financial waterfall calculations
-2. **Zonda integration** - Market data ingestion
-3. **DMS improvements** - Document extraction pipeline
-4. **Landscaper-native UI** - AI-first interface redesign
-5. **Lifecycle tiles** - Navigation redesign
+**Overall Status: ~70% Alpha-Ready** — Core valuation workflow functional, key gaps in reconciliation UI and reports.
+
+### Feature Status by Workflow Step
+
+| Step | Feature | Status | Key Gap |
+|------|---------|--------|---------|
+| 1 | Project Creation | ✅ WORKS | No Landscaper during creation |
+| 2 | Document Upload & Extraction | ⚠️ PARTIAL | Async pipeline orchestration unclear |
+| 3 | Document Management | ✅ WORKS | Full DMS with 30+ API routes |
+| 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
+| 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
+| 6 | Operations Tab | ⚠️ PARTIAL | Save endpoint still on legacy Next.js |
+| 7 | Landscaper Chat | ✅ WORKS | 50+ tools, thread-based, mutations |
+| 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
+| 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
+| 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases |
+| 11 | Reconciliation | 🔧 STUBBED | Backend done, frontend placeholder only |
+| 12 | Capitalization | ⚠️ PARTIAL | Waterfall calc endpoint missing (404) |
+| 13 | Reports | 🔧 STUBBED | Hardcoded to project 17, no PDF gen |
+| 14 | Knowledge Base | ⚠️ PARTIAL | RAG works, pgvector Phase 2, no Library UI |
+
+### Alpha Blockers (Priority Order)
+
+1. **Reconciliation frontend** — Build `ReconciliationPanel.tsx` (backend ready)
+2. **Operations save migration** — Move to Django from legacy Next.js route
+3. **Reports project scoping** — Remove hardcoded project 17
+4. **Waterfall calculate endpoint** — Wire to financial engine
+5. **Extraction pipeline verification** — End-to-end async flow
+6. **PDF report generation** — At minimum property summary
 
 ### Known Technical Debt
 
 - 50 TODO/FIXME markers across 40 files
-- Multiple grid libraries need consolidation
+- Multiple grid libraries need consolidation (TanStack preferred)
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
+- Operations save endpoint on legacy Next.js (being migrated)
+- Reports page hardcoded to project 17
+- Waterfall calc endpoint called but doesn't exist (404)
+- pgvector column commented out in Knowledge embeddings model
+
+### Navigation Architecture
+
+- **8-folder ARGUS-style tabs** with dynamic sub-tabs per property type
+- URL-driven state: `/projects/[id]?folder={folder}&tab={tab}`
+- `ProjectContentRouter` maps folder/tab combos to components
+- `folderTabConfig.ts` generates tabs per property type + analysis type
+- Two-row folder tabs with badge support (processing/error/pending)
+
+### Landscaper Architecture
+
+- **Left panel** (320px, collapsible to 64px strip)
+- Claude AI with 50+ registered tools (`@register_tool` decorator)
+- Level 2 Autonomy: propose mutations → user confirm/reject
+- Thread-based chat with per-page context awareness
+- RAG: DB-first queries → embedding retrieval → AI response
+- Activity feed + extraction logs + scenario management
 
 ### RAG/Knowledge System
 
-- Embeddings in `knowledge_embeddings` table (pgvector)
-- ~550+ document embeddings
-- Sync processing endpoint: `POST /api/knowledge/documents/{doc_id}/process/`
-- Claude integration for chat/analysis
+- Knowledge entity/fact system (subject-predicate-object triples)
+- OpenAI ada-002 embeddings (1536-dim) — generation works
+- pgvector table ready but vector column commented out (Phase 2)
+- RAG retrieval integrated with Landscaper chat
+- 40+ service files in `backend/apps/knowledge/services/`
+- Cross-project search backend exists, no REST endpoint yet
+- Sync processing: `POST /api/knowledge/documents/{doc_id}/process/`
+
+### Valuation Engine Status
+
+- **Sales Comparison:** Full CRUD, adjustment matrix, property-type-specific tables
+- **Cost Approach:** Marshall & Swift factors, 3 depreciation types, container cost metadata
+- **Income Approach:** 3 NOI bases (F-12 Current/Market/Stabilized), DCF monthly for MF
+- **Reconciliation:** Backend complete (weights, narrative versioning), no frontend
+- **Financial Engine:** `services/financial_engine_py/` with IRR/NPV/DSCR/waterfall tests
 
 ---
 
@@ -498,5 +554,6 @@ DO ask clarifying questions when:
 - Required information (table names, component locations, etc.) is missing
 - The scope is ambiguous (e.g., "fix the budget" - which aspect?)
 
-*Last updated: 2025-12-19*
+*Last updated: 2026-02-15*
+*Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Maintainer: Update when architecture decisions change*
