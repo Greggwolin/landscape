@@ -27,6 +27,10 @@
   border-right: none;
 }
 
+.kl-source-toggle .btn.kl-source-active {
+  font-weight: 600;
+}
+
 /* Filter Columns */
 .kl-filter-columns {
   display: grid;
@@ -89,7 +93,7 @@
 
 .kl-filter-chip.active {
   background-color: var(--cui-primary);
-  color: #fff;
+  color: var(--cui-white, #fff);
   border-color: var(--cui-primary);
 }
 
@@ -111,7 +115,19 @@
 
 .kl-filter-chip.active .kl-chip-count {
   background-color: rgba(255, 255, 255, 0.25);
-  color: #fff;
+  color: var(--cui-white, #fff);
+}
+
+.kl-filter-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kl-filter-empty {
+  padding: 8px;
+  color: var(--cui-secondary-color);
+  font-size: 0.75rem;
 }
 
 /* Counter Bar */
@@ -133,6 +149,11 @@
   gap: 12px;
 }
 
+.kl-counter-bar-summary {
+  color: var(--cui-primary);
+  font-weight: 500;
+}
+
 .kl-clear-filters {
   font-size: 0.8rem;
   color: var(--cui-primary);
@@ -147,6 +168,26 @@
   opacity: 0.8;
 }
 
+/* Download / Upload Notification */
+.kl-notice {
+  padding: 8px 16px;
+  margin: 0 0 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.kl-notice-success {
+  background-color: var(--cui-success-bg-subtle, rgba(25, 135, 84, 0.1));
+  color: var(--cui-success);
+  border: 1px solid var(--cui-success-border-subtle, rgba(25, 135, 84, 0.25));
+}
+
+.kl-notice-danger {
+  background-color: var(--cui-danger-bg-subtle, rgba(220, 53, 69, 0.1));
+  color: var(--cui-danger);
+  border: 1px solid var(--cui-danger-border-subtle, rgba(220, 53, 69, 0.25));
+}
+
 /* Document Result Card */
 .kl-doc-card {
   display: flex;
@@ -156,6 +197,7 @@
   border: 1px solid var(--cui-border-color);
   border-radius: 6px;
   background-color: var(--cui-body-bg);
+  cursor: pointer;
   transition: background-color 0.15s;
 }
 
@@ -192,6 +234,22 @@
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.kl-doc-card-actions .btn {
+  font-size: 0.75rem;
+}
+
+.kl-doc-card-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kl-preview-unavailable {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Auto-populated Document List */
@@ -289,6 +347,23 @@
   gap: 12px;
 }
 
+.kl-dropzone-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.kl-dropzone-status-label {
+  font-weight: 500;
+}
+
+.kl-dropzone-classifications {
+  font-size: 0.8rem;
+  color: var(--cui-secondary-color);
+  text-align: center;
+}
+
 /* Select all row */
 .kl-select-all-row {
   display: flex;
@@ -305,6 +380,20 @@
 
 .kl-select-all-row:hover {
   background-color: var(--cui-tertiary-bg);
+}
+
+/* Loading spinner area */
+.kl-loading-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.kl-loading-text {
+  color: var(--cui-secondary-color);
+  font-size: 0.85rem;
+  margin-left: 8px;
 }
 
 /* Expanded doc card highlight */
@@ -352,16 +441,42 @@
   background-color: var(--cui-body-bg);
   border: 1px solid var(--cui-border-color);
   border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
 }
 
 .kl-accordion-action-btn:hover:not(:disabled) {
   background-color: var(--cui-tertiary-bg);
 }
 
+.kl-accordion-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kl-accordion-action-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
 .kl-accordion-chatting-with {
   margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--cui-border-color);
+}
+
+.kl-accordion-chatting-label {
+  font-size: 11px;
+  color: var(--cui-tertiary-color);
+}
+
+.kl-accordion-chatting-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cui-secondary-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kl-accordion-chat {
@@ -386,9 +501,102 @@
   color: var(--cui-secondary-color);
 }
 
+.kl-accordion-empty-icon {
+  font-size: 30px;
+  margin-bottom: 8px;
+}
+
+.kl-accordion-empty-text {
+  font-size: 14px;
+  margin: 0;
+}
+
+.kl-accordion-empty-hint {
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+/* Chat messages */
+.kl-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kl-chat-row {
+  display: flex;
+}
+
+.kl-chat-row-user {
+  justify-content: flex-end;
+}
+
+.kl-chat-row-assistant {
+  justify-content: flex-start;
+}
+
+.kl-chat-bubble {
+  max-width: 80%;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.kl-chat-bubble-user {
+  background-color: var(--cui-primary);
+  color: var(--cui-white, #fff);
+}
+
+.kl-chat-bubble-assistant {
+  background-color: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  border: 1px solid var(--cui-border-color);
+}
+
+.kl-chat-content {
+  white-space: pre-wrap;
+}
+
+.kl-chat-time {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.kl-chat-time-user {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.kl-chat-time-assistant {
+  color: var(--cui-secondary-color);
+}
+
+.kl-chat-thinking {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.kl-chat-thinking-bubble {
+  background-color: var(--cui-body-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--cui-secondary-color);
+}
+
+/* Chat input area */
 .kl-accordion-input-area {
   border-top: 1px solid var(--cui-border-color);
   padding: 12px;
+}
+
+.kl-accordion-input-form {
+  display: flex;
+  gap: 8px;
 }
 
 .kl-accordion-input {
@@ -402,18 +610,166 @@
   outline: none;
 }
 
+.kl-accordion-input:disabled {
+  opacity: 0.5;
+}
+
 .kl-accordion-send-btn {
   padding: 8px 16px;
   background-color: var(--cui-primary);
-  color: #fff;
+  color: var(--cui-white, #fff);
   border-radius: 6px;
   border: none;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
 
 .kl-accordion-send-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.kl-accordion-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kl-accordion-send-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Classification Override Bar */
+.kl-classification-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background-color: var(--cui-body-bg);
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.kl-classification-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kl-classification-label {
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.kl-classification-select {
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  background-color: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  outline: none;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.kl-classification-select:focus {
+  border-color: var(--cui-primary);
+}
+
+.kl-geo-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.kl-geo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 10px;
+  background-color: var(--cui-secondary-bg);
+  color: var(--cui-body-color);
+  white-space: nowrap;
+}
+
+.kl-geo-tag-remove {
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 14px;
+  line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+.kl-geo-tag-remove:hover {
+  opacity: 1;
+}
+
+.kl-geo-tag-add {
+  font-size: 0.75rem;
+  color: var(--cui-primary);
+  cursor: pointer;
+  background: none;
+  border: 1px dashed var(--cui-border-color);
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.kl-geo-tag-add:hover {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.kl-geo-add-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kl-geo-add-select {
+  padding: 2px 4px;
+  font-size: 0.75rem;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  background-color: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  outline: none;
+}
+
+.kl-geo-add-input {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  background-color: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  outline: none;
+  width: 80px;
+}
+
+.kl-classification-saved {
+  font-size: 0.75rem;
+  color: var(--cui-success);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.kl-classification-saved.visible {
+  opacity: 1;
+}
+
+/* Hidden file input */
+.kl-hidden-input {
+  display: none;
 }

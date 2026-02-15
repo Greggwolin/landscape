@@ -160,10 +160,10 @@ export default function UploadDropZone({ djangoApiUrl, onUploadComplete }: Uploa
             <span>{uploadStatus}</span>
           </div>
         ) : uploadStatus ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{ fontWeight: 500 }}>{uploadStatus}</span>
+          <div className="kl-dropzone-status">
+            <span className="kl-dropzone-status-label">{uploadStatus}</span>
             {classificationResults.length > 0 && (
-              <div style={{ fontSize: '0.8rem', color: 'var(--cui-secondary-color)', textAlign: 'center' }}>
+              <div className="kl-dropzone-classifications">
                 {classificationResults.map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}
@@ -181,7 +181,7 @@ export default function UploadDropZone({ djangoApiUrl, onUploadComplete }: Uploa
         type="file"
         multiple
         onChange={handleFileChange}
-        style={{ display: 'none' }}
+        className="kl-hidden-input"
       />
     </>
   );

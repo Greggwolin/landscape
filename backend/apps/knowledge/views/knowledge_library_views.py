@@ -429,3 +429,185 @@ def knowledge_library_upload(request):
             })
 
     return Response({'uploads': results}, status=status.HTTP_201_CREATED)
+
+
+# =====================================================
+# Classification Override
+# =====================================================
+
+@api_view(['PATCH'])
+@permission_classes([AllowAny])
+def knowledge_library_update_classification(request, doc_id: int):
+    """
+    PATCH /api/knowledge/library/documents/{doc_id}/classification/
+
+    Update doc_type and/or property_type on a core_doc record.
+    Body: { "doc_type": "Offering", "property_type": "MF" }
+    """
+    doc_type = request.data.get('doc_type')
+    property_type = request.data.get('property_type')
+
+    if doc_type is None and property_type is None:
+        return Response(
+            {'error': 'At least one of doc_type or property_type is required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        sets = []
+        params = []
+        if doc_type is not None:
+            sets.append("doc_type = %s")
+            params.append(doc_type)
+        if property_type is not None:
+            sets.append("property_type = %s")
+            params.append(property_type)
+        sets.append("updated_at = NOW()")
+        params.append(doc_id)
+
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                UPDATE landscape.core_doc
+                SET {', '.join(sets)}
+                WHERE doc_id = %s AND deleted_at IS NULL
+                RETURNING doc_id
+            """, params)
+            row = cursor.fetchone()
+
+        if not row:
+            return Response({'error': 'Document not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({'doc_id': doc_id, 'updated': True})
+
+    except Exception as e:
+        logger.error("Classification update error for doc %s: %s", doc_id, e, exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def knowledge_library_geo_tags(request, doc_id: int):
+    """
+    GET  /api/knowledge/library/documents/{doc_id}/geo-tags/
+         Returns all geo tags for a document.
+
+    POST /api/knowledge/library/documents/{doc_id}/geo-tags/
+         Body: { "geo_level": "state", "geo_value": "NV" }
+         Adds a new geo tag with geo_source = 'user_assigned'.
+    """
+    try:
+        if request.method == 'GET':
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT doc_geo_tag_id, geo_level, geo_value, geo_source, created_at
+                    FROM landscape.doc_geo_tag
+                    WHERE doc_id = %s
+                    ORDER BY geo_level, geo_value
+                """, [doc_id])
+                columns = [col[0] for col in cursor.description]
+                tags = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                # Serialize datetime
+                for tag in tags:
+                    if tag.get('created_at'):
+                        tag['created_at'] = tag['created_at'].isoformat()
+
+            return Response({'tags': tags})
+
+        # POST — add a new geo tag
+        geo_level = request.data.get('geo_level', '').strip()
+        geo_value = request.data.get('geo_value', '').strip()
+
+        if not geo_level or not geo_value:
+            return Response(
+                {'error': 'geo_level and geo_value are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        valid_levels = ('state', 'city', 'county', 'msa', 'zip', 'metro', 'region')
+        if geo_level not in valid_levels:
+            return Response(
+                {'error': f'geo_level must be one of: {", ".join(valid_levels)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO landscape.doc_geo_tag (doc_id, geo_level, geo_value, geo_source, created_at)
+                VALUES (%s, %s, %s, 'user_assigned', NOW())
+                ON CONFLICT DO NOTHING
+                RETURNING doc_geo_tag_id
+            """, [doc_id, geo_level, geo_value])
+            row = cursor.fetchone()
+
+        tag_id = row[0] if row else None
+        return Response(
+            {'doc_geo_tag_id': tag_id, 'created': tag_id is not None},
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception as e:
+        logger.error("Geo tag error for doc %s: %s", doc_id, e, exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def knowledge_library_delete_geo_tag(request, doc_id: int, geo_tag_id: int):
+    """
+    DELETE /api/knowledge/library/documents/{doc_id}/geo-tags/{geo_tag_id}/
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM landscape.doc_geo_tag
+                WHERE doc_geo_tag_id = %s AND doc_id = %s
+                RETURNING doc_geo_tag_id
+            """, [geo_tag_id, doc_id])
+            row = cursor.fetchone()
+
+        if not row:
+            return Response({'error': 'Geo tag not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({'deleted': True})
+
+    except Exception as e:
+        logger.error("Geo tag delete error: %s", e, exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def knowledge_library_classification_options(request):
+    """
+    GET /api/knowledge/library/classification-options/
+
+    Returns available options for doc_type and property_type dropdowns.
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT DISTINCT document_type
+                FROM landscape.tbl_extraction_mapping
+                WHERE is_active = true
+                ORDER BY document_type
+            """)
+            doc_types = [row[0] for row in cursor.fetchall()]
+
+        property_types = [
+            {'code': 'LAND', 'label': 'Land Development'},
+            {'code': 'MF', 'label': 'Multifamily'},
+            {'code': 'OFF', 'label': 'Office'},
+            {'code': 'RET', 'label': 'Retail'},
+            {'code': 'IND', 'label': 'Industrial'},
+            {'code': 'HTL', 'label': 'Hotel'},
+            {'code': 'MXU', 'label': 'Mixed Use'},
+        ]
+
+        return Response({
+            'doc_types': doc_types,
+            'property_types': property_types,
+        })
+
+    except Exception as e:
+        logger.error("Classification options error: %s", e, exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -26,8 +26,8 @@ export default function SourceToggle({ active, counts, onChange }: SourceToggleP
           color={active === key ? 'primary' : 'secondary'}
           variant={active === key ? undefined : 'ghost'}
           size="sm"
+          className={active === key ? 'kl-source-active' : ''}
           onClick={() => onChange(key)}
-          style={{ fontWeight: active === key ? 600 : 400 }}
         >
           {label} ({counts[key]})
         </CButton>

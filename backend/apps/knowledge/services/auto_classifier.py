@@ -546,6 +546,18 @@ def auto_classify_document(
     result['property_type'] = pt['property_type']
     result['property_type_confidence'] = pt['confidence']
 
+    # Persist property_type if confidence is reasonable
+    if pt['property_type'] and pt['confidence'] >= 0.2:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE landscape.core_doc
+                    SET property_type = %s, updated_at = NOW()
+                    WHERE doc_id = %s
+                """, [pt['property_type'], doc_id])
+        except Exception as e:
+            logger.warning("Failed to update property_type for doc %s: %s", doc_id, e)
+
     logger.info(
         "[AUTO_CLASSIFY] doc=%s file=%s → type=%s (%.0f%%), property=%s (%.0f%%), geo=%d tags, text=%d chars",
         doc_id, filename, result['doc_type'], result['doc_type_confidence'] * 100,

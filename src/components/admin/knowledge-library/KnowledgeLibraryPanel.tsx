@@ -9,6 +9,7 @@ import FilterColumns, { type Facets, type ActiveFilters } from './FilterColumns'
 import CounterBar from './CounterBar';
 import UploadDropZone from './UploadDropZone';
 import DocResultCard, { type DocResult } from './DocResultCard';
+import DocClassificationBar from './DocClassificationBar';
 import './knowledge-library.css';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -245,25 +246,23 @@ export default function KnowledgeLibraryPanel() {
     }
   };
 
+  const isPreviewable = (uri: string | null): boolean => {
+    if (!uri) return false;
+    if (uri.includes('placeholder.local')) return false;
+    if (uri.startsWith('/Users/') || uri.startsWith('/home/')) return false;
+    if (uri === 'pending') return false;
+    return uri.startsWith('http');
+  };
+
   const handlePreview = (docId: number) => {
-    // Open the actual document file (PDF, etc.) in a new tab
     const doc = documents.find((d) => d.doc_id === docId);
     if (!doc) return;
     const uri = doc.storage_uri || '';
 
-    if (uri.includes('utfs.io')) {
-      // Real UploadThing URL — open directly
+    if (isPreviewable(uri)) {
       window.open(uri, '_blank');
-    } else if (uri.startsWith('http') && !uri.includes('placeholder.local')) {
-      // Other real URL (e.g., S3, CDN)
-      window.open(uri, '_blank');
-    } else if (uri && !uri.startsWith('http') && !uri.startsWith('/Users/')) {
-      // Relative path (e.g., /media/uploads/...) — prepend Django URL
-      window.open(`${DJANGO_API_URL}${uri}`, '_blank');
-    } else {
-      // Placeholder, local filesystem path, or missing — no browser-accessible file
-      alert(`No file available for preview.\n\nThis document ("${doc.name}") does not have a browser-accessible file URL. Re-upload the document to enable preview.`);
     }
+    // Non-previewable URIs are handled by button state (disabled + tooltip)
   };
 
   const handleRowClick = (docId: number) => {
@@ -335,10 +334,14 @@ export default function KnowledgeLibraryPanel() {
     handleSendMessage(docId, projectId, prompts[action], documentKey);
   }, [handleSendMessage]);
 
-  const handleUploadComplete = () => {
+  const refreshData = useCallback(() => {
     void fetchFacets(source, activeFilters);
     void fetchDocuments(source, activeFilters);
     void fetchSourceCounts();
+  }, [source, activeFilters, fetchFacets, fetchDocuments, fetchSourceCounts]);
+
+  const handleUploadComplete = () => {
+    refreshData();
   };
 
   const handleSelectAllVisible = () => {
@@ -356,11 +359,9 @@ export default function KnowledgeLibraryPanel() {
 
       {/* Filter Columns */}
       {isLoadingFacets && facets === EMPTY_FACETS ? (
-        <div className="d-flex align-items-center justify-content-center" style={{ padding: 40 }}>
+        <div className="kl-loading-center">
           <CSpinner size="sm" />
-          <span className="ms-2" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.85rem' }}>
-            Loading filters...
-          </span>
+          <span className="kl-loading-text">Loading filters...</span>
         </div>
       ) : (
         <FilterColumns
@@ -381,17 +382,7 @@ export default function KnowledgeLibraryPanel() {
 
       {/* Download / Upload Notification */}
       {downloadNotice && (
-        <div
-          style={{
-            padding: '8px 16px',
-            margin: '0 0 8px',
-            borderRadius: '6px',
-            fontSize: '0.85rem',
-            backgroundColor: downloadNotice.includes('failed') ? 'var(--cui-danger-bg-subtle, #f8d7da)' : 'var(--cui-success-bg-subtle, #d1e7dd)',
-            color: downloadNotice.includes('failed') ? 'var(--cui-danger, #dc3545)' : 'var(--cui-success, #198754)',
-            border: `1px solid ${downloadNotice.includes('failed') ? 'var(--cui-danger-border-subtle, #f5c2c7)' : 'var(--cui-success-border-subtle, #badbcc)'}`,
-          }}
-        >
+        <div className={`kl-notice ${downloadNotice.includes('failed') ? 'kl-notice-danger' : 'kl-notice-success'}`}>
           {downloadNotice}
         </div>
       )}
@@ -423,6 +414,7 @@ export default function KnowledgeLibraryPanel() {
                       doc={doc}
                       isSelected={selectedDocs.has(doc.doc_id)}
                       isExpanded={isExpanded}
+                      isPreviewable={isPreviewable(doc.storage_uri)}
                       onToggleSelect={handleToggleSelect}
                       onPreview={handlePreview}
                       onRowClick={handleRowClick}
@@ -434,6 +426,7 @@ export default function KnowledgeLibraryPanel() {
                         isChatLoading={isChatLoading}
                         onSendMessage={(msg) => handleSendMessage(doc.doc_id, doc.project_id ?? 0, msg, doc.document_key)}
                         onQuickAction={(action) => handleQuickAction(doc.doc_id, doc.project_id ?? 0, action, doc.document_key)}
+                        onClassificationChange={refreshData}
                       />
                     )}
                   </React.Fragment>
@@ -473,9 +466,10 @@ interface KLAccordionPanelProps {
   isChatLoading: boolean;
   onSendMessage: (message: string) => Promise<void>;
   onQuickAction: (action: string) => void;
+  onClassificationChange?: () => void;
 }
 
-function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQuickAction }: KLAccordionPanelProps) {
+function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQuickAction, onClassificationChange }: KLAccordionPanelProps) {
   const [inputValue, setInputValue] = React.useState('');
   const [isSending, setIsSending] = React.useState(false);
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -528,6 +522,14 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
 
   return (
     <div ref={panelRef} className="kl-accordion-panel" onClick={(e) => e.stopPropagation()}>
+      {/* Classification Override Bar (Part D) */}
+      <DocClassificationBar
+        docId={doc.doc_id}
+        currentDocType={doc.doc_type}
+        currentPropertyType={(doc as Record<string, unknown>).property_type as string | null | undefined}
+        onClassificationChange={onClassificationChange}
+      />
+
       <div className="kl-accordion-inner">
         {/* Left panel — Quick Actions */}
         <div className="kl-accordion-sidebar">
@@ -539,18 +541,14 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
               className="kl-accordion-action-btn"
               disabled={busy}
               onClick={() => onQuickAction(qa.key)}
-              style={{ opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer' }}
             >
-              <CIcon icon={qa.icon} style={{ width: 16, height: 16, color: qa.color }} />
+              <CIcon icon={qa.icon} className="icon" style={{ color: qa.color }} />
               <span>{qa.label}</span>
             </button>
           ))}
           <div className="kl-accordion-chatting-with">
-            <div style={{ fontSize: '11px', color: 'var(--cui-tertiary-color)' }}>Chatting with:</div>
-            <div
-              style={{ fontSize: '12px', fontWeight: 500, color: 'var(--cui-secondary-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              title={doc.name}
-            >
+            <div className="kl-accordion-chatting-label">Chatting with:</div>
+            <div className="kl-accordion-chatting-name" title={doc.name}>
               {doc.name}
             </div>
           </div>
@@ -561,24 +559,17 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
           <div className="kl-accordion-messages">
             {chatHistory.length === 0 ? (
               <div className="kl-accordion-empty">
-                <span style={{ fontSize: '30px', marginBottom: '8px' }}>💬</span>
-                <p style={{ fontSize: '14px', margin: 0 }}>Ask Landscaper about this document</p>
-                <p style={{ fontSize: '12px', marginTop: '4px', margin: 0 }}>or use a quick action to get started</p>
+                <span className="kl-accordion-empty-icon">💬</span>
+                <p className="kl-accordion-empty-text">Ask Landscaper about this document</p>
+                <p className="kl-accordion-empty-hint">or use a quick action to get started</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="kl-chat-messages">
                 {chatHistory.map((msg, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                    <div
-                      style={{
-                        maxWidth: '80%', borderRadius: '8px', padding: '8px 12px', fontSize: '14px',
-                        backgroundColor: msg.role === 'user' ? 'var(--cui-primary)' : 'var(--cui-body-bg)',
-                        color: msg.role === 'user' ? '#fff' : 'var(--cui-body-color)',
-                        border: msg.role === 'user' ? 'none' : '1px solid var(--cui-border-color)',
-                      }}
-                    >
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
-                      <div style={{ fontSize: '11px', marginTop: '4px', color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : 'var(--cui-secondary-color)' }}>
+                  <div key={idx} className={`kl-chat-row kl-chat-row-${msg.role}`}>
+                    <div className={`kl-chat-bubble kl-chat-bubble-${msg.role}`}>
+                      <div className="kl-chat-content">{msg.content}</div>
+                      <div className={`kl-chat-time kl-chat-time-${msg.role}`}>
                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
@@ -587,19 +578,17 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
               </div>
             )}
             {busy && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '12px' }}>
-                <div style={{ backgroundColor: 'var(--cui-body-bg)', border: '1px solid var(--cui-border-color)', borderRadius: '8px', padding: '8px 12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--cui-secondary-color)' }}>
-                    <CSpinner size="sm" />
-                    <span>Thinking...</span>
-                  </div>
+              <div className="kl-chat-thinking">
+                <div className="kl-chat-thinking-bubble">
+                  <CSpinner size="sm" />
+                  <span>Thinking...</span>
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
           <div className="kl-accordion-input-area">
-            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '8px' }}>
+            <form onSubmit={handleSubmit} className="kl-accordion-input-form">
               <input
                 ref={inputRef}
                 type="text"
@@ -608,15 +597,13 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
                 placeholder="Ask about this document..."
                 disabled={busy}
                 className="kl-accordion-input"
-                style={{ opacity: busy ? 0.5 : 1 }}
               />
               <button
                 type="submit"
                 disabled={!inputValue.trim() || busy}
                 className="kl-accordion-send-btn"
-                style={{ opacity: (!inputValue.trim() || busy) ? 0.5 : 1, cursor: (!inputValue.trim() || busy) ? 'not-allowed' : 'pointer' }}
               >
-                <CIcon icon={cilSend} style={{ width: 16, height: 16 }} />
+                <CIcon icon={cilSend} className="icon" />
                 <span>Send</span>
               </button>
             </form>
