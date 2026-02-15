@@ -3,6 +3,12 @@ const nextConfig = {
   reactStrictMode: true, // Re-enable strict mode for better development experience
   // Transpile ESM packages that need it
   transpilePackages: ['@mapbox/mapbox-gl-draw'],
+  // Raise server actions body size limit to match UI dropzone max (32MB)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '32mb',
+    },
+  },
   // Note: Most async params have been fixed. Remaining errors are pre-existing TypeScript issues
   // like 'error' is of type 'unknown', Activity type mismatches, etc.
   // TODO: Clean up remaining TypeScript strict mode issues in a separate PR

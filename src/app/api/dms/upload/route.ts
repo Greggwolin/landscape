@@ -18,6 +18,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { UTApi } from 'uploadthing/server';
 import { sql } from '@/lib/db';
 
+// Allow up to 60 seconds for large file uploads (up to 32MB)
+export const maxDuration = 60;
+
 const utapi = new UTApi();
 
 const DJANGO_API_URL =

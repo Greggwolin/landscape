@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
+// Allow up to 120 seconds for AI extraction of large documents
+export const maxDuration = 120;
+
 // Field extraction result structure
 interface ExtractedField {
   value: any
