@@ -1302,6 +1302,7 @@ from .document_classifier import (
     classify_document,
     DOCTYPE_TO_EVIDENCE
 )
+from .subtype_classifier import DocumentSubtypeClassifier
 
 
 class RegistryBasedExtractor:
@@ -1313,6 +1314,7 @@ class RegistryBasedExtractor:
     2. Uses the Field Registry to get target fields per document type
     3. Builds dynamic extraction prompts from registry metadata
     4. Stages extracted values with field_key linking to registry
+    5. Auto-assigns subtype tags when classifier confidence >= 0.6
     """
 
     def __init__(self, project_id: int, property_type: str = 'multifamily'):
@@ -1320,6 +1322,7 @@ class RegistryBasedExtractor:
         self.property_type = property_type
         self.registry = get_registry()
         self.classifier = DocumentClassifier(project_id)
+        self.subtype_classifier = DocumentSubtypeClassifier()
 
     def extract_from_document(
         self,
@@ -1383,6 +1386,18 @@ class RegistryBasedExtractor:
                 'error': 'No content found for document',
                 'doc_id': doc_id
             }
+
+        # Step 3b: Subtype classification — auto-assign tag if confident
+        subtype_result = self.subtype_classifier.classify(
+            content=doc_content['text'][:50000],
+            property_type=self.property_type,
+        )
+        if subtype_result.subtype_code and subtype_result.confidence >= 0.6:
+            self._assign_subtype_tag(doc_id, subtype_result.subtype_code, workspace_id=1)
+            logger.info(
+                f"Subtype detected for doc {doc_id}: {subtype_result.subtype_name} "
+                f"(confidence={subtype_result.confidence:.2f}, patterns={subtype_result.matched_patterns})"
+            )
 
         # Step 4: Build extraction prompt from registry
         prompt = self._build_registry_extraction_prompt(fields, doc_content['text'])
@@ -1485,6 +1500,41 @@ Never guess or make up values - only extract what is explicitly stated.""",
                 results['total_extractions'] += doc_result.get('extracted_count', 0)
 
         return results
+
+    def _assign_subtype_tag(self, doc_id: int, subtype_code: str, workspace_id: int = 1):
+        """Auto-assign the tag corresponding to a detected subtype."""
+        try:
+            with connection.cursor() as cursor:
+                # Find the tag linked to this subtype
+                cursor.execute("""
+                    SELECT tag_id FROM landscape.dms_doc_tags
+                    WHERE subtype_code = %s AND workspace_id = %s
+                    LIMIT 1
+                """, [subtype_code, workspace_id])
+                row = cursor.fetchone()
+
+                if row:
+                    tag_id = row[0]
+                    # Assign to document (ignore if already assigned)
+                    cursor.execute("""
+                        INSERT INTO landscape.dms_doc_tag_assignments (doc_id, tag_id, assigned_at)
+                        VALUES (%s, %s, NOW())
+                        ON CONFLICT (doc_id, tag_id) DO NOTHING
+                    """, [doc_id, tag_id])
+
+                    # Increment usage count
+                    cursor.execute("""
+                        UPDATE landscape.dms_doc_tags
+                        SET usage_count = (
+                            SELECT COUNT(*) FROM landscape.dms_doc_tag_assignments WHERE tag_id = %s
+                        )
+                        WHERE tag_id = %s
+                    """, [tag_id, tag_id])
+
+                    logger.info(f"Auto-assigned subtype tag '{subtype_code}' to doc {doc_id}")
+        except Exception as e:
+            logger.warning(f"Failed to assign subtype tag: {e}")
+            # Non-fatal — don't break extraction over a tag assignment failure
 
     def classify_document(self, doc_id: int) -> ClassificationResult:
         """Classify a document and return the result."""

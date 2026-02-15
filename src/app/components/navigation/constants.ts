@@ -7,7 +7,6 @@
 // Global navigation links (Tier 1)
 export const GLOBAL_NAV_LINKS = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
-  { id: 'dms', label: 'Documents', href: '/dms' },
 ] as const;
 
 // Sandbox dropdown pages (developer/prototype reference)

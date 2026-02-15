@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { CCard, CCardHeader, CCardBody } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilLayers, cilTrash, cilActionRedo } from '@coreui/icons';
+import { cilLayers, cilTrash, cilActionRedo, cilPlus } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
@@ -35,12 +35,21 @@ async function parseJsonSafely<T>(response: Response, context: string): Promise<
   }
 }
 
+const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 export default function DMSView({
   projectId,
   projectName,
   projectType = null
 }: DMSViewProps) {
   const defaultWorkspaceId = 1;
+
+  // "+ Add Type" inline input state
+  const [isAddingType, setIsAddingType] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  const [addTypeError, setAddTypeError] = useState<string | null>(null);
+  const [isSubmittingType, setIsSubmittingType] = useState(false);
+  const addTypeInputRef = useRef<HTMLInputElement>(null);
 
   // Documents state
   const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
@@ -78,28 +87,55 @@ export default function DMSView({
   const loadFilters = async () => {
     setIsLoadingFilters(true);
     try {
-      const docTypeParams = new URLSearchParams({
-        project_id: projectId.toString(),
-        workspace_id: defaultWorkspaceId.toString()
-      });
-      if (projectType) {
-        docTypeParams.append('project_type', projectType);
+      // Try Django project doc-types API first (returns merged template + custom types)
+      // Falls back to legacy Next.js template API if Django is unavailable
+      let docTypeItems: Array<{ doc_type_name: string; is_from_template: boolean; id?: number }> = [];
+      let usedDjangoApi = false;
+
+      try {
+        const djangoResponse = await fetch(`${DJANGO_API}/api/dms/projects/${projectId}/doc-types/`);
+        if (djangoResponse.ok) {
+          const djangoData = await parseJsonSafely<{
+            success?: boolean;
+            doc_types?: Array<{ doc_type_name: string; is_from_template: boolean; id?: number; display_order?: number }>
+          }>(djangoResponse, 'django/project-doc-types');
+          if (djangoData.success && Array.isArray(djangoData.doc_types) && djangoData.doc_types.length > 0) {
+            docTypeItems = djangoData.doc_types;
+            usedDjangoApi = true;
+          }
+        }
+      } catch {
+        // Django unavailable — fall through to legacy
       }
 
-      const [docTypesResponse, countsResponse] = await Promise.all([
-        fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`),
-        fetch(`/api/dms/filters/counts?project_id=${projectId}`)
-      ]);
+      if (!usedDjangoApi) {
+        // Legacy: load from Next.js template API
+        const docTypeParams = new URLSearchParams({
+          project_id: projectId.toString(),
+          workspace_id: defaultWorkspaceId.toString()
+        });
+        if (projectType) {
+          docTypeParams.append('project_type', projectType);
+        }
 
-      let docTypeOptions: string[] = [];
-      if (docTypesResponse.ok) {
-        const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
-          docTypesResponse,
-          'dms/templates/doc-types'
-        );
-        docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
+        const docTypesResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`);
+        let docTypeOptions: string[] = [];
+        if (docTypesResponse.ok) {
+          const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
+            docTypesResponse,
+            'dms/templates/doc-types'
+          );
+          docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
+        }
+
+        docTypeItems = docTypeOptions.map(type => ({
+          doc_type_name: type,
+          is_from_template: true,
+        }));
       }
 
+      // Fetch document counts
+      const countsResponse = await fetch(`/api/dms/filters/counts?project_id=${projectId}`);
       if (!countsResponse.ok) {
         throw new Error('Failed to fetch filter counts');
       }
@@ -115,12 +151,15 @@ export default function DMSView({
 
       const totalDocCount = countEntries.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
 
-      // If no documents are profiled yet, fall back to the "valuation" template filters when available
-      if (totalDocCount === 0) {
+      // If no documents and no Django types, fall back to "valuation" template
+      if (totalDocCount === 0 && !usedDjangoApi) {
         try {
-          const valuationParams = new URLSearchParams(docTypeParams);
-          valuationParams.set('project_type', 'valuation');
-          const valuationResponse = await fetch(`/api/dms/templates/doc-types?${valuationParams.toString()}`);
+          const docTypeParams = new URLSearchParams({
+            project_id: projectId.toString(),
+            workspace_id: defaultWorkspaceId.toString(),
+            project_type: 'valuation'
+          });
+          const valuationResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`);
           if (valuationResponse.ok) {
             const valuationData = await parseJsonSafely<{ doc_type_options?: string[] }>(
               valuationResponse,
@@ -128,7 +167,10 @@ export default function DMSView({
             );
             const valuationOptions = Array.isArray(valuationData.doc_type_options) ? valuationData.doc_type_options : [];
             if (valuationOptions.length > 0) {
-              docTypeOptions = valuationOptions;
+              docTypeItems = valuationOptions.map(type => ({
+                doc_type_name: type,
+                is_from_template: true,
+              }));
             }
           }
         } catch (valuationError) {
@@ -144,34 +186,38 @@ export default function DMSView({
         }
       });
 
-      const templateFilters = docTypeOptions.map((type: string) => {
-        const normalized = type.toLowerCase();
+      const typeFilters: FilterAccordion[] = docTypeItems.map((item) => {
+        const normalized = item.doc_type_name.toLowerCase();
         const count =
-          countMap.get(type) ??
+          countMap.get(item.doc_type_name) ??
           countMap.get(normalized) ??
           0;
 
         return {
-          doc_type: type,
+          doc_type: item.doc_type_name,
           icon: '📁',
           count,
           is_expanded: false,
-          documents: []
+          documents: [],
+          is_from_template: item.is_from_template,
+          custom_id: item.id,
         };
       });
 
-      const templateSet = new Set(docTypeOptions.map(type => type.toLowerCase()));
+      // Add any counted doc types not in the merged list
+      const typeSet = new Set(docTypeItems.map(item => item.doc_type_name.toLowerCase()));
       const extraFilters = countEntries
-        .filter(({ doc_type }) => doc_type && !templateSet.has(doc_type.toLowerCase()))
+        .filter(({ doc_type }) => doc_type && !typeSet.has(doc_type.toLowerCase()))
         .map(({ doc_type, count }) => ({
           doc_type,
           icon: '📁',
           count: count ?? 0,
           is_expanded: false,
-          documents: []
+          documents: [],
+          is_from_template: true, // treat as template since it came from actual docs
         }));
 
-      setAllFilters([...templateFilters, ...extraFilters]);
+      setAllFilters([...typeFilters, ...extraFilters]);
       setExpandedFilter(null);
     } catch (error) {
       console.error('Error loading filters:', error);
@@ -457,6 +503,114 @@ export default function DMSView({
     });
   };
 
+  // ─── "+ Add Type" handlers ───────────────────────────────────────
+  const handleStartAddType = useCallback(() => {
+    setIsAddingType(true);
+    setNewTypeName('');
+    setAddTypeError(null);
+    // Auto-focus happens via useEffect below
+  }, []);
+
+  useEffect(() => {
+    if (isAddingType && addTypeInputRef.current) {
+      addTypeInputRef.current.focus();
+    }
+  }, [isAddingType]);
+
+  const handleCancelAddType = useCallback(() => {
+    setIsAddingType(false);
+    setNewTypeName('');
+    setAddTypeError(null);
+  }, []);
+
+  const handleSubmitAddType = useCallback(async () => {
+    const trimmed = newTypeName.trim();
+    if (!trimmed) {
+      handleCancelAddType();
+      return;
+    }
+
+    // Check for duplicate (case-insensitive)
+    const existing = allFilters.find(
+      (f) => f.doc_type.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      setAddTypeError('This type already exists');
+      return;
+    }
+
+    setIsSubmittingType(true);
+    setAddTypeError(null);
+
+    try {
+      const response = await fetch(`${DJANGO_API}/api/dms/projects/${projectId}/doc-types/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doc_type_name: trimmed }),
+      });
+
+      const data = await parseJsonSafely<{
+        success?: boolean;
+        existing?: boolean;
+        doc_type?: { id: number; doc_type_name: string; is_from_template: boolean };
+        error?: string;
+      }>(response, 'django/project-doc-types POST');
+
+      if (data.existing) {
+        setAddTypeError('This type already exists');
+        return;
+      }
+
+      if (!data.success || !data.doc_type) {
+        setAddTypeError(data.error || 'Failed to create type');
+        return;
+      }
+
+      // Add the new filter immediately
+      setAllFilters((prev) => [
+        ...prev,
+        {
+          doc_type: data.doc_type!.doc_type_name,
+          icon: '📁',
+          count: 0,
+          is_expanded: false,
+          documents: [],
+          is_from_template: false,
+          custom_id: data.doc_type!.id,
+        },
+      ]);
+
+      handleCancelAddType();
+    } catch (error) {
+      console.error('Error adding doc type:', error);
+      setAddTypeError('Failed to add type');
+    } finally {
+      setIsSubmittingType(false);
+    }
+  }, [newTypeName, allFilters, projectId, handleCancelAddType]);
+
+  const handleDeleteFilter = useCallback(async (customId: number, docTypeName: string) => {
+    try {
+      const response = await fetch(
+        `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${customId}/`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        // Remove from local state immediately
+        setAllFilters((prev) => prev.filter((f) => !(f.custom_id === customId)));
+        // If the deleted filter was expanded, collapse it
+        if (expandedFilter === docTypeName) {
+          setExpandedFilter(null);
+        }
+      } else {
+        console.error('Failed to delete custom doc type:', response.status);
+      }
+    } catch (error) {
+      console.error('Error deleting custom doc type:', error);
+    }
+  }, [projectId, expandedFilter]);
+
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       {/* Main Content */}
@@ -477,18 +631,6 @@ export default function DMSView({
                   </span>
                 </div>
                 <div className="d-flex gap-2" onClick={(e) => e.stopPropagation()}>
-                  <a
-                    href="/dms"
-                    className="px-3 py-1 rounded border transition-colors"
-                    style={{
-                      borderColor: 'var(--cui-border-color)',
-                      color: 'var(--cui-primary)',
-                      fontSize: '0.85rem',
-                      textDecoration: 'none'
-                    }}
-                  >
-                    Open Global DMS
-                  </a>
                   <a
                     href={`/projects/${projectId}/documents?tab=upload`}
                     className="px-3 py-1 rounded text-white"
@@ -683,37 +825,103 @@ export default function DMSView({
                               <p className="text-sm">No documents found in this project</p>
                             </div>
                           ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                              {/* Left Column */}
-                              <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
-                                <AccordionFilters
-                                  projectId={projectId}
-                                  workspaceId={defaultWorkspaceId}
-                                  filters={leftColumnFilters}
-                                  onExpand={handleAccordionExpand}
-                                  onDocumentSelect={handleDocumentSelect}
-                                  expandedFilter={expandedFilter}
-                                  onUploadComplete={handleDocumentChange}
-                                  selectedDocIds={selectedDocIds}
-                                  onToggleDocSelection={handleToggleDocSelection}
-                                  onReviewMedia={handleReviewMedia}
-                                />
+                            <div>
+                              <div className="grid grid-cols-1 lg:grid-cols-2" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                                {/* Left Column */}
+                                <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
+                                  <AccordionFilters
+                                    projectId={projectId}
+                                    workspaceId={defaultWorkspaceId}
+                                    filters={leftColumnFilters}
+                                    onExpand={handleAccordionExpand}
+                                    onDocumentSelect={handleDocumentSelect}
+                                    expandedFilter={expandedFilter}
+                                    onUploadComplete={handleDocumentChange}
+                                    selectedDocIds={selectedDocIds}
+                                    onToggleDocSelection={handleToggleDocSelection}
+                                    onReviewMedia={handleReviewMedia}
+                                    onDeleteFilter={handleDeleteFilter}
+                                  />
+                                </div>
+
+                                {/* Right Column */}
+                                <div>
+                                  <AccordionFilters
+                                    projectId={projectId}
+                                    workspaceId={defaultWorkspaceId}
+                                    filters={rightColumnFilters}
+                                    onExpand={handleAccordionExpand}
+                                    onDocumentSelect={handleDocumentSelect}
+                                    expandedFilter={expandedFilter}
+                                    onUploadComplete={handleDocumentChange}
+                                    selectedDocIds={selectedDocIds}
+                                    onToggleDocSelection={handleToggleDocSelection}
+                                    onReviewMedia={handleReviewMedia}
+                                    onDeleteFilter={handleDeleteFilter}
+                                  />
+                                </div>
                               </div>
 
-                              {/* Right Column */}
-                              <div>
-                                <AccordionFilters
-                                  projectId={projectId}
-                                  workspaceId={defaultWorkspaceId}
-                                  filters={rightColumnFilters}
-                                  onExpand={handleAccordionExpand}
-                                  onDocumentSelect={handleDocumentSelect}
-                                  expandedFilter={expandedFilter}
-                                  onUploadComplete={handleDocumentChange}
-                                  selectedDocIds={selectedDocIds}
-                                  onToggleDocSelection={handleToggleDocSelection}
-                                  onReviewMedia={handleReviewMedia}
-                                />
+                              {/* + Add Type button / inline input */}
+                              <div
+                                className="px-4 py-2 border-t"
+                                style={{
+                                  borderColor: 'var(--cui-border-color)',
+                                  backgroundColor: 'var(--cui-body-bg)'
+                                }}
+                              >
+                                {isAddingType ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 relative">
+                                      <input
+                                        ref={addTypeInputRef}
+                                        type="text"
+                                        className="w-full px-3 py-1.5 text-sm rounded border"
+                                        style={{
+                                          borderColor: addTypeError ? 'var(--cui-danger)' : 'var(--cui-border-color)',
+                                          backgroundColor: 'var(--cui-body-bg)',
+                                          color: 'var(--cui-body-color)',
+                                          outline: 'none',
+                                        }}
+                                        placeholder="New document type..."
+                                        value={newTypeName}
+                                        onChange={(e) => {
+                                          setNewTypeName(e.target.value);
+                                          if (addTypeError) setAddTypeError(null);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            void handleSubmitAddType();
+                                          } else if (e.key === 'Escape') {
+                                            handleCancelAddType();
+                                          }
+                                        }}
+                                        disabled={isSubmittingType}
+                                      />
+                                      {addTypeError && (
+                                        <p className="text-xs mt-0.5" style={{ color: 'var(--cui-danger)' }}>
+                                          {addTypeError}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {isSubmittingType && (
+                                      <div
+                                        className="animate-spin rounded-full h-4 w-4 border-2"
+                                        style={{ borderColor: 'var(--cui-primary)', borderTopColor: 'transparent' }}
+                                      />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={handleStartAddType}
+                                    className="flex items-center gap-1.5 text-sm py-1 transition-colors hover:opacity-80"
+                                    style={{ color: 'var(--cui-secondary-color)' }}
+                                  >
+                                    <CIcon icon={cilPlus} className="w-4 h-4" />
+                                    + Add Type
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )
@@ -738,6 +946,7 @@ export default function DMSView({
                             document={selectedDocument}
                             onClose={handleCloseDocumentPreview}
                             onDocumentChange={handleDocumentChange}
+                            folderDocType={expandedFilter || undefined}
                           />
                         </div>
                       </>
@@ -797,7 +1006,7 @@ export default function DMSView({
                 docId={parseInt(firstSelectedDoc.doc_id, 10)}
                 projectId={projectId}
                 workspaceId={defaultWorkspaceId}
-                docType={firstSelectedDoc.doc_type || 'general'}
+                docType={firstSelectedDoc.doc_type || expandedFilter || 'general'}
                 projectType={projectType}
                 initialProfile={(firstSelectedDoc.profile_json as Record<string, unknown>) || {}}
                 onSave={handleEditProfileSave}

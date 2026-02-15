@@ -105,4 +105,8 @@ urlpatterns = [
     path('library/search/', knowledge_library_views.knowledge_library_search, name='knowledge_library_search'),
     path('library/batch-download/', knowledge_library_views.knowledge_library_batch_download, name='knowledge_library_batch_download'),
     path('library/upload/', knowledge_library_views.knowledge_library_upload, name='knowledge_library_upload'),
+    path('library/classification-options/', knowledge_library_views.knowledge_library_classification_options, name='knowledge_library_classification_options'),
+    path('library/documents/<int:doc_id>/classification/', knowledge_library_views.knowledge_library_update_classification, name='knowledge_library_update_classification'),
+    path('library/documents/<int:doc_id>/geo-tags/', knowledge_library_views.knowledge_library_geo_tags, name='knowledge_library_geo_tags'),
+    path('library/documents/<int:doc_id>/geo-tags/<int:geo_tag_id>/', knowledge_library_views.knowledge_library_delete_geo_tag, name='knowledge_library_delete_geo_tag'),
 ]

@@ -1,0 +1,2088 @@
+diff --git a/backend/apps/knowledge/services/extraction_service.py b/backend/apps/knowledge/services/extraction_service.py
+index 152932c..650e53d 100644
+--- a/backend/apps/knowledge/services/extraction_service.py
++++ b/backend/apps/knowledge/services/extraction_service.py
+@@ -1665,6 +1665,19 @@ class BatchedExtractionService:
+                 fields = []
+                 for scope in scopes:
+                     scope_fields = self.registry.get_fields_by_scope(scope, self.property_type)
++                    # DIAG-SCOPE: Log fields retrieved per scope
++                    field_keys = [f.field_key for f in scope_fields]
++                    input_fields = [f.field_key for f in scope_fields if f.field_role == 'input']
++                    output_fields = [f.field_key for f in scope_fields if f.field_role == 'output']
++                    logger.info(f"[DIAG-SCOPE] Scope '{scope}': {len(scope_fields)} total fields ({len(input_fields)} input, {len(output_fields)} output)")
++                    logger.info(f"[DIAG-SCOPE] Scope '{scope}' field_keys: {field_keys[:20]}{'...' if len(field_keys) > 20 else ''}")
++
++                    # DIAG-UNIT: Special logging for unit_type scope
++                    if scope == 'unit_type':
++                        logger.info(f"[DIAG-UNIT] unit_type scope fields: {field_keys}")
++                        for f in scope_fields:
++                            logger.info(f"[DIAG-UNIT] Field '{f.field_key}': scope={f.scope}, field_role={f.field_role}, extract_policy={f.extract_policy}")
++
+                     fields.extend(scope_fields)
+ 
+                 if not fields:
+@@ -1675,6 +1688,7 @@ class BatchedExtractionService:
+                         'fields': 0,
+                         'note': 'No fields found for scopes',
+                     })
++                    logger.warning(f"[DIAG-SCOPE] Batch '{batch_name}' has NO fields for scopes {scopes}")
+                     continue
+ 
+                 logger.info(f"Batch '{batch_name}': {len(fields)} fields from scopes {scopes}")
+@@ -1964,6 +1978,20 @@ Extract ALL rent comps as array under "rent_comp_name":
+     def _get_document_content(self, doc_id: int) -> Optional[str]:
+         """Get document text content from embeddings."""
+         with connection.cursor() as cursor:
++            # DIAG-DOC: Log document retrieval start
++            logger.info(f"[DIAG-DOC] Fetching content for doc_id={doc_id}, project_id={self.project_id}")
++
++            # DIAG-VECTOR: Check what chunks exist for this doc vs all docs
++            cursor.execute("""
++                SELECT source_id, COUNT(*) as chunk_count
++                FROM landscape.knowledge_embeddings
++                WHERE source_type = 'document_chunk'
++                GROUP BY source_id
++                ORDER BY source_id
++            """)
++            all_chunks = cursor.fetchall()
++            logger.info(f"[DIAG-VECTOR] All document chunks in DB: {[(r[0], r[1]) for r in all_chunks]}")
++
+             cursor.execute("""
+                 SELECT content_text
+                 FROM landscape.knowledge_embeddings
+@@ -1973,6 +2001,13 @@ Extract ALL rent comps as array under "rent_comp_name":
+             """, [doc_id])
+             rows = cursor.fetchall()
+ 
++            # DIAG-DOC: Log chunk retrieval results
++            logger.info(f"[DIAG-DOC] Retrieved {len(rows)} chunks for doc_id={doc_id}")
++            if rows:
++                # DIAG-CONTEXT: Log first 200 chars of first chunk to verify doc identity
++                first_chunk = rows[0][0][:200] if rows[0][0] else "(empty)"
++                logger.info(f"[DIAG-CONTEXT] First chunk preview (doc_id={doc_id}): {first_chunk}")
++
+         if rows:
+             return "\n\n".join(row[0] for row in rows if row[0])
+         return None
+@@ -1980,6 +2015,7 @@ Extract ALL rent comps as array under "rent_comp_name":
+     def _get_document_info(self, doc_id: int) -> Optional[Dict[str, Any]]:
+         """Get document info."""
+         with connection.cursor() as cursor:
++            # DIAG-DOC: Also log document metadata
+             cursor.execute("""
+                 SELECT doc_id, doc_name, project_id, doc_type
+                 FROM landscape.core_doc
+@@ -1988,12 +2024,16 @@ Extract ALL rent comps as array under "rent_comp_name":
+             row = cursor.fetchone()
+ 
+         if row:
+-            return {
++            doc_info = {
+                 'doc_id': row[0],
+                 'doc_name': row[1],
+                 'project_id': row[2],
+                 'doc_type': row[3],
+             }
++            # DIAG-DOC: Log document metadata for verification
++            logger.info(f"[DIAG-DOC] Document info: name='{doc_info['doc_name']}', project_id={doc_info['project_id']}, type={doc_info['doc_type']}")
++            return doc_info
++        logger.warning(f"[DIAG-DOC] No document found for doc_id={doc_id}")
+         return None
+ 
+     def _parse_batch_response(
+@@ -2041,9 +2081,16 @@ Extract ALL rent comps as array under "rent_comp_name":
+         array_scopes = {'unit', 'unit_type', 'sales_comp', 'rent_comp'}
+         staged_count = 0
+ 
++        # DIAG-TABLE: Log what's coming in for staging
++        logger.info(f"[DIAG-TABLE] _stage_batch_extractions called with {len(extractions)} extractions for scopes {scopes}")
++        logger.info(f"[DIAG-TABLE] Extraction keys received: {list(extractions.keys())}")
++        logger.info(f"[DIAG-TABLE] Field map has {len(field_map)} fields: {list(field_map.keys())[:20]}...")
++
+         with connection.cursor() as cursor:
+             for field_key, extraction in extractions.items():
+                 if not isinstance(extraction, dict):
++                    # DIAG-TABLE: Log non-dict extractions
++                    logger.warning(f"[DIAG-TABLE] Skipping non-dict extraction for {field_key}: {type(extraction)}")
+                     continue
+ 
+                 value = extraction.get('value')
+@@ -2066,11 +2113,19 @@ Extract ALL rent comps as array under "rent_comp_name":
+                             break
+ 
+                 if not field:
+-                    logger.warning(f"No field mapping for {field_key}")
++                    # DIAG-TABLE: Log when field mapping is missing
++                    logger.warning(f"[DIAG-TABLE] No field mapping for '{field_key}' - SKIPPING. Available: {list(field_map.keys())[:10]}...")
+                     continue
+ 
++                # DIAG-TABLE: Log each field being staged with its role
++                logger.info(f"[DIAG-TABLE] Staging field '{field_key}': scope={field.scope}, field_role={field.field_role}, value_type={type(value).__name__}")
++
+                 # Handle array-scoped fields
+                 if field.scope in array_scopes and isinstance(value, list):
++                    # DIAG-ARRAY: Log array extraction details
++                    logger.info(f"[DIAG-ARRAY] Field '{field_key}' is array-scoped (scope={field.scope}), has {len(value)} items")
++                    if value:
++                        logger.info(f"[DIAG-ARRAY] First item sample: {str(value[0])[:200]}")
+                     for array_idx, item in enumerate(value):
+                         # Determine scope_label
+                         if field.scope == 'unit_type':
+@@ -2144,6 +2199,8 @@ Extract ALL rent comps as array under "rent_comp_name":
+                     ])
+                     staged_count += 1
+ 
++        # DIAG-TABLE: Summary of staging
++        logger.info(f"[DIAG-TABLE] STAGING COMPLETE: Staged {staged_count} extractions for doc {doc_id}")
+         logger.info(f"Staged {staged_count} extractions for doc {doc_id}")
+         return staged_count
+ 
+diff --git a/backend/apps/knowledge/services/extraction_writer.py b/backend/apps/knowledge/services/extraction_writer.py
+index 5e8e0c7..4d7f5ca 100644
+--- a/backend/apps/knowledge/services/extraction_writer.py
++++ b/backend/apps/knowledge/services/extraction_writer.py
+@@ -567,44 +567,76 @@ class ExtractionWriter:
+ 
+     def _insert_full_unit_type(self, data: Dict[str, Any]) -> Tuple[bool, str]:
+         """Insert or update a unit type row from extracted dict."""
+-        # Extract unit type name for matching
+-        unit_type_name = data.get('unit_type_name') or data.get('unit_type')
++        # Extract unit type name for matching - try multiple field names
++        unit_type_name = (
++            data.get('unit_type_name') or
++            data.get('unit_type') or
++            data.get('name')
++        )
+         if not unit_type_name:
+             # Try to construct from bed/bath
+             beds = data.get('bedrooms', data.get('beds', ''))
+             baths = data.get('bathrooms', data.get('baths', ''))
+-            if beds and baths:
++            if beds is not None and baths is not None:
+                 unit_type_name = f"{beds}BR/{baths}BA"
+ 
+         if not unit_type_name:
+             return False, "No unit_type_name found in data"
+ 
+-        # Check if exists
++        # Get unit_type_code - use explicit value or fall back to name
++        unit_type_code = data.get('unit_type_code') or unit_type_name
++
++        # Check if exists - match on unit_type_code or unit_type_name
+         with connection.cursor() as cursor:
+             cursor.execute("""
+                 SELECT unit_type_id FROM landscape.tbl_multifamily_unit_type
+                 WHERE project_id = %s AND (
+-                    unit_type_name = %s
+-                    OR LOWER(REPLACE(unit_type_name, ' ', '')) = LOWER(REPLACE(%s, ' ', ''))
++                    unit_type_code = %s
++                    OR LOWER(REPLACE(unit_type_code, ' ', '')) = LOWER(REPLACE(%s, ' ', ''))
+                 )
+-            """, [self.project_id, unit_type_name, unit_type_name])
++            """, [self.project_id, unit_type_code, unit_type_code])
+             row = cursor.fetchone()
+ 
+-        # Map extracted field names to column names
++        # Map extracted field names to actual database column names
++        # Left side: extraction field names, Right side: actual DB column names
+         field_mapping = {
+-            'bedrooms': 'bedrooms', 'beds': 'bedrooms',
+-            'bathrooms': 'bathrooms', 'baths': 'bathrooms',
+-            'unit_count': 'unit_count', 'count': 'unit_count',
+-            'avg_sqft': 'avg_sqft', 'square_feet': 'avg_sqft', 'sf': 'avg_sqft',
+-            'market_rent': 'market_rent', 'rent': 'market_rent',
+-            'current_rent': 'current_rent', 'in_place_rent': 'current_rent',
++            # Bed/bath
++            'bedrooms': 'bedrooms',
++            'beds': 'bedrooms',
++            'bathrooms': 'bathrooms',
++            'baths': 'bathrooms',
++            # Unit count
++            'unit_count': 'total_units',
++            'total_units': 'total_units',
++            'count': 'total_units',
++            'total_units_by_type': 'total_units',
++            # Square footage
++            'avg_square_feet': 'avg_square_feet',
++            'avg_sqft': 'avg_square_feet',
++            'square_feet': 'avg_square_feet',
++            'sf': 'avg_square_feet',
++            # Market rent
++            'market_rent': 'current_market_rent',
++            'current_market_rent': 'current_market_rent',
++            'rent': 'current_market_rent',
++            # Current/in-place rent (if different column exists)
++            'current_rent_avg': 'notes',  # Store in notes for now - no separate column
++            'in_place_rent': 'notes',
++            # Unit type code
++            'unit_type_code': 'unit_type_code',
+         }
+ 
+-        # Build update dict
++        # Build update dict with proper column names
+         columns = {}
+         for key, col in field_mapping.items():
+             if key in data and data[key] is not None:
+-                columns[col] = data[key]
++                # Don't overwrite with duplicate mappings
++                if col not in columns:
++                    columns[col] = data[key]
++
++        # Always set unit_type_code
++        if 'unit_type_code' not in columns:
++            columns['unit_type_code'] = unit_type_code
+ 
+         if row:
+             # Update existing
+@@ -618,13 +650,11 @@ class ExtractionWriter:
+                         SET {set_clause}, updated_at = NOW()
+                         WHERE unit_type_id = %s AND project_id = %s
+                     """, values)
+-            return True, f"Updated unit_type: {unit_type_name}"
++            return True, f"Updated unit_type: {unit_type_code}"
+         else:
+-            # Insert new
+-            columns['unit_type_name'] = unit_type_name
++            # Insert new - ensure unit_type_code is set
+             col_names = ', '.join(columns.keys())
+             placeholders = ', '.join(['%s'] * len(columns))
+-            values = list(columns.values()) + [self.project_id]
+ 
+             with connection.cursor() as cursor:
+                 cursor.execute(f"""
+@@ -632,7 +662,7 @@ class ExtractionWriter:
+                     (project_id, {col_names}, created_at, updated_at)
+                     VALUES (%s, {placeholders}, NOW(), NOW())
+                 """, [self.project_id] + list(columns.values()))
+-            return True, f"Inserted unit_type: {unit_type_name}"
++            return True, f"Inserted unit_type: {unit_type_code}"
+ 
+     def _write_unit_upsert(
+         self,
+diff --git a/backend/apps/knowledge/services/field_registry.py b/backend/apps/knowledge/services/field_registry.py
+index 157afd7..d73d667 100644
+--- a/backend/apps/knowledge/services/field_registry.py
++++ b/backend/apps/knowledge/services/field_registry.py
+@@ -276,7 +276,19 @@ class FieldRegistry:
+     def get_fields_by_scope(self, scope: str, property_type: str = 'multifamily') -> List[FieldMapping]:
+         """Get all fields for a specific scope (project, unit_type, etc.)."""
+         mappings = self.get_all_mappings(property_type)
+-        return [m for m in mappings.values() if m.scope == scope and m.resolved]
++        all_fields = [m for m in mappings.values() if m.scope == scope and m.resolved]
++
++        # DIAG-FILTER: Log field role breakdown
++        input_fields = [m for m in all_fields if m.field_role == 'input']
++        output_fields = [m for m in all_fields if m.field_role == 'output']
++        logger.info(f"[DIAG-FILTER] get_fields_by_scope('{scope}', '{property_type}'): "
++                    f"{len(all_fields)} total, {len(input_fields)} input, {len(output_fields)} output")
++
++        if output_fields:
++            output_keys = [m.field_key for m in output_fields]
++            logger.info(f"[DIAG-FILTER] Output fields in scope '{scope}' (should be filtered later?): {output_keys}")
++
++        return all_fields
+ 
+     def get_fields_by_table(self, table_name: str, property_type: str = 'multifamily') -> List[FieldMapping]:
+         """Get all fields that write to a specific table."""
+diff --git a/backend/apps/knowledge/urls.py b/backend/apps/knowledge/urls.py
+index 554c8a7..6910f5b 100644
+--- a/backend/apps/knowledge/urls.py
++++ b/backend/apps/knowledge/urls.py
+@@ -55,4 +55,7 @@ urlpatterns = [
+     path('projects/<int:project_id>/documents/classify/', extraction_views.classify_project_documents, name='knowledge-project-classify'),
+     path('projects/<int:project_id>/extract-all/', extraction_views.extract_project_v3, name='knowledge-project-extract-v3'),
+     path('fields/<str:doc_type>/', extraction_views.get_fields_for_doc_type, name='knowledge-fields-by-doctype'),
++
++    # Diagnostic endpoints
++    path('projects/<int:project_id>/extraction-diagnostics/', extraction_views.get_extraction_diagnostics, name='knowledge-extraction-diagnostics'),
+ ]
+diff --git a/backend/apps/knowledge/views/extraction_views.py b/backend/apps/knowledge/views/extraction_views.py
+index 9d0e7c5..08714b9 100644
+--- a/backend/apps/knowledge/views/extraction_views.py
++++ b/backend/apps/knowledge/views/extraction_views.py
+@@ -99,6 +99,7 @@ def get_all_extractions(request, project_id: int):
+                 e.extraction_id,
+                 e.doc_id,
+                 d.doc_name,
++                e.field_key,
+                 e.target_table,
+                 e.target_field,
+                 e.extracted_value,
+@@ -106,6 +107,9 @@ def get_all_extractions(request, project_id: int):
+                 e.source_text,
+                 e.confidence_score,
+                 e.status,
++                e.scope,
++                e.scope_label,
++                e.array_index,
+                 e.validated_value,
+                 e.validated_by,
+                 e.validated_at,
+@@ -401,9 +405,12 @@ def bulk_validate_extractions(request, project_id: int):
+ 
+     Request body:
+     {
+-        "extraction_ids": [1, 2, 3, ...],
+-        "action": "accept" | "reject"
++        "extraction_ids": [1, 2, 3, ...],  // Optional if action is accept_all
++        "action": "accept" | "reject" | "accept_all",
++        "write_to_targets": true  // Optional, defaults to true
+     }
++
++    accept_all: Accepts all pending extractions for this project (no extraction_ids needed)
+     """
+     from django.db import connection, transaction
+     from ..services.extraction_writer import ExtractionWriter
+@@ -415,12 +422,25 @@ def bulk_validate_extractions(request, project_id: int):
+ 
+     extraction_ids = body.get('extraction_ids', [])
+     action = body.get('action', 'accept')
++    write_to_targets = body.get('write_to_targets', True)  # Default to writing
++
++    # Handle accept_all action - fetch all pending extraction IDs for this project
++    if action == 'accept_all':
++        action = 'accept'  # Normalize action
++        with connection.cursor() as cursor:
++            cursor.execute("""
++                SELECT extraction_id
++                FROM landscape.ai_extraction_staging
++                WHERE project_id = %s AND status = 'pending'
++            """, [project_id])
++            extraction_ids = [row[0] for row in cursor.fetchall()]
++            logger.info(f"[bulk_validate] accept_all: found {len(extraction_ids)} pending extractions for project {project_id}")
+ 
+     if not extraction_ids:
+-        return JsonResponse({'error': 'No extraction_ids provided'}, status=400)
++        return JsonResponse({'success': True, 'message': 'No pending extractions to process', 'results': {'success': [], 'failed': []}})
+ 
+     if action not in ['accept', 'reject']:
+-        return JsonResponse({'error': 'Bulk action must be accept or reject'}, status=400)
++        return JsonResponse({'error': 'Bulk action must be accept, reject, or accept_all'}, status=400)
+ 
+     results = {'success': [], 'failed': []}
+     new_status = 'accepted' if action == 'accept' else 'rejected'
+@@ -910,3 +930,137 @@ def extract_rent_roll(request, doc_id: int):
+ 
+     status = 200 if result.get('success') else 400
+     return JsonResponse(result, status=status)
++
++
++@csrf_exempt
++@require_http_methods(["GET"])
++def get_extraction_diagnostics(request, project_id: int):
++    """
++    GET /api/knowledge/projects/{project_id}/extraction-diagnostics/
++
++    Get a diagnostic summary of the extraction pipeline state for a project.
++    This helps identify why fields may be missing from extraction results.
++
++    Returns:
++    {
++        "success": true,
++        "project_id": 42,
++        "diagnostics": {
++            "documents": [...],
++            "embedding_stats": {...},
++            "extraction_stats": {...},
++            "registry_stats": {...}
++        }
++    }
++    """
++    from django.db import connection
++    from ..services.field_registry import get_registry
++
++    diagnostics = {
++        'documents': [],
++        'embedding_stats': {},
++        'extraction_stats': {},
++        'registry_stats': {},
++    }
++
++    with connection.cursor() as cursor:
++        # Get documents for this project
++        cursor.execute("""
++            SELECT doc_id, doc_name, doc_type, created_at
++            FROM landscape.core_doc
++            WHERE project_id = %s
++            ORDER BY created_at DESC
++        """, [int(project_id)])
++        docs = cursor.fetchall()
++
++        for doc in docs:
++            doc_id, doc_name, doc_type, created_at = doc
++            # Get embedding count for this doc
++            cursor.execute("""
++                SELECT COUNT(*)
++                FROM landscape.knowledge_embeddings
++                WHERE source_id = %s AND source_type = 'document_chunk'
++            """, [doc_id])
++            chunk_count = cursor.fetchone()[0]
++
++            diagnostics['documents'].append({
++                'doc_id': doc_id,
++                'doc_name': doc_name,
++                'doc_type': doc_type,
++                'chunk_count': chunk_count,
++                'created_at': created_at.isoformat() if created_at else None,
++            })
++
++        # Get all embedding stats
++        cursor.execute("""
++            SELECT source_id, COUNT(*) as count
++            FROM landscape.knowledge_embeddings
++            WHERE source_type = 'document_chunk'
++            GROUP BY source_id
++            ORDER BY source_id
++        """)
++        embedding_by_doc = cursor.fetchall()
++        diagnostics['embedding_stats'] = {
++            'documents_with_embeddings': len(embedding_by_doc),
++            'by_doc_id': {str(r[0]): r[1] for r in embedding_by_doc},
++        }
++
++        # Get extraction stats for this project
++        cursor.execute("""
++            SELECT
++                scope,
++                field_key,
++                status,
++                COUNT(*) as count
++            FROM landscape.ai_extraction_staging
++            WHERE project_id = %s
++            GROUP BY scope, field_key, status
++            ORDER BY scope, field_key
++        """, [int(project_id)])
++        extraction_rows = cursor.fetchall()
++
++        by_scope = {}
++        by_field_key = {}
++        by_status = {}
++        for row in extraction_rows:
++            scope, field_key, status, count = row
++            by_scope[scope] = by_scope.get(scope, 0) + count
++            by_field_key[field_key] = by_field_key.get(field_key, 0) + count
++            by_status[status or 'null'] = by_status.get(status or 'null', 0) + count
++
++        diagnostics['extraction_stats'] = {
++            'total_extractions': sum(by_status.values()),
++            'by_scope': by_scope,
++            'by_status': by_status,
++            'field_keys_extracted': list(by_field_key.keys()),
++            'field_count': len(by_field_key),
++        }
++
++    # Get registry stats
++    registry = get_registry()
++    mf_mappings = registry.get_all_mappings('multifamily')
++
++    by_scope_registry = {}
++    input_fields = []
++    output_fields = []
++    for field_key, mapping in mf_mappings.items():
++        scope = mapping.scope
++        by_scope_registry[scope] = by_scope_registry.get(scope, 0) + 1
++        if mapping.field_role == 'input':
++            input_fields.append(field_key)
++        else:
++            output_fields.append(field_key)
++
++    diagnostics['registry_stats'] = {
++        'total_fields': len(mf_mappings),
++        'input_fields': len(input_fields),
++        'output_fields': len(output_fields),
++        'by_scope': by_scope_registry,
++        'sample_output_fields': output_fields[:10],
++    }
++
++    return JsonResponse({
++        'success': True,
++        'project_id': int(project_id),
++        'diagnostics': diagnostics,
++    })
+diff --git a/backend/config/settings.py b/backend/config/settings.py
+index 7c1f0d3..3867e82 100644
+--- a/backend/config/settings.py
++++ b/backend/config/settings.py
+@@ -226,6 +226,48 @@ SPECTACULAR_SETTINGS = {
+     'SERVE_INCLUDE_SCHEMA': False,
+ }
+ 
++# ============================================================================
++# LOGGING CONFIGURATION
++# ============================================================================
++
++LOGGING = {
++    'version': 1,
++    'disable_existing_loggers': False,
++    'formatters': {
++        'verbose': {
++            'format': '{levelname} {asctime} {module} {message}',
++            'style': '{',
++        },
++        'simple': {
++            'format': '{levelname} {message}',
++            'style': '{',
++        },
++    },
++    'handlers': {
++        'console': {
++            'class': 'logging.StreamHandler',
++            'formatter': 'verbose',
++        },
++        'file': {
++            'class': 'logging.FileHandler',
++            'filename': '/tmp/landscape_diag.log',
++            'formatter': 'verbose',
++        },
++    },
++    'loggers': {
++        'apps.knowledge': {
++            'handlers': ['console', 'file'],
++            'level': 'INFO',
++            'propagate': True,
++        },
++        'apps.knowledge.services': {
++            'handlers': ['console', 'file'],
++            'level': 'DEBUG',
++            'propagate': False,
++        },
++    },
++}
++
+ # ============================================================================
+ # CALCULATION ENGINE CONFIGURATION
+ # ============================================================================
+diff --git a/reference/multifam/chadron/Chadron - Rent Roll & Delinquency as of 09.30.2025 with September Rent Received.xlsx b/reference/multifam/chadron/Chadron - Rent Roll & Delinquency as of 09.30.2025 with September Rent Received.xlsx
+deleted file mode 100644
+index a32e38d..0000000
+Binary files a/reference/multifam/chadron/Chadron - Rent Roll & Delinquency as of 09.30.2025 with September Rent Received.xlsx and /dev/null differ
+diff --git a/src/app/api/projects/[projectId]/details/route.ts b/src/app/api/projects/[projectId]/details/route.ts
+index 24699ee..348bfb9 100644
+--- a/src/app/api/projects/[projectId]/details/route.ts
++++ b/src/app/api/projects/[projectId]/details/route.ts
+@@ -80,14 +80,15 @@ export async function PATCH(
+ 
+     const result = await sql.query(query, [projectId, ...values]);
+ 
+-    if (result.rows.length === 0) {
++    // Neon's sql.query() returns rows directly as an array, not {rows: [...]}
++    if (!result || result.length === 0) {
+       return NextResponse.json(
+         { error: 'Project not found' },
+         { status: 404 }
+       );
+     }
+ 
+-    return NextResponse.json(result.rows[0]);
++    return NextResponse.json(result[0]);
+ 
+   } catch (error) {
+     console.error('Error updating project details:', error);
+diff --git a/src/app/api/projects/[projectId]/route.ts b/src/app/api/projects/[projectId]/route.ts
+index 9a47952..afc18ab 100644
+--- a/src/app/api/projects/[projectId]/route.ts
++++ b/src/app/api/projects/[projectId]/route.ts
+@@ -98,6 +98,39 @@ export async function PATCH(req: NextRequest, context: Params) {
+   }
+ }
+ 
++export async function DELETE(_req: NextRequest, context: Params) {
++  try {
++    const { projectId } = await context.params
++    if (!projectId) return NextResponse.json({ error: 'project id required' }, { status: 400 })
++
++    // Delete related records first (cascade)
++    await sql`DELETE FROM landscape.ai_extraction_staging WHERE project_id = ${projectId}::bigint`
++    await sql`DELETE FROM landscape.ai_ingestion_history WHERE project_id = ${projectId}::bigint`
++    await sql`DELETE FROM landscape.landscaper_chat_message WHERE project_id = ${projectId}::bigint`
++    await sql`DELETE FROM landscape.core_doc WHERE project_id = ${projectId}::bigint`
++
++    // Hard delete the project
++    const rows = await sql`
++      DELETE FROM landscape.tbl_project
++      WHERE project_id = ${projectId}::bigint
++      RETURNING project_id
++    `
++
++    if (!rows || rows.length === 0) {
++      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
++    }
++
++    return NextResponse.json({ success: true, deleted: rows[0].project_id })
++  } catch (error: unknown) {
++    const message = error instanceof Error ? error.message : String(error)
++    console.error('Project DELETE error:', error)
++    return NextResponse.json(
++      { error: 'Failed to delete project', details: message },
++      { status: 500 }
++    )
++  }
++}
++
+ export async function GET(_req: NextRequest, context: Params) {
+   try {
+     const { projectId } = await context.params
+diff --git a/src/app/api/projects/minimal/route.ts b/src/app/api/projects/minimal/route.ts
+index 56e0c3a..43c7f32 100644
+--- a/src/app/api/projects/minimal/route.ts
++++ b/src/app/api/projects/minimal/route.ts
+@@ -75,17 +75,62 @@ const buildLocationDescription = (body: MinimalProjectRequest) => {
+   return null
+ }
+ 
++// Helper: Generate a unique project name if duplicate exists
++async function getUniqueProjectName(baseName: string): Promise<string> {
++  // Check if the name already exists
++  const existing = await sql<{ project_name: string }[]>`
++    SELECT project_name FROM landscape.tbl_project
++    WHERE project_name = ${baseName}
++    LIMIT 1
++  `
++
++  if (existing.length === 0) {
++    return baseName
++  }
++
++  // Name exists, find the next available suffix
++  const pattern = `${baseName} (%)`
++  const similar = await sql<{ project_name: string }[]>`
++    SELECT project_name FROM landscape.tbl_project
++    WHERE project_name LIKE ${baseName + ' (%'}
++    ORDER BY project_name
++  `
++
++  // Find the highest number suffix
++  let maxNum = 1
++  for (const row of similar) {
++    const match = row.project_name.match(/\((\d+)\)$/)
++    if (match) {
++      const num = parseInt(match[1], 10)
++      if (num >= maxNum) {
++        maxNum = num + 1
++      }
++    }
++  }
++
++  return `${baseName} (${maxNum})`
++}
++
+ export async function POST(request: NextRequest) {
++  console.log('[/api/projects/minimal] POST request received');
+   try {
+     const body = await request.json() as MinimalProjectRequest
++    console.log('[/api/projects/minimal] Request body:', JSON.stringify(body));
+ 
+     if (!body.project_name || !body.project_type_code) {
++      console.log('[/api/projects/minimal] Missing required fields');
+       return NextResponse.json(
+         { error: 'project_name and project_type_code are required' },
+         { status: 400 }
+       )
+     }
+ 
++    // Get a unique project name (handles duplicates)
++    const uniqueProjectName = await getUniqueProjectName(body.project_name)
++    if (uniqueProjectName !== body.project_name) {
++      console.log(`[/api/projects/minimal] Renamed duplicate: "${body.project_name}" -> "${uniqueProjectName}"`)
++    }
++
+     const acresGross = convertToAcres(body.site_area ?? null, body.site_area_unit)
+     const locationDescription = buildLocationDescription(body)
+     const latitude = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null
+@@ -136,7 +181,7 @@ export async function POST(request: NextRequest) {
+         created_at,
+         updated_at
+       ) VALUES (
+-        ${body.project_name},
++        ${uniqueProjectName},
+         ${body.project_type_code},
+         ${dmsTemplateId ?? null},
+         ${body.property_subtype || body.development_type || null},
+@@ -165,15 +210,20 @@ export async function POST(request: NextRequest) {
+     `
+ 
+     if (inserted.length === 0) {
++      console.log('[/api/projects/minimal] Insert returned empty array');
+       throw new Error('Failed to create project')
+     }
+ 
++    console.log('[/api/projects/minimal] Project created:', JSON.stringify(inserted[0]));
+     return NextResponse.json({
+       project: inserted[0]
+     })
+   } catch (error: unknown) {
+-    console.error('Minimal project creation failed:', error)
++    console.error('[/api/projects/minimal] ERROR:', error);
+     const message = error instanceof Error ? error.message : String(error)
++    const stack = error instanceof Error ? error.stack : undefined
++    console.error('[/api/projects/minimal] Error message:', message);
++    console.error('[/api/projects/minimal] Error stack:', stack);
+     return NextResponse.json(
+       { error: 'Failed to create project', details: message },
+       { status: 500 }
+diff --git a/src/app/components/NewProjectButton.tsx b/src/app/components/NewProjectButton.tsx
+index 50c6309..324ecb9 100644
+--- a/src/app/components/NewProjectButton.tsx
++++ b/src/app/components/NewProjectButton.tsx
+@@ -1,7 +1,8 @@
+ 'use client'
+ 
+ import React, { useState } from 'react'
+-import NewProjectModal from './NewProjectModal'
++// Old modal kept as backup: import NewProjectModal from './NewProjectModal'
++import { NewProjectOnboardingModal } from '@/components/projects/onboarding'
+ 
+ const NewProjectButton: React.FC = () => {
+   const [isModalOpen, setIsModalOpen] = useState(false)
+@@ -28,7 +29,7 @@ const NewProjectButton: React.FC = () => {
+         New Project
+       </button>
+ 
+-      <NewProjectModal
++      <NewProjectOnboardingModal
+         isOpen={isModalOpen}
+         onClose={() => setIsModalOpen(false)}
+       />
+diff --git a/src/app/dashboard/page.tsx b/src/app/dashboard/page.tsx
+index 692e7d2..42dd8f5 100644
+--- a/src/app/dashboard/page.tsx
++++ b/src/app/dashboard/page.tsx
+@@ -2,7 +2,8 @@
+ 
+ import React, { useEffect, useMemo, useState } from 'react';
+ import { useProjectContext } from '@/app/components/ProjectProvider';
+-import NewProjectModal from '@/app/components/NewProjectModal';
++// Old modal kept as backup: import NewProjectModal from '@/app/components/NewProjectModal';
++import { NewProjectOnboardingModal } from '@/components/projects/onboarding';
+ import DashboardMap from '@/app/components/dashboard/DashboardMap';
+ import { ProjectTable, ProjectWithCompleteness } from '@/components/dashboard/ProjectTable';
+ import { DashboardChat } from '@/components/dashboard/DashboardChat';
+@@ -145,25 +146,21 @@ export default function DashboardPage() {
+ 
+   return (
+     <div className="flex flex-col h-full">
+-      {/* Main content area */}
+-      <PageContent className="flex-1 overflow-hidden">
++      {/* Main content area with workspace-matching gutters */}
++      <div className="flex flex-col gap-3" style={{ padding: '12px' }}>
+         {/* Header */}
+-        <div className="flex items-center justify-between mb-4">
+-          <div>
+-            <h1 className="text-2xl font-bold text-foreground">Projects</h1>
+-            <p className="text-sm text-muted">
+-              {projectsWithCompleteness.length} project{projectsWithCompleteness.length !== 1 ? 's' : ''}
+-              {activeFilter !== 'ALL' && ` (${PROPERTY_FILTERS.find(f => f.key === activeFilter)?.label})`}
+-            </p>
++        <div className="flex items-center justify-between mb-1">
++          <div className="pl-[2px]">
++            <h1 className="text-2xl font-bold text-foreground leading-tight">Projects</h1>
+           </div>
+-          <div className="flex items-center gap-3">
++          <div className="flex items-center gap-2.5">
+             {/* Filter pills */}
+-            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-card p-1">
++            <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-card px-1 py-1">
+               {PROPERTY_FILTERS.map((filter) => (
+                 <button
+                   key={filter.key}
+                   onClick={() => handleFilterChange(filter.key)}
+-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
++                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                     activeFilter === filter.key
+                       ? 'bg-primary text-white'
+                       : 'text-muted hover:text-foreground hover:bg-surface-hover'
+@@ -191,24 +188,25 @@ export default function DashboardPage() {
+         </div>
+ 
+         {/* Two-column layout: Table (2/3) + Map (1/3) */}
+-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100%-80px)]">
++        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+           {/* Project Table */}
+-          <div className="lg:col-span-2 h-full">
+-            <div className="h-full rounded-xl border border-border bg-surface-card overflow-hidden shadow-sm">
+-              <ProjectTable
+-                projects={projectsWithCompleteness}
+-                isLoading={isLoadingCompleteness}
+-              />
+-            </div>
++          <div className="lg:col-span-2">
++            <ProjectTable
++              projects={projectsWithCompleteness}
++              isLoading={isLoadingCompleteness}
++            />
+           </div>
+ 
+           {/* Map */}
+-          <div className="hidden lg:block h-full">
+-            <div className="rounded-xl border border-border bg-surface-card overflow-hidden h-full shadow-sm flex flex-col">
+-              <div className="border-b border-border px-3 py-3" style={{ backgroundColor: '#F0F1F2' }}>
++          <div className="hidden lg:flex min-h-[520px]">
++            <div
++              className="flex-1 rounded-xl border border-border bg-surface-card overflow-hidden shadow-sm flex flex-col"
++              style={{ minHeight: '520px' }}
++            >
++              <div className="border-b border-border px-3 py-1.5" style={{ backgroundColor: '#F0F1F2' }}>
+                 <h3 className="text-sm font-semibold text-foreground">Project Locations</h3>
+               </div>
+-              <div className="h-[calc(100%-48px)] px-3 pb-3 pt-2">
++              <div className="flex-1 px-3 pb-3 pt-1">
+                 <DashboardMap
+                   projects={filteredProjects}
+                   selectedProjectId={selectedProjectId}
+@@ -218,24 +216,26 @@ export default function DashboardPage() {
+             </div>
+           </div>
+         </div>
+-      </PageContent>
++      </div>
+ 
+       {/* Bottom chat bar */}
+-      <div className="mt-4 rounded-xl border border-border bg-surface-card overflow-hidden shadow-sm">
+-        <div className="border-b border-border px-3 py-3" style={{ backgroundColor: '#F0F1F2' }}>
+-          <h3 className="text-sm font-semibold text-foreground">Landscaper</h3>
+-        </div>
+-        <div className="p-4">
+-          <DashboardChat
+-            onSend={handleChatMessage}
+-            isLoading={isChatLoading}
+-            placeholder="Ask Landscaper about your portfolio..."
+-          />
++      <div className="px-3 pb-3">
++        <div className="rounded-xl border border-border bg-surface-card overflow-hidden shadow-sm">
++          <div className="border-b border-border px-3 py-1.5" style={{ backgroundColor: '#F0F1F2' }}>
++            <h3 className="text-sm font-semibold text-foreground">Landscaper</h3>
++          </div>
++          <div className="p-3">
++            <DashboardChat
++              onSend={handleChatMessage}
++              isLoading={isChatLoading}
++              placeholder="Ask Landscaper about your portfolio..."
++            />
++          </div>
+         </div>
+       </div>
+ 
+       {/* New Project Modal */}
+-      <NewProjectModal
++      <NewProjectOnboardingModal
+         isOpen={isNewProjectModalOpen}
+         onClose={() => setIsNewProjectModalOpen(false)}
+       />
+diff --git a/src/app/projects/[projectId]/components/channels/ChannelModal.tsx b/src/app/projects/[projectId]/components/channels/ChannelModal.tsx
+index f53d49e..9c75688 100644
+--- a/src/app/projects/[projectId]/components/channels/ChannelModal.tsx
++++ b/src/app/projects/[projectId]/components/channels/ChannelModal.tsx
+@@ -31,8 +31,8 @@ const channelConfig: Record<ChannelType, {
+   chatPlaceholder: string;
+ }> = {
+   landscaper: {
+-    title: 'Landscaper',
+-    icon: '🧎‍♂️🌿',
++    title: 'Project',
++    icon: '🏗️',
+     chatPlaceholder: 'Ask about project status, assumptions, or next steps...'
+   },
+   property: {
+diff --git a/src/app/projects/[projectId]/components/channels/PropertyChannelTools.tsx b/src/app/projects/[projectId]/components/channels/PropertyChannelTools.tsx
+index ea31c4c..d02aeb9 100644
+--- a/src/app/projects/[projectId]/components/channels/PropertyChannelTools.tsx
++++ b/src/app/projects/[projectId]/components/channels/PropertyChannelTools.tsx
+@@ -1,11 +1,23 @@
+ 'use client';
+ 
+-import React, { useState } from 'react';
++import React, { useState, useEffect } from 'react';
++import { unitTypesAPI } from '@/lib/api/multifamily';
++import { formatNumber, formatCurrency } from '@/utils/formatNumber';
+ 
+ interface PropertyChannelToolsProps {
+   projectId: string;
+ }
+ 
++interface UnitType {
++  unit_type_id: number;
++  unit_type_code: string;
++  bedrooms: number | string;
++  bathrooms: number | string;
++  avg_square_feet: number | null;
++  total_units: number | null;
++  current_market_rent: number | null;
++}
++
+ export function PropertyChannelTools({ projectId }: PropertyChannelToolsProps) {
+   const [activeTab, setActiveTab] = useState<'overview' | 'physical' | 'legal' | 'acquisition'>('overview');
+ 
+@@ -56,12 +68,109 @@ function PropertyOverview({ projectId }: { projectId: string }) {
+ }
+ 
+ function PropertyPhysical({ projectId }: { projectId: string }) {
++  const [unitTypes, setUnitTypes] = useState<UnitType[]>([]);
++  const [loading, setLoading] = useState(true);
++
++  useEffect(() => {
++    async function fetchUnitTypes() {
++      try {
++        const data = await unitTypesAPI.list(parseInt(projectId));
++        setUnitTypes(data);
++      } catch (error) {
++        console.error('Failed to fetch unit types:', error);
++      } finally {
++        setLoading(false);
++      }
++    }
++    fetchUnitTypes();
++  }, [projectId]);
++
++  // Calculate totals
++  const totalUnits = unitTypes.reduce((sum, ut) => sum + (ut.total_units || 0), 0);
++  const weightedRentSum = unitTypes.reduce((sum, ut) => {
++    const units = ut.total_units || 0;
++    const rent = typeof ut.current_market_rent === 'string'
++      ? parseFloat(ut.current_market_rent)
++      : (ut.current_market_rent || 0);
++    return sum + (units * rent);
++  }, 0);
++  const avgRent = totalUnits > 0 ? weightedRentSum / totalUnits : 0;
++
++  if (loading) {
++    return (
++      <div className="space-y-4">
++        <h3 className="font-semibold text-sm">Unit Mix</h3>
++        <p className="text-sm text-muted">Loading...</p>
++      </div>
++    );
++  }
++
++  if (unitTypes.length === 0) {
++    return (
++      <div className="space-y-4">
++        <h3 className="font-semibold text-sm">Unit Mix</h3>
++        <p className="text-sm text-muted">
++          No unit types found. Upload a rent roll or offering memorandum to extract unit mix data.
++        </p>
++      </div>
++    );
++  }
++
+   return (
+     <div className="space-y-4">
+-      <h3 className="font-semibold text-sm">Physical Characteristics</h3>
+-      <p className="text-sm text-muted">
+-        Building specifications, unit mix, and amenities.
+-      </p>
++      <div className="flex justify-between items-center">
++        <h3 className="font-semibold text-sm">Unit Mix</h3>
++        <div className="text-xs text-muted">
++          {totalUnits} units · {formatCurrency(avgRent)} avg rent
++        </div>
++      </div>
++
++      <div className="overflow-x-auto">
++        <table className="w-full text-xs">
++          <thead>
++            <tr className="border-b border-border">
++              <th className="text-left py-2 px-2 font-medium">Type</th>
++              <th className="text-center py-2 px-2 font-medium">Beds</th>
++              <th className="text-center py-2 px-2 font-medium">Baths</th>
++              <th className="text-right py-2 px-2 font-medium">SF</th>
++              <th className="text-right py-2 px-2 font-medium">Units</th>
++              <th className="text-right py-2 px-2 font-medium">Rent</th>
++            </tr>
++          </thead>
++          <tbody>
++            {unitTypes
++              .sort((a, b) => {
++                const bedsA = typeof a.bedrooms === 'string' ? parseFloat(a.bedrooms) : (a.bedrooms || 0);
++                const bedsB = typeof b.bedrooms === 'string' ? parseFloat(b.bedrooms) : (b.bedrooms || 0);
++                return bedsA - bedsB;
++              })
++              .map((ut) => (
++                <tr key={ut.unit_type_id} className="border-b border-border/50 hover:bg-hover-overlay">
++                  <td className="py-2 px-2 font-medium">{ut.unit_type_code || '—'}</td>
++                  <td className="py-2 px-2 text-center text-muted">{ut.bedrooms ?? '—'}</td>
++                  <td className="py-2 px-2 text-center text-muted">{ut.bathrooms ?? '—'}</td>
++                  <td className="py-2 px-2 text-right text-muted">
++                    {ut.avg_square_feet ? formatNumber(ut.avg_square_feet) : '—'}
++                  </td>
++                  <td className="py-2 px-2 text-right">{ut.total_units ?? '—'}</td>
++                  <td className="py-2 px-2 text-right font-medium">
++                    {ut.current_market_rent ? formatCurrency(Number(ut.current_market_rent)) : '—'}
++                  </td>
++                </tr>
++              ))}
++          </tbody>
++          <tfoot>
++            <tr className="border-t border-border font-medium">
++              <td className="py-2 px-2">Total</td>
++              <td className="py-2 px-2"></td>
++              <td className="py-2 px-2"></td>
++              <td className="py-2 px-2"></td>
++              <td className="py-2 px-2 text-right">{totalUnits}</td>
++              <td className="py-2 px-2 text-right">{formatCurrency(avgRent)}</td>
++            </tr>
++          </tfoot>
++        </table>
++      </div>
+     </div>
+   );
+ }
+diff --git a/src/app/projects/[projectId]/components/tabs/ProjectTab.tsx b/src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
+index 1670d1d..f54060e 100644
+--- a/src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
++++ b/src/app/projects/[projectId]/components/tabs/ProjectTab.tsx
+@@ -9,7 +9,8 @@ import { fetchMarketStatsForProject, MarketStatsForProject } from '@/lib/api/mar
+ import ContactsSection from '@/components/projects/contacts/ContactsSection';
+ import ProjectTabMap from '@/components/map/ProjectTabMap';
+ import { useProjectContext } from '@/app/components/ProjectProvider';
+-import NewProjectModal from '@/app/components/NewProjectModal';
++// Old modal kept as backup: import NewProjectModal from '@/app/components/NewProjectModal';
++import { NewProjectOnboardingModal } from '@/components/projects/onboarding';
+ import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
+ 
+ interface Project {
+@@ -1423,7 +1424,7 @@ export default function ProjectTab({
+       </CRow>
+ 
+       </div>
+-      <NewProjectModal
++      <NewProjectOnboardingModal
+         isOpen={isNewProjectModalOpen}
+         onClose={() => setIsNewProjectModalOpen(false)}
+       />
+diff --git a/src/app/projects/[projectId]/components/workspace/ChannelPills.tsx b/src/app/projects/[projectId]/components/workspace/ChannelPills.tsx
+index 1f487a5..278d901 100644
+--- a/src/app/projects/[projectId]/components/workspace/ChannelPills.tsx
++++ b/src/app/projects/[projectId]/components/workspace/ChannelPills.tsx
+@@ -11,7 +11,7 @@ interface ChannelPill {
+ }
+ 
+ const channels: ChannelPill[] = [
+-  { id: 'landscaper', label: 'Landscaper', icon: '🏗️' },
++  { id: 'landscaper', label: 'Project', icon: '🏗️' },
+   { id: 'property', label: 'Property', icon: '🏢' },
+   { id: 'market', label: 'Market', icon: '📊' },
+   { id: 'budget', label: 'Budget', icon: '💰' },
+diff --git a/src/components/layout/UnifiedSidebar.tsx b/src/components/layout/UnifiedSidebar.tsx
+index 5beb458..e8fa695 100644
+--- a/src/components/layout/UnifiedSidebar.tsx
++++ b/src/components/layout/UnifiedSidebar.tsx
+@@ -35,8 +35,8 @@ const getAgentNavItems = (projectId?: string): NavItem[] => {
+   return [
+     {
+       id: 'coo',
+-      name: 'Landscaper',
+-      icon: '🧎‍♂️🌿',
++      name: 'Project',
++      icon: '🏗️',
+       path: basePath,
+       status: 'complete',
+       summary: 'Project overview',
+@@ -78,7 +78,7 @@ const getChannelNavItems = (projectId?: string): NavItem[] => {
+   const isDisabled = !projectId;
+ 
+   return [
+-    { id: 'landscaper-new', name: 'Landscaper', icon: '🧎‍♂️🌿', path: basePath, status: 'complete', summary: 'Workspace overview', disabled: isDisabled },
++    { id: 'landscaper-new', name: 'Project', icon: '🏗️', path: basePath, status: 'complete', summary: 'Workspace overview', disabled: isDisabled },
+     { id: 'property-new', name: 'Property', icon: '🏢', path: basePath, status: 'partial', summary: 'Property details', disabled: isDisabled },
+     { id: 'market-new', name: 'Market', icon: '📊', path: basePath, status: 'complete', summary: 'Market analysis', disabled: isDisabled },
+     { id: 'budget-new', name: 'Budget', icon: '💰', path: basePath, status: 'partial', summary: 'Budget analysis', disabled: isDisabled },
+diff --git a/src/components/projects/onboarding/NewProjectFieldTable.tsx b/src/components/projects/onboarding/NewProjectFieldTable.tsx
+index 7e8a154..47de4fa 100644
+--- a/src/components/projects/onboarding/NewProjectFieldTable.tsx
++++ b/src/components/projects/onboarding/NewProjectFieldTable.tsx
+@@ -12,29 +12,96 @@ interface NewProjectFieldTableProps {
+ 
+ // Field labels map - in production this would come from the registry
+ const FIELD_LABELS: Record<string, string> = {
++  // Core identification
+   property_name: 'Property Name',
+   street_address: 'Street Address',
+   city: 'City',
+   state: 'State',
+   zip_code: 'ZIP Code',
++  county: 'County',
++  apn_primary: 'APN',
+   property_type: 'Property Type',
+   property_class: 'Property Class',
++  property_subtype: 'Property Subtype',
++  // Physical characteristics
+   total_units: 'Total Units',
++  number_of_buildings: 'Buildings',
+   year_built: 'Year Built',
+   year_renovated: 'Year Renovated',
+   stories: 'Stories',
+   rentable_sf: 'Rentable SF',
++  gross_sf: 'Gross SF',
++  total_building_sf: 'Building SF',
++  avg_unit_sf: 'Avg Unit SF',
+   lot_size_acres: 'Lot Size (Acres)',
+-  parking_spaces_total: 'Parking Spaces',
++  lot_size_sf: 'Lot Size (SF)',
++  land_area_sf: 'Land Area SF',
++  // Parking
++  parking_spaces_total: 'Total Parking',
++  surface_spaces: 'Surface Spaces',
++  garage_spaces: 'Garage Spaces',
++  covered_spaces: 'Covered Spaces',
+   parking_ratio: 'Parking Ratio',
++  ev_charging_spaces: 'EV Charging',
++  // Manager & metering
++  has_manager_unit: 'Manager Unit',
++  manager_unit_count: 'Manager Units',
++  electric_metered_individually: 'Electric Metered',
++  gas_metered_individually: 'Gas Metered',
++  water_metered_individually: 'Water Metered',
++  // Pricing inputs
+   asking_price: 'Asking Price',
+   acquisition_price: 'Acquisition Price',
+-  cap_rate_current: 'Cap Rate',
+-  current_noi: 'Current NOI',
+-  current_vacancy_rate: 'Vacancy Rate',
++  current_gpr: 'Current GPR',
++  proforma_gpr: 'Proforma GPR',
++  // Assumptions
++  cap_rate_going_in: 'Going-In Cap',
++  cap_rate_exit: 'Exit Cap Rate',
++  exit_cap_rate: 'Exit Cap Rate',
++  hold_period_years: 'Hold Period (yrs)',
++  physical_vacancy_pct: 'Physical Vacancy %',
++  economic_vacancy_pct: 'Economic Vacancy %',
++  rent_growth_year_1: 'Rent Growth Y1',
++  rent_growth_stabilized: 'Rent Growth Stab.',
++  expense_growth_pct: 'Expense Growth %',
++  discount_rate: 'Discount Rate',
++  loss_to_lease_pct: 'Loss to Lease %',
++  // Market
+   submarket: 'Submarket',
++  walk_score: 'Walk Score',
++  transit_score: 'Transit Score',
++  // Unit type fields (used when label not provided in FieldValue)
++  unit_type_name: 'Unit Type',
++  unit_type_code: 'Type Code',
++  unit_count: 'Unit Count',
++  bedrooms: 'Bedrooms',
++  bathrooms: 'Bathrooms',
++  avg_square_feet: 'Avg SF',
++  market_rent: 'Market Rent',
++  current_rent_avg: 'Current Rent',
++  total_units_by_type: 'Total Units',
+ };
+ 
++// Get label for a field, handling composite keys (e.g., "unit_type.2BR/1.75BA.bedrooms")
++function getFieldLabel(fieldKey: string, fieldValue: FieldValue): string {
++  // If the field has an explicit label from extraction, use it
++  if (fieldValue.label) {
++    return fieldValue.label;
++  }
++
++  // Check if it's a composite key (scope.label.field)
++  const parts = fieldKey.split('.');
++  if (parts.length === 3) {
++    // Extract the field name from composite key
++    const [_scope, scopeLabel, fieldName] = parts;
++    const fieldLabel = FIELD_LABELS[fieldName] || fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
++    return `${scopeLabel} - ${fieldLabel}`;
++  }
++
++  // Simple key - use lookup or format
++  return FIELD_LABELS[fieldKey] || fieldKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
++}
++
+ const SOURCE_ICONS = {
+   document: FileText,
+   chat: MessageCircle,
+@@ -121,7 +188,7 @@ export default function NewProjectFieldTable({
+         <tbody>
+           {fieldEntries.map(([fieldKey, field]) => {
+             const SourceIcon = SOURCE_ICONS[field.source];
+-            const label = field.label || FIELD_LABELS[fieldKey] || fieldKey;
++            const label = getFieldLabel(fieldKey, field);
+ 
+             return (
+               <tr
+diff --git a/src/components/projects/onboarding/NewProjectOnboardingModal.tsx b/src/components/projects/onboarding/NewProjectOnboardingModal.tsx
+index 4615e59..82bdb7f 100644
+--- a/src/components/projects/onboarding/NewProjectOnboardingModal.tsx
++++ b/src/components/projects/onboarding/NewProjectOnboardingModal.tsx
+@@ -1,6 +1,6 @@
+ 'use client';
+ 
+-import React, { useState, useCallback, useMemo, useEffect } from 'react';
++import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { X, ExternalLink } from 'lucide-react';
+ import { Button } from '@/components/ui/button';
+@@ -14,9 +14,8 @@ import type {
+   ReadinessResult,
+   ViewMode,
+   ChannelTab,
+-  ValidationResult,
+ } from './types';
+-import { FIELD_COUNT_THRESHOLD, MINIMUM_CREATE_FIELDS } from './types';
++import { FIELD_COUNT_THRESHOLD } from './types';
+ 
+ interface NewProjectOnboardingModalProps {
+   isOpen: boolean;
+@@ -40,6 +39,19 @@ What are we working on?`,
+   timestamp: new Date(),
+ };
+ 
++// Extraction batches for multifamily onboarding
++// See backend/apps/knowledge/services/extraction_service.py for batch definitions
++const ONBOARDING_EXTRACTION_BATCHES = [
++  'core_property',   // Property name, address, year built, total units
++  'deal_market',     // Asking price, cap rate, market demographics
++  'unit_types',      // Unit mix summary with rents (bed/bath, SF, counts)
++  'financials',      // Operating expenses, income, assumptions
++  'comparables',     // Sales and rent comps
++] as const;
++
++// Heavy batch - run separately if needed for detailed unit-level data
++// const DETAILED_EXTRACTION_BATCHES = ['rent_roll'] as const;
++
+ export default function NewProjectOnboardingModal({
+   isOpen,
+   onClose,
+@@ -52,7 +64,7 @@ export default function NewProjectOnboardingModal({
+   // Core state
+   const [projectId, setProjectId] = useState<number | null>(null);
+   const [projectName, setProjectName] = useState<string>('');
+-  const [propertyType, setPropertyType] = useState<string>('multifamily');
++  const [propertyType, _setPropertyType] = useState<string>('multifamily');
+ 
+   // Field values
+   const [fields, setFields] = useState<Map<string, FieldValue>>(new Map());
+@@ -66,7 +78,8 @@ export default function NewProjectOnboardingModal({
+   const [isProcessing, setIsProcessing] = useState(false);
+ 
+   // Document state
+-  const [pendingDocument, setPendingDocument] = useState<File | null>(null);
++  const [_pendingDocument, setPendingDocument] = useState<File | null>(null);
++  const [_uploadedDocId, setUploadedDocId] = useState<number | null>(null);
+ 
+   // Readiness state
+   const [modelReadiness, setModelReadiness] = useState<ReadinessResult | null>(null);
+@@ -75,6 +88,11 @@ export default function NewProjectOnboardingModal({
+   const [isCreating, setIsCreating] = useState(false);
+   const [createError, setCreateError] = useState<string | null>(null);
+ 
++  // Track whether user explicitly saved/opened the project
++  // Use ref for synchronous access in handleClose (avoids race condition with setState)
++  const [userSavedProject, setUserSavedProject] = useState(false);
++  const userSavedProjectRef = useRef(false);
++
+   // Check if we should transition to tabs view
+   useEffect(() => {
+     if (fields.size >= FIELD_COUNT_THRESHOLD && viewMode === 'table') {
+@@ -168,7 +186,7 @@ export default function NewProjectOnboardingModal({
+     }
+   }, [projectId]);
+ 
+-  // Handle document drop
++  // Handle document drop - real extraction pipeline
+   const handleDocumentDrop = useCallback(async (file: File) => {
+     setPendingDocument(file);
+     setIsProcessing(true);
+@@ -177,48 +195,278 @@ export default function NewProjectOnboardingModal({
+     const receiptMessage: ChatMessage = {
+       id: `receipt-${Date.now()}`,
+       role: 'assistant',
+-      content: `I received **${file.name}**. Let me analyze it...`,
++      content: `I received **${file.name}**. Uploading and analyzing...`,
+       timestamp: new Date(),
+     };
+     setMessages((prev) => [...prev, receiptMessage]);
+ 
+     try {
+-      // For now, simulate document processing
+-      // In production, this would call the document processing endpoints
+-      await new Promise((resolve) => setTimeout(resolve, 2000));
++      // 1. Create placeholder project if none exists (required by DMS schema)
++      let workingProjectId = projectId;
++      if (!workingProjectId) {
++        const placeholderName = file.name.replace(/\.[^/.]+$/, '').substring(0, 50);
++        const requestBody = {
++          project_name: placeholderName,
++          project_type_code: 'MF',
++          property_subtype: 'MF',
++          analysis_type: 'Income Property'
++        };
++        console.log('[handleDocumentDrop] Creating project with:', requestBody);
++
++        const createResp = await fetch('/api/projects/minimal', {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify(requestBody)
++        });
++
++        console.log('[handleDocumentDrop] Response status:', createResp.status, createResp.statusText);
++
++        const createText = await createResp.text();
++        console.log('[handleDocumentDrop] Response text:', createText);
++
++        let createData;
++        try {
++          createData = JSON.parse(createText);
++        } catch (e) {
++          console.error('[handleDocumentDrop] Failed to parse response:', e);
++          throw new Error(`Failed to create project: Invalid response`);
++        }
++
++        if (!createResp.ok) {
++          console.error('[handleDocumentDrop] Project creation failed:', createResp.status, createResp.statusText, createData);
++          throw new Error(createData.error || createData.details || `Failed to create project (${createResp.status})`);
++        }
++        const { project } = createData;
++        workingProjectId = project.project_id;
++        setProjectId(workingProjectId);
++      }
++
++      // 2. Compute SHA256 hash for deduplication
++      const sha256 = await computeSha256(file);
++
++      // 3. Upload file to storage
++      const formData = new FormData();
++      formData.append('file', file);
++      formData.append('project_id', String(workingProjectId));
++
++      const uploadResp = await fetch('/api/dms/upload', {
++        method: 'POST',
++        body: formData,
++      });
++      if (!uploadResp.ok) {
++        const uploadErr = await uploadResp.json();
++        throw new Error(uploadErr.error || 'File upload failed');
++      }
++      const { storage_uri } = await uploadResp.json();
++
++      // 4. Create DMS document record (triggers RAG processing)
++      const docResp = await fetch('/api/dms/docs', {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({
++          system: {
++            project_id: workingProjectId,
++            doc_name: file.name,
++            doc_type: 'offering_memorandum',
++            storage_uri,
++            sha256,
++            mime_type: file.type,
++            file_size_bytes: file.size,
++          }
++        })
++      });
++      if (!docResp.ok) {
++        const docErr = await docResp.json();
++        throw new Error(docErr.error || 'Document creation failed');
++      }
++      const { doc } = await docResp.json();
++      setUploadedDocId(doc.doc_id);
++
++      // 5. Show analyzing message
++      setMessages((prev) => [...prev, {
++        id: `analyzing-${Date.now()}`,
++        role: 'assistant',
++        content: 'Document uploaded. Running AI extraction...',
++        timestamp: new Date(),
++      }]);
++
++      // 6. Run batched extraction via Django API
++      const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
++      console.log(`[handleDocumentDrop] Running batched extraction for doc ${doc.doc_id}, project ${workingProjectId}`);
++      const extractResp = await fetch(
++        `${DJANGO_API}/api/knowledge/documents/${doc.doc_id}/extract-batched/`,
++        {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify({
++            project_id: workingProjectId,
++            property_type: 'multifamily',
++            batches: [...ONBOARDING_EXTRACTION_BATCHES]
++          })
++        }
++      );
+ 
+-      // Simulate extraction results
+-      const mockExtractedFields = simulateDocumentExtraction(file.name);
++      const extractResult = await extractResp.json();
++      console.log(`[handleDocumentDrop] Extraction result:`, extractResult);
+ 
+-      // Update fields
++      if (!extractResp.ok) {
++        throw new Error(extractResult.error || 'Extraction failed');
++      }
++
++      // 7. Fetch staged extractions (pending status)
++      console.log(`[handleDocumentDrop] Fetching staged extractions for project ${workingProjectId}`);
++      const stagedResp = await fetch(
++        `${DJANGO_API}/api/knowledge/projects/${workingProjectId}/extractions/?status=pending`
++      );
++      const stagedData = await stagedResp.json();
++      console.log(`[handleDocumentDrop] Staged extractions response:`, stagedData);
++
++      // If no pending extractions, try fetching all extractions
++      let extractionsToUse = stagedData.extractions || [];
++      if (extractionsToUse.length === 0) {
++        console.log(`[handleDocumentDrop] No pending extractions, fetching all...`);
++        const allResp = await fetch(
++          `${DJANGO_API}/api/knowledge/projects/${workingProjectId}/extractions/`
++        );
++        const allData = await allResp.json();
++        console.log(`[handleDocumentDrop] All extractions:`, allData);
++        extractionsToUse = allData.extractions || [];
++      }
++
++      // 8. Transform to field Map
++      const extractedFields = transformExtractionToFields(extractionsToUse);
+       setFields((prev) => {
+         const updated = new Map(prev);
+-        mockExtractedFields.forEach((value, key) => {
+-          updated.set(key, value);
+-        });
++        extractedFields.forEach((v, k) => updated.set(k, v));
+         return updated;
+       });
+ 
+-      // Calculate mock readiness
+-      const fieldKeys = Array.from(mockExtractedFields.keys());
++      // 8b. Auto-accept extractions to write to target tables (so project workspace can read them)
++      if (extractionsToUse.length > 0) {
++        console.log(`[handleDocumentDrop] Auto-accepting ${extractionsToUse.length} extractions to write to target tables`);
++        try {
++          const acceptResp = await fetch(
++            `${DJANGO_API}/api/knowledge/projects/${workingProjectId}/extractions/bulk-validate/`,
++            {
++              method: 'POST',
++              headers: { 'Content-Type': 'application/json' },
++              body: JSON.stringify({
++                action: 'accept_all',
++                write_to_targets: true
++              })
++            }
++          );
++
++          if (acceptResp.ok) {
++            const acceptResult = await acceptResp.json();
++            console.log('[handleDocumentDrop] Auto-accept result:', acceptResult);
++          } else {
++            const errorText = await acceptResp.text();
++            console.warn('[handleDocumentDrop] Failed to auto-accept extractions:', errorText);
++          }
++        } catch (acceptError) {
++          console.warn('[handleDocumentDrop] Error auto-accepting extractions:', acceptError);
++        }
++      }
++
++      // 9. Update project record with all extracted values
++      const projectUpdatePayload: Record<string, unknown> = {};
++
++      // Map extracted field keys to project table columns
++      const fieldToColumnMap: Record<string, string> = {
++        'property_name': 'project_name',
++        'project_name': 'project_name',
++        'street_address': 'street_address',
++        'city': 'city',
++        'state': 'state',
++        'zip_code': 'zip_code',
++        'county': 'county',
++        'apn_primary': 'apn_primary',
++        'total_units': 'total_units',
++        'year_built': 'year_built',
++        'rentable_sf': 'gross_sf',
++        'gross_sf': 'gross_sf',
++        'lot_size_acres': 'lot_size_acres',
++        'acres_gross': 'acres_gross',
++        'number_of_buildings': 'stories',  // Map to available column
++        'parking_spaces': 'parking_spaces',
++        'asking_price': 'asking_price',
++        'price_per_unit': 'price_per_unit',
++        'cap_rate_current': 'cap_rate_current',
++      };
++
++      for (const [fieldKey, columnName] of Object.entries(fieldToColumnMap)) {
++        const fieldValue = extractedFields.get(fieldKey);
++        if (fieldValue?.value !== undefined && fieldValue.value !== null && fieldValue.value !== '') {
++          // Skip if we already have this column set (avoid overwriting with later mappings)
++          if (!(columnName in projectUpdatePayload)) {
++            projectUpdatePayload[columnName] = fieldValue.value;
++          }
++        }
++      }
++
++      // Update project name in state
++      const nameField = extractedFields.get('property_name') || extractedFields.get('project_name');
++      if (nameField) {
++        setProjectName(String(nameField.value));
++      }
++
++      // Send update to server if we have any fields
++      if (Object.keys(projectUpdatePayload).length > 0) {
++        console.log('[handleDocumentDrop] Updating project with extracted values:', projectUpdatePayload);
++        try {
++          const updateResp = await fetch(`/api/projects/${workingProjectId}/details`, {
++            method: 'PATCH',
++            headers: { 'Content-Type': 'application/json' },
++            body: JSON.stringify(projectUpdatePayload),
++          });
++          if (!updateResp.ok) {
++            console.warn('[handleDocumentDrop] Failed to update project:', await updateResp.text());
++          } else {
++            console.log('[handleDocumentDrop] Project updated successfully');
++          }
++        } catch (error) {
++          console.error('[handleDocumentDrop] Error updating project:', error);
++        }
++      }
++
++      // 10. Log ingestion to activity feed
++      try {
++        await fetch(`/api/projects/${workingProjectId}/activity`, {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/json' },
++          body: JSON.stringify({
++            activity_type: 'document_ingested',
++            channel: 'project',
++            title: `Ingested ${file.name}`,
++            description: `AI extraction completed - ${extractedFields.size} fields extracted`,
++            metadata: {
++              doc_id: doc.doc_id,
++              doc_name: file.name,
++              fields_extracted: extractedFields.size,
++              batches_run: extractResult.batches_run || ONBOARDING_EXTRACTION_BATCHES.length,
++            }
++          }),
++        });
++        console.log('[handleDocumentDrop] Activity logged successfully');
++      } catch (activityError) {
++        console.warn('[handleDocumentDrop] Failed to log activity (endpoint may not exist):', activityError);
++      }
++
++      // 11. Calculate readiness
++      const fieldCount = extractedFields.size;
+       setModelReadiness({
+-        readiness_score: Math.min(95, fieldKeys.length * 3),
+-        populated_count: fieldKeys.length,
++        readiness_score: Math.min(95, fieldCount * 4),
++        populated_count: fieldCount,
+         total_input_fields: 209,
+-        missing_critical: fieldKeys.length < 10 ? [
+-          { field_key: 'cap_rate_exit', label: 'Exit Cap Rate' },
+-          { field_key: 'expense_growth_pct', label: 'Expense Growth %' },
+-        ] : [],
+-        missing_important: [
+-          { field_key: 'rent_growth_year_2', label: 'Year 2 Rent Growth' },
+-          { field_key: 'discount_rate', label: 'Discount Rate' },
+-        ],
+-        can_run_model: fieldKeys.length >= 10,
+-        confidence_level: fieldKeys.length >= 15 ? 'high' : fieldKeys.length >= 10 ? 'medium' : 'low',
++        missing_critical: [],
++        missing_important: [],
++        can_run_model: fieldCount >= 8,
++        confidence_level: fieldCount >= 15 ? 'high' : fieldCount >= 8 ? 'medium' : 'low',
+       });
+ 
+-      // Add summary message
+-      const summaryMessage = generateExtractionSummary(file.name, mockExtractedFields.size);
++      // 11. Generate summary from real data
++      const summaryMessage = generateExtractionSummary(file.name, extractedFields);
+       setMessages((prev) => [...prev, summaryMessage]);
+ 
+     } catch (error) {
+@@ -226,7 +474,7 @@ export default function NewProjectOnboardingModal({
+       const errorMessage: ChatMessage = {
+         id: `error-${Date.now()}`,
+         role: 'assistant',
+-        content: `I had trouble processing **${file.name}**. The file may be corrupted or in an unsupported format. Try uploading a different document.`,
++        content: `I had trouble processing **${file.name}**. ${error instanceof Error ? error.message : 'Please try again.'}`,
+         timestamp: new Date(),
+       };
+       setMessages((prev) => [...prev, errorMessage]);
+@@ -234,7 +482,7 @@ export default function NewProjectOnboardingModal({
+       setIsProcessing(false);
+       setPendingDocument(null);
+     }
+-  }, []);
++  }, [projectId]);
+ 
+   // Update fields from extraction
+   const updateFieldsFromExtraction = useCallback((
+@@ -318,14 +566,34 @@ export default function NewProjectOnboardingModal({
+   // Handle opening the project
+   const handleOpenProject = useCallback(() => {
+     if (projectId) {
++      // Set ref synchronously BEFORE any async operations
++      userSavedProjectRef.current = true;
++      setUserSavedProject(true);
++      console.log('[handleOpenProject] Marked project as saved, navigating to:', `/projects/${projectId}`);
+       router.push(`/projects/${projectId}`);
+       onClose();
+     }
+   }, [projectId, router, onClose]);
+ 
+-  // Handle modal close
+-  const handleClose = useCallback(() => {
+-    if (fields.size > 0 && !projectId) {
++  // Handle modal close - clean up orphan projects
++  const handleClose = useCallback(async () => {
++    console.log('[handleClose] Starting - projectId:', projectId, 'userSavedProjectRef:', userSavedProjectRef.current);
++
++    // Check ref (synchronous) instead of state to avoid race condition
++    if (projectId && !userSavedProjectRef.current) {
++      const confirmed = window.confirm(
++        'This will discard the project and all extracted data. Continue?'
++      );
++      if (!confirmed) return;
++
++      // Delete the orphan project
++      try {
++        await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
++        console.log(`[handleClose] Deleted orphan project ${projectId}`);
++      } catch (error) {
++        console.error('[handleClose] Failed to delete orphan project:', error);
++      }
++    } else if (fields.size > 0 && !projectId) {
+       const confirmed = window.confirm('You have unsaved work. Are you sure you want to close?');
+       if (!confirmed) return;
+     }
+@@ -412,12 +680,12 @@ export default function NewProjectOnboardingModal({
+ 
+         {/* Two-column layout */}
+         <div className="flex flex-1 overflow-hidden">
+-          {/* Left column - Chat (70%) */}
++          {/* Left column - Chat (60%) */}
+           <div
+             className={`flex-1 overflow-hidden border-r ${
+               isDark ? 'border-slate-800' : 'border-slate-200'
+             }`}
+-            style={{ flexBasis: '70%' }}
++            style={{ flexBasis: '60%' }}
+           >
+             <NewProjectChat
+               messages={messages}
+@@ -429,10 +697,10 @@ export default function NewProjectOnboardingModal({
+             />
+           </div>
+ 
+-          {/* Right column - Fields (30%) */}
++          {/* Right column - Fields (40%) */}
+           <div
+             className="overflow-hidden"
+-            style={{ flexBasis: '30%' }}
++            style={{ flexBasis: '40%' }}
+           >
+             {viewMode === 'table' ? (
+               <NewProjectFieldTable
+@@ -541,66 +809,308 @@ function extractFieldsFromMessage(message: string): Map<string, FieldValue> {
+   return fields;
+ }
+ 
+-// Helper: Simulate document extraction (mock data)
+-function simulateDocumentExtraction(fileName: string): Map<string, FieldValue> {
++// Helper: Compute SHA256 hash for file deduplication
++async function computeSha256(file: File): Promise<string> {
++  const buffer = await file.arrayBuffer();
++  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
++  return Array.from(new Uint8Array(hashBuffer))
++    .map(b => b.toString(16).padStart(2, '0'))
++    .join('');
++}
++
++// Output-only fields: extracted for validation comparison but not populated as inputs
++// These are calculated values that should be compared against model outputs
++const OUTPUT_ONLY_FIELDS = new Set([
++  'price_per_unit',
++  'price_per_sf',
++  'cap_rate_proforma',
++  'cap_rate_current',
++  'grm_current',
++  'grm_proforma',
++  'current_noi',
++  'proforma_noi',
++  'current_egi',
++  'proforma_egi',
++  'current_opex',
++  'proforma_opex',
++  'current_vacancy_rate',
++  'proforma_vacancy_rate',
++]);
++
++// Array-scoped extraction types that need unpacking
++const ARRAY_SCOPED_TABLES = new Set([
++  'tbl_multifamily_unit_type',
++  'tbl_rent_comp',
++  'tbl_sales_comp',
++  'tbl_unit',
++]);
++
++// Helper: Check if extraction is array-scoped and needs unpacking
++function isArrayScopedExtraction(ext: {
++  scope?: string;
++  target_table?: string;
++  scope_label?: string;
++}): boolean {
++  // Check by scope name
++  if (ext.scope && ['unit_type', 'rent_comp', 'sales_comp', 'unit'].includes(ext.scope)) {
++    return true;
++  }
++  // Check by target table
++  if (ext.target_table && ARRAY_SCOPED_TABLES.has(ext.target_table)) {
++    return true;
++  }
++  return false;
++}
++
++// Helper: Unpack nested unit type extraction into individual fields
++function unpackArrayExtraction(
++  ext: {
++    scope?: string;
++    scope_label?: string;
++    array_index?: number;
++    extracted_value: any;
++    confidence_score?: number | string;
++  },
++  timestamp: Date
++): Map<string, FieldValue> {
+   const fields = new Map<string, FieldValue>();
+-  const timestamp = new Date();
+ 
+-  // Simulate extracting common fields from an OM
+-  const mockData: Record<string, any> = {
+-    property_name: 'Chadron Terrace',
+-    street_address: '14105 Chadron Avenue',
+-    city: 'Hawthorne',
+-    state: 'CA',
+-    zip_code: '90250',
+-    total_units: 113,
+-    year_built: 2016,
+-    stories: 3,
+-    rentable_sf: 89400,
+-    parking_spaces_total: 156,
+-    parking_ratio: 1.38,
+-    asking_price: 42500000,
+-    cap_rate_current: 5.25,
+-    current_vacancy_rate: 4.5,
+-    opex_real_estate_taxes: 425000,
+-    opex_property_insurance: 95000,
+-    opex_management_fee: 127500,
+-    submarket: 'South Bay',
+-  };
++  // Parse extracted_value if string
++  let nestedData = ext.extracted_value;
++  if (typeof nestedData === 'string') {
++    try {
++      nestedData = JSON.parse(nestedData);
++    } catch {
++      console.log('[unpackArrayExtraction] Failed to parse extracted_value:', nestedData);
++      return fields;
++    }
++  }
++
++  // nestedData should now be an object with individual fields
++  if (typeof nestedData !== 'object' || nestedData === null || Array.isArray(nestedData)) {
++    console.log('[unpackArrayExtraction] Unexpected nested data type:', typeof nestedData);
++    return fields;
++  }
+ 
+-  Object.entries(mockData).forEach(([key, value]) => {
+-    fields.set(key, {
++  // Use scope_label as the identifier (e.g., "2BR/1.75BA")
++  const scopeLabel = ext.scope_label || `item_${ext.array_index || 0}`;
++  const scope = ext.scope || 'unit_type';
++
++  // Parse confidence
++  const confidence = typeof ext.confidence_score === 'string'
++    ? parseFloat(ext.confidence_score)
++    : (ext.confidence_score || 0.85);
++
++  // Unpack each field from the nested object
++  for (const [fieldName, value] of Object.entries(nestedData)) {
++    if (value === null || value === undefined) continue;
++
++    // Create composite key: scope.label.field (e.g., "unit_type.2BR/1.75BA.bedrooms")
++    const compositeKey = `${scope}.${scopeLabel}.${fieldName}`;
++
++    fields.set(compositeKey, {
+       value,
+       source: 'document',
+-      confidence: 0.85 + Math.random() * 0.1,
++      confidence,
+       timestamp,
++      label: `${scopeLabel} - ${formatFieldLabel(fieldName)}`,
++      fieldType: scope,
+     });
++  }
++
++  console.log(`[unpackArrayExtraction] Unpacked ${fields.size} fields from ${scope}.${scopeLabel}`);
++  return fields;
++}
++
++// Helper: Format field name to display label
++function formatFieldLabel(fieldName: string): string {
++  return fieldName
++    .replace(/_/g, ' ')
++    .replace(/\b\w/g, c => c.toUpperCase());
++}
++
++// Helper: Transform extraction API response to field Map
++function transformExtractionToFields(
++  extractions: Array<{
++    extraction_id?: number;
++    field_key?: string;
++    target_field?: string;
++    target_table?: string;
++    scope?: string;
++    scope_label?: string;
++    array_index?: number;
++    extracted_value: any;
++    confidence_score?: number | string;
++    status?: string;
++  }>
++): Map<string, FieldValue> {
++  const fields = new Map<string, FieldValue>();
++  const timestamp = new Date();
++
++  console.log(`[transformExtractionToFields] Processing ${extractions.length} extractions`);
++
++  // DEBUG: Log raw extraction structure to diagnose array unpacking
++  console.log('[DEBUG-RAW] All extractions received:', extractions.map(e => ({
++    field_key: e.field_key,
++    scope: e.scope,
++    target_table: e.target_table,
++    scope_label: e.scope_label,
++    value_type: typeof e.extracted_value,
++    is_array: Array.isArray(e.extracted_value),
++    value_preview: typeof e.extracted_value === 'string'
++      ? e.extracted_value.substring(0, 100)
++      : JSON.stringify(e.extracted_value).substring(0, 100)
++  })));
++
++  // DEBUG: Check isArrayScopedExtraction for unit-related fields
++  extractions.forEach(e => {
++    const isArray = isArrayScopedExtraction(e);
++    if (isArray || e.scope?.includes('unit') || e.field_key?.includes('unit') || e.target_table?.includes('unit')) {
++      console.log('[DEBUG-ARRAY-CHECK]', {
++        field_key: e.field_key,
++        scope: e.scope,
++        target_table: e.target_table,
++        scope_label: e.scope_label,
++        isArrayScopedExtraction_result: isArray
++      });
++    }
+   });
+ 
++  // Track array-scoped extractions for summary
++  let arrayExtractionCount = 0;
++  let unpackedFieldCount = 0;
++
++  for (const ext of extractions) {
++    // Debug: Log any extraction with nested/array extracted_value
++    if (typeof ext.extracted_value === 'object' ||
++        (typeof ext.extracted_value === 'string' && (ext.extracted_value.startsWith('[') || ext.extracted_value.startsWith('{')))) {
++      console.log('[DEBUG-ARRAY] Potential array extraction:', JSON.stringify(ext, null, 2));
++    }
++
++    // Check if this is an array-scoped extraction that needs unpacking
++    if (isArrayScopedExtraction(ext)) {
++      arrayExtractionCount++;
++      const unpackedFields = unpackArrayExtraction(ext, timestamp);
++      unpackedFields.forEach((value, key) => {
++        fields.set(key, value);
++        unpackedFieldCount++;
++      });
++      continue;
++    }
++
++    // Regular (non-array) extraction handling
++    // Use target_field as the key (this is what the Django API returns)
++    const key = ext.target_field || ext.field_key;
++    if (!key) {
++      console.log(`[transformExtractionToFields] Skipping extraction without key:`, ext);
++      continue;
++    }
++
++    // Skip output-only fields - they're for validation comparison, not population
++    if (OUTPUT_ONLY_FIELDS.has(key)) {
++      console.log(`[transformExtractionToFields] Skipping output field: ${key}`);
++      continue;
++    }
++
++    // Parse extracted_value if it's a JSON string
++    let value = ext.extracted_value;
++    if (typeof value === 'string') {
++      // Try to parse as JSON
++      try {
++        const parsed = JSON.parse(value);
++        // If it's an object with nested fields, flatten for tbl_project fields
++        if (typeof parsed === 'object' && !Array.isArray(parsed) && ext.target_table === 'tbl_project') {
++          // For tbl_project, use the value directly
++          value = parsed;
++        } else {
++          value = parsed;
++        }
++      } catch {
++        // Keep as string if not valid JSON - remove surrounding quotes if present
++        if (value.startsWith('"') && value.endsWith('"')) {
++          value = value.slice(1, -1);
++        }
++      }
++    }
++
++    // Parse confidence_score (API returns it as string)
++    const confidence = typeof ext.confidence_score === 'string'
++      ? parseFloat(ext.confidence_score)
++      : (ext.confidence_score || 0.85);
++
++    // Map certain API field names to display field names
++    const displayKey = mapFieldKey(key);
++
++    console.log(`[transformExtractionToFields] ${key} -> ${displayKey}:`, value, `(confidence: ${confidence})`);
++
++    fields.set(displayKey, {
++      value,
++      source: 'document',
++      confidence,
++      timestamp,
++    });
++  }
++
++  console.log(`[transformExtractionToFields] Produced ${fields.size} fields total:`);
++  console.log(`  - Regular fields: ${fields.size - unpackedFieldCount}`);
++  console.log(`  - Array extractions processed: ${arrayExtractionCount}`);
++  console.log(`  - Unpacked array fields: ${unpackedFieldCount}`);
++  console.log(`  - Field keys:`, Array.from(fields.keys()));
+   return fields;
+ }
+ 
+-// Helper: Generate extraction summary message
+-function generateExtractionSummary(fileName: string, fieldCount: number): ChatMessage {
++// Map API field names to display field names for the field table
++// Most fields pass through as-is; only remap where DB column differs from display
++function mapFieldKey(key: string): string {
++  const mappings: Record<string, string> = {
++    // API returns project_name, we display as property_name
++    'project_name': 'property_name',
++    // DB column gross_sf maps to rentable_sf in UI
++    'gross_sf': 'rentable_sf',
++  };
++  return mappings[key] || key;
++}
++
++// Helper: Generate extraction summary message from real extracted data
++function generateExtractionSummary(
++  fileName: string,
++  extractedFields: Map<string, FieldValue>
++): ChatMessage {
++  const propertyName = extractedFields.get('property_name')?.value || 'Property';
++  const city = extractedFields.get('city')?.value;
++  const state = extractedFields.get('state')?.value;
++  const units = extractedFields.get('total_units')?.value;
++  const askingPrice = extractedFields.get('asking_price')?.value;
++  const yearBuilt = extractedFields.get('year_built')?.value;
++  const capRate = extractedFields.get('cap_rate_going_in')?.value || extractedFields.get('cap_rate_current')?.value;
++
++  const location = city && state ? `${city}, ${state}` : city || state || 'Unknown location';
++  const priceFormatted = askingPrice
++    ? `$${(Number(askingPrice) / 1_000_000).toFixed(1)}M`
++    : 'Not specified';
++
++  // Build bullet points for available data
++  const bullets: string[] = [];
++  bullets.push(`• Property: ${propertyName}`);
++  bullets.push(`• Location: ${location}`);
++  if (units) bullets.push(`• Units: ${units}`);
++  if (yearBuilt) bullets.push(`• Year Built: ${yearBuilt}`);
++  bullets.push(`• Asking Price: ${priceFormatted}`);
++  if (capRate) bullets.push(`• Cap Rate: ${Number(capRate).toFixed(2)}%`);
++
+   return {
+     id: `summary-${Date.now()}`,
+     role: 'assistant',
+-    content: `I've analyzed **${fileName}** and extracted **${fieldCount} fields**.
++    content: `I've analyzed **${fileName}** and extracted **${extractedFields.size} fields**.
+ 
+ **Key details found:**
+-• Property: Chadron Terrace
+-• Location: Hawthorne, CA
+-• Units: 113
+-• Asking Price: $42.5M
+-• Cap Rate: 5.25%
+-
+-You can review all extracted data in the panel on the right. Click any field to edit if needed.
++${bullets.join('\n')}
+ 
+-Would you like me to pull any additional information from the document?`,
++Review the extracted data in the panel on the right. Click any field to edit if needed.`,
+     timestamp: new Date(),
+     metadata: {
+       documentId: Date.now(),
+-      fieldsExtracted: ['property_name', 'city', 'state', 'total_units', 'asking_price'],
++      fieldsExtracted: Array.from(extractedFields.keys()),
+       confidence: 0.88,
+     },
+   };
+diff --git a/src/components/projects/onboarding/types.ts b/src/components/projects/onboarding/types.ts
+index 2fc4f20..f232c96 100644
+--- a/src/components/projects/onboarding/types.ts
++++ b/src/components/projects/onboarding/types.ts
+@@ -97,21 +97,43 @@ export interface NewProjectState {
+ 
+ // Field definitions for each channel tab
+ export const PROPERTY_SIMPLIFIED_FIELDS = [
++  // Core identification
+   'property_name',
+   'street_address',
+   'city',
+   'state',
+   'zip_code',
++  'county',
++  'apn_primary',
+   'property_type',
+   'property_class',
++  'property_subtype',
++  // Physical
+   'total_units',
++  'number_of_buildings',
+   'year_built',
+   'year_renovated',
+   'stories',
+   'rentable_sf',
++  'gross_sf',
++  'total_building_sf',
++  'avg_unit_sf',
+   'lot_size_acres',
++  'lot_size_sf',
++  'land_area_sf',
++  // Parking
+   'parking_spaces_total',
++  'surface_spaces',
++  'garage_spaces',
++  'covered_spaces',
+   'parking_ratio',
++  'ev_charging_spaces',
++  // Manager & metering
++  'has_manager_unit',
++  'manager_unit_count',
++  'electric_metered_individually',
++  'gas_metered_individually',
++  'water_metered_individually',
+ ];
+ 
+ export const BUDGET_SIMPLIFIED_FIELDS = [
+@@ -148,10 +170,16 @@ export const MARKET_SIMPLIFIED_FIELDS = [
+ ];
+ 
+ export const UNDERWRITER_SIMPLIFIED_FIELDS = [
++  // Pricing inputs (from OM)
+   'asking_price',
+   'acquisition_price',
++  // Income inputs (from OM - used for validation)
++  'current_gpr',
++  'proforma_gpr',
++  // Assumptions (user inputs)
+   'cap_rate_going_in',
+   'cap_rate_exit',
++  'exit_cap_rate',
+   'hold_period_years',
+   'physical_vacancy_pct',
+   'economic_vacancy_pct',

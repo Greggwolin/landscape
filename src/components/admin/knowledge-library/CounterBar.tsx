@@ -46,7 +46,7 @@ export default function CounterBar({
     <div className="kl-counter-bar">
       <div>
         <strong>Scope:</strong> {totalCount} document{totalCount !== 1 ? 's' : ''} matching{' '}
-        <span style={{ color: 'var(--cui-primary)', fontWeight: 500 }}>{summary}</span>
+        <span className="kl-counter-bar-summary">{summary}</span>
       </div>
       <div className="kl-counter-bar-actions">
         {selectedCount > 0 && (

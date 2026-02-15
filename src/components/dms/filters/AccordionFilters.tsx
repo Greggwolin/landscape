@@ -15,6 +15,8 @@ export interface FilterAccordion {
   count: number;
   is_expanded: boolean;
   documents?: DMSDocument[];
+  is_from_template?: boolean;
+  custom_id?: number; // dms_project_doc_types.id for custom types
 }
 
 import styles from './AccordionFilters.module.css';
@@ -109,6 +111,7 @@ interface AccordionFiltersProps {
   selectedDocIds?: Set<string>;
   onToggleDocSelection?: (docId: string) => void;
   onReviewMedia?: (docId: number, docName: string) => void;
+  onDeleteFilter?: (customId: number, docTypeName: string) => void;
 }
 
 const acceptedFileTypes = {
@@ -135,6 +138,7 @@ interface FilterDropRowProps {
   selectedDocIds?: Set<string>;
   onToggleDocSelection?: (docId: string) => void;
   onReviewMedia?: (docId: number, docName: string) => void;
+  onDeleteFilter?: (customId: number, docTypeName: string) => void;
 }
 
 function FilterDropRow({
@@ -147,9 +151,11 @@ function FilterDropRow({
   onUploadComplete,
   selectedDocIds,
   onToggleDocSelection,
-  onReviewMedia
+  onReviewMedia,
+  onDeleteFilter
 }: FilterDropRowProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // pendingFiles stores remaining files when collision pauses processing
   // Will be used by collision resolution to continue the upload queue
   const [, setPendingFiles] = useState<File[]>([]);
@@ -340,7 +346,7 @@ function FilterDropRow({
     <div key={filter.doc_type} style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       <div
         {...getRootProps()}
-        className={`flex items-center gap-1.5 px-3 py-1.25 transition-colors ${styles.filterRow} ${dropStateClass}`}
+        className={`group flex items-center gap-1.5 px-3 py-1.25 transition-colors ${styles.filterRow} ${dropStateClass}`}
         style={{
           ...headerDynamicStyle,
           borderBottomWidth: '1px',
@@ -387,6 +393,75 @@ function FilterDropRow({
           <button className="text-sm hover:underline" style={{ color: 'var(--cui-body-color)' }}>
             Edit
           </button>
+        )}
+
+        {/* Delete button for custom (non-template) types */}
+        {filter.is_from_template === false && filter.custom_id && onDeleteFilter && (
+          <div className="relative" style={{ marginLeft: '2px' }}>
+            {showDeleteConfirm ? (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 p-2 rounded shadow-lg border text-xs"
+                style={{
+                  backgroundColor: 'var(--cui-body-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  minWidth: '200px',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                  Remove &lsquo;{filter.doc_type}&rsquo;?<br />
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>
+                    Documents move to Misc.
+                  </span>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    className="px-2 py-0.5 rounded text-white"
+                    style={{ backgroundColor: 'var(--cui-danger)', fontSize: '0.7rem' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteFilter(filter.custom_id!, filter.doc_type);
+                      setShowDeleteConfirm(false);
+                    }}
+                  >
+                    Remove
+                  </button>
+                  <button
+                    className="px-2 py-0.5 rounded border"
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      color: 'var(--cui-body-color)',
+                      fontSize: '0.7rem'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteConfirm(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className={styles.filterDeleteButton}
+                style={{
+                  color: 'var(--cui-secondary-color)',
+                  fontSize: '0.9rem',
+                  lineHeight: 1,
+                  padding: '2px 4px',
+                  borderRadius: '3px'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteConfirm(true);
+                }}
+                title={`Remove "${filter.doc_type}"`}
+              >
+                ×
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -465,7 +540,8 @@ export default function AccordionFilters({
   onUploadComplete,
   selectedDocIds,
   onToggleDocSelection,
-  onReviewMedia
+  onReviewMedia,
+  onDeleteFilter
 }: AccordionFiltersProps) {
   const renderedFilters = useMemo(() => filters, [filters]);
 
@@ -484,6 +560,7 @@ export default function AccordionFilters({
           selectedDocIds={selectedDocIds}
           onToggleDocSelection={onToggleDocSelection}
           onReviewMedia={onReviewMedia}
+          onDeleteFilter={onDeleteFilter}
         />
       ))}
     </div>

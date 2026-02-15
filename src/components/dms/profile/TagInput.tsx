@@ -6,6 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 interface TagSuggestion {
   tag_name: string;
   usage_count: number;
+  tag_id?: number;
 }
 
 interface TagInputProps {
@@ -29,28 +30,58 @@ export default function TagInput({
 }: TagInputProps) {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
+  const [fuzzyMatches, setFuzzyMatches] = useState<TagSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
+  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
+  const [editingTagValue, setEditingTagValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
   // Fetch suggestions when input changes
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (inputValue.trim().length < 1) {
         setSuggestions([]);
+        setFuzzyMatches([]);
         setShowSuggestions(false);
         return;
       }
 
       if (!projectId && !workspaceId) {
-        console.warn('TagInput: projectId or workspaceId required for suggestions');
         return;
       }
 
       setIsLoading(true);
       try {
+        // Try Django endpoint first for workspace-scoped tags with fuzzy matching
+        if (workspaceId) {
+          const params = new URLSearchParams({
+            q: inputValue.trim(),
+            workspace_id: workspaceId.toString(),
+            limit: '10',
+          });
+
+          const response = await fetch(`${DJANGO_API}/api/dms/tags/suggest/?${params.toString()}`);
+          if (response.ok) {
+            const data = await response.json();
+            const filtered = (data.suggestions || []).filter(
+              (s: TagSuggestion) => !value.includes(s.tag_name)
+            );
+            setSuggestions(filtered);
+            setFuzzyMatches((data.fuzzy_matches || []).filter(
+              (s: TagSuggestion) => !value.includes(s.tag_name)
+            ));
+            setShowSuggestions(filtered.length > 0 || (data.fuzzy_matches || []).length > 0);
+            setSelectedIndex(-1);
+            return;
+          }
+        }
+
+        // Fall back to Next.js endpoint
         const params = new URLSearchParams({
           prefix: inputValue.trim(),
           limit: '10',
@@ -61,23 +92,21 @@ export default function TagInput({
 
         const response = await fetch(`/api/dms/tags/suggest?${params.toString()}`);
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch suggestions');
-        }
+        if (!response.ok) throw new Error('Failed to fetch suggestions');
 
         const data = await response.json();
-
-        // Filter out tags that are already selected
-        const filteredSuggestions = (data.suggestions || []).filter(
-          (suggestion: TagSuggestion) => !value.includes(suggestion.tag_name)
+        const filtered = (data.suggestions || []).filter(
+          (s: TagSuggestion) => !value.includes(s.tag_name)
         );
 
-        setSuggestions(filteredSuggestions);
-        setShowSuggestions(filteredSuggestions.length > 0);
+        setSuggestions(filtered);
+        setFuzzyMatches([]);
+        setShowSuggestions(filtered.length > 0);
         setSelectedIndex(-1);
       } catch (error) {
         console.error('Error fetching tag suggestions:', error);
         setSuggestions([]);
+        setFuzzyMatches([]);
         setShowSuggestions(false);
       } finally {
         setIsLoading(false);
@@ -86,7 +115,7 @@ export default function TagInput({
 
     const debounceTimer = setTimeout(fetchSuggestions, 200);
     return () => clearTimeout(debounceTimer);
-  }, [inputValue, projectId, workspaceId, value]);
+  }, [inputValue, projectId, workspaceId, value, DJANGO_API]);
 
   // Handle click outside to close suggestions
   useEffect(() => {
@@ -104,6 +133,19 @@ export default function TagInput({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Focus edit input when editing starts
+  useEffect(() => {
+    if (editingTagIndex !== null && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingTagIndex]);
+
+  const allSuggestionItems = [
+    ...suggestions,
+    ...fuzzyMatches.map((fm) => ({ ...fm, isFuzzy: true })),
+  ];
 
   const addTag = (tag: string) => {
     const trimmedTag = tag.trim();
@@ -136,48 +178,82 @@ export default function TagInput({
     inputRef.current?.focus();
   };
 
+  const startEditingTag = (index: number) => {
+    if (disabled) return;
+    setEditingTagIndex(index);
+    setEditingTagValue(value[index]);
+  };
+
+  const commitEditTag = () => {
+    if (editingTagIndex === null) return;
+
+    const newName = editingTagValue.trim();
+    const oldName = value[editingTagIndex];
+
+    if (!newName || newName === oldName) {
+      setEditingTagIndex(null);
+      setEditingTagValue('');
+      return;
+    }
+
+    // Check for duplicate
+    if (value.some((t, i) => i !== editingTagIndex && t.toLowerCase() === newName.toLowerCase())) {
+      alert(`Tag "${newName}" already exists on this document.`);
+      setEditingTagIndex(null);
+      setEditingTagValue('');
+      return;
+    }
+
+    // Update locally
+    const newTags = [...value];
+    newTags[editingTagIndex] = newName;
+    onChange(newTags);
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+  };
+
+  const cancelEditTag = () => {
+    setEditingTagIndex(null);
+    setEditingTagValue('');
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Handle Enter or Comma to add tag
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
 
-      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-        // Add selected suggestion
-        addTag(suggestions[selectedIndex].tag_name);
+      if (selectedIndex >= 0 && selectedIndex < allSuggestionItems.length) {
+        addTag(allSuggestionItems[selectedIndex].tag_name);
       } else if (inputValue.trim()) {
-        // Add typed value as new tag
         addTag(inputValue);
       }
-    }
-
-    // Handle Backspace to remove last tag when input is empty
-    else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
+    } else if (e.key === 'Backspace' && !inputValue && value.length > 0) {
       removeTag(value.length - 1);
-    }
-
-    // Handle arrow key navigation
-    else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev =>
-        prev < suggestions.length - 1 ? prev + 1 : prev
+        prev < allSuggestionItems.length - 1 ? prev + 1 : prev
       );
-    }
-    else if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
-    }
-
-    // Handle Escape to close suggestions
-    else if (e.key === 'Escape') {
+    } else if (e.key === 'Escape') {
       setShowSuggestions(false);
       setSelectedIndex(-1);
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEditTag();
+    } else if (e.key === 'Escape') {
+      cancelEditTag();
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
 
-    // Don't allow comma in the input (it's a delimiter)
     if (newValue.includes(',')) {
       const tag = newValue.replace(',', '').trim();
       if (tag) addTag(tag);
@@ -190,7 +266,7 @@ export default function TagInput({
   return (
     <div className="w-full">
       {/* Tags Display */}
-      <div className="flex flex-wrap gap-2 mb-2">
+      <div className="d-flex flex-wrap gap-2 mb-2">
         {value.map((tag, index) => (
           <span
             key={`${tag}-${index}`}
@@ -199,15 +275,39 @@ export default function TagInput({
               backgroundColor: 'var(--cui-primary-bg-subtle)',
               color: 'var(--cui-primary)',
               border: '1px solid var(--cui-primary-border-subtle)',
-              fontSize: '0.75rem'
+              fontSize: '0.75rem',
             }}
           >
-            {tag}
-            {!disabled && (
+            {editingTagIndex === index ? (
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editingTagValue}
+                onChange={(e) => setEditingTagValue(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                onBlur={commitEditTag}
+                className="border-0 bg-transparent p-0"
+                style={{
+                  color: 'var(--cui-primary)',
+                  fontSize: '0.75rem',
+                  width: `${Math.max(editingTagValue.length, 3)}ch`,
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <span
+                onDoubleClick={() => startEditingTag(index)}
+                style={{ cursor: disabled ? 'default' : 'pointer' }}
+                title={disabled ? undefined : 'Double-click to rename'}
+              >
+                {tag}
+              </span>
+            )}
+            {!disabled && editingTagIndex !== index && (
               <button
                 type="button"
                 onClick={() => removeTag(index)}
-                style={{ color: 'var(--cui-primary)' }}
+                style={{ color: 'var(--cui-primary)', lineHeight: 1 }}
                 aria-label={`Remove ${tag}`}
               >
                 <XMarkIcon style={{ width: '14px', height: '14px' }} />
@@ -218,7 +318,7 @@ export default function TagInput({
       </div>
 
       {/* Input Field */}
-      <div className="relative">
+      <div className="position-relative">
         <input
           ref={inputRef}
           type="text"
@@ -226,7 +326,7 @@ export default function TagInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (suggestions.length > 0) {
+            if (allSuggestionItems.length > 0) {
               setShowSuggestions(true);
             }
           }}
@@ -242,13 +342,13 @@ export default function TagInput({
 
         {/* Loading Indicator */}
         {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="position-absolute" style={{ right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}>
             <div className="spinner-border spinner-border-sm" role="status" />
           </div>
         )}
 
         {/* Suggestions Dropdown */}
-        {showSuggestions && suggestions.length > 0 && (
+        {showSuggestions && allSuggestionItems.length > 0 && (
           <div
             ref={dropdownRef}
             className="position-absolute z-3 w-100 mt-1 border rounded shadow"
@@ -261,11 +361,11 @@ export default function TagInput({
           >
             {suggestions.map((suggestion, index) => (
               <button
-                key={suggestion.tag_name}
+                key={`s-${suggestion.tag_name}`}
                 type="button"
                 onClick={() => addTag(suggestion.tag_name)}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className="w-100 text-start px-3 py-2 d-flex align-items-center justify-content-between"
+                className="w-100 text-start px-3 py-2 d-flex align-items-center justify-content-between border-0"
                 style={{
                   backgroundColor: selectedIndex === index ? 'var(--cui-primary-bg-subtle)' : 'transparent',
                   color: 'var(--cui-body-color)'
@@ -279,13 +379,69 @@ export default function TagInput({
                 </span>
               </button>
             ))}
+
+            {/* Fuzzy matches section */}
+            {fuzzyMatches.length > 0 && (
+              <>
+                <div
+                  className="px-3 py-1 small fw-medium"
+                  style={{
+                    color: 'var(--cui-secondary-color)',
+                    borderTop: '1px solid var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-tertiary-bg)',
+                  }}
+                >
+                  Did you mean...?
+                </div>
+                {fuzzyMatches.map((match, idx) => {
+                  const overallIndex = suggestions.length + idx;
+                  return (
+                    <button
+                      key={`f-${match.tag_name}`}
+                      type="button"
+                      onClick={() => addTag(match.tag_name)}
+                      onMouseEnter={() => setSelectedIndex(overallIndex)}
+                      className="w-100 text-start px-3 py-2 d-flex align-items-center justify-content-between border-0"
+                      style={{
+                        backgroundColor: selectedIndex === overallIndex ? 'var(--cui-primary-bg-subtle)' : 'transparent',
+                        color: 'var(--cui-body-color)',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      <span style={{ color: 'var(--cui-body-color)' }}>
+                        {match.tag_name}
+                      </span>
+                      <span className="small" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {match.usage_count} uses
+                      </span>
+                    </button>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Create new option */}
+            {inputValue.trim() && !suggestions.some(s => s.tag_name.toLowerCase() === inputValue.trim().toLowerCase()) && (
+              <button
+                type="button"
+                onClick={() => addTag(inputValue)}
+                className="w-100 text-start px-3 py-2 d-flex align-items-center border-0"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--cui-primary)',
+                  borderTop: '1px solid var(--cui-border-color)',
+                }}
+              >
+                Create new tag: &ldquo;{inputValue.trim()}&rdquo;
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {/* Helper Text */}
-      <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)' }}>
-        Press Enter or comma to add a tag. {value.length}/{maxTags} tags
+      <p className="mt-1 small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+        Press Enter or comma to add a tag. Double-click a tag to rename. {value.length}/{maxTags} tags
       </p>
     </div>
   );

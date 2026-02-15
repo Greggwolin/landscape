@@ -304,19 +304,14 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
 
   return (
     <CModal visible={isOpen} onClose={onClose} size="lg" backdrop="static">
-      <CModalHeader>
-        <CModalTitle className="d-flex flex-column">
-          <span>Edit Project Profile</span>
-          {profile.project_name && (
-            <span className="text-muted small">{profile.project_name}</span>
-          )}
-        </CModalTitle>
+      <CModalHeader closeButton className="py-2 px-3">
+        <CModalTitle className="mb-0">Edit Project Profile</CModalTitle>
       </CModalHeader>
-      <CModalBody>
+      <CModalBody className="p-2">
         {floatingStyles}
         <CForm className="project-profile-floating">
-          {/* Row 1: Project Name (30%), Analysis Type (25%), Asking Price (45%) */}
-          <CRow className="mb-3">
+          {/* Row 1: Project Name + Perspective + Purpose + Asking Price */}
+          <CRow className="mb-2">
             <CCol xs={12} className="profile-col-r1-project">
               <CFormFloating>
                 <CFormInput
@@ -334,75 +329,62 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
                 <div className="invalid-feedback d-block">{errors.project_name}</div>
               )}
             </CCol>
-            <CCol xs={12} className="profile-col-r1-analysis">
-              <div className="d-flex flex-column gap-2">
-                <CFormSelect
-                  id="analysis_perspective"
-                  floatingLabel={
-                    <>
-                      Perspective <span className="text-danger">*</span>
-                    </>
-                  }
-                  value={formData.analysis_perspective || ''}
-                  onChange={(e) =>
-                    handleInputChange('analysis_perspective', e.target.value as AnalysisPerspective)
-                  }
-                  invalid={!!errors.analysis_perspective}
-                  className="text-start"
-                  placeholder=" "
-                >
-                  <option value="" disabled hidden></option>
-                  {ANALYSIS_PERSPECTIVES.map((value) => (
-                    <option key={value} value={value}>
-                      {PERSPECTIVE_LABELS[value]}
-                    </option>
-                  ))}
-                </CFormSelect>
-                {errors.analysis_perspective && (
-                  <div className="invalid-feedback d-block">{errors.analysis_perspective}</div>
-                )}
-
-                <CFormSelect
-                  id="analysis_purpose"
-                  floatingLabel={
-                    <>
-                      Purpose <span className="text-danger">*</span>
-                    </>
-                  }
-                  value={formData.analysis_purpose || ''}
-                  onChange={(e) =>
-                    handleInputChange('analysis_purpose', e.target.value as AnalysisPurpose)
-                  }
-                  invalid={!!errors.analysis_purpose}
-                  className="text-start"
-                  placeholder=" "
-                >
-                  <option value="" disabled hidden></option>
-                  {ANALYSIS_PURPOSES.map((value) => (
-                    <option key={value} value={value}>
-                      {PURPOSE_LABELS[value]}
-                    </option>
-                  ))}
-                </CFormSelect>
-                {errors.analysis_purpose && (
-                  <div className="invalid-feedback d-block">{errors.analysis_purpose}</div>
-                )}
-
-                {formData.analysis_perspective === 'INVESTMENT' && (
-                  <label className="d-flex align-items-center gap-2 small">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formData.value_add_enabled)}
-                      onChange={(e) => handleInputChange('value_add_enabled', e.target.checked)}
-                    />
-                    Include value-add analysis
-                  </label>
-                )}
-                {errors.value_add_enabled && (
-                  <div className="invalid-feedback d-block">{errors.value_add_enabled}</div>
-                )}
-              </div>
+            <CCol xs={12} className="profile-col-r1-perspective">
+              <CFormSelect
+                id="analysis_perspective"
+                floatingLabel={
+                  <>
+                    Perspective <span className="text-danger">*</span>
+                  </>
+                }
+                value={formData.analysis_perspective || ''}
+                onChange={(e) =>
+                  handleInputChange('analysis_perspective', e.target.value as AnalysisPerspective)
+                }
+                invalid={!!errors.analysis_perspective}
+                className="text-start"
+                placeholder=" "
+              >
+                <option value="" disabled hidden></option>
+                {ANALYSIS_PERSPECTIVES.map((value) => (
+                  <option key={value} value={value}>
+                    {PERSPECTIVE_LABELS[value]}
+                  </option>
+                ))}
+              </CFormSelect>
+              {errors.analysis_perspective && (
+                <div className="invalid-feedback d-block">{errors.analysis_perspective}</div>
+              )}
             </CCol>
+
+            <CCol xs={12} className="profile-col-r1-purpose">
+              <CFormSelect
+                id="analysis_purpose"
+                floatingLabel={
+                  <>
+                    Purpose <span className="text-danger">*</span>
+                  </>
+                }
+                value={formData.analysis_purpose || ''}
+                onChange={(e) =>
+                  handleInputChange('analysis_purpose', e.target.value as AnalysisPurpose)
+                }
+                invalid={!!errors.analysis_purpose}
+                className="text-start"
+                placeholder=" "
+              >
+                <option value="" disabled hidden></option>
+                {ANALYSIS_PURPOSES.map((value) => (
+                  <option key={value} value={value}>
+                    {PURPOSE_LABELS[value]}
+                  </option>
+                ))}
+              </CFormSelect>
+              {errors.analysis_purpose && (
+                <div className="invalid-feedback d-block">{errors.analysis_purpose}</div>
+              )}
+            </CCol>
+
             <CCol xs={12} className="profile-col-r1-price">
               <CFormFloating>
                 <CFormInput
@@ -428,8 +410,29 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
             </CCol>
           </CRow>
 
-          {/* Row 2: Property Type (25%), Property Subtype (30%), Units (20%), Gross Acres (25%) */}
-          <CRow className="mb-3">
+          {/* Row 2: Value Add */}
+          {(formData.analysis_perspective === 'INVESTMENT' || errors.value_add_enabled) && (
+            <CRow className="mb-2">
+              <CCol xs={12}>
+                {formData.analysis_perspective === 'INVESTMENT' && (
+                  <label className="project-profile-checkbox d-flex align-items-center gap-2 small">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.value_add_enabled)}
+                      onChange={(e) => handleInputChange('value_add_enabled', e.target.checked)}
+                    />
+                    Include value-add analysis
+                  </label>
+                )}
+                {errors.value_add_enabled && (
+                  <div className="invalid-feedback d-block">{errors.value_add_enabled}</div>
+                )}
+              </CCol>
+            </CRow>
+          )}
+
+          {/* Row 3: Property Type (25%), Property Subtype (30%), Units (20%), Gross Acres (25%) */}
+          <CRow className="mb-2">
             <CCol xs={12} className="profile-col-r2-type">
               <CFormSelect
                 id="property_type_code"
@@ -515,49 +518,9 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
             </CCol>
           </CRow>
 
-          {/* Row 3: Ownership Type (40%), Analysis Start Date (60%) */}
-          <CRow className="mb-3">
-            <CCol xs={12} className="profile-col-r3-ownership">
-              <CFormSelect
-                id="ownership_type"
-                floatingLabel="Ownership Type"
-                value={formData.ownership_type || ''}
-                onChange={(e) =>
-                  handleInputChange('ownership_type', e.target.value || undefined)
-                }
-                className="text-start"
-                placeholder=" "
-              >
-                <option value="" disabled hidden></option>
-                {OWNERSHIP_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
-            <CCol xs={12} className="profile-col-r3-start">
-              <CFormFloating>
-                <CFormInput
-                  type="date"
-                  id="analysis_start_date"
-                  value={formData.analysis_start_date || ''}
-                  onChange={(e) =>
-                    handleInputChange('analysis_start_date', e.target.value || undefined)
-                  }
-                  placeholder=" "
-                />
-                <CFormLabel htmlFor="analysis_start_date">
-                  Analysis Start Date [Period = 0]
-                </CFormLabel>
-              </CFormFloating>
-            </CCol>
-          </CRow>
-
-          {/* Row 4+: Address (unchanged) */}
-          <CRow className="mb-3">
-            <CCol md={12}>
+          {/* Row 4: Address + City + County + State + Zip */}
+          <CRow className="mb-2">
+            <CCol xs={12} className="profile-col-r4-address">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -571,11 +534,8 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
                 <CFormLabel htmlFor="address">Address</CFormLabel>
               </CFormFloating>
             </CCol>
-          </CRow>
 
-          {/* Row 6: City, County, State, Zip */}
-          <CRow className="mb-3">
-            <CCol md={4}>
+            <CCol xs={12} className="profile-col-r4-city">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -590,7 +550,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={4}>
+            <CCol xs={12} className="profile-col-r4-county">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -605,7 +565,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-state">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -620,7 +580,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
 
-            <CCol md={2}>
+            <CCol xs={12} className="profile-col-r4-zip">
               <CFormFloating>
                 <CFormInput
                   type="text"
@@ -636,8 +596,8 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
             </CCol>
           </CRow>
 
-          {/* Row 7: Market (MSA), APN */}
-          <CRow className="mb-3">
+          {/* Row 5: Market (MSA), APN */}
+          <CRow className="mb-2">
             <CCol md={6}>
               <CFormSelect
                 id="msa_id"
@@ -676,9 +636,49 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
               </CFormFloating>
             </CCol>
           </CRow>
+
+          {/* Row 6: Ownership Type (40%), Analysis Start Date (60%) */}
+          <CRow className="mb-2">
+            <CCol xs={12} className="profile-col-r3-ownership">
+              <CFormSelect
+                id="ownership_type"
+                floatingLabel="Ownership Type"
+                value={formData.ownership_type || ''}
+                onChange={(e) =>
+                  handleInputChange('ownership_type', e.target.value || undefined)
+                }
+                className="text-start"
+                placeholder=" "
+              >
+                <option value="" disabled hidden></option>
+                {OWNERSHIP_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            <CCol xs={12} className="profile-col-r3-start">
+              <CFormFloating>
+                <CFormInput
+                  type="date"
+                  id="analysis_start_date"
+                  value={formData.analysis_start_date || ''}
+                  onChange={(e) =>
+                    handleInputChange('analysis_start_date', e.target.value || undefined)
+                  }
+                  placeholder=" "
+                />
+                <CFormLabel htmlFor="analysis_start_date">
+                  Analysis Start Date [Period = 0]
+                </CFormLabel>
+              </CFormFloating>
+            </CCol>
+          </CRow>
         </CForm>
       </CModalBody>
-      <CModalFooter>
+      <CModalFooter className="py-2 px-3">
         <SemanticButton intent="secondary-action" onClick={onClose} disabled={isSaving}>
           Cancel
         </SemanticButton>
@@ -694,54 +694,113 @@ export default ProjectProfileEditModal;
 
 // Scoped floating label adjustments for selects in this modal only
 const floatingStyles = (
-  <style jsx>{`
+  <style jsx global>{`
+    .project-profile-floating .row {
+      --cui-gutter-x: 0.5rem;
+    }
+
+    .project-profile-floating .form-floating > .form-control,
     .project-profile-floating .form-floating > .form-select {
-      padding-top: 1.35rem;
-      padding-bottom: 0.55rem;
+      min-height: calc(3rem + 2px);
+      padding: 1.35rem 0.5rem 0.5rem 0.5rem;
       line-height: 1.25;
+    }
+
+    .project-profile-floating .form-floating > .form-select {
       text-align: left;
       text-align-last: left;
       -moz-text-align-last: left;
     }
 
+    .project-profile-floating .form-floating > label {
+      padding: 0.5rem;
+    }
+
+    .project-profile-floating .project-profile-checkbox {
+      border: 1px solid var(--cui-border-color);
+      border-radius: var(--cui-border-radius);
+      padding: 0.5rem;
+      background: var(--cui-body-bg);
+    }
+
     @media (min-width: 768px) {
       .project-profile-floating .profile-col-r1-project {
-        flex: 0 0 30%;
-        max-width: 30%;
+        flex: 0 0 28%;
+        max-width: 28%;
+        width: 28%;
       }
-      .project-profile-floating .profile-col-r1-analysis {
-        flex: 0 0 25%;
-        max-width: 25%;
+      .project-profile-floating .profile-col-r1-perspective {
+        flex: 0 0 20%;
+        max-width: 20%;
+        width: 20%;
+      }
+      .project-profile-floating .profile-col-r1-purpose {
+        flex: 0 0 20%;
+        max-width: 20%;
+        width: 20%;
       }
       .project-profile-floating .profile-col-r1-price {
-        flex: 0 0 45%;
-        max-width: 45%;
+        flex: 0 0 32%;
+        max-width: 32%;
+        width: 32%;
       }
 
       .project-profile-floating .profile-col-r2-type {
         flex: 0 0 25%;
         max-width: 25%;
+        width: 25%;
       }
       .project-profile-floating .profile-col-r2-subtype {
         flex: 0 0 30%;
         max-width: 30%;
+        width: 30%;
       }
       .project-profile-floating .profile-col-r2-units {
         flex: 0 0 20%;
         max-width: 20%;
+        width: 20%;
       }
       .project-profile-floating .profile-col-r2-acres {
         flex: 0 0 25%;
         max-width: 25%;
+        width: 25%;
+      }
+
+      .project-profile-floating .profile-col-r4-address {
+        flex: 0 0 40%;
+        max-width: 40%;
+        width: 40%;
+      }
+      .project-profile-floating .profile-col-r4-city {
+        flex: 0 0 18%;
+        max-width: 18%;
+        width: 18%;
+      }
+      .project-profile-floating .profile-col-r4-county {
+        flex: 0 0 18%;
+        max-width: 18%;
+        width: 18%;
+      }
+      .project-profile-floating .profile-col-r4-state {
+        flex: 0 0 8%;
+        max-width: 8%;
+        width: 8%;
+      }
+      .project-profile-floating .profile-col-r4-zip {
+        flex: 0 0 16%;
+        max-width: 16%;
+        width: 16%;
       }
 
       .project-profile-floating .profile-col-r3-ownership {
         flex: 0 0 40%;
         max-width: 40%;
+        width: 40%;
       }
       .project-profile-floating .profile-col-r3-start {
         flex: 0 0 60%;
         max-width: 60%;
+        width: 60%;
       }
     }
   `}</style>

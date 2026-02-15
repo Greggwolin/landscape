@@ -1,11 +1,13 @@
 'use client';
 
 import React from 'react';
-import { CButton } from '@coreui/react';
+import { CButton, CTooltip } from '@coreui/react';
 
 export interface DocResult {
   doc_id: number;
+  document_key?: string | null;   // Platform Knowledge slug — used for chat routing
   name: string;
+  project_id: number | null;
   project_name: string | null;
   doc_type: string;
   format: string;
@@ -14,13 +16,17 @@ export interface DocResult {
   modified_at: string | null;
   relevance_score: number;
   snippet: string;
+  storage_uri: string | null;
 }
 
 interface DocResultCardProps {
   doc: DocResult;
   isSelected: boolean;
+  isExpanded?: boolean;
+  isPreviewable?: boolean;
   onToggleSelect: (docId: number) => void;
   onPreview: (docId: number) => void;
+  onRowClick?: (docId: number) => void;
 }
 
 const FORMAT_ICONS: Record<string, string> = {
@@ -55,8 +61,11 @@ function formatSize(bytes: number | null): string {
 export default function DocResultCard({
   doc,
   isSelected,
+  isExpanded = false,
+  isPreviewable = true,
   onToggleSelect,
   onPreview,
+  onRowClick,
 }: DocResultCardProps) {
   const icon = FORMAT_ICONS[doc.format] || FORMAT_ICONS.OTHER;
   const metaParts = [
@@ -66,14 +75,33 @@ export default function DocResultCard({
     formatDate(doc.modified_at || doc.uploaded_at),
   ].filter(Boolean);
 
+  const previewButton = (
+    <CButton
+      color="primary"
+      variant="ghost"
+      size="sm"
+      disabled={!isPreviewable}
+      className={isPreviewable ? '' : 'kl-preview-unavailable'}
+      onClick={(e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isPreviewable) onPreview(doc.doc_id);
+      }}
+    >
+      Preview
+    </CButton>
+  );
+
   return (
-    <div className="kl-doc-card">
+    <div
+      className={`kl-doc-card${isExpanded ? ' kl-doc-card-expanded' : ''}`}
+      onClick={() => onRowClick?.(doc.doc_id)}
+    >
       <input
         type="checkbox"
         checked={isSelected}
         onChange={() => onToggleSelect(doc.doc_id)}
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
+        className="kl-doc-card-checkbox"
       />
       <span className="kl-doc-card-icon">{icon}</span>
       <div className="kl-doc-card-info">
@@ -81,15 +109,13 @@ export default function DocResultCard({
         <div className="kl-doc-card-meta">{metaParts.join(' \u00B7 ')}</div>
       </div>
       <div className="kl-doc-card-actions">
-        <CButton
-          color="primary"
-          variant="ghost"
-          size="sm"
-          onClick={() => onPreview(doc.doc_id)}
-          style={{ fontSize: '0.75rem' }}
-        >
-          Preview
-        </CButton>
+        {isPreviewable ? (
+          previewButton
+        ) : (
+          <CTooltip content="File not available for preview" placement="top">
+            {previewButton}
+          </CTooltip>
+        )}
       </div>
     </div>
   );

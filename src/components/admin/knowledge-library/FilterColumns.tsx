@@ -99,7 +99,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
             </div>
             <div className="kl-filter-chips">
               {items.length === 0 ? (
-                <div style={{ padding: '8px', color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                <div className="kl-filter-empty">
                   No options
                 </div>
               ) : (
@@ -117,7 +117,7 @@ export default function FilterColumns({ facets, activeFilters, onToggleFilter }:
                       disabled={isDimmed}
                       type="button"
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="kl-filter-chip-label">
                         {label}
                       </span>
                       <span className="kl-chip-count">{item.count}</span>

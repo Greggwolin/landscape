@@ -699,14 +699,54 @@ class ExtractionMappingViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='document-types')
     def document_types(self, request):
-        """GET list of document types with counts."""
-        type_counts = ExtractionMapping.objects.values('document_type').annotate(
-            count=Count('mapping_id'),
-            active_count=Count('mapping_id', filter=Q(is_active=True))
-        ).order_by('document_type')
+        """GET list of document types with counts.
+
+        Returns a unified vocabulary combining:
+        1. All unique doc_types from DMS templates
+        2. Any doc types currently used in extraction mappings
+        """
+        # Get mapping counts per document_type
+        mapping_counts = {
+            item['document_type']: {
+                'count': item['count'],
+                'active_count': item['active_count'],
+            }
+            for item in ExtractionMapping.objects.values('document_type').annotate(
+                count=Count('mapping_id'),
+                active_count=Count('mapping_id', filter=Q(is_active=True))
+            )
+        }
+
+        # Get all unique doc types from DMS templates
+        template_doc_types = set()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT unnest(doc_type_options) AS doc_type
+                    FROM landscape.dms_templates
+                    WHERE doc_type_options IS NOT NULL
+                    ORDER BY doc_type
+                """)
+                for row in cursor.fetchall():
+                    if row[0]:
+                        template_doc_types.add(row[0])
+        except Exception:
+            pass
+
+        # Merge: all template types + any mapping-only types
+        all_doc_types = template_doc_types | set(mapping_counts.keys())
+
+        result = []
+        for dt in sorted(all_doc_types):
+            counts = mapping_counts.get(dt, {'count': 0, 'active_count': 0})
+            result.append({
+                'document_type': dt,
+                'count': counts['count'],
+                'active_count': counts['active_count'],
+            })
 
         return Response({
-            'document_types': list(type_counts),
+            'document_types': result,
         })
 
     @action(detail=False, methods=['get'], url_path='target-tables')

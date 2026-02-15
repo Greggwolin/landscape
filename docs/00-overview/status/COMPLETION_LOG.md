@@ -10,6 +10,10 @@ Historical record of feature and migration completions. For current implementati
 
 | Date | Milestone | Notes |
 |------|-----------|-------|
+| 2026-02-14 | Extraction Mapping Doc Type Alignment | Remapped 145 mappings from uppercase codes to template vocabulary, applicable_tags JSONB column, audit log |
+| 2026-02-14 | Document Tag System & Subtype Classifier | dms_doc_tags/assignments tables, 6 Django endpoints, TagInput w/ fuzzy suggest, ai_document_subtypes (13 seeded), auto-tag at ≥0.6 confidence |
+| 2026-02-14 | Project DMS "+ Add Type" & Extraction Panel Rewrite | Inline custom type input, SWR-based ExtractionMappingAdmin, help modal, template-aligned badges |
+| 2026-02-14 | Global /dms Route Removal + Doc Chat Fix | Removed /dms page/nav (replaced by Knowledge Library), added core_doc_text fallback for unembedded docs |
 | 2026-02-13 | Knowledge Library Integration | Landscaper admin panel Knowledge Library with 5-column cascading faceted filters, progressive search fallback, batch download, drag-and-drop upload, doc_geo_tag table, 4 Django API endpoints, 7 React components |
 | 2026-02-13 | Cloudflare R2 Media Storage | Configured R2 storage for document media, fixed build issues |
 | 2026-02-13 | Investment Committee Challenge Mode | IC Devil's Advocate tools for Landscaper, scenario-based challenge sessions |

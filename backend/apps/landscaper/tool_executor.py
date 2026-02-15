@@ -11295,6 +11295,60 @@ def ingest_document(
                 'skipped_fields': []
             }
 
+        # Subtype classification — detect property subtype and auto-tag
+        subtype_info = None
+        try:
+            from apps.knowledge.services.subtype_classifier import DocumentSubtypeClassifier
+            subtype_classifier = DocumentSubtypeClassifier()
+            # Determine property type from project
+            _property_type = None
+            with connection.cursor() as _c:
+                _c.execute("""
+                    SELECT property_type FROM landscape.tbl_project WHERE project_id = %s
+                """, [project_id])
+                _row = _c.fetchone()
+                if _row and _row[0]:
+                    _property_type = _row[0].lower()
+
+            subtype_result = subtype_classifier.classify(
+                content=content[:50000],
+                property_type=_property_type,
+            )
+            if subtype_result.subtype_code and subtype_result.confidence >= 0.6:
+                subtype_info = {
+                    'subtype_code': subtype_result.subtype_code,
+                    'subtype_name': subtype_result.subtype_name,
+                    'confidence': round(subtype_result.confidence, 2),
+                    'matched_patterns': subtype_result.matched_patterns[:5],
+                }
+                # Auto-assign the subtype tag to the document
+                try:
+                    with connection.cursor() as _tc:
+                        _tc.execute("""
+                            SELECT tag_id FROM landscape.dms_doc_tags
+                            WHERE subtype_code = %s AND workspace_id = 1
+                            LIMIT 1
+                        """, [subtype_result.subtype_code])
+                        tag_row = _tc.fetchone()
+                        if tag_row:
+                            _tc.execute("""
+                                INSERT INTO landscape.dms_doc_tag_assignments (doc_id, tag_id, assigned_at)
+                                VALUES (%s, %s, NOW())
+                                ON CONFLICT (doc_id, tag_id) DO NOTHING
+                            """, [doc_id, tag_row[0]])
+                            _tc.execute("""
+                                UPDATE landscape.dms_doc_tags
+                                SET usage_count = (
+                                    SELECT COUNT(*) FROM landscape.dms_doc_tag_assignments WHERE tag_id = %s
+                                )
+                                WHERE tag_id = %s
+                            """, [tag_row[0], tag_row[0]])
+                            logger.info(f"Auto-assigned subtype tag '{subtype_result.subtype_code}' to doc {doc_id}")
+                except Exception as tag_err:
+                    logger.warning(f"Failed to assign subtype tag during ingestion: {tag_err}")
+        except Exception as subtype_err:
+            logger.warning(f"Subtype classification failed (non-fatal): {subtype_err}")
+
         # Extract key-value pairs from the content
         # Look for patterns like "Label: Value" or "Label = Value"
         extracted_pairs = _extract_key_value_pairs(content)
@@ -11374,7 +11428,7 @@ def ingest_document(
                 updated_fields=updated_fields
             )
 
-        return {
+        result = {
             'success': True,
             'doc_id': doc_id,
             'doc_name': doc_name,
@@ -11387,6 +11441,12 @@ def ingest_document(
                 'errors': len(errors)
             }
         }
+
+        # Include subtype detection info for Landscaper to report
+        if subtype_info:
+            result['subtype_detected'] = subtype_info
+
+        return result
 
     except Exception as e:
         logger.error(f"Error ingesting document {doc_id}: {e}")
