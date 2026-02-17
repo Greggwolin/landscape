@@ -48,11 +48,11 @@ TRAINING_CHUNKS = [
 
     ("MF", "property_details", "task_guide",
      "Entering property details",
-     """Go to Property > Details. This page captures the physical description of the property: name, address, year built, number of units, total square footage, lot size, zoning, and property class. The complexity mode (Napkin/Standard/Detail) controls how many fields are visible. In Napkin mode you see only the essentials — about 20 fields. Switch to Standard or Detail mode using the toggle in the sub-tab header to see additional fields like parking ratio, amenities, and structural details."""),
+     """Go to Property > Details. This page captures the physical description of the property: name, address, year built, number of units, total square footage, lot size, zoning, and property class. The project mode (Napkin/Standard) controls how many fields are visible. In Napkin mode you see only the essentials — about 23 fields. Switch to Standard mode using the toggle in the sub-tab header to see the full professional field set including parking ratio, amenities, and structural details."""),
 
     ("BOTH", "property_details", "task_guide",
-     "What is complexity mode",
-     """Complexity mode controls how much detail is visible on each page. There are three levels: Napkin mode shows the minimum fields needed for a quick analysis (like a back-of-napkin sketch). Standard mode shows a professional-level set of fields suitable for most underwriting. Detail mode shows every available field for institutional-grade analysis. You can switch modes at any time without losing data — fields hidden in simpler modes retain their values. The mode toggle appears in the sub-tab header area. This is unique to Landscape — ARGUS has no equivalent and always shows full complexity."""),
+     "What are project modes",
+     """Landscape has two project modes. Napkin mode shows only the essential fields needed for a quick analysis — about 23 fields total. Standard mode shows the full professional field set for detailed underwriting. You can switch between modes at any time without losing data — fields hidden in Napkin mode retain their values. The mode toggle appears in the sub-tab header area. This is unique to Landscape — ARGUS has no equivalent and always shows full complexity."""),
 
     # ============================================================
     # PROPERTY > RENT ROLL
@@ -208,11 +208,11 @@ TRAINING_CHUNKS = [
 
     ("MF", "general", "excel_crosswalk",
      "Landscape for Excel users overview",
-     """If you build underwriting models in Excel, Landscape replaces the typical multi-tab spreadsheet model. Each Landscape folder tab corresponds to what would be a worksheet in your Excel model: the Property tab replaces your property summary sheet, Operations replaces your operating statement sheet, and Valuation replaces your DCF/cap rate sheets. The key advantage: formulas are built in. You do not maintain cell references, copy formulas down rows, or worry about broken links between sheets. Enter your assumptions once and the calculations cascade automatically. Complexity modes let you start simple (Napkin = quick Excel sketch) and add detail later."""),
+     """If you build underwriting models in Excel, Landscape replaces the typical multi-tab spreadsheet model. Each Landscape folder tab corresponds to what would be a worksheet in your Excel model: the Property tab replaces your property summary sheet, Operations replaces your operating statement sheet, and Valuation replaces your DCF/cap rate sheets. The key advantage: formulas are built in. You do not maintain cell references, copy formulas down rows, or worry about broken links between sheets. Enter your assumptions once and the calculations cascade automatically. Project modes let you start simple (Napkin = quick Excel sketch) and switch to Standard for the full field set later."""),
 
     ("MF", "general", "argus_crosswalk",
      "Landscape for ARGUS Enterprise users overview",
-     """If you use ARGUS Enterprise for income property valuation, Landscape covers the same workflow with a more visual, unified interface. The Rent Roll replaces ARGUS Tenants module. Operations replaces the separate Revenue and Expense modules. Income Approach provides DCF and Direct Cap similar to ARGUS Cash Flow and Valuation. Key differences: Landscape auto-links rent roll to revenue (no manual configuration needed). Complexity modes let you work at different detail levels. Document extraction replaces manual data entry from offering memoranda. The three-approach valuation (Sales, Cost, Income) is integrated into one platform instead of requiring external tools for Sales Comparison and Cost Approach."""),
+     """If you use ARGUS Enterprise for income property valuation, Landscape covers the same workflow with a more visual, unified interface. The Rent Roll replaces ARGUS Tenants module. Operations replaces the separate Revenue and Expense modules. Income Approach provides DCF and Direct Cap similar to ARGUS Cash Flow and Valuation. Key differences: Landscape auto-links rent roll to revenue (no manual configuration needed). Project modes (Napkin/Standard) let you work at different detail levels. Document extraction replaces manual data entry from offering memoranda. The three-approach valuation (Sales, Cost, Income) is integrated into one platform instead of requiring external tools for Sales Comparison and Cost Approach."""),
 
 ]
 

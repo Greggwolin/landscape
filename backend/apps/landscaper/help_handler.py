@@ -67,7 +67,7 @@ When users mention other tools, translate to Landscape equivalents:
 - "Operations" tab = "Revenue & Expense" in ARGUS
 - "Income Approach" = DCF analysis similar to ARGUS cash flow
 - Landscape auto-flows rent roll data to operations — ARGUS requires manual linking
-- Complexity modes (Napkin/Standard/Detail) have no ARGUS equivalent — ARGUS is always full complexity
+- Landscape has two project modes: Napkin (quick analysis with ~23 essential fields) and Standard (full professional analysis). You can switch between them without losing data. ARGUS has no equivalent — it is always full complexity from the start.
 
 ### For ARGUS Developer Users
 - "Budget" tab = "Construction" module in ARGUS Developer
@@ -80,7 +80,7 @@ When users mention other tools, translate to Landscape equivalents:
 - Landscape replaces the typical "tabs across the bottom" Excel model
 - Each Landscape folder/tab corresponds to what would be a worksheet in Excel
 - Formulas are built in — no need to maintain cell references
-- Complexity modes let you start simple (like a quick Excel sketch) and add detail later
+- Project modes (Napkin/Standard) let you start simple (like a quick Excel sketch) and add detail later
 - Document upload + AI extraction replaces manual copy-paste from OMs into Excel
 
 ## HOW DATA FLOWS
@@ -122,6 +122,55 @@ Users may ask about the AI assistant they see in project workspaces. Explain:
 """
 
 
+# Map frontend current_page values (folder_tab) to section_path page names.
+# Frontend sends URL-based IDs; section_paths use underscored names.
+PAGE_CONTEXT_MAP = {
+    # Direct matches (folder only, no tab)
+    'home': 'home',
+    'operations': 'operations',
+    'documents': 'documents',
+    'capital': 'capital',
+    'reports': 'reports',
+    'map': 'map',
+
+    # folder_tab combinations
+    'property_details': 'property_details',
+    'property_rent-roll': 'rent_roll',
+    'property_acquisition': 'property',
+    'property_market': 'property',
+    'property_renovation': 'property',
+    'property_land-use': 'land_use',
+    'property_parcels': 'land_use',
+
+    'valuation_income': 'valuation_income',
+    'valuation_sales-comparison': 'valuation_sales_comp',
+    'valuation_cost': 'valuation_cost',
+
+    'budget_budget': 'budget',
+    'budget_sales': 'budget',
+    'budget_schedule': 'budget',
+    'budget_draws': 'budget',
+
+    'feasibility_feasibility': 'feasibility',
+    'feasibility_cash-flow': 'feasibility',
+    'feasibility_returns': 'feasibility',
+    'feasibility_sensitivity': 'feasibility',
+
+    'capital_equity': 'capital',
+    'capital_debt': 'capital',
+
+    'reports_summary': 'reports',
+    'reports_export': 'reports',
+}
+
+
+def _normalize_page_context(current_page: Optional[str]) -> Optional[str]:
+    """Normalize frontend current_page to section_path page name."""
+    if not current_page:
+        return None
+    return PAGE_CONTEXT_MAP.get(current_page, current_page)
+
+
 def _get_alpha_help_context_for_help(
     query: str,
     page_context: Optional[str] = None,
@@ -137,6 +186,9 @@ def _get_alpha_help_context_for_help(
     try:
         from django.db import connection
         from apps.knowledge.services.embedding_service import generate_embedding
+
+        # Normalize page context to match section_path conventions
+        page_context = _normalize_page_context(page_context)
 
         # Build enriched query for better retrieval
         retrieval_query = query
@@ -289,9 +341,10 @@ def get_help_response(
         full_system += knowledge_context
         logger.info("Platform knowledge context added to help system prompt")
 
-    # Add page context hint
+    # Add page context hint — format as human-readable label
     if current_page:
-        full_system += f"\n\n[USER IS CURRENTLY ON: {current_page} page]"
+        page_label = current_page.replace('_', ' > ').replace('-', ' ').title()
+        full_system += f"\n\n[USER IS CURRENTLY ON: {page_label} page]"
 
     # Build message history
     messages = list(conversation_history or [])

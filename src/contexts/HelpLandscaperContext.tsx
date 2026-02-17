@@ -1,7 +1,15 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useMemo,
+  Suspense,
+  ReactNode,
+} from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -36,25 +44,43 @@ const HelpLandscaperContext = createContext<HelpLandscaperContextType | undefine
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-/** Map pathname to a page context string for the backend. */
-function detectCurrentPage(pathname: string | null): string | undefined {
+/**
+ * Build a page context string from URL pathname and search params.
+ *
+ * Project workspace URLs use query params for navigation:
+ *   /projects/17?folder=property&tab=rent-roll  →  "property_rent-roll"
+ *   /projects/17?folder=operations              →  "operations"
+ *   /projects/17?folder=valuation&tab=income    →  "valuation_income"
+ *   /projects/17                                →  "home"
+ *
+ * The returned string is sent to the Help backend as `current_page`,
+ * where it is used to filter platform knowledge chunks and to tell
+ * Claude what page the user is viewing.
+ */
+function buildCurrentPage(
+  pathname: string | null,
+  folder: string | null,
+  tab: string | null,
+): string | undefined {
   if (!pathname) return undefined;
 
-  // Project-scoped pages: /projects/[id]?folder=X&tab=Y
-  // We extract from the URL search params in the component, but here
-  // we can detect the broad section from the path itself.
-  const segments = pathname.split('/').filter(Boolean);
-
-  // If inside a project workspace, the folder comes from query params
-  // which we won't have here. Fall back to pathname segments.
-  if (segments[0] === 'projects' && segments.length >= 2) {
-    // Check for known sub-paths
-    const sub = segments[2];
-    if (sub) return sub;
-    return 'home';
+  // --- Query-param-based detection (folder tabs) ---
+  if (folder && tab) {
+    return `${folder}_${tab}`;        // e.g. "property_rent-roll", "valuation_income"
+  }
+  if (folder) {
+    return folder;                     // e.g. "home", "operations", "documents"
   }
 
-  // Global pages
+  // --- Pathname-based fallback ---
+  const segments = pathname.split('/').filter(Boolean);
+
+  if (segments[0] === 'projects' && segments.length >= 2) {
+    const sub = segments[2];
+    if (sub) return sub;               // e.g. /projects/17/documents → "documents"
+    return 'home';                     // e.g. /projects/17           → "home"
+  }
+
   if (pathname.startsWith('/documents')) return 'documents';
   if (pathname.startsWith('/dashboard')) return 'home';
   if (pathname === '/') return 'home';
@@ -70,11 +96,19 @@ function detectPropertyTypeFromPath(): string | undefined {
 }
 
 /* ------------------------------------------------------------------ */
-/* Provider                                                            */
+/* Inner Provider (uses useSearchParams — requires Suspense boundary) */
 /* ------------------------------------------------------------------ */
 
-export function HelpLandscaperProvider({ children }: { children: ReactNode }) {
+function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  /** Resolve the current page from pathname + folder/tab query params. */
+  const currentPage = useMemo(() => {
+    const folder = searchParams?.get('folder') ?? null;
+    const tab = searchParams?.get('tab') ?? null;
+    return buildCurrentPage(pathname, folder, tab);
+  }, [pathname, searchParams]);
 
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<HelpMessage[]>([]);
@@ -106,7 +140,6 @@ export function HelpLandscaperProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
 
     try {
-      const currentPage = detectCurrentPage(pathname);
       const propertyTypeContext = detectPropertyTypeFromPath();
 
       const response = await fetch(`${DJANGO_API_URL}/api/landscaper/help/chat/`, {
@@ -151,7 +184,7 @@ export function HelpLandscaperProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, pathname, conversationId]);
+  }, [isLoading, currentPage, conversationId]);
 
   return (
     <HelpLandscaperContext.Provider
@@ -168,6 +201,18 @@ export function HelpLandscaperProvider({ children }: { children: ReactNode }) {
     >
       {children}
     </HelpLandscaperContext.Provider>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Exported Provider (wraps inner in Suspense for useSearchParams)    */
+/* ------------------------------------------------------------------ */
+
+export function HelpLandscaperProvider({ children }: { children: ReactNode }) {
+  return (
+    <Suspense>
+      <HelpLandscaperProviderInner>{children}</HelpLandscaperProviderInner>
+    </Suspense>
   );
 }
 
