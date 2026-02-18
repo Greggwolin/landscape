@@ -10,6 +10,13 @@ Year-over-year projection:
 - Terminal Value: Year N+1 NOI / Exit Cap Rate - Selling Costs
 - PV: Discount each year's cash flow back at discount_rate
 
+When value_add_enabled = true, overlays a renovation schedule:
+- Staggered unit renovations (N units/month starting at reno_start_month)
+- Vacancy loss during renovation + relet lag
+- Renovation CapEx and relocation costs
+- Rent premium gains on re-leased units
+- Terminal NOI reflects post-renovation stabilized income
+
 Session: DCF Implementation
 """
 
@@ -22,6 +29,138 @@ from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
 from .income_approach_service import IncomeApproachDataService
+
+
+def build_renovation_schedule(
+    total_units: int,
+    avg_unit_sf: float,
+    per_unit_monthly_rent: float,
+    value_add: Dict[str, Any],
+    hold_period_months: int,
+) -> Dict[str, List[float]]:
+    """
+    Generate a month-by-month renovation schedule.
+
+    Args:
+        total_units: Total unit count for the property (or units_to_renovate).
+        avg_unit_sf: Average SF per unit.
+        per_unit_monthly_rent: Current average monthly rent per unit.
+        value_add: Dict of value-add assumption fields from tbl_value_add_assumptions.
+        hold_period_months: Total months in the analysis.
+
+    Returns:
+        Dict with monthly arrays (1-indexed, index 0 unused):
+        - reno_vacancy_loss: Revenue lost from units offline (vacancy + relet lag)
+        - reno_cost: Hard cost of renovations per month
+        - relocation_cost: Relocation incentives paid per month
+        - rent_premium_gain: Incremental rent from renovated, re-leased units
+        - units_in_reno: Count of units under renovation
+        - units_in_relet: Count of units in relet lag
+        - units_renovated: Cumulative units completed and re-leased
+    """
+    # Parse assumptions
+    renovate_all = value_add.get('renovate_all', True)
+    units_to_renovate = total_units if renovate_all else int(value_add.get('units_to_renovate', 0) or 0)
+    units_to_renovate = min(units_to_renovate, total_units)
+
+    starts_per_month = int(value_add.get('reno_starts_per_month', 2) or 2)
+    start_month = int(value_add.get('reno_start_month', 3) or 3)
+    months_to_complete = int(value_add.get('months_to_complete', 3) or 3)
+    relet_lag = int(value_add.get('relet_lag_months', 2) or 2)
+    rent_premium_pct = float(value_add.get('rent_premium_pct', 0.15) or 0.15)
+
+    reno_cost_basis = value_add.get('reno_cost_basis', 'sf')
+    reno_cost_per_sf = float(value_add.get('reno_cost_per_sf', 0) or 0)
+    relocation_incentive = float(value_add.get('relocation_incentive', 0) or 0)
+
+    # Cost per unit
+    if reno_cost_basis == 'unit':
+        # reno_cost_per_sf is actually $/unit when basis='unit'
+        cost_per_unit = reno_cost_per_sf
+    else:
+        cost_per_unit = reno_cost_per_sf * avg_unit_sf
+
+    # Monthly premium per renovated unit
+    premium_per_unit = per_unit_monthly_rent * rent_premium_pct
+
+    # Initialize arrays (0-indexed, month 1 = index 1)
+    size = hold_period_months + 1
+    reno_vacancy_loss = [0.0] * size
+    reno_cost_arr = [0.0] * size
+    relocation_cost_arr = [0.0] * size
+    rent_premium_gain = [0.0] * size
+    units_in_reno = [0] * size
+    units_in_relet = [0] * size
+    units_renovated = [0] * size
+
+    # Track batches: each batch is (start_month, count)
+    batches = []
+    units_scheduled = 0
+    batch_month = start_month
+    while units_scheduled < units_to_renovate:
+        count = min(starts_per_month, units_to_renovate - units_scheduled)
+        batches.append((batch_month, count))
+        units_scheduled += count
+        batch_month += 1
+
+    # Process each batch through its lifecycle
+    cumulative_released = 0
+    for (b_start, b_count) in batches:
+        # Month b_start: units vacated, reno starts
+        # Months [b_start, b_start + months_to_complete): under renovation
+        # Months [b_start + months_to_complete, b_start + months_to_complete + relet_lag): relet lag
+        # Month b_start + months_to_complete + relet_lag: re-leased at premium
+
+        reno_end = b_start + months_to_complete  # exclusive: first month after reno done
+        relet_end = reno_end + relet_lag          # exclusive: first month unit is leased
+
+        # Relocation cost: paid in the month units are vacated
+        if b_start <= hold_period_months:
+            relocation_cost_arr[b_start] += relocation_incentive * b_count
+
+        # Renovation cost: spread evenly across renovation months
+        if months_to_complete > 0:
+            monthly_reno_cost = (cost_per_unit * b_count) / months_to_complete
+            for m in range(b_start, min(reno_end, hold_period_months + 1)):
+                reno_cost_arr[m] += monthly_reno_cost
+
+        # Vacancy loss: units offline during renovation + relet lag
+        for m in range(b_start, min(relet_end, hold_period_months + 1)):
+            reno_vacancy_loss[m] += per_unit_monthly_rent * b_count
+
+        # Track counts
+        for m in range(b_start, min(reno_end, hold_period_months + 1)):
+            units_in_reno[m] += b_count
+        for m in range(reno_end, min(relet_end, hold_period_months + 1)):
+            units_in_relet[m] += b_count
+
+        # Rent premium: starts when units are re-leased
+        if relet_end <= hold_period_months:
+            cumulative_released += b_count
+            for m in range(relet_end, hold_period_months + 1):
+                rent_premium_gain[m] += premium_per_unit * b_count
+
+    # Build cumulative units_renovated (re-leased)
+    # Easier: for each month, count how many batches have fully re-leased by that month
+    for month in range(1, hold_period_months + 1):
+        count = 0
+        for (b_start, b_count) in batches:
+            relet_end = b_start + months_to_complete + relet_lag
+            if month >= relet_end:
+                count += b_count
+        units_renovated[month] = count
+
+    return {
+        'reno_vacancy_loss': reno_vacancy_loss,
+        'reno_cost': reno_cost_arr,
+        'relocation_cost': relocation_cost_arr,
+        'rent_premium_gain': rent_premium_gain,
+        'units_in_reno': units_in_reno,
+        'units_in_relet': units_in_relet,
+        'units_renovated': units_renovated,
+        'units_to_renovate': units_to_renovate,
+        'premium_per_unit': premium_per_unit,
+    }
 
 
 class DCFCalculationService:
@@ -48,6 +187,58 @@ class DCFCalculationService:
             return float(value)
         except (ValueError, TypeError):
             return default
+
+    def _get_value_add_assumptions(self) -> Optional[Dict[str, Any]]:
+        """
+        Fetch value-add assumptions if value_add_enabled on the project.
+        Returns None if value-add is not enabled or no assumptions exist.
+        """
+        with connection.cursor() as cursor:
+            # Check if project has value_add_enabled
+            cursor.execute("""
+                SELECT value_add_enabled
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [self.project_id])
+            row = cursor.fetchone()
+            if not row or not row[0]:
+                return None
+
+            # Fetch value-add assumptions
+            cursor.execute("""
+                SELECT
+                    is_enabled,
+                    reno_cost_per_sf,
+                    reno_cost_basis,
+                    relocation_incentive,
+                    renovate_all,
+                    units_to_renovate,
+                    reno_starts_per_month,
+                    reno_start_month,
+                    months_to_complete,
+                    rent_premium_pct,
+                    relet_lag_months
+                FROM landscape.tbl_value_add_assumptions
+                WHERE project_id = %s
+            """, [self.project_id])
+            va_row = cursor.fetchone()
+
+            if not va_row or not va_row[0]:  # is_enabled check
+                return None
+
+            return {
+                'is_enabled': va_row[0],
+                'reno_cost_per_sf': self._decimal_to_float(va_row[1]),
+                'reno_cost_basis': va_row[2] or 'sf',
+                'relocation_incentive': self._decimal_to_float(va_row[3]),
+                'renovate_all': va_row[4] if va_row[4] is not None else True,
+                'units_to_renovate': va_row[5],
+                'reno_starts_per_month': va_row[6],
+                'reno_start_month': va_row[7],
+                'months_to_complete': va_row[8],
+                'rent_premium_pct': self._decimal_to_float(va_row[9]),
+                'relet_lag_months': va_row[10],
+            }
 
     def _get_base_data(self) -> Dict[str, Any]:
         """
@@ -231,8 +422,28 @@ class DCFCalculationService:
                 'pv_noi': round(pv_noi, 2),
             })
 
-        # Exit analysis - terminal NOI is Year N+1 projected NOI
-        terminal_noi = noi_series[-1] * (1 + income_growth_rate)
+        # ================================================================
+        # Exit analysis — terminal NOI derived from Year N actuals
+        # ================================================================
+        # Use the last annual projection (Year N) and grow by one year.
+        # This is consistent with the monthly calculate_monthly() method
+        # and ensures value-add renovations are reflected in terminal NOI.
+        # ================================================================
+        last_year = projections[-1]  # Year N (the final hold-period year)
+
+        # Grow Year N → Year N+1: revenue at income growth, expenses at expense growth
+        terminal_gpr = last_year['gpr'] * (1 + income_growth_rate)
+        terminal_vacancy = last_year['vacancy_loss'] * (1 + income_growth_rate)
+        terminal_credit_loss = last_year['credit_loss'] * (1 + income_growth_rate)
+        terminal_other_income = last_year['other_income'] * (1 + income_growth_rate)
+        terminal_egi = last_year['egi'] * (1 + income_growth_rate)
+
+        terminal_base_opex = last_year['base_opex'] * (1 + expense_growth_rate)
+        terminal_mgmt_fee = last_year['management_fee'] * (1 + expense_growth_rate)
+        terminal_reserves = last_year['replacement_reserves']  # Fixed per-unit, no growth
+        terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
+
+        terminal_noi = terminal_egi - terminal_total_opex
         exit_value = terminal_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
@@ -271,7 +482,7 @@ class DCFCalculationService:
             noi_series=noi_series,
             base_discount_rate=discount_rate,
             base_exit_cap_rate=terminal_cap_rate,
-            income_growth_rate=income_growth_rate,
+            terminal_noi=terminal_noi,
             selling_costs_pct=selling_costs_pct,
             discount_interval=float(assumptions.get('discount_rate_interval', 0.005)),
             cap_interval=float(assumptions.get('cap_rate_interval', 0.005)),
@@ -354,7 +565,7 @@ class DCFCalculationService:
         noi_series: List[float],
         base_discount_rate: float,
         base_exit_cap_rate: float,
-        income_growth_rate: float,
+        terminal_noi: float,
         selling_costs_pct: float,
         discount_interval: float = 0.005,
         cap_interval: float = 0.005,
@@ -395,7 +606,7 @@ class DCFCalculationService:
                     noi_series=noi_series,
                     discount_rate=disc_rate,
                     exit_cap_rate=exit_cap,
-                    income_growth_rate=income_growth_rate,
+                    terminal_noi=terminal_noi,
                     selling_costs_pct=selling_costs_pct,
                 )
                 row_values.append(round(pv, 2))
@@ -414,7 +625,7 @@ class DCFCalculationService:
         noi_series: List[float],
         discount_rate: float,
         exit_cap_rate: float,
-        income_growth_rate: float,
+        terminal_noi: float,
         selling_costs_pct: float,
     ) -> float:
         """Calculate present value at specific discount and exit cap rates."""
@@ -426,8 +637,7 @@ class DCFCalculationService:
             for year, noi in enumerate(noi_series)
         )
 
-        # Terminal value
-        terminal_noi = noi_series[-1] * (1 + income_growth_rate)
+        # Terminal value (pre-computed terminal NOI)
         exit_value = terminal_noi / exit_cap_rate if exit_cap_rate > 0 else 0
         net_reversion = exit_value * (1 - selling_costs_pct)
 
@@ -488,8 +698,23 @@ class DCFCalculationService:
         # Start date - use analysis_start_date or default to today
         start_date = project.analysis_start_date or date.today()
 
-        # Calculate month-by-month projections
+        # Value-add renovation schedule
         total_months = hold_period * 12
+        value_add = self._get_value_add_assumptions()
+        reno_schedule = None
+
+        if value_add:
+            per_unit_monthly_rent = (current_annual_rent / 12 / unit_count) if unit_count > 0 else 0
+            avg_unit_sf = (total_sf / unit_count) if unit_count > 0 else 0
+            reno_schedule = build_renovation_schedule(
+                total_units=unit_count,
+                avg_unit_sf=avg_unit_sf,
+                per_unit_monthly_rent=per_unit_monthly_rent,
+                value_add=value_add,
+                hold_period_months=total_months,
+            )
+
+        # Calculate month-by-month projections
         projections = []
         noi_series = []
 
@@ -503,9 +728,25 @@ class DCFCalculationService:
             growth_factor = (1 + monthly_income_growth) ** (month - 1)
             monthly_gpr = monthly_rent_base * growth_factor
 
-            vacancy_loss = monthly_gpr * vacancy_rate
-            credit_loss = monthly_gpr * credit_loss_rate
-            egi = monthly_gpr - vacancy_loss - credit_loss + monthly_other_income
+            # Value-add revenue adjustments
+            reno_vac_loss = 0.0
+            reno_prem_gain = 0.0
+            reno_capex = 0.0
+            reno_reloc = 0.0
+            if reno_schedule:
+                # Apply growth to vacancy loss and premium (they're based on current rent,
+                # but the actual loss/gain should reflect the grown rent for that month)
+                reno_vac_loss = reno_schedule['reno_vacancy_loss'][month] * growth_factor
+                reno_prem_gain = reno_schedule['rent_premium_gain'][month] * growth_factor
+                reno_capex = reno_schedule['reno_cost'][month]
+                reno_reloc = reno_schedule['relocation_cost'][month]
+
+            # Adjusted GPR: base GPR minus renovation vacancy loss plus rent premium
+            adjusted_gpr = monthly_gpr - reno_vac_loss + reno_prem_gain
+
+            vacancy_loss = adjusted_gpr * vacancy_rate
+            credit_loss = adjusted_gpr * credit_loss_rate
+            egi = adjusted_gpr - vacancy_loss - credit_loss + monthly_other_income
 
             # Expenses grow similarly
             expense_growth_factor = (1 + monthly_expense_growth) ** (month - 1)
@@ -516,18 +757,19 @@ class DCFCalculationService:
             noi = egi - total_opex
             noi_series.append(noi)
 
+            # Net reversion and total cash flow are populated AFTER the
+            # exit analysis section below (back-patched into the last month).
             # PV factor for discounting (monthly)
             pv_factor = 1 / ((1 + monthly_discount_rate) ** month)
-            pv_noi = noi * pv_factor
 
-            projections.append({
+            projection = {
                 'periodId': period_id,
                 'periodLabel': period_label,
                 'periodIndex': month,  # 1-based
                 'month': month,
                 'year': (month - 1) // 12 + 1,  # Year 1, 2, 3...
                 'quarter': ((month - 1) // 3) + 1,  # Q1, Q2, Q3...
-                'gpr': round(monthly_gpr, 2),
+                'gpr': round(adjusted_gpr, 2),
                 'vacancy_loss': round(vacancy_loss, 2),
                 'credit_loss': round(credit_loss, 2),
                 'other_income': round(monthly_other_income, 2),
@@ -537,14 +779,72 @@ class DCFCalculationService:
                 'replacement_reserves': round(monthly_reserves, 2),
                 'total_opex': round(total_opex, 2),
                 'noi': round(noi, 2),
+                'net_reversion': 0.0,
+                'total_cash_flow': round(noi, 2),
                 'pv_factor': round(pv_factor, 6),
-                'pv_noi': round(pv_noi, 2),
-            })
+                'pv_cash_flow': round(noi * pv_factor, 2),
+            }
 
-        # Exit analysis - terminal NOI is next month after hold period
-        # Annualized from final monthly NOI
-        final_monthly_noi = noi_series[-1]
-        terminal_annual_noi = final_monthly_noi * 12 * (1 + income_growth_rate)
+            # Add renovation fields when value-add is active
+            if reno_schedule:
+                projection['reno_vacancy_loss'] = round(reno_vac_loss, 2)
+                projection['reno_rent_premium'] = round(reno_prem_gain, 2)
+                projection['reno_capex'] = round(reno_capex, 2)
+                projection['relocation_cost'] = round(reno_reloc, 2)
+
+            projections.append(projection)
+
+        # ================================================================
+        # Exit analysis - terminal NOI derived from Year N actuals
+        # ================================================================
+        # Instead of computing terminal NOI from base × growth^N (which
+        # ignores renovation premium and other mid-stream adjustments),
+        # we aggregate the LAST 12 monthly projections (Year N) and grow
+        # each component by one year. This ensures terminal NOI reflects
+        # all actual cash flow adjustments including value-add renovations.
+        # ================================================================
+
+        last_12 = projections[-12:]  # Last fiscal year (Year N)
+
+        # Aggregate Year N revenue components from actual monthly projections
+        year_n_gpr = sum(p['gpr'] for p in last_12)
+        year_n_vacancy = sum(p['vacancy_loss'] for p in last_12)
+        year_n_credit_loss = sum(p['credit_loss'] for p in last_12)
+        year_n_other_income = sum(p['other_income'] for p in last_12)
+        year_n_egi = sum(p['egi'] for p in last_12)
+
+        # Aggregate Year N expense components from actual monthly projections
+        year_n_base_opex = sum(p['base_opex'] for p in last_12)
+        year_n_mgmt_fee = sum(p['management_fee'] for p in last_12)
+        year_n_reserves = sum(p['replacement_reserves'] for p in last_12)
+        year_n_total_opex = sum(p['total_opex'] for p in last_12)
+        year_n_noi = sum(p['noi'] for p in last_12)
+
+        # Aggregate Year N renovation fields (if present)
+        year_n_reno_vacancy = sum(p.get('reno_vacancy_loss', 0) for p in last_12)
+        year_n_reno_premium = sum(p.get('reno_rent_premium', 0) for p in last_12)
+
+        # Grow Year N → Year N+1 (terminal year)
+        # Revenue components grow at income growth rate
+        terminal_gpr = year_n_gpr * (1 + income_growth_rate)
+        terminal_reno_vacancy = year_n_reno_vacancy * (1 + income_growth_rate)
+        terminal_reno_premium = year_n_reno_premium * (1 + income_growth_rate)
+        terminal_vacancy = year_n_vacancy * (1 + income_growth_rate)
+        terminal_credit_loss = year_n_credit_loss * (1 + income_growth_rate)
+        terminal_other_income = year_n_other_income * (1 + income_growth_rate)
+        terminal_egi = year_n_egi * (1 + income_growth_rate)
+
+        # Expense components grow at expense growth rate
+        terminal_base_opex = year_n_base_opex * (1 + expense_growth_rate)
+        terminal_mgmt_fee = year_n_mgmt_fee * (1 + expense_growth_rate)
+        terminal_reserves = year_n_reserves  # Reserves don't grow (per-unit fixed)
+        terminal_total_opex = terminal_base_opex + terminal_mgmt_fee + terminal_reserves
+
+        terminal_annual_noi = terminal_egi - terminal_total_opex
+
+        # Value-add context for response
+        terminal_is_post_reno = reno_schedule is not None
+
         exit_value = terminal_annual_noi / terminal_cap_rate if terminal_cap_rate > 0 else 0
         selling_costs = exit_value * selling_costs_pct
         net_reversion = exit_value - selling_costs
@@ -561,9 +861,41 @@ class DCFCalculationService:
             'pv_reversion': round(pv_reversion, 2),
         }
 
-        # Calculate present value (sum of all discounted cash flows)
-        pv_of_noi = sum(p['pv_noi'] for p in projections)
-        present_value = pv_of_noi + pv_reversion
+        # Terminal year line-item breakdown for frontend Year N+1 column
+        terminal_year = {
+            'gpr': round(terminal_gpr, 2),
+            'vacancy_loss': round(terminal_vacancy, 2),
+            'credit_loss': round(terminal_credit_loss, 2),
+            'other_income': round(terminal_other_income, 2),
+            'egi': round(terminal_egi, 2),
+            'base_opex': round(terminal_base_opex, 2),
+            'management_fee': round(terminal_mgmt_fee, 2),
+            'replacement_reserves': round(terminal_reserves, 2),
+            'total_opex': round(terminal_total_opex, 2),
+            'noi': round(terminal_annual_noi, 2),
+        }
+
+        if reno_schedule:
+            terminal_year['reno_vacancy_loss'] = round(terminal_reno_vacancy, 2)
+            terminal_year['reno_rent_premium'] = round(terminal_reno_premium, 2)
+            # No CapEx or relocation in terminal year (renovations complete)
+            terminal_year['reno_capex'] = 0.0
+            terminal_year['relocation_cost'] = 0.0
+
+        # ================================================================
+        # Back-patch the LAST month with net_reversion and total_cash_flow
+        # so the grid can show reversion as a Year N cash flow event.
+        # ================================================================
+        last_proj = projections[-1]
+        last_pv_factor = last_proj['pv_factor']
+        last_noi = last_proj['noi']
+        last_proj['net_reversion'] = round(net_reversion, 2)
+        last_proj['total_cash_flow'] = round(last_noi + net_reversion, 2)
+        last_proj['pv_cash_flow'] = round((last_noi + net_reversion) * last_pv_factor, 2)
+
+        # Calculate present value = sum of discounted total cash flows
+        # (NOI for months 1..N-1, NOI + reversion for month N)
+        present_value = sum(p['pv_cash_flow'] for p in projections)
 
         # Calculate IRR using numpy-financial (with monthly cash flows)
         irr = self._calculate_monthly_irr(noi_series, net_reversion, present_value)
@@ -583,17 +915,22 @@ class DCFCalculationService:
             noi_series=[sum(noi_series[i*12:(i+1)*12]) for i in range(hold_period)],  # Annual NOIs
             base_discount_rate=discount_rate,
             base_exit_cap_rate=terminal_cap_rate,
-            income_growth_rate=income_growth_rate,
+            terminal_noi=terminal_annual_noi,
             selling_costs_pct=selling_costs_pct,
             discount_interval=float(assumptions.get('discount_rate_interval', 0.005)),
             cap_interval=float(assumptions.get('cap_rate_interval', 0.005)),
         )
 
-        return {
+        # Get analysis_purpose for frontend label selection
+        analysis_purpose = getattr(project, 'analysis_purpose', None) or 'VALUATION'
+
+        result = {
             'project_id': self.project_id,
             'period_type': 'monthly',
             'start_date': start_date.isoformat(),
             'total_periods': total_months,
+            'value_add_enabled': reno_schedule is not None,
+            'analysis_purpose': analysis_purpose,
             'assumptions': {
                 'hold_period_years': hold_period,
                 'discount_rate': discount_rate,
@@ -614,9 +951,28 @@ class DCFCalculationService:
             },
             'projections': projections,
             'exit_analysis': exit_analysis,
+            'terminal_year': terminal_year,
             'metrics': metrics,
             'sensitivity_matrix': sensitivity_matrix,
         }
+
+        if reno_schedule:
+            result['exit_analysis']['terminal_is_post_reno'] = terminal_is_post_reno
+            result['exit_analysis']['terminal_reno_premium'] = round(terminal_reno_premium, 2)
+            result['renovation_schedule'] = {
+                'units_to_renovate': reno_schedule['units_to_renovate'],
+                'total_reno_cost': round(sum(reno_schedule['reno_cost']), 2),
+                'total_relocation_cost': round(sum(reno_schedule['relocation_cost']), 2),
+                'total_vacancy_loss': round(sum(reno_schedule['reno_vacancy_loss']), 2),
+                'total_rent_premium': round(sum(reno_schedule['rent_premium_gain']), 2),
+                'program_duration_months': max(
+                    (m for m in range(len(reno_schedule['units_renovated']))
+                     if reno_schedule['units_renovated'][m] < reno_schedule['units_to_renovate']),
+                    default=0
+                ) + 1 if reno_schedule['units_to_renovate'] > 0 else 0,
+            }
+
+        return result
 
     def _calculate_monthly_irr(
         self,
