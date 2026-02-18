@@ -1277,6 +1277,108 @@ def compare_rent_roll(request, project_id: int):
 
 
 @csrf_exempt
+@require_http_methods(["POST"])
+def compute_rent_roll_delta_view(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/rent-roll/delta/
+
+    Compute delta between an uploaded rent roll file and existing data
+    using deterministic Excel parsing (no AI tokens).
+    """
+    from ..services.delta_computation import compute_rent_roll_delta
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    document_id = body.get('document_id')
+    mappings = body.get('mappings', [])
+
+    if not document_id:
+        return JsonResponse({'success': False, 'error': 'document_id is required'}, status=400)
+    if not mappings:
+        return JsonResponse({'success': False, 'error': 'mappings array is required'}, status=400)
+
+    result = compute_rent_roll_delta(
+        project_id=int(project_id),
+        document_id=int(document_id),
+        mappings=mappings,
+    )
+
+    status_code = 200 if result.get('success') else 400
+    return JsonResponse(result, status=status_code)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_pending_rent_roll_changes_view(request, project_id: int):
+    """
+    GET /api/knowledge/projects/{project_id}/rent-roll/pending-changes/
+
+    Fetch any pending rent roll deltas for the grid to highlight.
+    """
+    from ..services.delta_computation import get_pending_rent_roll_changes
+
+    result = get_pending_rent_roll_changes(int(project_id))
+    return JsonResponse(result)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def apply_rent_roll_delta_view(request, project_id: int):
+    """
+    POST /api/knowledge/projects/{project_id}/rent-roll/apply-delta/
+
+    Apply accepted delta changes to production data.
+    Creates a snapshot for rollback.
+    """
+    from ..services.delta_computation import apply_rent_roll_delta
+
+    try:
+        body = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+    extraction_ids = body.get('extraction_ids', [])
+    decisions = body.get('decisions', {})
+
+    if not extraction_ids:
+        return JsonResponse({'success': False, 'error': 'extraction_ids is required'}, status=400)
+
+    # Default all to 'accept' if no decisions provided
+    if not decisions:
+        decisions = {str(eid): 'accept' for eid in extraction_ids}
+
+    result = apply_rent_roll_delta(
+        project_id=int(project_id),
+        extraction_ids=extraction_ids,
+        decisions=decisions,
+    )
+
+    # Clear the awaiting_delta_review flag so extraction tools
+    # stop being force-included on subsequent Landscaper turns
+    if result.get('success'):
+        try:
+            from ..models import ExtractionJob
+            flagged_jobs = ExtractionJob.objects.filter(
+                project_id=int(project_id),
+                result_summary__awaiting_delta_review=True,
+            )
+            for job in flagged_jobs:
+                job.result_summary['awaiting_delta_review'] = False
+                job.save(update_fields=['result_summary'])
+        except Exception as flag_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[apply_delta] Failed to clear awaiting_delta_review flag: {flag_err}"
+            )
+
+    status_code = 200 if result.get('success') else 400
+    return JsonResponse(result, status=status_code)
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def list_rent_roll_snapshots(request, project_id: int):
     """

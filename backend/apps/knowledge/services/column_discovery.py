@@ -46,10 +46,13 @@ class MappingConfidence(Enum):
 
 class MappingAction(Enum):
     """Suggested action for column mapping."""
-    AUTO = "auto"           # High confidence, will map automatically
-    SUGGEST = "suggest"     # Medium confidence, user should confirm
-    NEEDS_INPUT = "needs_input"  # Low/no confidence, user must decide
-    SKIP = "skip"           # User chose to skip
+    AUTO = "auto"                    # High confidence, will map automatically
+    SUGGEST = "suggest"              # Medium confidence, user should confirm
+    NEEDS_INPUT = "needs_input"      # Low/no confidence, user must decide
+    SPLIT_REQUIRED = "split_required"  # Compound column needing split (e.g., BD/BA)
+    NON_STANDARD = "non_standard"    # Candidate for dynamic column creation
+    SKIP_SUGGESTED = "skip_suggested"  # Computed total or redundant — suggest skip
+    SKIP = "skip"                    # User chose to skip
 
 
 @dataclass
@@ -185,6 +188,78 @@ TYPE_PATTERNS = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Unit Row Validation — shared filter for consistent counts
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Regex for valid unit numbers — at least 1 digit, typically 1-5 digits
+# e.g., "101", "201A", "2-BR", "A1"
+_VALID_UNIT_NUMBER_PATTERN = re.compile(r'^\d{1,5}[A-Za-z]?$')
+
+# Known non-unit values that appear in the Unit column
+_NON_UNIT_HEADER_VALUES = frozenset({
+    'unit', 'unit #', 'unit no', 'apt', 'apt #',
+    'total', 'totals', 'subtotal', 'grand total',
+})
+
+
+def is_valid_unit_row(row: List[Any], unit_col_idx: Optional[int]) -> bool:
+    """
+    Determine whether a data row represents a real unit.
+    Excludes:
+      - Rows where the Unit column is null, empty, or whitespace-only
+      - Header echo rows (value matches known header labels)
+      - Property name / address strings (non-numeric, long text)
+      - Subtotal / summary rows
+    Used consistently in column_discovery and delta_computation.
+    """
+    if unit_col_idx is None:
+        return True  # Can't filter without knowing which column is Unit
+
+    if unit_col_idx >= len(row):
+        return False
+
+    raw = str(row[unit_col_idx]).strip() if row[unit_col_idx] else ''
+    if not raw or raw.lower() in ('', 'none', 'nan'):
+        return False
+
+    lower = raw.lower()
+
+    # Reject known header/label values
+    if lower in _NON_UNIT_HEADER_VALUES:
+        return False
+
+    # Reject long text (property name rows, addresses, etc.)
+    if len(raw) > 10:
+        return False
+
+    # Must contain at least one digit (unit numbers always do)
+    if not any(ch.isdigit() for ch in raw):
+        return False
+
+    return True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exclusion prefix list — columns that should NOT match standard fields
+# ─────────────────────────────────────────────────────────────────────────────
+
+EXCLUSION_PREFIXES = [
+    'delinquent',
+    'past due',
+    'balance',
+    'outstanding',
+    'total',
+    'subtotal',
+    'ytd',
+    'received',
+    'collected',
+]
+
+# Section 8 detection patterns for Tags/mixed-value columns
+SECTION_8_PATTERNS = ['sec. 8', 'section 8', 'sec8', 's8', 'hcv', 'housing choice']
+
+
 def discover_columns(
     storage_uri: str,
     mime_type: Optional[str] = None,
@@ -260,23 +335,54 @@ def discover_columns(
 
         warnings.extend(parse_warnings)
 
+        # Identify the Unit column index for row filtering
+        # Quick scan: find the most likely unit_number column
+        unit_col_idx_for_filter = None
+        for idx, header in enumerate(headers):
+            if header.lower().strip() in ('unit', 'unit #', 'unit no', 'unit number', 'apt', 'apt #'):
+                unit_col_idx_for_filter = idx
+                break
+
+        # Filter data rows to only valid unit rows (Bug fix: excludes property name rows, subtotals)
+        if unit_col_idx_for_filter is not None:
+            valid_data_rows = [row for row in data_rows if is_valid_unit_row(row, unit_col_idx_for_filter)]
+            excluded_count = len(data_rows) - len(valid_data_rows)
+            if excluded_count > 0:
+                warnings.append(f"Excluded {excluded_count} non-unit rows (property headers, totals, or blanks)")
+                logger.info(f"[discover_columns] Filtered {excluded_count} non-unit rows, {len(valid_data_rows)} valid units remain")
+        else:
+            valid_data_rows = data_rows
+
         # Build column mappings
         columns = []
         for idx, header in enumerate(headers):
-            sample_values = _get_sample_values(data_rows, idx, max_samples=5)
+            sample_values = _get_sample_values(valid_data_rows, idx, max_samples=5)
             proposed_target, confidence = _match_column_to_field(header, sample_values)
             data_type = _infer_data_type(header, sample_values)
 
-            # Determine action based on confidence
-            if confidence == MappingConfidence.HIGH:
+            # Check for compound columns first (BD/BA pattern)
+            compound_info = _detect_compound_column(header, sample_values)
+            if compound_info:
+                action = MappingAction.SPLIT_REQUIRED
+                notes = compound_info['note']
+                # Override proposed_target — compound columns don't map to a single field
+                proposed_target = None
+            elif _should_suggest_skip(header, sample_values):
+                action = MappingAction.SKIP_SUGGESTED
+                notes = f"Looks like a computed total or summary column — recommend skipping"
+            elif confidence == MappingConfidence.HIGH:
                 action = MappingAction.AUTO
+                notes = _generate_mapping_notes(header, proposed_target, confidence, data_type)
             elif confidence == MappingConfidence.MEDIUM:
                 action = MappingAction.SUGGEST
+                notes = _generate_mapping_notes(header, proposed_target, confidence, data_type)
+            elif confidence == MappingConfidence.NONE and proposed_target is None:
+                # No match — check if it's a candidate for dynamic column
+                action = MappingAction.NON_STANDARD
+                notes = _generate_mapping_notes(header, proposed_target, confidence, data_type)
             else:
                 action = MappingAction.NEEDS_INPUT
-
-            # Generate notes
-            notes = _generate_mapping_notes(header, proposed_target, confidence, data_type)
+                notes = _generate_mapping_notes(header, proposed_target, confidence, data_type)
 
             columns.append(ColumnMapping(
                 source_column=header,
@@ -291,7 +397,7 @@ def discover_columns(
 
         return DiscoveryResult(
             file_name=file_name or "unknown",
-            total_rows=len(data_rows),
+            total_rows=len(valid_data_rows),
             total_columns=len(headers),
             columns=columns,
             parse_warnings=warnings,
@@ -440,6 +546,16 @@ def _match_column_to_field(
         return None, MappingConfidence.NONE
 
     normalized = column_name.lower().strip()
+    # Strip punctuation for prefix matching (e.g., "Delinquent Rent as of 9/30/2025")
+    normalized_clean = re.sub(r'[^\w\s]', ' ', normalized).strip()
+
+    # EXCLUSION CHECK — skip standard field matching if column starts with an
+    # exclusion prefix. These columns contain keywords like "rent" or "balance"
+    # but are NOT standard rent roll fields (they're delinquency, YTD totals, etc.)
+    for prefix in EXCLUSION_PREFIXES:
+        if normalized_clean.startswith(prefix):
+            logger.info(f"[_match_column_to_field] '{column_name}' excluded by prefix '{prefix}' — skipping standard mapping")
+            return None, MappingConfidence.NONE
 
     # Check exact matches first (HIGH confidence)
     for field, config in STANDARD_FIELDS.items():
@@ -464,6 +580,58 @@ def _match_column_to_field(
 
     # No match found
     return None, MappingConfidence.NONE
+
+
+# Patterns for compound columns requiring splitting
+COMPOUND_PATTERNS = [
+    {
+        'pattern': re.compile(r'bd\s*/\s*ba|bed\s*/\s*bath|br\s*/\s*ba', re.IGNORECASE),
+        'output_fields': [
+            {'name': 'bedrooms', 'type': 'number', 'label': 'Beds (integer)'},
+            {'name': 'bathrooms', 'type': 'number', 'label': 'Baths (decimal)'},
+        ],
+        'note': 'Compound Bed/Bath column — splits into Beds (integer) + Baths (decimal). Plan auto-derives from Bed/Bath.',
+    },
+]
+
+# Patterns for columns that should be skipped (computed totals, summaries)
+SKIP_PATTERNS = re.compile(
+    r'total\b|subtotal|sum\b|grand\s*total|balance\s*due|amount\s*due',
+    re.IGNORECASE,
+)
+
+
+def _detect_compound_column(column_name: str, sample_values: List[str]) -> Optional[Dict[str, Any]]:
+    """Detect if a column is compound (e.g., BD/BA) and needs splitting."""
+    for compound in COMPOUND_PATTERNS:
+        if compound['pattern'].search(column_name):
+            return {
+                'output_fields': compound['output_fields'],
+                'note': compound['note'],
+            }
+
+    # Also detect by sample values: patterns like "3/2.00", "2/1.5"
+    bd_ba_value_pattern = re.compile(r'^\d+\s*/\s*\d+\.?\d*$')
+    if sample_values and sum(1 for v in sample_values if bd_ba_value_pattern.match(v)) >= len(sample_values) * 0.5:
+        return {
+            'output_fields': [
+                {'name': 'bedrooms', 'type': 'number', 'label': 'Beds (integer)'},
+                {'name': 'bathrooms', 'type': 'number', 'label': 'Baths (decimal)'},
+            ],
+            'note': 'Values follow N/N.NN pattern — likely Bed/Bath. Splits into Beds + Baths.',
+        }
+
+    return None
+
+
+def _should_suggest_skip(column_name: str, sample_values: List[str]) -> bool:
+    """Detect if a column is a computed total or summary that should be skipped."""
+    if SKIP_PATTERNS.search(column_name):
+        return True
+    # Check for "received" + date pattern in column name (e.g., "Sept. Total Rent Received")
+    if re.search(r'(total|sum)\s+(rent\s+)?received', column_name, re.IGNORECASE):
+        return True
+    return False
 
 
 def _infer_data_type(column_name: str, sample_values: List[str]) -> str:
@@ -659,6 +827,7 @@ def apply_column_mapping(
     project_id: int,
     document_id: int,
     mappings: List[Dict[str, Any]],
+    section8_source_column: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Apply column mapping decisions and queue an extraction job.
@@ -675,6 +844,9 @@ def apply_column_mapping(
             - create_dynamic: bool (optional)
             - dynamic_column_name: str (optional, if create_dynamic)
             - data_type: str (optional, if create_dynamic)
+        section8_source_column: Optional source column name containing Sec 8
+            indicators. When provided, creates an 'is_section_8' boolean
+            dynamic column extracted from this column's values.
 
     Returns:
         Dict with: success, job_id, job_status, dynamic_columns_created,
@@ -736,6 +908,30 @@ def apply_column_mapping(
             'created': created,
         })
 
+    # Create Section 8 boolean flag column if requested
+    if section8_source_column:
+        sec8_key = 'is_section_8'
+        sec8_def, sec8_created = DynamicColumnDefinition.objects.get_or_create(
+            project_id=project_id,
+            table_name='multifamily_unit',
+            column_key=sec8_key,
+            defaults={
+                'display_label': 'Section 8',
+                'data_type': 'boolean',
+                'source': 'user',
+                'is_proposed': False,
+                'proposed_from_document_id': document_id,
+            }
+        )
+        created_columns.append({
+            'id': sec8_def.id,
+            'column_key': sec8_key,
+            'display_label': 'Section 8',
+            'source_column': section8_source_column,
+            'created': sec8_created,
+            'is_section_8_flag': True,
+        })
+
     # Check for existing active job for this document
     existing_job = ExtractionJob.objects.filter(
         project_id=project_id,
@@ -761,10 +957,16 @@ def apply_column_mapping(
             'standard_mappings': standard_mappings,
             'dynamic_columns': [c for c in created_columns],
             'skipped_columns': skipped_columns,
+            **(({'section8_source_column': section8_source_column} if section8_source_column else {})),
         }
     )
 
-    def run_extraction_async(job_id: int, proj_id: int, doc_id: int):
+    # Check existing unit count before extraction to determine auto-commit
+    from apps.multifamily.models import MultifamilyUnit
+    existing_unit_count = MultifamilyUnit.objects.filter(project_id=project_id).count()
+    is_initial_load = existing_unit_count == 0
+
+    def run_extraction_async(job_id: int, proj_id: int, doc_id: int, auto_commit: bool):
         """Background thread to run extraction without blocking."""
         import django
         django.db.connections.close_all()
@@ -774,7 +976,7 @@ def apply_column_mapping(
             from apps.knowledge.models import ExtractionJob as EJ
 
             job = EJ.objects.get(job_id=job_id)
-            logger.info(f"[async_extraction] Starting extraction for job {job_id}, doc {doc_id}")
+            logger.info(f"[async_extraction] Starting extraction for job {job_id}, doc {doc_id} (auto_commit={auto_commit})")
 
             job.status = 'processing'
             job.started_at = timezone.now()
@@ -799,6 +1001,40 @@ def apply_column_mapping(
             job.save()
             logger.info(f"[async_extraction] Completed job {job_id}: {extract_result.get('units_extracted', 0)} units")
 
+            # Auto-commit for initial loads (no existing units before extraction)
+            if auto_commit:
+                try:
+                    from django.db import connection as conn
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT extraction_id FROM landscape.ai_extraction_staging
+                            WHERE project_id = %s AND scope = 'unit' AND status = 'pending'
+                        """, [proj_id])
+                        extraction_ids = [row[0] for row in cursor.fetchall()]
+
+                    if extraction_ids:
+                        from apps.documents.views import commit_staging_data_internal
+                        decisions = {str(eid): {'action': 'accept'} for eid in extraction_ids}
+                        commit_result, _ = commit_staging_data_internal(
+                            project_id=proj_id,
+                            extraction_ids=extraction_ids,
+                            decisions=decisions,
+                            user=None,
+                            create_snapshot=True,
+                        )
+                        job.result_summary['auto_committed'] = True
+                        job.result_summary['units_committed'] = commit_result.get('units_affected', 0)
+                        job.result_summary['snapshot_id'] = commit_result.get('snapshot_id')
+                        job.save()
+                        logger.info(
+                            f"[async_extraction] Auto-committed {commit_result.get('units_affected', 0)} units "
+                            f"for initial load (job {job_id})"
+                        )
+                except Exception as commit_err:
+                    logger.exception(f"[async_extraction] Auto-commit failed for job {job_id}: {commit_err}")
+                    job.result_summary['auto_commit_error'] = str(commit_err)
+                    job.save()
+
         except Exception as e:
             logger.exception(f"[async_extraction] Failed for job {job_id}: {e}")
             try:
@@ -813,22 +1049,27 @@ def apply_column_mapping(
     # Start background thread
     thread = threading.Thread(
         target=run_extraction_async,
-        args=(job.job_id, project_id, document_id),
+        args=(job.job_id, project_id, document_id, is_initial_load),
         daemon=False,
         name=f"extraction-job-{job.job_id}"
     )
     thread.start()
 
-    logger.info(f"[apply_column_mapping] Started async extraction job {job.job_id}")
+    logger.info(f"[apply_column_mapping] Started async extraction job {job.job_id} (initial_load={is_initial_load})")
 
     return {
         'success': True,
         'job_id': job.job_id,
         'job_status': 'queued',
-        'dynamic_columns_created': len([c for c in created_columns if c.get('created')]),
-        'standard_mappings': len(standard_mappings),
-        'skipped_columns': len(skipped_columns),
-        'message': 'Extraction started. Poll job status for progress.',
+        'is_initial_load': is_initial_load,
+        'dynamic_columns_created': created_columns,
+        'standard_mappings_count': len(standard_mappings),
+        'skipped_columns': skipped_columns,
+        'message': (
+            'Extraction started. Data will be auto-committed (initial load).'
+            if is_initial_load
+            else 'Extraction started. Changes will be staged for review.'
+        ),
     }
 
 
@@ -1012,12 +1253,14 @@ def suggest_import_action(existing: dict, comparison: Optional[dict]) -> dict:
 
 
 def _extract_unit_numbers_from_data(data_rows: List[List[Any]], unit_col_idx: Optional[int]) -> list:
-    """Extract unit numbers from parsed file data."""
+    """Extract unit numbers from parsed file data, filtering to valid unit rows only."""
     if unit_col_idx is None:
         return []
 
     unit_numbers = []
     for row in data_rows:
+        if not is_valid_unit_row(row, unit_col_idx):
+            continue
         if unit_col_idx < len(row):
             val = str(row[unit_col_idx]).strip()
             if val and val.lower() not in ('', 'none', 'nan'):
@@ -1378,6 +1621,9 @@ def discover_columns_enhanced(
         'summary': {
             'total_columns': len(result.columns),
             'auto_mapped_count': len([c for c in result.columns if c.action == MappingAction.AUTO.value]),
+            'split_required_count': len([c for c in result.columns if c.action == MappingAction.SPLIT_REQUIRED.value]),
+            'non_standard_count': len([c for c in result.columns if c.action == MappingAction.NON_STANDARD.value]),
+            'skip_suggested_count': len([c for c in result.columns if c.action == MappingAction.SKIP_SUGGESTED.value]),
             'unmapped_count': len([c for c in result.columns if c.proposed_target is None]),
             'existing_unit_count': existing_analysis.get('unit_count', 0),
             'file_unit_count': len(file_unit_numbers),
@@ -1425,18 +1671,34 @@ def format_discovery_for_chat(discovery_result: dict) -> str:
         for opt in suggested['options']:
             parts.append(f"  {opt['key']}) {opt['label']}")
 
-    # 2. Column mapping — compact, no sample data
+    # 2. Column mapping — grouped by action type
     columns = discovery_result.get('columns', [])
     auto_mapped = []
     needs_confirm = []
+    split_required = []
+    non_standard = []
+    skip_suggested = []
     unmapped = []
+
     for col in columns:
         name = col.get('source_column', '')
         target = col.get('proposed_target', '')
-        confidence = col.get('confidence', '')
-        if confidence == 'high' and target:
+        action = col.get('action', '')
+        samples = col.get('sample_values', [])
+        notes = col.get('notes', '')
+
+        if action == 'split_required':
+            sample_str = f" (samples: {', '.join(samples[:3])})" if samples else ''
+            split_required.append(f"{name}{sample_str} — {notes}")
+        elif action == 'skip_suggested':
+            skip_suggested.append(f"{name} — {notes}")
+        elif action == 'non_standard':
+            sample_str = f" (samples: {', '.join(samples[:3])})" if samples else ''
+            dtype = col.get('data_type_hint', 'text')
+            non_standard.append(f"{name}{sample_str} [{dtype}]")
+        elif action == 'auto' and target:
             auto_mapped.append(f"{name} -> {target}")
-        elif confidence == 'medium' and target:
+        elif action == 'suggest' and target:
             needs_confirm.append(f"{name} -> {target}")
         elif not target:
             unmapped.append(name)
@@ -1445,8 +1707,39 @@ def format_discovery_for_chat(discovery_result: dict) -> str:
         parts.append(f"AUTO-MAPPED: {', '.join(auto_mapped)}")
     if needs_confirm:
         parts.append(f"NEEDS CONFIRM: {', '.join(needs_confirm)}")
+    if split_required:
+        parts.append(f"SPLIT REQUIRED: {'; '.join(split_required)}")
+    if non_standard:
+        parts.append(f"NON-STANDARD (dynamic column candidates): {'; '.join(non_standard)}")
+    if skip_suggested:
+        parts.append(f"SKIP SUGGESTED: {'; '.join(skip_suggested)}")
     if unmapped:
         parts.append(f"UNMAPPED: {', '.join(unmapped)}")
+
+    # Section 8 detection — scan NON_STANDARD columns for mixed-value fields
+    # that contain Section 8 indicators (Tags, Additional Tags, etc.)
+    for col in columns:
+        action = col.get('action', '')
+        if action not in ('non_standard', 'needs_input'):
+            continue
+        samples = col.get('sample_values', [])
+        name = col.get('source_column', '')
+        if not samples:
+            continue
+        # Check if any sample contains Section 8 patterns
+        has_sec8 = any(
+            any(pat in val.lower() for pat in SECTION_8_PATTERNS)
+            for val in samples if val
+        )
+        if has_sec8:
+            parts.append(
+                f"❓ {name} → Contains mixed values including 'Sec. 8' indicators.\n"
+                f"   I can:\n"
+                f"   (1) Create a 'Section 8' boolean flag (Y/N) extracted from this column\n"
+                f"   (2) Create a raw '{name}' text column with the full value\n"
+                f"   (3) Both — Section 8 flag + {name} column\n"
+                f"   What would you like?"
+            )
 
     # 3. Plan field — counts only
     plan = discovery_result.get('plan_analysis') or {}
