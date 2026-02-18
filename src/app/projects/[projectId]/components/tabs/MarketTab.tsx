@@ -18,6 +18,7 @@ import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import MarketMapView from '@/app/components/Market/MarketMapView';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import PropertyTab from './PropertyTab';
+import SfCompsTile from '@/components/analysis/SfCompsTile';
 
 interface Project {
   project_id: number;
@@ -264,6 +265,19 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
     return compName;
   };
 
+  const getCompetitorStatusColor = (status?: string | null) => {
+    switch (status) {
+      case 'selling':
+        return '#198754';
+      case 'sold_out':
+        return '#6c757d';
+      case 'planned':
+        return '#0dcaf0';
+      default:
+        return '#dc3545';
+    }
+  };
+
   const getLotLabel = (comp: MarketCompetitiveProject) => {
     const product = comp.products?.find(p =>
       p.lot_dimensions || p.lot_width_ft || p.unit_size_avg_sf || p.unit_size_min_sf || p.unit_size_max_sf
@@ -336,19 +350,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-market-row="pricing">
         {/* Left Column - SFD Pricing */}
         <div>
-          <CCard>
-            <CCardHeader>
-              <div className="d-flex align-items-center gap-2">
-                <LandscaperIcon size={18} />
-                <span className="fw-semibold">SFD Pricing</span>
-              </div>
-            </CCardHeader>
-            <CCardBody>
-              <p className="mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
-                Napkin pricing has been retired. Use competitive project pricing and market map data below.
-              </p>
-            </CCardBody>
-          </CCard>
+          <SfCompsTile projectId={projectId} title="SFD Pricing" />
         </div>
 
         {/* Right Column - Landscaper Analysis */}
@@ -648,7 +650,19 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                           onClick={() => comp.id && setSelectedCompetitorId(comp.id)}
                         >
                           <span className="text-sm font-medium truncate" style={{ color: 'var(--cui-body-color)' }}>
-                            {getSubdivisionName(comp)}
+                            <span className="d-inline-flex align-items-center gap-2">
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  backgroundColor: getCompetitorStatusColor(comp.status),
+                                  border: '1px solid rgba(0,0,0,0.08)',
+                                  flexShrink: 0
+                                }}
+                              />
+                              {getSubdivisionName(comp)}
+                            </span>
                           </span>
                           <span className="text-sm truncate" style={{ color: 'var(--cui-secondary-color)' }}>
                             {comp.builder_name || '-'}

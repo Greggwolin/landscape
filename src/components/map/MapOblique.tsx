@@ -6,9 +6,21 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useRef, forwardRef, useImperativeHandle, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  createContext,
+  useContext,
+} from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
+import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
 
 const METERS_PER_STORY = 3.2;
 
@@ -45,6 +57,7 @@ export interface MapObliqueProps {
  onFeatureClick?: (featureId?: string) => void;
  showExtrusions?: boolean; // Toggle between 3D buildings and flat markers (default true)
  onMapClick?: (lngLat: [number, number]) => void;
+ children?: React.ReactNode;
 }
 
 export interface MapObliqueRef {
@@ -73,6 +86,10 @@ const buildHeightExpr = (featureColor?: string) => {
  };
 };
 
+const MapObliqueContext = createContext<maplibregl.Map | null>(null);
+
+export const useMapOblique = () => useContext(MapObliqueContext);
+
 export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  function MapOblique(
  {
@@ -86,13 +103,15 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  markers = [],
  onFeatureClick,
  showExtrusions = true,
- onMapClick
+ onMapClick,
+ children
  },
  ref
  ) {
  const mapRef = useRef<maplibregl.Map | null>(null);
  const containerRef = useRef<HTMLDivElement | null>(null);
  const [mapLoaded, setMapLoaded] = useState(false);
+ const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
 
  useImperativeHandle(
  ref,
@@ -123,67 +142,24 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  useEffect(() => {
  if (!containerRef.current) return;
 
- // Check if styleUrl is a full URL (MapTiler) or shorthand (aerial)
+ // Resolve style: google-* shorthand, aerial shorthand, or full URL
+ registerGoogleProtocol();
  let mapStyle: string | maplibregl.StyleSpecification;
 
- if (styleUrl.startsWith('http://') || styleUrl.startsWith('https://')) {
+ const googlePrefix = 'google-';
+ if (styleUrl.startsWith(googlePrefix)) {
+ // Google Map Tiles: google-roadmap, google-satellite, google-terrain, google-hybrid
+ const googleType = styleUrl.slice(googlePrefix.length) as GoogleBasemapType;
+ mapStyle = getGoogleBasemapStyle(googleType);
+ } else if (styleUrl === 'aerial') {
+ // Legacy: ESRI World Imagery with labels — now use Google hybrid instead
+ mapStyle = getGoogleBasemapStyle('hybrid');
+ } else if (styleUrl.startsWith('http://') || styleUrl.startsWith('https://')) {
  // Use the URL directly (e.g., MapTiler)
  mapStyle = styleUrl;
- } else if (styleUrl === 'aerial') {
- // Build aerial imagery style (ESRI World Imagery) with street labels
- mapStyle = {
- version: 8,
- sources: {
- 'satellite': {
- type: 'raster',
- tiles: [
- 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
- ],
- tileSize: 256,
- attribution: 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
- },
- 'labels': {
- type: 'raster',
- tiles: [
- 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
- ],
- tileSize: 256
- },
- 'boundaries': {
- type: 'raster',
- tiles: [
- 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
- ],
- tileSize: 256
- }
- },
- layers: [
- {
- id: 'satellite',
- type: 'raster',
- source: 'satellite',
- minzoom: 0,
- maxzoom: 22
- },
- {
- id: 'labels',
- type: 'raster',
- source: 'labels',
- minzoom: 0,
- maxzoom: 22
- },
- {
- id: 'boundaries',
- type: 'raster',
- source: 'boundaries',
- minzoom: 0,
- maxzoom: 22
- }
- ]
- };
  } else {
- // Default to ESRI if unknown
- mapStyle = styleUrl;
+ // Default to Google roadmap
+ mapStyle = getGoogleBasemapStyle('roadmap');
  }
 
  const map = new maplibregl.Map({
@@ -194,7 +170,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  pitch,
  bearing,
  antialias: true,
- scrollZoom: false,
+ scrollZoom: true,
  });
 
  map.on('load', () => {
@@ -217,11 +193,13 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  }
 
  mapRef.current = map;
+ setMapInstance(map);
 
  return () => {
  map.remove();
  mapRef.current = null;
  setMapLoaded(false);
+ setMapInstance(null);
  };
  }, [styleUrl]);
  // Only recreate map if styleUrl changes
@@ -234,7 +212,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  if (!map || !mapLoaded) return;
 
  // Remove existing line layers and sources
- const existingLayers = map.getStyle().layers || [];
+ const lineStyle = map.getStyle();
+ const existingLayers = lineStyle?.layers || [];
  for (const layer of existingLayers) {
  if (layer.id.endsWith('-line')) {
  map.removeLayer(layer.id);
@@ -271,8 +250,9 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  if (!map || !mapLoaded) return;
 
  // Remove existing extrusion layers and sources
- const existingLayers = map.getStyle().layers || [];
- for (const layer of existingLayers) {
+ const extStyle = map.getStyle();
+ const existingExtLayers = extStyle?.layers || [];
+ for (const layer of existingExtLayers) {
  if (layer.id.endsWith('-fill')) {
  map.removeLayer(layer.id);
  const sourceId = layer.id.replace('-fill', '');
@@ -423,6 +403,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  }, [markers, showExtrusions, onFeatureClick, mapLoaded]);
 
  return (
+ <MapObliqueContext.Provider value={mapInstance}>
+ <>
  <div
  ref={containerRef}
  style={{
@@ -432,6 +414,9 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  overflow: 'hidden'
  }}
  />
+ {children}
+ </>
+ </MapObliqueContext.Provider>
  );
  }
 );

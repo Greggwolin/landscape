@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { parcelLoader } from '../../utils/parcelLoader'
 import { geocodeLocation, getZoomLevel, type GeocodingResult } from '../../../lib/geocoding'
-import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol'
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps'
 
 interface GISMapProps {
  projectId: number
@@ -171,9 +172,10 @@ const GISMap: React.FC<GISMapProps> = ({
 
  const createMap = () => {
  try {
+ registerGoogleProtocol()
  map.current = new maplibregl.Map({
  container: mapContainer.current!,
- style: getEsriHybridStyle(),
+ style: getGoogleBasemapStyle('hybrid'),
  center: geocodingResult
  ? [geocodingResult.longitude, geocodingResult.latitude]
  : [-111.927912, 33.028911], // Default: Anderson Road & Farrell Road intersection

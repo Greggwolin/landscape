@@ -377,6 +377,28 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Comparable Markers
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-marker {
+  width: 30px;
+  height: 30px;
+  display: block;
+  cursor: pointer;
+}
+
+.map-tab-marker svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+  transition: transform 0.15s ease;
+}
+
+.map-tab-marker:hover svg {
+  transform: scale(1.1);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Demographics Panel (at bottom of map area)
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -655,4 +677,75 @@
 
 .mapbox-gl-draw_ctrl-draw-btn {
   display: none !important; /* We use our own toolbar */
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Parcel Click Popups
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-popup .maplibregl-popup-content {
+  background: var(--cui-card-bg, #1a1a24);
+  color: var(--cui-body-color, #e5e5e5);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.map-tab-popup .maplibregl-popup-close-button {
+  color: var(--cui-secondary-color, #9ca3af);
+  font-size: 18px;
+  padding: 4px 8px;
+}
+
+.map-tab-popup .maplibregl-popup-close-button:hover {
+  color: var(--cui-body-color, #e5e5e5);
+  background: transparent;
+}
+
+.map-tab-popup .maplibregl-popup-tip {
+  border-top-color: var(--cui-card-bg, #1a1a24);
+}
+
+.map-tab-popup-content strong {
+  color: var(--cui-secondary-color, #9ca3af);
+  font-weight: 500;
+}
+
+/* Comparable Popup Content (match Location Intelligence map) */
+.comparable-popup-content {
+  padding: 12px;
+  min-width: 180px;
+}
+
+.comparable-popup-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 0.95em;
+}
+
+.comparable-popup-address {
+  font-size: 0.85em;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 2px;
+}
+
+.comparable-popup-details {
+  font-size: 0.85em;
+  color: var(--cui-body-color, #d1d5db);
+}
+
+.comparable-popup-rent {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--cui-body-color, #f9fafb);
+  margin-top: 6px;
+}
+
+.comparable-popup-distance {
+  font-size: 0.8em;
+  color: var(--cui-tertiary-color, var(--cui-secondary-color, #6b7280));
+  margin-top: 4px;
 }

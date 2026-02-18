@@ -59,6 +59,7 @@ export interface LayerVisibility {
   rings: boolean;
   userPoints: boolean;
   satellite: boolean;
+  hybrid: boolean;
 }
 
 // Props for the LocationMap component
@@ -69,6 +70,7 @@ export interface LocationMapProps {
   layers: LayerVisibility;
   selectedRadius: number | null;
   onMapClick?: (lngLat: [number, number]) => void;
+  onRingClick?: (ring: RingDemographics, lngLat: [number, number]) => void;
   onPointClick?: (point: UserMapPoint) => void;
   isAddingPoint?: boolean;
   resizeToken?: number;

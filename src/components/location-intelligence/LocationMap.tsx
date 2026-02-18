@@ -12,6 +12,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import type { LocationMapProps } from './types';
 import { RING_COLORS, POINT_CATEGORIES } from './constants';
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const CENTER_SOURCE_ID = 'center-point';
@@ -26,6 +28,7 @@ export function LocationMap({
   layers,
   selectedRadius,
   onMapClick,
+  onRingClick,
   onPointClick,
   isAddingPoint = false,
   resizeToken = 0,
@@ -34,7 +37,12 @@ export function LocationMap({
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const onMapClickRef = useRef(onMapClick);
+  const onRingClickRef = useRef(onRingClick);
+  const ringsRef = useRef(rings);
+  const centerRef = useRef(center);
+  const layersRef = useRef(layers);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [styleRevision, setStyleRevision] = useState(0);
   const [blockGroupFeatures, setBlockGroupFeatures] = useState<GeoJSON.FeatureCollection | null>(null);
 
   // Keep the callback ref up to date
@@ -42,60 +50,33 @@ export function LocationMap({
     onMapClickRef.current = onMapClick;
   }, [onMapClick]);
 
+  useEffect(() => {
+    onRingClickRef.current = onRingClick;
+  }, [onRingClick]);
+
+  useEffect(() => {
+    ringsRef.current = rings;
+  }, [rings]);
+
+  useEffect(() => {
+    centerRef.current = center;
+  }, [center]);
+
+  useEffect(() => {
+    layersRef.current = layers;
+  }, [layers]);
+
   // Initialize map once; subsequent center/layer changes are handled by dedicated effects.
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const mapStyle: maplibregl.StyleSpecification = {
-      version: 8,
-      sources: {
-        satellite: {
-          type: 'raster',
-          tiles: [
-            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          ],
-          tileSize: 256,
-          attribution: 'Tiles © Esri',
-        },
-        labels: {
-          type: 'raster',
-          tiles: [
-            'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
-          ],
-          tileSize: 256,
-        },
-        osm: {
-          type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors',
-        },
-      },
-      layers: [
-        {
-          id: 'osm',
-          type: 'raster',
-          source: 'osm',
-          layout: { visibility: layers.satellite ? 'none' : 'visible' },
-        },
-        {
-          id: 'satellite',
-          type: 'raster',
-          source: 'satellite',
-          layout: { visibility: layers.satellite ? 'visible' : 'none' },
-        },
-        {
-          id: 'labels',
-          type: 'raster',
-          source: 'labels',
-          layout: { visibility: layers.satellite ? 'visible' : 'none' },
-        },
-      ],
-    };
+    registerGoogleProtocol();
+    const initialBasemap = layers.hybrid ? 'hybrid' : layers.satellite ? 'satellite' : 'roadmap';
+    const initialStyle = getGoogleBasemapStyle(initialBasemap);
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: mapStyle,
+      style: initialStyle,
       center: center,
       zoom: 12,
       antialias: true,
@@ -107,8 +88,45 @@ export function LocationMap({
 
     // Handle map clicks - use ref to get current callback
     map.current.on('click', (e) => {
+      const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+
+      if (onRingClickRef.current && layersRef.current?.rings) {
+        const ringSet = ringsRef.current;
+        if (Array.isArray(ringSet) && ringSet.length > 0 && map.current) {
+          const ringLayerIds = ringSet.map((ring) => `ring-${ring.radius_miles}-fill`);
+          const hitFeatures = map.current.queryRenderedFeatures(e.point, { layers: ringLayerIds });
+          if (hitFeatures.length > 0) {
+            const hitLayerId = hitFeatures[0].layer.id;
+            const match = hitLayerId.match(/ring-([\\d.]+)-fill/);
+            const radiusValue = match ? Number(match[1]) : null;
+            const clickedRing = radiusValue === null ? null : ringSet.find((ring) => ring.radius_miles === radiusValue);
+            if (clickedRing) {
+              onRingClickRef.current(clickedRing, lngLat);
+              return;
+            }
+          }
+
+          const point = turf.point(lngLat);
+          const [centerLng, centerLat] = centerRef.current;
+          const clickedRing = [...ringSet]
+            .sort((a, b) => a.radius_miles - b.radius_miles)
+            .find((ring) => {
+              const circle = turf.circle([centerLng, centerLat], ring.radius_miles, {
+                steps: 64,
+                units: 'miles',
+              });
+              return turf.booleanPointInPolygon(point, circle);
+            });
+
+          if (clickedRing) {
+            onRingClickRef.current(clickedRing, lngLat);
+            return;
+          }
+        }
+      }
+
       if (onMapClickRef.current) {
-        onMapClickRef.current([e.lngLat.lng, e.lngLat.lat]);
+        onMapClickRef.current(lngLat);
       }
     });
 
@@ -185,26 +203,28 @@ export function LocationMap({
         },
       });
     }
-  }, [mapLoaded, center]);
+  }, [mapLoaded, center, styleRevision]);
 
   // Draw ring circles using Turf.js
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
+    let ringCleanup: (() => void) | undefined;
 
     // Ensure style is loaded before adding sources/layers
     if (!map.current.isStyleLoaded()) {
       const styleLoadHandler = () => {
         if (map.current) {
-          updateRings();
+          ringCleanup = updateRings();
         }
       };
       map.current.once('styledata', styleLoadHandler);
       return () => {
         map.current?.off('styledata', styleLoadHandler);
+        ringCleanup?.();
       };
     }
 
-    updateRings();
+    const cleanupHandlers = updateRings();
 
     function updateRings() {
       if (!map.current) return;
@@ -223,6 +243,13 @@ export function LocationMap({
       if (!layers.rings) return;
 
       // Add ring circles
+      const ringClickHandlers: Array<{
+        id: string;
+        click: (e: maplibregl.MapMouseEvent) => void;
+        enter: () => void;
+        leave: () => void;
+      }> = [];
+
       rings.forEach((ring) => {
         const radius = ring.radius_miles;
         const colors = RING_COLORS[radius];
@@ -277,9 +304,55 @@ export function LocationMap({
             'line-opacity': 1,
           },
         });
+
+        // Make rings clickable for demographics popup
+        const fillLayerId = `ring-${radius}-fill`;
+        const handleClick = (e: maplibregl.MapMouseEvent) => {
+          const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          if (onRingClickRef.current) {
+            onRingClickRef.current(ring, lngLat);
+            return;
+          }
+          if (onMapClickRef.current) {
+            onMapClickRef.current(lngLat);
+          }
+        };
+        const handleEnter = () => {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = 'pointer';
+          }
+        };
+        const handleLeave = () => {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = isAddingPoint ? 'crosshair' : '';
+          }
+        };
+
+        map.current?.on('click', fillLayerId, handleClick);
+        map.current?.on('mouseenter', fillLayerId, handleEnter);
+        map.current?.on('mouseleave', fillLayerId, handleLeave);
+
+        ringClickHandlers.push({
+          id: fillLayerId,
+          click: handleClick,
+          enter: handleEnter,
+          leave: handleLeave,
+        });
       });
+
+      return () => {
+        ringClickHandlers.forEach(({ id, click, enter, leave }) => {
+          if (!map.current) return;
+          map.current.off('click', id, click);
+          map.current.off('mouseenter', id, enter);
+          map.current.off('mouseleave', id, leave);
+        });
+      };
     }
-  }, [mapLoaded, rings, layers.rings, selectedRadius, center]);
+    return () => {
+      cleanupHandlers?.();
+    };
+  }, [mapLoaded, rings, layers.rings, selectedRadius, center, styleRevision, isAddingPoint]);
 
   // Fetch nearby block-group boundaries
   useEffect(() => {
@@ -386,7 +459,7 @@ export function LocationMap({
         },
       });
     }
-  }, [mapLoaded, blockGroupFeatures, layers.blockGroups]);
+  }, [mapLoaded, blockGroupFeatures, layers.blockGroups, styleRevision]);
 
   // Update overlay markers (rental comparables)
   useEffect(() => {
@@ -425,7 +498,7 @@ export function LocationMap({
         offset: [0, -30],
         closeButton: true,
         closeOnClick: true,
-        className: 'map-marker-popup',
+        className: 'location-map-popup',
       }).setHTML(popupHtml);
 
       const marker = new maplibregl.Marker({ element: el }).setLngLat(point.coordinates);
@@ -442,34 +515,33 @@ export function LocationMap({
 
       markersRef.current.push(marker);
     });
-  }, [mapLoaded, userPoints, layers.userPoints, onPointClick]);
+  }, [mapLoaded, userPoints, layers.userPoints, onPointClick, styleRevision]);
 
-  // Toggle satellite layer
+  // Toggle basemap: satellite / hybrid / roadmap
+  const prevBasemapRef = useRef<string>(
+    layers.hybrid ? 'hybrid' : layers.satellite ? 'satellite' : 'roadmap'
+  );
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    const satelliteLayer = map.current.getLayer('satellite');
-    const labelsLayer = map.current.getLayer('labels');
-    const osmLayer = map.current.getLayer('osm');
+    const currentBasemap = layers.hybrid ? 'hybrid' : layers.satellite ? 'satellite' : 'roadmap';
+    if (currentBasemap === prevBasemapRef.current) return;
+    prevBasemapRef.current = currentBasemap;
 
-    if (satelliteLayer && labelsLayer && osmLayer) {
-      map.current.setLayoutProperty(
-        'satellite',
-        'visibility',
-        layers.satellite ? 'visible' : 'none'
-      );
-      map.current.setLayoutProperty(
-        'labels',
-        'visibility',
-        layers.satellite ? 'visible' : 'none'
-      );
-      map.current.setLayoutProperty(
-        'osm',
-        'visibility',
-        layers.satellite ? 'none' : 'visible'
-      );
-    }
-  }, [mapLoaded, layers.satellite]);
+    const newStyle = getGoogleBasemapStyle(currentBasemap as 'hybrid' | 'satellite' | 'roadmap');
+    map.current.setStyle(newStyle);
+
+    // After the new style finishes loading, bump the revision counter
+    // so that all custom-layer effects re-fire and re-add their data.
+    const handleStyleLoad = () => {
+      setStyleRevision((prev) => prev + 1);
+    };
+    map.current.once('style.load', handleStyleLoad);
+
+    return () => {
+      map.current?.off('style.load', handleStyleLoad);
+    };
+  }, [mapLoaded, layers.satellite, layers.hybrid]);
 
   // Resize map when the container dimensions change (e.g., accordion expand)
   useEffect(() => {
