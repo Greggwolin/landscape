@@ -40,6 +40,9 @@ interface ProjectDetails {
   gross_sf?: number;
   year_built?: number;
   ownership_type?: string;
+  apn?: string | null;
+  apn_primary?: string | null;
+  apn_secondary?: string | null;
 }
 
 const IMPROVED_PROPERTY_TYPES = [
@@ -72,6 +75,7 @@ export function SalesComparisonApproach({
     yearBuilt?: number | null;
     ownershipType?: string | null;
   } | null>(null);
+  const [subjectApn, setSubjectApn] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const { activeProject } = useProjectContext();
   const subjectLocation = useMemo(
@@ -90,6 +94,23 @@ export function SalesComparisonApproach({
     buildingSf: subjectProperty?.buildingSf != null ? Number(subjectProperty.buildingSf) : undefined,
   }), [activeProject, subjectLocation, subjectProperty]);
 
+  const compApns = useMemo(() => {
+    const apns = displayComparables
+      .map((comp) => {
+        const extra = (comp.extra_data ?? {}) as Record<string, unknown>;
+        const candidate =
+          (comp as unknown as Record<string, unknown>).apn ||
+          (comp as unknown as Record<string, unknown>).parcel_apn ||
+          extra.apn ||
+          extra.apn_primary ||
+          extra.parcel_apn ||
+          extra.ain;
+        return typeof candidate === 'string' ? candidate.trim() : '';
+      })
+      .filter(Boolean);
+    return apns.length ? apns : undefined;
+  }, [displayComparables]);
+
   useEffect(() => {
     let active = true;
     const loadSubjectDetails = async () => {
@@ -106,6 +127,8 @@ export function SalesComparisonApproach({
             yearBuilt: details.year_built ?? null,
             ownershipType: details.ownership_type ?? null
           });
+          const apnCandidate = (details.apn_primary || details.apn || details.apn_secondary || '').trim();
+          setSubjectApn(apnCandidate.length > 0 ? apnCandidate : null);
           return;
         }
       } catch (error) {
@@ -121,6 +144,7 @@ export function SalesComparisonApproach({
         yearBuilt: null,
         ownershipType: null
       });
+      setSubjectApn(null);
     };
 
     loadSubjectDetails();
@@ -191,6 +215,8 @@ export function SalesComparisonApproach({
           projectId={projectId.toString()}
           styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
           height="500px"
+          subjectApn={subjectApn ?? undefined}
+          compApns={compApns}
         />
       )}
 
@@ -249,6 +275,8 @@ export function SalesComparisonApproach({
                 projectId={projectId.toString()}
                 styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
                 height="100%"
+                subjectApn={subjectApn ?? undefined}
+                compApns={compApns}
               />
             )}
           </div>

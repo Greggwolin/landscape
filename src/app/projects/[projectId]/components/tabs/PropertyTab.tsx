@@ -706,7 +706,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   }, [loadData, refreshDynamicColumns]);
   useLandscaperRefresh(
     projectId,
-    ['units', 'leases', 'unit_types', 'project'],
+    ['units', 'leases', 'unit_types', 'project', 'dynamic_columns'],
     refreshAll
   );
 

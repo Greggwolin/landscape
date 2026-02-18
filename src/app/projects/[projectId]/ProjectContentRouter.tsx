@@ -33,6 +33,7 @@ import CapitalizationTab from './components/tabs/CapitalizationTab';
 import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
 import RenovationSubTab from './components/tabs/RenovationSubTab';
 import { MapTab } from '@/components/map-tab';
+import { ICPage } from '@/components/ic/ICPage';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 
 interface Project {
@@ -250,6 +251,13 @@ function ProjectContentRouter({
             return <ReportsTab project={project} />;
           case 'export':
             return <ComingSoon folder="reports" tab="export" icon="📤" />;
+          case 'investment_committee':
+            return (
+              <ICPage
+                projectId={project.project_id}
+                projectName={project.project_name}
+              />
+            );
           default:
             return <ReportsTab project={project} />;
         }

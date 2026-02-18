@@ -10,7 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
 import CIcon from '@coreui/icons-react';
-import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
+import { cilBug, cilSettings, cilMoon, cilSun, cilLifeRing } from '@coreui/icons';
+import { useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
 
 /**
  * TopNavigationBar - Tier 1 Global Navigation
@@ -36,6 +37,7 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
+  const { isOpen: isHelpOpen, toggleHelp } = useHelpLandscaper();
   const [showBugHint, setShowBugHint] = React.useState(false);
   const logoSrc = '/logo-invert.png';
 
@@ -158,6 +160,22 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
                 )}
               </div>
             )}
+
+            {/* Help Landscaper Button */}
+            <button
+              type="button"
+              onClick={toggleHelp}
+              className="rounded-full p-2 transition-colors"
+              style={{
+                color: 'var(--nav-text)',
+                backgroundColor: isHelpOpen ? 'var(--nav-active-bg)' : 'transparent',
+              }}
+              {...navHoverHandlers(isHelpOpen)}
+              aria-label="Help"
+              title="Help"
+            >
+              <CIcon icon={cilLifeRing} size="lg" />
+            </button>
 
             {/* Settings Button */}
             <button

@@ -19,16 +19,12 @@ import React, { Suspense, useState, useCallback, useEffect } from 'react';
 import { CCard, CToast, CToastBody, CToaster } from '@coreui/react';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
-import {
-  RentRollUpdateReviewModal,
-  RentRollComparisonResponse,
-  RentRollExtractionMap,
-} from '@/components/landscaper/RentRollUpdateReviewModal';
+// RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
 import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
 import { ActiveProjectBar } from './components/ActiveProjectBar';
-import { AlphaAssistantFlyout } from '@/components/alpha';
+// AlphaAssistantFlyout removed — all help/feedback consolidated into global Help panel
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
@@ -81,8 +77,6 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // Use the pending rent roll extractions hook
   const {
     pendingCount: rentRollPendingCount,
-    documentId: pendingDocumentId,
-    refresh: refreshPendingExtractions,
   } = usePendingRentRollExtractions(projectId);
 
   // Use extraction job status hook
@@ -116,11 +110,6 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   }, [rentRollJob, rentRollPendingCount]);
 
   const rentRollBadgeState = getRentRollBadgeState();
-
-  // Rent roll review modal state
-  const [showRentRollReviewModal, setShowRentRollReviewModal] = useState(false);
-  const [rentRollComparisonData, setRentRollComparisonData] = useState<RentRollComparisonResponse | null>(null);
-  const [rentRollExtractedUnits, setRentRollExtractedUnits] = useState<RentRollExtractionMap>({});
 
   // Resizable panel state
   const {
@@ -168,90 +157,32 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     setFolderTab(folder, tab);
   };
 
-  // Handle rent roll badge click - fetch comparison data and open modal
-  const handleRentRollBadgeClick = useCallback(async (): Promise<boolean> => {
-    if (rentRollPendingCount === 0 || !pendingDocumentId) {
-      return false; // Allow normal navigation
-    }
+  // Handle rent roll badge click - navigate to rent roll tab (pending changes shown inline in grid)
+  const handleRentRollBadgeClick = useCallback((): boolean => {
+    // Navigate to the rent roll tab where the grid shows inline highlights
+    setFolderTab('property', 'rent-roll');
+    return false; // Allow navigation to proceed
+  }, [setFolderTab]);
 
-    try {
-      // Fetch comparison data from the Django backend
-      const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document_id: pendingDocumentId }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to fetch rent roll comparison:', response.status);
-        return false; // Allow normal navigation on error
-      }
-
-      const data = await response.json();
-
-      // Build extraction map from deltas
-      const extractedUnits: RentRollExtractionMap = {};
-      if (data.deltas) {
-        data.deltas.forEach((delta: { extraction_id: number; unit_number: string | number | null; changes: Array<{ field: string; extracted_value: unknown }> }) => {
-          const unitData: Record<string, unknown> = { unit_number: delta.unit_number };
-          delta.changes.forEach((change) => {
-            unitData[change.field] = change.extracted_value;
-          });
-          extractedUnits[delta.extraction_id] = unitData;
-        });
-      }
-
-      setRentRollComparisonData(data);
-      setRentRollExtractedUnits(extractedUnits);
-      setShowRentRollReviewModal(true);
-      return true; // Prevent normal navigation
-    } catch (err) {
-      console.error('Error fetching rent roll comparison:', err);
-      return false; // Allow normal navigation on error
-    }
-  }, [projectId, rentRollPendingCount, pendingDocumentId]);
-
-  // Handle sub-tab badge click
-  const handleSubTabBadgeClick = useCallback((tabId: string, badgeCount: number): boolean => {
+  // Handle sub-tab badge click — navigate to rent roll tab (pending changes shown inline)
+  const handleSubTabBadgeClick = useCallback((tabId: string, _badgeCount: number): boolean => {
     if (tabId === 'rent-roll') {
       // If processing or queued, don't do anything
       if (rentRollBadgeState.type === 'processing') {
-        return true; // Prevent navigation but don't open modal
+        return true; // Prevent navigation
       }
       // If error, refresh and try again
       if (rentRollBadgeState.type === 'error') {
         refreshJobStatus();
         return true;
       }
-      // If pending with count, open the modal
-      if (badgeCount > 0 || rentRollBadgeState.type === 'pending') {
-        handleRentRollBadgeClick();
-        return true;
-      }
+      // Navigate to rent roll tab — grid will show pending change highlights
+      handleRentRollBadgeClick();
     }
     return false;
   }, [handleRentRollBadgeClick, rentRollBadgeState, refreshJobStatus]);
 
-  // Handle commit success - refresh pending count and close modal
-  const handleRentRollCommitSuccess = useCallback((snapshotId?: number) => {
-    console.log('Rent roll commit successful, snapshot ID:', snapshotId);
-    refreshPendingExtractions();
-    setShowRentRollReviewModal(false);
-    setRentRollComparisonData(null);
-    setRentRollExtractedUnits({});
-  }, [refreshPendingExtractions]);
 
-  // Handle modal close (without commit) - just close, keep pending
-  const handleRentRollModalClose = useCallback(() => {
-    setShowRentRollReviewModal(false);
-    setRentRollComparisonData(null);
-    setRentRollExtractedUnits({});
-  }, []);
-
-  // Alpha Assistant flyout state
-  const [isAlphaFlyoutOpen, setIsAlphaFlyoutOpen] = useState(false);
-  const pageContext = `${currentFolder}/${currentTab}`;
   const activeFolderConfig = folderConfig.folders.find((folder) => folder.id === currentFolder);
   const activeSubTabConfig = activeFolderConfig?.subTabs.find((tab) => tab.id === currentTab);
   const landscaperContextLabel = activeSubTabConfig?.label || (
@@ -280,7 +211,6 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       {/* Full-width Active Project Bar - sticky below top nav */}
       <ActiveProjectBar
         projectId={projectId}
-        onAlphaAssistantClick={() => setIsAlphaFlyoutOpen(true)}
       />
 
       {/* Two-column split below the project bar */}
@@ -396,27 +326,6 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </CCard>
         </div>
       </div>
-
-      {/* Alpha Assistant Flyout */}
-      <AlphaAssistantFlyout
-        isOpen={isAlphaFlyoutOpen}
-        onClose={() => setIsAlphaFlyoutOpen(false)}
-        pageContext={pageContext}
-        projectId={projectId}
-      />
-
-      {/* Rent Roll Review Modal */}
-      {rentRollComparisonData && (
-        <RentRollUpdateReviewModal
-          visible={showRentRollReviewModal}
-          onClose={handleRentRollModalClose}
-          projectId={projectId}
-          comparisonData={rentRollComparisonData}
-          extractedUnitsById={rentRollExtractedUnits}
-          onCommitSuccess={handleRentRollCommitSuccess}
-          onRefresh={refreshPendingExtractions}
-        />
-      )}
 
       {/* File drop toast notification */}
       <CToaster placement="top-end" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 9999 }}>

@@ -6,6 +6,8 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useRef,
+  useEffect,
   Suspense,
   ReactNode,
 } from 'react';
@@ -26,6 +28,9 @@ interface HelpLandscaperContextType {
   messages: HelpMessage[];
   conversationId: string | null;
   isLoading: boolean;
+  currentPage: string | undefined;
+  activeFolder: string | null;
+  activeTab: string | null;
   toggleHelp: () => void;
   sendMessage: (text: string) => Promise<void>;
   clearConversation: () => void;
@@ -99,28 +104,77 @@ function detectPropertyTypeFromPath(): string | undefined {
 /* Inner Provider (uses useSearchParams — requires Suspense boundary) */
 /* ------------------------------------------------------------------ */
 
+/** Check if a pathname is a workspace (project detail) page. */
+function isWorkspacePage(path: string | null): boolean {
+  if (!path) return false;
+  // Match /projects/123, /projects/123?folder=... etc.
+  return /^\/projects\/\d+/.test(path);
+}
+
+/** Session-storage key used to remember that the user manually closed help. */
+const HELP_DISMISSED_KEY = 'landscape_help_dismissed';
+
 function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Expose raw folder/tab from URL for tab-aware consumers
+  const activeFolder = searchParams?.get('folder') ?? null;
+  const activeTab = searchParams?.get('tab') ?? null;
+
   /** Resolve the current page from pathname + folder/tab query params. */
   const currentPage = useMemo(() => {
-    const folder = searchParams?.get('folder') ?? null;
-    const tab = searchParams?.get('tab') ?? null;
-    return buildCurrentPage(pathname, folder, tab);
-  }, [pathname, searchParams]);
+    return buildCurrentPage(pathname, activeFolder, activeTab);
+  }, [pathname, activeFolder, activeTab]);
 
-  const [isOpen, setIsOpen] = useState(false);
+  // Determine if the user has manually dismissed help this session
+  const userDismissedRef = useRef<boolean>(
+    typeof window !== 'undefined'
+      ? sessionStorage.getItem(HELP_DISMISSED_KEY) === 'true'
+      : false,
+  );
+
+  // Default open on workspace pages unless user dismissed it this session
+  const isWorkspace = isWorkspacePage(pathname);
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const dismissed = sessionStorage.getItem(HELP_DISMISSED_KEY) === 'true';
+    return isWorkspace && !dismissed;
+  });
+
+  // When navigating INTO a workspace page from a non-workspace page,
+  // auto-open the panel (unless user previously dismissed it this session).
+  const prevIsWorkspaceRef = useRef(isWorkspace);
+  useEffect(() => {
+    const wasWorkspace = prevIsWorkspaceRef.current;
+    prevIsWorkspaceRef.current = isWorkspace;
+
+    // Entered workspace from outside
+    if (isWorkspace && !wasWorkspace && !userDismissedRef.current) {
+      setIsOpen(true);
+    }
+  }, [isWorkspace]);
+
   const [messages, setMessages] = useState<HelpMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const toggleHelp = useCallback(() => {
-    setIsOpen(prev => !prev);
+    setIsOpen(prev => {
+      const next = !prev;
+      // If user is closing the panel, remember that for the session
+      if (!next) {
+        userDismissedRef.current = true;
+        try { sessionStorage.setItem(HELP_DISMISSED_KEY, 'true'); } catch {}
+      }
+      return next;
+    });
   }, []);
 
   const closeHelp = useCallback(() => {
     setIsOpen(false);
+    userDismissedRef.current = true;
+    try { sessionStorage.setItem(HELP_DISMISSED_KEY, 'true'); } catch {}
   }, []);
 
   const clearConversation = useCallback(() => {
@@ -193,6 +247,9 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
         messages,
         conversationId,
         isLoading,
+        currentPage,
+        activeFolder,
+        activeTab,
         toggleHelp,
         sendMessage,
         clearConversation,

@@ -3,9 +3,87 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { CCloseButton } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilLifeRing, cilTrash, cilArrowRight } from '@coreui/icons';
+import {
+  cilLifeRing,
+  cilTrash,
+  cilArrowRight,
+  cilChevronBottom,
+  cilChevronTop,
+} from '@coreui/icons';
 import { useHelpLandscaper, HelpMessage } from '@/contexts/HelpLandscaperContext';
 import './help-landscaper-panel.css';
+
+/* ------------------------------------------------------------------ */
+/* Types for structured page guide content                             */
+/* ------------------------------------------------------------------ */
+
+interface PageGuideContent {
+  page_name: string;
+  page_title: string;
+  what_you_can_do: string[];
+  coming_soon: string[];
+  tips: string[];
+}
+
+/* ------------------------------------------------------------------ */
+/* Human-readable labels for folder/tab combos                         */
+/* ------------------------------------------------------------------ */
+
+const PAGE_LABELS: Record<string, string> = {
+  // Home
+  home: 'Project Home',
+
+  // Property folder (MF)
+  property: 'Property',
+  property_details: 'Property Details',
+  'property_rent-roll': 'Rent Roll',
+  property_market: 'Market',
+  property_renovation: 'Renovation',
+
+  // Property folder (Land Dev)
+  property_acquisition: 'Acquisition',
+  'property_land-use': 'Land Use',
+  property_parcels: 'Parcels',
+
+  // Operations
+  operations: 'Operations',
+
+  // Valuation (MF)
+  valuation: 'Valuation',
+  'valuation_sales-comparison': 'Sales Comparison',
+  'valuation_cost-approach': 'Cost Approach',
+  valuation_income: 'Income Approach',
+
+  // Valuation (Land Dev)
+  valuation_feasibility: 'Feasibility',
+  'valuation_cash-flow': 'Cash Flow',
+  valuation_returns: 'Returns',
+  valuation_sensitivity: 'Sensitivity',
+
+  // Budget (Land Dev)
+  budget: 'Budget',
+  budget_schedule: 'Schedule',
+  budget_sales: 'Sales',
+  budget_draws: 'Draws',
+
+  // Capital
+  capitalization: 'Capitalization',
+  capitalization_equity: 'Equity',
+  capitalization_debt: 'Debt',
+
+  // Reports
+  reports: 'Reports',
+  reports_summary: 'Report Summary',
+  reports_export: 'Report Export',
+
+  // Documents
+  documents: 'Documents',
+  documents_all: 'All Documents',
+  documents_extractions: 'Extractions',
+
+  // Map
+  map: 'Map',
+};
 
 /* ------------------------------------------------------------------ */
 /* Message Bubble                                                      */
@@ -38,6 +116,131 @@ function TypingIndicator() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Page Guide - collapsible structured content                         */
+/* ------------------------------------------------------------------ */
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+function PageGuide({ currentPage }: { currentPage: string | undefined }) {
+  const [content, setContent] = useState<PageGuideContent | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const lastFetchedPage = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!currentPage || currentPage === lastFetchedPage.current) return;
+    lastFetchedPage.current = currentPage;
+
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `${DJANGO_API_URL}/api/knowledge/platform/alpha-help/?page_context=${encodeURIComponent(currentPage)}`,
+        );
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        if (!cancelled) {
+          setContent({
+            page_name: currentPage,
+            page_title: PAGE_LABELS[currentPage] || currentPage,
+            what_you_can_do: data.what_you_can_do || [],
+            coming_soon: data.coming_soon || [],
+            tips: data.tips || [],
+          });
+        }
+      } catch {
+        if (!cancelled) setContent(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentPage]);
+
+  const label = currentPage ? PAGE_LABELS[currentPage] || currentPage : null;
+
+  // Nothing to show if not on a workspace page
+  if (!currentPage) return null;
+
+  const hasContent =
+    content &&
+    (content.what_you_can_do.length > 0 ||
+      content.coming_soon.length > 0 ||
+      content.tips.length > 0);
+
+  return (
+    <div className="help-page-guide">
+      {/* Collapsible header */}
+      <button
+        type="button"
+        className="help-page-guide-header"
+        onClick={() => setExpanded((p) => !p)}
+      >
+        <span className="help-page-guide-label">{label || 'Page Guide'}</span>
+        <CIcon icon={expanded ? cilChevronTop : cilChevronBottom} size="sm" />
+      </button>
+
+      {/* Collapsible body */}
+      {expanded && (
+        <div className="help-page-guide-body">
+          {loading && (
+            <p className="help-page-guide-loading">Loading page guide…</p>
+          )}
+          {!loading && hasContent && (
+            <>
+              {content.what_you_can_do.length > 0 && (
+                <div className="help-guide-section">
+                  <h6 className="help-guide-section-title help-guide-section-title--success">
+                    What You Can Do
+                  </h6>
+                  <ul className="help-guide-list">
+                    {content.what_you_can_do.map((item, i) => (
+                      <li key={`what-${i}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {content.coming_soon.length > 0 && (
+                <div className="help-guide-section">
+                  <h6 className="help-guide-section-title help-guide-section-title--warning">
+                    Coming Soon
+                  </h6>
+                  <ul className="help-guide-list">
+                    {content.coming_soon.map((item, i) => (
+                      <li key={`soon-${i}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {content.tips.length > 0 && (
+                <div className="help-guide-section">
+                  <h6 className="help-guide-section-title help-guide-section-title--info">
+                    Tips
+                  </h6>
+                  <ul className="help-guide-list">
+                    {content.tips.map((item, i) => (
+                      <li key={`tip-${i}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+          {!loading && !hasContent && (
+            <p className="help-page-guide-empty">
+              No specific guide available for this page yet. Ask a question below!
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Panel                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -46,6 +249,7 @@ export default function HelpLandscaperPanel() {
     isOpen,
     messages,
     isLoading,
+    currentPage,
     closeHelp,
     sendMessage,
     clearConversation,
@@ -111,6 +315,9 @@ export default function HelpLandscaperPanel() {
           <CCloseButton onClick={closeHelp} />
         </div>
       </div>
+
+      {/* Page Guide - tab-aware structured content */}
+      <PageGuide currentPage={currentPage} />
 
       {/* Messages */}
       <div className="help-panel-messages">

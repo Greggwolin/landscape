@@ -5,7 +5,7 @@
  * - Project selector dropdown (left)
  * - Property type pill (color-coded)
  * - Analysis type badge (CoreUI color)
- * - Version badge and Alpha Assistant button (right side)
+ * - Version badge (right side)
  *
  * Chevron collapse/expand for Landscaper is NOT here — it lives in the Landscaper panel header.
  *
@@ -19,8 +19,6 @@
 import React, { useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CBadge } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilLifeRing } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
 import { VersionBadge } from '@/components/changelog';
@@ -37,12 +35,10 @@ import {
 
 interface ActiveProjectBarProps {
   projectId: number;
-  onAlphaAssistantClick?: () => void;
 }
 
 export function ActiveProjectBar({
   projectId,
-  onAlphaAssistantClick,
 }: ActiveProjectBarProps) {
   const { projects, activeProject, selectProject } = useProjectContext();
   const router = useRouter();
@@ -178,33 +174,8 @@ export function ActiveProjectBar({
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Version badge - right side, before Alpha Assistant */}
+      {/* Version badge - right side */}
       <VersionBadge />
-
-      {/* Alpha Assistant button - right side */}
-      {onAlphaAssistantClick && (
-        <button
-          onClick={onAlphaAssistantClick}
-          className="alpha-assistant-trigger"
-          title="Alpha Assistant - Help & Feedback"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.375rem 0.75rem',
-            border: '1px solid var(--cui-border-color)',
-            borderRadius: '6px',
-            backgroundColor: 'var(--cui-body-bg)',
-            color: 'var(--cui-body-color)',
-            cursor: 'pointer',
-            fontSize: '0.8125rem',
-            fontWeight: 500,
-          }}
-        >
-          <CIcon icon={cilLifeRing} size="sm" />
-          <span>Alpha Tester</span>
-        </button>
-      )}
     </div>
   );
 }
