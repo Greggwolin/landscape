@@ -6,14 +6,14 @@ export type RenoCostBasis = 'sf' | 'unit';
 
 export interface ValueAddState {
   isEnabled: boolean;
-  renoStartMonth: number;
-  renoStartsPerMonth: number;
-  monthsToComplete: number;
-  renoCost: number;
+  renoStartMonth: number | null;
+  renoStartsPerMonth: number | null;
+  monthsToComplete: number | null;
+  renoCost: number | null;
   renoCostBasis: RenoCostBasis;
-  relocationIncentive: number;
-  rentPremiumPct: number;
-  reletMonths: number;
+  relocationIncentive: number | null;
+  rentPremiumPct: number | null;
+  reletMonths: number | null;
   // Legacy field mapping
   renovateAll: boolean;
   unitsToRenovate: number | null;
@@ -64,14 +64,14 @@ const MGMT_FEE_PCT = 0.03; // Management fee on incremental revenue
 
 const DEFAULT_STATE: ValueAddState = {
   isEnabled: false,
-  renoStartMonth: 3,
-  renoStartsPerMonth: 2,
-  monthsToComplete: 3,
-  renoCost: 25,
+  renoStartMonth: null,
+  renoStartsPerMonth: null,
+  monthsToComplete: null,
+  renoCost: null,
   renoCostBasis: 'sf',
-  relocationIncentive: 3500,
-  rentPremiumPct: 0.40,
-  reletMonths: 2,
+  relocationIncentive: null,
+  rentPremiumPct: null,
+  reletMonths: null,
   renovateAll: true,
   unitsToRenovate: null
 };
@@ -91,19 +91,30 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
   const deriveState = useCallback(
     (data: Record<string, unknown>, avgSf: number): ValueAddState => {
       const basis = (data.reno_cost_basis as RenoCostBasis) || DEFAULT_STATE.renoCostBasis;
-      const storedPerSf = Number(data.reno_cost_per_sf ?? DEFAULT_STATE.renoCost);
-      const renoCost = basis === 'unit' ? Math.round(storedPerSf * avgSf) : storedPerSf;
+
+      // Preserve null from API — null means "not configured yet"
+      const toNullableNumber = (val: unknown): number | null => {
+        if (val === null || val === undefined) return null;
+        const num = Number(val);
+        return Number.isNaN(num) ? null : num;
+      };
+
+      const storedPerSf = toNullableNumber(data.reno_cost_per_sf);
+      let renoCost: number | null = storedPerSf;
+      if (storedPerSf !== null && basis === 'unit') {
+        renoCost = Math.round(storedPerSf * avgSf);
+      }
 
       return {
         isEnabled: Boolean(data.is_enabled ?? DEFAULT_STATE.isEnabled),
-        renoStartMonth: Number(data.reno_start_month ?? DEFAULT_STATE.renoStartMonth),
-        renoStartsPerMonth: Number(data.reno_starts_per_month ?? data.reno_pace_per_month ?? DEFAULT_STATE.renoStartsPerMonth),
-        monthsToComplete: Number(data.months_to_complete ?? DEFAULT_STATE.monthsToComplete),
+        renoStartMonth: toNullableNumber(data.reno_start_month),
+        renoStartsPerMonth: toNullableNumber(data.reno_starts_per_month ?? data.reno_pace_per_month),
+        monthsToComplete: toNullableNumber(data.months_to_complete),
         renoCost,
         renoCostBasis: basis,
-        relocationIncentive: Number(data.relocation_incentive ?? DEFAULT_STATE.relocationIncentive),
-        rentPremiumPct: Number(data.rent_premium_pct ?? DEFAULT_STATE.rentPremiumPct),
-        reletMonths: Number(data.relet_months ?? data.relet_lag_months ?? DEFAULT_STATE.reletMonths),
+        relocationIncentive: toNullableNumber(data.relocation_incentive),
+        rentPremiumPct: toNullableNumber(data.rent_premium_pct),
+        reletMonths: toNullableNumber(data.relet_months ?? data.relet_lag_months),
         renovateAll: Boolean(data.renovate_all ?? DEFAULT_STATE.renovateAll),
         unitsToRenovate: data.units_to_renovate === null || data.units_to_renovate === undefined
           ? null
@@ -118,7 +129,11 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
     reno_start_month: nextState.renoStartMonth,
     reno_starts_per_month: nextState.renoStartsPerMonth,
     months_to_complete: nextState.monthsToComplete,
-    reno_cost_per_sf: nextState.renoCostBasis === 'sf' ? nextState.renoCost : nextState.renoCost / (stats.avgUnitSf || 1),
+    reno_cost_per_sf: nextState.renoCost === null
+      ? null
+      : nextState.renoCostBasis === 'sf'
+        ? nextState.renoCost
+        : nextState.renoCost / (stats.avgUnitSf || 1),
     reno_cost_basis: nextState.renoCostBasis,
     relocation_incentive: nextState.relocationIncentive,
     rent_premium_pct: nextState.rentPremiumPct,
@@ -246,28 +261,36 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
     const totalUnits = stats.totalUnits || 0;
     const avgCurrentRent = stats.avgCurrentRent || 0;
 
+    // Coerce null to 0 for calculations
+    const renoCost = state.renoCost ?? 0;
+    const relocationIncentive = state.relocationIncentive ?? 0;
+    const monthsToComplete = state.monthsToComplete ?? 0;
+    const reletMonths = state.reletMonths ?? 0;
+    const renoStartsPerMonth = state.renoStartsPerMonth ?? 0;
+    const rentPremiumPct = state.rentPremiumPct ?? 0;
+
     // Units in program
     const unitsInProgram = state.renovateAll ? totalUnits : (state.unitsToRenovate || 0);
 
     // Cost per unit (based on SF or Unit toggle)
     const costPerUnit = state.renoCostBasis === 'sf'
-      ? state.renoCost * avgUnitSf
-      : state.renoCost;
+      ? renoCost * avgUnitSf
+      : renoCost;
 
     // COSTS
     const renovationCost = unitsInProgram * costPerUnit;
-    const relocationCost = unitsInProgram * state.relocationIncentive;
-    const totalDowntimeMonths = state.monthsToComplete + state.reletMonths;
+    const relocationCost = unitsInProgram * relocationIncentive;
+    const totalDowntimeMonths = monthsToComplete + reletMonths;
     const vacancyLoss = unitsInProgram * avgCurrentRent * totalDowntimeMonths;
     const totalProgramCost = renovationCost + relocationCost + vacancyLoss;
 
     // Program duration
-    const programDurationMonths = state.renoStartsPerMonth > 0
-      ? Math.ceil(unitsInProgram / state.renoStartsPerMonth)
+    const programDurationMonths = renoStartsPerMonth > 0
+      ? Math.ceil(unitsInProgram / renoStartsPerMonth)
       : 0;
 
     // ANNUAL IMPACT (at stabilization - all units renovated and leased)
-    const monthlyPremiumPerUnit = avgCurrentRent * state.rentPremiumPct;
+    const monthlyPremiumPerUnit = avgCurrentRent * rentPremiumPct;
     const annualGrossRevenueIncrease = unitsInProgram * monthlyPremiumPerUnit * 12;
     const annualExpenseIncrease = annualGrossRevenueIncrease * MGMT_FEE_PCT;
     const annualNoiImpact = annualGrossRevenueIncrease - annualExpenseIncrease;
@@ -305,7 +328,7 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
       },
       programDurationMonths,
       // Legacy fields for backward compatibility
-      effectiveCostPerUnit: costPerUnit + state.relocationIncentive,
+      effectiveCostPerUnit: costPerUnit + relocationIncentive,
       totalRenovationCost: totalProgramCost,
       renovationDurationMonths: programDurationMonths,
       stabilizedAnnualPremium: annualGrossRevenueIncrease,

@@ -173,6 +173,8 @@ export interface SaveInputRequest {
   post_reno_value?: number | null;
   post_reno_count?: number | null;
   post_reno_rate?: number | null;
+  post_reno_per_sf?: number | null;
+  post_reno_growth_rate?: number | null;
 }
 
 /**

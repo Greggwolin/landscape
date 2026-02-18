@@ -23,6 +23,8 @@ interface InputUpdate {
   post_reno_value?: number | null;
   post_reno_count?: number | null;
   post_reno_rate?: number | null;
+  post_reno_per_sf?: number | null;
+  post_reno_growth_rate?: number | null;
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
@@ -42,53 +44,52 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
 
     // Process each update with upsert
-    // Note: tbl_operations_user_inputs may not exist until migration 043 is run
-    try {
-      for (const update of updates) {
-        await sql`
-          INSERT INTO tbl_operations_user_inputs (
-            project_id,
-            section,
-            line_item_key,
-            category_id,
-            as_is_value,
-            as_is_count,
-            as_is_rate,
-            as_is_growth_rate,
-            post_reno_value,
-            post_reno_count,
-            post_reno_rate,
-            updated_at
-          ) VALUES (
-            ${projectIdNum},
-            ${update.section},
-            ${update.line_item_key},
-            ${update.category_id || null},
-            ${update.as_is_value ?? null},
-            ${update.as_is_count ?? null},
-            ${update.as_is_rate ?? null},
-            ${update.as_is_growth_rate ?? null},
-            ${update.post_reno_value ?? null},
-            ${update.post_reno_count ?? null},
-            ${update.post_reno_rate ?? null},
-            NOW()
-          )
-          ON CONFLICT (project_id, section, line_item_key)
-          DO UPDATE SET
-            as_is_value = COALESCE(EXCLUDED.as_is_value, tbl_operations_user_inputs.as_is_value),
-            as_is_count = COALESCE(EXCLUDED.as_is_count, tbl_operations_user_inputs.as_is_count),
-            as_is_rate = COALESCE(EXCLUDED.as_is_rate, tbl_operations_user_inputs.as_is_rate),
-            as_is_growth_rate = COALESCE(EXCLUDED.as_is_growth_rate, tbl_operations_user_inputs.as_is_growth_rate),
-            post_reno_value = COALESCE(EXCLUDED.post_reno_value, tbl_operations_user_inputs.post_reno_value),
-            post_reno_count = COALESCE(EXCLUDED.post_reno_count, tbl_operations_user_inputs.post_reno_count),
-            post_reno_rate = COALESCE(EXCLUDED.post_reno_rate, tbl_operations_user_inputs.post_reno_rate),
-            updated_at = NOW()
-        `;
-      }
-    } catch (tableError) {
-      // Table doesn't exist yet - return success anyway
-      // Values will be kept in memory until migration 043 is run
-      console.warn('tbl_operations_user_inputs table not found, migration 043 may not have run yet');
+    for (const update of updates) {
+      await sql`
+        INSERT INTO tbl_operations_user_inputs (
+          project_id,
+          section,
+          line_item_key,
+          category_id,
+          as_is_value,
+          as_is_count,
+          as_is_rate,
+          as_is_growth_rate,
+          post_reno_value,
+          post_reno_count,
+          post_reno_rate,
+          post_reno_per_sf,
+          post_reno_growth_rate,
+          updated_at
+        ) VALUES (
+          ${projectIdNum},
+          ${update.section},
+          ${update.line_item_key},
+          ${update.category_id || null},
+          ${update.as_is_value ?? null},
+          ${update.as_is_count ?? null},
+          ${update.as_is_rate ?? null},
+          ${update.as_is_growth_rate ?? null},
+          ${update.post_reno_value ?? null},
+          ${update.post_reno_count ?? null},
+          ${update.post_reno_rate ?? null},
+          ${update.post_reno_per_sf ?? null},
+          ${update.post_reno_growth_rate ?? null},
+          NOW()
+        )
+        ON CONFLICT (project_id, section, line_item_key)
+        DO UPDATE SET
+          as_is_value = COALESCE(EXCLUDED.as_is_value, tbl_operations_user_inputs.as_is_value),
+          as_is_count = COALESCE(EXCLUDED.as_is_count, tbl_operations_user_inputs.as_is_count),
+          as_is_rate = COALESCE(EXCLUDED.as_is_rate, tbl_operations_user_inputs.as_is_rate),
+          as_is_growth_rate = COALESCE(EXCLUDED.as_is_growth_rate, tbl_operations_user_inputs.as_is_growth_rate),
+          post_reno_value = COALESCE(EXCLUDED.post_reno_value, tbl_operations_user_inputs.post_reno_value),
+          post_reno_count = COALESCE(EXCLUDED.post_reno_count, tbl_operations_user_inputs.post_reno_count),
+          post_reno_rate = COALESCE(EXCLUDED.post_reno_rate, tbl_operations_user_inputs.post_reno_rate),
+          post_reno_per_sf = COALESCE(EXCLUDED.post_reno_per_sf, tbl_operations_user_inputs.post_reno_per_sf),
+          post_reno_growth_rate = COALESCE(EXCLUDED.post_reno_growth_rate, tbl_operations_user_inputs.post_reno_growth_rate),
+          updated_at = NOW()
+      `;
     }
 
     return NextResponse.json({

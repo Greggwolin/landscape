@@ -113,6 +113,7 @@
     "lucide-react": "^0.542.0",
     "mammoth": "^1.11.0",
     "maplibre-gl": "^5.17.0",
+    "maplibre-google-maps": "^1.1.0",
     "marked": "^4.3.0",
     "meilisearch": "^0.53.0",
     "next": "^15.5.9",

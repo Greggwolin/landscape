@@ -115,8 +115,32 @@ function parseRedfinDate(dateStr: string): string | null {
   if (!dateStr || dateStr.trim() === '') return null;
 
   try {
+    const trimmed = dateStr.trim();
+
+    // Format: MM/DD/YYYY or M/D/YYYY
+    const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) {
+      const month = parseInt(slashMatch[1], 10) - 1;
+      const day = parseInt(slashMatch[2], 10);
+      const year = parseInt(slashMatch[3], 10);
+      if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+        const date = new Date(year, month, day);
+        return date.toISOString();
+      }
+    }
+
+    // Format: YYYY-MM-DD
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const year = parseInt(isoMatch[1], 10);
+      const month = parseInt(isoMatch[2], 10) - 1;
+      const day = parseInt(isoMatch[3], 10);
+      const date = new Date(year, month, day);
+      return date.toISOString();
+    }
+
     // Format: "Month-DD-YYYY"
-    const parts = dateStr.split('-');
+    const parts = trimmed.split('-');
     if (parts.length !== 3) return null;
 
     const monthNames: Record<string, number> = {

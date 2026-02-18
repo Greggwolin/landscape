@@ -88,6 +88,29 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
         return instance
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Source cap rates from Income Approach, not tbl_project.
+        try:
+            from apps.financial.models_valuation import IncomeApproach
+
+            income = (
+                IncomeApproach.objects
+                .filter(project_id=instance.project_id)
+                .order_by('-updated_at', '-income_approach_id')
+                .values('selected_cap_rate', 'terminal_cap_rate')
+                .first()
+            )
+            selected = income['selected_cap_rate'] if income else None
+            terminal = income['terminal_cap_rate'] if income else None
+        except Exception:
+            selected = None
+            terminal = None
+
+        data['cap_rate_current'] = str(selected) if selected is not None else None
+        data['cap_rate_proforma'] = str(terminal) if terminal is not None else None
+        return data
+
 
 class ProjectListSerializer(serializers.ModelSerializer):
     """

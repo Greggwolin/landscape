@@ -63,7 +63,6 @@ type ProjectLike = {
 
 const DEFAULT_RADIUS_MILES = 3;
 const DEFAULT_SOLD_WITHIN_DAYS = 180;
-const DEFAULT_MIN_YEAR_BUILT_OFFSET = 2; // Only include homes built within last 2 years
 
 function parsePositiveInteger(value: string | null): number | null {
   if (value === null) return null;
@@ -235,10 +234,7 @@ export async function GET(req: NextRequest, context: Params) {
   const soldWithinDays = daysParam ?? DEFAULT_SOLD_WITHIN_DAYS;
   const propertyType: PropertyType = propertyTypeParam ?? 'house';
 
-  // Default to homes built within last 2 years if no minYear specified
-  const currentYear = new Date().getFullYear();
-  const defaultMinYear = currentYear - DEFAULT_MIN_YEAR_BUILT_OFFSET;
-  const minYearBuilt = minYearParam ?? defaultMinYear;
+  const minYearBuilt = minYearParam ?? undefined;
 
   try {
     // Fetch project to get location
@@ -285,7 +281,7 @@ export async function GET(req: NextRequest, context: Params) {
       asOfDate: now.toISOString(),
       searchRadiusMiles,
       soldWithinDays,
-      minYearBuilt,
+      ...(minYearBuilt !== undefined && { minYearBuilt }),
       ...(maxYearParam && { maxYearBuilt: maxYearParam }),
       propertyType,
       stats,

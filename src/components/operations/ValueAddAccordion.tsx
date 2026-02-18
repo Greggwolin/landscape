@@ -202,7 +202,10 @@ export function ValueAddAccordion({
             </div>
           </div>
           <div className="ops-value-add-summary-note">
-            Rent premium assumed at {formatPercent(state.rentPremiumPct)} on renovated units.
+            {state.rentPremiumPct !== null
+              ? <>Rent premium assumed at {formatPercent(state.rentPremiumPct)} on renovated units.</>
+              : <>Configure rent premium to see projected impact.</>
+            }
           </div>
         </div>
       </div>
