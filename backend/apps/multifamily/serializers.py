@@ -207,6 +207,21 @@ class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
 
     project_id = serializers.IntegerField(source='project.project_id', read_only=True)
 
+    # Explicitly allow null for all configurable numeric fields
+    reno_cost_per_sf = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, allow_null=True
+    )
+    relocation_incentive = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True
+    )
+    reno_starts_per_month = serializers.IntegerField(required=False, allow_null=True)
+    reno_start_month = serializers.IntegerField(required=False, allow_null=True)
+    months_to_complete = serializers.IntegerField(required=False, allow_null=True)
+    rent_premium_pct = serializers.DecimalField(
+        max_digits=5, decimal_places=4, required=False, allow_null=True
+    )
+    relet_lag_months = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = ValueAddAssumptions
         fields = [
@@ -229,7 +244,7 @@ class ValueAddAssumptionsSerializer(serializers.ModelSerializer):
         read_only_fields = ['value_add_id', 'created_at', 'updated_at']
 
     def validate(self, attrs):
-        """Enforce basic field constraints."""
+        """Enforce basic field constraints. All numeric fields allow NULL (unconfigured)."""
         reno_cost_per_sf = attrs.get('reno_cost_per_sf')
         relocation_incentive = attrs.get('relocation_incentive')
         reno_starts_per_month = attrs.get('reno_starts_per_month')
