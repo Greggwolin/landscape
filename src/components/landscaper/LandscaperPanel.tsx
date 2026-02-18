@@ -12,11 +12,7 @@ import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
-import {
-  RentRollUpdateReviewModal,
-  type RentRollComparisonResponse,
-  type RentRollExtractionMap,
-} from './RentRollUpdateReviewModal';
+// RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import { useFileDrop } from '@/contexts/FileDropContext';
@@ -100,10 +96,6 @@ export function LandscaperPanel({
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
   const [, setPendingFile] = useState<File | null>(null);
-  const [rentRollComparison, setRentRollComparison] = useState<RentRollComparisonResponse | null>(null);
-  const [rentRollExtractedUnits, setRentRollExtractedUnits] = useState<RentRollExtractionMap>({});
-  const [showRentRollReviewModal, setShowRentRollReviewModal] = useState(false);
-
   // Field mapping interface state (for Excel/CSV rent rolls)
   const [showFieldMappingModal, setShowFieldMappingModal] = useState(false);
   const [fieldMappingDocId, setFieldMappingDocId] = useState<number | null>(null);
@@ -432,60 +424,14 @@ export function LandscaperPanel({
 
               if (extractData.success && (extractData.total_staged > 0 || pendingData.extractions?.length > 0)) {
                 if (isRentRoll) {
-                  try {
-                    const compareResponse = await fetch(
-                      `${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`,
-                      {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ document_id: docId }),
-                      }
-                    );
-
-                    if (compareResponse.ok) {
-                      const comparison = await compareResponse.json();
-                      if (comparison?.deltas?.length > 0) {
-                        const extractionIds = new Set(
-                          comparison.deltas.map((delta: { extraction_id: number }) => delta.extraction_id)
-                        );
-                        const extractedUnits: RentRollExtractionMap = {};
-                        (pendingData.extractions || []).forEach((ext: {
-                          extraction_id?: number;
-                          extracted_value?: unknown;
-                        }) => {
-                          if (!ext.extraction_id || !extractionIds.has(ext.extraction_id)) return;
-                          let extractedValue = ext.extracted_value;
-                          if (typeof extractedValue === 'string') {
-                            try {
-                              extractedValue = JSON.parse(extractedValue);
-                            } catch {
-                              return;
-                            }
-                          }
-                          if (extractedValue && typeof extractedValue === 'object') {
-                            extractedUnits[ext.extraction_id] = extractedValue as Record<string, unknown>;
-                          }
-                        });
-
-                        setRentRollComparison(comparison);
-                        setRentRollExtractedUnits(extractedUnits);
-                        setShowRentRollReviewModal(true);
-                        setShowExtractionModal(false);
-                        setExtractionResult(null);
-                        setPendingFile(null);
-                        setDropNotice(null);
-                        return;
-                      }
-
-                      setDropNotice(`Uploaded ${createdDocs.length} document(s). No rent roll changes found to review.`);
-                      return;
-                    }
-
-                    const compareErrorText = await compareResponse.text();
-                    console.error('Rent roll comparison failed:', compareResponse.status, compareErrorText);
-                  } catch (compareError) {
-                    console.error('Rent roll comparison failed:', compareError);
-                  }
+                  // Rent roll delta review is now handled inline in the grid
+                  // via usePendingRentRollChanges — just notify and let the hook pick it up
+                  refreshPendingExtractions();
+                  setDropNotice(`Extraction complete! Rent roll changes are highlighted in the grid for review.`);
+                  setIsUploading(false);
+                  setUploadProgress(0);
+                  setUploadMessage('');
+                  return;
                 }
 
                 // Convert extraction staging format to field_mappings format for modal
@@ -640,45 +586,6 @@ export function LandscaperPanel({
     }
   }, [uploadFiles, isUploading, uploadThingIsUploading]);
 
-  // Open rent roll review modal
-  const openRentRollReviewModal = useCallback(async () => {
-    if (!pendingDocumentId || rentRollPendingCount === 0) return;
-
-    try {
-      const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/knowledge/projects/${projectId}/rent-roll/compare/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document_id: pendingDocumentId }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to fetch rent roll comparison:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Build extraction map from deltas
-      const extractedUnits: RentRollExtractionMap = {};
-      if (data.deltas) {
-        data.deltas.forEach((delta: { extraction_id: number; unit_number: string | number | null; changes: Array<{ field: string; extracted_value: unknown }> }) => {
-          const unitData: Record<string, unknown> = { unit_number: delta.unit_number };
-          delta.changes.forEach((change) => {
-            unitData[change.field] = change.extracted_value;
-          });
-          extractedUnits[delta.extraction_id] = unitData;
-        });
-      }
-
-      setRentRollComparison(data);
-      setRentRollExtractedUnits(extractedUnits);
-      setShowRentRollReviewModal(true);
-    } catch (err) {
-      console.error('Error fetching rent roll comparison:', err);
-    }
-  }, [projectId, pendingDocumentId, rentRollPendingCount]);
-
   // Handle field mapping completion
   const handleFieldMappingComplete = useCallback(
     async (result: { jobId: number; unitsExtracted: number }) => {
@@ -702,41 +609,6 @@ export function LandscaperPanel({
     },
     [refreshPendingExtractions, pendingDocumentId]
   );
-
-  const handleRentRollCommitSuccess = useCallback(async (snapshotId?: number) => {
-    setShowRentRollReviewModal(false);
-    setRentRollComparison(null);
-    setRentRollExtractedUnits({});
-    setDropNotice('Rent roll data committed successfully.');
-    refreshPendingExtractions();
-
-    if (!snapshotId) return;
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/landscaper/activities`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          activity_type: 'update',
-          title: 'Rent Roll Updated',
-          summary: `Rent roll updated from ${rentRollComparison?.document_name || 'document'}.`,
-          status: 'complete',
-          confidence: null,
-          details: [
-            'Rollback available',
-            `snapshot_id:${snapshotId}`,
-          ],
-          source_type: 'rent_roll',
-          source_id: String(snapshotId),
-        }),
-      });
-      if (response.ok) {
-        queryClient.invalidateQueries({ queryKey: ['landscaper-activities', projectId.toString()] });
-      }
-    } catch (activityError) {
-      console.error('Failed to create activity item:', activityError);
-    }
-  }, [projectId, queryClient, rentRollComparison, refreshPendingExtractions]);
 
   // Media preview modal handler (triggered from Landscaper chat MediaSummaryCard)
   const handleReviewMedia = useCallback((docId: number, docName: string) => {
@@ -1010,16 +882,23 @@ export function LandscaperPanel({
             <div className="d-flex align-items-center gap-2">
               <CIcon icon={cilCheckCircle} size="sm" />
               <span className="small">
-                Extraction complete! {rentRollPendingCount} changes ready for review.
+                Extraction complete! {rentRollPendingCount} changes highlighted in the rent roll grid.
               </span>
             </div>
             <CButton
               color="primary"
               size="sm"
-              onClick={openRentRollReviewModal}
+              onClick={() => {
+                // Navigate to rent roll tab where inline delta review is shown
+                const url = new URL(window.location.href);
+                url.searchParams.set('folder', 'property');
+                url.searchParams.set('tab', 'rent-roll');
+                window.history.pushState({}, '', url.toString());
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
               className="me-2"
             >
-              Review Now
+              View in Grid
             </CButton>
           </CAlert>
         )}
@@ -1041,21 +920,6 @@ export function LandscaperPanel({
       </div>
 
       {/* Extraction Review Modal */}
-      {showRentRollReviewModal && rentRollComparison && (
-        <RentRollUpdateReviewModal
-          visible={showRentRollReviewModal}
-          onClose={() => {
-            setShowRentRollReviewModal(false);
-            setRentRollComparison(null);
-            setRentRollExtractedUnits({});
-          }}
-          projectId={projectId}
-          comparisonData={rentRollComparison}
-          extractedUnitsById={rentRollExtractedUnits}
-          onCommitSuccess={handleRentRollCommitSuccess}
-        />
-      )}
-
       {showExtractionModal && extractionResult && (
         <ExtractionReviewModal
           isOpen={showExtractionModal}

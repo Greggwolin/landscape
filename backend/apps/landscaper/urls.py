@@ -29,6 +29,7 @@ from .views_instructions import (
     KpiDefinitionDetailView,
     KpiDefinitionByTypeView,
 )
+from .views_help import HelpChatView
 
 # Project-scoped endpoints
 urlpatterns = [
@@ -239,6 +240,16 @@ urlpatterns = [
             'post': 'create',
         }),
         name='landscaper-global-chat'
+    ),
+
+    # ========================================================================
+    # Help Landscaper Endpoint (Global Platform Training Assistant)
+    # ========================================================================
+
+    path(
+        'landscaper/help/chat/',
+        HelpChatView.as_view(),
+        name='help-chat'
     ),
 
     # ========================================================================

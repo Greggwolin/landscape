@@ -75,7 +75,7 @@ ASSUMPTION_BENCHMARK_MAP = {
     },
     'rent_growth_pct': {
         'table': 'tbl_revenue_rent',
-        'field': 'annual_growth_rate',
+        'field': 'annual_rent_growth_pct',
         'benchmark_category': 'rent_growth',
         'label': 'Rent Growth Rate',
         'unit': '%',
@@ -83,12 +83,24 @@ ASSUMPTION_BENCHMARK_MAP = {
     },
     'expense_growth_pct': {
         'table': 'tbl_operating_expenses',
-        'field': 'annual_escalation_pct',
+        'field': 'escalation_rate',
         'benchmark_category': 'expense_growth',
         'label': 'Expense Growth Rate',
         'unit': '%',
         'direction': 'lower_is_aggressive',
+        'aggregation': 'avg',
     },
+}
+
+# Map project_type_code to benchmark property_type
+PROJECT_TYPE_TO_BENCHMARK = {
+    'LAND': 'land',
+    'MF': 'multifamily',
+    'OFF': 'multifamily',   # Use MF benchmarks for office as proxy
+    'RET': 'multifamily',   # Use MF benchmarks for retail as proxy
+    'IND': 'multifamily',   # Use MF benchmarks for industrial as proxy
+    'HTL': 'multifamily',   # Use MF benchmarks for hotel as proxy
+    'MXU': 'multifamily',   # Use MF benchmarks for mixed-use as proxy
 }
 
 # Aggressiveness thresholds (std deviations from benchmark)
@@ -136,13 +148,14 @@ def start_ic_session(
         if not project_info:
             return {'success': False, 'error': f'Project {project_id} not found'}
 
-        property_type = project_info.get('project_type_code', 'LAND')
+        project_type_code = project_info.get('project_type_code', 'LAND')
+        benchmark_property_type = PROJECT_TYPE_TO_BENCHMARK.get(project_type_code, 'multifamily')
 
         # Scan assumptions against benchmarks
-        assumptions = _scan_project_assumptions(project_id, property_type)
+        assumptions = _scan_project_assumptions(project_id, benchmark_property_type)
 
         # Load benchmark data
-        benchmarks = _load_benchmarks(property_type)
+        benchmarks = _load_benchmarks(benchmark_property_type)
 
         # Rank assumptions by deviation from benchmarks
         challenges = _rank_challenges(
@@ -160,11 +173,27 @@ def start_ic_session(
             challenges=challenges,
         )
 
+        # Also create relational IC session/challenge records
+        ic_session_id = None
+        try:
+            from .ic_service import create_ic_session_record
+            ic_session_id = create_ic_session_record(
+                project_id=project_id,
+                scenario_log_id=session_id,
+                thread_id=thread_id,
+                aggressiveness=aggressiveness,
+                total_assumptions_scanned=len(assumptions),
+                challenges=challenges,
+            )
+        except Exception as e:
+            logger.warning(f"[IC] Could not create IC session record: {e}")
+
         return {
             'success': True,
             'session_id': session_id,
+            'ic_session_id': ic_session_id,
             'project_name': project_info.get('project_name', f'Project {project_id}'),
-            'property_type': property_type,
+            'property_type': project_type_code,
             'aggressiveness': aggressiveness,
             'threshold_std_dev': threshold_std,
             'total_assumptions_scanned': len(assumptions),
@@ -173,7 +202,8 @@ def start_ic_session(
             'hint': (
                 'Present challenges one at a time, starting with the most aggressive. '
                 'For each, reference the benchmark comparison and ask the user to respond. '
-                'Use whatif_compute to model each challenge.'
+                'Use whatif_compute to model each challenge. After user responds, '
+                'call ic_respond_challenge to record the decision.'
             ),
         }
 
@@ -197,7 +227,7 @@ def get_next_challenge(
             cursor.execute("""
                 SELECT scenario_data
                 FROM tbl_scenario_log
-                WHERE id = %s
+                WHERE scenario_log_id = %s
             """, [session_id])
             row = cursor.fetchone()
 
@@ -234,7 +264,7 @@ def get_next_challenge(
             cursor.execute("""
                 UPDATE tbl_scenario_log
                 SET scenario_data = %s, updated_at = %s
-                WHERE id = %s
+                WHERE scenario_log_id = %s
             """, [json.dumps(session_data), timezone.now(), session_id])
 
         return {
@@ -347,7 +377,12 @@ def _load_benchmarks(property_type: str) -> Dict[str, Dict]:
                 category = row[0] or ''
                 subcategory = row[1] or ''
                 name = row[2] or ''
-                metadata = row[3] or {}
+                metadata_raw = row[3] or {}
+                # context_metadata may come back as string from psycopg2
+                if isinstance(metadata_raw, str):
+                    metadata = json.loads(metadata_raw)
+                else:
+                    metadata = metadata_raw
 
                 key = category.lower()
                 if key not in benchmarks:
@@ -445,20 +480,33 @@ def _rank_challenges(
         else:
             suggested = bench_mean - (bench_std * 0.5)  # Suggest 0.5 std below mean
 
-        suggested = round(suggested, 2)
+        suggested = round(suggested, 4)
+
+        # Format values for display (percentages stored as decimals need *100)
+        def _fmt(val, unit):
+            if unit == '%' and isinstance(val, (int, float)) and abs(val) < 1:
+                return f"{val * 100:.1f}%"
+            elif unit == '$' and isinstance(val, (int, float)):
+                return f"${val:,.0f}"
+            else:
+                return f"{val}{unit}"
+
+        display_val = _fmt(value, assumption['unit'])
+        display_mean = _fmt(bench_mean, assumption['unit'])
+        display_suggested = _fmt(suggested, assumption['unit'])
 
         challenge_text = (
             f"Your {assumption['label']} assumption of "
-            f"{assumption['value']}{assumption['unit']} is {percentile_desc} "
-            f"for this market (benchmark: {round(bench_mean, 2)}{assumption['unit']}). "
-            f"What does the model look like at {suggested}{assumption['unit']}?"
+            f"{display_val} is {percentile_desc} "
+            f"for this market (benchmark: {display_mean}). "
+            f"What does the model look like at {display_suggested}?"
         )
 
         # For high aggressiveness, also flag conservative assumptions
         if aggressiveness >= 8 and deviation_score < -0.5:
             challenge_text = (
-                f"Your {assumption['label']} of {assumption['value']}{assumption['unit']} "
-                f"appears conservative vs market ({round(bench_mean, 2)}{assumption['unit']}). "
+                f"Your {assumption['label']} of {display_val} "
+                f"appears conservative vs market ({display_mean}). "
                 f"Are you accounting for all factors, or is this intentionally cautious?"
             )
 
@@ -506,7 +554,7 @@ def _create_ic_session_log(
                 (project_id, thread_id, scenario_name, status, source,
                  scenario_data, tags, created_at, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
+            RETURNING scenario_log_id
         """, [
             project_id,
             thread_id,
@@ -514,7 +562,7 @@ def _create_ic_session_log(
             'active_shadow',
             'ic_session',
             json.dumps(session_data),
-            json.dumps(['ic', 'devil_advocate']),
+            ['ic', 'devil_advocate'],
             timezone.now(),
             timezone.now(),
         ])

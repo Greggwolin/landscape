@@ -13,6 +13,13 @@ import { ICResultsTabs, type ScenarioStep } from './ICResultsTabs';
 import { PresentationModeView } from './PresentationModeView';
 import { LandscaperChatThreaded, type LandscaperChatHandle } from '@/components/landscaper/LandscaperChatThreaded';
 
+interface ShadowDelta {
+  metric: string;
+  baseline: number | string;
+  current: number | string;
+  delta: number | string;
+}
+
 interface ICPageProps {
   projectId: number;
   projectName?: string;
@@ -22,11 +29,91 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
   const [aggressiveness, setAggressiveness] = useState(5);
   const [sessionActive, setSessionActive] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [icSessionId, setIcSessionId] = useState<number | null>(null);
   const [challengeCount, setChallengeCount] = useState(0);
   const [presentedCount, setPresentedCount] = useState(0);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [scenarioSteps, setScenarioSteps] = useState<ScenarioStep[]>([]);
+  const [shadowDeltas, setShadowDeltas] = useState<ShadowDelta[]>([]);
+  const [baselineMetrics, setBaselineMetrics] = useState<Record<string, number | string>>({});
+  const [currentMetrics, setCurrentMetrics] = useState<Record<string, number | string>>({});
   const chatRef = useRef<LandscaperChatHandle>(null);
+
+  // -----------------------------------------------------------------------
+  // Tool result handler — bridges chat tool executions to right panel state
+  // -----------------------------------------------------------------------
+  const handleToolResult = useCallback((toolName: string, result: Record<string, unknown>) => {
+    if (toolName === 'ic_start_session' && result.success) {
+      setSessionId(result.session_id as number);
+      setIcSessionId((result.ic_session_id as number) || null);
+      setChallengeCount(result.challenges_identified as number);
+      setSessionActive(true);
+
+      // If baseline metrics are returned, store them
+      if (result.baseline_snapshot && typeof result.baseline_snapshot === 'object') {
+        const snap = result.baseline_snapshot as Record<string, unknown>;
+        const metrics = (snap.metrics || {}) as Record<string, number | string>;
+        setBaselineMetrics(metrics);
+        setCurrentMetrics(metrics); // Start with baseline
+      }
+    }
+
+    if (toolName === 'ic_challenge_next') {
+      if (result.completed) {
+        // Session complete — no more challenges
+      } else {
+        setPresentedCount(result.challenge_index as number || 0);
+      }
+    }
+
+    if (toolName === 'ic_respond_challenge' && result.success) {
+      const deltas = (result.impact_deltas || {}) as Record<string, number>;
+      const step: ScenarioStep = {
+        index: scenarioSteps.length,
+        label: (result.label as string) || '',
+        assumption_key: '',
+        original_value: (result.current_value as number) || '',
+        override_value: (result.user_value ?? result.suggested_value) as number || '',
+        unit: (result.unit as string) || '',
+        deltas,
+      };
+      setScenarioSteps(prev => [...prev, step]);
+
+      // Update progress from session_progress
+      const progress = result.session_progress as Record<string, unknown> | undefined;
+      if (progress) {
+        setPresentedCount(progress.presented as number || 0);
+        setChallengeCount(progress.total as number || challengeCount);
+      }
+    }
+
+    if (toolName === 'whatif_compute' && result.success) {
+      // Update current metrics and shadow deltas from whatif result
+      const metrics = (result.metrics || {}) as Record<string, number | string>;
+      const delta = (result.delta || {}) as Record<string, number | string>;
+
+      if (Object.keys(metrics).length > 0) {
+        setCurrentMetrics(metrics);
+      }
+
+      // Build shadow deltas for the Returns tab
+      if (Object.keys(delta).length > 0) {
+        const newDeltas: ShadowDelta[] = Object.entries(metrics).map(([key, current]) => ({
+          metric: key,
+          baseline: baselineMetrics[key] ?? '-',
+          current,
+          delta: delta[key] ?? '-',
+        }));
+        setShadowDeltas(newDeltas);
+      }
+    }
+
+    if (toolName === 'sensitivity_grid' && result.success) {
+      // Sensitivity data is displayed directly in the chat response
+      // and also populates the Sensitivity tab via scenarioSteps
+      // The grid data structure is already handled by ICResultsTabs
+    }
+  }, [scenarioSteps, baselineMetrics, challengeCount]);
 
   const handleStartSession = useCallback(async () => {
     if (chatRef.current) {
@@ -34,7 +121,7 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
         `Start an Investment Committee review with aggressiveness level ${aggressiveness}. ` +
         `Challenge my assumptions and show me where the model might be too aggressive or too conservative.`
       );
-      setSessionActive(true);
+      // Note: sessionActive is set via handleToolResult when ic_start_session succeeds
     }
   }, [aggressiveness]);
 
@@ -131,6 +218,7 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
                 pageContext="investment_committee"
                 contextPillLabel="IC Review"
                 contextPillColor="warning"
+                onToolResult={handleToolResult}
               />
             </div>
           )}
@@ -163,6 +251,9 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
           <ICResultsTabs
             projectId={projectId}
             scenarioSteps={scenarioSteps}
+            shadowDeltas={shadowDeltas}
+            baselineMetrics={baselineMetrics}
+            currentMetrics={currentMetrics}
           />
 
           {/* Session Summary (when active) */}
@@ -186,6 +277,7 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
                       onClick={() => {
                         setSessionActive(false);
                         setSessionId(null);
+                        setIcSessionId(null);
                       }}
                     >
                       End Session

@@ -33,6 +33,66 @@ def _sanitize_for_json(obj):
     return obj
 
 
+def ensure_tool_results_closed(message_history: list) -> list:
+    """
+    Scan message history for tool_use blocks without matching tool_result.
+    Inject placeholder tool_result for any orphaned tool_use blocks.
+
+    Must be called before every client.messages.create() call.
+
+    The Claude API returns a 400 error if an assistant message contains
+    tool_use blocks that aren't followed by a user message with matching
+    tool_result content blocks. This guard prevents that.
+    """
+    if not message_history:
+        return message_history
+
+    # Walk messages looking for assistant messages with tool_use blocks
+    pending_tool_use_ids = set()
+
+    for msg in message_history:
+        role = msg.get('role', '')
+        content = msg.get('content')
+
+        if role == 'assistant':
+            # Check for tool_use blocks in structured content
+            if isinstance(content, list):
+                for block in content:
+                    if hasattr(block, 'type') and block.type == 'tool_use':
+                        pending_tool_use_ids.add(block.id)
+                    elif isinstance(block, dict) and block.get('type') == 'tool_use':
+                        pending_tool_use_ids.add(block.get('id'))
+
+        elif role == 'user':
+            # Check for tool_result blocks that close pending tool_use ids
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get('type') == 'tool_result':
+                        tool_use_id = block.get('tool_use_id')
+                        pending_tool_use_ids.discard(tool_use_id)
+
+    # If there are orphaned tool_use blocks, inject closing tool_result messages
+    if pending_tool_use_ids:
+        logger.warning(
+            f"[ensure_tool_results_closed] Found {len(pending_tool_use_ids)} orphaned tool_use blocks, "
+            f"injecting placeholder tool_results"
+        )
+        placeholder_results = [
+            {
+                "type": "tool_result",
+                "tool_use_id": tid,
+                "content": "Tool execution completed. No additional result data available."
+            }
+            for tid in pending_tool_use_ids
+        ]
+        message_history.append({
+            "role": "user",
+            "content": placeholder_results,
+        })
+
+    return message_history
+
+
 def _truncate_tool_result(result, max_chars=4000):
     """Truncate tool results to prevent context bloat on continuation calls.
 
@@ -133,25 +193,105 @@ METHODOLOGY_TASK_TYPES = {
 # Alpha Help Integration
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Triggers for "how-to" questions about platform usage
-ALPHA_HELP_TRIGGERS = {
-    # Direct questions
-    'how do i', 'how can i', 'how to', 'where do i', 'where can i',
-    'what does', 'what is the', 'can i', 'is there a',
-    'show me how', 'help me', 'i need help',
+# ── Two-tier trigger system for detecting app-usage questions ──
+#
+# STRONG triggers: multi-word phrases that are unambiguously about platform
+# usage. If any match, return True immediately (no negative-signal check).
+#
+# WEAK triggers: single words / short phrases that *could* appear in data
+# questions. Only fire when no negative signal is present.
+#
+# NEGATIVE signals: phrases indicating a data / action question. Override
+# weak triggers (strong triggers are never overridden).
 
-    # Feature questions
-    'upload', 'export', 'import', 'download',
-    'save', 'delete', 'edit', 'add', 'create', 'update',
+# Patterns containing regex wildcards — compiled once at module load
+import re as _re
 
-    # Navigation
-    'find', 'navigate', 'go to', 'get to', 'access',
-    'tab', 'page', 'section', 'panel', 'menu',
+_STRONG_TRIGGER_PATTERNS = [
+    _re.compile(p) for p in [
+        r'what does the .+ tab',
+        r'how is the .+ calculated',
+        r'explain the .+ formula',
+        r'does .+ update .+ automatically',
+        r'does .+ flow to',
+        r'where does .+ come from',
+    ]
+]
+
+ALPHA_HELP_STRONG_TRIGGERS = [
+    # How-to / where-to questions
+    'how do i', 'how can i', 'how to use', 'how does the', 'how does this',
+    'where do i', 'where can i',
+    'where is the', 'where are the', 'how do i get to', 'how do i navigate',
+    'show me how', 'help me understand', 'can you explain how',
+
+    # Page / UI awareness
+    'what does this page', 'what am i looking at',
+
+    # ARGUS / Excel crosswalk
+    'how is this different from argus', 'in argus', 'compared to argus',
+    'vs argus', 'how does this compare to excel', 'in excel',
+    'compared to excel',
+
+    # Data-flow questions
+    'what feeds into', 'what populates',
+
+    # Mode / feature questions
+    'what is napkin mode', 'what is standard mode', 'how do i switch mode',
+
+    # Import / export / upload
+    'how do i export', 'how do i print', 'how do i upload', 'how do i import',
+    'what file types',
+
+    # Feature availability
+    'not yet available', 'not implemented', 'on the roadmap',
+    'is there a way to',
+
+    # Calculation methodology
+    'what formula',
+]
+
+ALPHA_HELP_WEAK_TRIGGERS = [
+    # UI element words — can appear in data questions too
+    'tab', 'page', 'panel', 'menu', 'navigation', 'section',
 
     # Feature status
-    'coming soon', 'not working', 'broken', 'missing',
+    'coming soon', 'not working', 'broken', 'missing feature',
     'available', 'supported', 'implemented',
-}
+]
+
+ALPHA_HELP_NEGATIVE_SIGNALS = [
+    # Data / value questions
+    'what is the noi', 'what is my', 'what are the numbers',
+
+    # Mutation commands
+    'update the', 'change the',
+
+    # Extraction / analysis
+    'extract', 'analyze this', 'analyze the',
+    'summarize the', 'compare my', 'what does the data show',
+
+    # Calculation execution (not methodology)
+    'run the', 'calculate the', 'for this property',
+
+    # Data inspection
+    'current value', 'show me the data', 'what are the expenses',
+]
+
+# Pre-compile a regex for negative signals that contain wildcards
+_NEGATIVE_SIGNAL_PATTERNS = [
+    _re.compile(p) for p in [
+        r'set the .+ to',
+    ]
+]
+
+# Behavioral instruction appended when platform knowledge is injected
+PLATFORM_KNOWLEDGE_INSTRUCTION = """
+When the user asks about how to use the Landscape app (navigation, features,
+calculations, comparisons to ARGUS/Excel), use the platform knowledge context above
+to give specific, accurate answers. Cite features by name and describe the actual UI
+rather than guessing. You still have full tool access for data questions.
+"""
 
 # Page names that map to section_path filtering
 PAGE_NAME_MAP = {
@@ -216,22 +356,50 @@ def _needs_platform_knowledge(message: str, task_type: Optional[str] = None) -> 
 
 def _needs_alpha_help(message: str, page_context: Optional[str] = None) -> bool:
     """
-    Detect if message is asking about platform usage/features.
+    Detect if a message is asking about platform usage/features.
 
-    Returns True if user is asking "how-to" questions about the platform,
-    asking about feature availability, or navigating the interface.
+    Uses a two-tier trigger system:
+      1. Strong triggers  → return True immediately (unambiguous app-usage)
+      2. Negative signals → return False immediately (data/action question)
+      3. Weak triggers    → return True only when combined with page context
+      4. Default          → return False
+
+    Strong triggers are never overridden by negative signals.
+    Weak triggers are overridden by negative signals.
     """
     message_lower = message.lower()
 
-    # Check for help-related triggers
-    if any(trigger in message_lower for trigger in ALPHA_HELP_TRIGGERS):
+    # 1. Strong triggers — fixed phrases (simple `in` match)
+    if any(trigger in message_lower for trigger in ALPHA_HELP_STRONG_TRIGGERS):
         return True
 
-    # If page_context is provided and user asks about "this", assume platform help
-    if page_context and any(word in message_lower for word in ['this', 'here', 'current']):
+    # 1b. Strong triggers — regex patterns (for wildcards like "how is the .+ calculated")
+    if any(pattern.search(message_lower) for pattern in _STRONG_TRIGGER_PATTERNS):
         return True
 
+    # 2. Negative signals — fixed phrases
+    if any(signal in message_lower for signal in ALPHA_HELP_NEGATIVE_SIGNALS):
+        return False
+
+    # 2b. Negative signals — regex patterns
+    if any(pattern.search(message_lower) for pattern in _NEGATIVE_SIGNAL_PATTERNS):
+        return False
+
+    # 3. Weak triggers — only fire when page context + deictic words present
+    has_weak = any(trigger in message_lower for trigger in ALPHA_HELP_WEAK_TRIGGERS)
+    if has_weak:
+        # Deictic words ("this page", "here", "current tab") strongly imply
+        # the user is asking about the UI, not about data values.
+        if page_context and any(w in message_lower for w in ['this', 'here', 'current']):
+            return True
+
+    # 4. Default
     return False
+
+
+def _is_platform_usage_question(message: str, page_context: Optional[str] = None) -> bool:
+    """Public alias for _needs_alpha_help. Used by audit/test scripts."""
+    return _needs_alpha_help(message, page_context)
 
 
 def _detect_page_from_message(message: str) -> Optional[str]:
@@ -561,7 +729,7 @@ def _needs_user_knowledge(message: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Model to use for responses
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = "claude-opus-4-20250514"
 ANTHROPIC_TIMEOUT_SECONDS = 120
 
 # Maximum tokens for response
@@ -988,6 +1156,61 @@ The extraction runs asynchronously - report the job_id in 1-2 sentences.""",
                         "required": ["source_column"]
                     },
                     "description": "Array of column-to-field mapping decisions"
+                },
+                "section8_source_column": {
+                    "type": "string",
+                    "description": "Source column name containing Section 8 indicators (e.g., 'Tags'). When provided, an 'is_section_8' boolean flag column is created by extracting Sec. 8 patterns from this column's values."
+                }
+            },
+            "required": ["document_id", "mappings"]
+        }
+    },
+    {
+        "name": "compute_rent_roll_delta",
+        "description": """Compare an uploaded rent roll file against existing data using deterministic Excel parsing.
+Returns a structured delta showing exactly which fields changed on which units.
+Use this for SUBSEQUENT UPDATES when rent roll data already exists in the project.
+
+The delta is stored for the frontend grid to highlight changed cells.
+After calling this tool, narrate the delta summary to the user and offer to highlight changes in the grid.
+
+Do NOT use this for initial imports — use confirm_column_mapping instead.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "integer",
+                    "description": "Document ID of the uploaded rent roll file"
+                },
+                "mappings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "source_column": {
+                                "type": "string",
+                                "description": "Original column name from the file"
+                            },
+                            "target_field": {
+                                "type": ["string", "null"],
+                                "description": "Landscape standard field name, or null to skip"
+                            },
+                            "create_dynamic": {
+                                "type": "boolean",
+                                "description": "If true, map to a dynamic column"
+                            },
+                            "dynamic_column_name": {
+                                "type": "string",
+                                "description": "Dynamic column key name"
+                            },
+                            "data_type": {
+                                "type": "string",
+                                "description": "Data type: text, number, currency, boolean, date, percent"
+                            }
+                        },
+                        "required": ["source_column"]
+                    },
+                    "description": "Array of column-to-field mappings (same format as confirm_column_mapping)"
                 }
             },
             "required": ["document_id", "mappings"]
@@ -1662,17 +1885,20 @@ Returns {count: 0, records: []} if no units exist.""",
         "description": """Add or update individual units for a multifamily property.
 Upserts by project_id + unit_number (creates if not exists, updates if exists).
 
-Each record in the array should have:
-- unit_number: REQUIRED - Unit identifier (e.g., '101', 'A-101')
+MULTIFAMILY UNIT FIELDS (use these exact names in records):
+- unit_number: REQUIRED - Unit identifier (e.g., '101', 'A-101') — do NOT update this field
 - unit_type: REQUIRED for new units - Unit type code
-- square_feet: REQUIRED for new units - Unit size
+- square_feet: REQUIRED for new units - integer
 - building_name: Building identifier
-- floor_number: Floor level
-- bedrooms, bathrooms: Unit specs
-- market_rent, current_rent: Rent amounts
-- occupancy_status: 'occupied', 'vacant', 'down'
+- bedrooms: integer
+- bathrooms: decimal
+- current_rent: decimal - Current/actual rent amount
+- market_rent: decimal - Market rent amount
+- occupancy_status: 'occupied' | 'vacant' | 'notice' | 'eviction' | 'model' | 'down'
+  (Excel values are auto-normalized: "Current" → "occupied", "Vacant-Unrented" → "vacant")
+  IMPORTANT: Use occupancy_status, NOT status. The field name is occupancy_status.
 - lease_start_date, lease_end_date: Lease dates (YYYY-MM-DD)
-- renovation_status: 'none', 'planned', 'in_progress', 'complete'
+- renovation_status: 'none' | 'planned' | 'in_progress' | 'complete'
 - renovation_cost, renovation_date: Renovation details
 - is_section8, is_manager: Special unit flags
 - has_balcony, has_patio, view_type: Amenities
@@ -1714,6 +1940,39 @@ Example: Import unit-level rent roll from a document.""",
                 "reason": {"type": "string", "description": "Reason for update"}
             },
             "required": ["records"]
+        }
+    },
+    {
+        "name": "delete_units",
+        "description": """Delete specified units from the project. Two-phase confirmation flow:
+
+Phase 1 (default): Call WITHOUT confirmed=true. Returns the list of units found and a confirmation prompt.
+Present this to the user: "I found N units to delete: [list]. Reason: [reason]. Shall I proceed?"
+
+Phase 2: After the user confirms, call AGAIN with the SAME unit_identifiers AND confirmed=true.
+This actually executes the deletion.
+
+IMPORTANT: Never skip Phase 1. Always present the confirmation to the user first.
+Handles dependent records (leases, turns) automatically.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "unit_identifiers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of unit numbers to delete (e.g., ['237', '238', '239'])"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Brief reason for deletion (e.g., 'Duplicates not found in rent roll document')"
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "Set to true ONLY after the user has confirmed the deletion. Do not set on first call.",
+                    "default": False
+                }
+            },
+            "required": ["unit_identifiers"]
         }
     },
     # ─────────────────────────────────────────────────────────────────────────
@@ -4871,7 +5130,7 @@ by calling this tool with the user's confirmation.""",
         }
     },
     # =========================================================================
-    # Phase 7: Investment Committee (2 tools)
+    # Phase 7: Investment Committee (4 tools)
     # =========================================================================
     {
         "name": "ic_start_session",
@@ -4918,6 +5177,81 @@ all challenges have been presented.""",
                 }
             },
             "required": ["session_id"]
+        }
+    },
+    {
+        "name": "ic_respond_challenge",
+        "description": """Record the user's response to an IC challenge.
+After the user accepts, rejects, or modifies a challenged assumption,
+call this to track the response and update session progress. This enables
+the results panel to show which challenges were accepted vs rejected
+and their cumulative impact on the model.""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "session_id": {
+                    "type": "integer",
+                    "description": "IC session ID (ic_session_id from ic_start_session)"
+                },
+                "challenge_index": {
+                    "type": "integer",
+                    "description": "1-based index of the challenge being responded to"
+                },
+                "response": {
+                    "type": "string",
+                    "enum": ["accept", "reject", "modify"],
+                    "description": "User's response: accept the suggested value, reject it, or modify with their own value"
+                },
+                "user_value": {
+                    "type": "number",
+                    "description": "User's proposed value (required for 'modify' responses)"
+                },
+                "impact_deltas": {
+                    "type": "object",
+                    "description": "KPI impact deltas from the whatif_compute result for this challenge"
+                }
+            },
+            "required": ["session_id", "challenge_index", "response"]
+        }
+    },
+    {
+        "name": "sensitivity_grid",
+        "description": """Generate a sensitivity matrix for an assumption.
+Tests the assumption at multiple values (e.g., -20%, -10%, base, +10%, +20%)
+and returns a grid showing the impact on key metrics (IRR, NPV, NOI, etc.)
+at each level. Use after an IC challenge to show the full sensitivity range,
+or when the user asks "how sensitive is the model to X?".""",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "assumption_key": {
+                    "type": "string",
+                    "description": "Key of the assumption to test (e.g., 'discount_rate', 'vacancy_loss_pct')"
+                },
+                "table": {
+                    "type": "string",
+                    "description": "Source table (e.g., 'tbl_dcf_analysis', 'tbl_vacancy_assumption')"
+                },
+                "field": {
+                    "type": "string",
+                    "description": "DB field name (e.g., 'discount_rate', 'vacancy_loss_pct')"
+                },
+                "base_value": {
+                    "type": "number",
+                    "description": "Current value of the assumption"
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Percentage changes to test. Default: [-0.20, -0.10, -0.05, 0, 0.05, 0.10, 0.20]"
+                },
+                "target_metrics": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Which metrics to compute (e.g., ['irr', 'npv', 'noi']). Default: all key metrics"
+                }
+            },
+            "required": ["assumption_key", "table", "field", "base_value"]
         }
     },
 ]
@@ -5036,6 +5370,10 @@ RESPONSE STYLE (CRITICAL - FOLLOW EXACTLY):
    - Responses are displayed as plain text, not rendered markdown
 
 3. BE CONCISE:
+   - When the user asks for a list, give them the list. Not a preamble, then options, then the list.
+   - When the user asks you to find something, find it and report what you found.
+   - Maximum 2 sentences of context before delivering results. If results are ready, skip context entirely.
+   - Never present A/B/C options after the user has already given you a clear instruction.
    - 1-2 sentences for routine updates
    - Just do the task and confirm what you did
    - Only ask questions if truly necessary
@@ -5048,6 +5386,79 @@ Bad: "## Analysis\n**I'll analyze** this by looking at three factors..."
 
 Good: "Updated the county to Ventura County based on the Thousand Oaks address."
 Bad: "I need to check the current address first. Let me retrieve that information..."
+
+4. ACTION FIRST (CRITICAL):
+When the user asks you to DO something (find data, list values, update fields, compare records),
+your FIRST action must be to call the appropriate tool(s) and execute the task.
+
+DO NOT:
+- Present options (A/B/C) when the user has already told you what to do
+- Repeat information the user already knows
+- Show column mappings, count summaries, or analysis preambles before doing the task
+- Ask "which approach would you prefer?" when the instruction is clear
+
+DO:
+- Execute the task immediately using available tools
+- Return the specific results the user asked for
+- If you encounter an issue during execution, report the specific issue — not a menu of options
+- Keep responses focused on what was asked. If the user says "list the unit numbers," respond with unit numbers.
+
+The ONLY time to present options is when the user's request is genuinely ambiguous and you cannot
+determine the correct action. "Find the bed/bath values in the rent roll" is not ambiguous — it
+means read the document and find the values.
+
+FINANCIAL ASSUMPTIONS SOURCE OF TRUTH:
+Cap rate, discount rate, and growth rates must be read from database fields using tools.
+Do NOT pull these values from uploaded documents.
+
+5. NO REPETITION:
+Never repeat the same information across consecutive messages. If you already told the user
+the unit count discrepancy, do not repeat it in your next response. Each response must advance
+the conversation — either by executing a task, reporting new findings, or asking a genuinely
+new question.
+
+If the user re-asks a question, it means your previous response did not answer it. Do not
+repeat your previous response — actually answer the question this time.
+
+6. SURGICAL OPERATIONS:
+When the user asks you to reconcile, clean up, or fix data:
+- First IDENTIFY the specific records that need to change (query the DB and/or read the document)
+- Then STATE YOUR PLAN before executing: "I'm going to: (1) delete units X, Y, Z because [reason], (2) update field A on units B, C, D, (3) add value to field E on units F, G. This will bring the database into parity with [source]."
+- Then EXECUTE the specific changes using targeted tools (delete_units, update_units, update_project_field)
+- Do NOT run bulk extraction/import when the user is asking for a small number of specific changes
+- The confirm_column_mapping / analyze_rent_roll_columns tools are for INITIAL IMPORT of a rent roll, not for fixing a few fields on existing data
+
+delete_units uses a TWO-PHASE confirmation flow:
+  1. Call delete_units with unit_identifiers → tool returns confirmation payload (NOT yet deleted)
+  2. Present to user: "Delete N units: [list]. Reason: [reason]. Shall I proceed?"
+  3. ONLY after user confirms → call delete_units again with confirmed=true → units are deleted
+  Never skip the confirmation step. Never set confirmed=true on the first call.
+
+WRONG approach to "delete duplicates and update bed/bath":
+→ Run analyze_rent_roll_columns on the entire file → confirm_column_mapping → 452 bulk changes
+
+RIGHT approach to "delete duplicates and update bed/bath":
+→ Query DB for units not in the rent roll document → delete_units for the extras
+→ Query DB for units with null bed/bath → read document for correct values → update_units for just those fields
+→ Query DB for commercial units → update_units to set Plan = "Retail" or "Office"
+→ Total changes: ~20, not 452
+
+7. MUTATION RESPONSE ACCURACY:
+When a tool returns a result indicating an action was "proposed" or "pending" (has mutation_id, expires_at):
+- Do NOT tell the user the action is complete
+- Say: "I've queued [action] for your approval. You'll see a confirmation prompt to finalize."
+- If the user says the change didn't happen, check whether it's still pending
+
+When a tool returns action='confirm_required' or status='pending_confirmation':
+- Present the confirmation details to the user (what will be changed, count, reason)
+- Ask: "Shall I proceed?"
+- Only call the tool again with confirmed=true AFTER the user explicitly confirms
+
+When a tool directly executes and returns action='deleted' or action='updated':
+- Confirm completion: "Done. [action description]."
+- These are final — the change is already applied
+
+NEVER say "Done" or "Deleted" when the actual result says proposed/pending/confirm_required.
 
 DOCUMENT READING:
 You have access to documents uploaded to this project. You can:
@@ -5068,73 +5479,125 @@ For manual extraction (more control):
 
 RENT ROLL EXTRACTION BEHAVIOR:
 
-When the user uploads a rent roll file and you call analyze_rent_roll_columns, follow these rules strictly:
+NOTE: This section ONLY applies when the user explicitly asks to map, import, or extract data
+from a rent roll file. Do NOT call analyze_rent_roll_columns for vague requests like "help me
+with the rent roll" — instead ask what specifically they need help with. Only trigger extraction
+when the user's intent to import/map is clear (e.g., "import the rent roll", "map the columns",
+"extract from the rent roll file"). For general questions about units, bed/bath values, missing
+data, or other rent roll queries, follow the Action First rule above.
 
-ANALYSIS PHASE (one response only):
-Present your analysis in a SINGLE concise message with these sections. Use short labels, not full paragraphs:
+IMPORTANT: If the rent roll has already been imported and the user is asking to fix specific discrepancies
+(missing values, duplicates, wrong plan types), use targeted tools:
+- delete_units for removing duplicates or extras
+- update_units for fixing specific field values on specific units
+- get_document_content to look up correct values from the source document
+Do NOT re-run the full extraction pipeline to fix a handful of records.
 
-  EXISTING DATA: [count] units in DB, [count] in file. [X matching, Y new, Z DB-only].
-  If counts don't match the file's stated total, flag it: "File says 113 total but I found [X]. [Y] units may need cleanup."
+MULTIFAMILY UNIT FIELDS (use these exact names in update_units calls):
+- occupancy_status: "occupied" | "vacant" | "notice" | "eviction" | "model" | "down"
+  (Excel values "Current" → "occupied", "Vacant-Unrented" → "vacant" — auto-normalized)
+  CRITICAL: The field is occupancy_status, NOT status. Never use "status" as a field name.
+- bedrooms: integer
+- bathrooms: decimal
+- square_feet: integer
+- current_rent: decimal
+- market_rent: decimal
+- unit_number: string (identifier — do NOT update this field)
 
-  COLUMN MAPPING:
-  Auto-mapped: Unit, Tenant, Status, Sqft, Rent, Lease From, Lease To
-  BD/BA → splits into Bed (integer) + Bath (decimal). Plan auto-derives from Bed/Bath — no manual mapping needed.
-  [List any columns that need user decision]
+The rent roll flow has 4 phases. Follow them in order.
 
-  UNMAPPED COLUMNS: Tags, Additional Tags, Delinquent Rent, etc.
-  Default recommendation: Combine Tags + Additional Tags into single "Other" column (comma-separated).
-  Delinquent Rent → currency column.
-  Only offer to split into separate boolean columns if user specifically requests it.
+=== PHASE 1 — ANALYSIS (triggered by structured file drop or explicit import request) ===
+
+Call analyze_rent_roll_columns with the document_id. Then present results in a SINGLE message:
+
+  AUTO-MAPPED: Unit, Tenant, Status, Sqft, Rent, Lease From, Lease To (checkmark each)
+  SPLIT: BD/BA → Beds (integer) + Baths (decimal). Plan auto-derives. No manual mapping needed.
+  AMBIGUOUS: [List any columns needing user decision, with sample values]
+  NON-STANDARD: [Dynamic column candidates — e.g., "Delinquent Rent → currency column", "Section 8 → yes/no"]
+  SKIP SUGGESTED: [Computed totals or summary columns recommended to skip]
 
   OPTIONS:
-  A) [recommended action — e.g., "Fill blanks + derive Plans + create Other and Delinquency columns"]
+  A) [recommended — e.g., "Create Delinquency and Sec 8 columns, skip Sept Total"]
   B) [alternative]
   C) Let me customize
 
-That's it. One message. Wait for user response.
+That's it. One message. Wait for user response. Do NOT extract yet.
 
-EXECUTION PHASE — CRITICAL RULES:
+=== PHASE 2 — MAPPING CONFIRMATION (user responds) ===
+
+Parse the user's natural language response into mapping decisions. Confirm in ONE sentence:
+"Got it. Creating Sec 8 and Delinquency columns, skipping Sept Total. Extracting now."
+
+Call confirm_column_mapping with the appropriate parameters. This triggers extraction.
+
+The system auto-detects whether this is an initial load or update:
+- INITIAL LOAD (no existing units): Extraction auto-commits. Proceed to Phase 3.
+- UPDATE (units exist): Extraction runs asynchronously. Proceed to Phase 3b, then Phase 4.
+
+=== PHASE 3 — POST-EXTRACTION NARRATION (initial load) ===
+
+After confirm_column_mapping returns with is_initial_load: true (data is auto-committed):
+
+Report in 1-3 sentences:
+"Done. [X] units loaded. [Y] flagged as Section 8. [Z] units have delinquency totaling $[amount]. [N] vacant."
+
+Flag anything unusual: missing BD/BA on commercial units, unit count vs file total discrepancy, etc.
+
+=== PHASE 3b — ASYNC HANDOFF (update flow) ===
+
+After confirm_column_mapping returns with is_initial_load: false and job_status: 'queued':
+- The extraction is running in the background. Data has NOT been written yet.
+- Do NOT say "Done" or imply any data was committed.
+- Narrate: "Extraction is running. Once it finishes staging, I'll compare against your existing rent roll and show you exactly what changed. Say 'check for changes' or just let me know when you're ready."
+
+=== PHASE 4 — UPDATE FLOW NARRATION (subsequent updates) ===
+
+When the user returns on ANY subsequent message (e.g., "ok", "go ahead", "check for changes",
+"show me the delta", or any other message), call compute_rent_roll_delta IMMEDIATELY with the
+document_id and mappings from the earlier confirm_column_mapping call. No further confirmation needed.
+Do NOT ask "would you like me to check?" — just call the tool.
+
+After compute_rent_roll_delta returns:
+
+Report the delta summary:
+"This file has [X] units matching your rent roll. I found changes on [Y] units: [Z] rent changes, [W] lease date updates, [N] status changes."
+
+Then: "Changes are highlighted in the rent roll grid. You can accept or reject them individually by right-clicking, or use the Accept All / Reject All buttons in the banner above the grid."
+
+=== BEHAVIORAL RULES (all phases) ===
 
 1. WHEN USER CONFIRMS, EXECUTE IMMEDIATELY.
-   - "A" means do option A. Call confirm_column_mapping with the appropriate parameters. Do NOT restate the plan. Do NOT ask "should I proceed?" Do NOT re-present the analysis.
-   - "delete them" or "remove the extras" means execute the deletion. Confirm with ONE sentence after: "Deleted [X] units. Ready to proceed with import."
+   - "A" means do option A. Call confirm_column_mapping. Do NOT restate the plan.
    - "proceed" or "go ahead" or "yes" means execute. Not ask again.
 
-2. NEVER restate the full analysis after user has seen it once.
-   - After user confirms: execute and report result in 1-2 sentences.
-   - After user gives specific instructions: acknowledge in 1 sentence, then execute.
-   - WRONG: "You're absolutely right! The system has 121 units but there should be 113..." (user already knows this)
-   - RIGHT: "Deleted 8 extra units (322-329). 113 units remaining. Running import now."
+2. NEVER restate the full analysis after user has seen it.
+   - After user confirms: execute and report in 1-2 sentences.
+   - WRONG: "You're absolutely right! The system has 121 units..." (user already knows this)
+   - RIGHT: "Deleted 8 extra units. 113 remaining. Running import now."
 
 3. NEVER say "You're absolutely right" or "You're correct" — just do what was asked.
 
 4. FOLLOW USER INSTRUCTIONS EXACTLY.
-   - If user says "combine into a single Other column" — do that. Don't offer alternatives.
    - If user says "skip delinquency" — skip it. Don't argue.
-   - If user corrects you — accept the correction in one sentence and adjust. Don't re-explain.
+   - If user corrects you — accept in one sentence and adjust.
 
-5. BD/BA AND PLAN LOGIC (memorize this):
+5. BD/BA AND PLAN LOGIC:
    - BD/BA like "3/2.00" splits into: Bed=3, Bath=2.0
    - Plan auto-derives when Bed and Bath are populated (e.g., "3BR/2BA")
    - NEVER suggest mapping BD/BA directly to Plan
    - NEVER suggest creating separate "bedrooms" and "bathrooms" columns — Bed and Bath ARE the standard fields
-   - If Plan has blanks and Bed/Bath data exists, say: "[X] Plans can be auto-derived from Bed/Bath data."
 
 6. RESPONSE LENGTH:
-   - Initial analysis: Can be detailed (the one-time presentation above)
+   - Phase 1 analysis: Can be detailed (the one-time presentation)
    - All subsequent responses: 1-3 sentences max
    - Confirmations: 1 sentence ("Done. [what happened].")
-   - Corrections: 1 sentence acknowledgment + adjusted action
 
 7. UNIT COUNT DISCREPANCIES:
-   - The total at the bottom of the rent roll file is authoritative
-   - If DB count ≠ file total, recommend cleanup FIRST before import
-   - Present specific unit numbers to delete if identifiable
-   - After user confirms deletion, execute immediately — do not ask again
+   - File total is authoritative
+   - If DB count ≠ file total, recommend cleanup FIRST
+   - After user confirms deletion, execute immediately
 
-Note: For rent roll extraction, the analysis phase IS the confirmation step. When the user responds to the analysis with a choice, that IS their confirmation. Do not add additional confirmation steps.
-
-Do NOT use this for PDF rent rolls - they use the normal extraction pipeline.
+Do NOT use this for PDF rent rolls — they use the normal extraction pipeline.
 
 RENTAL COMPARABLES:
 When asked to populate rental comps, comparables, or comp data from a document:
@@ -5261,9 +5724,13 @@ When on the Investment Committee page (page_context='investment_committee'):
 - Present challenges one at a time, starting with the most aggressive assumption
 - For each challenge, reference the benchmark comparison and ask the user to respond
 - When the user responds, use whatif_compute to model the suggested alternative
-- After presenting results, call ic_challenge_next to get the next assumption
+- After modeling the what-if, call ic_respond_challenge to record the user's decision
+  (accept/reject/modify) along with the impact_deltas from whatif_compute
+- After recording, call ic_challenge_next to get the next assumption to challenge
 - Continue until all challenges are exhausted or the user exits
 - At aggressiveness 7+, also flag assumptions that seem too conservative
+- When the user asks "how sensitive is this?" for a challenged assumption, use
+  sensitivity_grid to show the full range of impact (-20% to +20%)
 - Track all scenarios in the session for presentation mode export
 
 PRESENTATION MODE:
@@ -5661,6 +6128,7 @@ def get_landscaper_response(
         )
         if alpha_context:
             full_system += alpha_context
+            full_system += PLATFORM_KNOWLEDGE_INSTRUCTION
             logger.info("Alpha help context added to system prompt")
 
     # Add user knowledge if query benefits from past experience
@@ -5814,12 +6282,16 @@ def get_landscaper_response(
             analysis_purpose=project_context.get('analysis_purpose'),
         )
 
+        _flag_forced = False
+        _pid = project_context.get('project_id')
+
         if tool_executor:
             include_extraction = should_include_extraction_tools(last_user_message or "")
             available_tool_names = get_tools_for_page(
                 page_context=normalized_context,
                 include_extraction=include_extraction,
-                is_admin=is_admin
+                is_admin=is_admin,
+                project_id=_pid,
             )
             filtered_tools = [
                 tool for tool in LANDSCAPER_TOOLS
@@ -5828,16 +6300,95 @@ def get_landscaper_response(
             api_kwargs['tools'] = filtered_tools
             # DIAGNOSTIC: Log which tools are sent to Claude
             tool_names_sent = [t.get('name', '?') for t in filtered_tools]
+            # QL_49 debug: check if extraction tools were forced by awaiting_delta_review flag
+            _keyword_match = include_extraction
+            _flag_forced = (not _keyword_match and 'compute_rent_roll_delta' in tool_names_sent)
             logger.info(
                 f"[TOOL_FILTER] Page: {page_context!r} -> {normalized_context}, "
                 f"Tools: {len(filtered_tools)}/{len(LANDSCAPER_TOOLS)}, "
-                f"Extraction: {include_extraction}"
+                f"Extraction: keyword={_keyword_match}, flag_forced={_flag_forced}, "
+                f"project_id={_pid}"
             )
+            if _flag_forced:
+                print(f"=== QL_49: awaiting_delta_review FLAG forced extraction tools for project {_pid} ===")
             logger.info(f"[DIAGNOSTIC] TOOLS SENT TO CLAUDE: {tool_names_sent}")
-            if 'analyze_rent_roll_columns' in tool_names_sent:
-                print(f"=== DIAGNOSTIC: analyze_rent_roll_columns IS in tools list ({len(filtered_tools)} tools) ===")
+            if 'compute_rent_roll_delta' in tool_names_sent:
+                print(f"=== DIAGNOSTIC: compute_rent_roll_delta IS in tools list ({len(filtered_tools)} tools) ===")
             else:
-                print(f"=== DIAGNOSTIC: analyze_rent_roll_columns NOT in tools list. Tools: {tool_names_sent} ===")
+                print(f"=== DIAGNOSTIC: compute_rent_roll_delta NOT in tools list. Tools: {tool_names_sent} ===")
+
+        # QL_49: Force-execute compute_rent_roll_delta when awaiting_delta_review flag is set.
+        # Bypass Claude's tool selection entirely — execute server-side and inject result
+        # into the conversation so Claude only needs to narrate.
+        _forced_delta_result = None
+        _forced_delta_executions = []
+        if _flag_forced and tool_executor and _pid:
+            try:
+                from apps.knowledge.models import ExtractionJob as _EJ
+                _flagged_job = _EJ.objects.filter(
+                    project_id=_pid,
+                    result_summary__awaiting_delta_review=True,
+                ).order_by('-created_at').first()
+
+                if _flagged_job:
+                    _doc_id = _flagged_job.result_summary.get('delta_document_id')
+                    _mappings = _flagged_job.result_summary.get('delta_mappings')
+                    _job_status = _flagged_job.status
+
+                    if _job_status not in ('completed',):
+                        # Extraction still running — tell Claude to inform the user
+                        _forced_delta_result = {
+                            'success': False,
+                            'still_running': True,
+                            'job_id': _flagged_job.job_id,
+                            'job_status': _job_status,
+                            'message': f'Extraction job {_flagged_job.job_id} is still {_job_status}. Ask the user to wait a moment and try again.',
+                        }
+                        logger.info(f"[QL_49] Extraction job {_flagged_job.job_id} still {_job_status}, deferring delta")
+                    elif _doc_id and _mappings:
+                        logger.info(f"[QL_49] Force-executing compute_rent_roll_delta (doc={_doc_id}, job={_flagged_job.job_id})")
+                        _forced_delta_result = tool_executor(
+                            tool_name='compute_rent_roll_delta',
+                            tool_input={'document_id': _doc_id, 'mappings': _mappings},
+                            project_id=_pid,
+                        )
+                        _forced_delta_executions.append({
+                            'tool': 'compute_rent_roll_delta',
+                            'tool_use_id': 'forced_delta_ql49',
+                            'success': _forced_delta_result.get('success', False),
+                            'is_proposal': False,
+                            'result': _forced_delta_result,
+                        })
+                        logger.info(f"[QL_49] Forced delta result: success={_forced_delta_result.get('success')}, "
+                                    f"units_with_changes={_forced_delta_result.get('summary', {}).get('units_with_changes', '?')}")
+                    else:
+                        logger.warning(f"[QL_49] Flag set but missing delta_document_id or delta_mappings on job {_flagged_job.job_id}")
+            except Exception as _delta_err:
+                logger.error(f"[QL_49] Forced delta execution failed: {_delta_err}", exc_info=True)
+
+        # If we force-executed the delta, inject the result into the conversation
+        # so Claude narrates it instead of making its own tool call
+        if _forced_delta_result is not None:
+            print(f'[QL_63_DEBUG] Forced delta execution fired for project {_pid}, result: {str(_forced_delta_result)[:200]}')
+            _delta_result_str = _truncate_tool_result(_forced_delta_result)
+            _delta_context = (
+                "\n\n<pre_executed_tool>\n"
+                "Tool: compute_rent_roll_delta (auto-executed because awaiting_delta_review was set)\n"
+                f"Result: {_delta_result_str}\n"
+                "</pre_executed_tool>\n\n"
+                "INSTRUCTION: Narrate the above delta result to the user following Phase 4 rules. "
+                "Do NOT call compute_rent_roll_delta again — it has already been executed."
+            )
+            # Append to the last user message
+            if claude_messages and claude_messages[-1].get('role') == 'user':
+                _last_content = claude_messages[-1].get('content', '')
+                if isinstance(_last_content, str):
+                    claude_messages[-1]['content'] = _last_content + _delta_context
+                elif isinstance(_last_content, list):
+                    claude_messages[-1]['content'].append({'type': 'text', 'text': _delta_context})
+
+        # Guard: ensure no orphaned tool_use blocks in message history
+        claude_messages = ensure_tool_results_closed(claude_messages)
 
         logger.info(f"[AI_HANDLER] Calling Claude with {len(claude_messages)} messages, last message: {claude_messages[-1]['content'][:100] if claude_messages else 'none'}...")
         response = client.messages.create(**api_kwargs)
@@ -5845,7 +6396,7 @@ def get_landscaper_response(
         # Process response with potential tool use loop
         field_updates = []
         tool_calls_made = []
-        tool_executions = []  # Track full tool execution details for frontend events
+        tool_executions = list(_forced_delta_executions)  # Include any forced delta execution
         media_summary = None  # Track media summary for inline chat card
         final_content = ""
         total_input_tokens = response.usage.input_tokens
@@ -5862,8 +6413,8 @@ def get_landscaper_response(
                 print(f"=== DIAGNOSTIC: CLAUDE TEXT RESPONSE (first 200 chars): {_diag_block.text[:200]} ===")
 
         # Tool loop safeguards
-        MAX_TOOL_ITERATIONS = 5
-        MAX_TOOL_LOOP_SECONDS = 75  # Leave buffer for frontend's 150s timeout
+        MAX_TOOL_ITERATIONS = 10  # Increased from 5 — rent roll extraction needs ~6-8 steps
+        MAX_TOOL_LOOP_SECONDS = 90  # Leave buffer for frontend's 150s timeout
         tool_loop_start = time.time()
         tool_iteration = 0
         loop_broke_early = False
@@ -5905,6 +6456,7 @@ def get_landscaper_response(
                 logger.info(f"[Tool Loop] Executing: {tool_name}")
                 tool_calls_made.append({
                     'tool': tool_name,
+                    'tool_use_id': tool_id,
                     'input': tool_input
                 })
 
@@ -5978,6 +6530,7 @@ def get_landscaper_response(
                     # Track tool execution for frontend mutation events
                     tool_executions.append({
                         'tool': tool_name,
+                        'tool_use_id': tool_id,
                         'success': result.get('success', False),
                         'is_proposal': False,
                         'result': _sanitize_for_json(result)
@@ -5992,6 +6545,7 @@ def get_landscaper_response(
                     })
                     tool_executions.append({
                         'tool': tool_name,
+                        'tool_use_id': tool_id,
                         'success': False,
                         'is_proposal': False,
                         'error': str(e)
@@ -6006,6 +6560,9 @@ def get_landscaper_response(
                 "role": "user",
                 "content": tool_results
             })
+
+            # Guard: ensure no orphaned tool_use blocks before continuation
+            claude_messages = ensure_tool_results_closed(claude_messages)
 
             # Get next response
             total_msg_chars = sum(len(str(m.get('content', ''))) for m in claude_messages)
@@ -6023,15 +6580,33 @@ def get_landscaper_response(
         # If loop broke early, make one final call WITHOUT tools to get a summary
         if loop_broke_early and tool_executor:
             logger.info("[Tool Loop] Making final summary call (no tools)")
+            # Must provide tool_results for any pending tool_use blocks in the
+            # last response, otherwise the Claude API returns a 400 error.
             claude_messages.append({
                 "role": "assistant",
                 "content": response.content
             })
+            # Check if the last response had tool_use blocks that need results
+            pending_tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    pending_tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": "Tool call limit reached. This tool was not executed."
+                    })
+            if pending_tool_results:
+                claude_messages.append({
+                    "role": "user",
+                    "content": pending_tool_results
+                })
             claude_messages.append({
                 "role": "user",
                 "content": "Tool call limit reached. Please summarize what was accomplished with the information gathered so far. Do not call any more tools."
             })
             try:
+                # Guard: ensure no orphaned tool_use blocks before summary call
+                claude_messages = ensure_tool_results_closed(claude_messages)
                 summary_kwargs = {k: v for k, v in api_kwargs.items() if k != 'tools'}
                 summary_kwargs['messages'] = claude_messages
                 response = client.messages.create(**summary_kwargs)
@@ -6039,6 +6614,14 @@ def get_landscaper_response(
                 total_output_tokens += response.usage.output_tokens
             except Exception as e:
                 logger.error(f"[Tool Loop] Final summary call failed: {e}")
+                # Fallback: provide a minimal response so the user isn't left with nothing
+                if not final_content:
+                    final_content = (
+                        "I ran into a processing limit while executing that task. "
+                        "The operation requires more steps than I can complete in one go. "
+                        "Try breaking it into smaller steps — for example, "
+                        "\"delete the 8 extra units first\" then \"update bed/bath values.\""
+                    )
 
         # Extract final text content
         for block in response.content:
@@ -6047,6 +6630,61 @@ def get_landscaper_response(
 
         total_elapsed = time.time() - tool_loop_start
         logger.info(f"[Tool Loop] Complete: {tool_iteration} iterations, {total_elapsed:.1f}s total, {len(tool_calls_made)} tool calls")
+
+        # Narration guarantee: if tools were executed but Claude produced no text,
+        # force a narration turn. This prevents the "silent completion" bug where
+        # confirm_column_mapping or other mutation tools execute but no follow-up
+        # message is generated for the user.
+        narration_tools = {'confirm_column_mapping', 'compute_rent_roll_delta', 'update_units', 'delete_units'}
+        executed_narration_tools = [tc['tool'] for tc in tool_calls_made if tc['tool'] in narration_tools]
+        if executed_narration_tools and not final_content.strip():
+            logger.info(f"[Tool Loop] No narration after tool execution ({executed_narration_tools}), forcing narration turn")
+            try:
+                # Build a narration prompt from the last tool results
+                last_tool_summaries = []
+                for exec_info in tool_executions:
+                    if exec_info.get('tool') in narration_tools and exec_info.get('success'):
+                        last_tool_summaries.append(
+                            f"Tool '{exec_info['tool']}' succeeded: {str(exec_info.get('result', {}))[:500]}"
+                        )
+                narration_prompt = (
+                    "The following tools completed successfully but you didn't produce a response. "
+                    "Please narrate the results concisely (1-3 sentences): "
+                    + "; ".join(last_tool_summaries)
+                )
+                # Append as assistant + user to maintain proper turn structure
+                claude_messages.append({
+                    "role": "assistant",
+                    "content": response.content
+                })
+                # Close any orphaned tool_use blocks
+                claude_messages = ensure_tool_results_closed(claude_messages)
+                claude_messages.append({
+                    "role": "user",
+                    "content": narration_prompt
+                })
+                narration_kwargs = {k: v for k, v in api_kwargs.items() if k != 'tools'}
+                narration_kwargs['messages'] = claude_messages
+                narration_response = client.messages.create(**narration_kwargs)
+                total_input_tokens += narration_response.usage.input_tokens
+                total_output_tokens += narration_response.usage.output_tokens
+                for block in narration_response.content:
+                    if hasattr(block, 'text'):
+                        final_content += block.text
+                logger.info(f"[Tool Loop] Forced narration produced {len(final_content)} chars")
+            except Exception as narr_err:
+                logger.error(f"[Tool Loop] Forced narration call failed: {narr_err}")
+                # Build a minimal narration from tool results
+                for exec_info in tool_executions:
+                    if exec_info.get('tool') in narration_tools and exec_info.get('success'):
+                        result = exec_info.get('result', {})
+                        if exec_info['tool'] == 'confirm_column_mapping':
+                            final_content = (
+                                f"Extraction started (job #{result.get('job_id', '?')}). "
+                                f"{result.get('standard_mappings_count', 0)} columns mapped, "
+                                f"{len(result.get('dynamic_columns_created', []))} dynamic columns created. "
+                                f"{result.get('message', '')}"
+                            )
 
         # Check if response was truncated due to max_tokens limit
         if response.stop_reason == "max_tokens":

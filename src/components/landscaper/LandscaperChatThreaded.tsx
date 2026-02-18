@@ -34,6 +34,7 @@ interface LandscaperChatThreadedProps {
   onToggleExpand?: () => void;
   onCollapsePanel?: () => void;
   onReviewMedia?: (docId: number, docName: string) => void;
+  onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
 }
 
 /**
@@ -58,6 +59,7 @@ function getPageContextHint(context: string): string {
     land_budget: 'Budget & Costs',
     land_schedule: 'Absorption & Schedule',
     reports: 'Reports & Analytics',
+    investment_committee: 'IC Devil\'s Advocate',
     documents: 'Document Management',
     map: 'Map & Spatial Insights',
     alpha_assistant: 'Platform Help',
@@ -79,6 +81,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onToggleExpand,
     onCollapsePanel,
     onReviewMedia,
+    onToolResult,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -106,6 +109,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     projectId: projectId.toString(),
     pageContext,
     subtabContext,
+    onToolResult,
   });
 
   // Expose sendMessage to parent via imperative handle (for programmatic chat injection)

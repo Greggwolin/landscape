@@ -1089,21 +1089,65 @@ class MutationService:
                         # in bulk to minimize DB round-trips (was N+1 per unit)
                         unit_type_stats = {}
 
-                        # Phase 1: Normalize all records
+                        # Status normalization map (Excel/document → canonical)
+                        _STATUS_MAP = {
+                            'current': 'occupied', 'occupied': 'occupied',
+                            'vacant': 'vacant', 'vacant-unrented': 'vacant',
+                            'vacant-rented': 'vacant', 'vacant unrented': 'vacant',
+                            'vacant rented': 'vacant', 'notice': 'notice',
+                            'eviction': 'eviction', 'model': 'model', 'down': 'down',
+                            'employee': 'occupied', 'office': 'occupied',
+                        }
+
+                        # Updatable unit fields (used to detect partial vs full records)
+                        _UNIT_DATA_FIELDS = {
+                            'unit_type', 'bedrooms', 'bathrooms', 'square_feet',
+                            'current_rent', 'market_rent', 'occupancy_status',
+                        }
+
+                        # Phase 1: Normalize all records, tracking which fields
+                        # were explicitly provided vs defaulted
                         normalized = []
                         for rec in records:
+                            # Track which fields are explicitly present in the input
+                            provided_fields = set()
+
                             unit_type = rec.get("unit_type") or rec.get("unit_type_code") or rec.get("unit_type_name", "")
+                            if "unit_type" in rec or "unit_type_code" in rec or "unit_type_name" in rec:
+                                provided_fields.add("unit_type")
                             if not unit_type and (rec.get("bedrooms") is not None or rec.get("bathrooms") is not None):
                                 br = rec.get("bedrooms", 0)
                                 ba = rec.get("bathrooms", 1)
                                 unit_type = f"{int(br)}BR/{int(ba)}BA"
+                                provided_fields.add("unit_type")
 
                             bedrooms = rec.get("bedrooms", 0)
+                            if "bedrooms" in rec:
+                                provided_fields.add("bedrooms")
                             bathrooms = rec.get("bathrooms", 1)
+                            if "bathrooms" in rec:
+                                provided_fields.add("bathrooms")
                             square_feet = rec.get("square_feet", 0)
+                            if "square_feet" in rec:
+                                provided_fields.add("square_feet")
                             current_rent = rec.get("current_rent", 0)
+                            if "current_rent" in rec:
+                                provided_fields.add("current_rent")
                             market_rent = rec.get("market_rent", 0)
-                            occupancy_status = rec.get("occupancy_status") or rec.get("status", "occupied")
+                            if "market_rent" in rec:
+                                provided_fields.add("market_rent")
+
+                            raw_status = rec.get("occupancy_status") or rec.get("status")
+                            if raw_status:
+                                provided_fields.add("occupancy_status")
+                                occupancy_status = _STATUS_MAP.get(
+                                    raw_status.strip().lower() if isinstance(raw_status, str) else '',
+                                    raw_status
+                                )
+                                if occupancy_status != raw_status:
+                                    logger.info(f"[Mutation] Normalized status '{raw_status}' → '{occupancy_status}'")
+                            else:
+                                occupancy_status = "occupied"  # default for new units only
 
                             normalized.append({
                                 "unit_number": rec.get("unit_number"),
@@ -1117,6 +1161,7 @@ class MutationService:
                                 "lease_start_date": rec.get("lease_start_date"),
                                 "lease_end_date": rec.get("lease_end_date"),
                                 "lease_term_months": rec.get("lease_term_months"),
+                                "_provided_fields": provided_fields,
                             })
 
                             # Aggregate unit type stats for floorplan table
@@ -1134,6 +1179,42 @@ class MutationService:
                                 unit_type_stats[unit_type]["market_rent_total"] += (market_rent or 0)
 
                         logger.info(f"[Mutation] Batch upserting {len(normalized)} units for project {project_id}")
+
+                        # Phase 1b: For partial updates (not all data fields provided),
+                        # pre-load existing units and merge to avoid overwriting with defaults
+                        is_partial = any(
+                            r["_provided_fields"] and r["_provided_fields"] != _UNIT_DATA_FIELDS
+                            for r in normalized
+                        )
+                        if is_partial:
+                            unit_numbers_to_load = [r["unit_number"] for r in normalized]
+                            cursor.execute("""
+                                SELECT unit_number, unit_type, bedrooms, bathrooms,
+                                       square_feet, current_rent, market_rent, occupancy_status
+                                FROM landscape.tbl_multifamily_unit
+                                WHERE project_id = %s AND unit_number = ANY(%s::text[])
+                            """, [project_id, unit_numbers_to_load])
+                            existing_map = {}
+                            for row in cursor.fetchall():
+                                existing_map[row[0]] = {
+                                    "unit_type": row[1] or "",
+                                    "bedrooms": float(row[2]) if row[2] else 0,
+                                    "bathrooms": float(row[3]) if row[3] else 1,
+                                    "square_feet": row[4] or 0,
+                                    "current_rent": float(row[5]) if row[5] else 0,
+                                    "market_rent": float(row[6]) if row[6] else 0,
+                                    "occupancy_status": row[7] or "occupied",
+                                }
+
+                            # Merge: for each record, fill in unspecified fields from existing data
+                            for rec in normalized:
+                                existing = existing_map.get(rec["unit_number"])
+                                if existing:
+                                    for field in _UNIT_DATA_FIELDS:
+                                        if field not in rec["_provided_fields"]:
+                                            rec[field] = existing[field]
+
+                            logger.info(f"[Mutation] Partial update: merged with {len(existing_map)} existing units")
 
                         # Phase 2: Batch upsert all units in one query using UNNEST
                         unit_numbers = [r["unit_number"] for r in normalized]
@@ -1329,6 +1410,47 @@ class MutationService:
                         response["floorplan_types_created"] = len(unit_type_stats)
                     return response
 
+                elif mutation_type == "unit_delete" and isinstance(proposed_value, dict):
+                    # Batch delete units and their dependents
+                    unit_ids = proposed_value.get("unit_ids", [])
+                    unit_numbers = proposed_value.get("unit_numbers", [])
+                    if not unit_ids:
+                        return {"success": False, "error": "No unit_ids in delete payload"}
+
+                    id_placeholders = ','.join(['%s'] * len(unit_ids))
+
+                    # Delete leases first (FK constraint)
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_lease
+                        WHERE unit_id IN ({id_placeholders})
+                    """, unit_ids)
+                    leases_deleted = cursor.rowcount
+
+                    # Delete turns (FK constraint)
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_turn
+                        WHERE unit_id IN ({id_placeholders})
+                    """, unit_ids)
+                    turns_deleted = cursor.rowcount
+
+                    # Delete the units
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_unit
+                        WHERE project_id = %s AND unit_id IN ({id_placeholders})
+                    """, [project_id] + unit_ids)
+                    units_deleted = cursor.rowcount
+
+                    return {
+                        "success": True,
+                        "action": "deleted",
+                        "units_deleted": units_deleted,
+                        "unit_numbers": unit_numbers,
+                        "dependents_removed": {
+                            "leases": leases_deleted,
+                            "turns": turns_deleted,
+                        },
+                    }
+
                 else:
                     return {"success": False, "error": f"Unknown mutation type: {mutation_type}"}
 
@@ -1411,12 +1533,13 @@ def get_current_value(
 
     Used to populate current_value in proposals for comparison display.
     """
-    pk_column = PK_COLUMNS.get(table_name)
+    normalized_table = table_name.split('.')[-1]
+    pk_column = PK_COLUMNS.get(normalized_table)
     if not pk_column:
         return None
 
     # Determine which ID to use
-    if table_name == "tbl_project":
+    if normalized_table == "tbl_project":
         target_id = project_id
     elif record_id:
         target_id = record_id
@@ -1424,9 +1547,30 @@ def get_current_value(
         return None
 
     try:
+        if normalized_table == "tbl_project" and field_name in (
+            "cap_rate_current",
+            "cap_rate_proforma",
+            "cap_rate_going_in",
+            "cap_rate",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT selected_cap_rate, terminal_cap_rate
+                    FROM landscape.tbl_income_approach
+                    WHERE project_id = %s
+                    ORDER BY updated_at DESC NULLS LAST, income_approach_id DESC
+                    LIMIT 1
+                """, [project_id])
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                if field_name == "cap_rate_proforma":
+                    return row[1]
+                return row[0]
+
         with connection.cursor() as cursor:
             cursor.execute(f"""
-                SELECT {field_name} FROM landscape.{table_name}
+                SELECT {field_name} FROM landscape.{normalized_table}
                 WHERE {pk_column} = %s
             """, [target_id])
             row = cursor.fetchone()
