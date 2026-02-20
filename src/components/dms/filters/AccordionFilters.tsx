@@ -49,6 +49,9 @@ interface CollisionCheckResult {
     filename: string;
     version_number: number;
     uploaded_at: string;
+    doc_type?: string | null;
+    file_size_bytes?: number | null;
+    mime_type?: string | null;
     extraction_summary: {
       facts_extracted: number;
       embeddings: number;
@@ -236,7 +239,10 @@ function FilterDropRow({
 
     const docResult = await response.json();
 
-    if ((docResult?.collision || docResult?.duplicate) && docResult?.existing_doc) {
+      if ((docResult?.collision || docResult?.duplicate) && docResult?.existing_doc) {
+      if (pendingCollision) {
+        throw new Error('collision_ignored');
+      }
       addCollision({
         file,
         hash,
@@ -246,14 +252,21 @@ function FilterDropRow({
           filename: docResult.existing_doc.filename,
           version_number: docResult.existing_doc.version_number,
           uploaded_at: docResult.existing_doc.uploaded_at,
+          doc_type: docResult.existing_doc.doc_type,
+          file_size_bytes: docResult.existing_doc.file_size_bytes,
+          mime_type: docResult.existing_doc.mime_type,
         },
         projectId,
         workspaceId,
         docType: filter.doc_type,
+        onDiscard: () => {
+          setPendingFiles([]);
+          setIsUploading(false);
+        },
       });
       throw new Error('collision_detected');
     }
-  }, [filter.doc_type, projectId, workspaceId, startUpload, addCollision]);
+  }, [filter.doc_type, projectId, workspaceId, startUpload, addCollision, pendingCollision]);
 
   /**
    * Process files with collision detection - triggers Landscaper for collisions
@@ -281,6 +294,9 @@ function FilterDropRow({
 
       if (collision.collision && collision.existing_doc && collision.match_type) {
         // 3. Collision found - trigger Landscaper instead of modal
+        if (pendingCollision) {
+          return;
+        }
         addCollision({
           file,
           hash: contentHash,
@@ -290,10 +306,17 @@ function FilterDropRow({
             filename: collision.existing_doc.filename,
             version_number: collision.existing_doc.version_number,
             uploaded_at: collision.existing_doc.uploaded_at,
+            doc_type: collision.existing_doc.doc_type,
+            file_size_bytes: collision.existing_doc.file_size_bytes,
+            mime_type: collision.existing_doc.mime_type,
           },
           projectId,
           workspaceId,
           docType: filter.doc_type,
+          onDiscard: () => {
+            setPendingFiles([]);
+            setIsUploading(false);
+          },
         });
         setPendingFiles(remainingFiles);
         // Don't proceed with upload - Landscaper will handle via context
@@ -316,6 +339,9 @@ function FilterDropRow({
         setPendingFiles(remainingFiles);
         return;
       }
+      if (error instanceof Error && error.message === 'collision_ignored') {
+        return;
+      }
       console.error('Error processing file:', error);
       // Continue with remaining files despite error
       if (remainingFiles.length > 0) {
@@ -325,7 +351,7 @@ function FilterDropRow({
         onUploadComplete?.();
       }
     }
-  }, [projectId, uploadSingleFile, onUploadComplete, addCollision]);
+  }, [projectId, uploadSingleFile, onUploadComplete, addCollision, pendingCollision]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;

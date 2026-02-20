@@ -6,11 +6,10 @@ import { cilCloudUpload, cilSend } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
 import { useLandscaper } from '@/hooks/useLandscaper';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useToast } from '@/hooks/use-toast';
 import {
   useLandscaperCollision,
   buildCollisionMessage,
-  type CollisionAction,
   type PendingCollision,
 } from '@/contexts/LandscaperCollisionContext';
 
@@ -154,33 +153,6 @@ function detectQueryIntent(query: string): IntentResult {
  return { intent, confidence, signals };
 }
 
-interface UploadThingResult {
- url: string;
- key: string;
- name: string;
- size: number;
- serverData?: {
- storage_uri: string;
- sha256: string;
- doc_name: string;
- mime_type: string;
- file_size_bytes: number;
- project_id: number;
- workspace_id: number;
- doc_type: string;
- discipline?: string;
- phase_id?: number;
- parcel_id?: number;
- };
-}
-
-async function computeFileHash(file: File): Promise<string> {
- const arrayBuffer = await file.arrayBuffer();
- const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
- const hashArray = Array.from(new Uint8Array(hashBuffer));
- return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 export interface DmsLandscaperMessage {
  role: 'user' | 'assistant';
  content: string;
@@ -217,6 +189,7 @@ export default function DmsLandscaperPanel({
  onResolveLink,
  onDocumentsUpdated,
 }: DmsLandscaperPanelProps) {
+ const { showToast } = useToast();
  const [input, setInput] = useState('');
  const [localMessages, setLocalMessages] = useState<DmsLandscaperMessage[]>([
  {
@@ -226,13 +199,15 @@ export default function DmsLandscaperPanel({
  ]);
  const [isHandlingCollision, setIsHandlingCollision] = useState(false);
  const [isHandlingLink, setIsHandlingLink] = useState(false);
+ const [collisionStep, setCollisionStep] = useState<'prompt' | 'notes'>('prompt');
+ const [collisionNotes, setCollisionNotes] = useState('');
+ const [collisionError, setCollisionError] = useState<string | null>(null);
  const lastCollisionIdRef = useRef<string | null>(null);
  const lastLinkKeyRef = useRef<string | null>(null);
 
  const {
   pendingCollision,
-  resolveCollision,
-  setOnCollisionResolved,
+  clearCollision,
  } = useLandscaperCollision();
 
  // Use unified Landscaper API for AI queries (projectId: null for global context)
@@ -243,31 +218,6 @@ export default function DmsLandscaperPanel({
  } = useLandscaper({
  projectId: null,
  activeTab: 'dms',
- });
-
- const uploadHeaders = useMemo(() => {
-  if (!pendingCollision) {
-   return {
-    'x-project-id': '0',
-    'x-workspace-id': '1',
-    'x-doc-type': 'general',
-   };
-  }
-  return {
-   'x-project-id': pendingCollision.projectId.toString(),
-   'x-workspace-id': (pendingCollision.workspaceId ?? 1).toString(),
-   'x-doc-type': pendingCollision.docType || 'general',
-   ...(pendingCollision.discipline && { 'x-discipline': pendingCollision.discipline }),
-   ...(pendingCollision.phaseId && { 'x-phase-id': pendingCollision.phaseId.toString() }),
-   ...(pendingCollision.parcelId && { 'x-parcel-id': pendingCollision.parcelId.toString() }),
-  };
- }, [pendingCollision]);
-
- const { startUpload } = useUploadThing('documentUploader', {
-  headers: uploadHeaders,
-  onUploadError: (error) => {
-   console.error('[DMS_LANDSCAPER] Upload error:', error);
-  },
  });
 
  // Combine local messages (document filter results) with AI messages
@@ -309,6 +259,16 @@ export default function DmsLandscaperPanel({
  }, [pendingCollision]);
 
  useEffect(() => {
+  if (!pendingCollision) {
+   setCollisionStep('prompt');
+   setCollisionNotes('');
+   setCollisionError(null);
+   return;
+  }
+  setCollisionError(null);
+ }, [pendingCollision]);
+
+ useEffect(() => {
   if (!pendingLink) return;
   const linkKey = `${pendingLink.sourceDocId}-${pendingLink.targetDocId}`;
   if (lastLinkKeyRef.current === linkKey) return;
@@ -325,96 +285,114 @@ export default function DmsLandscaperPanel({
   }
  }, [pendingLink]);
 
- useEffect(() => {
-  const handleCollisionResponse = async (action: CollisionAction, collision: PendingCollision) => {
-   const { file, existingDoc, projectId: collisionProjectId } = collision;
-   setIsHandlingCollision(true);
-   try {
-    if (action === 'version') {
-     const formData = new FormData();
-     formData.append('file', file);
+ const formatBytes = useCallback((value?: number | null) => {
+  if (!value || !Number.isFinite(value)) return null;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+   size /= 1024;
+   unitIndex += 1;
+  }
+  const precision = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(precision)} ${units[unitIndex]}`;
+ }, []);
 
-     const response = await fetch(
-      `/api/projects/${collisionProjectId}/dms/docs/${existingDoc.doc_id}/version`,
-      {
-       method: 'POST',
-       body: formData,
-      }
-     );
+ const formatDate = useCallback((value?: string | number | null) => {
+  if (!value) return null;
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString();
+ }, []);
 
-     if (!response.ok) {
-      throw new Error('Failed to upload new version');
-     }
+ const buildVersionNotes = useCallback((collision: PendingCollision) => {
+  const { file, existingDoc, docType } = collision;
+  const lines: string[] = [];
+  lines.push(`New version of "${existingDoc.filename}".`);
+  if (existingDoc.version_number) {
+   lines.push(`Previous version: V${existingDoc.version_number}.`);
+  }
+  const docTypeLabel = existingDoc.doc_type || docType;
+  if (docTypeLabel) {
+   lines.push(`Document type: ${docTypeLabel}.`);
+  }
+  const oldSize = formatBytes(existingDoc.file_size_bytes);
+  const newSize = formatBytes(file.size);
+  if (oldSize && newSize) {
+   lines.push(`File size: ${oldSize} → ${newSize}.`);
+  } else if (newSize) {
+   lines.push(`File size: ${newSize}.`);
+  }
+  const oldDate = formatDate(existingDoc.uploaded_at);
+  const newDate = formatDate(file.lastModified);
+  if (oldDate && newDate) {
+   lines.push(`Updated: ${oldDate} → ${newDate}.`);
+  } else if (newDate) {
+   lines.push(`Updated: ${newDate}.`);
+  }
+  return lines.join(' ');
+ }, [formatBytes, formatDate]);
 
-     const result = await response.json();
-     appendMessage({
-      role: 'assistant',
-      content: `Done. I've uploaded "${file.name}" as V${result.version_no || result.new_version || 'new'} of "${existingDoc.filename}".`,
-     });
-     onDocumentsUpdated?.();
-    } else if (action === 'skip') {
-     const results = await startUpload([file]) as UploadThingResult[] | undefined;
-     if (!results || results.length === 0) {
-      throw new Error('Upload failed - no results');
-     }
+ const handleStartNotes = useCallback(() => {
+  if (!pendingCollision) return;
+  setCollisionError(null);
+  if (!collisionNotes.trim()) {
+   setCollisionNotes(buildVersionNotes(pendingCollision));
+  }
+  setCollisionStep('notes');
+ }, [buildVersionNotes, collisionNotes, pendingCollision]);
 
-     const result = results[0];
-     const serverData = result.serverData;
-     const sha256 = serverData?.sha256 || collision.hash || await computeFileHash(file);
+ const handleCancelCollision = useCallback(() => {
+  if (!pendingCollision) return;
+  pendingCollision.onDiscard?.();
+  clearCollision();
+  setCollisionStep('prompt');
+  setCollisionNotes('');
+  setCollisionError(null);
+ }, [clearCollision, pendingCollision]);
 
-     const payload = {
-      system: {
-       project_id: serverData?.project_id ?? collision.projectId,
-       workspace_id: serverData?.workspace_id ?? collision.workspaceId ?? 1,
-       phase_id: serverData?.phase_id ?? collision.phaseId ?? null,
-       parcel_id: serverData?.parcel_id ?? collision.parcelId ?? null,
-       doc_name: serverData?.doc_name ?? file.name,
-       doc_type: serverData?.doc_type ?? collision.docType ?? 'general',
-       discipline: serverData?.discipline ?? collision.discipline,
-       status: 'draft',
-       storage_uri: serverData?.storage_uri ?? result.url,
-       sha256: sha256,
-       file_size_bytes: serverData?.file_size_bytes ?? file.size,
-       mime_type: serverData?.mime_type ?? file.type,
-       version_no: 1,
-      },
-      profile: {},
-      ai: { source: 'upload' },
-     };
-
-     const response = await fetch('/api/dms/docs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-     });
-
-     if (!response.ok) {
-      throw new Error('Failed to create document record');
-     }
-
-     appendMessage({
-      role: 'assistant',
-      content: `Got it. I uploaded "${file.name}" as a separate document.`,
-     });
-     onDocumentsUpdated?.();
-    }
-   } catch (error) {
-    console.error('[DMS_LANDSCAPER] Collision resolution error:', error);
-    appendMessage({
-     role: 'assistant',
-     content: `There was an error processing the file: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    });
-   } finally {
-    setIsHandlingCollision(false);
+ const handleSaveVersion = useCallback(async () => {
+  if (!pendingCollision || isHandlingCollision) return;
+  setIsHandlingCollision(true);
+  setCollisionError(null);
+  try {
+   const formData = new FormData();
+   formData.append('file', pendingCollision.file);
+   if (collisionNotes.trim()) {
+    formData.append('version_notes', collisionNotes.trim());
    }
-  };
 
-  setOnCollisionResolved(handleCollisionResponse);
+   const response = await fetch(
+    `/api/projects/${pendingCollision.projectId}/dms/docs/${pendingCollision.existingDoc.doc_id}/version`,
+    {
+     method: 'POST',
+     body: formData,
+    }
+   );
 
-  return () => {
-   setOnCollisionResolved(null);
-  };
- }, [appendMessage, onDocumentsUpdated, setOnCollisionResolved, startUpload]);
+   if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to upload new version');
+   }
+
+   const result = await response.json();
+   appendMessage({
+    role: 'assistant',
+    content: `Saved "${pendingCollision.file.name}" as V${result.version_no || result.new_version || 'new'} of "${pendingCollision.existingDoc.filename}".`,
+   });
+   showToast({ title: 'Saved as new version', message: pendingCollision.file.name, type: 'success' });
+   pendingCollision.onDiscard?.();
+   clearCollision();
+   setCollisionStep('prompt');
+   setCollisionNotes('');
+   onDocumentsUpdated?.();
+  } catch (error) {
+   console.error('[DMS_LANDSCAPER] Version upload error:', error);
+   setCollisionError(error instanceof Error ? error.message : 'Failed to upload new version');
+  } finally {
+   setIsHandlingCollision(false);
+  }
+ }, [appendMessage, clearCollision, collisionNotes, isHandlingCollision, onDocumentsUpdated, pendingCollision, showToast]);
 
  const {
  getRootProps,
@@ -459,22 +437,30 @@ export default function DmsLandscaperPanel({
  if (pendingCollision) {
   const normalized = query.toLowerCase();
   const isYes = /^(y|yes|yeah|yep|sure|ok|okay|upload|version)/.test(normalized);
-  const isNo = /^(n|no|nope|nah|separate|skip)/.test(normalized);
+  const isNo = /^(n|no|nope|nah|cancel|discard|stop)/.test(normalized);
 
   appendMessage({ role: 'user', content: query });
 
+  if (collisionStep === 'notes') {
+   appendMessage({
+    role: 'assistant',
+    content: 'Use "Save Version" to continue or "Back" to return to the prompt.',
+   });
+   return;
+  }
+
   if (isYes) {
-   resolveCollision('version');
+   handleStartNotes();
    return;
   }
   if (isNo) {
-   resolveCollision('skip');
+   handleCancelCollision();
    return;
   }
 
   appendMessage({
    role: 'assistant',
-   content: 'Please reply "yes" to upload as a new version, or "no" to upload as a separate document.',
+   content: 'Please reply "yes" to add a new version, or "cancel" to discard this upload.',
   });
   return;
  }
@@ -614,9 +600,11 @@ export default function DmsLandscaperPanel({
   isSending,
   isHandlingCollision,
   isHandlingLink,
+  collisionStep,
   pendingCollision,
   pendingLink,
-  resolveCollision,
+  handleCancelCollision,
+  handleStartNotes,
   appendMessage,
   onResolveLink,
   onDocumentsUpdated,
@@ -685,32 +673,73 @@ export default function DmsLandscaperPanel({
  ))}
  </div>
 
- {pendingCollision && (
+ {pendingCollision && collisionStep === 'prompt' && (
  <div className="mt-3 flex flex-wrap gap-2">
  <button
  type="button"
  disabled={isHandlingCollision}
  onClick={() => {
  appendMessage({ role: 'user', content: 'Yes' });
- resolveCollision('version');
+ handleStartNotes();
  }}
- className="px-3 py-1 rounded-md text-xs text-white"
- style={{ backgroundColor: 'var(--cui-primary)' }}
+ className="btn btn-primary btn-sm"
  >
- Upload as New Version
+ Yes, add as new version
  </button>
  <button
  type="button"
  disabled={isHandlingCollision}
  onClick={() => {
- appendMessage({ role: 'user', content: 'No' });
- resolveCollision('skip');
+ appendMessage({ role: 'user', content: 'Cancel' });
+ handleCancelCollision();
  }}
- className="px-3 py-1 rounded-md text-xs border"
- style={{ borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+ className="btn btn-ghost-secondary btn-sm"
  >
- Upload Separately
+ Cancel
  </button>
+ </div>
+ )}
+
+ {pendingCollision && collisionStep === 'notes' && (
+ <div className="mt-3 border rounded-md p-3" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+ <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">
+ Version Notes
+ </div>
+ <textarea
+ rows={4}
+ value={collisionNotes}
+ onChange={(event) => setCollisionNotes(event.target.value)}
+ placeholder="Describe what changed in this version..."
+ className="w-full rounded-md border px-3 py-2 text-xs"
+ style={{
+ borderColor: 'var(--cui-border-color)',
+ backgroundColor: 'var(--cui-body-bg)',
+ color: 'var(--cui-body-color)'
+ }}
+ />
+ {collisionError && (
+ <div className="text-xs mt-2" style={{ color: 'var(--cui-danger)' }}>
+ {collisionError}
+ </div>
+ )}
+ <div className="mt-2 flex flex-wrap gap-2">
+ <button
+ type="button"
+ disabled={isHandlingCollision}
+ onClick={() => void handleSaveVersion()}
+ className="btn btn-primary btn-sm"
+ >
+ {isHandlingCollision ? 'Saving...' : 'Save Version'}
+ </button>
+ <button
+ type="button"
+ disabled={isHandlingCollision}
+ onClick={() => setCollisionStep('prompt')}
+ className="btn btn-ghost-secondary btn-sm"
+ >
+ Back
+ </button>
+ </div>
  </div>
  )}
 
@@ -775,9 +804,9 @@ export default function DmsLandscaperPanel({
  void handleSend();
  }
  }}
- disabled={isHandlingCollision || isHandlingLink}
+ disabled={isHandlingCollision || isHandlingLink || (pendingCollision && collisionStep === 'notes')}
  className="h-9 flex-1 rounded-md border border bg-body px-3 text-xs text-body"
- />
+/>
  <button
  type="button"
  onClick={() => void handleSend()}

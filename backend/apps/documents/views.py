@@ -1041,6 +1041,9 @@ def check_upload_collision(request, project_id):
                 "filename": matched_doc.doc_name,
                 "version_number": matched_doc.version_no,
                 "uploaded_at": matched_doc.created_at.isoformat() if matched_doc.created_at else None,
+                "doc_type": matched_doc.doc_type,
+                "file_size_bytes": matched_doc.file_size_bytes,
+                "mime_type": matched_doc.mime_type,
                 "extraction_summary": {
                     "facts_extracted": facts_count,
                     "embeddings": embeddings_count

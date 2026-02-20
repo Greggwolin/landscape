@@ -50,18 +50,21 @@ interface DocCreateResult {
 }
 
 interface CollisionCheckResult {
- collision: boolean;
- match_type?: 'filename' | 'content' | 'both';
- existing_doc?: {
- doc_id: number;
- filename: string;
- version_number: number;
- uploaded_at: string;
- extraction_summary: {
- facts_extracted: number;
- embeddings: number;
- };
- };
+  collision: boolean;
+  match_type?: 'filename' | 'content' | 'both';
+  existing_doc?: {
+    doc_id: number;
+    filename: string;
+    version_number: number;
+    uploaded_at: string;
+    doc_type?: string | null;
+    file_size_bytes?: number | null;
+    mime_type?: string | null;
+    extraction_summary: {
+      facts_extracted: number;
+      embeddings: number;
+    };
+  };
 }
 
 // CollisionData type moved to LandscaperCollisionContext
@@ -134,7 +137,7 @@ export default function Dropzone({
  const [, setPendingFiles] = useState<File[]>([]);
 
  // Collision handling via Landscaper context
- const { addCollision, pendingCollision } = useLandscaperCollision();
+  const { addCollision, pendingCollision } = useLandscaperCollision();
 
  const { startUpload, isUploading: uploadThingUploading } = useUploadThing('documentUploader', {
  headers: {
@@ -275,45 +278,67 @@ export default function Dropzone({
 
  if (collision.collision && collision.existing_doc && collision.match_type) {
  // 3. Collision found - trigger Landscaper instead of modal
+ if (pendingCollision) {
+  return;
+ }
  addCollision({
- file,
- hash: contentHash,
- matchType: collision.match_type,
- existingDoc: {
- doc_id: collision.existing_doc.doc_id,
- filename: collision.existing_doc.filename,
- version_number: collision.existing_doc.version_number,
- uploaded_at: collision.existing_doc.uploaded_at,
- },
- projectId,
- workspaceId,
- docType,
- discipline,
- phaseId,
- parcelId,
- });
+          file,
+          hash: contentHash,
+          matchType: collision.match_type,
+          existingDoc: {
+            doc_id: collision.existing_doc.doc_id,
+            filename: collision.existing_doc.filename,
+            version_number: collision.existing_doc.version_number,
+            uploaded_at: collision.existing_doc.uploaded_at,
+            doc_type: collision.existing_doc.doc_type,
+            file_size_bytes: collision.existing_doc.file_size_bytes,
+            mime_type: collision.existing_doc.mime_type,
+          },
+          projectId,
+          workspaceId,
+          docType,
+          discipline,
+          phaseId,
+          parcelId,
+          onDiscard: () => {
+            setPendingFiles([]);
+            setIsUploading(false);
+            setUploadProgress({});
+          },
+        });
  setPendingFiles(remainingFiles);
  // Don't proceed with upload - Landscaper will handle via context
  return;
- }
+}
 
  // 4. No collision - proceed with upload
  const result = await uploadSingleFile(file, contentHash);
  if (result?.collision && result.collisionData?.existingDoc) {
- addCollision({
- file,
- hash: contentHash,
- matchType: result.collisionData.matchType,
- existingDoc: result.collisionData.existingDoc,
- projectId,
- workspaceId,
- docType,
- discipline,
- phaseId,
- parcelId,
- });
- setPendingFiles(remainingFiles);
- return;
+  if (pendingCollision) {
+   return;
+  }
+  addCollision({
+        file,
+        hash: contentHash,
+        matchType: result.collisionData.matchType,
+        existingDoc: {
+          ...result.collisionData.existingDoc,
+          doc_type: docType,
+        },
+        projectId,
+        workspaceId,
+        docType,
+        discipline,
+        phaseId,
+        parcelId,
+        onDiscard: () => {
+          setPendingFiles([]);
+          setIsUploading(false);
+          setUploadProgress({});
+        },
+      });
+      setPendingFiles(remainingFiles);
+  return;
  }
 
  onUploadComplete?.([result]);
@@ -335,7 +360,7 @@ export default function Dropzone({
  setIsUploading(false);
  }
  }
- }, [projectId, onUploadComplete, onUploadError, addCollision]);
+ }, [projectId, onUploadComplete, onUploadError, addCollision, pendingCollision]);
 
  const onDrop = useCallback(async (acceptedFiles: File[]) => {
  if (acceptedFiles.length === 0) return;

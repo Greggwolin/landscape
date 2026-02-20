@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Check for existing document with same sha256 or filename (collision detection)
     const [hashMatch] = system.sha256
       ? await sql`
-        SELECT doc_id, version_no, doc_name, status, created_at
+        SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
         FROM landscape.core_doc
         WHERE sha256_hash = ${system.sha256}
           AND project_id = ${system.project_id}
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       : [];
 
     const [filenameMatch] = await sql`
-      SELECT doc_id, version_no, doc_name, status, created_at
+      SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
       FROM landscape.core_doc
       WHERE LOWER(doc_name) = LOWER(${system.doc_name})
         AND project_id = ${system.project_id}
@@ -122,6 +122,9 @@ export async function POST(req: NextRequest) {
             filename: matchedDoc.doc_name,
             version_number: matchedDoc.version_no,
             uploaded_at: matchedDoc.created_at,
+            doc_type: matchedDoc.doc_type,
+            file_size_bytes: matchedDoc.file_size_bytes,
+            mime_type: matchedDoc.mime_type,
             extraction_summary: {
               facts_extracted: factsExtracted,
               embeddings,
