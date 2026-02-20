@@ -464,7 +464,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       id: fillId,
       type: 'fill',
       source: srcId,
-      filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']],
+      filter: ['!=', '$type', 'Point'],
       paint: {
         'fill-color': ['coalesce', ['get', 'color'], LAYER_COLORS.saleComps],
         'fill-opacity': 0.25,
@@ -475,7 +475,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       id: lineId,
       type: 'line',
       source: srcId,
-      filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'MultiPolygon']],
+      filter: ['!=', '$type', 'Point'],
       paint: {
         'line-color': ['coalesce', ['get', 'color'], LAYER_COLORS.saleComps],
         'line-width': 2,

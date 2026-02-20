@@ -26,6 +26,37 @@ interface IndicatedValueSummaryProps {
   projectId: number;
 }
 
+/**
+ * Calculate adjusted price per unit from base price + adjustment percentages.
+ * Mirrors the logic in ComparablesGrid.getAdjustedPricePerUnit() so the
+ * indicated value panel stays in sync with the grid display.
+ */
+function calcLiveAdjustedPrice(comp: SalesComparable): number | null {
+  // Base price: prefer price_per_unit, fall back to sale_price / units
+  let basePrice: number | null = null;
+  if (comp.price_per_unit != null) {
+    basePrice = Number(comp.price_per_unit);
+    if (!Number.isFinite(basePrice)) basePrice = null;
+  }
+  if (basePrice == null && comp.sale_price != null && comp.units != null) {
+    const sp = Number(comp.sale_price);
+    const u = Number(comp.units);
+    if (Number.isFinite(sp) && Number.isFinite(u) && u !== 0) {
+      basePrice = sp / u;
+    }
+  }
+  if (basePrice == null) return null;
+
+  // Sum all adjustment percentages (user override takes priority)
+  const totalAdj = (comp.adjustments || []).reduce((sum, adj) => {
+    const pct = Number(adj.user_adjustment_pct ?? adj.adjustment_pct ?? 0);
+    return sum + (Number.isFinite(pct) ? pct : 0);
+  }, 0);
+
+  const adjusted = basePrice * (1 + totalAdj);
+  return Number.isFinite(adjusted) ? adjusted : null;
+}
+
 export function IndicatedValueSummary({
   comparables,
   reconciliation,
@@ -55,6 +86,12 @@ export function IndicatedValueSummary({
     }
   }, [projectId]);
 
+  // Pre-compute live adjusted prices for all comps (matches grid logic)
+  const compsWithLiveAdj = comparables.map(comp => ({
+    comp,
+    liveAdjusted: calcLiveAdjustedPrice(comp),
+  })).filter(({ liveAdjusted }) => liveAdjusted != null && liveAdjusted > 0);
+
   // Use effective acquisition price from API, fall back to prop, then to 0
   const effectivePrice = acquisitionData?.effective_acquisition_price ?? subjectAskingPrice ?? 0;
   const priceSource = acquisitionData?.price_source;
@@ -69,29 +106,32 @@ export function IndicatedValueSummary({
     return `$${(Number(value) / 1000000).toFixed(2)}M`;
   };
 
-  // Calculate weighted average if not in reconciliation
+  // Calculate weighted average from LIVE adjusted prices (not stale DB field)
   const calculateWeightedAverage = () => {
-    const compsWithAdjusted = comparables.filter(
-      (c) => c.adjusted_price_per_unit && c.adjusted_price_per_unit > 0
-    );
-
-    if (compsWithAdjusted.length === 0) return 0;
-
-    // Simple average for now (in production, use actual weights)
-    const sum = compsWithAdjusted.reduce(
-      (acc, comp) => acc + Number(comp.adjusted_price_per_unit),
-      0
-    );
-    return sum / compsWithAdjusted.length;
+    if (compsWithLiveAdj.length === 0) return 0;
+    const sum = compsWithLiveAdj.reduce((acc, { liveAdjusted }) => acc + liveAdjusted!, 0);
+    return sum / compsWithLiveAdj.length;
   };
 
-  const weightedAvg = reconciliation?.sales_comparison_value
-    ? Number(reconciliation.sales_comparison_value) / subjectUnits
-    : calculateWeightedAverage();
+  // Always use live-calculated average here — reconciliation values
+  // belong on the Reconciliation tab, not the Sales Comparison panel
+  const weightedAvg = calculateWeightedAverage();
+  const indicatedValue = weightedAvg * subjectUnits;
 
-  const indicatedValue = reconciliation?.final_reconciled_value
-    ? Number(reconciliation.final_reconciled_value)
-    : weightedAvg * subjectUnits;
+  // DEBUG: remove after verifying fix
+  console.log('[IndicatedValueSummary] DEBUG', {
+    totalComps: comparables.length,
+    compsWithLiveAdj: compsWithLiveAdj.length,
+    liveValues: compsWithLiveAdj.map(({ comp, liveAdjusted }) => ({
+      name: comp.property_name,
+      raw: comp.price_per_unit,
+      adjDB: comp.adjusted_price_per_unit,
+      adjLive: liveAdjusted,
+      adjCount: (comp.adjustments || []).length,
+    })),
+    weightedAvg,
+    indicatedValue,
+  });
 
   const variance = effectivePrice > 0 && indicatedValue > 0
     ? ((effectivePrice - indicatedValue) / indicatedValue) * 100
@@ -150,25 +190,22 @@ export function IndicatedValueSummary({
             </tr>
           </thead>
           <tbody>
-            {comparables.map((comp) => {
-              if (!comp.adjusted_price_per_unit) return null;
-              return (
-                <tr
-                  key={comp.comparable_id}
-                  style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}
-                >
-                  <td className="py-2 px-3" style={{ color: 'var(--cui-body-color)' }}>
-                    Comp #{comp.comp_number}: {comp.property_name}
-                  </td>
-                  <td className="py-2 px-3 text-right" style={{ color: 'var(--cui-body-color)' }}>
-                    {formatCurrency(Number(comp.price_per_unit))}
-                  </td>
-                  <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                    {formatCurrency(Number(comp.adjusted_price_per_unit))}
-                  </td>
-                </tr>
-              );
-            })}
+            {compsWithLiveAdj.map(({ comp, liveAdjusted }) => (
+              <tr
+                key={comp.comparable_id}
+                style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}
+              >
+                <td className="py-2 px-3" style={{ color: 'var(--cui-body-color)' }}>
+                  Comp #{comp.comp_number}: {comp.property_name}
+                </td>
+                <td className="py-2 px-3 text-right" style={{ color: 'var(--cui-body-color)' }}>
+                  {formatCurrency(Number(comp.price_per_unit))}
+                </td>
+                <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                  {formatCurrency(liveAdjusted)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -199,7 +236,7 @@ export function IndicatedValueSummary({
           className="text-xs mt-2"
           style={{ color: 'var(--cui-secondary-color)' }}
         >
-          Based on {comparables.filter(c => c.adjusted_price_per_unit).length} adjusted comparables
+          Based on {compsWithLiveAdj.length} adjusted comparables
         </div>
       </div>
 

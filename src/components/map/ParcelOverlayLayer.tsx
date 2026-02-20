@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { fetchParcelsByAPN } from '@/lib/gis/laCountyParcels';
@@ -17,6 +17,7 @@ const SUBJECT_FILL_LAYER_ID = 'la-parcels-subject-fill';
 const SUBJECT_LINE_LAYER_ID = 'la-parcels-subject-line';
 const COMPS_FILL_LAYER_ID = 'la-parcels-comps-fill';
 const COMPS_LINE_LAYER_ID = 'la-parcels-comps-line';
+const MIN_PARCEL_ZOOM = 17.5;
 
 const normalizeId = (value: string) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
@@ -113,6 +114,8 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
   const map = useMapOblique();
   const [collection, setCollection] = useState<FeatureCollection>(emptyCollection());
   const [colors, setColors] = useState(() => buildColors());
+  const [isZoomEligible, setIsZoomEligible] = useState(false);
+  const lastFetchedKeyRef = useRef<string>('');
 
   const normalizedSubjectApn = subjectApn?.trim() || '';
   const normalizedCompApns = useMemo(
@@ -126,6 +129,23 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
   );
 
   useEffect(() => {
+    if (!map) return;
+
+    const updateZoom = () => {
+      setIsZoomEligible(map.getZoom() >= MIN_PARCEL_ZOOM);
+    };
+
+    updateZoom();
+    map.on('zoomend', updateZoom);
+    map.on('load', updateZoom);
+
+    return () => {
+      map.off('zoomend', updateZoom);
+      map.off('load', updateZoom);
+    };
+  }, [map]);
+
+  useEffect(() => {
     setColors(buildColors());
   }, []);
 
@@ -134,6 +154,22 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
 
     if (!apnKey) {
       setCollection(emptyCollection());
+      lastFetchedKeyRef.current = '';
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!isZoomEligible) {
+      if (lastFetchedKeyRef.current !== apnKey) {
+        setCollection(emptyCollection());
+      }
+      return () => {
+        active = false;
+      };
+    }
+
+    if (lastFetchedKeyRef.current === apnKey && collection.features.length) {
       return () => {
         active = false;
       };
@@ -146,6 +182,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
       if (!result.features.length) {
         console.warn('No LA County parcel geometry returned for APNs:', apns);
       }
+      lastFetchedKeyRef.current = apnKey;
       setCollection(result);
     };
 
@@ -158,7 +195,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
     return () => {
       active = false;
     };
-  }, [apnKey, normalizedSubjectApn, normalizedCompApns]);
+  }, [apnKey, normalizedSubjectApn, normalizedCompApns, isZoomEligible, collection.features.length]);
 
   useEffect(() => {
     if (!map) return;
@@ -189,6 +226,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
           id: SUBJECT_FILL_LAYER_ID,
           type: 'fill',
           source: SUBJECT_SOURCE_ID,
+          minzoom: MIN_PARCEL_ZOOM,
           paint: {
             'fill-color': colors.subjectFill,
             'fill-opacity': 0.65,
@@ -199,6 +237,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
           id: SUBJECT_LINE_LAYER_ID,
           type: 'line',
           source: SUBJECT_SOURCE_ID,
+          minzoom: MIN_PARCEL_ZOOM,
           paint: {
             'line-color': colors.subjectStroke,
             'line-width': 2.2,
@@ -215,6 +254,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
           id: COMPS_FILL_LAYER_ID,
           type: 'fill',
           source: COMPS_SOURCE_ID,
+          minzoom: MIN_PARCEL_ZOOM,
           paint: {
             'fill-color': colors.compFill,
             'fill-opacity': 0.4,
@@ -225,6 +265,7 @@ export function ParcelOverlayLayer({ subjectApn, compApns }: ParcelOverlayProps)
           id: COMPS_LINE_LAYER_ID,
           type: 'line',
           source: COMPS_SOURCE_ID,
+          minzoom: MIN_PARCEL_ZOOM,
           paint: {
             'line-color': colors.compStroke,
             'line-width': 1.4,

@@ -212,22 +212,24 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  // The map preserves user's camera state after initialization
 
  // Effect: Update lines when they change
+ const prevLineIdsRef = useRef<string[]>([]);
  useEffect(() => {
  const map = mapRef.current;
  if (!map || !mapLoaded) return;
 
- // Remove existing line layers and sources
- const lineStyle = map.getStyle();
- const existingLayers = lineStyle?.layers || [];
- for (const layer of existingLayers) {
- if (layer.id.endsWith('-line')) {
- map.removeLayer(layer.id);
- const sourceId = layer.id.replace('-line', '');
+ // Remove previous line layers/sources only
+ const previousIds = prevLineIdsRef.current;
+ for (const sourceId of previousIds) {
+ const layerId = `${sourceId}-line`;
+ if (map.getLayer(layerId)) {
+ map.removeLayer(layerId);
+ }
  if (map.getSource(sourceId) && !hasLayerUsingSource(map, sourceId)) {
  map.removeSource(sourceId);
  }
  }
- }
+
+ prevLineIdsRef.current = lines.map((l) => l.id);
 
  // Add new lines
  for (const l of lines) {
@@ -250,22 +252,24 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  }, [lines, mapLoaded]);
 
  // Effect: Update extrusions when they change
+ const prevExtrusionIdsRef = useRef<string[]>([]);
  useEffect(() => {
  const map = mapRef.current;
  if (!map || !mapLoaded) return;
 
- // Remove existing extrusion layers and sources
- const extStyle = map.getStyle();
- const existingExtLayers = extStyle?.layers || [];
- for (const layer of existingExtLayers) {
- if (layer.id.endsWith('-fill')) {
- map.removeLayer(layer.id);
- const sourceId = layer.id.replace('-fill', '');
+ // Remove previous extrusion layers/sources only
+ const previousIds = prevExtrusionIdsRef.current;
+ for (const sourceId of previousIds) {
+ const layerId = `${sourceId}-fill`;
+ if (map.getLayer(layerId)) {
+ map.removeLayer(layerId);
+ }
  if (map.getSource(sourceId) && !hasLayerUsingSource(map, sourceId)) {
  map.removeSource(sourceId);
  }
  }
- }
+
+ prevExtrusionIdsRef.current = extrusions.map((e) => e.id);
 
  // Add extrusions only if showExtrusions is true
  if (showExtrusions) {

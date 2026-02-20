@@ -106,6 +106,13 @@ export function useMapFeatures(projectId: number | undefined) {
           setFeatures([]);
           return;
         }
+        if (response.status >= 500) {
+          // Server error - degrade gracefully and avoid hard failure
+          console.warn('Map features fetch failed with server error:', response.status);
+          setFeatures([]);
+          setError(`Failed to fetch features: ${response.status}`);
+          return;
+        }
         throw new Error(`Failed to fetch features: ${response.status}`);
       }
 
