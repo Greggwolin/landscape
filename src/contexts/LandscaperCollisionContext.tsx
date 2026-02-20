@@ -27,6 +27,11 @@ export interface PendingCollision {
   matchType: 'filename' | 'content' | 'both';
   existingDoc: CollisionExistingDoc;
   projectId: number;
+  workspaceId?: number;
+  docType?: string;
+  discipline?: string;
+  phaseId?: number;
+  parcelId?: number;
   timestamp: number;
 }
 

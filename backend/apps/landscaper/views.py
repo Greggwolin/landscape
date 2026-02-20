@@ -8,6 +8,7 @@ Provides:
 """
 
 import logging
+import re
 
 from rest_framework import viewsets, status
 
@@ -98,6 +99,22 @@ def _build_message_with_tool_context(msg, is_recent: bool = True) -> dict:
     # User messages and assistant messages without tool data pass through unchanged
     tool_calls = metadata.get('tool_calls', [])
     tool_executions = metadata.get('tool_executions', [])
+
+    # Strip hallucinated tool annotations from prior AI messages.
+    # Claude sometimes writes fake "[Tool calls executed...]" text instead
+    # of making actual tool_use API calls.  If this text appears in the
+    # message history, it reinforces the pattern.  Remove it.
+    if role == 'assistant' and not tool_executions:
+        # Remove fake tool call blocks
+        content = re.sub(
+            r'\[Tool calls executed.*?\]',
+            '',
+            content,
+            flags=re.DOTALL
+        )
+        # Remove lines starting with → that mimic tool results
+        content = re.sub(r'^→ .*$', '', content, flags=re.MULTILINE)
+        content = content.strip()
 
     if role != 'assistant' or (not tool_calls and not tool_executions):
         return {'role': role, 'content': content}
@@ -1314,6 +1331,11 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         if page_context:
             queryset = queryset.filter(page_context=page_context)
 
+        # Filter by subtab_context
+        subtab_context = self.request.query_params.get('subtab_context')
+        if subtab_context:
+            queryset = queryset.filter(subtab_context=subtab_context)
+
         # Filter by active status
         include_closed = self.request.query_params.get('include_closed', 'false').lower() == 'true'
         if not include_closed:
@@ -1547,7 +1569,11 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             )
 
             # Get message history for context (with tool call/result context)
-            messages = list(thread.messages.order_by('created_at')[:50])
+            # Use MOST RECENT 50 messages (not oldest 50) so the newest user
+            # message is always included for keyword-based tool filtering.
+            messages = list(
+                thread.messages.order_by('-created_at')[:50]
+            )[::-1]  # Reverse back to chronological order
             message_history = _build_message_history_with_tool_context(messages)
 
             # Get project context

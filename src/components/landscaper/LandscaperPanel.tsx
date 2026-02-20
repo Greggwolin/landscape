@@ -12,6 +12,7 @@ import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
+import { ExtractionQueueSection } from './ExtractionQueueSection';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
@@ -21,6 +22,7 @@ interface LandscaperPanelProps {
   projectId: number;
   activeTab?: string;
   pageContext?: string;
+  subtabContext?: string;
   contextPillLabel?: string;
   contextPillColor?: string;
   onToggleCollapse?: () => void;
@@ -72,6 +74,7 @@ export function LandscaperPanel({
   projectId,
   activeTab = 'home',
   pageContext,
+  subtabContext,
   contextPillLabel,
   contextPillColor,
   onToggleCollapse,
@@ -800,6 +803,7 @@ export function LandscaperPanel({
             ref={chatRef}
             projectId={projectId}
             pageContext={pageContext || activeTab}
+            subtabContext={subtabContext}
             contextPillLabel={contextPillLabel}
             contextPillColor={contextPillColor}
             isIngesting={isUploading || uploadThingIsUploading}
@@ -902,6 +906,9 @@ export function LandscaperPanel({
             </CButton>
           </CAlert>
         )}
+
+        {/* Extraction Queue (pending/failed items from dms_extract_queue) */}
+        <ExtractionQueueSection projectId={projectId} />
 
         {/* Activity Feed Card */}
         <CCard

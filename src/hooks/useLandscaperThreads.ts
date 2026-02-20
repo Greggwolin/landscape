@@ -223,6 +223,9 @@ export function useLandscaperThreads({
       const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
       url.searchParams.set('project_id', projectId);
       url.searchParams.set('page_context', pageContext);
+      if (subtabContext) {
+        url.searchParams.set('subtab_context', subtabContext);
+      }
       url.searchParams.set('include_closed', 'true');
 
       const response = await fetchWithTimeout(url.toString(), {
@@ -239,7 +242,7 @@ export function useLandscaperThreads({
       console.error('[LandscaperThreads] Failed to load threads:', err);
       return [];
     }
-  }, [projectId, pageContext, fetchWithTimeout, getAuthHeaders]);
+  }, [projectId, pageContext, subtabContext, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Load messages for a specific thread.
@@ -464,13 +467,13 @@ export function useLandscaperThreads({
     [activeThread, projectId, pageContext, onFieldUpdate, onToolResult, loadThreads, fetchWithTimeout, getAuthHeaders]
   );
 
-  // Initialize thread when page context changes
+  // Initialize thread when page context or subtab changes
   useEffect(() => {
-    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext });
+    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext, subtabContext });
     setMessages([]);
     setActiveThread(null);
     initializeThread();
-  }, [projectId, pageContext, initializeThread]);
+  }, [projectId, pageContext, subtabContext, initializeThread]);
 
   return {
     // Thread state

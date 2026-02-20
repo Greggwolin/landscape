@@ -11121,7 +11121,91 @@ def get_document_content(
                 if embedding_rows:
                     # Combine embedding chunks into readable content
                     chunks = [row[0] for row in embedding_rows if row[0]]
-                    combined_content = "\n\n---\n\n".join(chunks)
+
+                    # When focus is set, filter chunks to only relevant ones
+                    if focus:
+                        _focus_patterns = {
+                            'rental_comps': [
+                                r'(?i)(comparable|comp)\s*(rental|properties|rentals)',
+                                r'(?i)rental\s*comps',
+                                r'(?i)(market|competitive)\s*survey',
+                                r'(?i)bedroom.{0,5}bath.{0,20}\$\d',
+                            ],
+                            'operating_expenses': [
+                                r'(?i)operating\s*expenses',
+                                r'(?i)T-?12',
+                                r'(?i)trailing\s*twelve',
+                                r'(?i)expense\s*summary',
+                            ],
+                            'rent_roll': [
+                                r'(?i)proforma\s*(average|range|rent)',
+                                r'(?i)rent\s*roll\s*summary',
+                                r'\d{3}\s+(residential|commercial|leasing)',
+                                r'(?i)lease\s+from.*lease\s+to',
+                                r'(?i)BD/BA.*Amenity.*Sq\.\s*Ft',
+                            ],
+                        }
+                        patterns = _focus_patterns.get(focus, [])
+                        if patterns:
+                            import re as _re
+                            filtered = [c for c in chunks if any(_re.search(p, c) for p in patterns)]
+                            if filtered:
+                                logger.info(f"[get_document_content] Focus '{focus}' filtered {len(chunks)} chunks → {len(filtered)}")
+                                chunks = filtered
+
+                                # Post-process rent_roll focus: extract unit-level rows and add structure
+                                if focus == 'rent_roll' and filtered:
+                                    import re as _re_local
+                                    unit_rows = []
+
+                                    # Chunks are often single-line (no newlines between unit rows)
+                                    # Use regex split to find unit boundaries
+                                    full_text = " ".join(filtered)
+
+                                    # Split on unit number boundaries: look-ahead for digit pattern + type
+                                    # This captures "100 commercial/vacant - - 1,101 $3,303.00 ..."
+                                    unit_pattern = r'(?=\b(\d{2,4})\s+(residential|commercial|leasing))'
+
+                                    # Find all unit row start positions
+                                    unit_starts = list(_re_local.finditer(unit_pattern, full_text))
+
+                                    if unit_starts:
+                                        unit_rows.append("Unit | Type | BD/BA | Amenity | SqFt | Rent | LeaseFrom | LeaseTo | ProformaRange | ProformaAvg | CurrentRPSF | ProformaRPSF")
+                                        unit_rows.append("---")
+
+                                        for i, match in enumerate(unit_starts):
+                                            start = match.start()
+                                            # End is the start of the next unit, or end of string
+                                            end = unit_starts[i + 1].start() if i + 1 < len(unit_starts) else len(full_text)
+                                            row_text = full_text[start:end].strip()
+                                            # Clean up: remove page headers/footers that might be embedded
+                                            row_text = _re_local.sub(r'Rent Roll Summary.*?Offering Memorandum', '', row_text).strip()
+                                            row_text = _re_local.sub(r'14105 Chadron Ave \| \d+', '', row_text).strip()
+                                            row_text = _re_local.sub(r'Unit Type BD/BA Amenity Sq\.\s*Ft\..*?Proforma RPSF', '', row_text).strip()
+                                            if row_text:
+                                                unit_rows.append(row_text)
+
+                                    if len(unit_rows) > 2:  # More than just header + separator
+                                        # Look for totals
+                                        totals_match = _re_local.search(r'(\d+ units.*?(?:AVERAGES|$))', full_text)
+                                        if totals_match:
+                                            unit_rows.append("---")
+                                            unit_rows.append(totals_match.group(1).strip())
+
+                                        filtered_text = f"RENT ROLL - UNIT LEVEL DATA ({len(unit_rows) - 2} unit rows)\nColumns: Unit# Type BD/BA Amenity SqFt CurrentRent LeaseFrom LeaseTo ProformaRange ProformaAverage CurrentRPSF ProformaRPSF\n\n" + "\n".join(unit_rows)
+                                        combined_content = filtered_text
+                                        logger.info(f"[get_document_content] Rent roll post-processed: {len(unit_rows) - 2} unit rows extracted from continuous text")
+                                    else:
+                                        combined_content = "\n\n---\n\n".join(filtered)
+                                        logger.info(f"[get_document_content] Rent roll post-processing found no unit rows, returning raw chunks")
+                                else:
+                                    combined_content = "\n\n---\n\n".join(filtered)
+                            else:
+                                combined_content = "\n\n---\n\n".join(chunks)
+                        else:
+                            combined_content = "\n\n---\n\n".join(chunks)
+                    else:
+                        combined_content = "\n\n---\n\n".join(chunks)
 
                     # Truncate if too long
                     if len(combined_content) > max_length:
@@ -11334,6 +11418,13 @@ def _extract_focused_content(text: str, focus: str, max_length: int) -> Optional
             r'(?i)(property|real\s*estate)\s*taxes',
             r'(?i)utilities',
             r'(?i)management\s*fee',
+        ],
+        'rent_roll': [
+            r'(?i)proforma\s*(average|range|rent)',
+            r'(?i)rent\s*roll\s*summary',
+            r'\d{3}\s+(residential|commercial|leasing)',  # Unit rows like "100 commercial/vacant"
+            r'(?i)lease\s+from.*lease\s+to',
+            r'(?i)BD/BA.*Amenity.*Sq\.\s*Ft',
         ],
     }
 

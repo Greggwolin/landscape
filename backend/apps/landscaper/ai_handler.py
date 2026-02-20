@@ -989,8 +989,8 @@ IMPORTANT: Use the 'focus' parameter when extracting specific data types to ensu
                 },
                 "focus": {
                     "type": "string",
-                    "enum": ["rental_comps", "operating_expenses"],
-                    "description": "Focus on specific content type. Use 'rental_comps' when extracting comparable properties, 'operating_expenses' for T-12/expense data."
+                    "enum": ["rental_comps", "operating_expenses", "rent_roll"],
+                    "description": "Focus on specific content type. Use 'rental_comps' when extracting comparable properties, 'operating_expenses' for T-12/expense data, or 'rent_roll' to filter to rent roll / proforma sections."
                 }
             },
             "required": []
@@ -5390,6 +5390,7 @@ Bad: "I need to check the current address first. Let me retrieve that informatio
 4. ACTION FIRST (CRITICAL):
 When the user asks you to DO something (find data, list values, update fields, compare records),
 your FIRST action must be to call the appropriate tool(s) and execute the task.
+For data changes specifically: calling get_units or get_leases is NOT executing the change. You must call update_units, update_leases, or the appropriate mutation tool. If you find yourself only calling read tools when the user asked for a change, STOP and call the mutation tool.
 
 DO NOT:
 - Present options (A/B/C) when the user has already told you what to do
@@ -5460,6 +5461,32 @@ When a tool directly executes and returns action='deleted' or action='updated':
 
 NEVER say "Done" or "Deleted" when the actual result says proposed/pending/confirm_required.
 
+8. MUTATION EXECUTION REQUIREMENTS (CRITICAL):
+TOOL USE FORMAT (CRITICAL — DO NOT VIOLATE):
+- You MUST use the tool_use API mechanism to call tools. This means returning a tool_use content block, NOT writing tool names or results in your text.
+- NEVER write "[Tool calls executed...]", "→ OK", "→ Mutations applied", or any text that mimics tool call results.
+- NEVER narrate that you are calling a tool — actually call it using the tool_use mechanism.
+- If you cannot make a tool call, say so explicitly. Do NOT pretend the tool call happened.
+- WRONG: Writing "I'll call update_units now... Done. 113 units updated." in your text
+- RIGHT: Actually invoking update_units via tool_use, then narrating the real result
+
+When the user asks you to change, update, set, clear, fix, or modify values on units, leases, or any data:
+- You MUST call the appropriate mutation tool (update_units, update_leases, delete_units, etc.)
+- NEVER claim changes are complete without actually calling the mutation tool
+- NEVER assume changes from previous messages are still in effect — if the user says "it didn't work" or "nothing changed", re-execute the mutation regardless of what previous tool results showed
+- Reading data (get_units, get_leases) is NOT the same as changing data. If you only called a read tool, you have NOT made any changes.
+
+PARTIAL UPDATES with update_units:
+- Only include fields in your records that you're ACTUALLY changing
+- Example: to set market_rent=1200 for unit 101, send {"unit_number": "101", "market_rent": 1200} — do NOT include bedrooms, bathrooms, square_feet, etc.
+- The system will automatically preserve existing values for fields you don't include
+- If you want to CLEAR a field (set to null), explicitly include it with null value
+
+POST-MUTATION VERIFICATION:
+- After calling update_units, call get_units to verify at least 2-3 units received the correct values
+- If verification shows values didn't change, report the issue to the user — do NOT claim success
+- Include the verified values in your response: "Verified: Unit 101 market_rent is now $1,200"
+
 DOCUMENT READING:
 You have access to documents uploaded to this project. You can:
 - List all project documents with get_project_documents
@@ -5492,6 +5519,11 @@ IMPORTANT: If the rent roll has already been imported and the user is asking to 
 - update_units for fixing specific field values on specific units
 - get_document_content to look up correct values from the source document
 Do NOT re-run the full extraction pipeline to fix a handful of records.
+
+When asked to extract market rents, proforma rents, or unit-level data from an offering memo:
+- Use get_document_content with focus='rent_roll' to get only the rent roll table
+- Parse the Proforma Average column carefully — each row has: Unit, Type, BD/BA, Amenity, Sq.Ft., Rent, Lease from, Lease to, Proforma Range, Proforma Average
+- Use the EXACT values from the Proforma Average column — do not estimate or calculate
 
 MULTIFAMILY UNIT FIELDS (use these exact names in update_units calls):
 - occupancy_status: "occupied" | "vacant" | "notice" | "eviction" | "model" | "down"
@@ -6411,6 +6443,56 @@ def get_landscaper_response(
             elif hasattr(_diag_block, 'text'):
                 logger.info(f"[DIAGNOSTIC] CLAUDE TEXT (first 300 chars): {_diag_block.text[:300]}")
                 print(f"=== DIAGNOSTIC: CLAUDE TEXT RESPONSE (first 200 chars): {_diag_block.text[:200]} ===")
+
+        # Hallucination detection: if Claude claims to have executed mutations
+        # but didn't make any tool calls, force a retry with explicit instruction
+        if response.stop_reason == "end_turn" and tool_executor:
+            response_text = ""
+            for block in response.content:
+                if hasattr(block, 'text'):
+                    response_text += block.text
+
+            # Detect mutation hallucination patterns
+            import re as _hd_re
+            mutation_claim_patterns = [
+                r'(?i)(updated|modified|changed|set)\s+(all\s+)?\d+\s+units',
+                r'(?i)batch\s+\d+.*?updated',
+                r'(?i)done\.?\s+(all\s+)?\d+\s+units',
+                r'\[Tool calls executed',
+                r'→\s*(OK|success|Mutations applied)',
+                r'(?i)market.?rent.*?updated.*?to\s+\$',
+            ]
+
+            is_hallucinated_mutation = any(
+                _hd_re.search(p, response_text) for p in mutation_claim_patterns
+            )
+
+            if is_hallucinated_mutation:
+                logger.warning(f"[AI_HANDLER] HALLUCINATION DETECTED: Response claims mutations but stop_reason=end_turn (no tool calls). Forcing retry.")
+
+                # Build retry messages: include original + a correction
+                retry_messages = list(api_kwargs.get('messages', []))
+                retry_messages.append({
+                    "role": "assistant",
+                    "content": response_text[:200] + "..."
+                })
+                retry_messages.append({
+                    "role": "user",
+                    "content": (
+                        "STOP. You just wrote text CLAIMING to update units, but you did NOT make any tool calls. "
+                        "Your response had stop_reason=end_turn with zero tool_use blocks. "
+                        "Nothing was actually changed in the database. "
+                        "You MUST use the update_units tool via the tool_use API mechanism. "
+                        "Do it now — call update_units with the actual records. Start with the first batch of 20 units."
+                    )
+                })
+
+                retry_kwargs = dict(api_kwargs)
+                retry_kwargs['messages'] = retry_messages
+
+                logger.info(f"[AI_HANDLER] Retrying with hallucination correction prompt")
+                response = client.messages.create(**retry_kwargs)
+                logger.info(f"[AI_HANDLER] Retry response stop_reason={response.stop_reason}")
 
         # Tool loop safeguards
         MAX_TOOL_ITERATIONS = 10  # Increased from 5 — rent roll extraction needs ~6-8 steps

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions } from '@coreui/icons';
+import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
@@ -42,27 +42,27 @@ interface LandscaperChatThreadedProps {
  */
 function getPageContextHint(context: string): string {
   const hints: Record<string, string> = {
-    home: 'Project Overview',
-    mf_home: 'Project Overview',
-    land_home: 'Project Overview',
-    property: 'Property Details & Site',
-    mf_property: 'Property Details & Site',
-    land_planning: 'Planning & Land Use',
-    operations: 'Rent Roll & Operating Expenses',
-    mf_operations: 'Rent Roll & Operating Expenses',
-    valuation: 'Returns & Feasibility Analysis',
-    mf_valuation: 'Returns & Feasibility Analysis',
-    land_valuation: 'Feasibility & Market Analysis',
-    capitalization: 'Capital Structure & Financing',
-    mf_capitalization: 'Capital Structure & Financing',
-    land_capitalization: 'Capital Markets & Waterfall',
-    land_budget: 'Budget & Costs',
-    land_schedule: 'Absorption & Schedule',
-    reports: 'Reports & Analytics',
-    investment_committee: 'IC Devil\'s Advocate',
-    documents: 'Document Management',
-    map: 'Map & Spatial Insights',
-    alpha_assistant: 'Platform Help',
+    home: 'Overview',
+    mf_home: 'Overview',
+    land_home: 'Overview',
+    property: 'Property',
+    mf_property: 'Property',
+    land_planning: 'Planning',
+    operations: 'Operations',
+    mf_operations: 'Operations',
+    valuation: 'Valuation',
+    mf_valuation: 'Valuation',
+    land_valuation: 'Valuation',
+    capitalization: 'Capitalization',
+    mf_capitalization: 'Capitalization',
+    land_capitalization: 'Capitalization',
+    land_budget: 'Budget',
+    land_schedule: 'Schedule',
+    reports: 'Reports',
+    investment_committee: 'IC',
+    documents: 'Documents',
+    map: 'Map',
+    alpha_assistant: 'Help',
   };
   return hints[context] || 'General';
 }
@@ -91,7 +91,15 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   const prevMessageCount = useRef(0);
   const promptCopy =
     'Ask Landscaper anything about this project or drop a document and we\'ll get the model updated.';
-  const pageContextHint = contextPillLabel || getPageContextHint(pageContext);
+  const pageContextHint = contextPillLabel || (() => {
+    const baseHint = getPageContextHint(pageContext);
+    if (!subtabContext) return baseHint;
+    const subtabLabel = subtabContext.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    // Avoid duplication like "Rent Roll · Rent Roll"
+    if (baseHint.toLowerCase() === subtabLabel.toLowerCase()) return subtabLabel;
+    return `${baseHint} · ${subtabLabel}`;
+  })();
+  const isDmsContext = pageContext === 'documents';
 
   const {
     threads,
@@ -175,7 +183,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   // Handle document collision - send message to Landscaper
   useEffect(() => {
-    if (pendingCollision) {
+    if (pendingCollision && !isDmsContext) {
       const message = buildCollisionMessage(
         pendingCollision.file,
         pendingCollision.matchType,
@@ -190,11 +198,16 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
         console.error('Failed to send collision message:', err);
       });
     }
-  }, [pendingCollision, sendMessage]);
+  }, [pendingCollision, sendMessage, isDmsContext]);
 
   // Set up collision resolution handler
   // This will be called when user responds (detected via message parsing)
   useEffect(() => {
+    if (isDmsContext) {
+      return () => {
+        setOnCollisionResolved(null);
+      };
+    }
     const handleCollisionResponse = async (action: CollisionAction, collision: PendingCollision) => {
       const { file, existingDoc, projectId: collisionProjectId } = collision;
 
@@ -238,7 +251,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     return () => {
       setOnCollisionResolved(null);
     };
-  }, [sendMessage, setOnCollisionResolved]);
+  }, [sendMessage, setOnCollisionResolved, isDmsContext]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {
@@ -402,6 +415,22 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
             </span>
           </div>
         )}
+
+        {/* New Chat button */}
+        <button
+          type="button"
+          onClick={handleNewThread}
+          className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+          style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
+          title="New chat"
+          {...hoverNeutralBackground}
+        >
+          <CIcon
+            icon={cilPlus}
+            size="sm"
+            style={{ color: 'var(--cui-secondary-color)' }}
+          />
+        </button>
 
         {/* Thread list toggle */}
         <button
