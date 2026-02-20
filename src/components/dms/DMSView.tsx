@@ -10,6 +10,8 @@ import DmsLandscaperPanel, { type DmsPendingVersionLink } from '@/components/dms
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
+import StagingTray from '@/components/dms/staging/StagingTray';
+import { UploadStagingProvider, useUploadStaging } from '@/contexts/UploadStagingContext';
 import type { DMSDocument } from '@/types/dms';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,13 +41,24 @@ async function parseJsonSafely<T>(response: Response, context: string): Promise<
 
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-export default function DMSView({
+export default function DMSView(props: DMSViewProps) {
+  return (
+    <UploadStagingProvider projectId={props.projectId} workspaceId={1}>
+      <DMSViewInner {...props} />
+    </UploadStagingProvider>
+  );
+}
+
+function DMSViewInner({
   projectId,
   projectName,
   projectType = null
 }: DMSViewProps) {
   const defaultWorkspaceId = 1;
   const { showToast } = useToast();
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const { stageFiles, setDocTypes, stagedFiles } = useUploadStaging();
+  const prevHadStagedRef = useRef(false);
 
   // "+ Add Type" inline input state
   const [isAddingType, setIsAddingType] = useState(false);
@@ -258,6 +271,24 @@ export default function DMSView({
       setIsLoadingFilters(false);
     }
   };
+
+  // Sync doc types to staging context
+  useEffect(() => {
+    if (allFilters.length > 0) {
+      setDocTypes(allFilters.map(f => f.doc_type));
+    }
+  }, [allFilters, setDocTypes]);
+
+  // Refresh filters when all staged uploads complete
+  useEffect(() => {
+    const hasActive = stagedFiles.some(f => f.status !== 'complete' && f.status !== 'error');
+    const hasCompleted = stagedFiles.some(f => f.status === 'complete');
+    if (prevHadStagedRef.current && !hasActive && hasCompleted) {
+      void loadFilters();
+    }
+    prevHadStagedRef.current = stagedFiles.length > 0 && hasActive;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stagedFiles]);
 
   const totalItemCount = useMemo(() => {
     return allFilters.reduce((sum, f) => sum + (Number.isFinite(f.count) ? f.count : 0), 0);
@@ -841,13 +872,26 @@ export default function DMSView({
                   </span>
                 </div>
                 <div className="d-flex gap-2" onClick={(e) => e.stopPropagation()}>
-                  <a
-                    href={`/projects/${projectId}/documents?tab=upload`}
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.xlsm,.csv,.jpg,.jpeg,.png,.gif,.txt"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 0) stageFiles(files);
+                      e.target.value = '';
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => uploadInputRef.current?.click()}
                     className="px-3 py-1 rounded text-white"
-                    style={{ backgroundColor: 'var(--cui-primary)', fontSize: '0.85rem', textDecoration: 'none' }}
+                    style={{ backgroundColor: 'var(--cui-primary)', fontSize: '0.85rem', border: 'none', cursor: 'pointer' }}
                   >
                     Upload Documents
-                  </a>
+                  </button>
                 </div>
               </CCardHeader>
               {panelExpanded && (
@@ -1081,13 +1125,10 @@ export default function DMSView({
                                 {/* Left Column */}
                                 <div className="border-r" style={{ borderColor: 'var(--cui-border-color)' }}>
                                   <AccordionFilters
-                                    projectId={projectId}
-                                    workspaceId={defaultWorkspaceId}
                                     filters={leftColumnFilters}
                                     onExpand={handleAccordionExpand}
                                     onDocumentSelect={handleDocumentSelect}
                                     expandedFilter={expandedFilter}
-                                    onUploadComplete={handleDocumentChange}
                                     selectedDocIds={selectedDocIds}
                                     onToggleDocSelection={handleToggleDocSelection}
                                     onReviewMedia={handleReviewMedia}
@@ -1099,13 +1140,10 @@ export default function DMSView({
                                 {/* Right Column */}
                                 <div>
                                   <AccordionFilters
-                                    projectId={projectId}
-                                    workspaceId={defaultWorkspaceId}
                                     filters={rightColumnFilters}
                                     onExpand={handleAccordionExpand}
                                     onDocumentSelect={handleDocumentSelect}
                                     expandedFilter={expandedFilter}
-                                    onUploadComplete={handleDocumentChange}
                                     selectedDocIds={selectedDocIds}
                                     onToggleDocSelection={handleToggleDocSelection}
                                     onReviewMedia={handleReviewMedia}
@@ -1365,6 +1403,9 @@ export default function DMSView({
           }}
         />
       )}
+
+      {/* Staging Tray */}
+      <StagingTray />
     </div>
   );
 }

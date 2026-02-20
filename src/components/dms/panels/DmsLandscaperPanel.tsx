@@ -199,8 +199,6 @@ export default function DmsLandscaperPanel({
  ]);
  const [isHandlingCollision, setIsHandlingCollision] = useState(false);
  const [isHandlingLink, setIsHandlingLink] = useState(false);
- const [collisionStep, setCollisionStep] = useState<'prompt' | 'notes'>('prompt');
- const [collisionNotes, setCollisionNotes] = useState('');
  const [collisionError, setCollisionError] = useState<string | null>(null);
  const lastCollisionIdRef = useRef<string | null>(null);
  const lastLinkKeyRef = useRef<string | null>(null);
@@ -260,8 +258,6 @@ export default function DmsLandscaperPanel({
 
  useEffect(() => {
   if (!pendingCollision) {
-   setCollisionStep('prompt');
-   setCollisionNotes('');
    setCollisionError(null);
    return;
   }
@@ -333,33 +329,23 @@ export default function DmsLandscaperPanel({
   return lines.join(' ');
  }, [formatBytes, formatDate]);
 
- const handleStartNotes = useCallback(() => {
-  if (!pendingCollision) return;
-  setCollisionError(null);
-  if (!collisionNotes.trim()) {
-   setCollisionNotes(buildVersionNotes(pendingCollision));
-  }
-  setCollisionStep('notes');
- }, [buildVersionNotes, collisionNotes, pendingCollision]);
-
  const handleCancelCollision = useCallback(() => {
   if (!pendingCollision) return;
   pendingCollision.onDiscard?.();
   clearCollision();
-  setCollisionStep('prompt');
-  setCollisionNotes('');
   setCollisionError(null);
  }, [clearCollision, pendingCollision]);
 
- const handleSaveVersion = useCallback(async () => {
+ const handleSaveVersion = useCallback(async (notesOverride?: string) => {
   if (!pendingCollision || isHandlingCollision) return;
   setIsHandlingCollision(true);
   setCollisionError(null);
+  const notes = notesOverride ?? '';
   try {
    const formData = new FormData();
    formData.append('file', pendingCollision.file);
-   if (collisionNotes.trim()) {
-    formData.append('version_notes', collisionNotes.trim());
+   if (notes.trim()) {
+    formData.append('version_notes', notes.trim());
    }
 
    const response = await fetch(
@@ -383,8 +369,6 @@ export default function DmsLandscaperPanel({
    showToast({ title: 'Saved as new version', message: pendingCollision.file.name, type: 'success' });
    pendingCollision.onDiscard?.();
    clearCollision();
-   setCollisionStep('prompt');
-   setCollisionNotes('');
    onDocumentsUpdated?.();
   } catch (error) {
    console.error('[DMS_LANDSCAPER] Version upload error:', error);
@@ -392,7 +376,7 @@ export default function DmsLandscaperPanel({
   } finally {
    setIsHandlingCollision(false);
   }
- }, [appendMessage, clearCollision, collisionNotes, isHandlingCollision, onDocumentsUpdated, pendingCollision, showToast]);
+ }, [appendMessage, clearCollision, isHandlingCollision, onDocumentsUpdated, pendingCollision, showToast]);
 
  const {
  getRootProps,
@@ -441,16 +425,9 @@ export default function DmsLandscaperPanel({
 
   appendMessage({ role: 'user', content: query });
 
-  if (collisionStep === 'notes') {
-   appendMessage({
-    role: 'assistant',
-    content: 'Use "Save Version" to continue or "Back" to return to the prompt.',
-   });
-   return;
-  }
-
   if (isYes) {
-   handleStartNotes();
+   const autoNotes = buildVersionNotes(pendingCollision);
+   void handleSaveVersion(autoNotes);
    return;
   }
   if (isNo) {
@@ -600,11 +577,11 @@ export default function DmsLandscaperPanel({
   isSending,
   isHandlingCollision,
   isHandlingLink,
-  collisionStep,
   pendingCollision,
   pendingLink,
   handleCancelCollision,
-  handleStartNotes,
+  handleSaveVersion,
+  buildVersionNotes,
   appendMessage,
   onResolveLink,
   onDocumentsUpdated,
@@ -673,18 +650,26 @@ export default function DmsLandscaperPanel({
  ))}
  </div>
 
- {pendingCollision && collisionStep === 'prompt' && (
- <div className="mt-3 flex flex-wrap gap-2">
+ {pendingCollision && (
+ <div className="mt-3">
+ {collisionError && (
+ <div className="text-xs mb-2" style={{ color: 'var(--cui-danger)' }}>
+ {collisionError}
+ </div>
+ )}
+ <div className="flex flex-wrap gap-2">
  <button
  type="button"
  disabled={isHandlingCollision}
  onClick={() => {
  appendMessage({ role: 'user', content: 'Yes' });
- handleStartNotes();
+ // Auto-generate version notes and upload directly
+ const autoNotes = buildVersionNotes(pendingCollision);
+ void handleSaveVersion(autoNotes);
  }}
  className="btn btn-primary btn-sm"
  >
- Yes, add as new version
+ {isHandlingCollision ? 'Saving...' : 'Yes, add as new version'}
  </button>
  <button
  type="button"
@@ -696,48 +681,6 @@ export default function DmsLandscaperPanel({
  className="btn btn-ghost-secondary btn-sm"
  >
  Cancel
- </button>
- </div>
- )}
-
- {pendingCollision && collisionStep === 'notes' && (
- <div className="mt-3 border rounded-md p-3" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
- <div className="text-xs uppercase tracking-[0.2em] text-body-tertiary mb-2">
- Version Notes
- </div>
- <textarea
- rows={4}
- value={collisionNotes}
- onChange={(event) => setCollisionNotes(event.target.value)}
- placeholder="Describe what changed in this version..."
- className="w-full rounded-md border px-3 py-2 text-xs"
- style={{
- borderColor: 'var(--cui-border-color)',
- backgroundColor: 'var(--cui-body-bg)',
- color: 'var(--cui-body-color)'
- }}
- />
- {collisionError && (
- <div className="text-xs mt-2" style={{ color: 'var(--cui-danger)' }}>
- {collisionError}
- </div>
- )}
- <div className="mt-2 flex flex-wrap gap-2">
- <button
- type="button"
- disabled={isHandlingCollision}
- onClick={() => void handleSaveVersion()}
- className="btn btn-primary btn-sm"
- >
- {isHandlingCollision ? 'Saving...' : 'Save Version'}
- </button>
- <button
- type="button"
- disabled={isHandlingCollision}
- onClick={() => setCollisionStep('prompt')}
- className="btn btn-ghost-secondary btn-sm"
- >
- Back
  </button>
  </div>
  </div>
@@ -804,7 +747,7 @@ export default function DmsLandscaperPanel({
  void handleSend();
  }
  }}
- disabled={isHandlingCollision || isHandlingLink || (pendingCollision && collisionStep === 'notes')}
+ disabled={isHandlingCollision || isHandlingLink}
  className="h-9 flex-1 rounded-md border border bg-body px-3 text-xs text-body"
 />
  <button
