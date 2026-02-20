@@ -14,7 +14,7 @@ import type {
   SalesComparableForm
 } from '@/types/valuation';
 import { AdjustmentCell } from './AdjustmentCell';
-import { updateSalesComparable, updateUserAdjustment } from '@/lib/api/valuation';
+import { addAdjustment, updateSalesComparable, updateUserAdjustment } from '@/lib/api/valuation';
 import { LandscapeButton } from '@/components/ui/landscape';
 import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
 import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
@@ -51,7 +51,7 @@ const ADJUSTMENT_SECTIONS_MF: AdjustmentSectionDef[] = [
     adjustments: [
       { type: 'property_rights', label: 'Property Rights', indent: 1, source: 'backend' },
       { type: 'financing', label: 'Financing', indent: 1, source: 'backend' },
-      { type: 'conditions_of_sale', label: 'Conditions of Sale', indent: 1, source: 'backend' },
+      { type: 'sale_conditions', label: 'Conditions of Sale', indent: 1, source: 'backend' },
       { type: 'market_conditions', label: 'Market Conditions', indent: 1, source: 'backend' },
       { type: 'other', label: 'Other', indent: 1, source: 'backend' },
     ]
@@ -78,7 +78,7 @@ const ADJUSTMENT_SECTIONS_LAND: AdjustmentSectionDef[] = [
     adjustments: [
       { type: 'property_rights', label: 'Property Rights', indent: 1, source: 'backend' },
       { type: 'financing', label: 'Financing', indent: 1, source: 'backend' },
-      { type: 'conditions_of_sale', label: 'Conditions of Sale', indent: 1, source: 'backend' },
+      { type: 'sale_conditions', label: 'Conditions of Sale', indent: 1, source: 'backend' },
       { type: 'market_conditions', label: 'Market Conditions', indent: 1, source: 'backend' },
       { type: 'other', label: 'Other', indent: 1, source: 'backend' },
     ]
@@ -246,7 +246,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     setSubjectAdjustments(prev => {
       const next = { ...prev };
       if (next.financing == null) next.financing = 'All Cash';
-      if (next.conditions_of_sale == null) next.conditions_of_sale = 'Arms Length';
+      if (next.sale_conditions == null) next.sale_conditions = 'Arms Length';
       if (next.market_conditions == null) next.market_conditions = 'Current';
       if (next.other == null) next.other = 'N/A';
       if (next.location == null) next.location = subjectCity || 'N/A';
@@ -289,6 +289,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
       return (
         comp.adjustments?.find(a => a.adjustment_type === 'physical_age') ||
         comp.adjustments?.find(a => a.adjustment_type === 'physical_condition') ||
+        null
+      );
+    }
+    if (adjType === 'sale_conditions') {
+      return (
+        comp.adjustments?.find(a => a.adjustment_type === 'sale_conditions') ||
+        comp.adjustments?.find(a => a.adjustment_type === 'conditions_of_sale') ||
         null
       );
     }
@@ -542,10 +549,19 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
   const handleFinalChange = useCallback(async (compId: number, adjType: string, value: number | null) => {
     try {
       const comparable = comparables.find(c => c.comparable_id === compId);
-      const adjustment = comparable?.adjustments?.find(a => a.adjustment_type === adjType);
+      const adjustment = comparable ? getCurrentAdjustment(comparable, adjType) : null;
 
       if (!adjustment) {
-        console.warn('No adjustment found to update');
+        if (value == null) {
+          return;
+        }
+        await addAdjustment(projectId, compId, {
+          adjustment_type: adjType as SalesCompAdjustment['adjustment_type'],
+          adjustment_pct: value,
+          user_adjustment_pct: value,
+          ai_accepted: false
+        });
+        onRefresh?.();
         return;
       }
 
@@ -560,7 +576,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     } catch (error) {
       console.error('Failed to update user adjustment:', error);
     }
-  }, [comparables, onRefresh]);
+  }, [comparables, onRefresh, projectId]);
 
   // Handle delete click - open confirmation modal
   const handleDeleteClick = (compId: number) => {
@@ -618,6 +634,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
       return (
         comp.adjustments?.find(adj => adj.adjustment_type === 'physical_age') ||
         comp.adjustments?.find(adj => adj.adjustment_type === 'physical_condition') ||
+        null
+      );
+    }
+    if (adjType === 'sale_conditions') {
+      return (
+        comp.adjustments?.find(adj => adj.adjustment_type === 'sale_conditions') ||
+        comp.adjustments?.find(adj => adj.adjustment_type === 'conditions_of_sale') ||
         null
       );
     }

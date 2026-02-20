@@ -467,6 +467,9 @@ export interface SalesCompAdjustmentForm {
   adjustment_pct?: number;
   adjustment_amount?: number;
   justification?: string;
+  user_adjustment_pct?: number | null;
+  ai_accepted?: boolean;
+  user_notes?: string;
 }
 
 export interface ValuationReconciliationForm {

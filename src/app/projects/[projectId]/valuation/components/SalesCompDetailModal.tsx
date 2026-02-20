@@ -222,17 +222,17 @@ const OVERLAY_RECOMMENDATIONS: Record<OverlaySection, {
     rows: [
       {
         type: 'property_rights',
-        pct: 1.5,
+        pct: 0.015,
         rationale: 'Comp rights appear broader than subject rights package.',
       },
       {
         type: 'financing',
-        pct: -0.75,
+        pct: -0.0075,
         rationale: 'Debt terms were more favorable than current market debt costs.',
       },
       {
         type: 'sale_conditions',
-        pct: 0.5,
+        pct: 0.005,
         rationale: 'Buyer motivation indicates above-market urgency premium.',
       },
     ],
@@ -243,17 +243,17 @@ const OVERLAY_RECOMMENDATIONS: Record<OverlaySection, {
     rows: [
       {
         type: 'location',
-        pct: -2.0,
+        pct: -0.02,
         rationale: 'Subject micro-location outperforms comp trade area rent growth.',
       },
       {
         type: 'physical_age',
-        pct: 1.25,
+        pct: 0.0125,
         rationale: 'Comp effective age is older versus subject lifecycle profile.',
       },
       {
         type: 'physical_condition',
-        pct: 0.75,
+        pct: 0.0075,
         rationale: 'Observed renovation quality lags subject target finish level.',
       },
     ],
@@ -264,12 +264,12 @@ const OVERLAY_RECOMMENDATIONS: Record<OverlaySection, {
     rows: [
       {
         type: 'physical_unit_mix',
-        pct: 1.1,
+        pct: 0.011,
         rationale: 'Comp mix skews to smaller units with weaker per-unit rent depth.',
       },
       {
         type: 'physical_size',
-        pct: -0.8,
+        pct: -0.008,
         rationale: 'Per-unit size discount observed versus subject unit plan average.',
       },
     ],
@@ -289,8 +289,9 @@ function toNumber(value: string | number | null | undefined): number | null {
 function toFixedOrDash(value: number | string | null | undefined, decimals = 1, withSign = true): string {
   const numeric = toNumber(value);
   if (numeric == null || numeric === 0) return DASH;
-  const sign = numeric > 0 && withSign ? '+' : '';
-  return `${sign}${numeric.toFixed(decimals)}%`;
+  const percentValue = numeric * 100;
+  const sign = percentValue > 0 && withSign ? '+' : '';
+  return `${sign}${percentValue.toFixed(decimals)}%`;
 }
 
 const fmt = {
@@ -310,6 +311,11 @@ const fmt = {
     const numeric = toNumber(value);
     if (numeric == null || numeric === 0) return DASH;
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(numeric);
+  },
+  integerNoGroup(value: number | string | null | undefined): string {
+    const numeric = toNumber(value);
+    if (numeric == null || numeric === 0) return DASH;
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0, useGrouping: false }).format(numeric);
   },
   decimal(value: number | string | null | undefined, digits = 2): string {
     const numeric = toNumber(value);
@@ -504,10 +510,11 @@ function AdjPercentInput({
 }) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState('');
+  const formatDraft = (nextValue: number) => String(Number((nextValue * 100).toFixed(2)));
 
   useEffect(() => {
     if (!focused) {
-      setDraft(value == null || value === 0 ? '' : String(value));
+      setDraft(value == null || value === 0 ? '' : formatDraft(value));
     }
   }, [focused, value]);
 
@@ -520,7 +527,9 @@ function AdjPercentInput({
         setFocused(true);
         if (value == null || value === 0) {
           setDraft('');
+          return;
         }
+        setDraft(formatDraft(value));
       }}
       onChange={(event) => {
         setDraft(event.target.value);
@@ -532,7 +541,7 @@ function AdjPercentInput({
           onCommit(null);
           return;
         }
-        onCommit(parsed);
+        onCommit(parsed / 100);
       }}
     />
   );
@@ -552,7 +561,7 @@ function DashNumericInput({
   placeholder?: string;
   className?: string;
   textEnd?: boolean;
-  formatMode?: 'integer' | 'decimal' | 'raw';
+  formatMode?: 'integer' | 'decimal' | 'raw' | 'plain';
   decimalDigits?: number;
 }) {
   const [focused, setFocused] = useState(false);
@@ -563,6 +572,7 @@ function DashNumericInput({
     if (numeric == null || numeric === 0) return DASH;
     if (formatMode === 'decimal') return fmt.decimal(numeric, decimalDigits);
     if (formatMode === 'raw') return value;
+    if (formatMode === 'plain') return fmt.integerNoGroup(numeric);
     return fmt.integer(numeric);
   }, [decimalDigits, formatMode, value]);
 
@@ -600,6 +610,10 @@ function DashNumericInput({
         }
         if (formatMode === 'raw') {
           onChange(draft.replace(/,/g, ''));
+          return;
+        }
+        if (formatMode === 'plain') {
+          onChange(String(Math.round(parsed)));
           return;
         }
         onChange(String(Math.round(parsed)));
@@ -805,16 +819,16 @@ export function SalesCompDetailModal({
 
   const transactionSubtotalAmt = useMemo(() => {
     if (salePriceNum == null) return null;
-    return salePriceNum * (transactionSubtotalPct / 100);
+    return salePriceNum * transactionSubtotalPct;
   }, [salePriceNum, transactionSubtotalPct]);
 
   const propertySubtotalAmt = useMemo(() => {
     if (salePriceNum == null) return null;
-    return salePriceNum * (propertySubtotalPct / 100);
+    return salePriceNum * propertySubtotalPct;
   }, [propertySubtotalPct, salePriceNum]);
 
   const netAdjPct = transactionSubtotalPct + propertySubtotalPct;
-  const netAdjAmt = salePriceNum == null ? null : salePriceNum * (netAdjPct / 100);
+  const netAdjAmt = salePriceNum == null ? null : salePriceNum * netAdjPct;
 
   const pricePerUnit = useMemo(() => {
     if (salePriceNum == null || unitsNum == null || unitsNum === 0) return null;
@@ -828,7 +842,7 @@ export function SalesCompDetailModal({
 
   const adjPricePerUnit = useMemo(() => {
     if (pricePerUnit == null) return null;
-    return pricePerUnit * (1 + netAdjPct / 100);
+    return pricePerUnit * (1 + netAdjPct);
   }, [netAdjPct, pricePerUnit]);
 
   const marketConditionText = useMemo(() => formatMonthYear(watchedSaleDate), [watchedSaleDate]);
@@ -1152,7 +1166,7 @@ export function SalesCompDetailModal({
         adjustment_pct: normalizedPct,
         adjustment_amount: salePriceNum == null || normalizedPct == null
           ? null
-          : salePriceNum * (normalizedPct / 100),
+          : salePriceNum * normalizedPct,
         user_notes: row.user_notes || null,
         justification: row.justification || null,
         subject_value: row.subject_value || null,
@@ -1444,7 +1458,11 @@ export function SalesCompDetailModal({
                     <div className={styles.fieldGridRow}>
                       <div className={styles.fieldName}>Sale Date</div>
                       <div>
-                        <input type="date" className={combineClassNames('form-control', styles.smallControl)} {...register('sale_date')} />
+                        <input
+                          type="date"
+                          className={combineClassNames('form-control', styles.smallControl, styles.valueRight)}
+                          {...register('sale_date')}
+                        />
                       </div>
                       <div />
                       <div />
@@ -1463,7 +1481,6 @@ export function SalesCompDetailModal({
                               <DashNumericInput
                                 value={field.value}
                                 onChange={field.onChange}
-                                textEnd={false}
                                 className={styles.prefixedInput}
                                 formatMode="integer"
                               />
@@ -1479,14 +1496,14 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Property Rights"
                       valueNode={
-                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('property_rights')}>
+                        <select className={combineClassNames('form-select', styles.smallControl, styles.valueRight)} {...register('property_rights')}>
                           {PROPERTY_RIGHTS_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
                         </select>
                       }
                       adjustment={getAdjustment('property_rights')}
-                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('property_rights').adjustment_pct ?? 0) / 100)}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('property_rights').adjustment_pct ?? 0)}
                       onPctChange={(nextPct) => setAdjustmentValue('property_rights', { adjustment_pct: nextPct })}
                       onNotesChange={(nextNotes) => setAdjustmentValue('property_rights', { user_notes: nextNotes })}
                     />
@@ -1494,14 +1511,14 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Financing"
                       valueNode={
-                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('financing_type')}>
+                        <select className={combineClassNames('form-select', styles.smallControl, styles.valueRight)} {...register('financing_type')}>
                           {FINANCING_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
                         </select>
                       }
                       adjustment={getAdjustment('financing')}
-                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('financing').adjustment_pct ?? 0) / 100)}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('financing').adjustment_pct ?? 0)}
                       onPctChange={(nextPct) => setAdjustmentValue('financing', { adjustment_pct: nextPct })}
                       onNotesChange={(nextNotes) => setAdjustmentValue('financing', { user_notes: nextNotes })}
                     />
@@ -1509,14 +1526,14 @@ export function SalesCompDetailModal({
                     <AdjustmentRow
                       label="Sale Conditions"
                       valueNode={
-                        <select className={combineClassNames('form-select', styles.smallControl)} {...register('sale_conditions')}>
+                        <select className={combineClassNames('form-select', styles.smallControl, styles.valueRight)} {...register('sale_conditions')}>
                           {SALE_CONDITIONS_OPTIONS.map((option) => (
                             <option key={option} value={option}>{option}</option>
                           ))}
                         </select>
                       }
                       adjustment={getAdjustment('sale_conditions')}
-                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('sale_conditions').adjustment_pct ?? 0) / 100)}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('sale_conditions').adjustment_pct ?? 0)}
                       onPctChange={(nextPct) => setAdjustmentValue('sale_conditions', { adjustment_pct: nextPct })}
                       onNotesChange={(nextNotes) => setAdjustmentValue('sale_conditions', { user_notes: nextNotes })}
                     />
@@ -1525,7 +1542,7 @@ export function SalesCompDetailModal({
                       label="Market Conditions"
                       valueNode={<CalculatedBadgeValue value={marketConditionText} badge="AUTO" />}
                       adjustment={getAdjustment('market_conditions')}
-                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('market_conditions').adjustment_pct ?? 0) / 100)}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('market_conditions').adjustment_pct ?? 0)}
                       onPctChange={(nextPct) => setAdjustmentValue('market_conditions', { adjustment_pct: nextPct })}
                       onNotesChange={(nextNotes) => setAdjustmentValue('market_conditions', { user_notes: nextNotes })}
                     />
@@ -1572,7 +1589,7 @@ export function SalesCompDetailModal({
                       label="Location"
                       valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('city')} />}
                       adjustment={getAdjustment('location')}
-                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('location').adjustment_pct ?? 0) / 100)}
+                      adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('location').adjustment_pct ?? 0)}
                       onPctChange={(nextPct) => setAdjustmentValue('location', { adjustment_pct: nextPct })}
                       onNotesChange={(nextNotes) => setAdjustmentValue('location', { user_notes: nextNotes })}
                     />
@@ -1584,14 +1601,14 @@ export function SalesCompDetailModal({
                           valueNode={
                             <Controller
                               control={control}
-                              name="year_built"
-                              render={({ field }) => (
-                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="integer" />
-                              )}
-                            />
+                          name="year_built"
+                          render={({ field }) => (
+                                <DashNumericInput value={field.value} onChange={field.onChange} formatMode="plain" />
+                          )}
+                        />
                           }
                           adjustment={getAdjustment('physical_age')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_age').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_age').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_age', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_age', { user_notes: nextNotes })}
                         />
@@ -1608,7 +1625,7 @@ export function SalesCompDetailModal({
                             />
                           }
                           adjustment={getAdjustment('physical_size')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_size').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_size').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_size', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_size', { user_notes: nextNotes })}
                         />
@@ -1625,7 +1642,7 @@ export function SalesCompDetailModal({
                             />
                           }
                           adjustment={getAdjustment('physical_building_sf')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_building_sf').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_building_sf').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_building_sf', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_building_sf', { user_notes: nextNotes })}
                         />
@@ -1642,7 +1659,7 @@ export function SalesCompDetailModal({
                             />
                           }
                           adjustment={getAdjustment('physical_stories')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_stories').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_stories').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_stories', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_stories', { user_notes: nextNotes })}
                         />
@@ -1659,7 +1676,7 @@ export function SalesCompDetailModal({
                             />
                           }
                           adjustment={getAdjustment('physical_lot_size')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_lot_size').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_lot_size').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_lot_size', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_lot_size', { user_notes: nextNotes })}
                         />
@@ -1709,7 +1726,7 @@ export function SalesCompDetailModal({
                           label="Unit Mix"
                           valueNode={<CalculatedBadgeValue value={unitMixSummary} badge="VS SUBJ" />}
                           adjustment={getAdjustment('physical_unit_mix')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_unit_mix').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_unit_mix').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_unit_mix', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_unit_mix', { user_notes: nextNotes })}
                         />
@@ -1718,7 +1735,7 @@ export function SalesCompDetailModal({
                           label="Quality"
                           valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('quality')} />}
                           adjustment={getAdjustment('physical_condition')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('physical_condition').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('physical_condition').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('physical_condition', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('physical_condition', { user_notes: nextNotes })}
                         />
@@ -1727,7 +1744,7 @@ export function SalesCompDetailModal({
                           label="Other"
                           valueNode={<input className={combineClassNames('form-control', styles.smallControl)} {...register('property_other')} />}
                           adjustment={getAdjustment('other')}
-                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * ((getAdjustment('other').adjustment_pct ?? 0) / 100)}
+                          adjustmentAmount={salePriceNum == null ? null : salePriceNum * (getAdjustment('other').adjustment_pct ?? 0)}
                           onPctChange={(nextPct) => setAdjustmentValue('other', { adjustment_pct: nextPct })}
                           onNotesChange={(nextNotes) => setAdjustmentValue('other', { user_notes: nextNotes })}
                         />

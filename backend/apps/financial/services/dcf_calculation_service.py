@@ -73,12 +73,10 @@ def build_renovation_schedule(
     reno_cost_per_sf = float(value_add.get('reno_cost_per_sf', 0) or 0)
     relocation_incentive = float(value_add.get('relocation_incentive', 0) or 0)
 
-    # Cost per unit
-    if reno_cost_basis == 'unit':
-        # reno_cost_per_sf is actually $/unit when basis='unit'
-        cost_per_unit = reno_cost_per_sf
-    else:
-        cost_per_unit = reno_cost_per_sf * avg_unit_sf
+    # Cost per unit — the DB always stores the value as $/SF (the frontend
+    # normalises user input to $/SF before saving, regardless of cost basis).
+    # So we always multiply by avg_unit_sf to get the per-unit cost.
+    cost_per_unit = reno_cost_per_sf * avg_unit_sf
 
     # Monthly premium per renovated unit
     premium_per_unit = per_unit_monthly_rent * rent_premium_pct

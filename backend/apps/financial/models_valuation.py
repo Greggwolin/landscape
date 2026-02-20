@@ -194,7 +194,7 @@ class SalesComparable(models.Model):
             return None
 
         total_adjustment_pct = sum(
-            adj.adjustment_pct or 0
+            (adj.user_adjustment_pct if adj.user_adjustment_pct is not None else adj.adjustment_pct) or 0
             for adj in self.adjustments.all()
         )
 

@@ -126,6 +126,30 @@ export interface MFDcfMonthlyApiResponse {
 // TRANSFORM TO GRID FORMAT
 // ============================================================================
 
+const toNumber = (value: number | null | undefined): number => {
+  if (value == null) return 0;
+  return Number.isFinite(value) ? value : 0;
+};
+
+const toNegative = (value: number | null | undefined): number => {
+  const num = toNumber(value);
+  return num === 0 ? 0 : -Math.abs(num);
+};
+
+const computeEgiValue = (projection: {
+  gpr?: number;
+  vacancy_loss?: number;
+  credit_loss?: number;
+  other_income?: number;
+}): number => {
+  return (
+    toNumber(projection.gpr) +
+    toNegative(projection.vacancy_loss) +
+    toNegative(projection.credit_loss) +
+    toNumber(projection.other_income)
+  );
+};
+
 /**
  * Build the display projection window from hold period assumptions.
  * Backend may include a forward year for terminal NOI/reversion calculations;
@@ -158,11 +182,24 @@ export function transformMFDcfToGrid(
   // Build Income Statement rows from projections
   const buildRowValues = (
     projections: MFDcfProjection[],
-    field: keyof MFDcfProjection
+    field: keyof MFDcfProjection,
+    transform?: (value: number | null | undefined, projection: MFDcfProjection) => number
   ): Record<string, number> => {
     const values: Record<string, number> = {};
     projections.forEach((p) => {
-      values[p.periodId] = (p[field] as number) ?? 0;
+      const rawValue = (p[field] as number) ?? 0;
+      values[p.periodId] = transform ? transform(rawValue, p) : rawValue;
+    });
+    return values;
+  };
+
+  const buildComputedRowValues = (
+    projections: MFDcfProjection[],
+    compute: (projection: MFDcfProjection) => number
+  ): Record<string, number> => {
+    const values: Record<string, number> = {};
+    projections.forEach((p) => {
+      values[p.periodId] = compute(p);
     });
     return values;
   };
@@ -186,7 +223,7 @@ export function transformMFDcfToGrid(
       {
         id: 'reno_vacancy_loss',
         label: 'Less: Renovation Vacancy',
-        values: buildRowValues(data.projections, 'reno_vacancy_loss'),
+        values: buildRowValues(data.projections, 'reno_vacancy_loss', toNegative),
         indent: 1,
         isInformational: true,
       },
@@ -204,13 +241,13 @@ export function transformMFDcfToGrid(
     {
       id: 'vacancy_loss',
       label: 'Less: Vacancy',
-      values: buildRowValues(data.projections, 'vacancy_loss'),
+      values: buildRowValues(data.projections, 'vacancy_loss', toNegative),
       indent: 1,
     },
     {
       id: 'credit_loss',
       label: 'Less: Credit Loss',
-      values: buildRowValues(data.projections, 'credit_loss'),
+      values: buildRowValues(data.projections, 'credit_loss', toNegative),
       indent: 1,
     },
     {
@@ -222,7 +259,7 @@ export function transformMFDcfToGrid(
     {
       id: 'egi',
       label: 'Effective Gross Income',
-      values: buildRowValues(data.projections, 'egi'),
+      values: buildComputedRowValues(data.projections, computeEgiValue),
       isSubtotal: true,
     }
   );
@@ -629,7 +666,16 @@ function appendTerminalYear(
 
       // Get terminal value (if this row maps to a terminal field)
       const terminalValue = fieldKey !== undefined
-        ? (terminalData[fieldKey] ?? 0)
+        ? (row.id === 'egi'
+            ? computeEgiValue({
+                gpr: terminalData.gpr,
+                vacancy_loss: terminalData.vacancy_loss,
+                credit_loss: terminalData.credit_loss,
+                other_income: terminalData.other_income,
+              })
+            : ['vacancy_loss', 'credit_loss', 'reno_vacancy_loss'].includes(row.id)
+              ? toNegative(terminalData[fieldKey])
+              : toNumber(terminalData[fieldKey]))
         : undefined;
 
       const newValues = { ...row.values };

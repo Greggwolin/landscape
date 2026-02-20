@@ -169,7 +169,7 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def add_adjustment(self, request, comparable_id=None):
+    def add_adjustment(self, request, comparable_id=None, project_id=None, **kwargs):
         """Add an adjustment to a comparable."""
         comparable = self.get_object()
         adjustment_data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
