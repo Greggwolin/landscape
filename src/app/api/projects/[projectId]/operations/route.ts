@@ -165,7 +165,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (hasDetailedRentRoll) {
       const vacancyCalcResult = await sql`
         SELECT
-          COUNT(*) FILTER (WHERE occupancy_status != 'occupied' OR occupancy_status IS NULL) as vacant_count,
+          COUNT(*) FILTER (WHERE LOWER(occupancy_status) != 'occupied' OR occupancy_status IS NULL) as vacant_count,
           COUNT(*) as total_count
         FROM tbl_multifamily_unit
         WHERE project_id = ${projectIdNum}

@@ -34,9 +34,9 @@ export async function GET(
         COALESCE(b.base_rent_annual / 12, 0) as monthly_base_rent,
         COALESCE(b.base_rent_psf_annual, 0) as rent_psf_annual,
         CASE
-          WHEN l.lease_status = 'Active' THEN 'Occupied'
-          WHEN s.space_status = 'Available' THEN 'Vacant'
-          ELSE 'Occupied'
+          WHEN l.lease_status = 'Active' THEN 'occupied'
+          WHEN s.space_status = 'Available' THEN 'vacant'
+          ELSE 'occupied'
         END as occupancy_status,
         COALESCE(l.lease_type, NULL) as lease_type,
         false as has_percentage_rent,
@@ -54,12 +54,12 @@ export async function GET(
 
     // Calculate summary stats
     const total_spaces = spaces.length;
-    const occupied_spaces = spaces.filter(s => s.occupancy_status === 'Occupied').length;
+    const occupied_spaces = spaces.filter(s => s.occupancy_status?.toLowerCase() === 'occupied').length;
     const vacant_spaces = total_spaces - occupied_spaces;
 
     const total_sf = spaces.reduce((sum, s) => sum + parseFloat(s.rentable_sf || 0), 0);
     const occupied_sf = spaces
-      .filter(s => s.occupancy_status === 'Occupied')
+      .filter(s => s.occupancy_status?.toLowerCase() === 'occupied')
       .reduce((sum, s) => sum + parseFloat(s.rentable_sf || 0), 0);
 
     const occupancy_pct = total_sf > 0 ? (occupied_sf / total_sf) * 100 : 0;

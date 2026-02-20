@@ -67,23 +67,51 @@ const formatLocation = (project: ProjectSummary) => {
 };
 
 const formatUnits = (project: ProjectSummary) => {
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+  const countTypes = new Set(['units', 'lots', 'suites', 'keys', 'pads', 'rooms', 'other']);
+
   const canonicalCode = resolveCanonicalPropertyTypeCode(toTypeCode(project));
-  const units = project.total_residential_units ?? null;
-  const acreage = project.acreage ?? project.acres_gross ?? null;
-  const commercialSqft = project.total_commercial_sqft ?? null;
+  const primaryCountType = project.primary_count_type?.toLowerCase() ?? '';
+  const primaryCountRaw = toNumber(project.primary_count);
+  const primaryCount = countTypes.has(primaryCountType) ? primaryCountRaw : null;
+  const units = toNumber(project.total_residential_units) ?? primaryCount;
+  const primaryArea = toNumber(project.primary_area);
+  const primaryAreaType = project.primary_area_type?.toLowerCase() ?? null;
+  const commercialSqft =
+    toNumber(project.total_commercial_sqft) ??
+    (primaryAreaType?.includes('sf') ? primaryArea : null) ??
+    toNumber(project.gross_sf) ??
+    null;
 
   if (canonicalCode === 'LAND') {
-    if (units && units > 0) return `${units.toLocaleString()}`;
-    if (acreage) return `${acreage} Acres`;
+    const acreage =
+      toNumber(project.acreage) ??
+      toNumber(project.acres_gross) ??
+      (primaryAreaType?.includes('acre') ? primaryArea : null);
+    if (acreage && acreage > 0) {
+      return `${acreage.toLocaleString(undefined, { maximumFractionDigits: 2 })} AC`;
+    }
+    return 'TBD';
   }
 
   if (canonicalCode === 'MF') {
-    if (units && units > 0) return `${units.toLocaleString()}`;
+    const mfUnits = units ?? primaryCountRaw;
+    if (mfUnits && mfUnits > 0) return `${mfUnits.toLocaleString()} Units`;
   }
 
   if (canonicalCode && ['MXU', 'RET', 'OFF', 'IND', 'HTL'].includes(canonicalCode)) {
     if (commercialSqft && commercialSqft > 0) return `${commercialSqft.toLocaleString()} SF`;
   }
+
+  if (commercialSqft && commercialSqft > 0) return `${commercialSqft.toLocaleString()} SF`;
+  if (units && units > 0) return `${units.toLocaleString()} Units`;
 
   return 'TBD';
 };
@@ -189,12 +217,6 @@ function ProjectAccordion({
                     </div>
                   </div>
                   <div className="text-end">
-                    <div
-                      className="small text-uppercase"
-                      style={{ color: 'var(--cui-secondary-color)', letterSpacing: '0.03em', fontSize: '0.75rem' }}
-                    >
-                      Units
-                    </div>
                     <div className="fw-semibold" style={{ fontSize: '1rem' }}>{formatUnits(project)}</div>
                   </div>
                 </div>

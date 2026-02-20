@@ -181,6 +181,31 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   const [extractedFieldKeys, setExtractedFieldKeys] = useState<Set<string>>(new Set())
   const [pendingDocuments, setPendingDocuments] = useState<File[]>([])
 
+  // DMS Template selection
+  const [dmsTemplates, setDmsTemplates] = useState<Array<{ template_id: number; template_name: string; description: string | null; is_default: boolean }>>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null)
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    setLoadingTemplates(true)
+    fetch('/api/dms/templates')
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return
+        const templates = data.templates || []
+        setDmsTemplates(templates)
+        const defaultTpl = templates.find((t: { is_default: boolean }) => t.is_default)
+        if (defaultTpl && selectedTemplateId === null) {
+          setSelectedTemplateId(defaultTpl.template_id)
+        }
+      })
+      .catch(err => console.error('Failed to fetch DMS templates:', err))
+      .finally(() => { if (!cancelled) setLoadingTemplates(false) })
+    return () => { cancelled = true }
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (analysisPerspective === 'DEVELOPMENT' && valueAddEnabled) {
       setValue('value_add_enabled', false, { shouldDirty: true, shouldValidate: true })
@@ -863,7 +888,8 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         total_units: getNumeric(data.total_units),
         gross_sf: getNumeric(data.building_sf),
         analysis_start_date: data.analysis_start_date || undefined,
-        asking_price: getNumeric(data.asking_price)
+        asking_price: getNumeric(data.asking_price),
+        dms_template_id: selectedTemplateId || undefined
       }
 
       const response = await fetch('/api/projects/minimal', {
@@ -1300,6 +1326,41 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                 )}
               </div>
 
+              {/* Document Template Dropdown */}
+              <div>
+                <label className="form-label fw-medium mb-2" style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem' }}>
+                  Document Template
+                </label>
+                {loadingTemplates ? (
+                  <div className="d-flex align-items-center gap-2 small" style={{ color: 'var(--cui-secondary-color)' }}>
+                    <div className="spinner-border spinner-border-sm" role="status" />
+                    Loading templates...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedTemplateId ?? ''}
+                    onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : null)}
+                    className="form-select"
+                    style={{
+                      borderColor: 'var(--cui-border-color)',
+                      backgroundColor: 'var(--cui-card-bg)',
+                      color: 'var(--cui-body-color)',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    <option value="">No template</option>
+                    {dmsTemplates.map((tpl) => (
+                      <option key={tpl.template_id} value={tpl.template_id}>
+                        {tpl.template_name}{tpl.is_default ? ' (Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="mt-1 small" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                  Determines which document categories appear in this project&apos;s DMS.
+                </p>
+              </div>
+
               {/* Location Section */}
               <div ref={locationSectionRef} className="pt-2">
                 <div className="d-flex align-items-baseline gap-2 mb-3">
@@ -1447,6 +1508,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               resetFormState()
               setExtractedFieldKeys(new Set())
               setPendingDocuments([])
+              setSelectedTemplateId(dmsTemplates.find(t => t.is_default)?.template_id ?? null)
             }}
             disabled={isSubmitting}
             className="btn btn-link p-0 small"

@@ -2694,3 +2694,134 @@ def apply_rent_roll_mapping(request, project_id: int):
         return JsonResponse(result, status=status_code)
 
     return JsonResponse(result)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def manage_extract_queue(request, project_id: int):
+    """
+    GET  /api/knowledge/projects/{project_id}/extract-queue/
+         List dms_extract_queue items for this project.
+         Query params: status (optional filter)
+
+    POST /api/knowledge/projects/{project_id}/extract-queue/
+         Body: { "action": "delete_all" | "delete", "queue_ids": [int] (for delete) }
+         Manage queue items: delete selected or all pending/failed.
+    """
+    from django.db import connection
+
+    if request.method == 'GET':
+        status_filter = request.GET.get('status')
+
+        with connection.cursor() as cursor:
+            sql = """
+                SELECT q.queue_id, q.doc_id, d.doc_name, d.doc_type, d.mime_type,
+                       q.extract_type, q.status, q.attempts, q.max_attempts,
+                       q.error_message, q.created_at, q.processed_at
+                FROM landscape.dms_extract_queue q
+                JOIN landscape.core_doc d ON d.doc_id = q.doc_id
+                WHERE d.project_id = %s
+            """
+            params = [project_id]
+
+            if status_filter:
+                sql += " AND q.status = %s"
+                params.append(status_filter)
+
+            sql += " ORDER BY q.created_at DESC"
+
+            cursor.execute(sql, params)
+            columns = [c[0] for c in cursor.description]
+            rows = cursor.fetchall()
+
+        items = []
+        for row in rows:
+            item = dict(zip(columns, row))
+            if item.get('created_at'):
+                item['created_at'] = item['created_at'].isoformat()
+            if item.get('processed_at'):
+                item['processed_at'] = item['processed_at'].isoformat()
+            items.append(item)
+
+        status_counts = {}
+        for item in items:
+            s = item['status']
+            status_counts[s] = status_counts.get(s, 0) + 1
+
+        return JsonResponse({
+            'success': True,
+            'items': items,
+            'total': len(items),
+            'status_counts': status_counts,
+        })
+
+    elif request.method == 'POST':
+        import json
+        try:
+            body = json.loads(request.body)
+        except (json.JSONDecodeError, ValueError):
+            return JsonResponse({'success': False, 'error': 'Invalid JSON'}, status=400)
+
+        action = body.get('action')
+
+        with connection.cursor() as cursor:
+            if action == 'delete_all':
+                cursor.execute("""
+                    DELETE FROM landscape.dms_extract_queue q
+                    USING landscape.core_doc d
+                    WHERE q.doc_id = d.doc_id
+                      AND d.project_id = %s
+                      AND q.status IN ('pending', 'failed')
+                    RETURNING q.queue_id
+                """, [project_id])
+                deleted = cursor.fetchall()
+                return JsonResponse({
+                    'success': True,
+                    'deleted': len(deleted),
+                    'message': f'Cleared {len(deleted)} queue items',
+                })
+
+            elif action == 'delete':
+                queue_ids = body.get('queue_ids', [])
+                if not queue_ids:
+                    return JsonResponse({'success': False, 'error': 'No queue_ids provided'}, status=400)
+
+                cursor.execute("""
+                    DELETE FROM landscape.dms_extract_queue q
+                    USING landscape.core_doc d
+                    WHERE q.doc_id = d.doc_id
+                      AND d.project_id = %s
+                      AND q.queue_id = ANY(%s::int[])
+                    RETURNING q.queue_id
+                """, [project_id, queue_ids])
+                deleted = cursor.fetchall()
+                return JsonResponse({
+                    'success': True,
+                    'deleted': len(deleted),
+                    'message': f'Deleted {len(deleted)} queue items',
+                })
+
+            elif action == 'retry':
+                queue_ids = body.get('queue_ids', [])
+                if not queue_ids:
+                    return JsonResponse({'success': False, 'error': 'No queue_ids provided'}, status=400)
+
+                cursor.execute("""
+                    UPDATE landscape.dms_extract_queue q
+                    SET status = 'pending', attempts = 0, error_message = NULL
+                    FROM landscape.core_doc d
+                    WHERE q.doc_id = d.doc_id
+                      AND d.project_id = %s
+                      AND q.queue_id = ANY(%s::int[])
+                      AND q.status = 'failed'
+                    RETURNING q.queue_id
+                """, [project_id, queue_ids])
+                retried = cursor.fetchall()
+                return JsonResponse({
+                    'success': True,
+                    'retried': len(retried),
+                    'message': f'Reset {len(retried)} failed items to pending',
+                })
+
+            else:
+                return JsonResponse({'success': False, 'error': f'Unknown action: {action}'}, status=400)

@@ -245,6 +245,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             <LandscaperPanel
               projectId={projectId}
               activeTab={currentFolder}
+              pageContext={currentFolder}
+              subtabContext={currentTab}
               contextPillLabel={landscaperContextLabel}
               contextPillColor={landscaperContextColor}
               onToggleCollapse={toggleCollapsed}

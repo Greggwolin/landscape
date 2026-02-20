@@ -48,6 +48,7 @@ urlpatterns = [
     path('projects/<int:project_id>/extraction-jobs/', extraction_views.get_extraction_jobs, name='knowledge-extraction-jobs'),
     path('projects/<int:project_id>/extraction-jobs/<int:job_id>/', extraction_views.get_extraction_job, name='knowledge-extraction-job'),
     path('projects/<int:project_id>/extraction-jobs/<int:job_id>/cancel/', extraction_views.cancel_extraction_job, name='knowledge-cancel-extraction-job'),
+    path('projects/<int:project_id>/extract-queue/', extraction_views.manage_extract_queue, name='knowledge-extract-queue'),
 
     # Column discovery & field mapping (CC Prompt C3)
     path('projects/<int:project_id>/discover-columns/', extraction_views.discover_rent_roll_columns, name='knowledge-discover-columns'),

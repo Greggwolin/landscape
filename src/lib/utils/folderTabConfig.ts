@@ -313,6 +313,7 @@ export function createFolderConfig(
             { id: 'sales-comparison', label: 'Sales Comparison' },
             { id: 'cost', label: 'Cost Approach' },
             { id: 'income', label: 'Income Approach' },
+            { id: 'reconciliation', label: 'Reconciliation' },
           ]
         : [
             { id: 'cashflow', label: 'Cash Flow' },

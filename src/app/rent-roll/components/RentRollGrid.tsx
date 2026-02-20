@@ -242,7 +242,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       market_rent: unit.market_rent,
       other_features: unit.other_features,
       base_rent_monthly: Number(unit.current_rent) || 0,
-      lease_status: unit.occupancy_status === 'Vacant' ? 'VACANT' : 'ACTIVE',
+      lease_status: unit.occupancy_status?.toLowerCase() === 'vacant' ? 'VACANT' : 'ACTIVE',
       resident_name: null,
       _source: 'unit' as const
     }))
@@ -302,7 +302,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     // When showing units only, count occupied from occupancy_status
     const occupiedUnits = leases.length > 0
       ? leases.filter(l => l.lease_status === 'ACTIVE').length
-      : units.filter((u: Unit) => u.occupancy_status === 'Occupied').length
+      : units.filter((u: Unit) => u.occupancy_status?.toLowerCase() === 'occupied').length
     const vacantUnits = totalUnits - occupiedUnits
     const physicalOccupancyPct = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0
 
@@ -312,7 +312,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
           .filter(l => l.lease_status === 'ACTIVE')
           .reduce((sum, l) => sum + (Number(l.base_rent_monthly) || 0), 0)
       : units
-          .filter((u: Unit) => u.occupancy_status === 'Occupied')
+          .filter((u: Unit) => u.occupancy_status?.toLowerCase() === 'occupied')
           .reduce((sum, u: Unit) => sum + (Number(u.current_rent) || 0), 0)
 
     const annualScheduledRent = monthlyScheduledRent * 12
@@ -608,6 +608,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         const pending = getPendingCellStyle(params)
         return { fontWeight: 'bold', ...(pending || {}) }
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
     },
     {
       field: 'building_name',
@@ -625,6 +631,11 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
         values: unitTypeOptions.length > 0 ? unitTypeOptions : ['1BR', '2BR', '3BR', '4BR', 'Studio']
+      },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.value
       },
       cellStyle: (params) => {
         const pending = getPendingCellStyle(params)
@@ -656,6 +667,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         max: 10,
         precision: 0,  // Whole numbers only
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => {
         if (!params.value) return ''
         return params.value.toString()
@@ -673,6 +690,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         max: 5,
         precision: 1,  // Allows 1.5, 2.5, etc.
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => {
         if (!params.value) return ''
         return params.value.toString()
@@ -699,6 +722,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 90,
       type: 'numericColumn',
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => params.value ? formatNumber(params.value) : '',
     },
     {
@@ -706,6 +735,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       headerName: 'Lease Start',
       editable: true,
       width: 120,
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => formatDate(params.value),
     },
     {
@@ -713,6 +748,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       headerName: 'Lease End',
       editable: true,
       width: 120,
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => formatDate(params.value),
     },
     {
@@ -721,6 +762,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 130,
       type: 'numericColumn',
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => params.value ? formatCurrency(params.value) : '$0',
     },
     {
@@ -805,7 +852,13 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 150,
       minWidth: 130,
-      cellRenderer: (params: any) => <StatusBadge value={params.value} />,
+      cellRenderer: (params: any) => {
+        // Pending change display takes precedence over StatusBadge
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return <StatusBadge value={params.value} />
+      },
+      tooltipValueGetter: getPendingTooltip,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
         values: ['ACTIVE', 'NOTICE_GIVEN', 'EXPIRED', 'MONTH_TO_MONTH', 'CANCELLED'],
@@ -849,7 +902,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         )
       },
     },
-  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, handleAddRowAt, unitTypeMap, mutateLeases, showNotification, getPendingCellStyle, getPendingTooltip, hasPending, unitsWithChanges, getUnitSelectionState, selectAllForUnit, deselectAllForUnit])
+  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, handleAddRowAt, unitTypeMap, mutateLeases, showNotification, getPendingCellStyle, getPendingTooltip, pendingCellRenderer, hasPending, unitsWithChanges, getUnitSelectionState, selectAllForUnit, deselectAllForUnit])
 
   // Context menu with pending change actions
   const getContextMenuItems = useCallback((params: any) => {
@@ -1339,16 +1392,6 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
               cellStyle: (params) => {
                 const pendingStyle = getPendingCellStyle(params)
                 return pendingStyle || {}
-              },
-              cellRenderer: (params: any) => {
-                // If this cell has a pending change, render old/new display
-                const rendered = pendingCellRenderer(params)
-                if (rendered !== undefined) return rendered
-                // Fall through to default AG-Grid rendering
-                return undefined
-              },
-              tooltipValueGetter: (params) => {
-                return getPendingTooltip(params)
               },
             }}
             suppressColumnVirtualisation={true}  // Render all columns (no truncation)

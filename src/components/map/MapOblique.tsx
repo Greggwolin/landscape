@@ -90,6 +90,11 @@ const MapObliqueContext = createContext<maplibregl.Map | null>(null);
 
 export const useMapOblique = () => useContext(MapObliqueContext);
 
+const hasLayerUsingSource = (map: maplibregl.Map, sourceId: string) => {
+ const layers = map.getStyle()?.layers ?? [];
+ return layers.some((layer) => (layer as maplibregl.AnyLayer).source === sourceId);
+};
+
 export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  function MapOblique(
  {
@@ -218,7 +223,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  if (layer.id.endsWith('-line')) {
  map.removeLayer(layer.id);
  const sourceId = layer.id.replace('-line', '');
- if (map.getSource(sourceId)) {
+ if (map.getSource(sourceId) && !hasLayerUsingSource(map, sourceId)) {
  map.removeSource(sourceId);
  }
  }
@@ -256,7 +261,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  if (layer.id.endsWith('-fill')) {
  map.removeLayer(layer.id);
  const sourceId = layer.id.replace('-fill', '');
- if (map.getSource(sourceId)) {
+ if (map.getSource(sourceId) && !hasLayerUsingSource(map, sourceId)) {
  map.removeSource(sourceId);
  }
  }

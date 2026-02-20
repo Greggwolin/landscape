@@ -160,8 +160,8 @@ export default function RentRoll({ projectId }: RentRollProps) {
         sqft,
         currentRent,
         rentPerSF: currentRent && sqft > 0 ? Math.round((currentRent / sqft) * 100) / 100 : null,
-        leaseStart: lease?.lease_start_date || null,
-        leaseEnd: lease?.lease_end_date || null,
+        leaseStart: lease?.lease_start_date || unit.current_lease?.lease_start_date || null,
+        leaseEnd: lease?.lease_end_date || unit.current_lease?.lease_end_date || null,
         residentName: lease?.resident_name || null,
         leaseStatus: lease?.lease_status || 'VACANT',
         occupancyStatus,
@@ -237,7 +237,9 @@ export default function RentRoll({ projectId }: RentRollProps) {
     if (!dateStr) return '—';
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.toLocaleDateString('en-US', { year: '2-digit' });
+      return `${month}-${year}`;
     } catch {
       return dateStr;
     }

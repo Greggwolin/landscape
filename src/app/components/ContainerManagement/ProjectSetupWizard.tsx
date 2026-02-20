@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Building2, Home, Store, Factory, Landmark, Grid3x3, ChevronRight, Check } from 'lucide-react'
 
 // Asset type configurations with predefined label sets
@@ -95,6 +95,7 @@ interface ProjectSetupData {
   level2Label: string
   level3Label: string
   level4Label: string
+  dmsTemplateId?: number | null
 }
 
 export interface ProjectSetupWizardProps {
@@ -111,8 +112,32 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
     level1Label: '',
     level2Label: '',
     level3Label: '',
-    level4Label: ''
+    level4Label: '',
+    dmsTemplateId: null
   })
+
+  // DMS Template selection
+  const [dmsTemplates, setDmsTemplates] = useState<Array<{ template_id: number; template_name: string; is_default: boolean }>>([])
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadingTemplates(true)
+    fetch('/api/dms/templates')
+      .then(res => res.json())
+      .then(result => {
+        if (cancelled) return
+        const templates = result.templates || []
+        setDmsTemplates(templates)
+        const defaultTpl = templates.find((t: { is_default: boolean }) => t.is_default)
+        if (defaultTpl) {
+          setData(prev => ({ ...prev, dmsTemplateId: defaultTpl.template_id }))
+        }
+      })
+      .catch(err => console.error('Failed to fetch DMS templates:', err))
+      .finally(() => { if (!cancelled) setLoadingTemplates(false) })
+    return () => { cancelled = true }
+  }, [])
 
   const handleAssetTypeSelect = (assetType: AssetTypeKey) => {
     const config = ASSET_TYPE_CONFIGS[assetType]
@@ -253,6 +278,32 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                 />
               </div>
 
+              {/* Document Template */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Document Template
+                </label>
+                {loadingTemplates ? (
+                  <div className="text-sm text-gray-500">Loading templates...</div>
+                ) : (
+                  <select
+                    value={data.dmsTemplateId ?? ''}
+                    onChange={(e) => setData({ ...data, dmsTemplateId: e.target.value ? Number(e.target.value) : null })}
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">No template</option>
+                    {dmsTemplates.map((tpl) => (
+                      <option key={tpl.template_id} value={tpl.template_id}>
+                        {tpl.template_name}{tpl.is_default ? ' (Default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Determines which document categories appear in this project&apos;s DMS.
+                </p>
+              </div>
+
               {/* Hierarchy Levels + Custom Labels */}
               <div className="grid gap-8 md:grid-cols-2">
                 <div>
@@ -359,6 +410,15 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
                     {ASSET_TYPE_CONFIGS[data.assetType].name}
                   </div>
                 </div>
+
+                {data.dmsTemplateId && (
+                  <div>
+                    <div className="text-sm text-gray-500">Document Template</div>
+                    <div className="text-lg font-medium text-white">
+                      {dmsTemplates.find(t => t.template_id === data.dmsTemplateId)?.template_name || 'None'}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <div className="text-sm text-gray-500 mb-2">Hierarchy Structure</div>

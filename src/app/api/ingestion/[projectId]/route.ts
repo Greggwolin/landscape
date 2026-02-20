@@ -44,8 +44,8 @@ export async function GET(
     const unitSummary = await sql`
       SELECT
         COUNT(*) as total_units,
-        COUNT(CASE WHEN occupancy_status = 'Occupied' THEN 1 END) as occupied_units,
-        COUNT(CASE WHEN occupancy_status != 'Occupied' OR occupancy_status IS NULL THEN 1 END) as vacant_units,
+        COUNT(CASE WHEN LOWER(occupancy_status) = 'occupied' THEN 1 END) as occupied_units,
+        COUNT(CASE WHEN LOWER(occupancy_status) != 'occupied' OR occupancy_status IS NULL THEN 1 END) as vacant_units,
         ROUND(AVG(current_rent)::numeric, 2) as avg_rent,
         ROUND(AVG(market_rent)::numeric, 2) as avg_market_rent,
         SUM(current_rent) as total_monthly_rent

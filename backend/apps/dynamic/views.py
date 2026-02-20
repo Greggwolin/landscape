@@ -43,7 +43,7 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
         )
 
         # Filter by table if specified
-        table_name = self.request.query_params.get('table')
+        table_name = self.request.query_params.get('table_name') or self.request.query_params.get('table')
         if table_name:
             queryset = queryset.filter(table_name=table_name)
 
@@ -70,7 +70,7 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
         - table: Required. Table name (e.g., 'multifamily_unit')
         - row_ids: Optional. List of row IDs to get values for
         """
-        table_name = request.query_params.get('table')
+        table_name = request.query_params.get('table_name') or request.query_params.get('table')
         row_ids = request.query_params.getlist('row_ids')
 
         if not table_name:

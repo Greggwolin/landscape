@@ -10,7 +10,8 @@ import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property
 import { useCallback, useRef } from 'react';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
-import { useDynamicColumns, formatDynamicValue, type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
+import { type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
+import { usePendingRentRollChanges } from '@/hooks/usePendingRentRollChanges';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 interface Project {
@@ -306,6 +307,22 @@ const mockUnits: Unit[] = [
   { id: '8', unitNumber: '203', floorPlan: 'C1', sqft: 1250, bedrooms: 3, bathrooms: 2, currentRent: 2100, marketRent: 2250, proformaRent: 2300, leaseStart: '2024-01-01', leaseEnd: '2025-12-31', tenantName: 'Robert Garcia', status: 'Occupied', deposit: 2100, monthlyIncome: 2100, rentPerSF: 1.68, proformaRentPerSF: 1.84, notes: '' },
 ];
 
+// PropertyTab uses camelCase column IDs; the delta system uses backend snake_case field names.
+const COLUMN_TO_BACKEND_FIELD: Record<string, string> = {
+  currentRent: 'current_rent',
+  tenantName: 'tenant_name',
+  leaseStart: 'lease_start',
+  leaseEnd: 'lease_end',
+  status: 'occupancy_status',
+  marketRent: 'market_rent',
+  sqft: 'square_feet',
+  bedrooms: 'bedrooms',
+  bathrooms: 'bathrooms',
+  deposit: 'security_deposit',
+  unitNumber: 'unit_number',
+  floorPlan: 'unit_type',
+};
+
 // Column configuration - defines all available columns
 const defaultColumns: ColumnConfig[] = [
   // Unit Info
@@ -315,10 +332,10 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'bathrooms', label: 'Bath', category: 'unit', visible: true, type: 'input', description: 'Number of bathrooms' },
   { id: 'sqft', label: 'SF', category: 'unit', visible: true, type: 'input', description: 'Square footage of the unit' },
   // Tenant Info
-  { id: 'tenantName', label: 'Tenant', category: 'tenant', visible: false, type: 'input', description: 'Current tenant name (rarely used in underwriting)' },
+  { id: 'tenantName', label: 'Tenant', category: 'tenant', visible: true, type: 'input', description: 'Current tenant name (rarely used in underwriting)' },
   { id: 'status', label: 'Status', category: 'tenant', visible: true, type: 'input', description: 'Occupancy status: Occupied, Vacant, Notice, or Renewal' },
   // Lease Terms
-  { id: 'leaseStart', label: 'Lease Start', category: 'lease', visible: false, type: 'input', description: 'Lease commencement date' },
+  { id: 'leaseStart', label: 'Lease Start', category: 'lease', visible: true, type: 'input', description: 'Lease commencement date' },
   { id: 'leaseEnd', label: 'Lease End', category: 'lease', visible: true, type: 'input', description: 'Lease expiration date' },
   { id: 'deposit', label: 'Deposit', category: 'lease', visible: false, type: 'input', description: 'Security deposit amount' },
   // Financial
@@ -359,21 +376,122 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
   const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
   const propertyListRef = useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null);
 
-  // Dynamic columns from EAV system (additional rent roll fields)
-  const unitIds = useMemo(() => units.map(u => Number(u.id)), [units]);
+  // Dynamic EAV columns disabled for alpha — base columns cover all active fields.
+  // Re-enable when EAV value population is implemented.
+  const [dynamicColumnDefs, setDynamicColumnDefs] = useState<any[]>([]);
+  const dynamicValues: Record<string, Record<string, unknown>> = {};
+  const refreshDynamicColumns = () => {};
+
+  // Pending rent roll extraction changes (delta highlighting)
   const {
-    columns: dynamicColumnDefs,
-    values: dynamicValues,
-    refresh: refreshDynamicColumns,
-  } = useDynamicColumns(isMultifamily ? projectId : undefined, 'multifamily_unit', unitIds);
+    hasPending,
+    changes: pendingChanges,
+    pendingByCell,
+    summary: pendingSummary,
+    documentName: pendingDocName,
+    getFieldState,
+    toggleFieldAcceptance,
+    acceptAll,
+    rejectAll,
+    refresh: refreshPending,
+  } = usePendingRentRollChanges(isMultifamily ? Number(projectId) : undefined);
 
-  // Merge active dynamic columns into the column config list.
-  // Uses a stable fingerprint to prevent infinite re-render loops.
-  const dynColFingerprint = useMemo(
-    () => dynamicColumnDefs.filter(d => d.is_active && !d.is_proposed).map(d => d.id).join(','),
-    [dynamicColumnDefs]
+  // Fetch dynamic columns for multifamily projects (Tags, Additional Tags, etc.)
+  // These are DynamicColumnDefinition rows created during extraction via confirm_column_mapping
+  const [activeDynCols, setActiveDynCols] = useState<ColumnConfig[]>([]);
+  const [activeDynValues, setActiveDynValues] = useState<Record<string, Record<string, unknown>>>({});
+  useEffect(() => {
+    if (!isMultifamily) {
+      setActiveDynCols([]);
+      setActiveDynValues({});
+      return;
+    }
+    const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    // Fetch column definitions
+    fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        const allCols = Array.isArray(data) ? data : data.results || [];
+        // Only include active, non-proposed columns that DON'T overlap with base column labels
+        const baseLabels = new Set(defaultColumns.map(c => c.label.toLowerCase()));
+        const seen = new Set<string>();
+        const filtered = allCols.filter((d: any) => {
+          if (!d.is_active || d.is_proposed) return false;
+          const norm = d.display_label.toLowerCase();
+          if (baseLabels.has(norm)) return false;
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        });
+        setDynamicColumnDefs(filtered);
+        setActiveDynCols(filtered.map((d: any) => ({
+          id: `dyn_${d.column_key}`,
+          label: d.display_label,
+          category: 'dynamic' as const,
+          visible: true,
+          type: 'dynamic' as const,
+          description: `Custom field from extraction`,
+          dataType: d.data_type,
+          dynamicColumnId: d.id,
+        })));
+        // Fetch values for these columns
+        if (filtered.length > 0) {
+          fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/with_values/?table_name=multifamily_unit`)
+            .then(r => r.ok ? r.json() : { values: {} })
+            .then(vData => setActiveDynValues(vData.values || {}))
+            .catch(() => setActiveDynValues({}));
+        }
+      })
+      .catch(() => { setActiveDynCols([]); setActiveDynValues({}); });
+  }, [isMultifamily, projectId]);
+
+  // Derive additional columns from pending changes that aren't in base columns
+  const pendingExtraColumns = useMemo(() => {
+    if (!hasPending || pendingChanges.length === 0) return [];
+
+    // Collect all backend field names that have pending changes
+    const backendFieldsInBase = new Set(Object.values(COLUMN_TO_BACKEND_FIELD));
+    const extraFields = new Map<string, string>(); // field -> fieldLabel
+
+    for (const change of pendingChanges) {
+      if (!backendFieldsInBase.has(change.field) && !extraFields.has(change.field)) {
+        extraFields.set(change.field, change.fieldLabel);
+      }
+    }
+
+    // Convert to ColumnConfig entries
+    return Array.from(extraFields.entries()).map(([field, label]) => ({
+      id: `pending_${field}`,
+      label: label,
+      category: 'dynamic' as ColumnConfig['category'],
+      visible: true,
+      type: 'dynamic' as ColumnConfig['type'],
+      description: `Pending field from extraction`,
+    }));
+  }, [hasPending, pendingChanges]);
+
+  // NOTE: Dynamic column merge disabled — see stub above. Left intact for re-enablement.
+  const staticLabels = useMemo(
+    () => new Set(defaultColumns.map(c => c.label.toLowerCase())),
+    []
   );
+  const dynColFingerprint = useMemo(() => {
+    const seen = new Set<string>();
+    return dynamicColumnDefs
+      .filter(d => d.is_active && !d.is_proposed)
+      .filter(d => {
+        const norm = d.display_label.toLowerCase();
+        if (staticLabels.has(norm)) return false;
+        if (seen.has(norm)) return false;
+        seen.add(norm);
+        return true;
+      })
+      .map(d => d.id)
+      .join(',');
+  }, [dynamicColumnDefs, staticLabels]);
   const lastDynFingerprint = useRef('');
   useEffect(() => {
     if (!dynColFingerprint || dynColFingerprint === lastDynFingerprint.current) return;
@@ -381,9 +499,19 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setColumns(prev => {
       // Remove any previously-merged dynamic columns
       const staticCols = prev.filter(c => c.category !== 'dynamic');
-      // Build ColumnConfig entries from active dynamic definitions
+      // Build ColumnConfig entries from active dynamic definitions,
+      // excluding any whose display_label matches a base column (case-insensitive)
+      // and deduplicating dynamic columns against each other.
+      const seenDynLabels = new Set<string>();
       const dynCols: ColumnConfig[] = dynamicColumnDefs
         .filter(d => d.is_active && !d.is_proposed)
+        .filter(d => {
+          const normLabel = d.display_label.toLowerCase();
+          if (staticLabels.has(normLabel)) return false;
+          if (seenDynLabels.has(normLabel)) return false;
+          seenDynLabels.add(normLabel);
+          return true;
+        })
         .map(d => ({
           id: `dyn_${d.column_key}`,
           label: d.display_label,
@@ -397,7 +525,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       if (dynCols.length === 0) return prev; // No dynamic cols to add
       return [...staticCols, ...dynCols];
     });
-  }, [dynColFingerprint, dynamicColumnDefs]);
+  }, [dynColFingerprint, dynamicColumnDefs, staticLabels]);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -599,6 +727,31 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setPropertyColors(colors);
   }, []);
 
+  // Handle column resize drag
+  const handleResizeStart = useCallback((colId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).parentElement;
+    const startWidth = th?.offsetWidth ?? 120;
+    resizingRef.current = { colId, startX: e.clientX, startWidth };
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = moveEvent.clientX - resizingRef.current.startX;
+      const newWidth = Math.max(60, resizingRef.current.startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [resizingRef.current!.colId]: newWidth }));
+    };
+
+    const onMouseUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   // Load real data from database (extracted as callback so useLandscaperRefresh can trigger it)
   const loadData = useCallback(async () => {
     // Skip data loading for non-multifamily projects
@@ -658,8 +811,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           currentRent: baseRent,
           marketRent: marketRent,
           proformaRent: Math.round(marketRent * 1.05),
-          leaseStart: lease?.lease_start_date || '',
-          leaseEnd: lease?.lease_end_date || '',
+          leaseStart: lease?.lease_start_date || u.current_lease?.lease_start_date || u.lease_start_date || '',
+          leaseEnd: lease?.lease_end_date || u.current_lease?.lease_end_date || u.lease_end_date || '',
           tenantName: lease?.resident_name || '',
           status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
           deposit: Math.round(lease?.security_deposit || 0),
@@ -703,7 +856,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const refreshAll = useCallback(() => {
     loadData();
     refreshDynamicColumns();
-  }, [loadData, refreshDynamicColumns]);
+    refreshPending();
+  }, [loadData, refreshDynamicColumns, refreshPending]);
   useLandscaperRefresh(
     projectId,
     ['units', 'leases', 'unit_types', 'project', 'dynamic_columns'],
@@ -737,15 +891,65 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     });
   }, [units, hasCustomizedColumns]);
 
-  // Get visible columns
+  // Get visible columns (base + any extra columns from pending changes)
   const visibleColumns = useMemo(() => {
-    return columns.filter(col => col.visible);
-  }, [columns]);
+    const baseCols = columns.filter(col => col.visible);
+    return [...baseCols, ...pendingExtraColumns];
+  }, [columns, pendingExtraColumns]);
 
   // Render table cell content based on column
   const renderCellContent = (unit: Unit, columnId: string) => {
     const isEdit = isEditing(unit.id);
 
+    // If this cell has a pending change, show current → proposed
+    if (!isEdit) {
+      const backendField = COLUMN_TO_BACKEND_FIELD[columnId];
+      if (backendField) {
+        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+        if (change) {
+          const state = getFieldState(change.unitId, change.field);
+          const currentDisplay = change.currentValue != null ? String(change.currentValue) : '—';
+          const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+
+          // Format values for display (currency, numeric, or plain)
+          const isCurrency = ['currentRent', 'marketRent', 'proformaRent', 'deposit', 'monthlyIncome'].includes(columnId);
+          const isNumeric = !isNaN(Number(change.currentValue)) || !isNaN(Number(change.newValue));
+          const fmtCurrent = isCurrency && change.currentValue != null
+            ? `$${Number(change.currentValue).toLocaleString()}`
+            : isNumeric && change.currentValue != null && !isNaN(Number(change.currentValue))
+            ? Number(change.currentValue).toLocaleString()
+            : currentDisplay;
+          const fmtNew = isCurrency && change.newValue != null
+            ? `$${Number(change.newValue).toLocaleString()}`
+            : isNumeric && change.newValue != null && !isNaN(Number(change.newValue))
+            ? Number(change.newValue).toLocaleString()
+            : newDisplay;
+
+          if (state === 'accepted') {
+            // Accepted: show new value in green
+            return (
+              <span style={{ color: 'var(--cui-success)' }} title={`Was: ${fmtCurrent}`}>
+                {fmtNew}
+              </span>
+            );
+          } else {
+            // Pending: show current → new
+            return (
+              <span title={`Current: ${fmtCurrent} → Proposed: ${fmtNew}`}>
+                <span style={{ color: 'var(--cui-tertiary-color)', textDecoration: 'line-through', fontSize: '0.75rem' }}>
+                  {fmtCurrent}
+                </span>
+                <span style={{ color: 'var(--cui-warning)', marginLeft: '4px', fontWeight: 500 }}>
+                  {fmtNew}
+                </span>
+              </span>
+            );
+          }
+        }
+      }
+    }
+
+    // Normal rendering (no pending change or in edit mode)
     switch (columnId) {
       case 'unitNumber':
         return <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>{unit.unitNumber}</span>;
@@ -842,7 +1046,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseStart: e.target.value } : null)}
           />
         ) : (
-          unit.leaseStart || '—'
+          unit.leaseStart ? formatLeaseDate(unit.leaseStart) : '—'
         );
       case 'leaseEnd':
         return isEdit ? (
@@ -854,7 +1058,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseEnd: e.target.value } : null)}
           />
         ) : (
-          unit.leaseEnd || '—'
+          unit.leaseEnd ? formatLeaseDate(unit.leaseEnd) : '—'
         );
       case 'deposit':
         return isEdit ? (
@@ -887,14 +1091,27 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
         );
       default: {
-        // Dynamic column: look up value from the EAV dynamic values map
-        const colConfig = columns.find(c => c.id === columnId);
-        if (colConfig?.category === 'dynamic') {
+        // Pending extra column: show new value from pending changes
+        if (columnId.startsWith('pending_')) {
+          const backendField = columnId.replace('pending_', '');
+          const change = pendingByCell.get(`${unit.id}:${backendField}`);
+          if (change) {
+            const state = getFieldState(change.unitId, change.field);
+            const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+            return (
+              <span style={{ color: state === 'accepted' ? 'var(--cui-success)' : 'var(--cui-warning)', fontWeight: 500 }}>
+                {newDisplay}
+              </span>
+            );
+          }
+          return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+        }
+        // Dynamic column: look up value from activeDynValues (extraction-created columns)
+        if (columnId.startsWith('dyn_')) {
           const colKey = columnId.replace(/^dyn_/, '');
-          const rawValue = dynamicValues[unit.id]?.[colKey];
+          const rawValue = activeDynValues[unit.id]?.[colKey];
           if (rawValue === null || rawValue === undefined) return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
-          const formatted = formatDynamicValue(rawValue, colConfig.dataType || 'text');
-          return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatted}</span>;
+          return <span style={{ color: 'var(--cui-secondary-color)' }}>{String(rawValue)}</span>;
         }
         return null;
       }
@@ -1562,6 +1779,19 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       </div>
   );
 
+  // Format lease date as MMM-YY (e.g., "Sep-25")
+  const formatLeaseDate = (dateStr: string): string => {
+    if (!dateStr) return '—';
+    try {
+      const date = new Date(dateStr);
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.toLocaleDateString('en-US', { year: '2-digit' });
+      return `${month}-${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
   const renderRentRollContent = () => (
     <div className="space-y-4">
       {/* Detailed Rent Roll Table */}
@@ -1642,6 +1872,41 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           </div>
         </div>
 
+        {/* Pending extraction changes banner */}
+        {hasPending && (
+          <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: 'rgba(var(--cui-warning-rgb), 0.25)', borderBottom: '1px solid var(--cui-warning)' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium" style={{ color: 'var(--cui-warning)' }}>
+                {pendingSummary?.total_field_changes ?? pendingChanges.length} pending changes
+              </span>
+              {pendingDocName && (
+                <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  from {pendingDocName}
+                </span>
+              )}
+              <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>
+                Click yellow cells to accept
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={acceptAll}
+                className="px-3 py-1 text-xs rounded font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-success-rgb), 0.20)', color: 'var(--cui-success)', border: '1px solid var(--cui-success)' }}
+              >
+                Accept All ({pendingChanges.length})
+              </button>
+              <button
+                onClick={rejectAll}
+                className="px-3 py-1 text-xs rounded font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-danger-rgb), 0.20)', color: 'var(--cui-danger)', border: '1px solid var(--cui-danger)' }}
+              >
+                Reject All
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
@@ -1650,7 +1915,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                 </svg>
-                <span className="text-green-300 font-medium">Populates Floor Plans</span>
+                <span className="font-medium" style={{ color: 'var(--cui-success)' }}>Populates Floor Plans</span>
               </div>
             </div>
             <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -1679,22 +1944,69 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
             <thead style={{ backgroundColor: 'var(--cui-dark-bg)' }}>
               <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                 {visibleColumns.map(col => (
-                  <th key={col.id} className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`} style={{ color: 'var(--cui-secondary-color)' }}>
+                  <th
+                    key={col.id}
+                    className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`}
+                    style={{
+                      color: 'var(--cui-secondary-color)',
+                      position: 'relative',
+                      ...(columnWidths[col.id] ? { width: columnWidths[col.id] } : {}),
+                    }}
+                  >
                     {col.label}
+                    <div
+                      onMouseDown={(e) => handleResizeStart(col.id, e)}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '20%',
+                        bottom: '20%',
+                        width: 5,
+                        cursor: 'col-resize',
+                        userSelect: 'none',
+                        borderRight: '1px solid var(--cui-border-color)',
+                      }}
+                    />
                   </th>
                 ))}
-                <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
+                <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)', width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {units.map((unit, index) => (
                 <tr key={unit.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
                   {visibleColumns.map(col => (
-                    <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}>
+                    <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}
+                      style={(() => {
+                        // Check base columns via COLUMN_TO_BACKEND_FIELD mapping
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        // Also handle pending extra columns (pending_ prefix)
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return {};
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return {};
+                        const state = getFieldState(change.unitId, change.field);
+                        return state === 'accepted'
+                          ? { backgroundColor: 'rgba(var(--cui-success-rgb), 0.35)', borderBottom: '2px solid var(--cui-success)', cursor: 'pointer' }
+                          : { backgroundColor: 'rgba(var(--cui-warning-rgb), 0.35)', borderBottom: '2px solid var(--cui-warning)', cursor: 'pointer' };
+                      })()}
+                      onClick={() => {
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return;
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return;
+                        toggleFieldAcceptance(change.unitId, change.field);
+                      }}
+                    >
                       {renderCellContent(unit, col.id)}
                     </td>
                   ))}
