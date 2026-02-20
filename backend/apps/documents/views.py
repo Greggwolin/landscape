@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.core.files.storage import default_storage
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.db import connection, transaction
 from .models import (
     Document,
@@ -138,6 +138,63 @@ def upload_document(request):
         file_content = file.read()
         file_hash = hashlib.sha256(file_content).hexdigest()
         file.seek(0)  # Reset file pointer
+
+        # Collision check BEFORE saving file or creating core_doc
+        query = Document.objects.filter(
+            project_id=project_id,
+            deleted_at__isnull=True
+        )
+
+        filename_match = query.filter(doc_name__iexact=file.name).first()
+        hash_match = query.filter(sha256_hash=file_hash).first()
+
+        if filename_match or hash_match:
+            if filename_match and hash_match and filename_match.doc_id == hash_match.doc_id:
+                match_type = "both"
+                matched_doc = filename_match
+            elif hash_match:
+                match_type = "content"
+                matched_doc = hash_match
+            else:
+                match_type = "filename"
+                matched_doc = filename_match
+
+            facts_count = 0
+            embeddings_count = 0
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM landscape.doc_extracted_facts
+                        WHERE doc_id = %s AND superseded_at IS NULL
+                    """, [matched_doc.doc_id])
+                    facts_row = cursor.fetchone()
+                    facts_count = facts_row[0] if facts_row else 0
+
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM landscape.knowledge_embeddings
+                        WHERE source_type IN ('document', 'document_chunk')
+                        AND source_id = %s
+                        AND superseded_by_version IS NULL
+                    """, [matched_doc.doc_id])
+                    embeddings_row = cursor.fetchone()
+                    embeddings_count = embeddings_row[0] if embeddings_row else 0
+            except Exception:
+                pass
+
+            return Response({
+                "collision": True,
+                "match_type": match_type,
+                "existing_doc": {
+                    "doc_id": matched_doc.doc_id,
+                    "filename": matched_doc.doc_name,
+                    "version_number": matched_doc.version_no,
+                    "uploaded_at": matched_doc.created_at.isoformat() if matched_doc.created_at else None,
+                    "extraction_summary": {
+                        "facts_extracted": facts_count,
+                        "embeddings": embeddings_count
+                    }
+                }
+            }, status=status.HTTP_200_OK)
 
         # Save to storage
         saved_path = default_storage.save(file_path, file)
@@ -852,6 +909,52 @@ def commit_staging_data(request, doc_id):
 # DMS Versioning & Collision Detection Endpoints
 # =====================================================
 
+def _get_version_root(doc: Document) -> int:
+    """Return the root doc_id for a version chain (V1)."""
+    return doc.parent_doc_id or doc.doc_id
+
+
+def _get_version_chain(project_id: int, root_doc_id: int):
+    """Query all documents in a version chain (root + children)."""
+    return Document.objects.filter(
+        project_id=project_id,
+        deleted_at__isnull=True
+    ).filter(
+        Q(doc_id=root_doc_id) | Q(parent_doc_id=root_doc_id)
+    )
+
+
+def _get_extraction_counts(doc_id: int) -> tuple[int, int]:
+    """Get extracted fact and embedding counts for a document."""
+    facts_count = 0
+    embeddings_count = 0
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COUNT(*) FROM landscape.doc_extracted_facts
+                WHERE doc_id = %s AND superseded_at IS NULL
+            """, [doc_id])
+            facts_row = cursor.fetchone()
+            facts_count = facts_row[0] if facts_row else 0
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM landscape.knowledge_embeddings
+                WHERE source_type IN ('document', 'document_chunk')
+                AND source_id = %s
+                AND superseded_by_version IS NULL
+            """, [doc_id])
+            embeddings_row = cursor.fetchone()
+            embeddings_count = embeddings_row[0] if embeddings_row else 0
+    except Exception:
+        # If tables are missing or queries fail, return zeros
+        pass
+
+    return facts_count, embeddings_count
+
+
+def _build_extraction_summary(facts_count: int, embeddings_count: int) -> str:
+    return f"{facts_count} facts • {embeddings_count} embeddings"
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def check_upload_collision(request, project_id):
@@ -959,21 +1062,14 @@ def check_upload_collision(request, project_id):
 def upload_new_version(request, project_id, doc_id):
     """
     Upload a new version of an existing document.
-    - Increments version_number
+    - Creates a new core_doc record (version chain)
     - Keeps existing extractions (cumulative knowledge)
-    - Creates new embeddings tagged with new version
-    - Marks old embeddings as potentially superseded
+    - Creates new embeddings for the new version
 
-    Request: multipart form with file
+    Request: multipart form with file (+ optional notes)
     """
     try:
-        existing_doc = Document.objects.get(doc_id=doc_id, project_id=project_id)
-
-        if existing_doc.deleted_at:
-            return Response(
-                {"error": "Cannot version a deleted document"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        existing_doc = Document.objects.get(doc_id=doc_id, project_id=project_id, deleted_at__isnull=True)
 
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
@@ -981,6 +1077,18 @@ def upload_new_version(request, project_id, doc_id):
                 {"error": "No file provided"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        version_notes = request.data.get('notes') or request.data.get('version_notes') or ''
+
+        # Determine root doc (V1)
+        root_doc_id = _get_version_root(existing_doc)
+        root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
+
+        chain = _get_version_chain(project_id, root_doc_id)
+        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        new_version_no = max_version + 1
+
+        old_facts, old_embeddings = _get_extraction_counts(existing_doc.doc_id)
 
         # Compute content hash
         file_content = uploaded_file.read()
@@ -995,49 +1103,98 @@ def upload_new_version(request, project_id, doc_id):
         # Save to storage
         saved_path = default_storage.save(file_path, uploaded_file)
 
-        # Update existing doc record
-        old_version = existing_doc.version_no
-        existing_doc.version_no = old_version + 1
-        existing_doc.storage_uri = saved_path
-        existing_doc.sha256_hash = content_hash
-        existing_doc.file_size_bytes = len(file_content)
-        existing_doc.mime_type = uploaded_file.content_type or 'application/octet-stream'
-        existing_doc.updated_at = timezone.now()
-        existing_doc.status = 'processing'  # Will be reprocessed
-        existing_doc.save()
+        profile_json = existing_doc.profile_json or {}
+        if not isinstance(profile_json, dict):
+            profile_json = {}
+        profile_json = dict(profile_json)
+        if version_notes:
+            profile_json['version_notes'] = version_notes
 
-        # Mark old embeddings as potentially superseded
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                UPDATE landscape.knowledge_embeddings
-                SET superseded_by_version = %s
-                WHERE source_type = 'document'
-                AND source_id = %s
-                AND superseded_by_version IS NULL
-            """, [existing_doc.version_no, doc_id])
+        with transaction.atomic():
+            new_doc = Document.objects.create(
+                project_id=project_id,
+                workspace_id=existing_doc.workspace_id,
+                phase_id=existing_doc.phase_id,
+                parcel_id=existing_doc.parcel_id,
+                doc_name=root_doc.doc_name,
+                doc_type=root_doc.doc_type,
+                discipline=root_doc.discipline,
+                mime_type=uploaded_file.content_type or 'application/octet-stream',
+                file_size_bytes=len(file_content),
+                sha256_hash=content_hash,
+                storage_uri=saved_path,
+                version_no=new_version_no,
+                parent_doc_id=root_doc_id,
+                status='processing',
+                profile_json=profile_json,
+                created_by=existing_doc.created_by,
+                updated_by=existing_doc.updated_by,
+                created_at=timezone.now(),
+                updated_at=timezone.now(),
+            )
 
-        # Queue for reprocessing
-        DMSExtractQueue.objects.create(
-            doc_id=doc_id,
-            extract_type='general',
-            priority=5,
-            status='pending'
-        )
+            # Queue for processing
+            DMSExtractQueue.objects.create(
+                doc_id=new_doc.doc_id,
+                extract_type='general',
+                priority=5,
+                status='pending'
+            )
+
+        # Mark old embeddings as superseded by the new version
+        try:
+            old_doc_ids = list(chain.values_list('doc_id', flat=True))
+            with connection.cursor() as cursor:
+                for old_doc_id in old_doc_ids:
+                    cursor.execute("""
+                        UPDATE landscape.knowledge_embeddings
+                        SET superseded_by_version = %s
+                        WHERE source_type IN ('document', 'document_chunk')
+                        AND source_id = %s
+                        AND superseded_by_version IS NULL
+                    """, [new_version_no, old_doc_id])
+        except Exception:
+            logger.warning("Failed to supersede embeddings for version chain %s", root_doc_id)
 
         # Trigger synchronous RAG processing for new version
         from apps.knowledge.services.document_processor import processor
         try:
-            process_result = processor.process_document(doc_id)
-            logger.info(f"RAG processing complete for doc_id={doc_id} (v{existing_doc.version_no}): {process_result.get('embeddings_created', 0)} embeddings")
+            process_result = processor.process_document(new_doc.doc_id)
+            logger.info(
+                f"RAG processing complete for doc_id={new_doc.doc_id} (v{new_version_no}): "
+                f"{process_result.get('embeddings_created', 0)} embeddings"
+            )
         except Exception as process_error:
-            logger.warning(f"RAG processing failed for doc_id={doc_id}: {process_error}")
+            logger.warning(f"RAG processing failed for doc_id={new_doc.doc_id}: {process_error}")
+
+        # Auto-generate diff note if none provided
+        new_facts, new_embeddings = _get_extraction_counts(new_doc.doc_id)
+        diff_note = (
+            f"Facts: {old_facts} → {new_facts} ({new_facts - old_facts:+d}). "
+            f"Embeddings: {old_embeddings} → {new_embeddings} ({new_embeddings - old_embeddings:+d})."
+        )
+        if diff_note:
+            if version_notes:
+                profile_json['version_notes'] = f"{version_notes}\n{diff_note}"
+            else:
+                profile_json['version_notes'] = diff_note
+            new_doc.profile_json = profile_json
+            new_doc.save(update_fields=['profile_json'])
 
         return Response({
-            "doc_id": doc_id,
-            "new_version": existing_doc.version_no,
-            "old_version": old_version,
-            "message": "New version uploaded. Previous extractions preserved, new extractions will be added."
+            "doc_id": new_doc.doc_id,
+            "version_no": new_doc.version_no,
+            "new_version": new_doc.version_no,
+            "doc_name": new_doc.doc_name,
+            "created_at": new_doc.created_at.isoformat() if new_doc.created_at else None,
+            "updated_at": new_doc.updated_at.isoformat() if new_doc.updated_at else None,
+            "storage_uri": new_doc.storage_uri,
+            "mime_type": new_doc.mime_type,
+            "file_size_bytes": new_doc.file_size_bytes,
+            "sha256_hash": new_doc.sha256_hash,
+            "status": new_doc.status,
+            "parent_doc_id": new_doc.parent_doc_id,
+            "message": "New version uploaded.",
         })
 
     except Document.DoesNotExist:
@@ -1047,6 +1204,223 @@ def upload_new_version(request, project_id, doc_id):
         )
     except Exception as e:
         logger.exception("Error uploading new version for doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_document_versions(request, project_id, doc_id):
+    """
+    List version chain for a document (root + all versions).
+    Returns array ordered by version_no ascending.
+    """
+    try:
+        doc = Document.objects.get(doc_id=doc_id, project_id=project_id, deleted_at__isnull=True)
+        root_doc_id = _get_version_root(doc)
+
+        chain = _get_version_chain(project_id, root_doc_id).order_by('version_no', 'created_at')
+
+        versions = []
+        for version_doc in chain:
+            facts_count, embeddings_count = _get_extraction_counts(version_doc.doc_id)
+            profile = version_doc.profile_json or {}
+            notes = None
+            if isinstance(profile, dict):
+                notes = profile.get('version_notes') or profile.get('notes')
+
+            versions.append({
+                "doc_id": version_doc.doc_id,
+                "version_no": version_doc.version_no,
+                "doc_name": version_doc.doc_name,
+                "uploaded_at": version_doc.created_at.isoformat() if version_doc.created_at else None,
+                "uploaded_by": version_doc.created_by or "System",
+                "notes": notes,
+                "extraction_summary": _build_extraction_summary(facts_count, embeddings_count),
+            })
+
+        return Response(versions)
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error listing versions for doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def link_document_version(request, project_id, doc_id):
+    """
+    Link an existing document as a new version of a target document.
+    Request body: { "source_doc_id": int }
+    """
+    try:
+        source_doc_id = request.data.get('source_doc_id')
+        if not source_doc_id:
+            return Response(
+                {"error": "source_doc_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        target_doc = Document.objects.get(doc_id=doc_id, project_id=project_id, deleted_at__isnull=True)
+        source_doc = Document.objects.get(doc_id=source_doc_id, project_id=project_id, deleted_at__isnull=True)
+
+        if target_doc.doc_id == source_doc.doc_id:
+            return Response(
+                {"error": "source_doc_id cannot match target doc_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        root_doc_id = _get_version_root(target_doc)
+        root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
+
+        chain = _get_version_chain(project_id, root_doc_id)
+        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        new_version_no = max_version + 1
+
+        profile_json = source_doc.profile_json or {}
+        if not isinstance(profile_json, dict):
+            profile_json = {}
+        profile_json = dict(profile_json)
+        target_facts, target_embeddings = _get_extraction_counts(root_doc.doc_id)
+        source_facts, source_embeddings = _get_extraction_counts(source_doc.doc_id)
+        profile_json['version_notes'] = (
+            f"Linked as version V{new_version_no} of \"{root_doc.doc_name}\". "
+            f"Facts: {target_facts} → {source_facts} ({source_facts - target_facts:+d}). "
+            f"Embeddings: {target_embeddings} → {source_embeddings} ({source_embeddings - target_embeddings:+d})."
+        )
+
+        source_doc.parent_doc_id = root_doc_id
+        source_doc.version_no = new_version_no
+        source_doc.doc_name = f"{root_doc.doc_name} (V{new_version_no})"
+        source_doc.updated_at = timezone.now()
+        source_doc.profile_json = profile_json
+        source_doc.save()
+
+        return Response({
+            "doc_id": source_doc.doc_id,
+            "version_no": source_doc.version_no,
+            "doc_name": source_doc.doc_name,
+            "parent_doc_id": source_doc.parent_doc_id,
+            "message": "Document linked as new version.",
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error linking version for doc %s", doc_id)
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def restore_document_version(request, project_id, doc_id):
+    """
+    Restore a prior version by creating a new version from it.
+    Request body: { "source_doc_id": int }
+    """
+    try:
+        source_doc_id = request.data.get('source_doc_id')
+        if not source_doc_id:
+            return Response(
+                {"error": "source_doc_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        current_doc = Document.objects.get(doc_id=doc_id, project_id=project_id, deleted_at__isnull=True)
+        source_doc = Document.objects.get(doc_id=source_doc_id, project_id=project_id, deleted_at__isnull=True)
+
+        root_doc_id = _get_version_root(current_doc)
+        root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
+
+        chain = _get_version_chain(project_id, root_doc_id)
+        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        new_version_no = max_version + 1
+
+        profile_json = source_doc.profile_json or {}
+        if not isinstance(profile_json, dict):
+            profile_json = {}
+        profile_json = dict(profile_json)
+        profile_json['version_notes'] = (
+            f"Restored from V{source_doc.version_no}."
+        )
+
+        new_doc = Document.objects.create(
+            project_id=project_id,
+            workspace_id=source_doc.workspace_id,
+            phase_id=source_doc.phase_id,
+            parcel_id=source_doc.parcel_id,
+            doc_name=root_doc.doc_name,
+            doc_type=source_doc.doc_type,
+            discipline=source_doc.discipline,
+            mime_type=source_doc.mime_type,
+            file_size_bytes=source_doc.file_size_bytes,
+            sha256_hash=source_doc.sha256_hash,
+            storage_uri=source_doc.storage_uri,
+            version_no=new_version_no,
+            parent_doc_id=root_doc_id,
+            status='processing',
+            profile_json=profile_json,
+            created_by=source_doc.created_by,
+            updated_by=source_doc.updated_by,
+            created_at=timezone.now(),
+            updated_at=timezone.now(),
+        )
+
+        # Queue for processing (restore creates a new active version)
+        DMSExtractQueue.objects.create(
+            doc_id=new_doc.doc_id,
+            extract_type='general',
+            priority=5,
+            status='pending'
+        )
+
+        # Trigger synchronous RAG processing for restored version
+        from apps.knowledge.services.document_processor import processor
+        try:
+            process_result = processor.process_document(new_doc.doc_id)
+            logger.info(
+                f"RAG processing complete for doc_id={new_doc.doc_id} (v{new_version_no}): "
+                f"{process_result.get('embeddings_created', 0)} embeddings"
+            )
+        except Exception as process_error:
+            logger.warning(f"RAG processing failed for doc_id={new_doc.doc_id}: {process_error}")
+
+        return Response({
+            "doc_id": new_doc.doc_id,
+            "version_no": new_doc.version_no,
+            "doc_name": new_doc.doc_name,
+            "created_at": new_doc.created_at.isoformat() if new_doc.created_at else None,
+            "updated_at": new_doc.updated_at.isoformat() if new_doc.updated_at else None,
+            "storage_uri": new_doc.storage_uri,
+            "mime_type": new_doc.mime_type,
+            "file_size_bytes": new_doc.file_size_bytes,
+            "sha256_hash": new_doc.sha256_hash,
+            "message": "Version restored as new active version.",
+        })
+
+    except Document.DoesNotExist:
+        return Response(
+            {"error": "Document not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        logger.exception("Error restoring version for doc %s", doc_id)
         return Response(
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1187,6 +1561,15 @@ def permanent_delete_document(request, project_id, doc_id):
         # Delete associated data
         from django.db import connection
         with connection.cursor() as cursor:
+            # Delete extraction staging rows to avoid FK violations
+            try:
+                cursor.execute("""
+                    DELETE FROM landscape.ai_extraction_staging
+                    WHERE doc_id = %s
+                """, [doc_id])
+            except Exception:
+                logger.warning("Failed to delete ai_extraction_staging for doc %s", doc_id)
+
             # Delete extracted facts
             cursor.execute("""
                 DELETE FROM landscape.doc_extracted_facts

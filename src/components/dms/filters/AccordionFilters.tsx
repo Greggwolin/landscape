@@ -112,6 +112,7 @@ interface AccordionFiltersProps {
   onToggleDocSelection?: (docId: string) => void;
   onReviewMedia?: (docId: number, docName: string) => void;
   onDeleteFilter?: (customId: number, docTypeName: string) => void;
+  onLinkVersion?: (sourceDocId: string, targetDoc: DMSDocument) => void;
 }
 
 const acceptedFileTypes = {
@@ -139,6 +140,7 @@ interface FilterDropRowProps {
   onToggleDocSelection?: (docId: string) => void;
   onReviewMedia?: (docId: number, docName: string) => void;
   onDeleteFilter?: (customId: number, docTypeName: string) => void;
+  onLinkVersion?: (sourceDocId: string, targetDoc: DMSDocument) => void;
 }
 
 function FilterDropRow({
@@ -152,10 +154,12 @@ function FilterDropRow({
   selectedDocIds,
   onToggleDocSelection,
   onReviewMedia,
-  onDeleteFilter
+  onDeleteFilter,
+  onLinkVersion
 }: FilterDropRowProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [dropTargetDocId, setDropTargetDocId] = useState<string | null>(null);
   // pendingFiles stores remaining files when collision pauses processing
   // Will be used by collision resolution to continue the upload queue
   const [, setPendingFiles] = useState<File[]>([]);
@@ -227,8 +231,29 @@ function FilterDropRow({
           error: errorData
         }
       );
+      return;
     }
-  }, [filter.doc_type, projectId, workspaceId, startUpload]);
+
+    const docResult = await response.json();
+
+    if ((docResult?.collision || docResult?.duplicate) && docResult?.existing_doc) {
+      addCollision({
+        file,
+        hash,
+        matchType: docResult.match_type || 'content',
+        existingDoc: {
+          doc_id: docResult.existing_doc.doc_id,
+          filename: docResult.existing_doc.filename,
+          version_number: docResult.existing_doc.version_number,
+          uploaded_at: docResult.existing_doc.uploaded_at,
+        },
+        projectId,
+        workspaceId,
+        docType: filter.doc_type,
+      });
+      throw new Error('collision_detected');
+    }
+  }, [filter.doc_type, projectId, workspaceId, startUpload, addCollision]);
 
   /**
    * Process files with collision detection - triggers Landscaper for collisions
@@ -267,6 +292,8 @@ function FilterDropRow({
             uploaded_at: collision.existing_doc.uploaded_at,
           },
           projectId,
+          workspaceId,
+          docType: filter.doc_type,
         });
         setPendingFiles(remainingFiles);
         // Don't proceed with upload - Landscaper will handle via context
@@ -285,6 +312,10 @@ function FilterDropRow({
       }
 
     } catch (error) {
+      if (error instanceof Error && error.message === 'collision_detected') {
+        setPendingFiles(remainingFiles);
+        return;
+      }
       console.error('Error processing file:', error);
       // Continue with remaining files despite error
       if (remainingFiles.length > 0) {
@@ -481,13 +512,40 @@ function FilterDropRow({
             filter.documents.map((doc) => (
               <div
                 key={doc.doc_id}
-                className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-opacity-50"
+                className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer transition-colors border-b last:border-b-0 hover:bg-opacity-50 relative"
                 style={{
                   color: 'var(--cui-body-color)',
-                  backgroundColor: 'var(--cui-body-bg)',
+                  backgroundColor: dropTargetDocId === doc.doc_id ? 'var(--cui-primary-bg)' : 'var(--cui-body-bg)',
                   borderColor: 'var(--cui-border-color)'
                 }}
                 onClick={() => onDocumentSelect(doc)}
+                draggable={!!onLinkVersion}
+                onDragStart={(event) => {
+                  if (!onLinkVersion) return;
+                  event.dataTransfer.setData('application/x-dms-doc', doc.doc_id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragOver={(event) => {
+                  if (!onLinkVersion) return;
+                  if (!Array.from(event.dataTransfer.types).includes('application/x-dms-doc')) return;
+                  event.preventDefault();
+                  setDropTargetDocId(doc.doc_id);
+                }}
+                onDragLeave={() => {
+                  if (!onLinkVersion) return;
+                  if (dropTargetDocId === doc.doc_id) {
+                    setDropTargetDocId(null);
+                  }
+                }}
+                onDrop={(event) => {
+                  if (!onLinkVersion) return;
+                  event.preventDefault();
+                  const sourceDocId = event.dataTransfer.getData('application/x-dms-doc');
+                  setDropTargetDocId(null);
+                  if (sourceDocId && sourceDocId !== doc.doc_id) {
+                    onLinkVersion(sourceDocId, doc);
+                  }
+                }}
               >
                 <input
                   type="checkbox"
@@ -519,6 +577,14 @@ function FilterDropRow({
                     onClick={() => onReviewMedia(parseInt(doc.doc_id, 10), doc.doc_name)}
                   />
                 )}
+                {dropTargetDocId === doc.doc_id && (
+                  <span
+                    className="absolute right-2 top-1 text-[10px] uppercase tracking-wide"
+                    style={{ color: 'var(--cui-primary)' }}
+                  >
+                    Link as Version
+                  </span>
+                )}
               </div>
             ))
           )}
@@ -541,7 +607,8 @@ export default function AccordionFilters({
   selectedDocIds,
   onToggleDocSelection,
   onReviewMedia,
-  onDeleteFilter
+  onDeleteFilter,
+  onLinkVersion
 }: AccordionFiltersProps) {
   const renderedFilters = useMemo(() => filters, [filters]);
 
@@ -561,6 +628,7 @@ export default function AccordionFilters({
           onToggleDocSelection={onToggleDocSelection}
           onReviewMedia={onReviewMedia}
           onDeleteFilter={onDeleteFilter}
+          onLinkVersion={onLinkVersion}
         />
       ))}
     </div>

@@ -6,10 +6,12 @@ import CIcon from '@coreui/icons-react';
 import { cilLayers, cilTrash, cilActionRedo, cilPlus } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
+import DmsLandscaperPanel, { type DmsPendingVersionLink } from '@/components/dms/panels/DmsLandscaperPanel';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import type { DMSDocument } from '@/types/dms';
+import { useToast } from '@/hooks/use-toast';
 
 interface DMSViewProps {
   projectId: number;
@@ -43,6 +45,7 @@ export default function DMSView({
   projectType = null
 }: DMSViewProps) {
   const defaultWorkspaceId = 1;
+  const { showToast } = useToast();
 
   // "+ Add Type" inline input state
   const [isAddingType, setIsAddingType] = useState(false);
@@ -50,6 +53,31 @@ export default function DMSView({
   const [addTypeError, setAddTypeError] = useState<string | null>(null);
   const [isSubmittingType, setIsSubmittingType] = useState(false);
   const addTypeInputRef = useRef<HTMLInputElement>(null);
+
+  // Save-to-template prompt state
+  const [saveToTemplatePrompt, setSaveToTemplatePrompt] = useState<{
+    typeName: string;
+    templateId: number;
+    templateName: string;
+  } | null>(null);
+  const [isSavingToTemplate, setIsSavingToTemplate] = useState(false);
+
+  // Project's assigned template info
+  const [projectTemplate, setProjectTemplate] = useState<{
+    template_id: number;
+    template_name: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/dms/doc-types`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.template_id && data.template_name) {
+          setProjectTemplate({ template_id: data.template_id, template_name: data.template_name });
+        }
+      })
+      .catch(err => console.error('Failed to fetch project template info:', err));
+  }, [projectId]);
 
   // Documents state
   const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
@@ -70,6 +98,10 @@ export default function DMSView({
   const [isLoadingTrash, setIsLoadingTrash] = useState(false);
 
   const [panelExpanded, setPanelExpanded] = useState(true);
+  const [pendingVersionLink, setPendingVersionLink] = useState<DmsPendingVersionLink | null>(null);
+  const [isLandscaperFiltering, setIsLandscaperFiltering] = useState(false);
+  const [landscaperNotice, setLandscaperNotice] = useState<string | null>(null);
+  const selectAllTrashRef = useRef<HTMLInputElement>(null);
 
   // Media preview modal state
   const [showMediaPreview, setShowMediaPreview] = useState(false);
@@ -293,15 +325,53 @@ export default function DMSView({
     setShowMediaPreview(true);
   };
 
+  type DocumentChangeOptions = {
+    keepSelection?: boolean;
+    updatedDoc?: DMSDocument;
+  };
+
   // Handle document changes (refresh filters)
-  const handleDocumentChange = () => {
+  const handleDocumentChange = (options?: DocumentChangeOptions) => {
     void loadFilters();
     if (viewingTrash) {
       void loadTrashedDocuments();
     }
-    setSelectedDocument(null);
     setSelectedDocIds(new Set());
+    if (options?.keepSelection && options.updatedDoc) {
+      setSelectedDocument(options.updatedDoc);
+      return;
+    }
+    setSelectedDocument(null);
   };
+
+  const handleLandscaperQuery = useCallback(
+    async (query: string) => {
+      setIsLandscaperFiltering(true);
+      try {
+        const response = await fetch(
+          `/api/dms/search?q=${encodeURIComponent(query)}&project_id=${projectId}&limit=50`
+        );
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+        const data = await parseJsonSafely<{ totalHits?: number; pagination?: { limit?: number } }>(
+          response,
+          'dms/search from landscaper'
+        );
+        return {
+          count: data.totalHits || 0,
+          limit: data.pagination?.limit ?? null,
+        };
+      } finally {
+        setIsLandscaperFiltering(false);
+      }
+    },
+    [projectId]
+  );
+
+  const handleLandscaperClear = useCallback(() => {
+    setLandscaperNotice(null);
+  }, []);
 
   // Load trashed documents
   const loadTrashedDocuments = async () => {
@@ -345,6 +415,10 @@ export default function DMSView({
     return allFilters.flatMap((f) => f.documents || []);
   }, [allFilters, viewingTrash, trashedDocuments]);
 
+  const documentLookup = useMemo(() => {
+    return new Map(allDocuments.map((doc) => [doc.doc_id, doc]));
+  }, [allDocuments]);
+
   // Get selected documents for delete modal
   const selectedDocuments = useMemo(() => {
     return allDocuments.filter((doc) => selectedDocIds.has(doc.doc_id));
@@ -356,12 +430,72 @@ export default function DMSView({
     return trashedDocuments.filter((doc) => selectedDocIds.has(doc.doc_id));
   }, [trashedDocuments, selectedDocIds, viewingTrash]);
 
+  const selectedTrashCount = useMemo(() => {
+    if (!viewingTrash) return 0;
+    return trashedDocuments.reduce((count, doc) => count + (selectedDocIds.has(doc.doc_id) ? 1 : 0), 0);
+  }, [trashedDocuments, selectedDocIds, viewingTrash]);
+
+  const allTrashSelected = useMemo(() => {
+    return viewingTrash && trashedDocuments.length > 0 && selectedTrashCount === trashedDocuments.length;
+  }, [selectedTrashCount, trashedDocuments.length, viewingTrash]);
+
+  useEffect(() => {
+    if (!selectAllTrashRef.current) return;
+    selectAllTrashRef.current.indeterminate = viewingTrash && selectedTrashCount > 0 && !allTrashSelected;
+  }, [allTrashSelected, selectedTrashCount, viewingTrash]);
+
   // Get first selected document (for single-select actions like rename/edit profile)
   const firstSelectedDoc = useMemo(() => {
     if (selectedDocIds.size !== 1) return null;
     const docId = Array.from(selectedDocIds)[0];
     return allDocuments.find((doc) => doc.doc_id === docId) || null;
   }, [allDocuments, selectedDocIds]);
+
+  const handleLinkVersionRequest = useCallback(
+    (sourceDocId: string, targetDoc: DMSDocument) => {
+      const sourceDoc = documentLookup.get(sourceDocId);
+      if (!sourceDoc) {
+        console.warn('[DMS] Drag source doc not found:', sourceDocId);
+        return;
+      }
+      setPendingVersionLink({
+        projectId,
+        sourceDocId: sourceDoc.doc_id,
+        sourceDocName: sourceDoc.doc_name,
+        targetDocId: targetDoc.doc_id,
+        targetDocName: targetDoc.doc_name,
+      });
+    },
+    [documentLookup, projectId]
+  );
+
+  const handleResolveVersionLink = useCallback(
+    async (action: 'confirm' | 'cancel', link: DmsPendingVersionLink) => {
+      if (action === 'cancel') {
+        setPendingVersionLink(null);
+        return;
+      }
+
+      const response = await fetch(
+        `/api/projects/${projectId}/dms/docs/${link.targetDocId}/link-version`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_doc_id: link.sourceDocId }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[DMS] Link version failed:', errorText);
+        throw new Error('Failed to link version');
+      }
+
+      setPendingVersionLink(null);
+      handleDocumentChange();
+    },
+    [handleDocumentChange, projectId]
+  );
 
   // Handle bulk delete (move to trash)
   const handleBulkDelete = async () => {
@@ -485,6 +619,20 @@ export default function DMSView({
       throw new Error('Failed to save profile');
     }
 
+    // Detect doc_type change for toast notification
+    const newDocType = profile.doc_type as string | undefined;
+    const oldDocType = firstSelectedDoc.doc_type;
+    if (newDocType && newDocType !== oldDocType) {
+      const label = newDocType.charAt(0).toUpperCase() + newDocType.slice(1);
+      showToast({
+        title: 'Document Moved',
+        message: `Document moved to ${label}`,
+        type: 'success',
+      });
+    } else {
+      showToast('Profile saved', 'success');
+    }
+
     setShowProfileModal(false);
     setSelectedDocIds(new Set());
     void loadFilters();
@@ -501,6 +649,15 @@ export default function DMSView({
       }
       return next;
     });
+  };
+
+  const handleToggleAllTrashSelection = () => {
+    if (!viewingTrash) return;
+    if (allTrashSelected) {
+      setSelectedDocIds(new Set());
+      return;
+    }
+    setSelectedDocIds(new Set(trashedDocuments.map((doc) => doc.doc_id)));
   };
 
   // ─── "+ Add Type" handlers ───────────────────────────────────────
@@ -567,10 +724,11 @@ export default function DMSView({
       }
 
       // Add the new filter immediately
+      const addedTypeName = data.doc_type!.doc_type_name;
       setAllFilters((prev) => [
         ...prev,
         {
-          doc_type: data.doc_type!.doc_type_name,
+          doc_type: addedTypeName,
           icon: '📁',
           count: 0,
           is_expanded: false,
@@ -581,13 +739,22 @@ export default function DMSView({
       ]);
 
       handleCancelAddType();
+
+      // Show save-to-template prompt if project has an assigned template
+      if (projectTemplate) {
+        setSaveToTemplatePrompt({
+          typeName: addedTypeName,
+          templateId: projectTemplate.template_id,
+          templateName: projectTemplate.template_name,
+        });
+      }
     } catch (error) {
       console.error('Error adding doc type:', error);
       setAddTypeError('Failed to add type');
     } finally {
       setIsSubmittingType(false);
     }
-  }, [newTypeName, allFilters, projectId, handleCancelAddType]);
+  }, [newTypeName, allFilters, projectId, handleCancelAddType, projectTemplate]);
 
   const handleDeleteFilter = useCallback(async (customId: number, docTypeName: string) => {
     try {
@@ -610,6 +777,49 @@ export default function DMSView({
       console.error('Error deleting custom doc type:', error);
     }
   }, [projectId, expandedFilter]);
+
+  // Save a custom doc type back to the project's template
+  const handleSaveToTemplate = useCallback(async () => {
+    if (!saveToTemplatePrompt) return;
+    setIsSavingToTemplate(true);
+    try {
+      // Fetch current template to get existing doc_type_options, then append
+      const getRes = await fetch('/api/dms/templates');
+      const getData = await getRes.json();
+      const currentTemplate = (getData.templates || []).find(
+        (t: { template_id: number }) => t.template_id === saveToTemplatePrompt.templateId
+      );
+
+      if (!currentTemplate) {
+        console.error('Template not found');
+        setSaveToTemplatePrompt(null);
+        return;
+      }
+
+      const currentOptions: string[] = currentTemplate.doc_type_options || [];
+      const alreadyExists = currentOptions.some(
+        (opt: string) => opt.toLowerCase() === saveToTemplatePrompt.typeName.toLowerCase()
+      );
+
+      if (!alreadyExists) {
+        const updatedOptions = [...currentOptions, saveToTemplatePrompt.typeName].sort(
+          (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+        );
+
+        await fetch(`/api/dms/templates/${saveToTemplatePrompt.templateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ doc_type_options: updatedOptions }),
+        });
+      }
+
+      setSaveToTemplatePrompt(null);
+    } catch (error) {
+      console.error('Error saving to template:', error);
+    } finally {
+      setIsSavingToTemplate(false);
+    }
+  }, [saveToTemplatePrompt]);
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
@@ -644,17 +854,19 @@ export default function DMSView({
                 <CCardBody className="p-0">
                   <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                   {/* Breadcrumb */}
-                  <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-                    <div className="flex items-center gap-2 text-sm">
-                      <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
-                      <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                      <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
-                      <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                      <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
-                        {projectName}
-                      </span>
+                  {!viewingTrash && (
+                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+                      <div className="flex items-center gap-2 text-sm">
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
+                        <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
+                          {projectName}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Toolbar */}
                   <div className="px-4 py-1 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
@@ -757,6 +969,24 @@ export default function DMSView({
                     </div>
                   </div>
 
+                  {/* DMS Landscaper Panel */}
+                  <div
+                    className="px-4 py-3 border-b"
+                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
+                  >
+                    <DmsLandscaperPanel
+                      onDropFiles={() => {}}
+                      onQuerySubmit={handleLandscaperQuery}
+                      onClearQuery={handleLandscaperClear}
+                      activeDocType={expandedFilter}
+                      isFiltering={isLandscaperFiltering}
+                      notice={landscaperNotice}
+                      pendingLink={pendingVersionLink}
+                      onResolveLink={handleResolveVersionLink}
+                      onDocumentsUpdated={handleDocumentChange}
+                    />
+                  </div>
+
                   <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                     <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>
                       <div className="p-4 lg:p-6" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
@@ -778,6 +1008,27 @@ export default function DMSView({
                                 <p className="text-sm" style={{ color: 'var(--cui-warning)' }}>
                                   Documents in trash can be restored or permanently deleted. Permanent deletion cannot be undone.
                                 </p>
+                              </div>
+                              <div
+                                className="px-4 py-2 border-b"
+                                style={{
+                                  borderColor: 'var(--cui-border-color)',
+                                  backgroundColor: 'var(--cui-body-bg)'
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    ref={selectAllTrashRef}
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded"
+                                    style={{ borderColor: 'var(--cui-border-color)' }}
+                                    checked={allTrashSelected}
+                                    onChange={handleToggleAllTrashSelection}
+                                  />
+                                  <span className="text-xs font-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
+                                    Select all
+                                  </span>
+                                </div>
                               </div>
                               <div className="space-y-2">
                                 {trashedDocuments.map((doc) => (
@@ -841,6 +1092,7 @@ export default function DMSView({
                                     onToggleDocSelection={handleToggleDocSelection}
                                     onReviewMedia={handleReviewMedia}
                                     onDeleteFilter={handleDeleteFilter}
+                                    onLinkVersion={handleLinkVersionRequest}
                                   />
                                 </div>
 
@@ -858,6 +1110,7 @@ export default function DMSView({
                                     onToggleDocSelection={handleToggleDocSelection}
                                     onReviewMedia={handleReviewMedia}
                                     onDeleteFilter={handleDeleteFilter}
+                                    onLinkVersion={handleLinkVersionRequest}
                                   />
                                 </div>
                               </div>
@@ -923,6 +1176,43 @@ export default function DMSView({
                                   </button>
                                 )}
                               </div>
+
+                              {/* Save-to-template prompt */}
+                              {saveToTemplatePrompt && (
+                                <div
+                                  className="px-4 py-2 border-t text-sm"
+                                  style={{
+                                    borderColor: 'var(--cui-border-color)',
+                                    backgroundColor: 'var(--cui-info-bg-subtle, var(--cui-tertiary-bg))',
+                                  }}
+                                >
+                                  <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                                    Added &lsquo;{saveToTemplatePrompt.typeName}&rsquo; to this project.
+                                    Save to <strong>{saveToTemplatePrompt.templateName}</strong> for future projects?
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <button
+                                      className="px-3 py-1 rounded text-xs text-white"
+                                      style={{ backgroundColor: 'var(--cui-primary)' }}
+                                      disabled={isSavingToTemplate}
+                                      onClick={() => void handleSaveToTemplate()}
+                                    >
+                                      {isSavingToTemplate ? 'Saving...' : 'Save to Template'}
+                                    </button>
+                                    <button
+                                      className="px-3 py-1 rounded text-xs border"
+                                      style={{
+                                        borderColor: 'var(--cui-border-color)',
+                                        color: 'var(--cui-body-color)',
+                                      }}
+                                      disabled={isSavingToTemplate}
+                                      onClick={() => setSaveToTemplatePrompt(null)}
+                                    >
+                                      Keep Project Only
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )
                         )}
@@ -1008,7 +1298,10 @@ export default function DMSView({
                 workspaceId={defaultWorkspaceId}
                 docType={firstSelectedDoc.doc_type || expandedFilter || 'general'}
                 projectType={projectType}
-                initialProfile={(firstSelectedDoc.profile_json as Record<string, unknown>) || {}}
+                initialProfile={{
+                  ...((firstSelectedDoc.profile_json as Record<string, unknown>) || {}),
+                  doc_type: firstSelectedDoc.doc_type || expandedFilter || '',
+                }}
                 onSave={handleEditProfileSave}
                 onCancel={() => setShowProfileModal(false)}
                 onSuccess={() => {

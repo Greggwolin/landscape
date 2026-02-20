@@ -48,22 +48,85 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check for existing document with same sha256 + project_id (dedupe)
-    const existing = await sql`
+    // Check for existing document with same sha256 or filename (collision detection)
+    const [hashMatch] = system.sha256
+      ? await sql`
+        SELECT doc_id, version_no, doc_name, status, created_at
+        FROM landscape.core_doc
+        WHERE sha256_hash = ${system.sha256}
+          AND project_id = ${system.project_id}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `
+      : [];
+
+    const [filenameMatch] = await sql`
       SELECT doc_id, version_no, doc_name, status, created_at
       FROM landscape.core_doc
-      WHERE sha256_hash = ${system.sha256}
+      WHERE LOWER(doc_name) = LOWER(${system.doc_name})
         AND project_id = ${system.project_id}
+        AND deleted_at IS NULL
       LIMIT 1
     `;
 
-    if (existing.length > 0) {
-      console.log(`📦 Duplicate detected: sha256=${system.sha256}, project=${system.project_id}`);
+    if (hashMatch || filenameMatch) {
+      let matchType: 'filename' | 'content' | 'both' = 'filename';
+      let matchedDoc = filenameMatch;
+      if (hashMatch && filenameMatch && hashMatch.doc_id === filenameMatch.doc_id) {
+        matchType = 'both';
+        matchedDoc = hashMatch;
+      } else if (hashMatch) {
+        matchType = 'content';
+        matchedDoc = hashMatch;
+      }
+
+      let factsExtracted = 0;
+      let embeddings = 0;
+      try {
+        const [factsRow] = await sql<{ count: number }[]>`
+          SELECT COUNT(*)::int as count
+          FROM landscape.doc_extracted_facts
+          WHERE doc_id = ${matchedDoc.doc_id}
+            AND superseded_at IS NULL
+        `;
+        factsExtracted = factsRow?.count ?? 0;
+      } catch {
+        factsExtracted = 0;
+      }
+
+      try {
+        const [embeddingsRow] = await sql<{ count: number }[]>`
+          SELECT COUNT(*)::int as count
+          FROM landscape.knowledge_embeddings
+          WHERE source_type IN ('document', 'document_chunk')
+            AND source_id = ${matchedDoc.doc_id}
+            AND superseded_by_version IS NULL
+        `;
+        embeddings = embeddingsRow?.count ?? 0;
+      } catch {
+        embeddings = 0;
+      }
+
+      console.log(
+        `📦 Collision detected (${matchType}): doc_id=${matchedDoc.doc_id}, project=${system.project_id}`
+      );
+
       return NextResponse.json(
         {
           success: true,
+          collision: true,
           duplicate: true,
-          doc: existing[0],
+          match_type: matchType,
+          existing_doc: {
+            doc_id: matchedDoc.doc_id,
+            filename: matchedDoc.doc_name,
+            version_number: matchedDoc.version_no,
+            uploaded_at: matchedDoc.created_at,
+            extraction_summary: {
+              facts_extracted: factsExtracted,
+              embeddings,
+            },
+          },
         },
         { status: 200 }
       );

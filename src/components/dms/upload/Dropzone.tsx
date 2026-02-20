@@ -27,8 +27,20 @@ interface UploadThingResult {
 
 interface DocCreateResult {
  success: boolean;
- duplicate: boolean;
- doc: {
+ duplicate?: boolean;
+ collision?: boolean;
+ match_type?: 'filename' | 'content' | 'both';
+ existing_doc?: {
+ doc_id: number;
+ filename: string;
+ version_number: number;
+ uploaded_at: string;
+ extraction_summary?: {
+ facts_extracted: number;
+ embeddings: number;
+ };
+ };
+ doc?: {
  doc_id: number;
  version_no: number;
  doc_name: string;
@@ -202,6 +214,28 @@ export default function Dropzone({
  }
 
  const docResult: DocCreateResult = await response.json();
+
+ if (docResult.collision || docResult.duplicate) {
+ const fallbackExistingDoc = docResult.doc
+ ? {
+ doc_id: docResult.doc.doc_id,
+ filename: docResult.doc.doc_name,
+ version_number: docResult.doc.version_no,
+ uploaded_at: docResult.doc.created_at,
+ }
+ : null;
+
+ return {
+ collision: true,
+ collisionData: {
+ matchType: docResult.match_type || (docResult.duplicate ? 'content' : 'filename'),
+ existingDoc: docResult.existing_doc || fallbackExistingDoc,
+ },
+ file,
+ hash: sha256,
+ };
+ }
+
  console.log(`Document record created: doc_id=${docResult.doc?.doc_id}`);
 
  return {
@@ -252,6 +286,11 @@ export default function Dropzone({
  uploaded_at: collision.existing_doc.uploaded_at,
  },
  projectId,
+ workspaceId,
+ docType,
+ discipline,
+ phaseId,
+ parcelId,
  });
  setPendingFiles(remainingFiles);
  // Don't proceed with upload - Landscaper will handle via context
@@ -260,6 +299,23 @@ export default function Dropzone({
 
  // 4. No collision - proceed with upload
  const result = await uploadSingleFile(file, contentHash);
+ if (result?.collision && result.collisionData?.existingDoc) {
+ addCollision({
+ file,
+ hash: contentHash,
+ matchType: result.collisionData.matchType,
+ existingDoc: result.collisionData.existingDoc,
+ projectId,
+ workspaceId,
+ docType,
+ discipline,
+ phaseId,
+ parcelId,
+ });
+ setPendingFiles(remainingFiles);
+ return;
+ }
+
  onUploadComplete?.([result]);
 
  // 5. Continue with remaining files
