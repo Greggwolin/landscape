@@ -21,8 +21,7 @@ import {
 } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
-
-const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 
 interface LinkedMedia {
   link_id: number;
@@ -67,13 +66,14 @@ export default function ProjectPhotosModal({
   const queryClient = useQueryClient();
   const [showPicker, setShowPicker] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const djangoBaseUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
   // Fetch all media linked to this project
   const { data, isLoading } = useQuery<EntityMediaLinksResponse>({
     queryKey: ['entity-media', 'project', projectId],
     queryFn: async () => {
       const res = await fetch(
-        `${DJANGO_API_URL}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
+        `${djangoBaseUrl}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
       );
       if (!res.ok) throw new Error('Failed to fetch project media');
       return res.json();
@@ -84,7 +84,7 @@ export default function ProjectPhotosModal({
   // Remove a link
   const removeMutation = useMutation({
     mutationFn: async (linkId: number) => {
-      const res = await fetch(`${DJANGO_API_URL}/api/dms/media/links/${linkId}/`, {
+      const res = await fetch(`${djangoBaseUrl}/api/dms/media/links/${linkId}/`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to remove link');
@@ -157,12 +157,12 @@ export default function ProjectPhotosModal({
               }}
             >
               {links.map((link) => {
-                const thumbUrl = link.media?.thumbnail_uri
-                  ? `${DJANGO_API_URL}${link.media.thumbnail_uri}`
-                  : null;
-                const fullUrl = link.media?.storage_uri
-                  ? `${DJANGO_API_URL}${link.media.storage_uri}`
-                  : thumbUrl;
+                const thumbUrl = resolveMediaUrl(
+                  link.media?.thumbnail_uri || link.media?.storage_uri || ''
+                );
+                const fullUrl = resolveMediaUrl(
+                  link.media?.storage_uri || link.media?.thumbnail_uri || ''
+                );
 
                 return (
                   <div

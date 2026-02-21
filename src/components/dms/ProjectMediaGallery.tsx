@@ -13,6 +13,7 @@ import {
  CDropdownItem,
 } from '@coreui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -970,16 +971,6 @@ export default function ProjectMediaGallery({
 
  // ── Helpers ────────────────────────────────────────────────────────────
 
- const resolveImageSrc = useCallback(
- (uri: string | undefined | null): string => {
- if (!uri) return '';
- if (uri.startsWith('http')) return uri;
- if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
- return `${djangoBaseUrl}/media/${uri}`;
- },
- [djangoBaseUrl]
- );
-
  const buildSourcePdfHref = useCallback(
  (storageUri: string | null | undefined, sourcePage?: number): string => {
  if (!storageUri) return '';
@@ -1302,7 +1293,7 @@ export default function ProjectMediaGallery({
  }}
  >
  {filteredItems.map((item) => {
- const thumbSrc = resolveImageSrc(item.storage_uri || item.thumbnail_uri);
+ const thumbSrc = resolveMediaUrl(item.storage_uri || item.thumbnail_uri);
  const shouldAvoidUpscale =
  item.width_px < TILE_MAX_WIDTH || item.height_px < TILE_HEIGHT;
  const sourceDoc = docsById.get(String(item.doc_id));

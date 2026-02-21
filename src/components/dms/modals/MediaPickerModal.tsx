@@ -12,6 +12,7 @@ import {
   CSpinner,
 } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 
 /** Classification filter tabs */
 const FILTER_TABS = [
@@ -68,16 +69,6 @@ export default function MediaPickerModal({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeFilter, setActiveFilter] = useState('all');
   const [lightboxMedia, setLightboxMedia] = useState<AvailableMediaItem | null>(null);
-
-  const resolveImageSrc = useCallback(
-    (uri: string | undefined | null): string => {
-      if (!uri) return '';
-      if (uri.startsWith('http')) return uri;
-      if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
-      return `${djangoBaseUrl}/media/${uri}`;
-    },
-    [djangoBaseUrl]
-  );
 
   // Fetch available media
   const { data, isLoading, error } = useQuery({
@@ -285,7 +276,7 @@ export default function MediaPickerModal({
             >
               {filteredItems.map((item) => {
                 const isSelected = selectedIds.has(item.media_id);
-                const thumbUrl = resolveImageSrc(item.thumbnail_uri || item.storage_uri || '');
+                const thumbUrl = resolveMediaUrl(item.thumbnail_uri || item.storage_uri || '');
 
                 return (
                   <div
@@ -452,7 +443,7 @@ export default function MediaPickerModal({
         >
           <img
             src={
-              resolveImageSrc(lightboxMedia.storage_uri || lightboxMedia.thumbnail_uri || '')
+              resolveMediaUrl(lightboxMedia.storage_uri || lightboxMedia.thumbnail_uri || '')
             }
             alt={lightboxMedia.asset_name || 'Preview'}
             style={{

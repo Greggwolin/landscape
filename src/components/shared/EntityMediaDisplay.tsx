@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CSpinner } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 
 interface LinkedMedia {
   link_id: number;
@@ -60,13 +61,6 @@ export default function EntityMediaDisplay({
   const queryClient = useQueryClient();
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
-  const resolveImageSrc = (uri: string | null | undefined): string => {
-    if (!uri) return '';
-    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
-    if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
-    return `${djangoBaseUrl}/media/${uri}`;
-  };
-
   const { data, isLoading } = useQuery<EntityMediaLinksResponse>({
     queryKey: ['entity-media', entityType, entityId],
     queryFn: async () => {
@@ -113,8 +107,8 @@ export default function EntityMediaDisplay({
     const hero = links[0];
     if (!hero && !editable) return null;
 
-    const thumbUrl = resolveImageSrc(hero?.media?.thumbnail_uri || hero?.media?.storage_uri || '');
-    const fullUrl = resolveImageSrc(hero?.media?.storage_uri || hero?.media?.thumbnail_uri || '');
+    const thumbUrl = resolveMediaUrl(hero?.media?.thumbnail_uri || hero?.media?.storage_uri || '');
+    const fullUrl = resolveMediaUrl(hero?.media?.storage_uri || hero?.media?.thumbnail_uri || '');
 
     return (
       <>
@@ -262,8 +256,8 @@ export default function EntityMediaDisplay({
       <>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'nowrap' }}>
           {displayLinks.map((link) => {
-            const thumbUrl = resolveImageSrc(link.media?.thumbnail_uri || link.media?.storage_uri || '');
-            const fullUrl = resolveImageSrc(link.media?.storage_uri || link.media?.thumbnail_uri || '');
+            const thumbUrl = resolveMediaUrl(link.media?.thumbnail_uri || link.media?.storage_uri || '');
+            const fullUrl = resolveMediaUrl(link.media?.storage_uri || link.media?.thumbnail_uri || '');
 
             return (
               <div
@@ -417,7 +411,7 @@ export default function EntityMediaDisplay({
   const first = links[0];
   if (!first && !editable) return null;
 
-  const singleThumbUrl = resolveImageSrc(
+  const singleThumbUrl = resolveMediaUrl(
     first?.media?.thumbnail_uri || first?.media?.storage_uri || ''
   );
 
@@ -442,7 +436,7 @@ export default function EntityMediaDisplay({
           ? onAttach
           : singleThumbUrl
             ? () => {
-                const full = resolveImageSrc(
+                const full = resolveMediaUrl(
                   first?.media?.storage_uri || first?.media?.thumbnail_uri || ''
                 );
                 setLightboxUrl(full);
