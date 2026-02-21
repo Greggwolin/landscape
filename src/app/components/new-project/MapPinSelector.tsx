@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
+import { registerRasterDim } from '@/lib/maps/rasterDim'
 
 export interface GeocodeResult {
   city?: string
@@ -126,6 +127,8 @@ const MapPinSelector = ({
   useEffect(() => {
     if (!mapContainer.current || map.current) return
 
+    let cleanupRasterDim: (() => void) | null = null
+
     const initialCenter: [number, number] =
       latitude && longitude ? [longitude, latitude] : DEFAULT_CENTER
     const initialZoom = latitude && longitude ? 14 : DEFAULT_ZOOM
@@ -137,6 +140,8 @@ const MapPinSelector = ({
       zoom: initialZoom,
       attributionControl: false
     })
+
+    cleanupRasterDim = registerRasterDim(map.current, 0.3)
 
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
@@ -175,6 +180,7 @@ const MapPinSelector = ({
 
     return () => {
       if (map.current) {
+        cleanupRasterDim?.()
         map.current.remove()
         map.current = null
       }

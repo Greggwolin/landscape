@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSfComps, SfComp } from '@/hooks/analysis/useSfComps';
 import { formatMoney } from '@/utils/formatters/number';
 import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 
 interface MarketCompetitorProduct {
   lot_width_ft?: number | null;
@@ -170,6 +171,8 @@ export default function MarketMapView({
     if (!mapContainer.current || map.current) return;
     if (!projectLat || !projectLon) return;
 
+    let cleanupRasterDim: (() => void) | null = null;
+
     try {
       // Initialize map centered on project
       const selectedStyle = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
@@ -179,6 +182,8 @@ export default function MarketMapView({
         center: [projectLon, projectLat],
         zoom: 12
       });
+
+      cleanupRasterDim = registerRasterDim(map.current, 0.3);
 
       // Add navigation controls
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -208,6 +213,7 @@ export default function MarketMapView({
     // Cleanup
     return () => {
       if (map.current) {
+        cleanupRasterDim?.();
         map.current.remove();
         map.current = null;
       }

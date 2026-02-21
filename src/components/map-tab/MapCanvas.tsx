@@ -17,6 +17,7 @@ import { LAYER_COLORS } from './constants';
 import { RING_COLORS } from '@/components/location-intelligence';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
 
 // Expose map instance to parent via ref
@@ -51,6 +52,84 @@ function safeRemoveSource(m: maplibregl.Map, sourceId: string) {
   if (m.getSource(sourceId)) m.removeSource(sourceId);
 }
 
+const PARCEL_MIN_ZOOM = 17.5;
+const ALL_PARCEL_SOURCE_ID = 'la-parcels-all';
+const SUBJECT_PARCEL_SOURCE_ID = 'la-parcels-subject';
+const COMPS_PARCEL_SOURCE_ID = 'la-parcels-comps';
+const ALL_PARCEL_FILL_ID = 'la-parcels-all-fill';
+const ALL_PARCEL_LINE_ID = 'la-parcels-all-line';
+const SUBJECT_PARCEL_FILL_ID = 'la-parcels-subject-fill';
+const SUBJECT_PARCEL_LINE_ID = 'la-parcels-subject-line';
+const COMPS_PARCEL_FILL_ID = 'la-parcels-comps-fill';
+const COMPS_PARCEL_LINE_ID = 'la-parcels-comps-line';
+
+const normalizeParcelId = (value: string) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+
+const readCssVar = (name: string) => {
+  if (typeof window === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+};
+
+const buildParcelColors = () => {
+  const primaryRgb = readCssVar('--cui-primary-rgb');
+  const infoRgb = readCssVar('--cui-info-rgb');
+  const primaryFallback = readCssVar('--cui-primary');
+  const infoFallback = readCssVar('--cui-info');
+  const borderFallback = readCssVar('--cui-border-color');
+  const whiteFallback = readCssVar('--cui-white');
+  const bodyRgb = readCssVar('--cui-body-color-rgb');
+  const secondaryBg = readCssVar('--cui-secondary-bg');
+
+  const subjectStroke = primaryRgb ? `rgb(${primaryRgb})` : primaryFallback;
+  const compStroke = infoRgb ? `rgb(${infoRgb})` : infoFallback;
+  const subjectFill = primaryRgb ? `rgba(${primaryRgb}, 0.18)` : primaryFallback;
+  const compFill = infoRgb ? `rgba(${infoRgb}, 0.1)` : infoFallback;
+  const neutralStroke = whiteFallback || borderFallback || compStroke;
+  const neutralFill = bodyRgb ? `rgba(${bodyRgb}, 0.08)` : secondaryBg || neutralStroke;
+
+  return {
+    subjectStroke,
+    compStroke,
+    subjectFill,
+    compFill,
+    neutralStroke,
+    neutralFill,
+  };
+};
+
+const splitParcelFeatures = (
+  collection: GeoJSON.FeatureCollection,
+  subjectApn?: string | null,
+  compApns?: string[]
+) => {
+  const subjectKey = subjectApn ? normalizeParcelId(subjectApn) : '';
+  const compKeys = new Set((compApns ?? []).map(normalizeParcelId).filter(Boolean));
+
+  const subjectFeatures: GeoJSON.Feature[] = [];
+  const compFeatures: GeoJSON.Feature[] = [];
+  const otherFeatures: GeoJSON.Feature[] = [];
+
+  collection.features.forEach((feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const apn = typeof props.APN === 'string' ? props.APN : '';
+    const ain = typeof props.AIN === 'string' ? props.AIN : '';
+    const keys = [apn, ain].map(normalizeParcelId).filter(Boolean);
+
+    const isSubject = subjectKey && keys.includes(subjectKey);
+    const isComp = keys.some((key) => compKeys.has(key));
+
+    if (isSubject) {
+      subjectFeatures.push(feature);
+    } else if (isComp) {
+      compFeatures.push(feature);
+    } else {
+      otherFeatures.push(feature);
+    }
+  });
+
+  return { subjectFeatures, compFeatures, otherFeatures };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MapCanvas Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +148,9 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     taxParcels,
     saleComps,
     rentComps,
+    parcelCollection,
+    parcelSubjectApn,
+    parcelCompApns,
     selectedRingRadius,
     onMapClick,
     onRingClick,
@@ -84,6 +166,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const saleCompMarkersRef = useRef<maplibregl.Marker[]>([]);
   const rentCompMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const rasterDimCleanupRef = useRef<(() => void) | null>(null);
 
   // Expose map to parent component
   useImperativeHandle(ref, () => ({
@@ -118,8 +201,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     refList.current = [];
   };
 
-  const buildPinSvg = (color: string) => `
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="${color}" stroke="#000000" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+  const buildPinSvg = (color: string, stroke = 'var(--cui-body-color)') => `
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="${color}" stroke="${stroke}" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
   `;
@@ -142,15 +225,33 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       antialias: true,
     });
 
+    rasterDimCleanupRef.current = registerRasterDim(map.current, 0.3);
+
     // Add navigation controls
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.current.addControl(new maplibregl.ScaleControl(), 'bottom-right');
+
+    const emitViewState = () => {
+      if (!map.current || !onViewStateChangeRef.current) return;
+      const mapCenter = map.current.getCenter();
+      const mapZoom = map.current.getZoom();
+      const mapBounds = map.current.getBounds();
+      onViewStateChangeRef.current({
+        center: [mapCenter.lng, mapCenter.lat],
+        zoom: mapZoom,
+        bounds: [
+          [mapBounds.getWest(), mapBounds.getSouth()],
+          [mapBounds.getEast(), mapBounds.getNorth()],
+        ],
+      });
+    };
 
     map.current.on('load', () => {
       setMapLoaded(true);
       // Trigger resize to ensure map fills container correctly
       setTimeout(() => {
         map.current?.resize();
+        emitViewState();
       }, 100);
     });
 
@@ -162,17 +263,12 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     });
 
     // Track view state changes
-    map.current.on('moveend', () => {
-      if (!map.current || !onViewStateChangeRef.current) return;
-      const mapCenter = map.current.getCenter();
-      const mapZoom = map.current.getZoom();
-      onViewStateChangeRef.current({
-        center: [mapCenter.lng, mapCenter.lat],
-        zoom: mapZoom,
-      });
-    });
+    map.current.on('moveend', emitViewState);
+    map.current.on('zoomend', emitViewState);
 
     return () => {
+      rasterDimCleanupRef.current?.();
+      rasterDimCleanupRef.current = null;
       map.current?.remove();
       map.current = null;
       setMapLoaded(false);
@@ -432,6 +528,190 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   }, [mapLoaded, styleRevision, taxParcels, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
+  // LA County Parcel Overlays (subject + comps)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    const colors = buildParcelColors();
+
+    const removeParcelLayers = () => {
+      safeRemoveLayer(map.current!, ALL_PARCEL_FILL_ID);
+      safeRemoveLayer(map.current!, ALL_PARCEL_LINE_ID);
+      safeRemoveLayer(map.current!, SUBJECT_PARCEL_FILL_ID);
+      safeRemoveLayer(map.current!, SUBJECT_PARCEL_LINE_ID);
+      safeRemoveLayer(map.current!, COMPS_PARCEL_FILL_ID);
+      safeRemoveLayer(map.current!, COMPS_PARCEL_LINE_ID);
+      safeRemoveSource(map.current!, ALL_PARCEL_SOURCE_ID);
+      safeRemoveSource(map.current!, SUBJECT_PARCEL_SOURCE_ID);
+      safeRemoveSource(map.current!, COMPS_PARCEL_SOURCE_ID);
+    };
+
+    removeParcelLayers();
+
+    if (!parcelCollection?.features?.length) {
+      return;
+    }
+
+    const { subjectFeatures, compFeatures, otherFeatures } = splitParcelFeatures(
+      parcelCollection,
+      parcelSubjectApn ?? undefined,
+      parcelCompApns
+    );
+
+    if (!subjectFeatures.length && !compFeatures.length && !otherFeatures.length) {
+      return;
+    }
+
+    if (otherFeatures.length) {
+      map.current.addSource(ALL_PARCEL_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: otherFeatures },
+      });
+      map.current.addLayer({
+        id: ALL_PARCEL_FILL_ID,
+        type: 'fill',
+        source: ALL_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': colors.neutralFill,
+          'fill-opacity': 0.2,
+          'fill-outline-color': colors.neutralStroke,
+        },
+      });
+      map.current.addLayer({
+        id: ALL_PARCEL_LINE_ID,
+        type: 'line',
+        source: ALL_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': colors.neutralStroke,
+          'line-width': 1.8,
+          'line-opacity': 0.9,
+        },
+      });
+    }
+
+    if (compFeatures.length) {
+      map.current.addSource(COMPS_PARCEL_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: compFeatures },
+      });
+      map.current.addLayer({
+        id: COMPS_PARCEL_FILL_ID,
+        type: 'fill',
+        source: COMPS_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': colors.compFill,
+          'fill-opacity': 0.4,
+          'fill-outline-color': colors.compStroke,
+        },
+      });
+      map.current.addLayer({
+        id: COMPS_PARCEL_LINE_ID,
+        type: 'line',
+        source: COMPS_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': colors.compStroke,
+          'line-width': 2.2,
+        },
+      });
+    }
+
+    if (subjectFeatures.length) {
+      map.current.addSource(SUBJECT_PARCEL_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: subjectFeatures },
+      });
+      map.current.addLayer({
+        id: SUBJECT_PARCEL_FILL_ID,
+        type: 'fill',
+        source: SUBJECT_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': colors.subjectFill,
+          'fill-opacity': 0.65,
+          'fill-outline-color': colors.subjectStroke,
+        },
+      });
+      map.current.addLayer({
+        id: SUBJECT_PARCEL_LINE_ID,
+        type: 'line',
+        source: SUBJECT_PARCEL_SOURCE_ID,
+        minzoom: PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': colors.subjectStroke,
+          'line-width': 2.8,
+        },
+      });
+    }
+
+    const parcelLayerIds = [
+      ALL_PARCEL_FILL_ID,
+      COMPS_PARCEL_FILL_ID,
+      SUBJECT_PARCEL_FILL_ID,
+    ].filter((layerId) => map.current?.getLayer(layerId));
+
+    const handleParcelClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      if (!map.current || !e.features?.length) return;
+      const props = e.features[0].properties || {};
+      const apn = props.APN || props.apn || '';
+      const ain = props.AIN || props.ain || '';
+      const address = props.SitusFullAddress || props.situs_full_address || props.address || '';
+      const useDesc = props.UseDescription || props.use_description || '';
+
+      const rows: string[] = [];
+      if (apn) rows.push(`<strong>APN:</strong> ${apn}`);
+      if (ain) rows.push(`<strong>AIN:</strong> ${ain}`);
+      if (address) rows.push(`<strong>Address:</strong> ${address}`);
+      if (useDesc) rows.push(`<strong>Use:</strong> ${useDesc}`);
+      if (rows.length === 0) {
+        rows.push('<em>No parcel details available</em>');
+      }
+
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: true,
+        className: 'map-tab-popup map-tab-popup-compact',
+        maxWidth: '300px',
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(`<div class="map-tab-popup-compact-content">${rows.join('<br/>')}</div>`)
+        .addTo(map.current);
+    };
+
+    const handleParcelEnter = () => {
+      if (map.current) map.current.getCanvas().style.cursor = 'pointer';
+    };
+    const handleParcelLeave = () => {
+      if (map.current && !activeTool) map.current.getCanvas().style.cursor = '';
+    };
+
+    parcelLayerIds.forEach((layerId) => {
+      map.current?.on('click', layerId, handleParcelClick);
+      map.current?.on('mouseenter', layerId, handleParcelEnter);
+      map.current?.on('mouseleave', layerId, handleParcelLeave);
+    });
+
+    if (map.current.getLayer('project-center')) {
+      map.current.moveLayer('project-center');
+    }
+
+    return () => {
+      removeParcelLayers();
+      parcelLayerIds.forEach((layerId) => {
+        map.current?.off('click', layerId, handleParcelClick);
+        map.current?.off('mouseenter', layerId, handleParcelEnter);
+        map.current?.off('mouseleave', layerId, handleParcelLeave);
+      });
+    };
+  }, [mapLoaded, styleRevision, parcelCollection, parcelSubjectApn, parcelCompApns]);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Render Sale Comparables (red)
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -483,11 +763,37 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       },
     });
 
-    const pointFeatures = saleComps.features.filter((feature) => {
-      const type = feature.geometry?.type;
-      return type === 'Point' || type === 'MultiPoint';
+    const markerTargets: Array<{ feature: GeoJSON.Feature; coords: [number, number] }> = [];
+
+    saleComps.features.forEach((feature) => {
+      const geometry = feature.geometry;
+      if (!geometry) return;
+      const type = geometry.type;
+
+      if (type === 'Point') {
+        const coords = geometry.coordinates as [number, number];
+        markerTargets.push({ feature, coords });
+        return;
+      }
+
+      if (type === 'MultiPoint') {
+        const coords = (geometry.coordinates as [number, number][])[0];
+        if (coords) markerTargets.push({ feature, coords });
+        return;
+      }
+
+      if (type === 'Polygon' || type === 'MultiPolygon') {
+        try {
+          const centroid = turf.centroid(feature as turf.AllGeoJSON);
+          const coords = centroid.geometry.coordinates as [number, number];
+          markerTargets.push({ feature, coords });
+        } catch {
+          // ignore centroid errors
+        }
+      }
     });
-    pointFeatures.forEach((feature) => {
+
+    markerTargets.forEach(({ feature, coords }) => {
       if (!map.current) return;
       const props = (feature.properties ?? {}) as Record<string, unknown>;
       const color = (props.color as string) || LAYER_COLORS.saleComps;
@@ -512,40 +818,24 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         popup.setHTML(`<div class="map-tab-popup-content">${rows.length ? rows.join('<br/>') : '<em>No comp details</em>'}</div>`);
       }
 
-      const createMarker = (lng: number, lat: number) => {
-        const markerEl = document.createElement('div');
-        markerEl.className = 'map-tab-marker';
-        markerEl.innerHTML = buildPinSvg(color);
-        markerEl.style.cursor = 'pointer';
+      const markerEl = document.createElement('div');
+      markerEl.className = 'map-tab-marker';
+      markerEl.innerHTML = buildPinSvg(color, 'var(--cui-white)');
+      markerEl.style.cursor = 'pointer';
 
-        const marker = new maplibregl.Marker({ element: markerEl })
-          .setLngLat([lng, lat])
-          .setPopup(popup)
-          .addTo(map.current!);
+      const marker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat(coords)
+        .setPopup(popup)
+        .addTo(map.current!);
 
-        markerEl.addEventListener('click', (event) => {
-          event.stopPropagation();
-          if (marker.getPopup()) {
-            marker.togglePopup();
-          }
-        });
-
-        saleCompMarkersRef.current.push(marker);
-      };
-
-      if (feature.geometry?.type === 'Point') {
-        const coords = (feature.geometry as GeoJSON.Point).coordinates;
-        if (Array.isArray(coords) && coords.length >= 2) {
-          createMarker(coords[0], coords[1]);
+      markerEl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (marker.getPopup()) {
+          marker.togglePopup();
         }
-      } else if (feature.geometry?.type === 'MultiPoint') {
-        const coords = (feature.geometry as GeoJSON.MultiPoint).coordinates;
-        coords.forEach((coord) => {
-          if (Array.isArray(coord) && coord.length >= 2) {
-            createMarker(coord[0], coord[1]);
-          }
-        });
-      }
+      });
+
+      saleCompMarkersRef.current.push(marker);
     });
 
     // Click handler for comp popups

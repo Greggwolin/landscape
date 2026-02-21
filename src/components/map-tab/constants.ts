@@ -135,7 +135,7 @@ export function getDefaultLayerGroups(): LayerGroup[] {
         {
           id: 'demo-rings',
           label: 'Demo Rings',
-          visible: true,
+          visible: false,
           color: LAYER_COLORS.demoRings,
         },
         {

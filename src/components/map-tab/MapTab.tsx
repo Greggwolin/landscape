@@ -39,7 +39,7 @@ import type { FeatureGeometryType } from './FeatureModal';
 import { useMapDraw } from './hooks/useMapDraw';
 import type { DrawnFeature } from './hooks/useMapDraw';
 import { useMapFeatures } from './hooks/useMapFeatures';
-import { useCompsMapData } from '@/lib/map/hooks';
+import { fetchJson } from '@/lib/fetchJson';
 import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
 import {
   useDemographics,
@@ -47,6 +47,7 @@ import {
   formatDemographicValue,
 } from '@/components/location-intelligence';
 import type { RingDemographics } from '@/components/location-intelligence';
+import { fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
 
 import './map-tab.css';
 
@@ -105,6 +106,7 @@ export function MapTab({ project }: MapTabProps) {
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups());
   const mapCanvasRef = useRef<MapCanvasRef>(null);
+  const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
 
   // ───── Feature Modal State ─────
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
@@ -127,6 +129,9 @@ export function MapTab({ project }: MapTabProps) {
   // ───── Toast ─────
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
+
+  const PARCEL_MIN_ZOOM = 17.5;
 
   // ───── Demographics (Ring) State ─────
   const [selectedRingRadius, setSelectedRingRadius] = useState<number | null>(null);
@@ -160,10 +165,37 @@ export function MapTab({ project }: MapTabProps) {
   }, [demographics, selectedRingRadius]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Hooks: useCompsMapData (Sale Comparables)
+  // Project profile (APN)
   // ─────────────────────────────────────────────────────────────────────────
 
-  const { data: compsMapData } = useCompsMapData(String(projectId));
+  const [profileApn, setProfileApn] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchJson<{ apn?: string | null }>(
+          `/api/projects/${projectId}/profile`,
+          { signal: controller.signal }
+        );
+        if (!active) return;
+        const apnValue = typeof profile?.apn === 'string' ? profile.apn.trim() : '';
+        setProfileApn(apnValue);
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load project profile APN:', error);
+        if (active) setProfileApn('');
+      }
+    };
+
+    loadProfile();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = {
@@ -222,23 +254,12 @@ export function MapTab({ project }: MapTabProps) {
     `;
   }, [formatShortCurrency]);
 
-  // Extract comps FeatureCollection (cast to standard GeoJSON for MapCanvas)
-  const rawSaleComps = useMemo<FeatureCollection | null>(() => {
-    if (!compsMapData?.comps?.features?.length) return null;
-    return compsMapData.comps as unknown as FeatureCollection;
-  }, [compsMapData]);
-
-  const [fallbackSaleComps, setFallbackSaleComps] = useState<FeatureCollection | null>(null);
+  const [saleComps, setSaleComps] = useState<FeatureCollection | null>(null);
 
   useEffect(() => {
-    if (rawSaleComps?.features?.length) {
-      setFallbackSaleComps(null);
-      return;
-    }
-
     const controller = new AbortController();
 
-    const loadSalesCompsFallback = async () => {
+    const loadSalesComps = async () => {
       try {
         const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
         const response = await fetch(`${djangoUrl}/api/projects/${projectId}/sales-comparables/`, {
@@ -266,7 +287,6 @@ export function MapTab({ project }: MapTabProps) {
               price: comp.sale_price != null ? Number(comp.sale_price) : null,
               price_per_unit: comp.price_per_unit != null ? Number(comp.price_per_unit) : null,
               date: comp.sale_date ?? null,
-              color: '#f59e0b',
             };
 
             return {
@@ -281,43 +301,33 @@ export function MapTab({ project }: MapTabProps) {
           })
           .filter(Boolean);
 
-        setFallbackSaleComps(
-          features.length
-            ? ({ type: 'FeatureCollection', features } as FeatureCollection)
-            : null
-        );
+        if (!features.length) {
+          setSaleComps(null);
+          return;
+        }
+
+        const enriched = features.map((feature, index) => {
+          const props = (feature.properties ?? {}) as Record<string, unknown>;
+          return {
+            ...feature,
+            properties: {
+              ...props,
+              popup_html: buildSaleCompPopupHtml(props, `Comp ${index + 1}`),
+            },
+          };
+        });
+
+        setSaleComps({ type: 'FeatureCollection', features: enriched });
       } catch (error) {
         if ((error as { name?: string }).name === 'AbortError') return;
-        console.warn('Failed to load sales comps fallback:', error);
-        setFallbackSaleComps(null);
+        console.warn('Failed to load sales comps:', error);
+        setSaleComps(null);
       }
     };
 
-    loadSalesCompsFallback();
+    loadSalesComps();
     return () => controller.abort();
-  }, [getAuthHeaders, projectId, rawSaleComps]);
-
-  const saleComps = useMemo<FeatureCollection | null>(() => {
-    const source = rawSaleComps ?? fallbackSaleComps;
-    if (!source?.features?.length) return null;
-
-    return {
-      ...source,
-      features: source.features.map((feature, index) => {
-        const props = (feature.properties ?? {}) as Record<string, unknown>;
-        const popup = buildSaleCompPopupHtml(props, `Comp ${index + 1}`);
-        const color = (props.color as string) || '#f59e0b';
-        return {
-          ...feature,
-          properties: {
-            ...props,
-            popup_html: popup,
-            color,
-          },
-        };
-      }),
-    };
-  }, [buildSaleCompPopupHtml, fallbackSaleComps, rawSaleComps]);
+  }, [buildSaleCompPopupHtml, getAuthHeaders, projectId]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Rental Comparables (Rent Comps)
@@ -609,6 +619,7 @@ export function MapTab({ project }: MapTabProps) {
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m) return;
+    if (hasProjectCenter) return;
 
     // Collect all loaded GeoJSON features for bounding
     const allFeatures: Feature[] = [];
@@ -630,7 +641,7 @@ export function MapTab({ project }: MapTabProps) {
     } catch {
       // ignore bbox calculation errors
     }
-  }, [planParcels, projectBoundary, taxParcels, saleComps, rentComps]);
+  }, [planParcels, projectBoundary, taxParcels, saleComps, rentComps, hasProjectCenter]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Update layer counts from loaded data
@@ -819,9 +830,85 @@ export function MapTab({ project }: MapTabProps) {
     setSelectedFeatureId(feature.id);
   }, []);
 
-  const handleViewStateChange = useCallback((_viewState: MapViewState) => {
-    // Optionally store view state for persistence
+  const handleViewStateChange = useCallback((viewState: MapViewState) => {
+    setMapZoom(viewState.zoom);
+    if (viewState.bounds) {
+      setMapBounds([
+        viewState.bounds[0][0],
+        viewState.bounds[0][1],
+        viewState.bounds[1][0],
+        viewState.bounds[1][1],
+      ]);
+    }
   }, []);
+
+  const subjectApn = useMemo(() => {
+    const candidate =
+      (project as Record<string, unknown>).apn_primary ??
+      (project as Record<string, unknown>).apn ??
+      (project as Record<string, unknown>).apn_secondary ??
+      (project as Record<string, unknown>).parcel_apn ??
+      (project as Record<string, unknown>).parcel_apn_primary ??
+      (project as Record<string, unknown>).parcel_apn_secondary;
+    const resolved = typeof candidate === 'string' ? candidate.trim() : '';
+    return resolved || profileApn;
+  }, [project, profileApn]);
+
+  const compApns = useMemo(() => {
+    const apns: string[] = [];
+    const features = saleComps?.features ?? [];
+    features.forEach((feature) => {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const candidate =
+        props.APN ??
+        props.apn ??
+        props.parcel_apn ??
+        props.apn_primary ??
+        props.apn_secondary ??
+        props.AIN ??
+        props.ain;
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) apns.push(trimmed);
+      }
+    });
+    return apns;
+  }, [saleComps]);
+
+  const parcelBoundsKey = useMemo(() => {
+    if (!mapBounds) return '';
+    return mapBounds.map((value) => value.toFixed(5)).join('|');
+  }, [mapBounds]);
+
+  const [parcelCollection, setParcelCollection] = useState<FeatureCollection | null>(null);
+  const lastParcelKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    if (mapZoom < PARCEL_MIN_ZOOM || !mapBounds) return;
+    if (!parcelBoundsKey) return;
+    if (lastParcelKeyRef.current === parcelBoundsKey) return;
+
+    let active = true;
+
+    const loadParcels = async () => {
+      try {
+        const result = await fetchParcelsByBbox(mapBounds);
+        if (!active) return;
+        setParcelCollection(result);
+        lastParcelKeyRef.current = parcelBoundsKey;
+      } catch (error) {
+        if (!active) return;
+        console.warn('Failed to fetch LA County parcels for map tab:', error);
+        setParcelCollection(null);
+      }
+    };
+
+    loadParcels();
+
+    return () => {
+      active = false;
+    };
+  }, [mapZoom, mapBounds, parcelBoundsKey]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Loading indicator
@@ -872,6 +959,9 @@ export function MapTab({ project }: MapTabProps) {
           taxParcels={taxParcels}
           saleComps={saleComps}
           rentComps={rentComps}
+          parcelCollection={parcelCollection}
+          parcelSubjectApn={subjectApn || null}
+          parcelCompApns={compApns}
           selectedRingRadius={selectedRingRadius}
           onMapClick={handleMapClick}
           onRingClick={handleRingClick}

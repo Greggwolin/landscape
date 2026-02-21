@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 
 interface MapViewProps {
   latitude?: number;
@@ -29,6 +30,8 @@ export default function MapView({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    let cleanupRasterDim: (() => void) | null = null;
+
     try {
       // Initialize map
       map.current = new maplibregl.Map({
@@ -37,6 +40,8 @@ export default function MapView({
         center: [longitude, latitude],
         zoom: zoom
       });
+
+      cleanupRasterDim = registerRasterDim(map.current, 0.3);
 
       // Add navigation controls
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -62,6 +67,7 @@ export default function MapView({
     // Cleanup
     return () => {
       if (map.current) {
+        cleanupRasterDim?.();
         map.current.remove();
         map.current = null;
       }

@@ -20,6 +20,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
 
 const METERS_PER_STORY = 3.2;
@@ -178,6 +179,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  scrollZoom: true,
  });
 
+ const cleanupRasterDim = registerRasterDim(map, 0.3);
+
  map.on('load', () => {
  setMapLoaded(true);
  });
@@ -201,6 +204,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  setMapInstance(map);
 
  return () => {
+ cleanupRasterDim();
  map.remove();
  mapRef.current = null;
  setMapLoaded(false);

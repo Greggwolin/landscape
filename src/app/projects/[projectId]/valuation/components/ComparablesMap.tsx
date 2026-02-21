@@ -11,6 +11,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { SalesComparable } from '@/types/valuation';
 import { COMP_MARKER_COLORS, getCompMarkerColor } from '@/lib/valuation/compMarkerUtils';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 
 interface ComparablesMapProps {
   comparables: SalesComparable[];
@@ -42,6 +43,8 @@ export function ComparablesMap({
 
   useEffect(() => {
     if (!mapContainer.current) return;
+
+    let cleanupRasterDim: (() => void) | null = null;
 
     // Clean up existing map
     if (map.current) {
@@ -119,6 +122,8 @@ export function ComparablesMap({
         zoom: 11,
         scrollZoom: false,
       });
+
+      cleanupRasterDim = registerRasterDim(newMap, 0.3);
 
       map.current = newMap;
 
@@ -215,21 +220,10 @@ export function ComparablesMap({
           markers.current.push(marker);
         });
 
-        // Center on subject property and fit all comps in view
+        // Center on subject property for initial state
         if (subjectProperty) {
-          // Set center to subject property first
           newMap.setCenter([subjectProperty.longitude, subjectProperty.latitude]);
-
-          // Then fit bounds to show all markers
-          if (validComps.length > 0) {
-            newMap.fitBounds(bounds, {
-              padding: { top: 60, bottom: 60, left: 60, right: 60 },
-              maxZoom: 13,
-              center: [subjectProperty.longitude, subjectProperty.latitude]
-            });
-          } else {
-            newMap.setZoom(13);
-          }
+          newMap.setZoom(13);
         } else if (validComps.length > 0) {
           newMap.fitBounds(bounds, {
             padding: { top: 60, bottom: 60, left: 60, right: 60 },
@@ -248,6 +242,7 @@ export function ComparablesMap({
       if (map.current) {
         markers.current.forEach(marker => marker.remove());
         markers.current = [];
+        cleanupRasterDim?.();
         map.current.remove();
         map.current = null;
       }

@@ -714,6 +714,28 @@
   font-weight: 500;
 }
 
+/* Compact popup (match demo ring popups styling) */
+.map-tab-popup-compact .maplibregl-popup-content {
+  background: var(--cui-card-bg, #1a1a24);
+  color: var(--cui-body-color, #e5e5e5);
+  border: 1px solid var(--cui-border-color, #2d2d3a);
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.map-tab-popup-compact-content {
+  padding: 10px 12px;
+  font-family: var(--cui-body-font-family);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.map-tab-popup-compact-content strong {
+  color: var(--cui-secondary-color, #9ca3af);
+  font-weight: 600;
+}
+
 /* Comparable Popup Content (match Location Intelligence map) */
 .comparable-popup-content {
   padding: 12px;

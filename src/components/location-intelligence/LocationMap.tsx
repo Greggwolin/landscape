@@ -14,6 +14,7 @@ import type { LocationMapProps } from './types';
 import { RING_COLORS, POINT_CATEGORIES } from './constants';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
+import { registerRasterDim } from '@/lib/maps/rasterDim';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const CENTER_SOURCE_ID = 'center-point';
@@ -82,6 +83,8 @@ export function LocationMap({
       antialias: true,
     });
 
+    const cleanupRasterDim = registerRasterDim(map.current, 0.3);
+
     map.current.on('load', () => {
       setMapLoaded(true);
     });
@@ -131,6 +134,7 @@ export function LocationMap({
     });
 
     return () => {
+      cleanupRasterDim();
       map.current?.remove();
       map.current = null;
       setMapLoaded(false);
