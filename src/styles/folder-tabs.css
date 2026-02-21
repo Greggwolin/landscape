@@ -294,7 +294,7 @@
   display: flex;
   gap: 0;
   padding: 0 1rem;
-  background: var(--cui-card-bg, var(--cui-secondary-bg));
+  background: var(--surface-subheader);
   border-bottom: 1px solid var(--cui-border-color);
   box-shadow: inset 0 -1px 0 var(--cui-border-color);
   min-height: 36px;
@@ -441,14 +441,14 @@
 .project-folder-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--cui-spacer-3, 1rem);
-  background-color: var(--surface-bg);
+  padding: 0.5rem;
+  background-color: transparent;
 }
 
 /* Sales tab - use white background throughout */
 .project-folder-content[data-subtab="sales"] {
-  background-color: var(--surface-bg) !important;
-  padding: 0.75rem !important;
+  background-color: transparent !important;
+  padding: 0.5rem !important;
 }
 
 .project-folder-content[data-subtab="sales"] .app-content {

@@ -26,6 +26,9 @@
   --line-soft: #e5e7eb;
   --line-strong: #cbd5e1;
 
+  /* Tile borders — visible edge for KPI/stat tiles */
+  --tile-border: #cbd5e1;
+
   /* Overlays */
   --hover-overlay: rgba(0, 0, 0, 0.04);
   --active-overlay: rgba(0, 0, 0, 0.08);
@@ -140,8 +143,8 @@
   --nav-tab-inactive-opacity: 0.75; /* All tabs show color, inactive slightly muted */
 
   /* Spacing */
-  --app-padding: 0.75rem; /* align to nav bar horizontal padding */
-  --component-gap: 0.75rem;
+  --app-padding: 0.5rem;
+  --component-gap: 0.5rem;
 
   /* Border Radius */
   --radius-card: 0.5rem;
@@ -180,16 +183,19 @@
   --surface-card: #111827;
   --surface-tile: #0f172a;
   --surface-page-bg: #0b1220;
-  --surface-card-header: #1f2937;
-  --surface-subheader: #111827;
+  --surface-card-header: #121827;
+  --surface-subheader: #1f2a37;
   --surface-operations-tile: #111827;
 
   --text-primary: #e5e7eb;
   --text-secondary: #9ca3af;
   --text-inverse: #111827;
 
-  --line-soft: #1f2937;
-  --line-strong: #374151;
+  --line-soft: #2d3748;
+  --line-strong: #4b5563;
+
+  /* Tile borders — match card border visibility */
+  --tile-border: #4b5563;
 
   --hover-overlay: rgba(255, 255, 255, 0.06);
   --active-overlay: rgba(255, 255, 255, 0.12);
@@ -259,6 +265,6 @@
   --ops-positive: #68d391;
   --ops-muted: #a0aec0;
   --ops-warn: #f6ad55;
-  --cui-card-header-bg: #1f2937;
-  --cui-card-subheader-bg: #111827;
+  --cui-card-header-bg: #121827;
+  --cui-card-subheader-bg: #1f2a37;
 }
