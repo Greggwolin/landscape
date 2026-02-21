@@ -296,6 +296,238 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
   );
 }
 
+/**
+ * PropertyNarrative - Generates a narrative description of the subject property
+ * for the Details tab. Pulls from project DB fields (physical description),
+ * rent roll stats, and any OM document narrative stored in the knowledge system.
+ */
+function PropertyNarrative({ projectId, units, floorPlans }: {
+  projectId: number;
+  units: Unit[];
+  floorPlans: FloorPlan[];
+}) {
+  const [propertyData, setPropertyData] = useState<Record<string, unknown> | null>(null);
+  const [omNarrative, setOmNarrative] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch project data (same source as PhysicalDescription)
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+        const [projectRes, docsRes] = await Promise.all([
+          fetch(`${djangoUrl}/api/projects/${projectId}/`),
+          fetch(`${djangoUrl}/api/documents/?project_id=${projectId}`),
+        ]);
+
+        if (projectRes.ok) {
+          const data = await projectRes.json();
+          setPropertyData(data);
+        }
+
+        // Look for OM document with extracted text
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          const docs = docsData.results || docsData;
+          const omDoc = docs.find((d: Record<string, unknown>) =>
+            d.doc_type === 'om' || d.doc_type === 'offering_memorandum' ||
+            (typeof d.doc_name === 'string' && /\b(om|offering.memo)/i.test(d.doc_name))
+          );
+          if (omDoc?.extracted_text) {
+            // Extract property description section from OM text
+            const text = omDoc.extracted_text as string;
+            const descMatch = text.match(/(?:property\s+description|subject\s+property|physical\s+description|the\s+property\s+is)[:\s]*([^]*?)(?=\n\n[A-Z]|\n#{1,3}\s|$)/i);
+            if (descMatch) {
+              setOmNarrative(descMatch[1].trim().slice(0, 1500));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[PropertyNarrative] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [projectId]);
+
+  // Build narrative from available data
+  const narrative = useMemo(() => {
+    if (!propertyData && units.length === 0) return null;
+
+    const d = propertyData || {};
+    const sentences: string[] = [];
+
+    // Property identity + location
+    const name = d.project_name as string;
+    const address = d.street_address || d.project_address;
+    const city = d.city || d.jurisdiction_city;
+    const state = d.state || d.jurisdiction_state;
+    const county = d.county || d.jurisdiction_county;
+    const location = [address, city, state].filter(Boolean).join(', ');
+
+    if (name && location) {
+      sentences.push(`${name} is located at ${location}${county ? ` in ${county} County` : ''}.`);
+    } else if (name) {
+      sentences.push(`${name} is the subject property.`);
+    }
+
+    // Building characteristics
+    const yearBuilt = d.year_built as number | null;
+    const totalUnits = d.total_units as number | null || units.length;
+    const stories = d.stories as number | null;
+    const buildingCount = d.building_count as number | null;
+    const constructionType = d.construction_type as string | null;
+    const grossSF = d.gross_sf as number | null;
+    const nra = d.net_rentable_area as number | null;
+    const propertyClass = d.property_class as string | null;
+
+    const buildingParts: string[] = [];
+    if (totalUnits) buildingParts.push(`${formatNumber(totalUnits)}-unit`);
+    if (propertyClass) buildingParts.push(`Class ${propertyClass}`);
+    buildingParts.push('multifamily property');
+
+    let buildingSentence = `The subject is a ${buildingParts.join(' ')}`;
+    const buildingDetails: string[] = [];
+    if (buildingCount && buildingCount > 1) buildingDetails.push(`${buildingCount} buildings`);
+    if (stories) buildingDetails.push(`${stories} ${stories === 1 ? 'story' : 'stories'}`);
+    if (constructionType) buildingDetails.push(`${constructionType} construction`);
+    if (buildingDetails.length > 0) buildingSentence += ` comprising ${buildingDetails.join(', ')}`;
+    if (yearBuilt) buildingSentence += `, originally constructed in ${yearBuilt}`;
+    buildingSentence += '.';
+    sentences.push(buildingSentence);
+
+    // Square footage
+    if (grossSF || nra) {
+      const sfParts: string[] = [];
+      if (grossSF) sfParts.push(`${formatNumber(grossSF)} gross SF`);
+      if (nra) sfParts.push(`${formatNumber(nra)} net rentable SF`);
+      sentences.push(`The property contains ${sfParts.join(' and ')}.`);
+    }
+
+    // Unit mix from floor plans
+    if (floorPlans.length > 0) {
+      const bedroomCounts = new Map<number, { count: number; avgSF: number; avgRent: number }>();
+      floorPlans.forEach(fp => {
+        const existing = bedroomCounts.get(fp.bedrooms);
+        if (existing) {
+          const totalCount = existing.count + fp.unitCount;
+          existing.avgSF = Math.round((existing.avgSF * existing.count + fp.sqft * fp.unitCount) / totalCount);
+          existing.avgRent = Math.round((existing.avgRent * existing.count + fp.currentRent * fp.unitCount) / totalCount);
+          existing.count = totalCount;
+        } else {
+          bedroomCounts.set(fp.bedrooms, { count: fp.unitCount, avgSF: fp.sqft, avgRent: fp.currentRent });
+        }
+      });
+
+      const mixParts = Array.from(bedroomCounts.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([beds, data]) => {
+          const label = beds === 0 ? 'studio' : `${beds}-bedroom`;
+          return `${data.count} ${label} (avg ${formatNumber(data.avgSF)} SF)`;
+        });
+
+      if (mixParts.length > 0) {
+        sentences.push(`The unit mix includes ${mixParts.join(', ')}.`);
+      }
+    }
+
+    // Site characteristics
+    const lotAcres = d.lot_size_acres || d.acres_gross;
+    const zoning = d.current_zoning as string | null;
+    const topography = d.topography as string | null;
+    const siteParts: string[] = [];
+    if (lotAcres) siteParts.push(`${Number(lotAcres).toFixed(2)} acres`);
+    if (zoning) siteParts.push(`zoned ${zoning}`);
+    if (topography) siteParts.push(`${(topography as string).toLowerCase()} topography`);
+    if (siteParts.length > 0) {
+      sentences.push(`The site encompasses ${siteParts.join(', ')}.`);
+    }
+
+    // Parking
+    const parkingSpaces = d.parking_spaces as number | null;
+    const parkingType = d.parking_type as string | null;
+    const parkingRatio = d.parking_ratio as number | null;
+    if (parkingSpaces) {
+      let parkingSentence = `Parking consists of ${formatNumber(parkingSpaces)} spaces`;
+      if (parkingType) parkingSentence += ` (${parkingType.toLowerCase()})`;
+      if (parkingRatio) parkingSentence += `, a ratio of ${parkingRatio.toFixed(1)} spaces per unit`;
+      parkingSentence += '.';
+      sentences.push(parkingSentence);
+    }
+
+    // Occupancy from units
+    if (units.length > 0) {
+      const occupied = units.filter(u => u.status === 'Occupied' || u.status === 'Renewal').length;
+      const occupancy = Math.round((occupied / units.length) * 100);
+      const avgRent = units.filter(u => u.currentRent > 0).reduce((sum, u) => sum + u.currentRent, 0) /
+        (units.filter(u => u.currentRent > 0).length || 1);
+      sentences.push(`As of the current rent roll, the property reports ${occupancy}% occupancy with an average in-place rent of ${formatCurrency(Math.round(avgRent))} per unit.`);
+    }
+
+    // Condition and quality
+    const conditionRating = d.condition_rating as number | null;
+    const qualityRating = d.quality_rating as number | null;
+    const effectiveAge = d.effective_age as number | null;
+    if (conditionRating || qualityRating || effectiveAge) {
+      const condParts: string[] = [];
+      if (conditionRating) condParts.push(`condition rated ${conditionRating}/5`);
+      if (qualityRating) condParts.push(`quality rated ${qualityRating}/5`);
+      if (effectiveAge) condParts.push(`an effective age of ${effectiveAge} years`);
+      sentences.push(`The improvements reflect ${condParts.join(', ')}.`);
+    }
+
+    return sentences.join(' ');
+  }, [propertyData, units, floorPlans]);
+
+  if (loading) {
+    return (
+      <div
+        className="rounded-lg p-4"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--cui-primary)', borderTopColor: 'transparent' }} />
+          <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Loading property narrative...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!narrative && !omNarrative) return null;
+
+  return (
+    <div
+      className="rounded-lg p-4"
+      style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0">
+          <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Property Description</h4>
+            <span className="studio-badge-info">Narrative</span>
+          </div>
+          <div className="text-sm space-y-3" style={{ color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
+            {omNarrative && (
+              <p>{omNarrative}</p>
+            )}
+            {narrative && (
+              <p>{narrative}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const mockUnits: Unit[] = [
   { id: '1', unitNumber: '101', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1200, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-01-15', leaseEnd: '2025-01-14', tenantName: 'John Smith', status: 'Occupied', deposit: 1200, monthlyIncome: 1200, rentPerSF: 1.85, proformaRentPerSF: 2.12, notes: '' },
   { id: '2', unitNumber: '102', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1225, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-03-01', leaseEnd: '2025-02-28', tenantName: 'Sarah Johnson', status: 'Occupied', deposit: 1225, monthlyIncome: 1225, rentPerSF: 1.88, proformaRentPerSF: 2.12, notes: '' },
@@ -763,26 +995,56 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     try {
       setLoading(true);
 
-      // Fetch unit types (floor plans)
-      const unitTypesData = await unitTypesAPI.list(projectId);
-      const transformedFloorPlans: FloorPlan[] = unitTypesData.map(ut => ({
-        id: ut.unit_type_id.toString(),
-        name: ut.unit_type_code,
-        bedrooms: Number(ut.bedrooms),
-        bathrooms: Number(ut.bathrooms),
-        sqft: ut.avg_square_feet,
-        unitCount: ut.total_units,
-        currentRent: Math.round(ut.current_market_rent || 0),
-        marketRent: Math.round(ut.current_market_rent || 0),
-        aiEstimate: 0 // Will be populated from comparables
-      }));
+      // Fetch unit types (floor plans), units, and leases in parallel
+      const [unitTypesData, unitsData, leasesData] = await Promise.all([
+        unitTypesAPI.list(projectId),
+        unitsAPI.list(projectId),
+        leasesAPI.list(projectId),
+      ]);
 
-      // Fetch units
-      const unitsData = await unitsAPI.list(projectId);
-
-      // Fetch leases to get tenant info
-      const leasesData = await leasesAPI.list(projectId);
       const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
+
+      // Build avg current rent per unit type from occupied leases (ACTIVE + MONTH_TO_MONTH)
+      const occupiedStatuses = ['ACTIVE', 'MONTH_TO_MONTH'];
+      const rentsByUnitType = new Map<string, number[]>();
+      unitsData.forEach(u => {
+        const lease = leasesByUnit.get(u.unit_id);
+        if (lease && occupiedStatuses.includes(lease.lease_status) && lease.base_rent_monthly) {
+          const rents = rentsByUnitType.get(u.unit_type) || [];
+          rents.push(Number(lease.base_rent_monthly));
+          rentsByUnitType.set(u.unit_type, rents);
+        }
+      });
+
+      // Only include unit types that have actual units assigned in the units table
+      const actualUnitCountByType = new Map<string, number>();
+      unitsData.forEach(u => {
+        actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
+      });
+
+      const transformedFloorPlans: FloorPlan[] = unitTypesData
+        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0)
+        .map(ut => {
+          const leaseRents = rentsByUnitType.get(ut.unit_type_code);
+          const avgLeaseRent = leaseRents && leaseRents.length > 0
+            ? Math.round(leaseRents.reduce((a, b) => a + b, 0) / leaseRents.length)
+            : 0;
+          // Use actual lease rent if available, otherwise fall back to market rent
+          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_market_rent || 0);
+          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.total_units;
+
+          return {
+            id: ut.unit_type_id.toString(),
+            name: ut.unit_type_code,
+            bedrooms: Number(ut.bedrooms),
+            bathrooms: Number(ut.bathrooms),
+            sqft: ut.avg_square_feet,
+            unitCount: actualCount,
+            currentRent,
+            marketRent: Math.round(ut.current_market_rent || 0),
+            aiEstimate: 0 // Will be populated from comparables
+          };
+        });
 
       const normalizeStatus = (status?: string | null): Unit['status'] => {
         if (!status) return 'Unknown';
@@ -800,7 +1062,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
         const marketRent = Math.round(u.market_rent || 0);
         const unitStatus = normalizeStatus(u.occupancy_status);
-        const leaseStatus = lease?.lease_status === 'ACTIVE' ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
+        const leaseStatus = lease && occupiedStatuses.includes(lease.lease_status) ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
         return {
           id: u.unit_id.toString(),
           unitNumber: u.unit_number,
@@ -1390,29 +1652,12 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                  <h3 className="font-semibold text-sm m-0" style={{ color: 'var(--cui-body-color)' }}>
                     Floor Plan Matrix
                   </h3>
-                  <div
-                    className="flex items-center gap-2"
-                    style={{
-                      padding: '0.2rem 0.9rem',
-                      borderRadius: '999px',
-                      border: '1px solid var(--cui-primary)',
-                      backgroundColor: 'var(--cui-primary-bg)',
-                    }}
-                  >
-                    <span
-                      className="font-semibold"
-                      style={{
-                        color: 'var(--cui-primary)',
-                        fontSize: '0.65rem',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      Aggregates from Units
-                    </span>
-                  </div>
+                  <span className="studio-badge-info">
+                    Aggregates from Units
+                  </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs">
                   <span style={{ color: 'var(--cui-secondary-color)' }}>
@@ -1556,32 +1801,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </div>
           </div>
 
-          {/* Landscaper Analysis - Below Floor Plan Matrix in right column */}
-          <div
-            className="rounded-lg p-4"
-            style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
-                  <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
-                  </span>
-                </div>
-                <LandscaperInsights
-                  floorPlans={floorPlansWithAI}
-                  comparables={comparables}
-                  comparablesByProperty={comparablesByProperty}
-                />
-              </div>
-            </div>
-          </div>
+          {/* Property Narrative - Below Floor Plan Matrix in right column */}
+          <PropertyNarrative projectId={projectId} units={units} floorPlans={floorPlans} />
         </div>
       </div>
     </div>
@@ -1776,7 +1997,34 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </div>
           </div>
         </div>
+
+      {/* Landscaper Analysis - Comp-based market insights */}
+      <div
+        className="rounded-lg p-4 shadow-lg"
+        style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
+              </span>
+            </div>
+            <LandscaperInsights
+              floorPlans={floorPlansWithAI}
+              comparables={comparables}
+              comparablesByProperty={comparablesByProperty}
+            />
+          </div>
+        </div>
       </div>
+    </div>
   );
 
   // Format lease date as MMM-YY (e.g., "Sep-25")

@@ -292,24 +292,17 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
                 Property Photos
               </span>
-              <span>
+              <span className="d-flex align-items-center gap-2">
                 <button
                   type="button"
+                  className="studio-badge-info"
                   onClick={() => setShowPhotosModal(true)}
-                  style={{
-                    fontSize: '0.7rem',
-                    padding: '0.2rem 0.7rem',
-                    borderRadius: '999px',
-                    lineHeight: 1,
-                    fontWeight: 600,
-                    backgroundColor: photoCount > 0 ? 'var(--cui-primary)' : 'transparent',
-                    color: photoCount > 0 ? '#FFFFFF' : 'var(--cui-primary)',
-                    border: photoCount > 0 ? 'none' : '1px solid var(--cui-primary)',
-                    cursor: 'pointer',
-                  }}
                 >
-                  {photoCount > 0 ? `Photos (${photoCount})` : 'Add Photo'}
+                  {photoCount > 0 ? 'Photos' : 'Add Photo'}
                 </button>
+                {photoCount > 0 && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }}>{photoCount}</span>
+                )}
               </span>
             </div>
           </div>

@@ -305,8 +305,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              // Use white background for sales tab to avoid grey card bg
-              ...(currentTab === 'sales' && { backgroundColor: 'var(--surface-bg)' }),
+              backgroundColor: 'transparent',
             }}
           >
             {/* Folder Tabs Navigation */}

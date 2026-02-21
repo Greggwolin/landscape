@@ -70,7 +70,9 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
         setLeases(leasesData);
 
         // Determine data source based on lease availability
-        const activeLeases = leasesData.filter(l => l.lease_status === 'ACTIVE');
+        // Include MONTH_TO_MONTH leases — these are occupied units generating rent
+        const occupiedStatuses = ['ACTIVE', 'MONTH_TO_MONTH'];
+        const activeLeases = leasesData.filter(l => occupiedStatuses.includes(l.lease_status));
         setDataSource(activeLeases.length > 0 ? 'rent_roll' : 'unit_type');
       } catch (err) {
         console.error('[FloorPlanMatrix] Error fetching data:', err);
@@ -86,10 +88,11 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
   // Build floor plan rows based on data source
   const floorPlanRows: FloorPlanRow[] = useMemo(() => {
     if (dataSource === 'rent_roll' && units.length > 0) {
-      // Aggregate from rent roll - build a map of unit_id to current rent from active leases
+      // Aggregate from rent roll - build a map of unit_id to current rent from occupied leases
+      const occupiedStatuses = ['ACTIVE', 'MONTH_TO_MONTH'];
       const unitRentMap = new Map<number, number>();
       leases.forEach(lease => {
-        if (lease.lease_status === 'ACTIVE' && lease.base_rent_monthly) {
+        if (occupiedStatuses.includes(lease.lease_status) && lease.base_rent_monthly) {
           unitRentMap.set(lease.unit_id, Number(lease.base_rent_monthly));
         }
       });

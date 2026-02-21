@@ -806,7 +806,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Property Identification</span>
             <SectionProgress
@@ -834,7 +834,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Site Characteristics</span>
             <SectionProgress
@@ -867,7 +867,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Building Characteristics</span>
             <SectionProgress
@@ -895,7 +895,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Parking & Access</span>
             <SectionProgress
@@ -916,7 +916,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Condition & Quality</span>
             <SectionProgress
@@ -939,7 +939,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <div>
           <div
             className="d-flex justify-content-between align-items-center"
-            style={{ background: 'var(--cui-tertiary-bg)', padding: '0.375rem 0.5rem' }}
+            style={{ background: 'var(--surface-subheader)', padding: '0.375rem 0.5rem' }}
           >
             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Walkability Scores</span>
             <SectionProgress
@@ -980,7 +980,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
       <CCardBody className="studio-card-body p-2 pt-3">
         {/* Section A: Property Identification */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Property Identification</span>
             <SectionProgress
               filled={countFilledFields(sections[0].fields)}
@@ -1033,7 +1033,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
 
         {/* Section B: Site Characteristics */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Site Characteristics</span>
             <SectionProgress
               filled={countFilledFields(sections[1].fields)}
@@ -1099,7 +1099,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
 
         {/* Section C: Building Characteristics */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Building Characteristics</span>
             <SectionProgress
               filled={countFilledFields(sections[2].fields)}
@@ -1152,7 +1152,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
 
         {/* Section D: Parking & Access */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Parking & Access</span>
             <SectionProgress
               filled={countFilledFields(sections[3].fields)}
@@ -1178,7 +1178,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
 
         {/* Section E: Condition & Quality */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Condition & Quality</span>
             <SectionProgress
               filled={countFilledFields(sections[4].fields)}
@@ -1212,7 +1212,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
 
         {/* Section F: Walkability Scores */}
         <div className="physical-section">
-          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--cui-tertiary-bg)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
+          <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>
             <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>Walkability Scores (0-100)</span>
             <SectionProgress
               filled={countFilledFields(sections[5].fields)}
