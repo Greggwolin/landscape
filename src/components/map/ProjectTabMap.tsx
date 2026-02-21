@@ -81,6 +81,20 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   const [savedView, setSavedView] = useState<{ pitch: number; bearing: number; zoom: number } | null>(initialSavedView);
   const appliedSavedViewRef = useRef(false);
 
+  // Basemap state — Google Map Tiles basemaps
+  type BasemapOption = 'google-roadmap' | 'google-satellite' | 'google-hybrid' | 'google-terrain';
+  const basemapOptions: { value: BasemapOption; label: string }[] = [
+    { value: 'google-hybrid', label: 'Hybrid' },
+    { value: 'google-roadmap', label: 'Map' },
+    { value: 'google-satellite', label: 'Satellite' },
+    { value: 'google-terrain', label: 'Terrain' },
+  ];
+  // Default to google-roadmap; if original styleUrl was 'aerial' the MapOblique now maps it to Google hybrid
+  const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(
+    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-roadmap'
+  );
+  const resolvedStyleUrl = activeBasemap;
+
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(() => {
@@ -244,7 +258,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
           zoom={initialZoom}
           pitch={pitch}
           bearing={bearing}
-          styleUrl={styleUrl}
+          styleUrl={resolvedStyleUrl}
           showExtrusions={false}
           markers={markers}
           lines={lines}
@@ -302,16 +316,41 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
         {/* Accordion Content */}
         {controlsExpanded && (
           <div
-            className="p-4"
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'auto auto 1fr 1fr',
-              gap: 16,
-              alignItems: 'center',
               borderTop: '1px solid var(--cui-border-color)',
               borderRadius: '0 0 0.5rem 0.5rem'
             }}
           >
+            {/* Basemap Switcher Row */}
+            <div
+              className="px-4 py-3 d-flex align-items-center gap-3"
+              style={{ borderBottom: '1px solid var(--cui-border-color)' }}
+            >
+              <span className="text-xs fw-semibold" style={{ color: 'var(--cui-secondary-color)' }}>Basemap</span>
+              <div className="btn-group btn-group-sm" role="group">
+                {basemapOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`btn btn-ghost-secondary${activeBasemap === opt.value ? ' active' : ''}`}
+                    onClick={() => setActiveBasemap(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Existing Controls Grid */}
+            <div
+              className="p-4"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto auto 1fr 1fr',
+                gap: 16,
+                alignItems: 'center',
+              }}
+            >
             <div className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
               <div className="fw-semibold mb-1">Set location</div>
               <div className="text-muted" style={{ fontSize: 12 }}>
@@ -455,6 +494,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
                 }}
               />
             </div>
+          </div>
           </div>
         )}
       </div>

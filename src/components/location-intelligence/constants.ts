@@ -32,7 +32,8 @@ export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   blockGroups: false,
   rings: true,
   userPoints: true,
-  satellite: true,
+  satellite: false,
+  hybrid: true,
 };
 
 // Map style URLs

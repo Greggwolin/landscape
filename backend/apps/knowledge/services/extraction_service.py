@@ -68,36 +68,36 @@ def parse_rent_roll_tags(tags_value: str) -> dict:
 
 def map_occupancy_status(source_status: str, tenant_name: str = None) -> str:
     """
-    Map source status values to standard occupancy_status.
+    Map source status values to standard occupancy_status (lowercase canonical).
 
     Mapping:
-    - Current, Occupied, Active -> Occupied
-    - Vacant, Vacant-Unrented -> Vacant
-    - Notice, Notice Given -> Notice
-    - Down, Offline -> Down
+    - Current, Occupied, Active -> 'occupied'
+    - Vacant, Vacant-Unrented -> 'vacant'
+    - Notice, Notice Given -> 'notice'
+    - Down, Offline -> 'down'
 
     If status is empty, infer from tenant name presence.
     """
     if not source_status:
         # Infer from tenant name
         if tenant_name and tenant_name.strip() and tenant_name.lower() not in ['current tenant', 'tenant', 'n/a', 'na', '--', '-']:
-            return 'Occupied'
-        return 'Vacant'
+            return 'occupied'
+        return 'vacant'
 
     status_lower = str(source_status).lower().strip()
 
-    # Direct matches
+    # Direct matches - return lowercase canonical values
     if status_lower in ('current', 'occupied', 'active', 'leased'):
-        return 'Occupied'
+        return 'occupied'
     elif 'vacant' in status_lower or status_lower in ('empty', 'available'):
-        return 'Vacant'
+        return 'vacant'
     elif 'notice' in status_lower or status_lower in ('ntv', 'move out'):
-        return 'Notice'
+        return 'notice'
     elif status_lower in ('down', 'offline', 'maintenance', 'renovation'):
-        return 'Down'
+        return 'down'
     else:
-        # Default to Occupied if unclear but has a value
-        return 'Occupied'
+        # Default to occupied if unclear but has a value
+        return 'occupied'
 
 
 def extract_tenant_name(value: str) -> Optional[str]:

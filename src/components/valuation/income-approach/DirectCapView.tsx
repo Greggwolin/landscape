@@ -18,9 +18,10 @@ import {
   formatMultiple,
   formatCurrencyCompact,
   NOI_BASIS_LABELS,
-  TILE_COLORS,
+  getTileColors,
 } from '@/types/income-approach';
 import SensitivityMatrix from './SensitivityMatrix';
+import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
 interface ExtendedDirectCapViewProps extends DirectCapViewProps {
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
@@ -39,6 +40,8 @@ export function DirectCapView({
   allTiles,
   onMethodChange,
 }: ExtendedDirectCapViewProps) {
+  const { theme } = useTheme();
+  const tileColors = getTileColors(theme);
   const { unit_count: unitCount, total_sf: totalSf } = propertySummary;
   // Use these for single-column display fallback
   void rentRollItems; // Used by single-column table (not multi-column)
@@ -135,7 +138,7 @@ export function DirectCapView({
                 Columns:
               </span>
               {orderedBases.map((basis) => {
-                const colors = TILE_COLORS[basis];
+                const colors = tileColors[basis];
                 const isVisible = visibleColumns[basis];
                 return (
                   <button
@@ -165,6 +168,7 @@ export function DirectCapView({
               unitCount={unitCount}
               totalSf={totalSf}
               selectedBasis={selectedBasis}
+              theme={theme}
             />
           ) : (
             <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
@@ -550,6 +554,7 @@ interface MultiColumnPLTableProps {
   unitCount: number;
   totalSf: number;
   selectedBasis: NOIBasis;
+  theme: 'light' | 'dark';
 }
 
 function MultiColumnPLTable({
@@ -558,7 +563,9 @@ function MultiColumnPLTable({
   unitCount,
   totalSf,
   selectedBasis,
+  theme,
 }: MultiColumnPLTableProps) {
+  const tileColors = getTileColors(theme);
   const colCount = tiles.length;
 
   return (
@@ -573,7 +580,7 @@ function MultiColumnPLTable({
         >
           <th className="text-left py-2" style={{ width: '40%' }}></th>
           {tiles.map((tile) => {
-            const colors = TILE_COLORS[tile.id];
+            const colors = tileColors[tile.id];
             const isSelected = tile.id === selectedBasis;
             return (
               <th
@@ -705,6 +712,7 @@ function MultiColumnPLTable({
           values={tiles.map((t) => t.calculation.noi)}
           tileIds={tiles.map((t) => t.id)}
           selectedBasis={selectedBasis}
+          theme={theme}
         />
 
         {/* VALUATION SECTION */}
@@ -738,7 +746,7 @@ function MultiColumnPLTable({
             INDICATED VALUE
           </td>
           {tiles.map((tile) => {
-            const colors = TILE_COLORS[tile.id];
+            const colors = tileColors[tile.id];
             const isSelected = tile.id === selectedBasis;
             return (
               <td
@@ -878,9 +886,11 @@ interface MultiColTotalRowProps {
   values: number[];
   tileIds: NOIBasis[];
   selectedBasis: NOIBasis;
+  theme: 'light' | 'dark';
 }
 
-function MultiColTotalRow({ label, values, tileIds, selectedBasis }: MultiColTotalRowProps) {
+function MultiColTotalRow({ label, values, tileIds, selectedBasis, theme }: MultiColTotalRowProps) {
+  const tileColors = getTileColors(theme);
   return (
     <tr
       className="border-t-2 border-b-2"
@@ -896,7 +906,7 @@ function MultiColTotalRow({ label, values, tileIds, selectedBasis }: MultiColTot
         {label}
       </td>
       {values.map((amount, idx) => {
-        const colors = TILE_COLORS[tileIds[idx]];
+        const colors = tileColors[tileIds[idx]];
         const isSelected = tileIds[idx] === selectedBasis;
         return (
           <td

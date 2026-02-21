@@ -5,20 +5,23 @@ import CIcon from '@coreui/icons-react';
 import {
   cilCommentSquare,
   cilPencil,
+  cilCloudUpload,
   cilCloudDownload,
   cilTrash,
   cilX,
   cilSettings,
 } from '@coreui/icons';
 import type { DMSDocument } from '@/types/dms';
+import { useToast } from '@/components/ui/toast';
 import { DocumentChatModal, RenameModal, DeleteConfirmModal } from '../modals';
 import ProfileForm from '../profile/ProfileForm';
+import DocumentVersionHistory from './DocumentVersionHistory';
 
 interface DocumentPreviewPanelProps {
   projectId: number;
   document: DMSDocument;
   onClose: () => void;
-  onDocumentChange?: () => void;
+  onDocumentChange?: (options?: { keepSelection?: boolean; updatedDoc?: DMSDocument }) => void;
   folderDocType?: string;
 }
 
@@ -29,10 +32,17 @@ export default function DocumentPreviewPanel({
   onDocumentChange,
   folderDocType,
 }: DocumentPreviewPanelProps) {
+  const { showToast } = useToast();
   const [showChatModal, setShowChatModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [showVersionUpload, setShowVersionUpload] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [versionFile, setVersionFile] = useState<File | null>(null);
+  const [versionNotes, setVersionNotes] = useState('');
+  const [versionError, setVersionError] = useState<string | null>(null);
+  const [isUploadingVersion, setIsUploadingVersion] = useState(false);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -62,6 +72,23 @@ export default function DocumentPreviewPanel({
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const buildUpdatedDoc = (data: Partial<Record<string, unknown>>): DMSDocument => {
+    const updatedDocId = data.doc_id ? String(data.doc_id) : doc.doc_id;
+    return {
+      ...doc,
+      doc_id: updatedDocId,
+      doc_name: (data.doc_name as string) || doc.doc_name,
+      version_no: (data.version_no as number) ?? doc.version_no,
+      storage_uri: (data.storage_uri as string) || doc.storage_uri,
+      mime_type: (data.mime_type as string) || doc.mime_type,
+      file_size_bytes: (data.file_size_bytes as number) ?? doc.file_size_bytes,
+      sha256_hash: (data.sha256_hash as string) || doc.sha256_hash,
+      created_at: (data.created_at as string) || doc.created_at,
+      updated_at: (data.updated_at as string) || doc.updated_at,
+      status: (data.status as string) || doc.status,
+    };
   };
 
   const handleRename = async (newName: string) => {
@@ -137,8 +164,73 @@ export default function DocumentPreviewPanel({
       throw new Error('Failed to save profile');
     }
 
+    // Detect doc_type change for toast notification
+    const newDocType = profile.doc_type as string | undefined;
+    const oldDocType = doc.doc_type;
+    if (newDocType && newDocType !== oldDocType) {
+      const label = newDocType.charAt(0).toUpperCase() + newDocType.slice(1);
+      showToast({
+        title: 'Document Moved',
+        message: `Document moved to ${label}`,
+        type: 'success',
+      });
+    } else {
+      showToast('Profile saved', 'success');
+    }
+
     setShowProfileForm(false);
     onDocumentChange?.();
+  };
+
+  const handleUploadNewVersion = async () => {
+    if (!versionFile) {
+      setVersionError('Please select a file to upload.');
+      return;
+    }
+
+    setIsUploadingVersion(true);
+    setVersionError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', versionFile);
+      if (versionNotes.trim()) {
+        formData.append('notes', versionNotes.trim());
+      }
+
+      const response = await fetch(
+        `/api/projects/${projectId}/dms/docs/${doc.doc_id}/version`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to upload new version');
+      }
+
+      const data = await response.json();
+      const updatedDoc = buildUpdatedDoc(data);
+      onDocumentChange?.({ keepSelection: true, updatedDoc });
+      showToast(`Version V${updatedDoc.version_no || ''} uploaded`, 'success');
+      setShowVersionUpload(false);
+      setVersionFile(null);
+      setVersionNotes('');
+    } catch (error) {
+      console.error('Version upload error:', error);
+      setVersionError(error instanceof Error ? error.message : 'Failed to upload new version');
+      showToast('Failed to upload new version', 'error');
+    } finally {
+      setIsUploadingVersion(false);
+    }
+  };
+
+  const handleRestoreVersion = (data: Record<string, unknown>) => {
+    const updatedDoc = buildUpdatedDoc(data);
+    onDocumentChange?.({ keepSelection: true, updatedDoc });
+    showToast(`Restored as V${updatedDoc.version_no || ''}`, 'success');
   };
 
   // Extract profile data
@@ -189,16 +281,20 @@ export default function DocumentPreviewPanel({
           <span className="fw-semibold text-truncate" style={{ color: 'var(--cui-body-color)' }}>
             {doc.doc_name}
           </span>
-          <span
+          <button
+            type="button"
+            onClick={() => setShowVersionHistory((prev) => !prev)}
             className="badge rounded-pill flex-shrink-0"
             style={{
               backgroundColor: 'var(--cui-primary-bg-subtle)',
               color: 'var(--cui-primary)',
               border: '1px solid var(--cui-primary-border-subtle)'
             }}
+            aria-label="Toggle version history"
+            title="View version history"
           >
             V{doc.version_no || 1}
-          </span>
+          </button>
         </div>
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
           <button
@@ -218,6 +314,17 @@ export default function DocumentPreviewPanel({
           </button>
         </div>
       </div>
+
+      {showVersionHistory && (
+        <div className="border-bottom" style={{ borderColor: 'var(--cui-card-border-color)' }}>
+          <DocumentVersionHistory
+            projectId={projectId}
+            docId={parseInt(doc.doc_id)}
+            currentDocId={parseInt(doc.doc_id)}
+            onRestored={handleRestoreVersion}
+          />
+        </div>
+      )}
 
       {/* Preview Content */}
       <div className="flex-grow-1 overflow-auto p-3">
@@ -341,6 +448,13 @@ export default function DocumentPreviewPanel({
       >
         <div className="d-grid gap-2">
           <button
+            className="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 justify-content-start"
+            onClick={() => setShowVersionUpload(true)}
+          >
+            <CIcon icon={cilCloudUpload} />
+            <span>Upload New Version</span>
+          </button>
+          <button
             className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2 justify-content-start"
             onClick={() => setShowProfileForm(true)}
           >
@@ -370,6 +484,78 @@ export default function DocumentPreviewPanel({
           </button>
         </div>
       </div>
+
+      {showVersionUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div
+            className="w-full max-w-md mx-4 rounded-lg shadow-xl overflow-hidden"
+            style={{ backgroundColor: 'var(--cui-body-bg)' }}
+          >
+            <div
+              className="px-4 py-3 border-bottom"
+              style={{ borderColor: 'var(--cui-border-color)' }}
+            >
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                Upload New Version
+              </h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  File
+                </label>
+                <input
+                  type="file"
+                  className="form-control form-control-sm"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setVersionFile(file);
+                    setVersionError(null);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  Version Notes (optional)
+                </label>
+                <textarea
+                  className="form-control form-control-sm"
+                  rows={3}
+                  value={versionNotes}
+                  onChange={(event) => setVersionNotes(event.target.value)}
+                  placeholder="Updated rent roll for October"
+                />
+              </div>
+              {versionError && (
+                <div className="text-xs" style={{ color: 'var(--cui-danger)' }}>
+                  {versionError}
+                </div>
+              )}
+              <div className="d-flex gap-2 justify-content-end">
+                <button
+                  className="btn btn-outline-secondary btn-sm"
+                  onClick={() => {
+                    setShowVersionUpload(false);
+                    setVersionFile(null);
+                    setVersionNotes('');
+                    setVersionError(null);
+                  }}
+                  disabled={isUploadingVersion}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleUploadNewVersion}
+                  disabled={isUploadingVersion}
+                >
+                  {isUploadingVersion ? 'Uploading...' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <DocumentChatModal

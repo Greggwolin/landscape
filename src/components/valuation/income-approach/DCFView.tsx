@@ -27,13 +27,14 @@ import {
   formatPercent,
   formatPerUnit,
   formatPerSF,
-  DCF_TILE_COLOR,
+  getDCFTileColor,
 } from '@/types/income-approach';
 import {
   aggregateMFCashFlow,
   formatMFDcfValue,
   type MFDcfMonthlyApiResponse,
 } from './mfCashFlowTransform';
+import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
 interface ExtendedDCFViewProps extends DCFViewProps {
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
@@ -47,6 +48,8 @@ export function DCFView({
   onMethodChange,
   monthlyData,
 }: ExtendedDCFViewProps) {
+  const { theme } = useTheme();
+  const dcfColors = getDCFTileColor(theme);
   const [timeScale, setTimeScale] = useState<TimeScale>('annual');
 
   // Transform monthly data for grid display
@@ -74,7 +77,19 @@ export function DCFView({
     );
   }
 
-  const { projections, exit_analysis, metrics, sensitivity_matrix, assumptions } = data;
+  const {
+    projections,
+    exit_analysis: annualExitAnalysis,
+    metrics: annualMetrics,
+    sensitivity_matrix: annualSensitivityMatrix,
+    assumptions,
+  } = data;
+
+  // Prefer monthly data sources (corrected terminal NOI, PV including reversion)
+  // over annual data when monthly data is available.
+  const exit_analysis = monthlyData?.exit_analysis ?? annualExitAnalysis;
+  const metrics = monthlyData?.metrics ?? annualMetrics;
+  const sensitivity_matrix = monthlyData?.sensitivity_matrix ?? annualSensitivityMatrix;
 
   return (
     <div className="space-y-6">
@@ -95,7 +110,7 @@ export function DCFView({
         <button
           className="px-4 py-2 text-sm font-medium rounded-lg"
           style={{
-            backgroundColor: DCF_TILE_COLOR.border,
+            backgroundColor: dcfColors.border,
             color: 'white',
           }}
         >
@@ -104,8 +119,8 @@ export function DCFView({
         <span
           className="ml-2 text-xs px-2 py-1 rounded"
           style={{
-            backgroundColor: DCF_TILE_COLOR.bg,
-            color: DCF_TILE_COLOR.text,
+            backgroundColor: dcfColors.bg,
+            color: dcfColors.text,
           }}
         >
           {assumptions.hold_period_years}-Year Hold
@@ -122,6 +137,7 @@ export function DCFView({
           showTimeScaleToggle={true}
           formatValue={formatMFDcfValue}
           title="Cash Flow Projections"
+          labelColumnHeader="Period [Fiscal]"
         />
       ) : (
         <LegacyCashFlowTable
@@ -129,6 +145,7 @@ export function DCFView({
           exit_analysis={exit_analysis}
           assumptions={assumptions}
           metrics={metrics}
+          theme={theme}
         />
       )}
 
@@ -147,7 +164,7 @@ export function DCFView({
           </h4>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span style={{ color: 'var(--cui-secondary-color)' }}>Terminal NOI (Yr {projections.length + 1})</span>
+              <span style={{ color: 'var(--cui-secondary-color)' }}>Terminal NOI (Yr {assumptions.hold_period_years + 1})</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(exit_analysis.terminal_noi)}</span>
             </div>
             <div className="flex justify-between">
@@ -176,8 +193,8 @@ export function DCFView({
         <div
           className="rounded-lg p-4"
           style={{
-            backgroundColor: DCF_TILE_COLOR.bg,
-            border: `1px solid ${DCF_TILE_COLOR.border}`,
+            backgroundColor: dcfColors.bg,
+            border: `1px solid ${dcfColors.border}`,
           }}
         >
           <h4 className="font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
@@ -194,17 +211,17 @@ export function DCFView({
             </div>
             <div
               className="flex justify-between pt-2 border-t"
-              style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+              style={{ borderColor: 'var(--cui-border-color)' }}
             >
               <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>Present Value</span>
-              <span className="font-bold text-lg" style={{ color: DCF_TILE_COLOR.text }}>
+              <span className="font-bold text-lg" style={{ color: dcfColors.text }}>
                 {formatCurrency(metrics.present_value)}
               </span>
             </div>
             {metrics.irr !== null && (
               <div className="flex justify-between">
                 <span style={{ color: 'var(--cui-secondary-color)' }}>IRR</span>
-                <span className="font-semibold" style={{ color: DCF_TILE_COLOR.text }}>
+                <span className="font-semibold" style={{ color: dcfColors.text }}>
                   {formatPercent(metrics.irr)}
                 </span>
               </div>
@@ -231,6 +248,7 @@ export function DCFView({
         selectedDiscountRate={assumptions.discount_rate}
         selectedExitCapRate={assumptions.terminal_cap_rate}
         unitCount={propertySummary.unit_count}
+        theme={theme}
       />
     </div>
   );
@@ -244,12 +262,15 @@ function LegacyCashFlowTable({
   exit_analysis,
   assumptions,
   metrics,
+  theme,
 }: {
   projections: any[];
   exit_analysis: any;
   assumptions: any;
   metrics: any;
+  theme: 'light' | 'dark';
 }) {
+  const dcfColors = getDCFTileColor(theme);
   const [showAllYears, setShowAllYears] = useState(false);
 
   // Show first 3, last 2, or all years
@@ -279,8 +300,8 @@ function LegacyCashFlowTable({
             onClick={() => setShowAllYears(!showAllYears)}
             className="text-sm px-2 py-1 rounded"
             style={{
-              color: DCF_TILE_COLOR.text,
-              backgroundColor: DCF_TILE_COLOR.bg,
+              color: dcfColors.text,
+              backgroundColor: dcfColors.bg,
             }}
           >
             {showAllYears ? 'Show Summary' : `Show All ${projections.length} Years`}
@@ -298,7 +319,7 @@ function LegacyCashFlowTable({
               <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>OpEx</th>
               <th className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>NOI</th>
               <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>PV Factor</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>PV of NOI</th>
+              <th className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>PV of NOI</th>
             </tr>
           </thead>
           <tbody>
@@ -313,7 +334,7 @@ function LegacyCashFlowTable({
                 );
               }
               return (
-                <LegacyCashFlowRow key={period.year} period={period} isLast={period.year === projections.length} />
+                <LegacyCashFlowRow key={period.year} period={period} isLast={period.year === projections.length} theme={theme} />
               );
             })}
             {/* Exit row */}
@@ -335,7 +356,7 @@ function LegacyCashFlowTable({
               <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
                 {(1 / Math.pow(1 + assumptions.discount_rate, projections.length)).toFixed(4)}
               </td>
-              <td className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>
+              <td className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>
                 {formatCurrencyCompact(exit_analysis.pv_reversion)}
               </td>
             </tr>
@@ -343,13 +364,13 @@ function LegacyCashFlowTable({
             <tr
               style={{
                 borderTop: '2px solid var(--cui-border-color)',
-                backgroundColor: DCF_TILE_COLOR.bg,
+                backgroundColor: dcfColors.bg,
               }}
             >
               <td colSpan={7} className="px-3 py-3 font-bold text-right" style={{ color: 'var(--cui-body-color)' }}>
                 PRESENT VALUE
               </td>
-              <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: DCF_TILE_COLOR.text }}>
+              <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: dcfColors.text }}>
                 {formatCurrency(metrics.present_value)}
               </td>
             </tr>
@@ -363,7 +384,8 @@ function LegacyCashFlowTable({
 /**
  * Legacy cash flow row component
  */
-function LegacyCashFlowRow({ period, isLast }: { period: any; isLast: boolean }) {
+function LegacyCashFlowRow({ period, isLast, theme }: { period: any; isLast: boolean; theme: 'light' | 'dark' }) {
+  const dcfColors = getDCFTileColor(theme);
   return (
     <tr
       style={{
@@ -392,7 +414,7 @@ function LegacyCashFlowRow({ period, isLast }: { period: any; isLast: boolean })
       <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
         {period.pv_factor.toFixed(4)}
       </td>
-      <td className="px-3 py-2 text-right font-semibold" style={{ color: DCF_TILE_COLOR.text }}>
+      <td className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>
         {formatCurrencyCompact(period.pv_noi)}
       </td>
     </tr>
@@ -406,12 +428,15 @@ function DCFSensitivityMatrix({
   data,
   selectedDiscountRate,
   selectedExitCapRate,
+  theme,
 }: {
   data: DCFSensitivityRow[];
   selectedDiscountRate: number;
   selectedExitCapRate: number;
   unitCount: number;
+  theme: 'light' | 'dark';
 }) {
+  const dcfColors = getDCFTileColor(theme);
   if (!data || data.length === 0) {
     return null;
   }
@@ -455,7 +480,7 @@ function DCFSensitivityMatrix({
                     key={cap}
                     className="px-3 py-2 text-right"
                     style={{
-                      color: isSelectedCap ? DCF_TILE_COLOR.text : 'var(--cui-secondary-color)',
+                      color: isSelectedCap ? dcfColors.text : 'var(--cui-secondary-color)',
                       fontWeight: isSelectedCap ? 'bold' : 'normal',
                     }}
                   >
@@ -473,13 +498,13 @@ function DCFSensitivityMatrix({
                   key={row.discount_rate}
                   style={{
                     borderBottom: '1px solid var(--cui-border-color)',
-                    backgroundColor: isSelectedRow ? DCF_TILE_COLOR.bg : undefined,
+                    backgroundColor: isSelectedRow ? dcfColors.bg : undefined,
                   }}
                 >
                   <td
                     className="px-3 py-2 font-medium"
                     style={{
-                      color: isSelectedRow ? DCF_TILE_COLOR.text : 'var(--cui-body-color)',
+                      color: isSelectedRow ? dcfColors.text : 'var(--cui-body-color)',
                     }}
                   >
                     {formatPercent(row.discount_rate, 2)}
@@ -492,9 +517,9 @@ function DCFSensitivityMatrix({
                         key={colIdx}
                         className="px-3 py-2 text-right"
                         style={{
-                          color: isSelectedCell ? DCF_TILE_COLOR.text : 'var(--cui-body-color)',
+                          color: isSelectedCell ? dcfColors.text : 'var(--cui-body-color)',
                           fontWeight: isSelectedCell ? 'bold' : 'normal',
-                          backgroundColor: isSelectedCell ? DCF_TILE_COLOR.border + '40' : undefined,
+                          backgroundColor: isSelectedCell ? dcfColors.border + '40' : undefined,
                         }}
                       >
                         {formatCurrencyCompact(value)}

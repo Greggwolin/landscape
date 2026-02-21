@@ -4,8 +4,6 @@ import React, { useState } from 'react';
 import { CSpinner } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-
 interface LinkedMedia {
   link_id: number;
   media_id: number;
@@ -58,14 +56,22 @@ export default function EntityMediaDisplay({
   onAttach,
   editable = false,
 }: EntityMediaDisplayProps) {
+  const djangoBaseUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
   const queryClient = useQueryClient();
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  const resolveImageSrc = (uri: string | null | undefined): string => {
+    if (!uri) return '';
+    if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
+    if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
+    return `${djangoBaseUrl}/media/${uri}`;
+  };
 
   const { data, isLoading } = useQuery<EntityMediaLinksResponse>({
     queryKey: ['entity-media', entityType, entityId],
     queryFn: async () => {
       const res = await fetch(
-        `${DJANGO_API_URL}/api/dms/media/links/?entity_type=${entityType}&entity_id=${entityId}`,
+        `${djangoBaseUrl}/api/dms/media/links/?entity_type=${entityType}&entity_id=${entityId}`,
       );
       if (!res.ok) throw new Error('Failed to fetch entity media');
       return res.json();
@@ -75,7 +81,7 @@ export default function EntityMediaDisplay({
 
   const removeMutation = useMutation({
     mutationFn: async (linkId: number) => {
-      const res = await fetch(`${DJANGO_API_URL}/api/dms/media/links/${linkId}/`, {
+      const res = await fetch(`${djangoBaseUrl}/api/dms/media/links/${linkId}/`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to remove link');
@@ -107,12 +113,8 @@ export default function EntityMediaDisplay({
     const hero = links[0];
     if (!hero && !editable) return null;
 
-    const thumbUrl = hero?.media?.thumbnail_uri
-      ? `${DJANGO_API_URL}${hero.media.thumbnail_uri}`
-      : null;
-    const fullUrl = hero?.media?.storage_uri
-      ? `${DJANGO_API_URL}${hero.media.storage_uri}`
-      : thumbUrl;
+    const thumbUrl = resolveImageSrc(hero?.media?.thumbnail_uri || hero?.media?.storage_uri || '');
+    const fullUrl = resolveImageSrc(hero?.media?.storage_uri || hero?.media?.thumbnail_uri || '');
 
     return (
       <>
@@ -260,12 +262,8 @@ export default function EntityMediaDisplay({
       <>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'nowrap' }}>
           {displayLinks.map((link) => {
-            const thumbUrl = link.media?.thumbnail_uri
-              ? `${DJANGO_API_URL}${link.media.thumbnail_uri}`
-              : null;
-            const fullUrl = link.media?.storage_uri
-              ? `${DJANGO_API_URL}${link.media.storage_uri}`
-              : thumbUrl;
+            const thumbUrl = resolveImageSrc(link.media?.thumbnail_uri || link.media?.storage_uri || '');
+            const fullUrl = resolveImageSrc(link.media?.storage_uri || link.media?.thumbnail_uri || '');
 
             return (
               <div
@@ -419,9 +417,9 @@ export default function EntityMediaDisplay({
   const first = links[0];
   if (!first && !editable) return null;
 
-  const singleThumbUrl = first?.media?.thumbnail_uri
-    ? `${DJANGO_API_URL}${first.media.thumbnail_uri}`
-    : null;
+  const singleThumbUrl = resolveImageSrc(
+    first?.media?.thumbnail_uri || first?.media?.storage_uri || ''
+  );
 
   return (
     <div
@@ -444,9 +442,9 @@ export default function EntityMediaDisplay({
           ? onAttach
           : singleThumbUrl
             ? () => {
-                const full = first?.media?.storage_uri
-                  ? `${DJANGO_API_URL}${first.media.storage_uri}`
-                  : singleThumbUrl;
+                const full = resolveImageSrc(
+                  first?.media?.storage_uri || first?.media?.thumbnail_uri || ''
+                );
                 setLightboxUrl(full);
               }
             : undefined

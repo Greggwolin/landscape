@@ -1,0 +1,654 @@
+/**
+ * ReconciliationPanel Component
+ *
+ * Final step in the valuation workflow — funnel design:
+ * Three approach tiles at top → weight assignment → reconciled value.
+ *
+ * Each tile shows key metrics + an expandable analysis section where the
+ * Landscaper (via the side panel) or the appraiser discusses reliability
+ * and recommended weighting for that approach.
+ *
+ * Approach concluded values are EDITABLE — the appraiser enters their
+ * opinion of value from each approach, not a raw calculation.
+ *
+ * @version 2.0
+ * @created 2026-02-20
+ */
+
+'use client';
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { CCard, CCardBody } from '@coreui/react';
+import { saveValuationReconciliation } from '@/lib/api/valuation';
+import type { ValuationSummary } from '@/types/valuation';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ReconciliationPanelProps {
+  projectId: number;
+  valuationData: ValuationSummary;
+  onRefresh?: () => void;
+}
+
+interface ApproachConfig {
+  key: 'sales_comparison' | 'cost_approach' | 'income_approach';
+  label: string;
+  icon: string;
+  color: string;
+  metrics: { label: string; value: string }[];
+  defaultValue: number | null;
+  analysis: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const DEBOUNCE_MS = 1500;
+
+function fmt(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return `$${Math.round(Number(value)).toLocaleString()}`;
+}
+
+function fmtM(value: number | null | undefined): string {
+  if (value == null) return '—';
+  const num = Number(value);
+  if (Math.abs(num) >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
+  return fmt(value);
+}
+
+function fmtPct(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return `${(Number(value) * 100).toFixed(2)}%`;
+}
+
+function todayISO(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function ReconciliationPanel({
+  projectId,
+  valuationData,
+  onRefresh,
+}: ReconciliationPanelProps) {
+  const existing = valuationData.reconciliation;
+
+  // ── Build approach configs from live data ────────────────────────────────
+  const salesSummary = valuationData.sales_comparison_summary;
+  const cost = valuationData.cost_approach;
+  const income = valuationData.income_approach;
+
+  const approachConfigs: ApproachConfig[] = useMemo(() => [
+    {
+      key: 'sales_comparison',
+      label: 'Sales Comparison Approach',
+      icon: '🏘️',
+      color: 'var(--cui-info)',
+      defaultValue: salesSummary?.total_indicated_value ?? null,
+      metrics: [
+        { label: 'Comparables', value: `${salesSummary?.total_comps ?? 0} comps` },
+        { label: 'Avg Adjusted $/Unit', value: fmt(salesSummary?.weighted_average_per_unit) },
+        { label: 'Indicated (calc)', value: fmtM(salesSummary?.total_indicated_value) },
+      ],
+      analysis: '',
+    },
+    {
+      key: 'cost_approach',
+      label: 'Cost Approach',
+      icon: '🏗️',
+      color: 'var(--cui-warning)',
+      defaultValue: cost?.indicated_value ?? null,
+      metrics: [
+        { label: 'Land Value', value: fmtM(cost?.total_land_value) },
+        { label: 'Replacement Cost', value: fmtM(cost?.total_replacement_cost) },
+        { label: 'Total Depreciation', value: fmtM(cost?.total_depreciation) },
+        { label: 'Indicated Value', value: fmtM(cost?.indicated_value) },
+      ],
+      analysis: '',
+    },
+    {
+      key: 'income_approach',
+      label: 'Income Approach',
+      icon: '💰',
+      color: 'var(--cui-success)',
+      defaultValue: income?.direct_cap_value ?? income?.dcf_value ?? null,
+      metrics: [
+        { label: 'Cap Rate', value: fmtPct(income?.selected_cap_rate) },
+        { label: 'Direct Cap Value', value: fmtM(income?.direct_cap_value) },
+        { label: 'DCF Value', value: fmtM(income?.dcf_value) },
+        { label: 'Cap Rate Comps', value: `${income?.cap_rate_comps?.length ?? 0} comps` },
+      ],
+      analysis: '',
+    },
+  ], [salesSummary, cost, income]);
+
+  // DEBUG: remove after verifying fix
+  console.log('[ReconciliationPanel] DEBUG sources', {
+    existingSalesValue: existing?.sales_comparison_value,
+    summaryTotalIndicated: salesSummary?.total_indicated_value,
+    summaryWeightedAvgPerUnit: salesSummary?.weighted_average_per_unit,
+    summaryTotalComps: salesSummary?.total_comps,
+    incomeDirectCap: income?.direct_cap_value,
+    incomeDcf: income?.dcf_value,
+  });
+
+  // ── Concluded values (editable by appraiser) ────────────────────────────
+  const [salesValue, setSalesValue] = useState<string>(
+    existing?.sales_comparison_value != null
+      ? String(Math.round(Number(existing.sales_comparison_value)))
+      : salesSummary?.total_indicated_value != null
+        ? String(Math.round(Number(salesSummary.total_indicated_value)))
+        : ''
+  );
+  const [costValue, setCostValue] = useState<string>(
+    existing?.cost_approach_value != null
+      ? String(Math.round(Number(existing.cost_approach_value)))
+      : cost?.indicated_value != null
+        ? String(Math.round(Number(cost.indicated_value)))
+        : ''
+  );
+  const [incomeValue, setIncomeValue] = useState<string>(
+    existing?.income_approach_value != null
+      ? String(Math.round(Number(existing.income_approach_value)))
+      : income?.direct_cap_value != null
+        ? String(Math.round(Number(income.direct_cap_value)))
+        : income?.dcf_value != null
+          ? String(Math.round(Number(income.dcf_value)))
+          : ''
+  );
+
+  // ── Weights ─────────────────────────────────────────────────────────────
+  const [salesWeight, setSalesWeight] = useState<number>(
+    existing?.sales_comparison_weight != null ? Number(existing.sales_comparison_weight) * 100 : 0
+  );
+  const [costWeight, setCostWeight] = useState<number>(
+    existing?.cost_approach_weight != null ? Number(existing.cost_approach_weight) * 100 : 0
+  );
+  const [incomeWeight, setIncomeWeight] = useState<number>(
+    existing?.income_approach_weight != null ? Number(existing.income_approach_weight) * 100 : 0
+  );
+
+  // ── Expanded tile state ─────────────────────────────────────────────────
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // ── Analysis text (per-approach Landscaper commentary) ──────────────────
+  const [analysisTexts, setAnalysisTexts] = useState<Record<string, string>>({
+    sales_comparison: '',
+    cost_approach: '',
+    income_approach: '',
+  });
+
+  // ── Other form state ────────────────────────────────────────────────────
+  const [narrative, setNarrative] = useState<string>(existing?.reconciliation_narrative ?? '');
+  const [valuationDate, setValuationDate] = useState<string>(existing?.valuation_date ?? todayISO());
+
+  // ── Save state ──────────────────────────────────────────────────────────
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Derived ─────────────────────────────────────────────────────────────
+  const totalWeight = salesWeight + costWeight + incomeWeight;
+  const weightsValid = totalWeight >= 99.5 && totalWeight <= 100.5;
+
+  const parsedSales = parseFloat(salesValue) || 0;
+  const parsedCost = parseFloat(costValue) || 0;
+  const parsedIncome = parseFloat(incomeValue) || 0;
+
+  const calculatedValue = useMemo(() => {
+    return (parsedSales * salesWeight / 100)
+      + (parsedCost * costWeight / 100)
+      + (parsedIncome * incomeWeight / 100);
+  }, [parsedSales, parsedCost, parsedIncome, salesWeight, costWeight, incomeWeight]);
+
+  // ── Value + weight getters by key ───────────────────────────────────────
+  const getValueByKey = (key: string): string => {
+    switch (key) {
+      case 'sales_comparison': return salesValue;
+      case 'cost_approach': return costValue;
+      case 'income_approach': return incomeValue;
+      default: return '';
+    }
+  };
+  const setValueByKey = (key: string, v: string) => {
+    const cleaned = v.replace(/[^0-9]/g, '');
+    switch (key) {
+      case 'sales_comparison': setSalesValue(cleaned); break;
+      case 'cost_approach': setCostValue(cleaned); break;
+      case 'income_approach': setIncomeValue(cleaned); break;
+    }
+    debouncedSave();
+  };
+  const getWeightByKey = (key: string): number => {
+    switch (key) {
+      case 'sales_comparison': return salesWeight;
+      case 'cost_approach': return costWeight;
+      case 'income_approach': return incomeWeight;
+      default: return 0;
+    }
+  };
+  const setWeightByKey = (key: string, v: number) => {
+    const clamped = Math.max(0, Math.min(100, v));
+    switch (key) {
+      case 'sales_comparison': setSalesWeight(clamped); break;
+      case 'cost_approach': setCostWeight(clamped); break;
+      case 'income_approach': setIncomeWeight(clamped); break;
+    }
+    debouncedSave();
+  };
+
+  // ── Save ────────────────────────────────────────────────────────────────
+  const doSave = useCallback(async () => {
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      const payload = {
+        project_id: projectId,
+        sales_comparison_value: parsedSales || undefined,
+        sales_comparison_weight: salesWeight / 100,
+        cost_approach_value: parsedCost || undefined,
+        cost_approach_weight: costWeight / 100,
+        income_approach_value: parsedIncome || undefined,
+        income_approach_weight: incomeWeight / 100,
+        final_reconciled_value: calculatedValue || undefined,
+        reconciliation_narrative: narrative,
+        valuation_date: valuationDate || todayISO(),
+      };
+      await saveValuationReconciliation(projectId, payload);
+      setLastSaved(new Date().toLocaleTimeString());
+      onRefresh?.();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [projectId, parsedSales, parsedCost, parsedIncome, salesWeight, costWeight, incomeWeight, calculatedValue, narrative, valuationDate, onRefresh]);
+
+  const debouncedSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(doSave, DEBOUNCE_MS);
+  }, [doSave]);
+
+  useEffect(() => {
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, []);
+
+  const toggleExpand = (key: string) => {
+    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────
+  return (
+    <div className="d-flex flex-column" style={{ gap: '1.5rem' }}>
+
+      {/* ─── THREE APPROACH TILES ─── */}
+      <div className="d-flex" style={{ gap: '1rem' }}>
+        {approachConfigs.map((approach) => {
+          const concludedValue = getValueByKey(approach.key);
+          const weight = getWeightByKey(approach.key);
+          const isExpanded = expanded[approach.key] ?? false;
+          const hasData = approach.metrics.some(m => m.value !== '—' && m.value !== '0 comps');
+
+          return (
+            <div key={approach.key} style={{ flex: 1, minWidth: 0 }}>
+              <CCard
+                style={{
+                  borderTop: `3px solid ${approach.color}`,
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.2s',
+                }}
+                className="h-100"
+              >
+                {/* Tile Header — clickable */}
+                <div
+                  onClick={() => toggleExpand(approach.key)}
+                  className="px-3 py-3"
+                  style={{ borderBottom: isExpanded ? '1px solid var(--cui-border-color)' : 'none' }}
+                >
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.25rem' }}>{approach.icon}</span>
+                      <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+                        {approach.label}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--cui-secondary-color)',
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s',
+                    }}>
+                      ▼
+                    </span>
+                  </div>
+
+                  {/* Concluded value — large display */}
+                  <div
+                    className="text-center py-2"
+                    style={{
+                      fontSize: '1.5rem',
+                      fontWeight: 700,
+                      color: concludedValue ? approach.color : 'var(--cui-secondary-color)',
+                    }}
+                  >
+                    {concludedValue ? fmtM(parseFloat(concludedValue)) : 'Not concluded'}
+                  </div>
+
+                  {/* Weight pill */}
+                  <div className="text-center">
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        padding: '2px 10px',
+                        borderRadius: '10px',
+                        backgroundColor: weight > 0 ? `${approach.color}22` : 'var(--cui-tertiary-bg)',
+                        color: weight > 0 ? approach.color : 'var(--cui-secondary-color)',
+                      }}
+                    >
+                      {weight > 0 ? `${weight}% weight` : 'No weight assigned'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Expanded Detail */}
+                {isExpanded && (
+                  <CCardBody className="pt-2 pb-3 px-3">
+                    {/* Key Metrics */}
+                    <div className="mb-3">
+                      <div
+                        className="mb-2"
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                      >
+                        Key Metrics
+                      </div>
+                      {approach.metrics.map((m, i) => (
+                        <div
+                          key={i}
+                          className="d-flex justify-content-between py-1"
+                          style={{
+                            fontSize: '0.8125rem',
+                            borderBottom: i < approach.metrics.length - 1 ? '1px solid var(--cui-border-color-translucent)' : 'none',
+                          }}
+                        >
+                          <span style={{ color: 'var(--cui-secondary-color)' }}>{m.label}</span>
+                          <span style={{ color: 'var(--cui-body-color)', fontWeight: 500 }}>{m.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Concluded Value Input */}
+                    <div className="mb-3">
+                      <label
+                        className="d-block mb-1"
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                      >
+                        Concluded Value
+                      </label>
+                      <div className="d-flex align-items-center" style={{ gap: '0.25rem' }}>
+                        <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9375rem' }}>$</span>
+                        <input
+                          type="text"
+                          value={concludedValue ? Number(concludedValue).toLocaleString() : ''}
+                          onChange={(e) => setValueByKey(approach.key, e.target.value)}
+                          placeholder={hasData ? 'Enter concluded value' : 'No approach data'}
+                          style={{
+                            flex: 1,
+                            padding: '6px 8px',
+                            fontSize: '0.9375rem',
+                            fontWeight: 600,
+                            border: '1px solid var(--cui-border-color)',
+                            borderRadius: '4px',
+                            backgroundColor: 'var(--cui-input-bg, var(--cui-card-bg))',
+                            color: 'var(--cui-body-color)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Weight Input */}
+                    <div className="mb-3">
+                      <label
+                        className="d-block mb-1"
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                      >
+                        Weight
+                      </label>
+                      <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={weight}
+                          onChange={(e) => setWeightByKey(approach.key, Number(e.target.value))}
+                          style={{ flex: 1, accentColor: approach.color }}
+                        />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--cui-body-color)', minWidth: '40px', textAlign: 'right' }}>
+                          {weight}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Analysis / Reliability Commentary */}
+                    <div>
+                      <div
+                        className="mb-1"
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                      >
+                        Reliability Analysis
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={analysisTexts[approach.key] || ''}
+                        onChange={(e) => {
+                          setAnalysisTexts(prev => ({ ...prev, [approach.key]: e.target.value }));
+                          debouncedSave();
+                        }}
+                        placeholder="Use the Landscaper panel to analyze this approach's reliability, then paste or summarize the key points here..."
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '0.8125rem',
+                          lineHeight: 1.5,
+                          border: '1px solid var(--cui-border-color)',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          color: 'var(--cui-body-color)',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+                  </CCardBody>
+                )}
+              </CCard>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ─── FUNNEL VISUAL ─── */}
+      <div className="text-center" style={{ margin: '-0.5rem 0' }}>
+        <svg width="120" height="40" viewBox="0 0 120 40" style={{ opacity: 0.3 }}>
+          <path d="M10,0 L110,0 L80,40 L40,40 Z" fill="var(--cui-body-color)" />
+        </svg>
+      </div>
+
+      {/* ─── RECONCILIATION SUMMARY ─── */}
+      <CCard>
+        <div
+          className="px-4 py-3 d-flex align-items-center justify-content-between"
+          style={{
+            backgroundColor: 'var(--surface-card-header)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
+          <div className="d-flex align-items-center" style={{ gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.25rem' }}>⚖️</span>
+            <h3 className="mb-0" style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Reconciliation of Value
+            </h3>
+          </div>
+          <div className="d-flex align-items-center" style={{ gap: '0.75rem' }}>
+            {isSaving && (
+              <span style={{ fontSize: '0.8125rem', color: 'var(--cui-secondary-color)' }}>Saving...</span>
+            )}
+            {lastSaved && !isSaving && (
+              <span style={{ fontSize: '0.8125rem', color: 'var(--cui-secondary-color)' }}>Saved {lastSaved}</span>
+            )}
+          </div>
+        </div>
+
+        <CCardBody className="p-4">
+          {/* Weight Summary Table */}
+          <table className="w-100 mb-4" style={{ borderCollapse: 'collapse', fontSize: '0.9375rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--cui-border-color)' }}>
+                <th className="text-start py-2" style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>Approach</th>
+                <th className="text-end py-2" style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>Concluded Value</th>
+                <th className="text-center py-2" style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>Weight</th>
+                <th className="text-end py-2" style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>Weighted Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Sales Comparison', value: parsedSales, weight: salesWeight, color: 'var(--cui-info)' },
+                { label: 'Cost Approach', value: parsedCost, weight: costWeight, color: 'var(--cui-warning)' },
+                { label: 'Income Approach', value: parsedIncome, weight: incomeWeight, color: 'var(--cui-success)' },
+              ].map((row) => (
+                <tr key={row.label} style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}>
+                  <td className="py-2" style={{ color: 'var(--cui-body-color)' }}>
+                    <span style={{ borderLeft: `3px solid ${row.color}`, paddingLeft: '8px' }}>{row.label}</span>
+                  </td>
+                  <td className="text-end py-2" style={{ color: row.value ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)', fontWeight: 500 }}>
+                    {row.value ? fmtM(row.value) : '—'}
+                  </td>
+                  <td className="text-center py-2" style={{ fontWeight: 500, color: 'var(--cui-body-color)' }}>
+                    {row.weight}%
+                  </td>
+                  <td className="text-end py-2" style={{ color: row.value && row.weight ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)', fontWeight: 500 }}>
+                    {row.value && row.weight ? fmtM(row.value * row.weight / 100) : '—'}
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ borderTop: '2px solid var(--cui-border-color)' }}>
+                <td className="py-2" style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>Total</td>
+                <td></td>
+                <td className="text-center py-2">
+                  <span
+                    style={{
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      padding: '2px 10px',
+                      borderRadius: '10px',
+                      backgroundColor: weightsValid ? 'var(--cui-success-bg)' : totalWeight > 100.5 ? 'var(--cui-danger-bg)' : 'var(--cui-warning-bg)',
+                      color: weightsValid ? 'var(--cui-success)' : totalWeight > 100.5 ? 'var(--cui-danger)' : 'var(--cui-warning)',
+                    }}
+                  >
+                    {totalWeight}%
+                  </span>
+                </td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Final Value */}
+          <div
+            className="p-4 rounded mb-4"
+            style={{
+              backgroundColor: weightsValid && calculatedValue > 0 ? 'var(--cui-success-bg)' : 'var(--cui-tertiary-bg)',
+              border: `2px solid ${weightsValid && calculatedValue > 0 ? 'var(--cui-success)' : 'var(--cui-border-color)'}`,
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-center">
+              <span style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+                Final Reconciled Value
+              </span>
+              <span
+                style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 700,
+                  color: weightsValid && calculatedValue > 0 ? 'var(--cui-success)' : 'var(--cui-body-color)',
+                }}
+              >
+                {calculatedValue > 0 ? fmtM(calculatedValue) : '—'}
+              </span>
+            </div>
+            {!weightsValid && totalWeight > 0 && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--cui-warning)', marginTop: '0.25rem' }}>
+                Weights must total 100%
+              </div>
+            )}
+          </div>
+
+          {/* Valuation Date */}
+          <div className="mb-3">
+            <label className="d-block mb-1" style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Effective Date of Value
+            </label>
+            <input
+              type="date"
+              value={valuationDate}
+              onChange={(e) => { setValuationDate(e.target.value); debouncedSave(); }}
+              style={{
+                width: '200px',
+                padding: '6px 10px',
+                fontSize: '0.875rem',
+                border: '1px solid var(--cui-border-color)',
+                borderRadius: '4px',
+                backgroundColor: 'var(--cui-input-bg, var(--cui-card-bg))',
+                color: 'var(--cui-body-color)',
+              }}
+            />
+          </div>
+
+          {/* Narrative */}
+          <div>
+            <label className="d-block mb-1" style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Reconciliation Narrative
+            </label>
+            <textarea
+              rows={6}
+              value={narrative}
+              onChange={(e) => { setNarrative(e.target.value); debouncedSave(); }}
+              placeholder="Explain the rationale for the weighting of each approach. Consider data quality, adjustment magnitude, market conditions, property age/type, and highest-and-best-use alignment..."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '0.875rem',
+                lineHeight: 1.5,
+                border: '1px solid var(--cui-border-color)',
+                borderRadius: '6px',
+                backgroundColor: 'var(--cui-input-bg, var(--cui-card-bg))',
+                color: 'var(--cui-body-color)',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+        </CCardBody>
+      </CCard>
+
+      {/* Error */}
+      {saveError && (
+        <div
+          className="p-3 rounded"
+          style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)', fontSize: '0.875rem', border: '1px solid var(--cui-danger)' }}
+        >
+          Save failed: {saveError}
+          <button className="btn btn-sm ms-3" style={{ color: 'var(--cui-danger)', textDecoration: 'underline', padding: 0 }} onClick={doSave}>
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

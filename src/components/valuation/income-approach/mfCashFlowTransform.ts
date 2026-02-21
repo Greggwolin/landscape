@@ -36,8 +36,15 @@ export interface MFDcfProjection {
   replacement_reserves: number;
   total_opex: number;
   noi: number;
+  net_reversion: number;      // 0 for all months except last, which has the reversion
+  total_cash_flow: number;    // NOI + net_reversion
   pv_factor: number;
-  pv_noi: number;
+  pv_cash_flow: number;       // total_cash_flow × pv_factor
+  // Value-add renovation fields (present only when value_add_enabled)
+  reno_vacancy_loss?: number;
+  reno_rent_premium?: number;
+  reno_capex?: number;
+  relocation_cost?: number;
 }
 
 export interface MFDcfMonthlyApiResponse {
@@ -45,6 +52,8 @@ export interface MFDcfMonthlyApiResponse {
   period_type: 'monthly';
   start_date: string;
   total_periods: number;
+  value_add_enabled?: boolean;
+  analysis_purpose?: string;  // 'VALUATION' | 'UNDERWRITING'
   assumptions: {
     hold_period_years: number;
     discount_rate: number;
@@ -70,6 +79,24 @@ export interface MFDcfMonthlyApiResponse {
     selling_costs: number;
     net_reversion: number;
     pv_reversion: number;
+    terminal_is_post_reno?: boolean;
+    terminal_reno_premium?: number;
+  };
+  terminal_year?: {
+    gpr: number;
+    vacancy_loss: number;
+    credit_loss: number;
+    other_income: number;
+    egi: number;
+    base_opex: number;
+    management_fee: number;
+    replacement_reserves: number;
+    total_opex: number;
+    noi: number;
+    reno_vacancy_loss?: number;
+    reno_rent_premium?: number;
+    reno_capex?: number;
+    relocation_cost?: number;
   };
   metrics: {
     present_value: number;
@@ -85,11 +112,43 @@ export interface MFDcfMonthlyApiResponse {
     values: number[];
     is_base_discount: boolean;
   }>;
+  renovation_schedule?: {
+    units_to_renovate: number;
+    total_reno_cost: number;
+    total_relocation_cost: number;
+    total_vacancy_loss: number;
+    total_rent_premium: number;
+    program_duration_months: number;
+  };
 }
 
 // ============================================================================
 // TRANSFORM TO GRID FORMAT
 // ============================================================================
+
+const toNumber = (value: number | null | undefined): number => {
+  if (value == null) return 0;
+  return Number.isFinite(value) ? value : 0;
+};
+
+const toNegative = (value: number | null | undefined): number => {
+  const num = toNumber(value);
+  return num === 0 ? 0 : -Math.abs(num);
+};
+
+const computeEgiValue = (projection: {
+  gpr?: number;
+  vacancy_loss?: number;
+  credit_loss?: number;
+  other_income?: number;
+}): number => {
+  return (
+    toNumber(projection.gpr) +
+    toNegative(projection.vacancy_loss) +
+    toNegative(projection.credit_loss) +
+    toNumber(projection.other_income)
+  );
+};
 
 /**
  * Build the display projection window from hold period assumptions.
@@ -123,81 +182,144 @@ export function transformMFDcfToGrid(
   // Build Income Statement rows from projections
   const buildRowValues = (
     projections: MFDcfProjection[],
-    field: keyof MFDcfProjection
+    field: keyof MFDcfProjection,
+    transform?: (value: number | null | undefined, projection: MFDcfProjection) => number
   ): Record<string, number> => {
     const values: Record<string, number> = {};
     projections.forEach((p) => {
-      values[p.periodId] = p[field] as number;
+      const rawValue = (p[field] as number) ?? 0;
+      values[p.periodId] = transform ? transform(rawValue, p) : rawValue;
     });
     return values;
   };
 
+  const buildComputedRowValues = (
+    projections: MFDcfProjection[],
+    compute: (projection: MFDcfProjection) => number
+  ): Record<string, number> => {
+    const values: Record<string, number> = {};
+    projections.forEach((p) => {
+      values[p.periodId] = compute(p);
+    });
+    return values;
+  };
+
+  const isValueAdd = data.value_add_enabled === true;
+
   // Revenue Section
+  const revenueRows: CashFlowRow[] = [
+    {
+      id: 'gpr',
+      label: 'Gross Potential Rent',
+      values: buildRowValues(data.projections, 'gpr'),
+    },
+  ];
+
+  // When value-add is active, GPR already reflects renovation adjustments
+  // (base rent minus renovation vacancy plus renovation premium).
+  // Show the components as informational sub-items.
+  if (isValueAdd) {
+    revenueRows.push(
+      {
+        id: 'reno_vacancy_loss',
+        label: 'Less: Renovation Vacancy',
+        values: buildRowValues(data.projections, 'reno_vacancy_loss', toNegative),
+        indent: 1,
+        isInformational: true,
+      },
+      {
+        id: 'reno_rent_premium',
+        label: 'Plus: Renovation Premium',
+        values: buildRowValues(data.projections, 'reno_rent_premium'),
+        indent: 1,
+        isInformational: true,
+      }
+    );
+  }
+
+  revenueRows.push(
+    {
+      id: 'vacancy_loss',
+      label: 'Less: Vacancy',
+      values: buildRowValues(data.projections, 'vacancy_loss', toNegative),
+      indent: 1,
+    },
+    {
+      id: 'credit_loss',
+      label: 'Less: Credit Loss',
+      values: buildRowValues(data.projections, 'credit_loss', toNegative),
+      indent: 1,
+    },
+    {
+      id: 'other_income',
+      label: 'Plus: Other Income',
+      values: buildRowValues(data.projections, 'other_income'),
+      indent: 1,
+    },
+    {
+      id: 'egi',
+      label: 'Effective Gross Income',
+      values: buildComputedRowValues(data.projections, computeEgiValue),
+      isSubtotal: true,
+    }
+  );
+
   const revenueSection: CashFlowSection = {
     id: 'revenue',
     label: 'Revenue',
-    rows: [
-      {
-        id: 'gpr',
-        label: 'Gross Potential Rent',
-        values: buildRowValues(data.projections, 'gpr'),
-      },
-      {
-        id: 'vacancy_loss',
-        label: 'Less: Vacancy',
-        values: buildRowValues(data.projections, 'vacancy_loss'),
-        indent: 1,
-      },
-      {
-        id: 'credit_loss',
-        label: 'Less: Credit Loss',
-        values: buildRowValues(data.projections, 'credit_loss'),
-        indent: 1,
-      },
-      {
-        id: 'other_income',
-        label: 'Plus: Other Income',
-        values: buildRowValues(data.projections, 'other_income'),
-        indent: 1,
-      },
-      {
-        id: 'egi',
-        label: 'Effective Gross Income',
-        values: buildRowValues(data.projections, 'egi'),
-        isSubtotal: true,
-      },
-    ],
+    rows: revenueRows,
   };
 
   // Expenses Section
+  const expenseRows: CashFlowRow[] = [
+    {
+      id: 'base_opex',
+      label: 'Operating Expenses',
+      values: buildRowValues(data.projections, 'base_opex'),
+    },
+    {
+      id: 'management_fee',
+      label: 'Management Fee',
+      values: buildRowValues(data.projections, 'management_fee'),
+      indent: 1,
+    },
+    {
+      id: 'replacement_reserves',
+      label: 'Replacement Reserves',
+      values: buildRowValues(data.projections, 'replacement_reserves'),
+      indent: 1,
+    },
+  ];
+
+  // Insert renovation capex rows when value-add is active
+  if (isValueAdd) {
+    expenseRows.push(
+      {
+        id: 'reno_capex',
+        label: 'Renovation CapEx',
+        values: buildRowValues(data.projections, 'reno_capex'),
+        indent: 1,
+      },
+      {
+        id: 'relocation_cost',
+        label: 'Relocation Costs',
+        values: buildRowValues(data.projections, 'relocation_cost'),
+        indent: 1,
+      }
+    );
+  }
+
+  expenseRows.push({
+    id: 'total_opex',
+    label: 'Total Operating Expenses',
+    values: buildRowValues(data.projections, 'total_opex'),
+    isSubtotal: true,
+  });
+
   const expenseSection: CashFlowSection = {
     id: 'expenses',
     label: 'Operating Expenses',
-    rows: [
-      {
-        id: 'base_opex',
-        label: 'Operating Expenses',
-        values: buildRowValues(data.projections, 'base_opex'),
-      },
-      {
-        id: 'management_fee',
-        label: 'Management Fee',
-        values: buildRowValues(data.projections, 'management_fee'),
-        indent: 1,
-      },
-      {
-        id: 'replacement_reserves',
-        label: 'Replacement Reserves',
-        values: buildRowValues(data.projections, 'replacement_reserves'),
-        indent: 1,
-      },
-      {
-        id: 'total_opex',
-        label: 'Total Operating Expenses',
-        values: buildRowValues(data.projections, 'total_opex'),
-        isSubtotal: true,
-      },
-    ],
+    rows: expenseRows,
   };
 
   // NOI Section
@@ -214,7 +336,38 @@ export function transformMFDcfToGrid(
     ],
   };
 
-  // DCF Section (PV calculations)
+  // Reversion Section — Net Reversion shows only in last period
+  const reversionSection: CashFlowSection = {
+    id: 'reversion',
+    label: 'Reversion',
+    rows: [
+      {
+        id: 'net_reversion',
+        label: 'Net Reversion',
+        values: buildRowValues(data.projections, 'net_reversion'),
+      },
+    ],
+  };
+
+  // Total Cash Flow Section — NOI + Net Reversion
+  // Label varies by analysis_purpose
+  const isValuation = (data.analysis_purpose ?? 'VALUATION').toUpperCase() === 'VALUATION';
+  const totalCashFlowLabel = isValuation ? 'Total Cash Flow' : 'Cash Flow Before Debt';
+
+  const totalCashFlowSection: CashFlowSection = {
+    id: 'total_cash_flow',
+    label: totalCashFlowLabel,
+    rows: [
+      {
+        id: 'total_cash_flow',
+        label: totalCashFlowLabel,
+        values: buildRowValues(data.projections, 'total_cash_flow'),
+        isTotal: true,
+      },
+    ],
+  };
+
+  // Present Value Analysis Section
   const dcfSection: CashFlowSection = {
     id: 'dcf',
     label: 'Present Value Analysis',
@@ -223,44 +376,20 @@ export function transformMFDcfToGrid(
         id: 'pv_factor',
         label: 'PV Factor',
         values: buildRowValues(data.projections, 'pv_factor'),
+        hideTotal: true,
       },
       {
-        id: 'pv_noi',
-        label: 'PV of NOI',
-        values: buildRowValues(data.projections, 'pv_noi'),
+        id: 'pv_cash_flow',
+        label: 'PV of Cash Flow',
+        values: buildRowValues(data.projections, 'pv_cash_flow'),
         isSubtotal: true,
       },
     ],
   };
 
-  // Add reversion to final period in DCF section
-  if (data.projections.length > 0) {
-    const lastPeriodId = data.projections[data.projections.length - 1].periodId;
-
-    // Add reversion rows
-    const reversionValues: Record<string, number> = {};
-    reversionValues[lastPeriodId] = data.exit_analysis.net_reversion;
-
-    const pvReversionValues: Record<string, number> = {};
-    pvReversionValues[lastPeriodId] = data.exit_analysis.pv_reversion;
-
-    dcfSection.rows.push(
-      {
-        id: 'net_reversion',
-        label: 'Net Reversion',
-        values: reversionValues,
-      },
-      {
-        id: 'pv_reversion',
-        label: 'PV of Reversion',
-        values: pvReversionValues,
-      }
-    );
-  }
-
   return {
     periods,
-    sections: [revenueSection, expenseSection, noiSection, dcfSection],
+    sections: [revenueSection, expenseSection, noiSection, reversionSection, totalCashFlowSection, dcfSection],
   };
 }
 
@@ -323,35 +452,61 @@ function aggregateToQuarters(
 }
 
 /**
- * Group periods by year and aggregate values
+ * Group periods by fiscal year and aggregate values.
+ *
+ * Fiscal years are 12-month spans anchored to the analysis start date
+ * (valuation date). For example, a Feb 2026 start date produces:
+ *   Year 1 = Feb 2026 – Jan 2027, labeled "2027" (calendar year of end)
+ *   Year 2 = Feb 2027 – Jan 2028, labeled "2028"
+ *   ...etc.
+ *
+ * This prevents partial/stub year columns that occur when grouping
+ * by calendar year with a non-January start date.
  */
 function aggregateToYears(
   projections: MFDcfProjection[],
   sections: CashFlowSection[]
 ): { periods: CashFlowPeriod[]; sections: CashFlowSection[] } {
-  // Group projections by calendar year
+  // Group projections by fiscal year (12-month spans from start date)
   const yearMap = new Map<
-    number,
-    { period: CashFlowPeriod; sourceIds: string[] }
+    string,
+    { period: CashFlowPeriod; sourceIds: string[]; fiscalYear: number }
   >();
 
   projections.forEach((p) => {
-    const calendarYear = parseInt(p.periodId.split('-')[0], 10);
+    // p.year is the fiscal year number (1, 2, 3...) assigned by the backend
+    // based on month index: year = Math.ceil(month / 12)
+    const fiscalYear = p.year;
+    const yearKey = `FY${fiscalYear}`;
 
-    if (!yearMap.has(calendarYear)) {
-      yearMap.set(calendarYear, {
+    // Label: the calendar year in which the fiscal year ENDS
+    // For a start month of Feb (2) with Year 1: ends Jan of next calendar year
+    // End month of fiscal year N = start_month - 1 (or 12 if start_month is 1)
+    // End calendar year = start_year + N if start_month > 1, else start_year + N - 1
+    // Simpler: derive from the last projection in each fiscal year group
+    if (!yearMap.has(yearKey)) {
+      yearMap.set(yearKey, {
         period: {
-          id: String(calendarYear),
-          label: String(calendarYear),
+          id: yearKey,
+          label: '', // Will be set after grouping
           startDate: p.periodId,
           endDate: p.periodId,
         },
         sourceIds: [],
+        fiscalYear,
       });
     }
-    yearMap.get(calendarYear)!.sourceIds.push(p.periodId);
-    // Update end date to last month in year
-    yearMap.get(calendarYear)!.period.endDate = p.periodId;
+    yearMap.get(yearKey)!.sourceIds.push(p.periodId);
+    yearMap.get(yearKey)!.period.endDate = p.periodId;
+  });
+
+  // Now set the label for each fiscal year based on the end date
+  yearMap.forEach((entry) => {
+    // The endDate is the last month's periodId (e.g., "2027-01")
+    // Extract calendar year from endDate for the column label
+    const endYear = parseInt(entry.period.endDate!.split('-')[0], 10);
+    entry.period.id = String(endYear);
+    entry.period.label = String(endYear);
   });
 
   const aggregatedPeriods = Array.from(yearMap.values()).map((y) => y.period);
@@ -436,6 +591,111 @@ function aggregateSectionValues(
 }
 
 // ============================================================================
+// TERMINAL YEAR (Yr N+1) COLUMN
+// ============================================================================
+
+/** Period ID used for the terminal year reference column */
+const TERMINAL_PERIOD_ID = '__terminal__';
+
+/**
+ * Row-to-field mapping for the terminal_year object.
+ * Maps grid row IDs to keys in the API terminal_year response.
+ *
+ * NOTE: net_reversion, total_cash_flow, pv_factor, and pv_cash_flow are
+ * intentionally EXCLUDED — the Yr N+1 column is a reference for the terminal
+ * year's revenue/expense/NOI breakdown only. Reversion is a Year N cash flow
+ * event, not a Year N+1 item.
+ */
+const TERMINAL_ROW_FIELD_MAP: Record<string, string> = {
+  gpr: 'gpr',
+  reno_vacancy_loss: 'reno_vacancy_loss',
+  reno_rent_premium: 'reno_rent_premium',
+  vacancy_loss: 'vacancy_loss',
+  credit_loss: 'credit_loss',
+  other_income: 'other_income',
+  egi: 'egi',
+  base_opex: 'base_opex',
+  management_fee: 'management_fee',
+  replacement_reserves: 'replacement_reserves',
+  reno_capex: 'reno_capex',
+  relocation_cost: 'relocation_cost',
+  total_opex: 'total_opex',
+  noi: 'noi',
+};
+
+/**
+ * Append the Year N+1 (terminal) reference column to aggregated grid data.
+ *
+ * - Adds a "Yr N+1" period at the end of the periods array.
+ * - Injects the terminal_year line-item values into each row's values map.
+ * - Sets explicit `row.total` excluding the terminal period so TOTAL column
+ *   only reflects the hold period.
+ * - Rows that don't map to a terminal field (e.g., pv_factor, pv_noi,
+ *   net_reversion, pv_reversion) get no terminal value and show "—".
+ */
+function appendTerminalYear(
+  result: { periods: CashFlowPeriod[]; sections: CashFlowSection[] },
+  terminalYear: MFDcfMonthlyApiResponse['terminal_year'],
+  holdPeriodYears: number,
+): { periods: CashFlowPeriod[]; sections: CashFlowSection[] } {
+  if (!terminalYear) return result;
+
+  const terminalData = terminalYear as Record<string, number | undefined>;
+
+  // Add terminal period with reference styling
+  const terminalPeriod: CashFlowPeriod = {
+    id: TERMINAL_PERIOD_ID,
+    label: `Yr ${holdPeriodYears + 1}`,
+    startDate: undefined,
+    endDate: undefined,
+    isReference: true,
+  };
+
+  const periods = [...result.periods, terminalPeriod];
+
+  // Update sections: inject terminal values and pre-compute totals
+  const sections = result.sections.map((section) => ({
+    ...section,
+    rows: section.rows.map((row) => {
+      const fieldKey = TERMINAL_ROW_FIELD_MAP[row.id];
+
+      // Compute hold-period total BEFORE adding terminal values
+      const holdPeriodTotal = Object.entries(row.values)
+        .filter(([key]) => key !== TERMINAL_PERIOD_ID)
+        .reduce((sum, [, val]) => sum + (val || 0), 0);
+
+      // Get terminal value (if this row maps to a terminal field)
+      const terminalValue = fieldKey !== undefined
+        ? (row.id === 'egi'
+            ? computeEgiValue({
+                gpr: terminalData.gpr,
+                vacancy_loss: terminalData.vacancy_loss,
+                credit_loss: terminalData.credit_loss,
+                other_income: terminalData.other_income,
+              })
+            : ['vacancy_loss', 'credit_loss', 'reno_vacancy_loss'].includes(row.id)
+              ? toNegative(terminalData[fieldKey])
+              : toNumber(terminalData[fieldKey]))
+        : undefined;
+
+      const newValues = { ...row.values };
+      if (terminalValue !== undefined) {
+        newValues[TERMINAL_PERIOD_ID] = terminalValue;
+      }
+
+      return {
+        ...row,
+        values: newValues,
+        // Set explicit total to exclude terminal year
+        total: holdPeriodTotal,
+      };
+    }),
+  }));
+
+  return { periods, sections };
+}
+
+// ============================================================================
 // MAIN AGGREGATION FUNCTION
 // ============================================================================
 
@@ -459,23 +719,44 @@ export function aggregateMFCashFlow(
   // First transform to grid format
   const { sections } = transformMFDcfToGrid(displayData);
 
+  let result: { periods: CashFlowPeriod[]; sections: CashFlowSection[] };
+
   switch (timeScale) {
     case 'monthly':
       // Return as-is (just transform format)
-      return transformMFDcfToGrid(displayData);
+      result = transformMFDcfToGrid(displayData);
+      break;
 
     case 'quarterly':
-      return aggregateToQuarters(displayProjections, sections);
+      result = aggregateToQuarters(displayProjections, sections);
+      break;
 
     case 'annual':
-      return aggregateToYears(displayProjections, sections);
+      result = aggregateToYears(displayProjections, sections);
+      break;
 
     case 'overall':
-      return aggregateToOverall(displayProjections, sections);
+      result = aggregateToOverall(displayProjections, sections);
+      break;
 
     default:
-      return transformMFDcfToGrid(displayData);
+      result = transformMFDcfToGrid(displayData);
   }
+
+  // Append Year N+1 terminal column for annual and quarterly views
+  // (Skip for monthly — too many columns already; skip for overall — single total)
+  if (
+    data.terminal_year &&
+    (timeScale === 'annual' || timeScale === 'quarterly')
+  ) {
+    result = appendTerminalYear(
+      result,
+      data.terminal_year,
+      data.assumptions?.hold_period_years ?? 10,
+    );
+  }
+
+  return result;
 }
 
 // ============================================================================

@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-13
+**Last Updated:** 2026-02-18
 **Version:** 4.0
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Rich Schema Refresh)
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh)
 
 ---
 
@@ -9,7 +9,31 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Rich Schema Export Refresh (February 12, 2026)**
+### 🆕 **Latest Update: DMS Extraction Doc Types + Tags + Knowledge Library (February 14, 2026)**
+
+**Vocabulary Alignment, Subtype Classification, and Knowledge Library Consolidation**
+
+Major DMS upgrades that align extraction mappings with DMS templates, introduce subtype tags, and unify document discovery inside the Knowledge Library:
+
+- ✅ **Doc type remap** - `tbl_extraction_mapping.document_type` aligned to DMS template vocabulary with audit log table for rollback
+- ✅ **Tag system** - `dms_doc_tags`, `dms_doc_tag_assignments`, `dms_project_doc_types`, plus `applicable_tags` JSONB filtering on extraction mappings
+- ✅ **Subtype classifier** - `ai_document_subtypes` + `DocumentSubtypeClassifier` auto-assigns subtype tags on ingest
+- ✅ **Project DMS "+ Add Type"** - Inline create/delete of project-specific doc types (template types protected)
+- ✅ **Extraction Mappings Admin** - Help modal, tooltips, and SWR-driven CRUD interface
+- ✅ **Knowledge Library consolidation** - Global `/dms` removed in favor of AdminModal Knowledge Library; document-scoped chat now falls back to `core_doc_text` when embeddings are missing
+- 📁 **Location:** See `docs/09-session-notes/2026-02-14-dms-extraction-doctype-tags.md`
+
+### Previous Update: Knowledge Library Integration (February 13, 2026)
+
+**Landscaper Admin Panel Integration + Faceted Search**
+
+- ✅ **Knowledge Library panel** - 5-column cascading facets, scoped chat, batch download, drag-and-drop upload
+- ✅ **Doc geo tags** - `doc_geo_tag` table and `backfill_geo_tags` management command
+- ✅ **Django endpoints** - Facets, search, batch-download, upload (`/api/knowledge/library/*`)
+- ✅ **Admin integration** - Added as Landscaper accordion section inside AdminModal
+- 📁 **Location:** See `docs/09-session-notes/2026-02-13-knowledge-library-integration.md`
+
+### Previous Update: Rich Schema Export Refresh (February 12, 2026)
 
 **Schema Documentation Synced to Live Database**
 
@@ -21,7 +45,7 @@ Refreshed the canonical rich schema snapshot to reflect live Neon DB state as of
 - ✅ **Export command verified** - `./scripts/export_schema.sh --verbose`
 - 📁 **Location:** `docs/schema/landscape_rich_schema_2026-02-12.json`
 
-### 🆕 **Latest Update: Planning Surface Simplification + Market Research Extraction (February 13, 2026)**
+### Previous Update: Planning Surface Simplification + Market Research Extraction (February 13, 2026)
 
 **PlanningWizard Moved to Archive + New Market Analysis Document Pipeline**
 

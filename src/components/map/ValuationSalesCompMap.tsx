@@ -6,25 +6,43 @@
 
 'use client';
 
-import React, { useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useCompsMapData } from '@/lib/map/hooks';
+import { ParcelOverlayLayer } from './ParcelOverlayLayer';
 
 export interface ValuationSalesCompMapProps {
   projectId: string;
   styleUrl: string;
   height?: string;
   onToggleComp?: (compId: string) => void;
+  subjectApn?: string;
+  compApns?: string[];
 }
 
 export default function ValuationSalesCompMap({
   projectId,
   styleUrl,
   height = '520px',
-  onToggleComp
+  onToggleComp,
+  subjectApn,
+  compApns
 }: ValuationSalesCompMapProps) {
   const { data, error, isLoading } = useCompsMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
+
+  // Basemap state
+  type BasemapOption = 'google-roadmap' | 'google-satellite' | 'google-hybrid' | 'google-terrain';
+  const basemapOptions: { value: BasemapOption; label: string }[] = [
+    { value: 'google-hybrid', label: 'Hybrid' },
+    { value: 'google-roadmap', label: 'Map' },
+    { value: 'google-satellite', label: 'Satellite' },
+    { value: 'google-terrain', label: 'Terrain' },
+  ];
+  const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(
+    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-roadmap'
+  );
+  const resolvedStyleUrl = activeBasemap;
 
   // Color comps by selected state
   const compsWithColor = useMemo(() => {
@@ -191,12 +209,34 @@ export default function ValuationSalesCompMap({
       </div>
 
       {/* Map */}
-      <div className="px-4 pb-4" style={{ height: 'calc(100% - 110px)' }}>
+      <div className="px-4 pb-4" style={{ height: 'calc(100% - 110px)', position: 'relative' }}>
+        {/* Basemap Switcher */}
+        <div
+          className="btn-group btn-group-sm"
+          role="group"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: 24,
+            zIndex: 10,
+          }}
+        >
+          {basemapOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`btn btn-ghost-secondary${activeBasemap === opt.value ? ' active' : ''}`}
+              onClick={() => setActiveBasemap(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <div className="h-full rounded-lg overflow-hidden">
         <MapOblique
           ref={mapRef}
           center={data.center}
-          styleUrl={styleUrl}
+          styleUrl={resolvedStyleUrl}
           showExtrusions={false}
           markers={[
             {
@@ -252,7 +292,9 @@ export default function ValuationSalesCompMap({
             })
           ]}
           onFeatureClick={handleFeatureClick}
-        />
+        >
+          <ParcelOverlayLayer subjectApn={subjectApn} compApns={compApns} />
+        </MapOblique>
         </div>
       </div>
 

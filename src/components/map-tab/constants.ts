@@ -11,9 +11,10 @@ import type { LayerGroup, BasemapStyle, FeatureCategory } from './types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const BASEMAP_OPTIONS: { value: BasemapStyle; label: string }[] = [
-  { value: 'satellite', label: 'Satellite' },
   { value: 'hybrid', label: 'Hybrid' },
-  { value: 'streets', label: 'Streets' },
+  { value: 'roadmap', label: 'Map' },
+  { value: 'satellite', label: 'Satellite' },
+  { value: 'terrain', label: 'Terrain' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,7 +135,7 @@ export function getDefaultLayerGroups(): LayerGroup[] {
         {
           id: 'demo-rings',
           label: 'Demo Rings',
-          visible: true,
+          visible: false,
           color: LAYER_COLORS.demoRings,
         },
         {

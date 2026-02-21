@@ -1,5 +1,5 @@
 # Landscape Application - UI Technical Documentation
-December 11, 2025
+February 18, 2026
 
 ## Table of Contents
 - [1. Navigation Architecture](#1-navigation-architecture)
@@ -10,7 +10,7 @@ December 11, 2025
   - [1.5 Project Context Switching](#15-project-context-switching)
   - [1.6 Tab Implementations](#16-tab-implementations)
   - [1.7 Header and Breadcrumb Patterns](#17-header-and-breadcrumb-patterns)
-  - [1.8 Project Mode System (Napkin/Standard)](#18-project-mode-system-napkinstandard)
+  - [1.8 Complexity Mode System (Basic/Standard/Advanced)](#18-complexity-mode-system-basicstandardadvanced)
 - [2. Page Inventory](#2-page-inventory)
 - [3. Component Architecture](#3-component-architecture)
 - [4. Styling System](#4-styling-system)
@@ -25,32 +25,19 @@ December 11, 2025
 
 ---
 
-## Recent Changes Summary (Since November 23, 2025)
+## Recent Changes Summary (Since February 8, 2026)
 
 ### Major Additions
-1. **User Management System** (`/admin/users`) - Full CRUD user management with modals for add/edit/delete/password reset
-2. **Napkin Mode System** - New project mode with `ProjectModeProvider` and `LifecycleTileNav` for simplified workflows
-3. **Dashboard Redesign** - Complete overhaul with filter tiles, project accordion, and integrated map
-4. **NapkinWaterfallForm** - Redesigned waterfall form with IRR/EM toggle and structured tile layout
-5. **DMS Improvements** - Multi-select deletion, toast notifications, multi-filter expansion
+1. **Folder Tabs + Resizable Project Layout** — `ActiveProjectBar`, split `ProjectLayoutClient`, `FolderTabs`, and `ProjectContentRouter`.
+2. **Landscaper Panel Enhancements** — Collapsible/resizable left panel with file drop handling and extraction badges.
+3. **Knowledge Library (AdminModal)** — Landscaper admin panel with faceted filters, scoped chat, batch download, and upload.
+4. **DMS Enhancements** — Project-level doc type management, tag input + subtype tagging, extraction mappings admin rewrite; global `/dms` removed.
+5. **Project Metadata Pills** — Property type tokens + analysis badges surfaced in `ActiveProjectBar`.
 
-### Project Type Code Change
-- **LAND → DEV**: All project type codes renamed from `LAND` to `DEV` (Development) in database and frontend
-
-### New Routes
-- `/projects/[projectId]/napkin` - Napkin mode entry point
-- `/projects/[projectId]/napkin/waterfall` - Napkin waterfall analysis
-- `/projects/[projectId]/napkin/analysis` - Napkin analysis page
-- `/projects/[projectId]/napkin/documents` - Napkin documents view
-- `/admin/users` - User management system
-- `/projects/[projectId]/capitalization` - Capitalization index page
-
-### New Components
-- `LifecycleTileNav` - Colored tile navigation for project modes
-- `ProjectModeProvider` - Context for napkin/standard mode switching
-- `NapkinAnalysisPage` - Napkin analysis landing with RLV, pricing panels
-- `WaterfallResults` - Waterfall calculation results display
-- `UserModals` (Add/Edit/Reset/Delete) - User management modals
+### Navigation/Route Changes
+- Project navigation now uses `?folder=` + `?tab=` query params (FolderTabs).
+- Global `/dms` route removed; document management is project-scoped (`/projects/[projectId]/documents`) and Knowledge Library lives in the AdminModal.
+- `ProjectModeContext` is deprecated; complexity tiers use Basic/Standard/Advanced, while the Assumptions page retains Napkin/Mid/Pro tiers.
 
 ---
 
@@ -61,62 +48,55 @@ December 11, 2025
 - **Pattern:** Sticky horizontal bar at the top of every page rendered through `NavigationLayout`.
 - **Structure:**
   - Left: Inverted Landscape logo linking to `/`.
-  - Right cluster: Global nav links (`GLOBAL_NAV_LINKS` → Dashboard `/dashboard`, Documents `/dms`), "Landscaper AI" trigger, `SandboxDropdown`, `UserMenuDropdown`, `SettingsDropdown`, theme toggle, bug reporter icon.
+  - Right cluster: Global nav links (`GLOBAL_NAV_LINKS` → Dashboard `/dashboard`), theme toggle, bug reporter icon (admin only), Help toggle, Settings (opens AdminModal), `UserMenuDropdown`.
   - Uses `usePathname` to highlight the active link, inline hover handlers to emulate pill hover states, and CSS variables defined in `src/styles/tokens.css` for color (58 px tall, `z-index` 50, border bottom `var(--nav-border)`).
 - **Interaction notes:**
   - Theme toggle is driven by `CoreUIThemeProvider` context and updates `data-theme` attributes globally.
   - Bug reporter button integrates with `IssueReporter` context to provide contextual hints when no element has been targeted.
+  - The Settings button opens the AdminModal (Landscaper config, Knowledge Library, extraction mappings).
   - Drop-down components rely on the shared `useOutsideClick` hook to close on blur.
 - **Responsive behavior:** Flex container with wrapping disabled; on narrow screens the items compress horizontally (no hamburger yet) → the "clumsy" behavior stems from scroll overflow once width < ~1100px.
 
 ```
 +---------------------------------------------------------------------+
-| LOGO | Dashboard | Documents | AI | Sandbox ▾ | User ▾ | Settings ▾ |
-|                                                    Theme | Bug 🐞    |
+| LOGO | Dashboard | Theme | Bug | Help | Settings | User ▾ |
 +---------------------------------------------------------------------+
 ```
 
 ### 1.2 Project Navigation Layer
-- **Component:** `ProjectContextBar` (`src/app/components/ProjectContextBar.tsx:1`).
-- **Scope:** Automatically injected for all `/projects/[projectId]` routes via `projects/[projectId]/layout.tsx:1` under the global navigation.
-- **Layout:** Sticky bar positioned at `top: 58px`, height 56 px, `z-index` 40.
-  - Left: `<select>` bound to `useProjectContext`; selecting pushes `/projects/{id}` and persists via `ProjectProvider`.
-  - Center: **Mode toggle** (Napkin/Standard) using `useProjectMode` context.
-  - Right: **LifecycleTileNav** component showing colored navigation tiles based on project type and mode.
+- **Components:** `ActiveProjectBar` + `ProjectLayoutClient` + `FolderTabs`.
+- **Scope:** Injected for all `/projects/[projectId]` routes via `projects/[projectId]/layout.tsx:1`.
+- **Layout:**
+  - `ActiveProjectBar` (sticky at `top: 58px`) with project selector, property type pill, analysis badges, and `VersionBadge`.
+  - `ProjectLayoutClient` renders a resizable split:
+    - Left: `LandscaperPanel` (collapsible to icon strip).
+    - Right: `FolderTabs` (two-row folder/subtab navigation) + content area.
 - **State sources:**
-  - Tab selection is read from the URL path using `usePathname` for tile-based navigation.
-  - Mode (Napkin/Standard) determined by URL path (`/napkin` segment).
-  - Tab-specific complexity modes (Napkin/Standard/Detail for data granularity) saved through `usePreference` (database-backed).
-- **Changes since Nov 23:**
-  - Added `LifecycleTileNav` component for visual tile-based navigation
-  - Integrated `ProjectModeProvider` for napkin/standard mode switching
-  - Mode toggle button added to switch between napkin and standard workflows
+  - Folder/tab selection is stored in URL query params (`?folder=` + `?tab=`) via `useFolderNavigation`.
+  - Folder definitions come from `folderTabConfig.ts` with analysis-type gating and property-type filters.
+  - `ProjectModeContext` remains for legacy compatibility but the project mode toggle is no longer surfaced in UI.
 
 ### 1.3 Ancillary Navigation Surfaces
-- **Sandbox / Developer links:** `SandboxDropdown` (`src/app/components/navigation/SandboxDropdown.tsx:1`) lists every prototype route (Budget Grid, GIS test, Document Review, etc.). It is the only entry point to most prototypes.
+- **Sandbox / Developer links:** Prototype routes still exist (Budget Grid, GIS test, Document Review, etc.), but there is no active Sandbox dropdown in the top nav. `SANDBOX_PAGES` remains defined in `src/app/components/navigation/constants.ts`.
 - **Admin nav:** `AdminNavBar` (`src/app/components/AdminNavBar.tsx:1`) mirrors the tab bar for `/admin/*` routes. It is sticky at `top:58px` and exposes Preferences, Benchmarks, Cost Library, **Users**, and DMS Admin.
-- **Preferences nav:** `PreferencesContextBar` (`src/app/components/PreferencesContextBar.tsx:1`) is a simplified copy of `ProjectContextBar` that sits directly under the top bar (no offset) and keeps the `tab` query string in sync.
+- **AdminModal (Settings button):** Opens the Landscaper admin panel with Knowledge Library, Extraction Mappings, and model configuration in accordion sections.
+- **Preferences nav:** `PreferencesContextBar` (`src/app/components/PreferencesContextBar.tsx:1`) is a simplified copy of the project selector bar and keeps the `tab` query string in sync.
 - **Legacy vertical nav:** `src/app/components/layout/vertical/Navigation.tsx` still ships the Materio sidebar (MUI + `@menu/vertical-menu`). It is only mounted inside older prototype pages such as `/projects/[projectId]/overview`.
 - **Route-level wrappers:** `NavigationLayout` (`src/app/components/NavigationLayout.tsx:1`) wraps the entire app (see `src/app/layout.tsx:1`) and can hide navigation for future auth/marketing routes via `hideNavigation` prop.
 
 ### 1.4 Route Structure
 
-**Note on Dual-Access Pattern:** Several features can be accessed BOTH as tabs within `/projects/[projectId]?tab=X` AND as standalone routes. This pattern provides deep-linking and focused workflows:
-- **Budget**: Tab (`?tab=budget`) or route (`/projects/[projectId]/budget`)
-- **Valuation**: Tab (`?tab=valuation`) or route (`/projects/[projectId]/valuation`)
-- **Operations (OpEx)**: Tab (`?tab=operations`) or routes (`/projects/[projectId]/opex`, `/opex-accounts`)
-- **Planning**: Tab (`?tab=planning`) or route (`/planning` - hardcoded to project 7)
-
-**Note on Project Modes:** Projects can operate in two modes:
-- **Standard Mode**: Full project workflow at `/projects/[projectId]/*`
-- **Napkin Mode**: Simplified analysis workflow at `/projects/[projectId]/napkin/*`
+**Note on Dual-Access Pattern:** Several features can be accessed BOTH via FolderTabs (`/projects/[projectId]?folder=X&tab=Y`) AND as standalone routes. This enables deep links and focused workflows:
+- **Budget**: Folder tab (`folder=budget`) or route (`/projects/[projectId]/budget`)
+- **Valuation/Feasibility**: Folder tab (`folder=valuation` or `feasibility`) or route (`/projects/[projectId]/valuation`)
+- **Capitalization**: Folder tab (`folder=capital`) or route (`/projects/[projectId]/capitalization/*`)
+- **Documents**: Folder tab (`folder=documents`) or route (`/projects/[projectId]/documents`)
 
 Representative tree of `src/app` (pages without `page.tsx` are omitted):
 
 ```
 / (redirects to /dashboard)
 ├── dashboard (redesigned with filter tiles + map)
-├── dms
 ├── planning (standalone, defaults to project 7)
 ├── reports
 ├── rent-roll
@@ -126,52 +106,35 @@ Representative tree of `src/app` (pages without `page.tsx` are omitted):
 ├── market, market-assumptions, inventory
 ├── projects
 │   ├── [projectId]
-│   │   ├── page (tab host - renders based on ?tab= query param)
-│   │   ├── layout (injects ProjectContextBar + ComplexityModeProvider + ProjectModeProvider)
-│   │   ├── napkin/ (NEW - Napkin mode)
-│   │   │   ├── page (napkin analysis landing)
-│   │   │   ├── layout (napkin-specific layout)
-│   │   │   ├── analysis/page
-│   │   │   ├── waterfall/page
-│   │   │   └── documents/page
+│   │   ├── page (folder/tab host - uses ?folder & ?tab)
+│   │   ├── layout (ActiveProjectBar + ProjectLayoutClient)
 │   │   ├── capitalization/ (NEW)
 │   │   │   ├── page (index)
 │   │   │   ├── equity/page
 │   │   │   ├── debt/page
 │   │   │   └── operations/page
-│   │   ├── overview (legacy Materio page)
+│   │   ├── documents/page.tsx (project DMS)
 │   │   ├── budget (standalone budget page with scope/stage filters)
 │   │   ├── valuation (standalone valuation page - three approaches)
 │   │   ├── assumptions (standalone assumptions editor)
 │   │   ├── settings (project settings page)
-│   │   ├── opex (multifamily operating expenses editor)
-│   │   └── opex-accounts (Chart of Accounts hierarchy viewer)
+│   │   ├── investment-committee
+│   │   └── project/ (summary, planning, budget, sales, dms)
 │   └── setup (project creation wizard)
 ├── admin
 │   ├── preferences
 │   ├── benchmarks
 │   │   └── cost-library
-│   ├── users (NEW - User Management System)
-│   └── dms
-│       └── templates
+│   ├── users
+│   └── dms/templates
 ├── preferences (global tabs → product library & taxonomy)
 ├── settings
 │   ├── taxonomy (land use taxonomy manager)
 │   └── budget-categories (budget category management)
-├── benchmarks
-│   ├── unit-costs
-│   └── products
 ├── growthrates (Materio version)
 ├── growthrates-original
 ├── growthratedetail
 ├── growthratesmanager
-├── prototypes
-│   ├── page (prototypes hub)
-│   ├── [prototypeId] (dynamic prototype routes)
-│   └── multifam
-│       └── rent-roll-inputs
-│           ├── page (main rent roll prototype)
-│           └── content (nested content page)
 ├── prototypes-multifam (multifamily prototypes index)
 ├── lease/[id] (legacy lease detail)
 ├── property/[id] (legacy property detail)
@@ -183,14 +146,14 @@ Representative tree of `src/app` (pages without `page.tsx` are omitted):
 ```
 
 **Dynamic segments:**
-- **Project routes:** `/projects/[projectId]/*` (tab host, budget, valuation, assumptions, settings, opex, opex-accounts, overview, napkin/*)
+- **Project routes:** `/projects/[projectId]/*` (folder host, budget, valuation, assumptions, settings, capitalization, documents, project/*)
 - **Prototype routes:** `/prototypes/[prototypeId]`
 - **Legacy routes:** `/lease/[id]`, `/property/[id]`, `/properties/[id]/analysis`
 
 ### 1.5 Project Context Switching
 - **Provider:** `ProjectProvider` (`src/app/components/ProjectProvider.tsx:1`) wraps the entire app in `src/app/layout.tsx:12`. It loads `/api/projects` through SWR, caches results, and stores the last project ID in `localStorage` (`activeProjectId`).
 - **Selection surfaces:**
-  - `ProjectContextBar` dropdown (primary way during project work).
+  - `ActiveProjectBar` dropdown (primary way during project work).
   - `Dashboard` project accordion rows call `selectProject(project_id)` then push `/projects/{id}` (`src/app/dashboard/page.tsx`).
   - `NewProjectModal` (`src/app/components/NewProjectModal.tsx:1`) refreshes projects, selects the new ID, and navigates the user to `/projects/{id}` after creation.
 - **Persistence:** Provider rehydrates from storage on mount and automatically falls back to the first project returned by `/api/projects` if the stored ID is missing.
@@ -199,86 +162,68 @@ Representative tree of `src/app` (pages without `page.tsx` are omitted):
 ### 1.6 Tab Implementations
 | Surface | Component / File | Behavior |
 | --- | --- | --- |
-| Project tiles | `LifecycleTileNav` (`src/components/projects/LifecycleTileNav.tsx`) | Colored tiles using URL path navigation; tiles differ by property type (DEV vs Income) and mode (Napkin vs Standard). |
-| Project tabs | `ProjectContextBar` (`src/app/components/ProjectContextBar.tsx:1`) | Stateless buttons hooked to URL query; displays `ModeChip`s driven by `usePreference`. |
-| DMS tabs | `LandscapeButton` pills in `src/app/dms/page.tsx` (also exported in `DMSView`) | Manual state stored in `useState<TabType>`; optionally synchronized with `?tab` on first load. |
+| Folder tabs | `FolderTabs` (`src/components/navigation/FolderTabs.tsx`) | Two-row folder/subtab navigation; selection is synced to `?folder=` + `?tab=` via `useFolderNavigation`. |
+| Folder config | `createFolderConfig` (`src/lib/utils/folderTabConfig.ts`) | Generates the 7-folder set with analysis-type gating and property-type filters. |
+| Project content router | `ProjectContentRouter` (`src/app/projects/[projectId]/ProjectContentRouter.tsx`) | Maps folder/tab combos to tab components (Property/Planning/Budget/etc.). |
 | Budget subtabs | `BudgetGridTab` (`src/components/budget/BudgetGridTab.tsx:36`) uses `useState<'grid' \| ...>` plus CoreUI `CNav` for grouping toggle inside the card. |
 | Admin nav | `AdminNavBar` (see above) uses Next `<Link>` objects with pure CSS for active state. |
 | Preferences | `PreferencesContextBar` controls `?tab=` query, rendering dynamic imports per tab. |
 | **Operations** | `OperationsTab` (`src/app/projects/[projectId]/components/tabs/OperationsTab.tsx:1`) **renders different UIs based on project type:** For `DEV` projects → `OpExHierarchy` (Chart of Accounts). For `MF` projects → `NestedExpenseTable` with benchmarks. For other types → "Coming Soon" placeholder. |
 | Planning | `PlanningTab` wraps `PlanningContent` for `DEV` projects; shows educational card for other types. |
 | Sales & Absorption | `SalesTab` renders `SalesContent` for `DEV` projects, otherwise shows guidance card. `SalesContent` orchestrates area/phase filters, pricing tables, inventory gauges, and parcel sales grid. |
-| Property | `PropertyTab` shows multifamily rent roll interface with Floor Plan Matrix, Comparable Rentals, Detailed Rent Roll sections (currently mock data). |
-| Valuation | `ValuationTab` has sub-tabs (Sales Comparison/Cost/Income) using button toggles; only Sales Comparison is active. |
-| Feasibility | `FeasibilityTab` has sub-tabs (Sales Comparison/Residual/Cash Flow) - all currently disabled/placeholder. |
-| Capitalization | `CapitalizationTab` - placeholder for future capitalization modeling. |
+| Property | `PropertyTab` handles property details, market, and rent roll subtabs (controlled by `activeTab`). |
+| Valuation | `ValuationTab` has sub-tabs (Sales Comparison/Cost/Income) using button toggles; Sales Comparison is the primary active view. |
+| Feasibility | `FeasibilityTab` has sub-tabs (Feasibility/Cash Flow/Returns/Sensitivity) with partial implementations. |
+| Capitalization | `CapitalizationTab` hosts the capitalization workspace (equity, debt, developer operations). |
 | Reports | `ReportsTab` renders report-type selector and scenario toggle; embeds `PropertySummaryView`. |
 | Documents | `DocumentsTab` embeds `DMSView` scoped to active project. |
 | Document Review | Uses Radix Tabs (`src/app/documents/review/page.tsx:37`) for queue / detail / analytics; default tab is "queue". |
-| Project-specific prototypes | Many smaller surfaces reuse `LandscapeButton` toggles (e.g., `/projects/[projectId]/budget/page.tsx:27`). |
+| Project-specific prototypes | Smaller surfaces reuse `LandscapeButton` toggles (e.g., `/projects/[projectId]/budget/page.tsx:27`). |
 
-**Tab Sets by Property Type**
+**Folder Tab Sets by Property Type**
 
-`getTabsForPropertyType` (`src/lib/utils/projectTabs.ts:1`) returns two canonical configurations:
+`createFolderConfig` (`src/lib/utils/folderTabConfig.ts`) generates a 7-folder configuration, with visibility gated by analysis tiles and project type:
 
-| Project Type | Tabs (in order) | Notes |
+| Project Type | Folders (base order) | Notes |
 | --- | --- | --- |
-| **Development** (`DEV`, `MPC`, `Subdivision`, etc.) | `project`, `planning`, `budget`, `operations`, `sales`, `feasibility`, `capitalization`, `reports`, `documents` | Sales & Absorption and Feasibility are only wired for land workflows today. |
-| **Income / Multifamily** (`MF`, `OFF`, `RET`, `IND`, `MXU`, `HTL`) | `project`, `property`, `operations`, `valuation`, `capitalization`, `reports`, `documents` | Property/Operations/Valuation tabs are the only ones with meaningful UI; other commercial-specific tabs are placeholders pending requirements. |
-
-**LifecycleTileNav Tile Sets** (`src/components/projects/LifecycleTileNav.tsx`)
-
-| Mode | Property Type | Tiles |
-| --- | --- | --- |
-| Standard | DEV | Home, Planning, Budget, Sales, Analysis, Reports, Documents, Capitalization (Pro) |
-| Standard | Income (MF, OFF, etc.) | Home, Property, Operations, Valuation, Capitalization (Pro), Reports, Documents |
-| Napkin | All | Home, Analysis, Documents |
+| **Development** (`DEV`, `MPC`, `Subdivision`, etc.) | Home, Property, Budget, Feasibility, Capital, Reports, Documents | Budget/Feasibility visibility can be toggled by analysis tile configuration. |
+| **Income / Multifamily** (`MF`, `OFF`, `RET`, `IND`, `MXU`, `HTL`) | Home, Property, Operations, Valuation, Capital, Reports, Documents | Operations/Valuation visibility can be toggled by analysis tile configuration. |
 
 ### 1.7 Header and Breadcrumb Patterns
 - **Standard header:** `PageHeader` (`src/components/ui/PageHeader.tsx:1`) renders a breadcrumb ordered list plus action slots. Only a handful of prototype pages import it today; most major screens still craft headers manually.
 - **Dynamic breadcrumbs:** `DynamicBreadcrumb` (`src/app/components/DynamicBreadcrumb.tsx:1`) adapts copy (Area/Phase/Parcel vs Property/Building/Unit) based on `useProjectConfig`. Currently used in the breadcrumb demo and GIS planning cards; production screens have not wired it in yet.
 - **Ad-hoc breadcrumbs:**
-  - DMS documents tab outputs `Home > Projects > {Project Name}` using `LandscapeButton`s (`src/app/dms/page.tsx:306`).
+  - Project Documents renders its own header/breadcrumbs inside `DMSView` (`src/components/dms/DMSView.tsx`).
   - Land Use Taxonomy page ships its own CSS/HTML breadcrumb (`src/app/settings/taxonomy/page.tsx:90`).
 - **Color hierarchy:** `docs/HEADER_COLOR_HIERARCHY.md` defines the header palette backed by CSS variables in `src/styles/tokens.css`. The design tokens are already applied in `BudgetDataGrid`, `BenchmarkAccordion`, and other components to standardize header backgrounds.
 
-### 1.8 Project Mode System (Napkin/Standard)
+### 1.8 Complexity Mode System (Basic/Standard/Advanced)
 
-**NEW Section - Added December 2025**
+The Complexity Mode system controls field density and UI depth inside specific tabs (Operations, Assumptions, Configure Columns). It is not a route-level mode.
 
-The Project Mode system allows users to switch between two workflow complexity levels:
-
-- **Napkin Mode:** Simplified, high-level analysis workflow for quick feasibility assessments
-- **Standard Mode:** Full-featured workflow with all project management capabilities
-
-**Provider:** `ProjectModeProvider` (`src/contexts/ProjectModeContext.tsx`)
+**Provider:** `ComplexityModeProvider` (`src/contexts/ComplexityModeContext.tsx`)
 
 **Key Features:**
-- Mode determined by URL path (`/napkin` segment)
-- Automatic mode switching via `setMode()` or `toggleMode()`
-- Persists across page navigations within the same project
+- Global mode with per-tab overrides (`globalMode`, `tabModes`).
+- Persists to localStorage per project (`complexity_mode_{projectId}`).
+- Exposes user capability flags for gated features.
 
-**Context Interface:**
+**Context Interface (abridged):**
 ```typescript
 {
-  mode: 'napkin' | 'standard';
-  setMode: (mode: ProjectMode) => void;
-  toggleMode: () => void;
+  globalMode: 'basic' | 'standard' | 'advanced';
+  setGlobalMode: (mode: ComplexityTier) => void;
+  tabModes: Record<string, ComplexityTier>;
+  setTabMode: (tab: string, mode: ComplexityTier) => void;
+  getEffectiveMode: (tab: string) => ComplexityTier;
 }
 ```
 
 **Used By:**
-- `LifecycleTileNav` - Determines which tiles to display
-- `ProjectContextBar` - Shows mode toggle button
-- `/projects/[projectId]/napkin/*` pages - Auto-set to napkin mode
-
-**Napkin Mode Routes:**
-| Route | Component | Purpose |
-| --- | --- | --- |
-| `/projects/[projectId]/napkin` | `NapkinPage` | Napkin mode landing with Property/Project tabs |
-| `/projects/[projectId]/napkin/analysis` | `NapkinAnalysisPage` | RLV summary, pricing panels, Landscaper |
-| `/projects/[projectId]/napkin/waterfall` | `NapkinWaterfallPage` | Waterfall analysis with `NapkinWaterfallForm` |
-| `/projects/[projectId]/napkin/documents` | Documents view | Project-scoped document management |
+- `OperationsTab` and rent roll configuration (column density and visibility).
+- `ConfigureColumnsModal` and other field-density toggles.
+- The Assumptions page uses its own Napkin/Mid/Pro tiers (legacy) and is not wired to `ComplexityModeContext`.
+- `ProjectModeContext` is deprecated and no longer drives navigation.
 
 ---
 
@@ -318,9 +263,9 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 **Purpose:** Multi-tab workspace acting as the "Project Overview" area called out in requirements.
 
 **Layout:**
-- `ProjectContextBar` across the top for project + tab selection + mode toggle.
-- `LifecycleTileNav` for visual navigation tiles (colored, route-based).
-- Tab host component `src/app/projects/[projectId]/page.tsx` reads `?tab=` and renders one of the imported tab modules.
+- Full-width `ActiveProjectBar` across the top for project selection + metadata pills.
+- `ProjectLayoutClient` split panel: Landscaper panel on the left, FolderTabs + content on the right.
+- Tab host component `src/app/projects/[projectId]/page.tsx` reads `?folder=` + `?tab=` and renders content via `ProjectContentRouter`.
 - Each tab uses CoreUI cards, grid layouts, or custom tables depending on domain. The available tabs depend on property type:
   - **Development projects** expose `Planning`, `Budget`, `Sales`, `Feasibility`, `Capitalization`, `Reports`, `Documents`, plus legacy `Sources/Uses/GIS`.
   - **Multifamily/Income-type projects** expose `Property`, `Operations`, `Valuation`, `Capitalization`, `Reports`, `Documents`. Other commercial project types still reuse these income templates until feature work lands.
@@ -332,64 +277,16 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 - `SalesTab`, `OperationsTab`, etc. – mostly prototypes with placeholder data but still shipping UI.
 - `ReportsTab` – described later.
 - `DocumentsTab` – embeds `DMSView` scoped to the active project.
+ - `FolderTabs` + `ProjectContentRouter` – primary navigation + routing.
+ - `LandscaperPanel` – resizable/collapsible left panel with document drop support.
 
 **Data Sources:**
 - Each tab fetches its own API slice (`/api/projects/{id}/details`, `/api/budget/...`, `/api/parcels`, etc.).
-- Shared contexts: `useProjectContext`, `ComplexityModeProvider`, `ProjectModeProvider`, `ScenarioProvider` (inside some tabs).
+- Shared contexts: `useProjectContext`, `ComplexityModeProvider`, `ScenarioProvider` (inside some tabs).
 
 **Interactions:**
-- Tab switching rewrites `?tab` query (no `history.replace`, so each click pushes a new entry).
-- Mode toggle switches between `/projects/{id}` (standard) and `/projects/{id}/napkin` (napkin).
+- Tab switching rewrites `?folder` + `?tab` query params (no `history.replace`, so each click pushes a new entry).
 - Many modals (`BudgetItemModalV2`, `NewProjectModal`, scenario modals) are local to tabs.
-
-### Napkin Mode (`/projects/[projectId]/napkin`)
-
-**NEW Page - Added November 2025**
-
-**Purpose:** Simplified analysis workflow for quick feasibility assessments without full project data entry.
-
-**Layout:**
-- `CNav` tabs for Property/Project switching
-- Property tab: `NapkinAnalysisPage` with RLV summary, pricing panels
-- Project tab: Project overview information
-
-**Key Components:**
-- `NapkinAnalysisPage` (`src/components/napkin/NapkinAnalysisPage.tsx`) - Main analysis interface
-- `RlvSummaryCard` - Residual land value summary
-- `NapkinSfdPricing`, `NapkinAttachedPricing` - Product pricing panels
-- `MdrPanel`, `CommercialPanel`, `InfrastructurePanel` - Product type panels
-- `LandscaperPanel` - AI chat integration
-- `PromoteModal` - Modal to promote napkin analysis to full project
-
-**Data Sources:**
-- Uses `useProjectContext` for project data
-- Pricing data from `/api/projects/{id}/napkin` endpoints
-
-### Napkin Waterfall (`/projects/[projectId]/napkin/waterfall`)
-
-**NEW Page - Added December 2025**
-
-**Purpose:** Waterfall distribution analysis in napkin mode.
-
-**Layout:**
-- Split view: `NapkinWaterfallForm` (left) + `WaterfallResults` (right)
-- Form includes IRR/Equity Multiple toggle
-- Results show period-by-period distributions
-
-**Key Components:**
-- `NapkinWaterfallForm` (`src/components/capitalization/NapkinWaterfallForm.tsx`)
-  - Waterfall type toggle (IRR / Equity Mult / IRR + EM)
-  - IRR hurdle table with tier inputs
-  - Equity multiples table
-  - Period inputs (investment, sale proceeds, cash flow)
-- `WaterfallResults` (`src/components/capitalization/WaterfallResults.tsx`)
-  - Period-by-period distribution table
-  - Pref/Hurdle/Residual columns by mode
-  - Cumulative accrued tracking
-
-**Data Sources:**
-- `/api/projects/{id}/waterfall/napkin` - Save/load waterfall inputs
-- `/api/projects/{id}/waterfall/calculate` - Calculate distributions
 
 ### User Management (`/admin/users`)
 
@@ -488,31 +385,30 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 - `ParcelSalesTable` (`src/components/sales/ParcelSalesTable.tsx`) – detailed grid of parcels, status, buyer, price, absorption month.
 - `SaleCalculationModal` – modal for calculating individual parcel sales.
 
-### Documents (DMS) (`/dms`, `/projects/[projectId]?tab=documents`, `/documents/review`)
-**Purpose:** Document management and AI review.
+### Documents (Project DMS) (`/projects/[projectId]/documents`, `/projects/[projectId]?folder=documents&tab=documents`, `/documents/review`)
+**Purpose:** Project-scoped document management and AI review. The global `/dms` route has been removed; cross-project search now lives in the Knowledge Library inside AdminModal.
 
 **Layout:**
-- `/dms` page uses a vertical flex container occupying the viewport.
-  - Top: `LandscapeButton`-based tabs (Documents / Upload).
-  - Document tab includes toolbar, filter accordions (two columns), detail panel when accordion items clicked, and `ProfileForm` for metadata.
-  - Upload tab splits the screen between `Dropzone`, `Queue`, and profile editor.
-- `DocumentsTab` inside projects renders `DMSView` with `hideHeader=false`, so it duplicates the same UI but respects the active project from context.
+- Project DMS uses a full-height container with `DMSView` as the primary surface.
+- `DocumentsTab` inside projects renders `DMSView` scoped to the active project.
+- Upload UI splits between `Dropzone`, `Queue`, and profile metadata.
+- Knowledge Library (AdminModal → Landscaper) provides cross-project discovery with facets, scoped chat, and batch download.
 
 **Key Components:**
-- `DMSView` (`src/components/dms/DMSView.tsx:1`) – shared logic used in both contexts.
+- `DMSView` (`src/components/dms/DMSView.tsx:1`) – shared logic for project document management.
 - `AccordionFilters`, `FilterDetailView`, `Dropzone`, `Queue`, `ProfileForm`.
+- `KnowledgeLibraryPanel`, `ExtractionMappingAdmin` (AdminModal).
 
-**Recent Changes (December 2025):**
-- **Multi-select deletion**: Checkbox selection enables delete button, supports batch deletion
-- **Toast notifications**: Replaced `alert()` with non-blocking toast for "Profile Updated!"
-- **Multi-filter expansion**: Changed from single `expandedFilter` to `expandedFilters` Set
-- **Document row highlighting**: Selected/checked documents show blue background
-- **Profile form simplification**: Removed versioning label, moved date inline with name
+**Recent Changes (Feb 2026):**
+- Doc type remap to DMS template vocabulary and extraction mapping rewrite.
+- Tag system + subtype tagging, project-level custom document types.
+- "+ Add Type" UI on project DMS, global `/dms` route removed.
 
 **Data Sources:**
 - Document types from `/api/dms/templates/doc-types` (project_id + workspace).
 - Counts from `/api/dms/filters/counts`.
 - Filter detail results from `/api/dms/search`.
+- Tag and doc-type endpoints from `/api/dms/tags/*` and `/api/dms/projects/{id}/doc-types/`.
 
 ### Capitalization (`/projects/[projectId]/capitalization/*`)
 
@@ -557,7 +453,7 @@ For each page, the summary reflects the current code in `/src` as of this snapsh
 
 ### Operating Expenses - Multifamily (`/projects/[projectId]/opex`, `/projects/[projectId]?tab=operations`)
 
-**Purpose:** Manage multifamily operating expenses with complexity mode support (Napkin/Standard/Detail).
+**Purpose:** Manage multifamily operating expenses with complexity mode support (Basic/Standard/Advanced).
 
 **Dual Access:**
 - **Tab:** Accessible via `?tab=operations` for `MF` projects (renders `OperationsTab` with `NestedExpenseTable`)
@@ -601,43 +497,34 @@ interface NavigationLayoutProps {
 **Purpose:** Tier-1 navigation with contextual tools.
 **Props Interface:** None (functional component using hooks).
 **Used By:** `NavigationLayout`.
-**Children:** Logo, nav links, `SandboxDropdown`, `UserMenuDropdown`, `SettingsDropdown`, theme toggle, bug reporter, `LandscaperChatModal`.
+**Children:** Logo, nav links (Dashboard), theme toggle, bug reporter, Help toggle, Settings (AdminModal), `UserMenuDropdown`.
 **Styling:** Inline CSS using CSS variables for nav background/borders defined in `tokens.css`.
 
-### ProjectContextBar
-**File:** `src/app/components/ProjectContextBar.tsx:1`
-**Purpose:** Tier-2 navigation for project-specific work.
-**Props:** `projectId: number`.
-**Used By:** `projects/[projectId]/layout.tsx`.
-**Children:** `<select>` for project selection, mode toggle button, `LifecycleTileNav` for tile navigation.
-**Styling:** Sticky bar with manual inline colors referencing CoreUI semantic vars.
-
-### LifecycleTileNav (NEW)
-**File:** `src/components/projects/LifecycleTileNav.tsx`
-**Purpose:** Visual tile-based navigation for project workflows.
-**Props:**
-```typescript
-interface LifecycleTileNavProps {
-  projectId: string;
-  propertyType?: string;
-}
-```
-**Used By:** `ProjectContextBar`
+### ActiveProjectBar
+**File:** `src/app/projects/[projectId]/components/ActiveProjectBar.tsx`
+**Purpose:** Full-width sticky project selector bar under the top nav.
+**Used By:** `ProjectLayoutClient`.
 **Features:**
-- Colored tiles (140px × 81px) with hover effects
-- Different tile sets for Standard vs Napkin mode
-- Different tile sets for DEV vs Income property types
-- Pro-only tiles (Capitalization) hidden for non-pro users
-- Active tile border highlighting
+- Project selector dropdown
+- Property type pill + analysis badges
+- `VersionBadge` on the right
 
-### ProjectModeProvider (NEW)
-**File:** `src/contexts/ProjectModeContext.tsx`
-**Purpose:** Context for managing napkin/standard project modes.
-**Used By:** Project layout, all project pages
+### ProjectLayoutClient
+**File:** `src/app/projects/[projectId]/ProjectLayoutClient.tsx`
+**Purpose:** Resizable split layout for project workspaces.
+**Children:** `ActiveProjectBar`, `LandscaperPanel`, `FolderTabs`, content area.
 **Features:**
-- URL-based mode detection (`/napkin` segment)
-- Mode switching via router navigation
-- `useProjectMode` hook for consuming context
+- Collapsible left Landscaper panel
+- Drag handle for resizing
+- Folder/tab navigation via query params
+
+### FolderTabs
+**File:** `src/components/navigation/FolderTabs.tsx`
+**Purpose:** Two-row folder/subtab navigation for project workflows.
+**Features:**
+- Folder row with color-coded indicators
+- Subtab row scoped to active folder
+- Badge states for extraction (processing/error/pending)
 
 ### LandscapeButton
 **File:** `src/components/ui/landscape/LandscapeButton.tsx:1`
@@ -645,30 +532,6 @@ interface LifecycleTileNavProps {
 **Props Interface:** Extends `CButtonProps` with `loading`, `icon`, `iconRight`.
 **Used By:** DMS tabs, Budget prototypes, `BudgetPage` header actions, Document breadcrumbs, etc.
 **Styling:** Relies on CoreUI theme so it stays consistent regardless of global scheme.
-
-### ModeChip
-**File:** `src/components/ui/ModeChip.tsx:1`
-**Purpose:** Visual indicator of Napkin/Standard/Detail complexity modes.
-**Props:** `mode: 'napkin' | 'standard' | 'detail'`.
-**Used By:** `ProjectContextBar` tab items.
-**Styling:** `CTooltip` + small square colored via CSS variables.
-
-### Napkin Components (NEW)
-
-**NapkinAnalysisPage**
-- **File:** `src/components/napkin/NapkinAnalysisPage.tsx`
-- **Purpose:** Main napkin analysis interface
-- **Features:** RLV summary, pricing panels, Landscaper chat, promote modal
-
-**NapkinWaterfallForm**
-- **File:** `src/components/capitalization/NapkinWaterfallForm.tsx`
-- **Purpose:** Waterfall input form with IRR/EM toggle
-- **Features:** Tier-based hurdle rates, equity multiples, period inputs, save state management
-
-**WaterfallResults**
-- **File:** `src/components/capitalization/WaterfallResults.tsx`
-- **Purpose:** Display waterfall calculation results
-- **Features:** Period table, distribution breakdown, cumulative tracking
 
 ### Budget Stack
 - **BudgetDataGrid** (`src/components/budget/BudgetDataGrid.tsx:1`): Table built with TanStack Table and inline virtualization.
@@ -722,18 +585,16 @@ interface LifecycleTileNavProps {
 
 **Canonical Values:**
 - TopNavigationBar: height 58px, padding 0 16px, z-index 50
-- ProjectContextBar: height 56px, top offset 58px, z-index 40
+- ActiveProjectBar: sticky below top nav (`top: 58px`), full width, z-index 40
 - Main content area: padding varies by page (inconsistent - see below)
-- LifecycleTileNav tiles: 140px × 81px, gap 12px (0.75rem)
+- FolderTabs: two-row nav with folder color indicators (`folder-tabs.css`)
 
 **Pages with Correct Padding:**
 - `/dashboard` - `CContainer fluid` with `p-4` (16px all sides)
-- `/projects/[projectId]/napkin/*` - Uses `d-flex flex-column gap-3`
 - `/admin/*` pages - Consistent `p-4` padding
 
 **Pages with Inconsistent Padding:**
-- `/projects/[projectId]` (standard mode) - Mixed inline styles and utility classes
-- `/dms` - Uses custom flex layout without standardized padding
+- `/projects/[projectId]` - Mixed inline styles and utility classes
 - `/reports` - Varies based on tab content
 
 **CSS Files Controlling Layout:**
@@ -771,7 +632,7 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 
 ### Contexts
 - **ComplexityModeProvider** (`src/contexts/ComplexityModeContext.tsx:1`): persists per-project global/tab complexity modes with localStorage, auto-saves after 1 second of inactivity.
-- **ProjectModeProvider** (`src/contexts/ProjectModeContext.tsx`) **NEW**: manages napkin/standard mode based on URL path.
+- **ProjectModeProvider** (`src/contexts/ProjectModeContext.tsx`) **Deprecated**: retained for backward compatibility; no longer drives navigation.
 - **ScenarioProvider** (`src/contexts/ScenarioContext.tsx:1`): loads `/api/financial/scenarios`, exposes CRUD methods.
 - **AuthContext** (`src/contexts/AuthContext.tsx`) **NEW**: manages authentication state, JWT tokens, user info.
 - **Project Config Hook** (`src/hooks/useProjectConfig.ts:1`): uses SWR to fetch labeling and container hierarchy.
@@ -780,7 +641,7 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 ### Local State Patterns
 - `useState` for tab selection (Project, DMS, Document Review) with occasional URL sync.
 - `React Hook Form` + Zod for complex forms (New Project, Product Library, DMS profile forms, User Management modals).
-- `useEffect` watchers for `localStorage` synchronization (Budget mode, Project mode, theme).
+- `useEffect` watchers for `localStorage` synchronization (Budget mode, Complexity mode, theme).
 
 ### Data Fetching
 - **SWR** (`useSWR`) for `/api/projects`, `/api/parcels`, `/api/phases`, `/api/projects/{id}/config`, `/api/financial/scenarios`.
@@ -797,29 +658,22 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 2. `NewProjectModal` (`src/app/components/NewProjectModal.tsx:1`) opens with multi-section form tabs (Asset Type, Configure, Location, Property Data, Path Selection).
 3. Form validations are enforced with Zod schema; file uploads restricted to approved extensions.
 4. On submit, form payload hits `/api/projects` and, upon success, `refreshProjects()` + `selectProject(projectId)` + `router.push(/projects/{id})` run sequentially.
-5. Modal closes, ProjectContextBar shows the new project as active.
+5. Modal closes, ActiveProjectBar shows the new project as active.
 
 ### Navigate Between Projects
-1. User opens any `/projects/{id}` route and uses the dropdown inside `ProjectContextBar`.
+1. User opens any `/projects/{id}` route and uses the dropdown inside `ActiveProjectBar`.
 2. `selectProject(newId)` updates context & localStorage.
-3. Router pushes `/projects/{newId}` (without preserving `?tab`).
+3. Router pushes `/projects/{newId}` and preserves folder/tab context via `getProjectSwitchUrl` when possible.
 4. Downstream components consuming `useProjectContext` re-render.
 
-### Switch Project Mode (NEW)
-1. User clicks mode toggle button in `ProjectContextBar`.
-2. `toggleMode()` from `useProjectMode` context fires.
-3. Router navigates between `/projects/{id}` and `/projects/{id}/napkin`.
-4. `LifecycleTileNav` updates to show appropriate tile set.
-5. Page content changes to napkin or standard workflow.
-
 ### Access Budget Data
-1. From ProjectContextBar, user clicks the Budget tile.
-2. Router navigates to `/projects/{id}/budget` or tile route.
+1. From FolderTabs, user clicks the Budget folder (and subtab).
+2. Router navigates to `/projects/{id}?folder=budget&tab=budget` (or `/projects/{id}/budget` if using the standalone route).
 3. `BudgetGridTab` mounts and loads data through `useBudgetData(projectId)`.
 4. User toggles modes, grouping, filters, or opens `BudgetItemModalV2` for editing.
 
 ### Upload Document
-1. From `/dms` or Documents tab, user selects the "Upload" tab.
+1. From `/projects/{id}/documents` or Documents folder tab, user selects the "Upload" tab.
 2. `Dropzone` accepts drag-and-drop or file dialog, populating `uploadedFiles` state.
 3. Each file flows through statuses (pending → uploading → processing → completed).
 4. Toast notification confirms "Profile Updated!" on save.
@@ -830,14 +684,6 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 3. User clicks delete, confirmation dialog shows count.
 4. Documents deleted via DELETE `/api/dms/docs/[id]`.
 5. Toast notification confirms deletion.
-
-### Run Waterfall Analysis (NEW)
-1. User navigates to `/projects/{id}/napkin/waterfall`.
-2. Selects waterfall type (IRR / Equity Mult / IRR + EM).
-3. Enters hurdle rates and equity multiples in input tables.
-4. Enters period data (investment, sale proceeds, cash flow).
-5. Clicks "Run Waterfall" button.
-6. `WaterfallResults` displays period-by-period distributions.
 
 ---
 
@@ -851,13 +697,6 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 | `/api/projects/[projectId]` | GET/PUT | Fetch/update project details |
 | `/api/projects/[projectId]/config` | GET | Fetch project configuration |
 | `/api/projects/minimal` | GET | Fetch minimal project list |
-
-### Waterfall APIs (NEW)
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/projects/[projectId]/waterfall/napkin` | GET/POST | Fetch/save napkin waterfall inputs |
-| `/api/projects/[projectId]/waterfall/calculate` | POST | Calculate waterfall distributions |
 
 ### User Management APIs (NEW)
 
@@ -901,41 +740,32 @@ Create a `PageContainer` component or standardized CSS class that enforces:
 ### Overview
 
 The Complexity Mode system allows users to switch between three levels of detail across multiple tabs:
-- **Napkin Mode:** High-level, simplified view (minimal fields)
-- **Standard Mode:** Balanced view with commonly-used fields
-- **Detail Mode:** Comprehensive view with all available fields
-
-**Note:** This is different from Project Mode (Napkin/Standard), which controls the overall workflow. Complexity Mode controls field visibility within tabs.
+- **Basic:** High-level, simplified view (minimal fields)
+- **Standard:** Balanced view with commonly-used fields
+- **Advanced:** Comprehensive view with all available fields
 
 ### Implementation
 
 **Provider:** `ComplexityModeProvider` (`src/contexts/ComplexityModeContext.tsx`)
 
 **Storage:**
-- Global mode stored in `localStorage` (`complexity_mode_{projectId}`)
-- Tab-specific modes stored via `usePreference` hook (database-backed)
+- Global mode + per-tab overrides stored in `localStorage` (`complexity_mode_{projectId}`)
 
 **Context Interface:**
 ```typescript
 {
-  globalMode: 'napkin' | 'standard' | 'detail';
+  globalMode: 'basic' | 'standard' | 'advanced';
   setGlobalMode: (mode: ComplexityTier) => void;
-  getTabMode: (tabId: string) => ComplexityTier;
+  tabModes: Record<string, ComplexityTier>;
   setTabMode: (tabId: string, mode: ComplexityTier) => void;
+  getEffectiveMode: (tabId: string) => ComplexityTier;
 }
 ```
 
-### Tabs Supporting Complexity Modes
-
-| Tab | Mode Support | Storage | Component |
-|-----|-------------|---------|-----------|
-| **Project** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
-| **Planning** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
-| **Budget** | ✅ Yes | `localStorage` | Shows `ModeChip` in tab button |
-| **Operations** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
-| **Property** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
-| **Valuation** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
-| **Sales** | ✅ Yes | `usePreference` | Shows `ModeChip` in tab button |
+### Current Usage
+- Operations tab uses complexity tiers for expense hierarchy density.
+- Rent roll Configure Columns modal uses tiers for default column sets.
+- Assumptions page retains its own Napkin/Mid/Pro tiers (legacy).
 
 ---
 
@@ -959,19 +789,18 @@ The Complexity Mode system allows users to switch between three levels of detail
 ### Modals / Dialogs
 - **CoreUI `CModal`:** Budget item editor, Quick Add Category, general info modals.
 - **Radix Dialog:** Document Review uses `CorrectionModal` (shadcn) for editing fields.
-- **Custom overlays:** `LandscaperChatModal` is controlled by `TopNavigationBar` state.
-- **User Modals (NEW):** `AddUserModal`, `EditUserModal`, `ResetPasswordModal`, `DeleteUserModal`
+- **Custom overlays:** AdminModal (Settings) and Help panel toggled from `TopNavigationBar`.
+- **User Modals:** `AddUserModal`, `EditUserModal`, `ResetPasswordModal`, `DeleteUserModal`
 
 ### Toast Notifications (Enhanced)
 - **Radix Toast:** Used throughout app via `useToast` hook.
 - **DMS Toast (NEW):** Custom inline toast for "Profile Updated!" feedback.
 
-### Navigation Tiles (NEW)
-- **LifecycleTileNav:** Colored tiles (140×81px) with:
-  - Background colors per tile type
-  - Hover opacity/transform effects
-  - Active state border highlighting
-  - Pro-only feature gating
+### Folder Tabs
+- **FolderTabs:** Two-row folder/subtab navigation with:
+  - Color-coded folder indicators
+  - Subtab badges for extraction status
+  - CSS-variable driven theming (no hardcoded colors)
 
 ---
 
@@ -984,8 +813,9 @@ The Complexity Mode system allows users to switch between three levels of detail
 
 ### Component-specific Notes
 - **TopNavigationBar:** Stays sticky across breakpoints but lacks collapse mechanism.
-- **ProjectContextBar:** Buttons overflow horizontally on <1200 px; no scroll container provided.
-- **LifecycleTileNav (NEW):** Tiles have `flexShrink: 0` and overflow horizontally when space constrained.
+- **ActiveProjectBar:** Long project names can overflow the selector on narrow screens.
+- **FolderTabs:** Folder row can overflow horizontally on small widths; no scroll affordance yet.
+- **Landscaper Panel:** Collapses automatically when resized below the threshold.
 - **Dashboard (NEW):** Uses `lg:grid-cols-[minmax(420px,520px)_1fr]` for responsive project list/map split.
 - **Tables:** CoreUI tables add `responsive` wrappers for horizontal scroll.
 
@@ -997,7 +827,7 @@ The Complexity Mode system allows users to switch between three levels of detail
 - **Data Virtualization:** `BudgetDataGrid` uses TanStack Table and optional virtualization for rows.
 - **Caching:** SWR caches project lists, parcels, phases, and scenarios.
 - **React Query** – ready for adoption but not yet widely used.
-- **Polling:** Some components poll localStorage (`ProjectContextBar` for budget mode).
+- **Polling:** Some components read localStorage for mode preferences (ComplexityModeContext, budget grid).
 - **MapLibre:** GIS components load map tiles lazily and clean up map instances on component unmount.
 - **Lazy Data Fetches:** Accordion filters fetch document lists only when expanded.
 
@@ -1009,7 +839,7 @@ The Complexity Mode system allows users to switch between three levels of detail
 - **ARIA / Semantics:**
   - `PageHeader` uses `<nav aria-label="breadcrumb">` and `aria-current` markers.
   - `TopNavigationBar` buttons carry `aria-label`s for theme and bug reporter.
-  - `ModeChip` exposes `role="status"` + `aria-label`.
+  - `FolderTabs` uses `role="tablist"`/`role="tab"` for folder and subtab rows.
   - `Tabs` in Document Review use Radix (with keyboard nav + ARIA attributes out of the box).
 - **Screen Reader Considerations:** Many buttons rely on iconography without `aria-label`; those should be wrapped as part of future updates.
 - **Color Contrast:** Tokens defined in `tokens.css` are tuned for dark/light parity.
@@ -1027,69 +857,53 @@ src/
 │   ├── components
 │   │   ├── NavigationLayout.tsx
 │   │   ├── TopNavigationBar.tsx
-│   │   ├── ProjectContextBar.tsx
+│   │   ├── PreferencesContextBar.tsx
 │   │   ├── OpExHierarchy.tsx (Chart of Accounts for DEV)
-│   │   ├── navigation/ (SandboxDropdown, UserMenuDropdown, SettingsDropdown)
+│   │   ├── navigation/ (UserMenuDropdown, constants)
 │   │   ├── dashboard/ (UserTile, DashboardMap)
 │   │   ├── Planning/ (PlanningContent, CollapsibleSection, etc.)
 │   │   ├── GIS/ (GISSetupWorkflow, PlanNavigation, etc.)
 │   │   └── layout/vertical/ (Materio sidebar)
 │   ├── dashboard/page.tsx (REDESIGNED)
-│   ├── dms/page.tsx
 │   ├── planning/page.tsx
 │   ├── reports/page.tsx
 │   ├── rent-roll/page.tsx
 │   ├── documents/review/page.tsx
 │   ├── projects
 │   │   ├── [projectId]
-│   │   │   ├── layout.tsx (includes ProjectModeProvider)
-│   │   │   ├── page.tsx (tab host)
-│   │   │   ├── napkin/ (NEW - Napkin mode routes)
-│   │   │   │   ├── page.tsx
-│   │   │   │   ├── layout.tsx
-│   │   │   │   ├── analysis/page.tsx
-│   │   │   │   ├── waterfall/page.tsx
-│   │   │   │   ├── documents/page.tsx
-│   │   │   │   └── components/ (PropertyTab, ProjectTab)
+│   │   │   ├── layout.tsx (ActiveProjectBar + ProjectLayoutClient)
+│   │   │   ├── page.tsx (folder/tab host)
+│   │   │   ├── ProjectLayoutClient.tsx
+│   │   │   ├── ProjectContentRouter.tsx
 │   │   │   ├── capitalization/ (NEW)
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── equity/page.tsx
 │   │   │   │   ├── debt/page.tsx
 │   │   │   │   └── operations/page.tsx
+│   │   │   ├── documents/page.tsx
 │   │   │   ├── budget/page.tsx
 │   │   │   ├── valuation/page.tsx
+│   │   │   ├── assumptions/page.tsx
 │   │   │   ├── settings/page.tsx
-│   │   │   ├── opex/page.tsx
-│   │   │   └── components/tabs/
+│   │   │   ├── investment-committee/page.tsx
+│   │   │   └── components/ (ActiveProjectBar, tabs)
 │   │   └── setup/page.tsx
 │   ├── admin
 │   │   ├── benchmarks/page.tsx
 │   │   ├── benchmarks/cost-library/page.tsx
 │   │   ├── preferences/page.tsx
-│   │   ├── users/page.tsx (NEW)
-│   │   │   └── components/UserModals.tsx (NEW)
+│   │   ├── users/page.tsx
 │   │   └── dms/templates/page.tsx
 │   └── ...
 ├── components
 │   ├── budget/ (BudgetDataGrid, BudgetGridTab, modals, hooks)
 │   ├── dms/ (DMSView, Dropzone, Queue, ProfileForm, AccordionFilters)
-│   ├── capitalization/ (NEW)
-│   │   ├── NapkinWaterfallForm.tsx
-│   │   ├── WaterfallResults.tsx
-│   │   ├── CapitalizationSubNav.tsx
-│   │   ├── DeveloperFeesTable.tsx
-│   │   └── ManagementOverheadTable.tsx
-│   ├── napkin/ (NEW)
-│   │   ├── NapkinAnalysisPage.tsx
-│   │   ├── RlvSummaryCard.tsx
-│   │   ├── NapkinSfdPricing.tsx
-│   │   ├── NapkinAttachedPricing.tsx
-│   │   ├── LandscaperPanel.tsx
-│   │   └── PromoteModal.tsx
-│   ├── projects/ (NEW)
-│   │   ├── LifecycleTileNav.tsx
-│   │   └── InflationRateDisplay.tsx
-│   ├── ui/ (PageHeader, LandscapeButton, ModeChip, toast)
+│   ├── navigation/FolderTabs.tsx
+│   ├── landscaper/ (LandscaperPanel, CollapsedLandscaperStrip)
+│   ├── admin/knowledge-library/ (KnowledgeLibraryPanel, filters, chat)
+│   ├── capitalization/ (CapitalizationSubNav, DeveloperFeesTable, LoanScheduleGrid, etc.)
+│   ├── projects/tiles/ (tileConfig.ts)
+│   ├── ui/ (PageHeader, SemanticCategoryChip, toast)
 │   ├── map/ (ProjectTabMap, MapOblique)
 │   ├── sales/ (PhaseTiles, PricingTable, ParcelSalesTable)
 │   ├── auth/ (NEW)
@@ -1097,7 +911,7 @@ src/
 │   └── ...
 ├── contexts
 │   ├── ComplexityModeContext.tsx
-│   ├── ProjectModeContext.tsx (NEW)
+│   ├── ProjectModeContext.tsx (deprecated)
 │   ├── ScenarioContext.tsx
 │   └── AuthContext.tsx (NEW)
 ├── hooks

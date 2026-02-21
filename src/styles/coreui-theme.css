@@ -40,8 +40,8 @@
   --cui-secondary-rgb: 107, 119, 133;
   --cui-success: #57c68a;
   --cui-success-rgb: 87, 198, 138;
-  --cui-warning: #f2c40d;
-  --cui-warning-rgb: 242, 196, 13;
+  --cui-warning: #d97706;
+  --cui-warning-rgb: 217, 119, 6;
   --cui-danger-ramp-01: #ae0303;
   --cui-danger-ramp-02: #d53434;
   --cui-danger-ramp-03: #e55353;
@@ -59,7 +59,7 @@
   --cui-secondary-dark: #4b5563;
   --cui-success-dark: #2f855a;
   --cui-danger-dark: var(--cui-danger-ramp-01);
-  --cui-warning-dark: #b45309;
+  --cui-warning-dark: #92400e;
   --cui-info-dark: #4c51bf;
 
   /* Structural neutrals */
@@ -78,7 +78,7 @@
   --cui-primary-bg: rgba(61, 153, 245, 0.10);
   --cui-success-bg: rgba(87, 198, 138, 0.10);
   --cui-danger-bg: rgba(230, 64, 114, 0.10);
-  --cui-warning-bg: rgba(242, 196, 13, 0.10);
+  --cui-warning-bg: rgba(217, 119, 6, 0.10);
 
   /* Subtle background variants */
   --cui-primary-bg-subtle: rgba(61, 153, 245, 0.05);
@@ -142,19 +142,26 @@
   --cui-card-border-color: var(--line-strong);
   --cui-footer-bg: var(--surface-card);
 
-  /* CoreUI semantic colors - same in dark mode */
+  /* CoreUI semantic colors — base values stay the same for buttons/non-badge uses.
+     Badge-specific dark-mode contrast is handled by .badge.bg-* overrides above. */
   --cui-primary: var(--cui-primary-ramp-03);
   --cui-primary-rgb: 79, 127, 199;
   --cui-primary-text: #ffffff;
   --cui-success: #57c68a;
   --cui-success-rgb: 87, 198, 138;
-  --cui-warning: #f2c40d;
-  --cui-warning-rgb: 242, 196, 13;
+  --cui-warning: #d97706;
+  --cui-warning-rgb: 217, 119, 6;
   --cui-danger: var(--cui-danger-ramp-03);
   --cui-danger-rgb: 229, 83, 83;
   --cui-danger-text: #ffffff;
   --cui-info: #7a80ec;
   --cui-info-rgb: 122, 128, 236;
+
+  /* Light/dark variants need explicit dark-mode overrides */
+  --cui-light: #1e293b;
+  --cui-light-rgb: 30, 41, 59;
+  --cui-dark: #374151;
+  --cui-dark-rgb: 55, 65, 81;
 
   /* Top Navigation Bridge */
   --cui-header-bg: var(--nav-bg);
@@ -267,16 +274,193 @@
   border-top: 1px solid var(--cui-border-color);
 }
 
+/* ==========================================================================
+   DARK MODE BADGE OVERRIDES
+   CBadge uses .bg-{color} → rgba(var(--cui-{color}-rgb), var(--cui-bg-opacity))
+   with --cui-badge-color: #fff (white text).
+
+   Strategy: Use semi-transparent backgrounds with bright text for legibility
+   on dark surfaces. Mirrors the button override pattern below.
+   ========================================================================== */
+
+[data-coreui-theme='dark'] .badge.bg-success {
+  --cui-bg-opacity: 0.2;
+  color: #6ee7a0 !important;
+  border: 1px solid rgba(87, 198, 138, 0.4);
+}
+
+[data-coreui-theme='dark'] .badge.bg-info {
+  --cui-bg-opacity: 0.2;
+  color: #a5b4fc !important;
+  border: 1px solid rgba(122, 128, 236, 0.4);
+}
+
+[data-coreui-theme='dark'] .badge.bg-warning {
+  --cui-bg-opacity: 0.25;
+  color: #fbbf24 !important;
+  border: 1px solid rgba(217, 119, 6, 0.5);
+}
+
+[data-coreui-theme='dark'] .badge.bg-danger {
+  --cui-bg-opacity: 0.2;
+  color: #fca5a5 !important;
+  border: 1px solid rgba(229, 83, 83, 0.4);
+}
+
+[data-coreui-theme='dark'] .badge.bg-primary {
+  --cui-bg-opacity: 0.2;
+  color: #93c5fd !important;
+  border: 1px solid rgba(79, 127, 199, 0.4);
+}
+
+[data-coreui-theme='dark'] .badge.bg-secondary {
+  --cui-bg-opacity: 0.2;
+  color: #d1d5db !important;
+  border: 1px solid rgba(107, 119, 133, 0.4);
+}
+
+/* light + dark variants are the worst offenders — completely invisible */
+[data-coreui-theme='dark'] .badge.bg-light {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-coreui-theme='dark'] .badge.bg-dark {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Ensure textColor="dark" overrides don't break dark mode badges */
+[data-coreui-theme='dark'] .badge.text-dark {
+  color: #e5e7eb !important;
+}
+
+/* ==========================================================================
+   Studio Badge Classes — from Style Catalog
+   Translucent pill badges with colored text + subtle border.
+   Work in both light and dark modes via CSS variable bridge.
+   ========================================================================== */
+
+.studio-badge-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+.studio-badge-info:hover {
+  background-color: rgba(37, 99, 235, 0.18);
+}
+[data-coreui-theme='dark'] .studio-badge-info {
+  background-color: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.35);
+}
+[data-coreui-theme='dark'] .studio-badge-info:hover {
+  background-color: rgba(96, 165, 250, 0.25);
+}
+
+.studio-badge-success {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  background-color: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+.studio-badge-success:hover {
+  background-color: rgba(22, 163, 74, 0.18);
+}
+[data-coreui-theme='dark'] .studio-badge-success {
+  background-color: rgba(110, 231, 160, 0.15);
+  color: #6ee7a0;
+  border-color: rgba(110, 231, 160, 0.35);
+}
+[data-coreui-theme='dark'] .studio-badge-success:hover {
+  background-color: rgba(110, 231, 160, 0.25);
+}
+
+.studio-badge-warning {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  background-color: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+.studio-badge-warning:hover {
+  background-color: rgba(217, 119, 6, 0.18);
+}
+[data-coreui-theme='dark'] .studio-badge-warning {
+  background-color: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+[data-coreui-theme='dark'] .studio-badge-warning:hover {
+  background-color: rgba(251, 191, 36, 0.25);
+}
+
+.studio-badge-error {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.15;
+  cursor: pointer;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+.studio-badge-error:hover {
+  background-color: rgba(220, 38, 38, 0.18);
+}
+[data-coreui-theme='dark'] .studio-badge-error {
+  background-color: rgba(252, 165, 165, 0.15);
+  color: #fca5a5;
+  border-color: rgba(252, 165, 165, 0.35);
+}
+[data-coreui-theme='dark'] .studio-badge-error:hover {
+  background-color: rgba(252, 165, 165, 0.25);
+}
+
 /* Dark mode button overrides - direct rules, not variables */
 [data-coreui-theme='dark'] .btn-warning {
-  background-color: rgba(255, 193, 7, 0.2) !important;
-  border-color: #ffc107 !important;
-  color: #ffffff !important;
+  background-color: rgba(217, 119, 6, 0.2) !important;
+  border-color: #d97706 !important;
+  color: #fbbf24 !important;
 }
 
 [data-coreui-theme='dark'] .btn-warning:hover {
-  background-color: rgba(255, 193, 7, 0.3) !important;
-  color: #ffffff !important;
+  background-color: rgba(217, 119, 6, 0.3) !important;
+  color: #fbbf24 !important;
 }
 
 [data-coreui-theme='dark'] .btn-success {

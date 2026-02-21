@@ -206,6 +206,7 @@ export default function ProjectTab({
   const [editingProfile, setEditingProfile] = useState(false);
   const [editedProject, setEditedProject] = useState<Partial<Project>>({});
   const [financialSummaryExpanded, setFinancialSummaryExpanded] = useState(false);
+  const [macroExpanded, setMacroExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(true);
 
   const addressFields: (keyof Project)[] = ['street_address', 'city', 'county', 'state', 'zip_code'];
@@ -418,7 +419,7 @@ export default function ProjectTab({
 
   const renderMapCard = () => {
     return (
-      <CCard style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
+      <CCard className="h-100" style={{ minHeight: '520px', display: 'flex', flexDirection: 'column', borderColor: 'var(--cui-border-color)' }}>
         <CCardHeader className="d-flex align-items-center justify-content-between">
           <span className="fw-semibold">Map - 3D Oblique View</span>
         </CCardHeader>
@@ -934,7 +935,7 @@ export default function ProjectTab({
         style={{ gap: 'var(--component-gap)', padding: '0.5rem' }}
       >
       {/* Section 1: Project Profile + Map - Side by side, no wrapper */}
-      <CRow className="g-3" style={{ alignItems: 'stretch' }}>
+      <CRow className="g-2" style={{ alignItems: 'stretch' }}>
         <CCol md={6} lg={5}>
           <ProjectProfileTile projectId={project.project_id} />
         </CCol>
@@ -954,11 +955,11 @@ export default function ProjectTab({
             <span>Financial Summary</span>
             <CIcon icon={financialSummaryExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
           </CCardHeader>
-          <CCardBody>
+          <CCardBody style={{ padding: '0.5rem' }}>
             {/* Financial Summary Tiles - All in One Row */}
-            <CRow className="mb-4">
+            <CRow className="mb-0">
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-primary-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-primary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-primary)' }}>
                     {formatCurrency(project.asking_price)}
                   </div>
@@ -968,7 +969,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-info-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-info-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-info)' }}>
                     {formatCurrency(project.price_per_unit)}
                   </div>
@@ -978,7 +979,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-success-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-success-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-success)' }}>
                     ${project.price_per_sf ? Number(project.price_per_sf).toFixed(2) : 'N/A'}
                   </div>
@@ -988,7 +989,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-warning-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-warning-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-warning)' }}>
                     {formatPercent(project.cap_rate_current)}
                   </div>
@@ -998,7 +999,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-danger-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-danger-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-danger)' }}>
                     {formatPercent(project.cap_rate_proforma)}
                   </div>
@@ -1008,7 +1009,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-secondary-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-secondary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
                     {formatCurrency(project.current_noi)}
                   </div>
@@ -1018,7 +1019,7 @@ export default function ProjectTab({
                 </div>
               </CCol>
               <CCol>
-                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderRadius: '8px' }}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-body-color)' }}>
                     {formatCurrency(project.proforma_noi)}
                   </div>
@@ -1171,7 +1172,178 @@ export default function ProjectTab({
         </CCard>
       )}
 
-      {/* Section 3: Contacts */}
+      {/* Section 3: Macro Conditions */}
+      <CCard>
+        <CCardHeader
+          className="d-flex justify-content-between align-items-center"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setMacroExpanded(!macroExpanded)}
+        >
+          <span className="fw-semibold">
+            Macro Conditions
+            {macroLocationLabel && (
+              <span className="text-xs ms-2 fw-normal" style={{ color: 'var(--cui-secondary-color)' }}>
+                ({macroLocationLabel})
+              </span>
+            )}
+          </span>
+          <CIcon icon={macroExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
+        </CCardHeader>
+        {macroExpanded && (
+          <CCardBody style={{ padding: '0.5rem' }}>
+            {(!macroCity || !macroState) && (
+              <div className="mb-2 text-center">
+                <p className="text-xs mb-0" style={{ color: 'var(--cui-warning)' }}>
+                  Project location not set. Showing national data.
+                </p>
+              </div>
+            )}
+            <CRow className="g-2">
+              {/* Inflation Tile */}
+              <CCol md={3}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-primary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
+                  {loadingMarketData ? (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
+                  ) : (
+                    <>
+                      <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-primary)' }}>
+                        {marketStats?.inflation.value !== null
+                          ? `${marketStats.inflation.value.toFixed(1)}`
+                          : 'N/A'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
+                        Inflation (CPI)
+                      </div>
+                      {marketStats?.inflation.yoy !== null && (
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            marginTop: '2px',
+                            color: marketStats.inflation.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
+                          }}
+                        >
+                          {marketStats.inflation.yoy >= 0 ? '▲' : '▼'}{' '}
+                          {Math.abs(marketStats.inflation.yoy).toFixed(1)}% YoY
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
+                        {marketStats?.inflation.updatedDate}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CCol>
+
+              {/* 10-Year Treasury Tile */}
+              <CCol md={3}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-success-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
+                  {loadingMarketData ? (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
+                  ) : (
+                    <>
+                      <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-success)' }}>
+                        {marketStats?.treasury10y.value !== null
+                          ? `${marketStats.treasury10y.value.toFixed(2)}%`
+                          : 'N/A'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
+                        10-Year Treasury
+                      </div>
+                      {marketStats?.treasury10y.yoy !== null && (
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            marginTop: '2px',
+                            color: marketStats.treasury10y.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
+                          }}
+                        >
+                          {marketStats.treasury10y.yoy >= 0 ? '▲' : '▼'}{' '}
+                          {Math.abs(marketStats.treasury10y.yoy).toFixed(1)}% YoY
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
+                        {marketStats?.treasury10y.updatedDate}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CCol>
+
+              {/* Prime Rate Tile */}
+              <CCol md={3}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-warning-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
+                  {loadingMarketData ? (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
+                  ) : (
+                    <>
+                      <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-warning)' }}>
+                        {marketStats?.primeRate.value !== null
+                          ? `${marketStats.primeRate.value.toFixed(2)}%`
+                          : 'N/A'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
+                        Prime Rate
+                      </div>
+                      {marketStats?.primeRate.yoy !== null && (
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            marginTop: '2px',
+                            color: marketStats.primeRate.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
+                          }}
+                        >
+                          {marketStats.primeRate.yoy >= 0 ? '▲' : '▼'}{' '}
+                          {Math.abs(marketStats.primeRate.yoy).toFixed(1)}% YoY
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
+                        {marketStats?.primeRate.updatedDate}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CCol>
+
+              {/* SOFR Tile */}
+              <CCol md={3}>
+                <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-info-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
+                  {loadingMarketData ? (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
+                  ) : (
+                    <>
+                      <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-info)' }}>
+                        {marketStats?.sofr90day.value !== null
+                          ? `${marketStats.sofr90day.value.toFixed(2)}%`
+                          : 'N/A'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
+                        SOFR (90-day)
+                      </div>
+                      {marketStats?.sofr90day.yoy !== null && (
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            marginTop: '2px',
+                            color: marketStats.sofr90day.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
+                          }}
+                        >
+                          {marketStats.sofr90day.yoy >= 0 ? '▲' : '▼'}{' '}
+                          {Math.abs(marketStats.sofr90day.yoy).toFixed(1)}% YoY
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
+                        {marketStats?.sofr90day.updatedDate}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CCol>
+            </CRow>
+          </CCardBody>
+        )}
+      </CCard>
+
+      {/* Section 4: Contacts */}
       <CCard>
         <CCardHeader
           className="d-flex justify-content-between align-items-center"
@@ -1182,177 +1354,12 @@ export default function ProjectTab({
           <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
         {contactsExpanded && (
-          <CCardBody style={{ padding: '0.75rem 1rem' }}>
+          <CCardBody style={{ padding: '0.5rem' }}>
             {/* Contacts Section - includes listing brokers */}
             <ContactsSection projectId={project.project_id} />
           </CCardBody>
         )}
       </CCard>
-
-      {/* Section 4: Macro Conditions - Individual Colored Tiles */}
-      <div className="mb-2">
-        <h5 className="mb-3" style={{ color: 'var(--cui-body-color)' }}>
-          Macro Conditions
-          {macroLocationLabel && (
-            <span className="text-xs ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
-              (Based on {macroLocationLabel})
-            </span>
-          )}
-        </h5>
-        {(!macroCity || !macroState) && (
-          <div className="mb-3 text-center">
-            <p className="text-xs" style={{ color: 'var(--cui-warning)' }}>
-              Project location not set. Showing national data.
-            </p>
-          </div>
-        )}
-      </div>
-
-      <CRow>
-        {/* Inflation Tile */}
-        <CCol md={3}>
-          <CCard className="text-center" style={{ backgroundColor: 'var(--cui-primary-bg)', borderColor: 'var(--cui-primary)' }}>
-            <CCardBody>
-              {loadingMarketData ? (
-                <div style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>
-              ) : (
-                <>
-                  <div className="text-3xl font-bold" style={{ color: 'var(--cui-primary)' }}>
-                    {marketStats?.inflation.value !== null
-                      ? `${marketStats.inflation.value.toFixed(1)}`
-                      : 'N/A'}
-                  </div>
-                  <div className="text-sm mt-1" style={{ color: 'var(--cui-body-color)' }}>
-                    Inflation (CPI)
-                  </div>
-                  {marketStats?.inflation.yoy !== null && (
-                    <div
-                      className="text-xs mt-2"
-                      style={{
-                        color: marketStats.inflation.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
-                      }}
-                    >
-                      {marketStats.inflation.yoy >= 0 ? '▲' : '▼'}{' '}
-                      {Math.abs(marketStats.inflation.yoy).toFixed(1)}% YoY
-                    </div>
-                  )}
-                  <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {marketStats?.inflation.updatedDate}
-                  </div>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        {/* 10-Year Treasury Tile */}
-        <CCol md={3}>
-          <CCard className="text-center" style={{ backgroundColor: 'var(--cui-success-bg)', borderColor: 'var(--cui-success)' }}>
-            <CCardBody>
-              {loadingMarketData ? (
-                <div style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>
-              ) : (
-                <>
-                  <div className="text-3xl font-bold" style={{ color: 'var(--cui-success)' }}>
-                    {marketStats?.treasury10y.value !== null
-                      ? `${marketStats.treasury10y.value.toFixed(2)}%`
-                      : 'N/A'}
-                  </div>
-                  <div className="text-sm mt-1" style={{ color: 'var(--cui-body-color)' }}>
-                    10-Year Treasury
-                  </div>
-                  {marketStats?.treasury10y.yoy !== null && (
-                    <div
-                      className="text-xs mt-2"
-                      style={{
-                        color: marketStats.treasury10y.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
-                      }}
-                    >
-                      {marketStats.treasury10y.yoy >= 0 ? '▲' : '▼'}{' '}
-                      {Math.abs(marketStats.treasury10y.yoy).toFixed(1)}% YoY
-                    </div>
-                  )}
-                  <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {marketStats?.treasury10y.updatedDate}
-                  </div>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        {/* Prime Rate Tile */}
-        <CCol md={3}>
-          <CCard className="text-center" style={{ backgroundColor: 'var(--cui-warning-bg)', borderColor: 'var(--cui-warning)' }}>
-            <CCardBody>
-              {loadingMarketData ? (
-                <div style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>
-              ) : (
-                <>
-                  <div className="text-3xl font-bold" style={{ color: 'var(--cui-warning)' }}>
-                    {marketStats?.primeRate.value !== null
-                      ? `${marketStats.primeRate.value.toFixed(2)}%`
-                      : 'N/A'}
-                  </div>
-                  <div className="text-sm mt-1" style={{ color: 'var(--cui-body-color)' }}>
-                    Prime Rate
-                  </div>
-                  {marketStats?.primeRate.yoy !== null && (
-                    <div
-                      className="text-xs mt-2"
-                      style={{
-                        color: marketStats.primeRate.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
-                      }}
-                    >
-                      {marketStats.primeRate.yoy >= 0 ? '▲' : '▼'}{' '}
-                      {Math.abs(marketStats.primeRate.yoy).toFixed(1)}% YoY
-                    </div>
-                  )}
-                  <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {marketStats?.primeRate.updatedDate}
-                  </div>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        {/* SOFR Tile */}
-        <CCol md={3}>
-          <CCard className="text-center" style={{ backgroundColor: 'var(--cui-info-bg)', borderColor: 'var(--cui-info)' }}>
-            <CCardBody>
-              {loadingMarketData ? (
-                <div style={{ color: 'var(--cui-secondary-color)' }}>Loading...</div>
-              ) : (
-                <>
-                  <div className="text-3xl font-bold" style={{ color: 'var(--cui-info)' }}>
-                    {marketStats?.sofr90day.value !== null
-                      ? `${marketStats.sofr90day.value.toFixed(2)}%`
-                      : 'N/A'}
-                  </div>
-                  <div className="text-sm mt-1" style={{ color: 'var(--cui-body-color)' }}>
-                    SOFR (90-day)
-                  </div>
-                  {marketStats?.sofr90day.yoy !== null && (
-                    <div
-                      className="text-xs mt-2"
-                      style={{
-                        color: marketStats.sofr90day.yoy >= 0 ? 'var(--cui-danger)' : 'var(--cui-success)',
-                      }}
-                    >
-                      {marketStats.sofr90day.yoy >= 0 ? '▲' : '▼'}{' '}
-                      {Math.abs(marketStats.sofr90day.yoy).toFixed(1)}% YoY
-                    </div>
-                  )}
-                  <div className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {marketStats?.sofr90day.updatedDate}
-                  </div>
-                </>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
 
       </div>
       <NewProjectModal

@@ -28,6 +28,8 @@ export interface CashFlowPeriod {
   label: string; // "Jan 2026", "Q1 2026", "2026", "TOTAL"
   startDate?: string; // ISO date (optional for display)
   endDate?: string; // ISO date (optional for display)
+  /** Reference column (e.g., Yr N+1 terminal year) — renders with lighter bg and italic header */
+  isReference?: boolean;
 }
 
 export interface CashFlowRow {
@@ -63,6 +65,8 @@ export interface CashFlowGridProps {
   title?: string;
   /** Header content to render in the controls row (e.g., export button) */
   headerActions?: React.ReactNode;
+  /** Label for the first column header (default: "Category") */
+  labelColumnHeader?: string;
 }
 
 // ============================================================================
@@ -158,6 +162,7 @@ export function CashFlowGrid({
   className,
   title,
   headerActions,
+  labelColumnHeader = 'Category',
 }: CashFlowGridProps) {
   // Determine if we should hide total column (e.g., in 'overall' mode where there's only one period)
   const hideTotalColumn = !showTotalColumn || (periods.length === 1 && periods[0].label === 'Total');
@@ -262,10 +267,22 @@ export function CashFlowGrid({
                   borderRight: '2px solid var(--cui-border-color)',
                 }}
               >
-                Category
+                {labelColumnHeader}
               </th>
               {periods.map((period) => (
-                <th key={period.id} style={headerCellStyle}>
+                <th
+                  key={period.id}
+                  style={{
+                    ...headerCellStyle,
+                    ...(period.isReference
+                      ? {
+                          fontStyle: 'italic',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          borderLeft: '2px solid var(--cui-border-color)',
+                        }
+                      : {}),
+                  }}
+                >
                   {period.label}
                 </th>
               ))}
@@ -370,6 +387,7 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
       {/* Period Value Cells */}
       {periods.map((period) => {
         const value = row.values[period.id] ?? 0;
+        const isRef = period.isReference === true;
         return (
           <td
             key={period.id}
@@ -380,6 +398,14 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
               color: value < 0 ? 'var(--cui-danger)' : undefined,
               textDecoration,
               borderTop,
+              ...(isRef
+                ? {
+                    backgroundColor: 'var(--cui-tertiary-bg)',
+                    borderLeft: '2px solid var(--cui-border-color)',
+                    fontStyle: 'italic',
+                    opacity: 0.85,
+                  }
+                : {}),
             }}
           >
             {formatValue(value, row)}

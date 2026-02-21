@@ -379,7 +379,7 @@ function EditableNumberRow({
 }
 
 interface RenovationCostRowProps {
-  cost: number;
+  cost: number | null;
   basis: RenoCostBasis;
   onUpdateCost: (value: number) => void;
   onUpdateBasis: (value: RenoCostBasis) => void;
@@ -394,12 +394,12 @@ function RenovationCostRow({
   disabled = false,
 }: RenovationCostRowProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [draftCost, setDraftCost] = useState(cost.toString());
+  const [draftCost, setDraftCost] = useState(cost !== null ? cost.toString() : '');
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setDraftCost(cost.toString());
+    setDraftCost(cost !== null ? cost.toString() : '');
   }, [cost]);
 
   useEffect(() => {
@@ -418,7 +418,7 @@ function RenovationCostRow({
   };
 
   const handleCancel = () => {
-    setDraftCost(cost.toString());
+    setDraftCost(cost !== null ? cost.toString() : '');
     setIsEditing(false);
   };
 
@@ -457,14 +457,14 @@ function RenovationCostRow({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isEditing, draftCost, onUpdateCost]);
 
-  const displayValue = `${formatCurrency(cost)} /${basis === 'sf' ? 'SF' : 'Unit'}`;
+  const displayValue = cost !== null ? `${formatCurrency(cost)} /${basis === 'sf' ? 'SF' : 'Unit'}` : '—';
 
   return (
     <div className="va-field-row" onClick={handleRowClick} ref={containerRef}>
       <span className="va-field-label">Renovation Cost</span>
       <div className="va-field-value-container" onMouseDown={(e) => e.stopPropagation()}>
         {!isEditing ? (
-          <span className="va-field-value">{displayValue}</span>
+          <span className={`va-field-value ${cost === null ? 'empty' : ''}`}>{displayValue}</span>
         ) : (
           <div className="va-cost-editor">
             <div className="va-basis-toggle">

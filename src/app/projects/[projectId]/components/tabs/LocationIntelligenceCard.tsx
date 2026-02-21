@@ -78,26 +78,13 @@ const getComparablePopupHtml = (comp: RentalComparable, color: string): string =
   const bedroomsValue = Number(comp.bedrooms || 0);
   const bathroomsValue = Number(comp.bathrooms || 0);
 
-  return `<div style="padding: 12px; min-width: 180px;">
-    <div style="font-weight: 600; color: ${color}; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
-    ${comp.address ? `<div style="font-size: 0.85em; color: #9ca3af; margin-bottom: 2px;">${comp.address}</div>` : ''}
-    <div style="font-size: 0.85em; color: #d1d5db;">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
-    <div style="font-size: 0.95em; font-weight: 600; color: #f9fafb; margin-top: 6px;">$${Math.round(rentValue).toLocaleString()}/mo</div>
-    ${comp.distance_miles ? `<div style="font-size: 0.8em; color: #6b7280; margin-top: 4px;">${comp.distance_miles} mi away</div>` : ''}
+  return `<div class="comparable-popup-content">
+    <div class="comparable-popup-name" style="color: ${color};">${comp.property_name}</div>
+    ${comp.address ? `<div class="comparable-popup-address">${comp.address}</div>` : ''}
+    <div class="comparable-popup-details">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
+    <div class="comparable-popup-rent">$${Math.round(rentValue).toLocaleString()}/mo</div>
+    ${comp.distance_miles ? `<div class="comparable-popup-distance">${comp.distance_miles} mi away</div>` : ''}
   </div>`;
-};
-
-const toRadians = (value: number): number => (value * Math.PI) / 180;
-
-const getDistanceMiles = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const earthRadiusMiles = 3958.7613;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusMiles * c;
 };
 
 export default function LocationIntelligenceCard({
@@ -163,6 +150,14 @@ export default function LocationIntelligenceCard({
       })
       .filter((point): point is UserMapPoint => point !== null);
   }, [comparableColors, rentalComparables]);
+
+  const { uniqueProjectCount, floorplanCount } = useMemo(() => {
+    const uniqueNames = new Set(rentalComparables.map((c) => c.property_name));
+    return {
+      uniqueProjectCount: uniqueNames.size,
+      floorplanCount: rentalComparables.length,
+    };
+  }, [rentalComparables]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -277,30 +272,23 @@ export default function LocationIntelligenceCard({
   }, []);
 
   const handleLayerToggle = useCallback((layer: keyof LayerVisibility) => {
-    setLayers((prev) => ({ ...prev, [layer]: !prev[layer] }));
+    setLayers((prev) => {
+      const next = { ...prev, [layer]: !prev[layer] };
+      // Satellite and Hybrid are mutually exclusive basemap modes
+      if (layer === 'satellite' && next.satellite) {
+        next.hybrid = false;
+      } else if (layer === 'hybrid' && next.hybrid) {
+        next.satellite = false;
+      }
+      return next;
+    });
   }, []);
 
-  const handleRingAreaClick = useCallback((lngLat: [number, number]) => {
-    if (!resolvedCenter || !demographics?.rings?.length) {
-      return;
-    }
-
-    const [clickLon, clickLat] = lngLat;
-    const [centerLon, centerLat] = resolvedCenter;
-    const distanceMiles = getDistanceMiles(centerLat, centerLon, clickLat, clickLon);
-
-    const clickedRing = [...demographics.rings]
-      .sort((a, b) => a.radius_miles - b.radius_miles)
-      .find((ring) => distanceMiles <= ring.radius_miles);
-
-    if (!clickedRing) {
-      return;
-    }
-
-    setSelectedRadius(clickedRing.radius_miles);
-    setSelectedRingStats(clickedRing);
+  const handleRingClick = useCallback((ring: RingDemographics) => {
+    setSelectedRadius(ring.radius_miles);
+    setSelectedRingStats(ring);
     setIsRingModalOpen(true);
-  }, [demographics?.rings, resolvedCenter]);
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     await refetch();
@@ -321,7 +309,19 @@ export default function LocationIntelligenceCard({
           cursor: 'pointer',
         }}
       >
-        <span>Competitve Rental Market</span>
+        <span>
+          {projectName} - Competitive Rental Market
+          <span
+            style={{
+              marginLeft: '1rem',
+              fontWeight: 400,
+              fontSize: '0.85em',
+              color: 'var(--cui-secondary-color)',
+            }}
+          >
+            {uniqueProjectCount} Projects / {floorplanCount} Floorplans
+          </span>
+        </span>
         <CIcon icon={isOpen ? cilChevronTop : cilChevronBottom} />
       </CCardHeader>
 
@@ -356,72 +356,76 @@ export default function LocationIntelligenceCard({
           )}
 
           {resolvedCenter && (
-            <>
-              <div className="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fw-semibold">{projectName}</span>
-                  <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
-                    {resolvedCenter[1].toFixed(5)}, {resolvedCenter[0].toFixed(5)}
-                  </span>
-                  <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
-                    · {rentalComparablePoints.length} rental comparables
-                  </span>
+            <div className="location-intelligence-map-shell">
+              <div
+                className="position-relative overflow-hidden location-intelligence-map-frame"
+                style={{
+                  borderRadius: '0.375rem',
+                  border: '1px solid var(--cui-border-color)',
+                  background: 'var(--cui-secondary-bg)',
+                }}
+              >
+                {shouldMountMap ? (
+                  <LocationMap
+                    center={resolvedCenter}
+                    rings={demographics?.rings || []}
+                    userPoints={rentalComparablePoints}
+                    layers={layers}
+                    selectedRadius={selectedRadius}
+                    onRingClick={handleRingClick}
+                    isAddingPoint={false}
+                    resizeToken={mapResizeToken}
+                  />
+                ) : (
+                  <div
+                    className="d-flex align-items-center justify-content-center h-100"
+                    style={{ color: 'var(--cui-secondary-color)' }}
+                  >
+                    Initializing map...
+                  </div>
+                )}
+
+                <div className="location-intelligence-overlay-stack">
+                  <CCard className="location-intelligence-overlay-card">
+                    <CCardHeader
+                      className="d-flex justify-content-between align-items-center location-intelligence-overlay-header"
+                      onClick={() => setIsLayersOpen((value) => !value)}
+                    >
+                      <span>Layers</span>
+                      <CIcon icon={isLayersOpen ? cilChevronTop : cilChevronBottom} />
+                    </CCardHeader>
+                    {isLayersOpen && (
+                      <CCardBody className="p-2 location-intelligence-overlay-body">
+                        <MapLayerToggle layers={layers} onToggle={handleLayerToggle} />
+                      </CCardBody>
+                    )}
+                  </CCard>
                 </div>
-                <div className="d-flex align-items-center gap-2">
-                  <CButton color="secondary" variant="outline" size="sm" onClick={() => void handleRefresh()}>
+
+                {/* Refresh button - bottom-left of map */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 12,
+                    left: 12,
+                    zIndex: 20,
+                  }}
+                >
+                  <CButton
+                    color="secondary"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleRefresh()}
+                    style={{
+                      background: 'var(--cui-card-bg)',
+                      borderColor: 'var(--cui-border-color)',
+                    }}
+                  >
                     Refresh
                   </CButton>
                 </div>
               </div>
-
-              <div className="location-intelligence-map-shell">
-                <div
-                  className="position-relative overflow-hidden location-intelligence-map-frame"
-                  style={{
-                    borderRadius: '0.375rem',
-                    border: '1px solid var(--cui-border-color)',
-                    background: 'var(--cui-secondary-bg)',
-                  }}
-                >
-                  {shouldMountMap ? (
-                    <LocationMap
-                      center={resolvedCenter}
-                      rings={demographics?.rings || []}
-                      userPoints={rentalComparablePoints}
-                      layers={layers}
-                      selectedRadius={selectedRadius}
-                      onMapClick={handleRingAreaClick}
-                      isAddingPoint={false}
-                      resizeToken={mapResizeToken}
-                    />
-                  ) : (
-                    <div
-                      className="d-flex align-items-center justify-content-center h-100"
-                      style={{ color: 'var(--cui-secondary-color)' }}
-                    >
-                      Initializing map...
-                    </div>
-                  )}
-
-                  <div className="location-intelligence-overlay-stack">
-                    <CCard className="location-intelligence-overlay-card">
-                      <CCardHeader
-                        className="d-flex justify-content-between align-items-center location-intelligence-overlay-header"
-                        onClick={() => setIsLayersOpen((value) => !value)}
-                      >
-                        <span>Layers</span>
-                        <CIcon icon={isLayersOpen ? cilChevronTop : cilChevronBottom} />
-                      </CCardHeader>
-                      {isLayersOpen && (
-                        <CCardBody className="p-2 location-intelligence-overlay-body">
-                          <MapLayerToggle layers={layers} onToggle={handleLayerToggle} />
-                        </CCardBody>
-                      )}
-                    </CCard>
-                  </div>
-                </div>
-              </div>
-            </>
+            </div>
           )}
         </CCardBody>
       )}

@@ -17,6 +17,7 @@ interface SetupProjectRequest {
   jurisdictionCity?: string
   jurisdictionCounty?: string
   jurisdictionState?: string
+  dmsTemplateId?: number | null
 }
 
 export async function POST(request: Request) {
@@ -31,6 +32,22 @@ export async function POST(request: Request) {
       )
     }
 
+    // Resolve DMS template: use provided value, or look up the workspace default
+    let dmsTemplateId: number | null = null
+    if (body.dmsTemplateId && Number.isFinite(body.dmsTemplateId)) {
+      dmsTemplateId = body.dmsTemplateId
+    } else {
+      const defaultTemplate = await sql<{ template_id: number }[]>`
+        SELECT template_id FROM landscape.dms_templates
+        WHERE is_default = true
+        ORDER BY template_id ASC
+        LIMIT 1
+      `
+      if (defaultTemplate.length > 0) {
+        dmsTemplateId = defaultTemplate[0].template_id
+      }
+    }
+
     // Start transaction
     // 1. Create project
     const projectResult = await sql<Array<{ project_id: number }>>`
@@ -42,7 +59,8 @@ export async function POST(request: Request) {
         start_date,
         jurisdiction_city,
         jurisdiction_county,
-        jurisdiction_state
+        jurisdiction_state,
+        dms_template_id
       )
       VALUES (
         ${body.projectName},
@@ -52,7 +70,8 @@ export async function POST(request: Request) {
         ${body.startDate ?? null},
         ${body.jurisdictionCity ?? null},
         ${body.jurisdictionCounty ?? null},
-        ${body.jurisdictionState ?? null}
+        ${body.jurisdictionState ?? null},
+        ${dmsTemplateId}
       )
       RETURNING project_id
     `

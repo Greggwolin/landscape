@@ -2,6 +2,18 @@
 
 This directory contains custom slash commands for the Landscape Platform project.
 
+## ⚠️ After Any Code Changes
+
+Always restart servers after making code changes:
+
+```bash
+bash restart.sh
+```
+
+This restarts both the Next.js app and Django backend.
+
+---
+
 ## Available Commands
 
 ### `/update-docs`
@@ -86,6 +98,7 @@ See [.claude/settings.local.json](../.claude/settings.local.json) for full list.
 4. ✅ Update permissions as needed
 5. ✅ Document prerequisites
 6. ✅ Include error handling notes
+7. ✅ Run `bash restart.sh` after every code change
 
 ---
 

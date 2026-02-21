@@ -18,6 +18,7 @@ import type { ValuationSummary } from '@/types/valuation';
 import { SalesComparisonApproach } from '../../valuation/components/SalesComparisonApproach';
 import { CostApproachTab } from '../../valuation/components/CostApproach/CostApproachTab';
 import { IncomeApproachContent } from './IncomeApproachContent';
+import { ReconciliationPanel } from '../../valuation/components/ReconciliationPanel';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface ValuationTabProps {
@@ -163,20 +164,11 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
       )}
 
       {normalizedTab === 'reconciliation' && (
-        <CCard>
-          <CCardBody className="text-center py-20">
-            <div className="text-6xl mb-4">⚖️</div>
-            <h3
-              className="font-bold mb-2"
-              style={{ fontSize: '1.25rem', color: 'var(--cui-body-color)' }}
-            >
-              Reconciliation
-            </h3>
-            <p style={{ fontSize: '0.9375rem', color: 'var(--cui-secondary-color)' }}>
-              Coming soon. Reconciliation workflow will appear here.
-            </p>
-          </CCardBody>
-        </CCard>
+        <ReconciliationPanel
+          projectId={projectId}
+          valuationData={valuationData}
+          onRefresh={fetchData}
+        />
       )}
     </>
   );

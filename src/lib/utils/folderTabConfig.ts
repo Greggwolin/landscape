@@ -34,6 +34,9 @@ export interface AnalysisTypeTileConfig {
   tile_development_budget: boolean;
 }
 
+/** Analysis purpose codes */
+export type AnalysisPurposeCode = 'VALUATION' | 'UNDERWRITING';
+
 export interface SubTab {
   id: string;
   label: string;
@@ -43,6 +46,8 @@ export interface SubTab {
   analysisTypes?: AnalysisTypeCode[];
   /** Optional: only show when value-add mode is enabled */
   requiresValueAdd?: boolean;
+  /** Optional: hide this subtab when analysis_purpose matches any of these values */
+  hideForPurpose?: AnalysisPurposeCode[];
 }
 
 export interface FolderTab {
@@ -71,7 +76,8 @@ function filterSubtabsByType(
   subtabs: SubTab[],
   projectType?: string,
   analysisType?: string,
-  valueAddEnabled: boolean = false
+  valueAddEnabled: boolean = false,
+  analysisPurpose?: string
 ): SubTab[] {
   const category = getProjectCategory(projectType);
   return subtabs.filter((tab) => {
@@ -90,6 +96,12 @@ function filterSubtabsByType(
     }
     if (tab.requiresValueAdd && !valueAddEnabled) {
       return false;
+    }
+    // Check analysis purpose exclusion
+    if (tab.hideForPurpose && analysisPurpose) {
+      if (tab.hideForPurpose.includes(analysisPurpose as AnalysisPurposeCode)) {
+        return false;
+      }
     }
     return true;
   });
@@ -175,11 +187,10 @@ export function createFolderConfig(
   analysisType?: string,
   tileConfig?: AnalysisTypeTileConfig | null,
   _analysisPerspective?: string,
-  _analysisPurpose?: string,
+  analysisPurpose?: string,
   valueAddEnabled: boolean = false
 ): FolderTabConfig {
   void _analysisPerspective;
-  void _analysisPurpose;
   const isIncome = isIncomeProperty(projectType);
 
   const folders: FolderTab[] = [
@@ -219,9 +230,11 @@ export function createFolderConfig(
             ],
           },
           // Acquisition - ALL project types (land dev also has acquisition costs)
+          // Hidden for VALUATION purpose (appraisal context has no acquisition)
           {
             id: 'acquisition',
             label: 'Acquisition',
+            hideForPurpose: ['VALUATION'],
           },
           { id: 'market', label: 'Market' },
           {
@@ -264,7 +277,8 @@ export function createFolderConfig(
         ],
         projectType,
         analysisType,
-        valueAddEnabled
+        valueAddEnabled,
+        analysisPurpose
       ),
     },
 
@@ -299,6 +313,7 @@ export function createFolderConfig(
             { id: 'sales-comparison', label: 'Sales Comparison' },
             { id: 'cost', label: 'Cost Approach' },
             { id: 'income', label: 'Income Approach' },
+            { id: 'reconciliation', label: 'Reconciliation' },
           ]
         : [
             { id: 'cashflow', label: 'Cash Flow' },
@@ -329,10 +344,17 @@ export function createFolderConfig(
       id: 'reports',
       label: 'Reports',
       color: TILE_COLORS.reports,
-      subTabs: [
-        { id: 'summary', label: 'Summary' },
-        { id: 'export', label: 'Export' },
-      ],
+      subTabs: filterSubtabsByType(
+        [
+          { id: 'summary', label: 'Summary' },
+          { id: 'export', label: 'Export' },
+          { id: 'investment_committee', label: 'IC Review', hideForPurpose: ['VALUATION'] as AnalysisPurposeCode[] },
+        ],
+        projectType,
+        analysisType,
+        valueAddEnabled,
+        analysisPurpose
+      ),
     },
 
     // ========================================

@@ -58,6 +58,7 @@ from .serializers_valuation import (
     ProjectPropertyAttributesSerializer,
 )
 from apps.projects.models import Project
+from .views_income_approach import _get_income_approach_data
 
 
 class SalesComparableViewSet(viewsets.ModelViewSet):
@@ -169,7 +170,7 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
         })
 
     @action(detail=True, methods=['post'])
-    def add_adjustment(self, request, comparable_id=None):
+    def add_adjustment(self, request, comparable_id=None, project_id=None, **kwargs):
         """Add an adjustment to a comparable."""
         comparable = self.get_object()
         adjustment_data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
@@ -498,7 +499,9 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         """Get complete valuation summary for a project."""
         project = get_object_or_404(Project, project_id=project_id)
 
-        # Get sales comparables (optionally filtered by property_type)
+        # Get sales comparables — exclude land comps for improved-property
+        # valuations (matches frontend IMPROVED_PROPERTY_TYPES filter)
+        LAND_TYPES = {'LAND', 'land', 'Land'}
         sales_comps = SalesComparable.objects.filter(
             project_id=project_id
         ).prefetch_related('adjustments').order_by('comp_number')
@@ -506,6 +509,14 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         property_type = request.query_params.get('property_type')
         if property_type:
             sales_comps = sales_comps.filter(property_type=property_type)
+
+        # For MF/CRE projects, exclude land comps from the summary calc
+        # (land comps have different price scales and skew the average)
+        project_type = (project.project_type_code or '').upper()
+        if project_type != 'LAND':
+            sales_comps = sales_comps.exclude(
+                property_type__in=LAND_TYPES
+            ).exclude(property_type__isnull=True).exclude(property_type='')
 
         # Calculate sales comparison summary
         sales_comparison_summary = {
@@ -516,11 +527,29 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         }
 
         if sales_comps.exists():
-            # Calculate weighted average (simple average for MVP)
+            # Calculate adjusted price/unit LIVE from adjustments
+            # (mirrors frontend ComparablesGrid logic — the stored
+            #  adjusted_price_per_unit field can be stale)
             adjusted_values = []
             for comp in sales_comps:
-                if comp.adjusted_price_per_unit:
-                    adjusted_values.append(float(comp.adjusted_price_per_unit))
+                base_price = None
+                if comp.price_per_unit:
+                    base_price = float(comp.price_per_unit)
+                elif comp.sale_price and comp.units:
+                    base_price = float(comp.sale_price) / float(comp.units)
+
+                if base_price is None:
+                    continue
+
+                total_adj_pct = 0.0
+                for adj in comp.adjustments.all():
+                    pct = adj.user_adjustment_pct if adj.user_adjustment_pct is not None else adj.adjustment_pct
+                    if pct is not None:
+                        total_adj_pct += float(pct)
+
+                live_adjusted = base_price * (1 + total_adj_pct)
+                if live_adjusted > 0:
+                    adjusted_values.append(live_adjusted)
 
             if adjusted_values:
                 weighted_avg = sum(adjusted_values) / len(adjusted_values)
@@ -536,11 +565,36 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         except CostApproach.DoesNotExist:
             cost_approach = None
 
-        # Get income approach
+        # Get income approach — use CALCULATED data, not raw model fields
+        # The model fields (direct_cap_value, dcf_value) are often null because
+        # values are computed on-the-fly from rent rolls + assumptions
+        income_approach_data = None
         try:
-            income_approach = IncomeApproach.objects.get(project_id=project_id)
-        except IncomeApproach.DoesNotExist:
-            income_approach = None
+            ia_calculated = _get_income_approach_data(project_id)
+            # Extract the key values the reconciliation panel needs
+            # Get DCF present value from the DCF calculation service
+            dcf_value = None
+            try:
+                from .services.dcf_calculation_service import DCFCalculationService
+                dcf_result = DCFCalculationService(project_id).calculate()
+                dcf_value = dcf_result.get('metrics', {}).get('present_value')
+            except Exception:
+                pass  # DCF may not be configured yet
+
+            income_approach_data = {
+                'income_approach_id': ia_calculated.get('income_approach_id'),
+                'selected_cap_rate': ia_calculated.get('assumptions', {}).get('selected_cap_rate'),
+                'direct_cap_value': ia_calculated.get('selected_value'),
+                'dcf_value': dcf_value,
+                'cap_rate_comps': [],
+            }
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(
+                f"[ValuationSummary] Failed to get income approach data for project {project_id}: {exc}",
+                exc_info=True,
+            )
+            income_approach_data = None
 
         # Get reconciliation
         try:
@@ -554,8 +608,7 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
             'sales_comparables': SalesComparableSerializer(sales_comps, many=True).data,
             'sales_comparison_summary': sales_comparison_summary,
             'cost_approach': CostApproachSerializer(cost_approach).data if cost_approach else None,
-            # Use legacy serializer until migration 046 is applied
-            'income_approach': IncomeApproachLegacySerializer(income_approach).data if income_approach else None,
+            'income_approach': income_approach_data,
             'reconciliation': ValuationReconciliationSerializer(reconciliation).data if reconciliation else None,
         }
 

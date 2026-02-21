@@ -50,19 +50,23 @@ export function useExtractionJobStatus(
 ) {
   const params = scope ? `?scope=${scope}` : '';
 
-  // Determine if we should poll frequently (active jobs) or less frequently
+  // Determine if we should poll frequently (active jobs) or stop when idle
   const { data, error, isLoading, mutate } = useSWR<ExtractionJobsResponse>(
     projectId ? `/api/projects/${projectId}/extraction-jobs${params}` : null,
     fetcher,
     {
       refreshInterval: (latestData) => {
-        // Poll every 2 seconds if any job is active, otherwise every 30 seconds
+        // Poll every 3 seconds if any job is active, otherwise stop polling
         const hasActiveJob = latestData?.jobs?.some(
           (j) => j.status === 'queued' || j.status === 'processing'
         );
-        return hasActiveJob ? 2000 : 30000;
+        return hasActiveJob ? 3000 : 0;
       },
-      revalidateOnFocus: true,
+      // Prevent phantom requests: don't refetch on tab focus or reconnect
+      // when no extraction is active. The conditional refreshInterval
+      // handles reactivation when a new job starts.
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
     }
   );
 

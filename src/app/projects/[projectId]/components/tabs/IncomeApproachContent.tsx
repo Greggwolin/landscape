@@ -139,13 +139,13 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
 
       {/* Two-Panel Layout: 30/70 Split */}
       <div className="flex gap-6 mt-6" style={{ minHeight: '600px' }}>
-        {/* Left Panel - Assumptions (24% - reduced from 30%) */}
+        {/* Left Panel - Assumptions */}
         <div
           className="flex-shrink-0 rounded-lg overflow-hidden"
           style={{
-            width: '24%',
-            minWidth: '260px',
-            maxWidth: '320px',
+            width: '26%',
+            minWidth: '280px',
+            maxWidth: '340px',
             backgroundColor: 'var(--cui-card-bg)',
             border: '1px solid var(--cui-border-color)',
           }}

@@ -95,11 +95,13 @@ interface UseLandscaperThreadsOptions {
   pageContext: string;
   subtabContext?: string;
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
+  onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
 }
 
 // Map tool names to the tables they affect
 const TOOL_TABLE_MAP: Record<string, string[]> = {
   update_units: ['units', 'leases', 'unit_types'],
+  delete_units: ['units', 'leases'],
   update_leases: ['leases'],
   update_unit_types: ['unit_types'],
   update_operating_expenses: ['operating_expenses'],
@@ -108,6 +110,8 @@ const TOOL_TABLE_MAP: Record<string, string[]> = {
   update_project_field: ['project'],
   bulk_update_fields: ['project'],
   update_cashflow_assumption: ['dcf_analysis', 'cashflow'],  // DCF/Cashflow assumptions
+  confirm_column_mapping: ['units', 'leases', 'unit_types', 'dynamic_columns'],
+  compute_rent_roll_delta: ['units', 'leases'],
 };
 
 /**
@@ -167,6 +171,7 @@ export function useLandscaperThreads({
   pageContext,
   subtabContext,
   onFieldUpdate,
+  onToolResult,
 }: UseLandscaperThreadsOptions) {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
@@ -218,6 +223,9 @@ export function useLandscaperThreads({
       const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
       url.searchParams.set('project_id', projectId);
       url.searchParams.set('page_context', pageContext);
+      if (subtabContext) {
+        url.searchParams.set('subtab_context', subtabContext);
+      }
       url.searchParams.set('include_closed', 'true');
 
       const response = await fetchWithTimeout(url.toString(), {
@@ -234,7 +242,7 @@ export function useLandscaperThreads({
       console.error('[LandscaperThreads] Failed to load threads:', err);
       return [];
     }
-  }, [projectId, pageContext, fetchWithTimeout, getAuthHeaders]);
+  }, [projectId, pageContext, subtabContext, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Load messages for a specific thread.
@@ -430,6 +438,15 @@ export function useLandscaperThreads({
         // Emit mutation events for auto-refresh
         emitMutationEventsIfNeeded(parseInt(projectId), data.assistant_message?.metadata);
 
+        // Emit tool result callbacks (for IC page data flow)
+        if (onToolResult && data.assistant_message?.metadata?.tool_executions) {
+          for (const exec of data.assistant_message.metadata.tool_executions) {
+            if (exec.success && exec.result) {
+              onToolResult(exec.tool, exec.result as Record<string, unknown>);
+            }
+          }
+        }
+
         // Refresh thread list to get updated title/timestamp
         await loadThreads();
 
@@ -447,16 +464,16 @@ export function useLandscaperThreads({
         setIsLoading(false);
       }
     },
-    [activeThread, projectId, pageContext, onFieldUpdate, loadThreads, fetchWithTimeout, getAuthHeaders]
+    [activeThread, projectId, pageContext, onFieldUpdate, onToolResult, loadThreads, fetchWithTimeout, getAuthHeaders]
   );
 
-  // Initialize thread when page context changes
+  // Initialize thread when page context or subtab changes
   useEffect(() => {
-    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext });
+    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext, subtabContext });
     setMessages([]);
     setActiveThread(null);
     initializeThread();
-  }, [projectId, pageContext, initializeThread]);
+  }, [projectId, pageContext, subtabContext, initializeThread]);
 
   return {
     // Thread state

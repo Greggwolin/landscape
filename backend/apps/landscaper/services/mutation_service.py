@@ -1046,6 +1046,10 @@ class MutationService:
                     if not records:
                         return {"success": False, "error": "No records in batch"}
 
+                    _raw_preview = json.dumps(records[:3], default=str)
+                    logger.info(f"[Mutation] RAW RECORDS PAYLOAD (first 3): {_raw_preview}")
+                    print(f"[Mutation] RAW RECORDS PAYLOAD (first 3): {_raw_preview}", flush=True)
+
                     created_count = 0
                     updated_count = 0
                     results = []
@@ -1089,21 +1093,65 @@ class MutationService:
                         # in bulk to minimize DB round-trips (was N+1 per unit)
                         unit_type_stats = {}
 
-                        # Phase 1: Normalize all records
+                        # Status normalization map (Excel/document → canonical)
+                        _STATUS_MAP = {
+                            'current': 'occupied', 'occupied': 'occupied',
+                            'vacant': 'vacant', 'vacant-unrented': 'vacant',
+                            'vacant-rented': 'vacant', 'vacant unrented': 'vacant',
+                            'vacant rented': 'vacant', 'notice': 'notice',
+                            'eviction': 'eviction', 'model': 'model', 'down': 'down',
+                            'employee': 'occupied', 'office': 'occupied',
+                        }
+
+                        # Updatable unit fields (used to detect partial vs full records)
+                        _UNIT_DATA_FIELDS = {
+                            'unit_type', 'bedrooms', 'bathrooms', 'square_feet',
+                            'current_rent', 'market_rent', 'occupancy_status',
+                        }
+
+                        # Phase 1: Normalize all records, tracking which fields
+                        # were explicitly provided vs defaulted
                         normalized = []
                         for rec in records:
+                            # Track which fields are explicitly present in the input
+                            provided_fields = set()
+
                             unit_type = rec.get("unit_type") or rec.get("unit_type_code") or rec.get("unit_type_name", "")
+                            if "unit_type" in rec or "unit_type_code" in rec or "unit_type_name" in rec:
+                                provided_fields.add("unit_type")
                             if not unit_type and (rec.get("bedrooms") is not None or rec.get("bathrooms") is not None):
                                 br = rec.get("bedrooms", 0)
                                 ba = rec.get("bathrooms", 1)
                                 unit_type = f"{int(br)}BR/{int(ba)}BA"
+                                provided_fields.add("unit_type")
 
                             bedrooms = rec.get("bedrooms", 0)
+                            if "bedrooms" in rec:
+                                provided_fields.add("bedrooms")
                             bathrooms = rec.get("bathrooms", 1)
+                            if "bathrooms" in rec:
+                                provided_fields.add("bathrooms")
                             square_feet = rec.get("square_feet", 0)
+                            if "square_feet" in rec:
+                                provided_fields.add("square_feet")
                             current_rent = rec.get("current_rent", 0)
+                            if "current_rent" in rec:
+                                provided_fields.add("current_rent")
                             market_rent = rec.get("market_rent", 0)
-                            occupancy_status = rec.get("occupancy_status") or rec.get("status", "occupied")
+                            if "market_rent" in rec:
+                                provided_fields.add("market_rent")
+
+                            raw_status = rec.get("occupancy_status") or rec.get("status")
+                            if raw_status:
+                                provided_fields.add("occupancy_status")
+                                occupancy_status = _STATUS_MAP.get(
+                                    raw_status.strip().lower() if isinstance(raw_status, str) else '',
+                                    raw_status
+                                )
+                                if occupancy_status != raw_status:
+                                    logger.info(f"[Mutation] Normalized status '{raw_status}' → '{occupancy_status}'")
+                            else:
+                                occupancy_status = "occupied"  # default for new units only
 
                             normalized.append({
                                 "unit_number": rec.get("unit_number"),
@@ -1117,6 +1165,7 @@ class MutationService:
                                 "lease_start_date": rec.get("lease_start_date"),
                                 "lease_end_date": rec.get("lease_end_date"),
                                 "lease_term_months": rec.get("lease_term_months"),
+                                "_provided_fields": provided_fields,
                             })
 
                             # Aggregate unit type stats for floorplan table
@@ -1134,6 +1183,99 @@ class MutationService:
                                 unit_type_stats[unit_type]["market_rent_total"] += (market_rent or 0)
 
                         logger.info(f"[Mutation] Batch upserting {len(normalized)} units for project {project_id}")
+                        _norm_preview_mr = [r.get("market_rent") for r in normalized[:3]]
+                        _norm_preview_un = [r.get("unit_number") for r in normalized[:3]]
+                        _norm_preview_pf = [list(r.get("_provided_fields", [])) for r in normalized[:3]]
+                        logger.info(f"[Mutation] NORMALIZED (first 3): market_rent={_norm_preview_mr}, unit_numbers={_norm_preview_un}, provided_fields={_norm_preview_pf}")
+                        print(f"[Mutation] NORMALIZED (first 3): market_rent={_norm_preview_mr}, unit_numbers={_norm_preview_un}, provided_fields={_norm_preview_pf}", flush=True)
+
+                        # Phase 1b: For partial updates, pre-load existing units and merge
+                        # to avoid overwriting good data with defaults.
+                        # A record is "partial" if it has ANY unspecified data fields —
+                        # OR if provided_fields is a subset of _UNIT_DATA_FIELDS (not all fields given)
+                        has_partial = any(
+                            not r["_provided_fields"]  # empty provided_fields = all defaults
+                            or r["_provided_fields"] != _UNIT_DATA_FIELDS
+                            for r in normalized
+                        )
+
+                        # ALWAYS pre-load existing data for merge when updating existing units
+                        unit_numbers_to_load = [r["unit_number"] for r in normalized]
+                        cursor.execute("""
+                            SELECT unit_number, unit_type, bedrooms, bathrooms,
+                                   square_feet, current_rent, market_rent, occupancy_status
+                            FROM landscape.tbl_multifamily_unit
+                            WHERE project_id = %s AND unit_number = ANY(%s::text[])
+                        """, [project_id, unit_numbers_to_load])
+                        existing_map = {}
+                        for row in cursor.fetchall():
+                            existing_map[row[0]] = {
+                                "unit_type": row[1] or "",
+                                "bedrooms": float(row[2]) if row[2] else 0,
+                                "bathrooms": float(row[3]) if row[3] else 1,
+                                "square_feet": row[4] or 0,
+                                "current_rent": float(row[5]) if row[5] else 0,
+                                "market_rent": float(row[6]) if row[6] else 0,
+                                "occupancy_status": row[7] or "occupied",
+                            }
+
+                        # Merge: for each record, preserve existing values for unspecified fields
+                        # AND for fields where the new value is a suspicious default (0, 1)
+                        for rec in normalized:
+                            existing = existing_map.get(rec["unit_number"])
+                            if existing:
+                                for field in _UNIT_DATA_FIELDS:
+                                    if field not in rec["_provided_fields"]:
+                                        # Field not explicitly provided — always keep existing
+                                        rec[field] = existing[field]
+                                    elif field in ("bedrooms", "bathrooms", "square_feet", "current_rent") and \
+                                         existing[field] and not rec.get("_provided_fields_explicit", False):
+                                        # Field was "provided" but with a default value — if existing has real data, keep it
+                                        # This catches Claude sending bedrooms=0 when the unit actually has 3 bedrooms
+                                        new_val = rec[field]
+                                        old_val = existing[field]
+                                        if field == "bedrooms" and new_val == 0 and old_val > 0:
+                                            rec[field] = old_val
+                                        elif field == "bathrooms" and new_val == 1 and old_val > 1:
+                                            rec[field] = old_val
+                                        elif field == "square_feet" and new_val == 0 and old_val > 0:
+                                            rec[field] = old_val
+                                        elif field == "current_rent" and new_val == 0 and old_val > 0:
+                                            rec[field] = old_val
+
+                        logger.info(f"[Mutation] Merged with {len(existing_map)} existing units (has_partial={has_partial})")
+
+                        # Phase 1c: Reject records for non-existent units when this is
+                        # clearly an update operation (not a bulk import).
+                        # Two triggers for UPDATE-ONLY mode:
+                        #   (a) Narrow field update: provided_fields is a small subset of all fields
+                        #       (e.g., only market_rent) — this is ALWAYS update-only, zero INSERTs
+                        #   (b) Majority exist: >50% of requested units already in DB
+                        existing_unit_numbers = set(existing_map.keys())
+                        total_in_request = len(normalized)
+                        existing_count = len(existing_unit_numbers)
+
+                        # Detect narrow field updates: if ALL records provide ≤2 data fields,
+                        # this is a targeted update (e.g., "set market_rent for these units"),
+                        # not a bulk import. Block ALL inserts unconditionally.
+                        all_provided = [r["_provided_fields"] for r in normalized]
+                        max_fields_provided = max((len(pf) for pf in all_provided), default=0)
+                        is_narrow_update = max_fields_provided <= 2
+
+                        # Also trigger update-only if >50% of units already exist (original heuristic)
+                        is_majority_existing = existing_count > total_in_request * 0.5
+
+                        if is_narrow_update or is_majority_existing:
+                            new_units = [r for r in normalized if r["unit_number"] not in existing_unit_numbers]
+                            if new_units:
+                                skipped_numbers = [r["unit_number"] for r in new_units]
+                                reason = "narrow field update" if is_narrow_update else "majority exist"
+                                logger.warning(f"[Mutation] UPDATE-ONLY mode ({reason}): skipping {len(new_units)} non-existent units: {skipped_numbers[:10]}")
+                                normalized = [r for r in normalized if r["unit_number"] in existing_unit_numbers]
+
+                        if not normalized:
+                            logger.warning(f"[Mutation] No valid units to upsert after filtering")
+                            return {"success": True, "created": 0, "updated": 0, "results": [], "message": "No matching units found to update"}
 
                         # Phase 2: Batch upsert all units in one query using UNNEST
                         unit_numbers = [r["unit_number"] for r in normalized]
@@ -1207,6 +1349,28 @@ class MutationService:
                         """, [all_unit_ids])
                         existing_leases = {row[0]: row[1] for row in cursor.fetchall()}
 
+                        # Preserve existing lease dates when not explicitly provided
+                        if existing_map:
+                            cursor.execute("""
+                                SELECT u.unit_number, l.lease_start_date, l.lease_end_date
+                                FROM landscape.tbl_multifamily_lease l
+                                JOIN landscape.tbl_multifamily_unit u ON u.unit_id = l.unit_id
+                                WHERE u.project_id = %s AND u.unit_number = ANY(%s::text[])
+                                ORDER BY u.unit_number, l.created_at DESC
+                            """, [project_id, unit_numbers_to_load])
+                            existing_lease_dates = {}
+                            for row in cursor.fetchall():
+                                if row[0] not in existing_lease_dates:  # Only keep most recent
+                                    existing_lease_dates[row[0]] = {"start": row[1], "end": row[2]}
+
+                            for rec in normalized:
+                                un = rec["unit_number"]
+                                if un in existing_lease_dates:
+                                    if rec.get("lease_start_date") is None and existing_lease_dates[un]["start"]:
+                                        rec["lease_start_date"] = existing_lease_dates[un]["start"]
+                                    if rec.get("lease_end_date") is None and existing_lease_dates[un]["end"]:
+                                        rec["lease_end_date"] = existing_lease_dates[un]["end"]
+
                         # Split into updates vs inserts
                         leases_to_update = []
                         leases_to_insert = []
@@ -1238,8 +1402,8 @@ class MutationService:
                                 SET base_rent_monthly = %s,
                                     effective_rent_monthly = %s,
                                     lease_status = %s,
-                                    lease_start_date = COALESCE(%s, lease_start_date),
-                                    lease_end_date = COALESCE(%s, lease_end_date),
+                                    lease_start_date = %s,
+                                    lease_end_date = %s,
                                     lease_term_months = COALESCE(%s, lease_term_months),
                                     updated_at = NOW()
                                 WHERE lease_id = %s
@@ -1329,6 +1493,47 @@ class MutationService:
                         response["floorplan_types_created"] = len(unit_type_stats)
                     return response
 
+                elif mutation_type == "unit_delete" and isinstance(proposed_value, dict):
+                    # Batch delete units and their dependents
+                    unit_ids = proposed_value.get("unit_ids", [])
+                    unit_numbers = proposed_value.get("unit_numbers", [])
+                    if not unit_ids:
+                        return {"success": False, "error": "No unit_ids in delete payload"}
+
+                    id_placeholders = ','.join(['%s'] * len(unit_ids))
+
+                    # Delete leases first (FK constraint)
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_lease
+                        WHERE unit_id IN ({id_placeholders})
+                    """, unit_ids)
+                    leases_deleted = cursor.rowcount
+
+                    # Delete turns (FK constraint)
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_turn
+                        WHERE unit_id IN ({id_placeholders})
+                    """, unit_ids)
+                    turns_deleted = cursor.rowcount
+
+                    # Delete the units
+                    cursor.execute(f"""
+                        DELETE FROM landscape.tbl_multifamily_unit
+                        WHERE project_id = %s AND unit_id IN ({id_placeholders})
+                    """, [project_id] + unit_ids)
+                    units_deleted = cursor.rowcount
+
+                    return {
+                        "success": True,
+                        "action": "deleted",
+                        "units_deleted": units_deleted,
+                        "unit_numbers": unit_numbers,
+                        "dependents_removed": {
+                            "leases": leases_deleted,
+                            "turns": turns_deleted,
+                        },
+                    }
+
                 else:
                     return {"success": False, "error": f"Unknown mutation type: {mutation_type}"}
 
@@ -1411,12 +1616,13 @@ def get_current_value(
 
     Used to populate current_value in proposals for comparison display.
     """
-    pk_column = PK_COLUMNS.get(table_name)
+    normalized_table = table_name.split('.')[-1]
+    pk_column = PK_COLUMNS.get(normalized_table)
     if not pk_column:
         return None
 
     # Determine which ID to use
-    if table_name == "tbl_project":
+    if normalized_table == "tbl_project":
         target_id = project_id
     elif record_id:
         target_id = record_id
@@ -1424,9 +1630,30 @@ def get_current_value(
         return None
 
     try:
+        if normalized_table == "tbl_project" and field_name in (
+            "cap_rate_current",
+            "cap_rate_proforma",
+            "cap_rate_going_in",
+            "cap_rate",
+        ):
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT selected_cap_rate, terminal_cap_rate
+                    FROM landscape.tbl_income_approach
+                    WHERE project_id = %s
+                    ORDER BY updated_at DESC NULLS LAST, income_approach_id DESC
+                    LIMIT 1
+                """, [project_id])
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                if field_name == "cap_rate_proforma":
+                    return row[1]
+                return row[0]
+
         with connection.cursor() as cursor:
             cursor.execute(f"""
-                SELECT {field_name} FROM landscape.{table_name}
+                SELECT {field_name} FROM landscape.{normalized_table}
                 WHERE {pk_column} = %s
             """, [target_id])
             row = cursor.fetchone()

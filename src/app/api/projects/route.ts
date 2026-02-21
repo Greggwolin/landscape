@@ -38,6 +38,11 @@ type RawProjectRow = {
   tile_config?: AnalysisTypeTileConfig | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
+  gross_sf?: number | null
+  primary_count?: number | null
+  primary_count_type?: string | null
+  primary_area?: number | null
+  primary_area_type?: string | null
   updated_at?: string | null
 }
 
@@ -110,6 +115,40 @@ function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: s
   if (!projectType) return null
   const match = PROPERTY_TYPE_FALLBACKS.find(([pattern]) => pattern.test(projectType))
   return match ? match[1] : null
+}
+
+const PRIMARY_COUNT_TYPES = new Set(['units', 'lots', 'suites', 'keys', 'pads', 'rooms', 'other'])
+
+function applyPrimaryMeasureFallbacks(project: RawProjectRow): RawProjectRow {
+  const primaryAreaType = project.primary_area_type?.toLowerCase() ?? ''
+  const primaryCountType = project.primary_count_type?.toLowerCase() ?? ''
+  const primaryArea =
+    typeof project.primary_area === 'number'
+      ? project.primary_area
+      : project.primary_area
+        ? Number(project.primary_area)
+        : null
+  const primaryAreaValue = Number.isFinite(primaryArea ?? NaN) ? primaryArea : null
+  const primaryCount =
+    typeof project.primary_count === 'number'
+      ? project.primary_count
+      : project.primary_count
+        ? Number(project.primary_count)
+        : null
+  const primaryCountValue = Number.isFinite(primaryCount ?? NaN) ? primaryCount : null
+  const countFallback = PRIMARY_COUNT_TYPES.has(primaryCountType) ? primaryCountValue : null
+  const projectTypeCode = project.project_type_code?.toUpperCase() ?? ''
+  const isMultifamily = projectTypeCode === 'MF' || projectTypeCode === 'MULTIFAMILY'
+  const multifamilyFallback = isMultifamily ? primaryCountValue : null
+
+  return {
+    ...project,
+    total_residential_units:
+      project.total_residential_units ?? countFallback ?? multifamilyFallback ?? null,
+    total_commercial_sqft:
+      project.total_commercial_sqft ??
+      (primaryAreaType.includes('sf') ? primaryAreaValue : null),
+  }
 }
 
 function getConfigKey(
@@ -208,6 +247,11 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         -- Phase 5 fields (nullable in legacy DB)
         COALESCE(total_units, target_units)::numeric AS total_residential_units,
         NULL::numeric AS total_commercial_sqft,
+        gross_sf,
+        primary_count,
+        primary_count_type,
+        primary_area,
+        primary_area_type,
         updated_at
       FROM landscape.tbl_project
       WHERE 1 = 1
@@ -241,6 +285,11 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         value_add_enabled,
         NULL::numeric AS total_residential_units,
         NULL::numeric AS total_commercial_sqft,
+        NULL::numeric AS gross_sf,
+        NULL::int AS primary_count,
+        NULL::text AS primary_count_type,
+        NULL::numeric AS primary_area,
+        NULL::text AS primary_area_type,
         updated_at
       FROM landscape.tbl_project
       ORDER BY updated_at DESC NULLS LAST, project_name
@@ -292,16 +341,18 @@ export async function GET(request: NextRequest) {
         const projects = Array.isArray(djangoData) ? djangoData : (djangoData.results || [])
 
         // Normalize and filter
-        const normalized = projects.map((project: RawProjectRow) => ({
-          ...deriveDimensionsFromAnalysisType(project.analysis_type),
-          ...project,
-          project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
-          is_active: project.is_active ?? true,
-          analysis_mode: project.analysis_mode ?? 'napkin',
-          analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
-          analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
-          value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
-        }))
+        const normalized = projects.map((project: RawProjectRow) =>
+          applyPrimaryMeasureFallbacks({
+            ...deriveDimensionsFromAnalysisType(project.analysis_type),
+            ...project,
+            project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
+            is_active: project.is_active ?? true,
+            analysis_mode: project.analysis_mode ?? 'napkin',
+            analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
+            analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
+            value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
+          })
+        )
         const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
         const filtered = propertyTypeFilter
@@ -335,16 +386,18 @@ export async function GET(request: NextRequest) {
       rows = [...rows, CARNEY_FALLBACK_PROJECT]
     }
 
-    const normalized = rows.map((project) => ({
-      ...deriveDimensionsFromAnalysisType(project.analysis_type),
-      ...project,
-      project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
-      is_active: project.is_active ?? true,
-      analysis_mode: project.analysis_mode ?? 'napkin',
-      analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
-      analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
-      value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
-    }))
+    const normalized = rows.map((project) =>
+      applyPrimaryMeasureFallbacks({
+        ...deriveDimensionsFromAnalysisType(project.analysis_type),
+        ...project,
+        project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
+        is_active: project.is_active ?? true,
+        analysis_mode: project.analysis_mode ?? 'napkin',
+        analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
+        analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
+        value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
+      })
+    )
     const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
     const filtered = propertyTypeFilter

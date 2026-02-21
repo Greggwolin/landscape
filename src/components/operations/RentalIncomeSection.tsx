@@ -111,7 +111,7 @@ export function RentalIncomeSection({
             {valueAddEnabled && (
               <>
                 <th className="num post-reno" style={{ width: '12%' }}>Post-Reno Rent</th>
-                <th className="num post-reno" style={{ width: '12%' }}>Reno Total</th>
+                <th className="num post-reno" style={{ width: '12%' }}>Annual</th>
               </>
             )}
           </tr>

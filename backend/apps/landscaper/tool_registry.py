@@ -33,6 +33,7 @@ EXTRACTION_TOOLS = [
     "extract_and_save_contacts",
     "analyze_rent_roll_columns",
     "confirm_column_mapping",
+    "compute_rent_roll_delta",
 ]
 
 # Tier 3: What-If tools - available on valuation, capitalization, and reports pages
@@ -62,6 +63,8 @@ WHATIF_TOOLS = [
     # Phase 7: Investment Committee
     "ic_start_session",
     "ic_challenge_next",
+    "ic_respond_challenge",
+    "sensitivity_grid",
 ]
 
 # Pages that get what-if tools
@@ -114,6 +117,7 @@ PAGE_TOOLS = {
         "update_unit_types",
         "get_units",
         "update_units",
+        "delete_units",
         "get_leases",
         "update_leases",
         # Comparables
@@ -433,10 +437,31 @@ def normalize_page_context(
 # TOOL FILTERING FUNCTIONS
 # =============================================================================
 
+def _has_active_extraction_workflow(project_id: Optional[int]) -> bool:
+    """
+    Check if the project has an active extraction workflow awaiting delta review.
+
+    Uses a lightweight DB query (.exists()) to avoid performance impact on
+    every Landscaper turn. Only called when keyword matching didn't already
+    trigger extraction tool inclusion.
+    """
+    if not project_id:
+        return False
+    try:
+        from apps.knowledge.models import ExtractionJob
+        return ExtractionJob.objects.filter(
+            project_id=project_id,
+            result_summary__awaiting_delta_review=True,
+        ).exists()
+    except Exception:
+        return False
+
+
 def get_tools_for_page(
     page_context: str,
     include_extraction: bool = False,
-    is_admin: bool = False
+    is_admin: bool = False,
+    project_id: Optional[int] = None,
 ) -> List[str]:
     """
     Get the list of tool names available for a given page context.
@@ -445,6 +470,7 @@ def get_tools_for_page(
         page_context: The current normalized page identifier (e.g., "mf_valuation")
         include_extraction: Include extraction tools (user mentioned document)
         is_admin: Include admin/config tools
+        project_id: Optional project ID for checking active extraction workflows
 
     Returns:
         List of tool names to include in Claude's tool set
@@ -463,6 +489,10 @@ def get_tools_for_page(
         tools.update(WHATIF_TOOLS)
 
     # Add extraction tools if on Documents page or document mentioned
+    # Also force-include if an active extraction workflow is awaiting delta review
+    if not include_extraction and project_id:
+        include_extraction = _has_active_extraction_workflow(project_id)
+
     if include_extraction or page_context == "documents":
         tools.update(EXTRACTION_TOOLS)
 

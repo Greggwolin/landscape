@@ -10,7 +10,8 @@ import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property
 import { useCallback, useRef } from 'react';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
-import { useDynamicColumns, formatDynamicValue, type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
+import { type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
+import { usePendingRentRollChanges } from '@/hooks/usePendingRentRollChanges';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 interface Project {
@@ -295,6 +296,238 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
   );
 }
 
+/**
+ * PropertyNarrative - Generates a narrative description of the subject property
+ * for the Details tab. Pulls from project DB fields (physical description),
+ * rent roll stats, and any OM document narrative stored in the knowledge system.
+ */
+function PropertyNarrative({ projectId, units, floorPlans }: {
+  projectId: number;
+  units: Unit[];
+  floorPlans: FloorPlan[];
+}) {
+  const [propertyData, setPropertyData] = useState<Record<string, unknown> | null>(null);
+  const [omNarrative, setOmNarrative] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch project data (same source as PhysicalDescription)
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+        const [projectRes, docsRes] = await Promise.all([
+          fetch(`${djangoUrl}/api/projects/${projectId}/`),
+          fetch(`${djangoUrl}/api/documents/?project_id=${projectId}`),
+        ]);
+
+        if (projectRes.ok) {
+          const data = await projectRes.json();
+          setPropertyData(data);
+        }
+
+        // Look for OM document with extracted text
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          const docs = docsData.results || docsData;
+          const omDoc = docs.find((d: Record<string, unknown>) =>
+            d.doc_type === 'om' || d.doc_type === 'offering_memorandum' ||
+            (typeof d.doc_name === 'string' && /\b(om|offering.memo)/i.test(d.doc_name))
+          );
+          if (omDoc?.extracted_text) {
+            // Extract property description section from OM text
+            const text = omDoc.extracted_text as string;
+            const descMatch = text.match(/(?:property\s+description|subject\s+property|physical\s+description|the\s+property\s+is)[:\s]*([^]*?)(?=\n\n[A-Z]|\n#{1,3}\s|$)/i);
+            if (descMatch) {
+              setOmNarrative(descMatch[1].trim().slice(0, 1500));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[PropertyNarrative] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [projectId]);
+
+  // Build narrative from available data
+  const narrative = useMemo(() => {
+    if (!propertyData && units.length === 0) return null;
+
+    const d = propertyData || {};
+    const sentences: string[] = [];
+
+    // Property identity + location
+    const name = d.project_name as string;
+    const address = d.street_address || d.project_address;
+    const city = d.city || d.jurisdiction_city;
+    const state = d.state || d.jurisdiction_state;
+    const county = d.county || d.jurisdiction_county;
+    const location = [address, city, state].filter(Boolean).join(', ');
+
+    if (name && location) {
+      sentences.push(`${name} is located at ${location}${county ? ` in ${county} County` : ''}.`);
+    } else if (name) {
+      sentences.push(`${name} is the subject property.`);
+    }
+
+    // Building characteristics
+    const yearBuilt = d.year_built as number | null;
+    const totalUnits = d.total_units as number | null || units.length;
+    const stories = d.stories as number | null;
+    const buildingCount = d.building_count as number | null;
+    const constructionType = d.construction_type as string | null;
+    const grossSF = d.gross_sf as number | null;
+    const nra = d.net_rentable_area as number | null;
+    const propertyClass = d.property_class as string | null;
+
+    const buildingParts: string[] = [];
+    if (totalUnits) buildingParts.push(`${formatNumber(totalUnits)}-unit`);
+    if (propertyClass) buildingParts.push(`Class ${propertyClass}`);
+    buildingParts.push('multifamily property');
+
+    let buildingSentence = `The subject is a ${buildingParts.join(' ')}`;
+    const buildingDetails: string[] = [];
+    if (buildingCount && buildingCount > 1) buildingDetails.push(`${buildingCount} buildings`);
+    if (stories) buildingDetails.push(`${stories} ${stories === 1 ? 'story' : 'stories'}`);
+    if (constructionType) buildingDetails.push(`${constructionType} construction`);
+    if (buildingDetails.length > 0) buildingSentence += ` comprising ${buildingDetails.join(', ')}`;
+    if (yearBuilt) buildingSentence += `, originally constructed in ${yearBuilt}`;
+    buildingSentence += '.';
+    sentences.push(buildingSentence);
+
+    // Square footage
+    if (grossSF || nra) {
+      const sfParts: string[] = [];
+      if (grossSF) sfParts.push(`${formatNumber(grossSF)} gross SF`);
+      if (nra) sfParts.push(`${formatNumber(nra)} net rentable SF`);
+      sentences.push(`The property contains ${sfParts.join(' and ')}.`);
+    }
+
+    // Unit mix from floor plans
+    if (floorPlans.length > 0) {
+      const bedroomCounts = new Map<number, { count: number; avgSF: number; avgRent: number }>();
+      floorPlans.forEach(fp => {
+        const existing = bedroomCounts.get(fp.bedrooms);
+        if (existing) {
+          const totalCount = existing.count + fp.unitCount;
+          existing.avgSF = Math.round((existing.avgSF * existing.count + fp.sqft * fp.unitCount) / totalCount);
+          existing.avgRent = Math.round((existing.avgRent * existing.count + fp.currentRent * fp.unitCount) / totalCount);
+          existing.count = totalCount;
+        } else {
+          bedroomCounts.set(fp.bedrooms, { count: fp.unitCount, avgSF: fp.sqft, avgRent: fp.currentRent });
+        }
+      });
+
+      const mixParts = Array.from(bedroomCounts.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([beds, data]) => {
+          const label = beds === 0 ? 'studio' : `${beds}-bedroom`;
+          return `${data.count} ${label} (avg ${formatNumber(data.avgSF)} SF)`;
+        });
+
+      if (mixParts.length > 0) {
+        sentences.push(`The unit mix includes ${mixParts.join(', ')}.`);
+      }
+    }
+
+    // Site characteristics
+    const lotAcres = d.lot_size_acres || d.acres_gross;
+    const zoning = d.current_zoning as string | null;
+    const topography = d.topography as string | null;
+    const siteParts: string[] = [];
+    if (lotAcres) siteParts.push(`${Number(lotAcres).toFixed(2)} acres`);
+    if (zoning) siteParts.push(`zoned ${zoning}`);
+    if (topography) siteParts.push(`${(topography as string).toLowerCase()} topography`);
+    if (siteParts.length > 0) {
+      sentences.push(`The site encompasses ${siteParts.join(', ')}.`);
+    }
+
+    // Parking
+    const parkingSpaces = d.parking_spaces as number | null;
+    const parkingType = d.parking_type as string | null;
+    const parkingRatio = d.parking_ratio as number | null;
+    if (parkingSpaces) {
+      let parkingSentence = `Parking consists of ${formatNumber(parkingSpaces)} spaces`;
+      if (parkingType) parkingSentence += ` (${parkingType.toLowerCase()})`;
+      if (parkingRatio) parkingSentence += `, a ratio of ${parkingRatio.toFixed(1)} spaces per unit`;
+      parkingSentence += '.';
+      sentences.push(parkingSentence);
+    }
+
+    // Occupancy from units
+    if (units.length > 0) {
+      const occupied = units.filter(u => u.status === 'Occupied' || u.status === 'Renewal').length;
+      const occupancy = Math.round((occupied / units.length) * 100);
+      const avgRent = units.filter(u => u.currentRent > 0).reduce((sum, u) => sum + u.currentRent, 0) /
+        (units.filter(u => u.currentRent > 0).length || 1);
+      sentences.push(`As of the current rent roll, the property reports ${occupancy}% occupancy with an average in-place rent of ${formatCurrency(Math.round(avgRent))} per unit.`);
+    }
+
+    // Condition and quality
+    const conditionRating = d.condition_rating as number | null;
+    const qualityRating = d.quality_rating as number | null;
+    const effectiveAge = d.effective_age as number | null;
+    if (conditionRating || qualityRating || effectiveAge) {
+      const condParts: string[] = [];
+      if (conditionRating) condParts.push(`condition rated ${conditionRating}/5`);
+      if (qualityRating) condParts.push(`quality rated ${qualityRating}/5`);
+      if (effectiveAge) condParts.push(`an effective age of ${effectiveAge} years`);
+      sentences.push(`The improvements reflect ${condParts.join(', ')}.`);
+    }
+
+    return sentences.join(' ');
+  }, [propertyData, units, floorPlans]);
+
+  if (loading) {
+    return (
+      <div
+        className="rounded-lg p-4"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--cui-primary)', borderTopColor: 'transparent' }} />
+          <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Loading property narrative...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!narrative && !omNarrative) return null;
+
+  return (
+    <div
+      className="rounded-lg p-4"
+      style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0">
+          <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Property Description</h4>
+            <span className="studio-badge-info">Narrative</span>
+          </div>
+          <div className="text-sm space-y-3" style={{ color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
+            {omNarrative && (
+              <p>{omNarrative}</p>
+            )}
+            {narrative && (
+              <p>{narrative}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const mockUnits: Unit[] = [
   { id: '1', unitNumber: '101', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1200, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-01-15', leaseEnd: '2025-01-14', tenantName: 'John Smith', status: 'Occupied', deposit: 1200, monthlyIncome: 1200, rentPerSF: 1.85, proformaRentPerSF: 2.12, notes: '' },
   { id: '2', unitNumber: '102', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1225, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-03-01', leaseEnd: '2025-02-28', tenantName: 'Sarah Johnson', status: 'Occupied', deposit: 1225, monthlyIncome: 1225, rentPerSF: 1.88, proformaRentPerSF: 2.12, notes: '' },
@@ -306,6 +539,22 @@ const mockUnits: Unit[] = [
   { id: '8', unitNumber: '203', floorPlan: 'C1', sqft: 1250, bedrooms: 3, bathrooms: 2, currentRent: 2100, marketRent: 2250, proformaRent: 2300, leaseStart: '2024-01-01', leaseEnd: '2025-12-31', tenantName: 'Robert Garcia', status: 'Occupied', deposit: 2100, monthlyIncome: 2100, rentPerSF: 1.68, proformaRentPerSF: 1.84, notes: '' },
 ];
 
+// PropertyTab uses camelCase column IDs; the delta system uses backend snake_case field names.
+const COLUMN_TO_BACKEND_FIELD: Record<string, string> = {
+  currentRent: 'current_rent',
+  tenantName: 'tenant_name',
+  leaseStart: 'lease_start',
+  leaseEnd: 'lease_end',
+  status: 'occupancy_status',
+  marketRent: 'market_rent',
+  sqft: 'square_feet',
+  bedrooms: 'bedrooms',
+  bathrooms: 'bathrooms',
+  deposit: 'security_deposit',
+  unitNumber: 'unit_number',
+  floorPlan: 'unit_type',
+};
+
 // Column configuration - defines all available columns
 const defaultColumns: ColumnConfig[] = [
   // Unit Info
@@ -315,10 +564,10 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'bathrooms', label: 'Bath', category: 'unit', visible: true, type: 'input', description: 'Number of bathrooms' },
   { id: 'sqft', label: 'SF', category: 'unit', visible: true, type: 'input', description: 'Square footage of the unit' },
   // Tenant Info
-  { id: 'tenantName', label: 'Tenant', category: 'tenant', visible: false, type: 'input', description: 'Current tenant name (rarely used in underwriting)' },
+  { id: 'tenantName', label: 'Tenant', category: 'tenant', visible: true, type: 'input', description: 'Current tenant name (rarely used in underwriting)' },
   { id: 'status', label: 'Status', category: 'tenant', visible: true, type: 'input', description: 'Occupancy status: Occupied, Vacant, Notice, or Renewal' },
   // Lease Terms
-  { id: 'leaseStart', label: 'Lease Start', category: 'lease', visible: false, type: 'input', description: 'Lease commencement date' },
+  { id: 'leaseStart', label: 'Lease Start', category: 'lease', visible: true, type: 'input', description: 'Lease commencement date' },
   { id: 'leaseEnd', label: 'Lease End', category: 'lease', visible: true, type: 'input', description: 'Lease expiration date' },
   { id: 'deposit', label: 'Deposit', category: 'lease', visible: false, type: 'input', description: 'Security deposit amount' },
   // Financial
@@ -359,21 +608,122 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
   const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
   const propertyListRef = useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null);
 
-  // Dynamic columns from EAV system (additional rent roll fields)
-  const unitIds = useMemo(() => units.map(u => Number(u.id)), [units]);
+  // Dynamic EAV columns disabled for alpha — base columns cover all active fields.
+  // Re-enable when EAV value population is implemented.
+  const [dynamicColumnDefs, setDynamicColumnDefs] = useState<any[]>([]);
+  const dynamicValues: Record<string, Record<string, unknown>> = {};
+  const refreshDynamicColumns = () => {};
+
+  // Pending rent roll extraction changes (delta highlighting)
   const {
-    columns: dynamicColumnDefs,
-    values: dynamicValues,
-    refresh: refreshDynamicColumns,
-  } = useDynamicColumns(isMultifamily ? projectId : undefined, 'multifamily_unit', unitIds);
+    hasPending,
+    changes: pendingChanges,
+    pendingByCell,
+    summary: pendingSummary,
+    documentName: pendingDocName,
+    getFieldState,
+    toggleFieldAcceptance,
+    acceptAll,
+    rejectAll,
+    refresh: refreshPending,
+  } = usePendingRentRollChanges(isMultifamily ? Number(projectId) : undefined);
 
-  // Merge active dynamic columns into the column config list.
-  // Uses a stable fingerprint to prevent infinite re-render loops.
-  const dynColFingerprint = useMemo(
-    () => dynamicColumnDefs.filter(d => d.is_active && !d.is_proposed).map(d => d.id).join(','),
-    [dynamicColumnDefs]
+  // Fetch dynamic columns for multifamily projects (Tags, Additional Tags, etc.)
+  // These are DynamicColumnDefinition rows created during extraction via confirm_column_mapping
+  const [activeDynCols, setActiveDynCols] = useState<ColumnConfig[]>([]);
+  const [activeDynValues, setActiveDynValues] = useState<Record<string, Record<string, unknown>>>({});
+  useEffect(() => {
+    if (!isMultifamily) {
+      setActiveDynCols([]);
+      setActiveDynValues({});
+      return;
+    }
+    const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    // Fetch column definitions
+    fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        const allCols = Array.isArray(data) ? data : data.results || [];
+        // Only include active, non-proposed columns that DON'T overlap with base column labels
+        const baseLabels = new Set(defaultColumns.map(c => c.label.toLowerCase()));
+        const seen = new Set<string>();
+        const filtered = allCols.filter((d: any) => {
+          if (!d.is_active || d.is_proposed) return false;
+          const norm = d.display_label.toLowerCase();
+          if (baseLabels.has(norm)) return false;
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        });
+        setDynamicColumnDefs(filtered);
+        setActiveDynCols(filtered.map((d: any) => ({
+          id: `dyn_${d.column_key}`,
+          label: d.display_label,
+          category: 'dynamic' as const,
+          visible: true,
+          type: 'dynamic' as const,
+          description: `Custom field from extraction`,
+          dataType: d.data_type,
+          dynamicColumnId: d.id,
+        })));
+        // Fetch values for these columns
+        if (filtered.length > 0) {
+          fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/with_values/?table_name=multifamily_unit`)
+            .then(r => r.ok ? r.json() : { values: {} })
+            .then(vData => setActiveDynValues(vData.values || {}))
+            .catch(() => setActiveDynValues({}));
+        }
+      })
+      .catch(() => { setActiveDynCols([]); setActiveDynValues({}); });
+  }, [isMultifamily, projectId]);
+
+  // Derive additional columns from pending changes that aren't in base columns
+  const pendingExtraColumns = useMemo(() => {
+    if (!hasPending || pendingChanges.length === 0) return [];
+
+    // Collect all backend field names that have pending changes
+    const backendFieldsInBase = new Set(Object.values(COLUMN_TO_BACKEND_FIELD));
+    const extraFields = new Map<string, string>(); // field -> fieldLabel
+
+    for (const change of pendingChanges) {
+      if (!backendFieldsInBase.has(change.field) && !extraFields.has(change.field)) {
+        extraFields.set(change.field, change.fieldLabel);
+      }
+    }
+
+    // Convert to ColumnConfig entries
+    return Array.from(extraFields.entries()).map(([field, label]) => ({
+      id: `pending_${field}`,
+      label: label,
+      category: 'dynamic' as ColumnConfig['category'],
+      visible: true,
+      type: 'dynamic' as ColumnConfig['type'],
+      description: `Pending field from extraction`,
+    }));
+  }, [hasPending, pendingChanges]);
+
+  // NOTE: Dynamic column merge disabled — see stub above. Left intact for re-enablement.
+  const staticLabels = useMemo(
+    () => new Set(defaultColumns.map(c => c.label.toLowerCase())),
+    []
   );
+  const dynColFingerprint = useMemo(() => {
+    const seen = new Set<string>();
+    return dynamicColumnDefs
+      .filter(d => d.is_active && !d.is_proposed)
+      .filter(d => {
+        const norm = d.display_label.toLowerCase();
+        if (staticLabels.has(norm)) return false;
+        if (seen.has(norm)) return false;
+        seen.add(norm);
+        return true;
+      })
+      .map(d => d.id)
+      .join(',');
+  }, [dynamicColumnDefs, staticLabels]);
   const lastDynFingerprint = useRef('');
   useEffect(() => {
     if (!dynColFingerprint || dynColFingerprint === lastDynFingerprint.current) return;
@@ -381,9 +731,19 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setColumns(prev => {
       // Remove any previously-merged dynamic columns
       const staticCols = prev.filter(c => c.category !== 'dynamic');
-      // Build ColumnConfig entries from active dynamic definitions
+      // Build ColumnConfig entries from active dynamic definitions,
+      // excluding any whose display_label matches a base column (case-insensitive)
+      // and deduplicating dynamic columns against each other.
+      const seenDynLabels = new Set<string>();
       const dynCols: ColumnConfig[] = dynamicColumnDefs
         .filter(d => d.is_active && !d.is_proposed)
+        .filter(d => {
+          const normLabel = d.display_label.toLowerCase();
+          if (staticLabels.has(normLabel)) return false;
+          if (seenDynLabels.has(normLabel)) return false;
+          seenDynLabels.add(normLabel);
+          return true;
+        })
         .map(d => ({
           id: `dyn_${d.column_key}`,
           label: d.display_label,
@@ -397,7 +757,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       if (dynCols.length === 0) return prev; // No dynamic cols to add
       return [...staticCols, ...dynCols];
     });
-  }, [dynColFingerprint, dynamicColumnDefs]);
+  }, [dynColFingerprint, dynamicColumnDefs, staticLabels]);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -599,6 +959,31 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     setPropertyColors(colors);
   }, []);
 
+  // Handle column resize drag
+  const handleResizeStart = useCallback((colId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).parentElement;
+    const startWidth = th?.offsetWidth ?? 120;
+    resizingRef.current = { colId, startX: e.clientX, startWidth };
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = moveEvent.clientX - resizingRef.current.startX;
+      const newWidth = Math.max(60, resizingRef.current.startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [resizingRef.current!.colId]: newWidth }));
+    };
+
+    const onMouseUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   // Load real data from database (extracted as callback so useLandscaperRefresh can trigger it)
   const loadData = useCallback(async () => {
     // Skip data loading for non-multifamily projects
@@ -610,26 +995,56 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     try {
       setLoading(true);
 
-      // Fetch unit types (floor plans)
-      const unitTypesData = await unitTypesAPI.list(projectId);
-      const transformedFloorPlans: FloorPlan[] = unitTypesData.map(ut => ({
-        id: ut.unit_type_id.toString(),
-        name: ut.unit_type_code,
-        bedrooms: Number(ut.bedrooms),
-        bathrooms: Number(ut.bathrooms),
-        sqft: ut.avg_square_feet,
-        unitCount: ut.total_units,
-        currentRent: Math.round(ut.current_market_rent || 0),
-        marketRent: Math.round(ut.current_market_rent || 0),
-        aiEstimate: 0 // Will be populated from comparables
-      }));
+      // Fetch unit types (floor plans), units, and leases in parallel
+      const [unitTypesData, unitsData, leasesData] = await Promise.all([
+        unitTypesAPI.list(projectId),
+        unitsAPI.list(projectId),
+        leasesAPI.list(projectId),
+      ]);
 
-      // Fetch units
-      const unitsData = await unitsAPI.list(projectId);
-
-      // Fetch leases to get tenant info
-      const leasesData = await leasesAPI.list(projectId);
       const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
+
+      // Build avg current rent per unit type from occupied leases (ACTIVE + MONTH_TO_MONTH)
+      const occupiedStatuses = ['ACTIVE', 'MONTH_TO_MONTH'];
+      const rentsByUnitType = new Map<string, number[]>();
+      unitsData.forEach(u => {
+        const lease = leasesByUnit.get(u.unit_id);
+        if (lease && occupiedStatuses.includes(lease.lease_status) && lease.base_rent_monthly) {
+          const rents = rentsByUnitType.get(u.unit_type) || [];
+          rents.push(Number(lease.base_rent_monthly));
+          rentsByUnitType.set(u.unit_type, rents);
+        }
+      });
+
+      // Only include unit types that have actual units assigned in the units table
+      const actualUnitCountByType = new Map<string, number>();
+      unitsData.forEach(u => {
+        actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
+      });
+
+      const transformedFloorPlans: FloorPlan[] = unitTypesData
+        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0)
+        .map(ut => {
+          const leaseRents = rentsByUnitType.get(ut.unit_type_code);
+          const avgLeaseRent = leaseRents && leaseRents.length > 0
+            ? Math.round(leaseRents.reduce((a, b) => a + b, 0) / leaseRents.length)
+            : 0;
+          // Use actual lease rent if available, otherwise fall back to market rent
+          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_market_rent || 0);
+          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.total_units;
+
+          return {
+            id: ut.unit_type_id.toString(),
+            name: ut.unit_type_code,
+            bedrooms: Number(ut.bedrooms),
+            bathrooms: Number(ut.bathrooms),
+            sqft: ut.avg_square_feet,
+            unitCount: actualCount,
+            currentRent,
+            marketRent: Math.round(ut.current_market_rent || 0),
+            aiEstimate: 0 // Will be populated from comparables
+          };
+        });
 
       const normalizeStatus = (status?: string | null): Unit['status'] => {
         if (!status) return 'Unknown';
@@ -647,7 +1062,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
         const marketRent = Math.round(u.market_rent || 0);
         const unitStatus = normalizeStatus(u.occupancy_status);
-        const leaseStatus = lease?.lease_status === 'ACTIVE' ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
+        const leaseStatus = lease && occupiedStatuses.includes(lease.lease_status) ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
         return {
           id: u.unit_id.toString(),
           unitNumber: u.unit_number,
@@ -658,8 +1073,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           currentRent: baseRent,
           marketRent: marketRent,
           proformaRent: Math.round(marketRent * 1.05),
-          leaseStart: lease?.lease_start_date || '',
-          leaseEnd: lease?.lease_end_date || '',
+          leaseStart: lease?.lease_start_date || u.current_lease?.lease_start_date || u.lease_start_date || '',
+          leaseEnd: lease?.lease_end_date || u.current_lease?.lease_end_date || u.lease_end_date || '',
           tenantName: lease?.resident_name || '',
           status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
           deposit: Math.round(lease?.security_deposit || 0),
@@ -703,10 +1118,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const refreshAll = useCallback(() => {
     loadData();
     refreshDynamicColumns();
-  }, [loadData, refreshDynamicColumns]);
+    refreshPending();
+  }, [loadData, refreshDynamicColumns, refreshPending]);
   useLandscaperRefresh(
     projectId,
-    ['units', 'leases', 'unit_types', 'project'],
+    ['units', 'leases', 'unit_types', 'project', 'dynamic_columns'],
     refreshAll
   );
 
@@ -737,15 +1153,65 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     });
   }, [units, hasCustomizedColumns]);
 
-  // Get visible columns
+  // Get visible columns (base + any extra columns from pending changes)
   const visibleColumns = useMemo(() => {
-    return columns.filter(col => col.visible);
-  }, [columns]);
+    const baseCols = columns.filter(col => col.visible);
+    return [...baseCols, ...pendingExtraColumns];
+  }, [columns, pendingExtraColumns]);
 
   // Render table cell content based on column
   const renderCellContent = (unit: Unit, columnId: string) => {
     const isEdit = isEditing(unit.id);
 
+    // If this cell has a pending change, show current → proposed
+    if (!isEdit) {
+      const backendField = COLUMN_TO_BACKEND_FIELD[columnId];
+      if (backendField) {
+        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+        if (change) {
+          const state = getFieldState(change.unitId, change.field);
+          const currentDisplay = change.currentValue != null ? String(change.currentValue) : '—';
+          const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+
+          // Format values for display (currency, numeric, or plain)
+          const isCurrency = ['currentRent', 'marketRent', 'proformaRent', 'deposit', 'monthlyIncome'].includes(columnId);
+          const isNumeric = !isNaN(Number(change.currentValue)) || !isNaN(Number(change.newValue));
+          const fmtCurrent = isCurrency && change.currentValue != null
+            ? `$${Number(change.currentValue).toLocaleString()}`
+            : isNumeric && change.currentValue != null && !isNaN(Number(change.currentValue))
+            ? Number(change.currentValue).toLocaleString()
+            : currentDisplay;
+          const fmtNew = isCurrency && change.newValue != null
+            ? `$${Number(change.newValue).toLocaleString()}`
+            : isNumeric && change.newValue != null && !isNaN(Number(change.newValue))
+            ? Number(change.newValue).toLocaleString()
+            : newDisplay;
+
+          if (state === 'accepted') {
+            // Accepted: show new value in green
+            return (
+              <span style={{ color: 'var(--cui-success)' }} title={`Was: ${fmtCurrent}`}>
+                {fmtNew}
+              </span>
+            );
+          } else {
+            // Pending: show current → new
+            return (
+              <span title={`Current: ${fmtCurrent} → Proposed: ${fmtNew}`}>
+                <span style={{ color: 'var(--cui-tertiary-color)', textDecoration: 'line-through', fontSize: '0.75rem' }}>
+                  {fmtCurrent}
+                </span>
+                <span style={{ color: 'var(--cui-warning)', marginLeft: '4px', fontWeight: 500 }}>
+                  {fmtNew}
+                </span>
+              </span>
+            );
+          }
+        }
+      }
+    }
+
+    // Normal rendering (no pending change or in edit mode)
     switch (columnId) {
       case 'unitNumber':
         return <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>{unit.unitNumber}</span>;
@@ -842,7 +1308,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseStart: e.target.value } : null)}
           />
         ) : (
-          unit.leaseStart || '—'
+          unit.leaseStart ? formatLeaseDate(unit.leaseStart) : '—'
         );
       case 'leaseEnd':
         return isEdit ? (
@@ -854,7 +1320,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseEnd: e.target.value } : null)}
           />
         ) : (
-          unit.leaseEnd || '—'
+          unit.leaseEnd ? formatLeaseDate(unit.leaseEnd) : '—'
         );
       case 'deposit':
         return isEdit ? (
@@ -887,14 +1353,27 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
         );
       default: {
-        // Dynamic column: look up value from the EAV dynamic values map
-        const colConfig = columns.find(c => c.id === columnId);
-        if (colConfig?.category === 'dynamic') {
+        // Pending extra column: show new value from pending changes
+        if (columnId.startsWith('pending_')) {
+          const backendField = columnId.replace('pending_', '');
+          const change = pendingByCell.get(`${unit.id}:${backendField}`);
+          if (change) {
+            const state = getFieldState(change.unitId, change.field);
+            const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+            return (
+              <span style={{ color: state === 'accepted' ? 'var(--cui-success)' : 'var(--cui-warning)', fontWeight: 500 }}>
+                {newDisplay}
+              </span>
+            );
+          }
+          return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+        }
+        // Dynamic column: look up value from activeDynValues (extraction-created columns)
+        if (columnId.startsWith('dyn_')) {
           const colKey = columnId.replace(/^dyn_/, '');
-          const rawValue = dynamicValues[unit.id]?.[colKey];
+          const rawValue = activeDynValues[unit.id]?.[colKey];
           if (rawValue === null || rawValue === undefined) return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
-          const formatted = formatDynamicValue(rawValue, colConfig.dataType || 'text');
-          return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatted}</span>;
+          return <span style={{ color: 'var(--cui-secondary-color)' }}>{String(rawValue)}</span>;
         }
         return null;
       }
@@ -1173,29 +1652,12 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                  <h3 className="font-semibold text-sm m-0" style={{ color: 'var(--cui-body-color)' }}>
                     Floor Plan Matrix
                   </h3>
-                  <div
-                    className="flex items-center gap-2"
-                    style={{
-                      padding: '0.2rem 0.9rem',
-                      borderRadius: '999px',
-                      border: '1px solid var(--cui-primary)',
-                      backgroundColor: 'var(--cui-primary-bg)',
-                    }}
-                  >
-                    <span
-                      className="font-semibold"
-                      style={{
-                        color: 'var(--cui-primary)',
-                        fontSize: '0.65rem',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      Aggregates from Units
-                    </span>
-                  </div>
+                  <span className="studio-badge-info">
+                    Aggregates from Units
+                  </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs">
                   <span style={{ color: 'var(--cui-secondary-color)' }}>
@@ -1339,32 +1801,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </div>
           </div>
 
-          {/* Landscaper Analysis - Below Floor Plan Matrix in right column */}
-          <div
-            className="rounded-lg p-4"
-            style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
-                  <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                    {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
-                  </span>
-                </div>
-                <LandscaperInsights
-                  floorPlans={floorPlansWithAI}
-                  comparables={comparables}
-                  comparablesByProperty={comparablesByProperty}
-                />
-              </div>
-            </div>
-          </div>
+          {/* Property Narrative - Below Floor Plan Matrix in right column */}
+          <PropertyNarrative projectId={projectId} units={units} floorPlans={floorPlans} />
         </div>
       </div>
     </div>
@@ -1559,8 +1997,48 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </div>
           </div>
         </div>
+
+      {/* Landscaper Analysis - Comp-based market insights */}
+      <div
+        className="rounded-lg p-4 shadow-lg"
+        style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0">
+            <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
+              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
+              </span>
+            </div>
+            <LandscaperInsights
+              floorPlans={floorPlansWithAI}
+              comparables={comparables}
+              comparablesByProperty={comparablesByProperty}
+            />
+          </div>
+        </div>
       </div>
+    </div>
   );
+
+  // Format lease date as MMM-YY (e.g., "Sep-25")
+  const formatLeaseDate = (dateStr: string): string => {
+    if (!dateStr) return '—';
+    try {
+      const date = new Date(dateStr);
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.toLocaleDateString('en-US', { year: '2-digit' });
+      return `${month}-${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
 
   const renderRentRollContent = () => (
     <div className="space-y-4">
@@ -1642,6 +2120,41 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           </div>
         </div>
 
+        {/* Pending extraction changes banner */}
+        {hasPending && (
+          <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: 'rgba(var(--cui-warning-rgb), 0.25)', borderBottom: '1px solid var(--cui-warning)' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium" style={{ color: 'var(--cui-warning)' }}>
+                {pendingSummary?.total_field_changes ?? pendingChanges.length} pending changes
+              </span>
+              {pendingDocName && (
+                <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  from {pendingDocName}
+                </span>
+              )}
+              <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>
+                Click yellow cells to accept
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={acceptAll}
+                className="px-3 py-1 text-xs rounded font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-success-rgb), 0.20)', color: 'var(--cui-success)', border: '1px solid var(--cui-success)' }}
+              >
+                Accept All ({pendingChanges.length})
+              </button>
+              <button
+                onClick={rejectAll}
+                className="px-3 py-1 text-xs rounded font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-danger-rgb), 0.20)', color: 'var(--cui-danger)', border: '1px solid var(--cui-danger)' }}
+              >
+                Reject All
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
@@ -1650,7 +2163,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                 </svg>
-                <span className="text-green-300 font-medium">Populates Floor Plans</span>
+                <span className="font-medium" style={{ color: 'var(--cui-success)' }}>Populates Floor Plans</span>
               </div>
             </div>
             <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -1679,22 +2192,69 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
             <thead style={{ backgroundColor: 'var(--cui-dark-bg)' }}>
               <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
                 {visibleColumns.map(col => (
-                  <th key={col.id} className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`} style={{ color: 'var(--cui-secondary-color)' }}>
+                  <th
+                    key={col.id}
+                    className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`}
+                    style={{
+                      color: 'var(--cui-secondary-color)',
+                      position: 'relative',
+                      ...(columnWidths[col.id] ? { width: columnWidths[col.id] } : {}),
+                    }}
+                  >
                     {col.label}
+                    <div
+                      onMouseDown={(e) => handleResizeStart(col.id, e)}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '20%',
+                        bottom: '20%',
+                        width: 5,
+                        cursor: 'col-resize',
+                        userSelect: 'none',
+                        borderRight: '1px solid var(--cui-border-color)',
+                      }}
+                    />
                   </th>
                 ))}
-                <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
+                <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)', width: 80 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {units.map((unit, index) => (
                 <tr key={unit.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
                   {visibleColumns.map(col => (
-                    <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}>
+                    <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}
+                      style={(() => {
+                        // Check base columns via COLUMN_TO_BACKEND_FIELD mapping
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        // Also handle pending extra columns (pending_ prefix)
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return {};
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return {};
+                        const state = getFieldState(change.unitId, change.field);
+                        return state === 'accepted'
+                          ? { backgroundColor: 'rgba(var(--cui-success-rgb), 0.35)', borderBottom: '2px solid var(--cui-success)', cursor: 'pointer' }
+                          : { backgroundColor: 'rgba(var(--cui-warning-rgb), 0.35)', borderBottom: '2px solid var(--cui-warning)', cursor: 'pointer' };
+                      })()}
+                      onClick={() => {
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return;
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return;
+                        toggleFieldAcceptance(change.unitId, change.field);
+                      }}
+                    >
                       {renderCellContent(unit, col.id)}
                     </td>
                   ))}

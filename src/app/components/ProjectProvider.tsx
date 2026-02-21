@@ -42,6 +42,11 @@ interface ProjectSummary {
   tile_config?: AnalysisTypeTileConfig | null
   total_residential_units?: number | null
   total_commercial_sqft?: number | null
+  gross_sf?: number | null
+  primary_count?: number | null
+  primary_count_type?: string | null
+  primary_area?: number | null
+  primary_area_type?: string | null
   updated_at?: string | null
 }
 

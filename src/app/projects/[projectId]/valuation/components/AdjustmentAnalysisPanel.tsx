@@ -72,6 +72,7 @@ export function AdjustmentAnalysisPanel({
         case 'financing':
           reason = 'This was an arms-length transaction with conventional financing terms.';
           break;
+        case 'sale_conditions':
         case 'conditions_of_sale':
           reason = 'This was a typical market sale with no special conditions.';
           break;

@@ -16,10 +16,11 @@ import {
   formatCurrencyCompact,
   formatPercent,
   formatPerUnit,
-  TILE_COLORS,
-  DCF_TILE_COLOR,
+  getTileColors,
+  getDCFTileColor,
   NOI_BASIS_LABELS,
 } from '@/types/income-approach';
+import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
 export type ValuationMethod = 'direct_cap' | 'dcf';
 
@@ -40,6 +41,7 @@ export function ValueTiles({
   activeMethod = 'direct_cap',
   onMethodChange,
 }: ExtendedValueTilesProps) {
+  const { theme } = useTheme();
   // Filter to only show the 3 Direct Cap tiles (in case backend sends more)
   const directCapTiles = tiles.filter(t =>
     t.id === 'f12_current' || t.id === 'f12_market' || t.id === 'stabilized'
@@ -67,6 +69,7 @@ export function ValueTiles({
           isSelected={activeMethod === 'direct_cap' && tile.id === selectedBasis}
           onClick={() => handleDirectCapClick(tile.id)}
           unitCount={unitCount}
+          theme={theme}
         />
       ))}
       {/* DCF Tile */}
@@ -75,6 +78,7 @@ export function ValueTiles({
         isLoading={isDCFLoading}
         isSelected={activeMethod === 'dcf'}
         onClick={handleDCFClick}
+        theme={theme}
       />
     </div>
   );
@@ -88,24 +92,28 @@ interface DCFTileProps {
   isLoading?: boolean;
   isSelected: boolean;
   onClick: () => void;
+  theme: 'light' | 'dark';
 }
 
-function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
+function DCFTile({ dcfData, isLoading, isSelected, onClick, theme }: DCFTileProps) {
+  const dcfColors = getDCFTileColor(theme);
+  const subtleBorder = theme === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+
   // Loading state
   if (isLoading) {
     return (
       <div
         className="relative rounded-lg p-4 text-left"
         style={{
-          backgroundColor: DCF_TILE_COLOR.bg,
+          backgroundColor: dcfColors.bg,
           borderWidth: '1px',
           borderStyle: 'dashed',
-          borderColor: DCF_TILE_COLOR.border,
+          borderColor: dcfColors.border,
         }}
       >
         <div
           className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
-          style={{ color: DCF_TILE_COLOR.text }}
+          style={{ color: dcfColors.text }}
         >
           DCF
         </div>
@@ -125,15 +133,15 @@ function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
         onClick={onClick}
         className="relative rounded-lg p-4 text-left transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer"
         style={{
-          backgroundColor: DCF_TILE_COLOR.bg,
+          backgroundColor: dcfColors.bg,
           borderWidth: '1px',
           borderStyle: 'dashed',
-          borderColor: DCF_TILE_COLOR.border,
+          borderColor: dcfColors.border,
         }}
       >
         <div
           className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
-          style={{ color: DCF_TILE_COLOR.text }}
+          style={{ color: dcfColors.text }}
         >
           DCF
         </div>
@@ -162,25 +170,25 @@ function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
       onClick={onClick}
       className="relative rounded-lg p-4 text-left transition-all duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-2"
       style={{
-        backgroundColor: DCF_TILE_COLOR.bg,
+        backgroundColor: dcfColors.bg,
         borderWidth: isSelected ? '3px' : '1px',
         borderStyle: 'solid',
-        borderColor: isSelected ? DCF_TILE_COLOR.border : 'rgba(255,255,255,0.1)',
-        boxShadow: isSelected ? `0 0 20px ${DCF_TILE_COLOR.border}40` : 'none',
+        borderColor: isSelected ? dcfColors.border : subtleBorder,
+        boxShadow: isSelected ? `0 0 20px ${dcfColors.border}40` : 'none',
       }}
     >
       {/* Selected indicator */}
       {isSelected && (
         <div
           className="absolute top-2 right-2 w-2 h-2 rounded-full"
-          style={{ backgroundColor: DCF_TILE_COLOR.border }}
+          style={{ backgroundColor: dcfColors.border }}
         />
       )}
 
       {/* Label */}
       <div
         className="text-xs font-medium uppercase tracking-wider mb-2 opacity-70"
-        style={{ color: DCF_TILE_COLOR.text }}
+        style={{ color: dcfColors.text }}
       >
         DCF
       </div>
@@ -196,7 +204,7 @@ function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
       {/* IRR */}
       <div
         className="text-sm mb-2"
-        style={{ color: DCF_TILE_COLOR.text }}
+        style={{ color: dcfColors.text }}
       >
         {metrics.irr !== null ? `${formatPercent(metrics.irr)} IRR` : '— IRR'}
       </div>
@@ -214,7 +222,7 @@ function DCFTile({ dcfData, isLoading, isSelected, onClick }: DCFTileProps) {
         className="text-xs mt-2 pt-2 border-t"
         style={{
           color: 'var(--cui-secondary-color)',
-          borderColor: 'rgba(255,255,255,0.1)',
+          borderColor: subtleBorder,
         }}
       >
         {assumptions.hold_period_years}-year hold
@@ -228,12 +236,16 @@ interface ValueTileCardProps {
   isSelected: boolean;
   onClick: () => void;
   unitCount: number;
+  theme: 'light' | 'dark';
 }
 
-function ValueTileCard({ tile, isSelected, onClick, unitCount: _unitCount }: ValueTileCardProps) {
+function ValueTileCard({ tile, isSelected, onClick, unitCount: _unitCount, theme }: ValueTileCardProps) {
+  const tileColors = getTileColors(theme);
   // Get colors for tile, fallback to market colors if not found
-  const colors = TILE_COLORS[tile.id] || TILE_COLORS['f12_market'];
+  const colors = tileColors[tile.id] || tileColors['f12_market'];
   void _unitCount; // Reserved for future unit-based calculations
+  const subtleBorder = theme === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+  const subtleBg = theme === 'light' ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.1)';
 
   return (
     <button
@@ -243,7 +255,7 @@ function ValueTileCard({ tile, isSelected, onClick, unitCount: _unitCount }: Val
         backgroundColor: colors.bg,
         borderWidth: isSelected ? '3px' : '1px',
         borderStyle: 'solid',
-        borderColor: isSelected ? colors.border : 'rgba(255,255,255,0.1)',
+        borderColor: isSelected ? colors.border : subtleBorder,
         boxShadow: isSelected ? `0 0 20px ${colors.border}40` : 'none',
       }}
     >
@@ -292,7 +304,7 @@ function ValueTileCard({ tile, isSelected, onClick, unitCount: _unitCount }: Val
         className="text-xs mt-2 pt-2 border-t"
         style={{
           color: 'var(--cui-secondary-color)',
-          borderColor: 'rgba(255,255,255,0.1)',
+          borderColor: subtleBorder,
         }}
       >
         NOI: {formatCurrencyCompact(tile.noi)}
@@ -303,7 +315,7 @@ function ValueTileCard({ tile, isSelected, onClick, unitCount: _unitCount }: Val
         <div
           className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 rounded"
           style={{
-            backgroundColor: 'rgba(255,255,255,0.1)',
+            backgroundColor: subtleBg,
             color: 'var(--cui-secondary-color)',
           }}
         >

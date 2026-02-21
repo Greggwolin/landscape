@@ -120,11 +120,19 @@ def _get_income_approach_data(project_id: int) -> dict:
         # =====================================================================
         cursor.execute("""
             SELECT
-                COALESCE(SUM(current_rent), 0) * 12 as t12_gpr,
-                COALESCE(SUM(market_rent), 0) * 12 as forward_gpr,
+                COALESCE(SUM(u.current_rent), 0) * 12 as t12_gpr,
+                COALESCE(SUM(
+                    CASE
+                        WHEN COALESCE(u.market_rent, 0) > 0 THEN u.market_rent
+                        ELSE COALESCE(ut.current_market_rent, u.current_rent, 0)
+                    END
+                ), 0) * 12 as forward_gpr,
                 COUNT(*) as unit_count
-            FROM landscape.tbl_multifamily_unit
-            WHERE project_id = %s
+            FROM landscape.tbl_multifamily_unit u
+            LEFT JOIN landscape.tbl_multifamily_unit_type ut
+                ON ut.project_id = u.project_id
+                AND ut.unit_type_code = u.unit_type
+            WHERE u.project_id = %s
         """, [project_id])
         rent_row = cursor.fetchone()
 

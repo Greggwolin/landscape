@@ -32,7 +32,7 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 
 // Consistent input width for alignment
 const INPUT_WIDTH = 'w-24';
-const SELECT_WIDTH = 'w-[7.75rem]'; // 10% wider than w-28 for dropdown
+const SELECT_WIDTH = 'w-[7.5rem]';
 
 export function AssumptionsPanel({
   assumptions,
@@ -380,16 +380,16 @@ interface ReadOnlyFieldProps {
 // ReadOnlyField - NO lock icon, just plain text aligned with inputs
 function ReadOnlyField({ label, value, tooltip }: ReadOnlyFieldProps) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <label
-        className="text-[13px] font-medium"
+        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
         style={{ color: 'var(--cui-secondary-color)' }}
-        title={tooltip}
+        title={tooltip || label}
       >
         {label}
       </label>
       <span
-        className={`${INPUT_WIDTH} text-right text-sm font-medium`}
+        className={`${INPUT_WIDTH} shrink-0 text-right pr-2 text-sm font-medium`}
         style={{ color: 'var(--cui-body-color)' }}
       >
         {value}
@@ -449,11 +449,11 @@ function PercentInput({
   const displayValue = isFocused ? localValue : `${localValue}%`;
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <label
-        className="text-[13px] font-medium"
+        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
         style={{ color: 'var(--cui-secondary-color)' }}
-        title={tooltip}
+        title={tooltip || label}
       >
         {label}
       </label>
@@ -463,11 +463,11 @@ function PercentInput({
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: '1px solid var(--cui-border-color)',
         }}
       />
     </div>
@@ -514,10 +514,11 @@ function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
   const displayValue = isFocused ? localValue : `$${localValue}`;
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <label
-        className="text-[13px] font-medium"
+        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
         style={{ color: 'var(--cui-secondary-color)' }}
+        title={label}
       >
         {label}
       </label>
@@ -527,11 +528,11 @@ function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: '1px solid var(--cui-border-color)',
         }}
       />
     </div>
@@ -582,10 +583,11 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
   const displayValue = isFocused ? localValue : (suffix ? `${localValue} ${suffix}` : localValue);
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <label
-        className="text-[13px] font-medium"
+        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
         style={{ color: 'var(--cui-secondary-color)' }}
+        title={label}
       >
         {label}
       </label>
@@ -595,11 +597,11 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} px-2 py-1 text-right text-sm rounded`}
+        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: '1px solid var(--cui-border-color)',
         }}
       />
     </div>
@@ -617,21 +619,22 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
   const safeValue = value ?? options[0]?.value ?? '';
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-2">
       <label
-        className="text-[13px] font-medium"
+        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
         style={{ color: 'var(--cui-secondary-color)' }}
+        title={label}
       >
         {label}
       </label>
       <select
         value={safeValue}
         onChange={(e) => onChange(e.target.value)}
-        className={`${SELECT_WIDTH} px-2 py-1 text-sm rounded`}
+        className={`${SELECT_WIDTH} shrink-0 px-2 py-px text-sm rounded`}
         style={{
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: '1px solid var(--cui-border-color)',
           cursor: 'pointer',
         }}
       >
@@ -651,12 +654,7 @@ interface AssumptionRowProps {
 
 function AssumptionRow({ children }: AssumptionRowProps) {
   return (
-    <div
-      className="border-t first:border-t-0"
-      style={{ borderColor: 'var(--cui-border-color)' }}
-    >
-      <div className="py-2">{children}</div>
-    </div>
+    <div className="py-0.5">{children}</div>
   );
 }
 

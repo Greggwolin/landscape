@@ -16,9 +16,20 @@ export async function GET(
     const projectId = parseInt(projectIdParam);
 
     const rows = await sql`
-      SELECT *
-      FROM landscape.tbl_project
-      WHERE project_id = ${projectId}
+      SELECT
+        p.*,
+        ia.selected_cap_rate AS income_selected_cap_rate,
+        ia.terminal_cap_rate AS income_terminal_cap_rate
+      FROM landscape.tbl_project p
+      LEFT JOIN LATERAL (
+        SELECT selected_cap_rate, terminal_cap_rate
+        FROM landscape.tbl_income_approach
+        WHERE project_id = p.project_id
+        ORDER BY updated_at DESC NULLS LAST, income_approach_id DESC
+        LIMIT 1
+      ) ia ON true
+      WHERE p.project_id = ${projectId}
+      LIMIT 1
     `;
 
     if (rows.length === 0) {
@@ -28,7 +39,16 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(rows[0]);
+    const row = rows[0];
+    const response = {
+      ...row,
+      cap_rate_current: row.income_selected_cap_rate ?? null,
+      cap_rate_proforma: row.income_terminal_cap_rate ?? null,
+    };
+    delete response.income_selected_cap_rate;
+    delete response.income_terminal_cap_rate;
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Error fetching project details:', error);

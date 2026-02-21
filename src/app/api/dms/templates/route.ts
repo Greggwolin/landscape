@@ -6,26 +6,32 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const workspaceId = searchParams.get('workspace_id');
 
-    if (!workspaceId) {
-      return NextResponse.json(
-        { error: 'workspace_id is required' },
-        { status: 400 }
-      );
-    }
-
-    const templates = await sql`
-      SELECT 
-        template_id,
-        template_name,
-        description,
-        doc_type_options,
-        is_default,
-        created_at,
-        updated_at
-      FROM landscape.dms_templates
-      WHERE workspace_id = ${workspaceId}
-      ORDER BY is_default DESC, template_name ASC
-    `;
+    const templates = workspaceId
+      ? await sql`
+          SELECT
+            template_id,
+            template_name,
+            description,
+            doc_type_options,
+            is_default,
+            created_at,
+            updated_at
+          FROM landscape.dms_templates
+          WHERE workspace_id = ${workspaceId}
+          ORDER BY is_default DESC, template_name ASC
+        `
+      : await sql`
+          SELECT
+            template_id,
+            template_name,
+            description,
+            doc_type_options,
+            is_default,
+            created_at,
+            updated_at
+          FROM landscape.dms_templates
+          ORDER BY is_default DESC, template_name ASC
+        `;
 
     return NextResponse.json({
       success: true,

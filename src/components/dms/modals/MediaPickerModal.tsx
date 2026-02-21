@@ -13,8 +13,6 @@ import {
 } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-
 /** Classification filter tabs */
 const FILTER_TABS = [
   { key: 'all', label: 'All' },
@@ -65,10 +63,21 @@ export default function MediaPickerModal({
   singleSelect = false,
   onSelect,
 }: MediaPickerModalProps) {
+  const djangoBaseUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeFilter, setActiveFilter] = useState('all');
   const [lightboxMedia, setLightboxMedia] = useState<AvailableMediaItem | null>(null);
+
+  const resolveImageSrc = useCallback(
+    (uri: string | undefined | null): string => {
+      if (!uri) return '';
+      if (uri.startsWith('http')) return uri;
+      if (uri.startsWith('/')) return `${djangoBaseUrl}${uri}`;
+      return `${djangoBaseUrl}/media/${uri}`;
+    },
+    [djangoBaseUrl]
+  );
 
   // Fetch available media
   const { data, isLoading, error } = useQuery({
@@ -79,7 +88,7 @@ export default function MediaPickerModal({
         entity_type: entityType,
         entity_id: String(entityId),
       });
-      const res = await fetch(`${DJANGO_API_URL}/api/dms/media/available/?${params}`);
+      const res = await fetch(`${djangoBaseUrl}/api/dms/media/available/?${params}`);
       if (!res.ok) throw new Error('Failed to fetch available media');
       return res.json() as Promise<{ project_id: number; total: number; items: AvailableMediaItem[] }>;
     },
@@ -91,7 +100,7 @@ export default function MediaPickerModal({
     mutationFn: async (mediaIds: number[]) => {
       const results = [];
       for (const mediaId of mediaIds) {
-        const res = await fetch(`${DJANGO_API_URL}/api/dms/media/links/`, {
+        const res = await fetch(`${djangoBaseUrl}/api/dms/media/links/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -276,9 +285,7 @@ export default function MediaPickerModal({
             >
               {filteredItems.map((item) => {
                 const isSelected = selectedIds.has(item.media_id);
-                const thumbUrl = item.thumbnail_uri
-                  ? `${DJANGO_API_URL}${item.thumbnail_uri}`
-                  : null;
+                const thumbUrl = resolveImageSrc(item.thumbnail_uri || item.storage_uri || '');
 
                 return (
                   <div
@@ -445,11 +452,7 @@ export default function MediaPickerModal({
         >
           <img
             src={
-              lightboxMedia.storage_uri
-                ? `${DJANGO_API_URL}${lightboxMedia.storage_uri}`
-                : lightboxMedia.thumbnail_uri
-                  ? `${DJANGO_API_URL}${lightboxMedia.thumbnail_uri}`
-                  : ''
+              resolveImageSrc(lightboxMedia.storage_uri || lightboxMedia.thumbnail_uri || '')
             }
             alt={lightboxMedia.asset_name || 'Preview'}
             style={{

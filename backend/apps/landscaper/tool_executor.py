@@ -160,6 +160,105 @@ ALLOWED_UPDATES = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Unit Field Aliases — map common tool input names to actual model field names
+# Applied in handle_update_units before passing records to MutationService
+# ─────────────────────────────────────────────────────────────────────────────
+UNIT_FIELD_ALIASES = {
+    'status': 'occupancy_status',
+    'occupancy': 'occupancy_status',
+    'beds': 'bedrooms',
+    'bath': 'bathrooms',
+    'baths': 'bathrooms',
+    'sqft': 'square_feet',
+    'sf': 'square_feet',
+    'rent': 'current_rent',
+    'lease_start': None,   # on lease model, not unit — flag for warning
+    'lease_end': None,     # on lease model, not unit — flag for warning
+}
+
+# Valid field names on MultifamilyUnit (for validation after alias resolution)
+VALID_UNIT_FIELDS = {
+    'unit_number', 'unit_type', 'unit_category', 'unit_designation',
+    'building_name', 'bedrooms', 'bathrooms', 'square_feet',
+    'current_rent', 'market_rent', 'occupancy_status',
+    'renovation_status', 'renovation_cost', 'renovation_date',
+    'turns', 'other_features', 'extra_data',
+    # Lease fields passed through to lease creation (not on unit model, but handled downstream)
+    'lease_start_date', 'lease_end_date', 'lease_term_months',
+    'tenant_name',
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Occupancy Status Normalization — map raw Excel/document values to canonical DB values
+# ─────────────────────────────────────────────────────────────────────────────
+OCCUPANCY_STATUS_MAP = {
+    'current': 'occupied',
+    'occupied': 'occupied',
+    'vacant': 'vacant',
+    'vacant-unrented': 'vacant',
+    'vacant-rented': 'vacant',
+    'vacant unrented': 'vacant',
+    'vacant rented': 'vacant',
+    'notice': 'notice',
+    'eviction': 'eviction',
+    'model': 'model',
+    'down': 'down',
+    'employee': 'occupied',
+    'office': 'occupied',
+}
+
+
+def normalize_unit_record(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize a single unit record: resolve field aliases and normalize values.
+
+    Applied before records reach MutationService to ensure consistent field names
+    and canonical occupancy status values.
+    """
+    normalized = {}
+    for key, value in rec.items():
+        # Check if this field is an alias
+        if key in UNIT_FIELD_ALIASES:
+            actual = UNIT_FIELD_ALIASES[key]
+            if actual is None:
+                # Field belongs to a related model — log warning and skip
+                logger.warning(
+                    f"[update_units] Field '{key}' belongs to a related model (lease), "
+                    f"not MultifamilyUnit. Value '{value}' will be skipped. "
+                    f"Use update_leases for lease fields."
+                )
+                continue
+            logger.debug(f"[update_units] Aliased field '{key}' → '{actual}'")
+            key = actual
+        normalized[key] = value
+
+    # Warn about unrecognized fields (but still pass them through for flexibility)
+    for key in normalized:
+        if key not in VALID_UNIT_FIELDS:
+            logger.warning(
+                f"[update_units] Unrecognized field '{key}' — not in MultifamilyUnit model. "
+                f"Value will be passed through but may be ignored by the database."
+            )
+
+    # Normalize occupancy_status values
+    status = normalized.get('occupancy_status')
+    if status and isinstance(status, str):
+        canonical = OCCUPANCY_STATUS_MAP.get(status.strip().lower())
+        if canonical:
+            if canonical != status:
+                logger.info(
+                    f"[update_units] Normalized occupancy_status: '{status}' → '{canonical}'"
+                )
+            normalized['occupancy_status'] = canonical
+        else:
+            logger.warning(
+                f"[update_units] Unrecognized occupancy_status value: '{status}'. "
+                f"Keeping raw value. Known values: {list(OCCUPANCY_STATUS_MAP.keys())}"
+            )
+
+    return normalized
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Operating Expense Account Mapping
 # Maps OM expense labels to category_id in core_unit_cost_category (Operations activity)
 # NOTE: After migration 042, these IDs reference core_unit_cost_category.category_id
@@ -465,13 +564,40 @@ def cast_value(field: str, value: str) -> Any:
 
 def get_current_value(table: str, field: str, project_id: int) -> Optional[Any]:
     """Get the current value of a field for a project."""
-    table_config = ALLOWED_UPDATES.get(table)
+    normalized_table = table.split('.')[-1]
+    table_config = ALLOWED_UPDATES.get(normalized_table)
     if not table_config:
         return None
 
     # Check for field aliases
     field_aliases = table_config.get('field_aliases', {})
     db_field = field_aliases.get(field, field)
+
+    # Special case: cap rates should come from Income Approach (source of truth)
+    if normalized_table == 'tbl_project' and db_field in (
+        'cap_rate_current',
+        'cap_rate_proforma',
+        'cap_rate_going_in',
+        'cap_rate',
+    ):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT selected_cap_rate, terminal_cap_rate
+                    FROM landscape.tbl_income_approach
+                    WHERE project_id = %s
+                    ORDER BY updated_at DESC NULLS LAST, income_approach_id DESC
+                    LIMIT 1
+                """, [project_id])
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                if db_field in ('cap_rate_proforma',):
+                    return row[1]
+                return row[0]
+        except Exception as e:
+            logger.warning(f"Could not get income approach cap rate for project {project_id}: {e}")
+            return None
 
     schema = table_config.get('schema', 'landscape')
     pk_field = table_config.get('pk_field')
@@ -484,7 +610,7 @@ def get_current_value(table: str, field: str, project_id: int) -> Optional[Any]:
         with connection.cursor() as cursor:
             query = f"""
                 SELECT {db_field}
-                FROM {schema}.{table}
+                FROM {schema}.{normalized_table}
                 WHERE {lookup_field} = %s
                 LIMIT 1
             """
@@ -1560,9 +1686,10 @@ def handle_get_project_fields(
     values = {}
 
     for field_spec in fields_input:
-        table = field_spec.get('table', '')
+        table_raw = field_spec.get('table', '')
+        table = table_raw.split('.')[-1]
         field = field_spec.get('field', '')
-        key = f"{table}.{field}"
+        key = f"{table_raw}.{field}"
 
         table_config = ALLOWED_UPDATES.get(table)
         if table_config and field in table_config['fields']:
@@ -2895,11 +3022,15 @@ def handle_update_units(
     When auto-executed (propose_only=False), uses MutationService._execute_mutation
     which creates units, leases, AND unit types in one atomic operation.
     """
-    records = tool_input.get('records', [])
+    raw_records = tool_input.get('records', [])
     reason = tool_input.get('reason', 'Update units')
 
-    if not records:
+    if not raw_records:
         return {'success': False, 'error': 'No records provided'}
+
+    # Normalize all records: resolve field aliases (status→occupancy_status, etc.)
+    # and normalize values (e.g., "Current"→"occupied", "Vacant-Unrented"→"vacant")
+    records = [normalize_unit_record(rec) for rec in raw_records]
 
     from .services.mutation_service import MutationService
 
@@ -2935,6 +3066,156 @@ def handle_update_units(
         )
 
     return result
+
+
+@register_tool('delete_units', is_mutation=True)
+def handle_delete_units(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Delete specified units from the project.
+
+    Two-phase confirmation flow (auto-execute path):
+      Phase 1: confirmed=false → validates units, returns confirmation payload
+      Phase 2: confirmed=true  → executes deletion
+
+    When not in AUTO_EXECUTE_TOOLS (propose_only=True), falls through to
+    MutationService.create_proposal() as before.
+
+    Handles dependent records (leases, turns) before deleting units.
+    Uses transaction.atomic() for the entire batch.
+    """
+    unit_identifiers = tool_input.get('unit_identifiers', [])
+    reason = tool_input.get('reason', 'Delete units')
+    confirmed = tool_input.get('confirmed', False)
+
+    if not unit_identifiers:
+        return {'success': False, 'error': 'No unit_identifiers provided'}
+
+    # Normalize to strings
+    unit_identifiers = [str(u).strip() for u in unit_identifiers]
+
+    # Validate units exist in this project
+    try:
+        with connection.cursor() as cursor:
+            placeholders = ','.join(['%s'] * len(unit_identifiers))
+            cursor.execute(f"""
+                SELECT unit_id, unit_number
+                FROM landscape.tbl_multifamily_unit
+                WHERE project_id = %s AND unit_number IN ({placeholders})
+            """, [project_id] + unit_identifiers)
+            found_units = {row[1]: row[0] for row in cursor.fetchall()}
+    except Exception as e:
+        logger.error(f"Error validating units for deletion: {e}")
+        return {'success': False, 'error': str(e)}
+
+    if not found_units:
+        return {
+            'success': False,
+            'error': f'None of the specified units found in this project: {unit_identifiers}'
+        }
+
+    not_found = [u for u in unit_identifiers if u not in found_units]
+    unit_ids = list(found_units.values())
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='unit_delete',
+            table_name='tbl_multifamily_unit',
+            field_name=None,
+            proposed_value={
+                'delete': True,
+                'unit_numbers': list(found_units.keys()),
+                'unit_ids': unit_ids,
+                'count': len(found_units),
+            },
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    # ── Auto-execute path: Two-phase confirmation ──────────────────────
+    # Phase 1: Return confirmation payload so Claude can present to user
+    if not confirmed:
+        return {
+            'success': True,
+            'action': 'confirm_required',
+            'status': 'pending_confirmation',
+            'message': (
+                f'Ready to delete {len(found_units)} unit(s). '
+                f'Call delete_units again with confirmed=true to execute.'
+            ),
+            'unit_numbers': list(found_units.keys()),
+            'unit_ids': unit_ids,
+            'count': len(found_units),
+            'reason': reason,
+            'not_found': not_found if not_found else [],
+            'hint': (
+                'Present this to the user: "I found [count] units to delete: [unit_numbers]. '
+                'Reason: [reason]. Shall I proceed?" '
+                'If the user confirms, call delete_units again with the same unit_identifiers '
+                'and confirmed=true.'
+            ),
+        }
+
+    # Phase 2: User confirmed — execute deletion
+    logger.info(f"[delete_units] Confirmed deletion of {len(unit_ids)} units for project {project_id}")
+
+    # Direct execution — delete dependents then units in one transaction
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                id_placeholders = ','.join(['%s'] * len(unit_ids))
+
+                # 1. Delete leases (FK: tbl_multifamily_lease.unit_id)
+                cursor.execute(f"""
+                    DELETE FROM landscape.tbl_multifamily_lease
+                    WHERE unit_id IN ({id_placeholders})
+                """, unit_ids)
+                leases_deleted = cursor.rowcount
+
+                # 2. Delete turns (FK: tbl_multifamily_turn.unit_id)
+                cursor.execute(f"""
+                    DELETE FROM landscape.tbl_multifamily_turn
+                    WHERE unit_id IN ({id_placeholders})
+                """, unit_ids)
+                turns_deleted = cursor.rowcount
+
+                # 3. Delete the units themselves
+                cursor.execute(f"""
+                    DELETE FROM landscape.tbl_multifamily_unit
+                    WHERE project_id = %s AND unit_id IN ({id_placeholders})
+                """, [project_id] + unit_ids)
+                units_deleted = cursor.rowcount
+
+        # Log the activity
+        _log_rent_roll_activity(
+            project_id, 'tbl_multifamily_unit', 'batch_delete',
+            0, 0, f"{reason} — deleted {units_deleted} units"
+        )
+
+        result = {
+            'success': True,
+            'action': 'deleted',
+            'units_deleted': units_deleted,
+            'unit_numbers': list(found_units.keys()),
+            'dependents_removed': {
+                'leases': leases_deleted,
+                'turns': turns_deleted,
+            },
+        }
+        if not_found:
+            result['not_found'] = not_found
+        return result
+
+    except Exception as e:
+        logger.error(f"Error deleting units: {e}")
+        return {'success': False, 'error': str(e)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -9470,10 +9751,15 @@ RESPONSE RULES (follow exactly):
 - If unit count doesn't match file total, recommend cleanup FIRST. Name the specific units to delete.
 """
 
-CONFIRM_BEHAVIORAL_NUDGE = """
+CONFIRM_NUDGE_INITIAL_LOAD = """
 ---
 RESPONSE RULE: Report what you did in 1-2 sentences max. Do NOT restate the original analysis.
 Example: "Done. Updated 113 units, derived 9 Plans, created Other and Delinquency columns."
+"""
+
+CONFIRM_NUDGE_UPDATE_FLOW = """
+---
+RESPONSE RULE: Extraction is running in the background. When complete, call compute_rent_roll_delta to analyze what changed — do NOT narrate "Done" or imply data was written. Tell the user extraction is running and to say "check for changes" when ready.
 """
 
 
@@ -9561,12 +9847,32 @@ def handle_confirm_column_mapping(
 ) -> Dict[str, Any]:
     """Apply confirmed column mappings and start rent roll extraction."""
     document_id = tool_input.get('document_id')
-    mappings = tool_input.get('mappings', [])
+    # Accept both 'mappings' (correct) and 'mapping' (common LLM mistake)
+    mappings = tool_input.get('mappings') or tool_input.get('mapping', [])
 
     if not document_id:
         return {'success': False, 'error': 'document_id is required'}
     if not mappings:
         return {'success': False, 'error': 'mappings array is required'}
+
+    # Normalize mappings: ensure each entry is a dict, not a string
+    normalized_mappings = []
+    for m in mappings:
+        if isinstance(m, str):
+            # LLM sometimes passes "column -> field" strings — parse them
+            parts = m.replace('→', '->').split('->')
+            if len(parts) == 2:
+                normalized_mappings.append({
+                    'source_column': parts[0].strip(),
+                    'target_field': parts[1].strip() if parts[1].strip().lower() not in ('null', 'skip', 'none', '') else None
+                })
+            else:
+                normalized_mappings.append({'source_column': m.strip(), 'target_field': None})
+        elif isinstance(m, dict):
+            normalized_mappings.append(m)
+        else:
+            logger.warning(f"Skipping unexpected mapping type: {type(m)} — {m}")
+    mappings = normalized_mappings
 
     try:
         from apps.documents.models import Document
@@ -9578,19 +9884,87 @@ def handle_confirm_column_mapping(
         except Document.DoesNotExist:
             return {'success': False, 'error': f'Document {document_id} not found in this project'}
 
+        # Section 8 source column — when provided, a boolean 'is_section_8'
+        # dynamic column is created and populated from this source column's values.
+        section8_source = tool_input.get('section8_source_column')
+
         result = apply_column_mapping(
             project_id=project_id,
             document_id=int(document_id),
             mappings=mappings,
+            section8_source_column=section8_source,
         )
 
-        # Append behavioral nudge so Claude responds concisely
-        result['response_rules'] = CONFIRM_BEHAVIORAL_NUDGE.strip()
+        # For update flows (not initial load), set awaiting_delta_review flag
+        # on the ExtractionJob so extraction tools persist across turns.
+        # Also store document_id and mappings so the forced delta call can use them.
+        if result.get('success') and not result.get('is_initial_load'):
+            try:
+                from apps.knowledge.models import ExtractionJob
+                job_id = result.get('job_id')
+                if job_id:
+                    job = ExtractionJob.objects.get(job_id=job_id)
+                    if job.result_summary is None:
+                        job.result_summary = {}
+                    job.result_summary['awaiting_delta_review'] = True
+                    job.result_summary['delta_document_id'] = int(document_id)
+                    job.result_summary['delta_mappings'] = mappings
+                    job.save(update_fields=['result_summary'])
+                    logger.info(f"[confirm_column_mapping] Set awaiting_delta_review=True on job {job_id} (doc={document_id})")
+            except Exception as flag_err:
+                logger.warning(f"[confirm_column_mapping] Failed to set awaiting_delta_review flag: {flag_err}")
+
+        # Append behavioral nudge — different for initial load vs update flow
+        if result.get('is_initial_load'):
+            result['response_rules'] = CONFIRM_NUDGE_INITIAL_LOAD.strip()
+        else:
+            result['response_rules'] = CONFIRM_NUDGE_UPDATE_FLOW.strip()
 
         return result
 
     except Exception as e:
         logger.error(f"Error confirming column mapping for doc {document_id}: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('compute_rent_roll_delta')
+def handle_compute_rent_roll_delta(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Compute delta between uploaded rent roll and existing data."""
+    document_id = tool_input.get('document_id')
+    mappings = tool_input.get('mappings') or tool_input.get('mapping', [])
+
+    if not document_id:
+        return {'success': False, 'error': 'document_id is required'}
+    if not mappings:
+        return {'success': False, 'error': 'mappings array is required'}
+
+    try:
+        from apps.knowledge.services.delta_computation import compute_rent_roll_delta
+
+        result = compute_rent_roll_delta(
+            project_id=project_id,
+            document_id=int(document_id),
+            mappings=mappings,
+        )
+
+        if result.get('success'):
+            # Append behavioral nudge for concise response
+            summary = result.get('summary', {})
+            result['response_rules'] = (
+                "Report the delta summary in 2-3 sentences. "
+                f"Units with changes: {summary.get('units_with_changes', 0)}. "
+                f"Total field changes: {summary.get('total_field_changes', 0)}. "
+                "Ask the user if they want to see the changes highlighted in the rent roll grid."
+            )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error computing rent roll delta for doc {document_id}: {e}", exc_info=True)
         return {'success': False, 'error': str(e)}
 
 
@@ -10330,6 +10704,8 @@ AUTO_EXECUTE_TOOLS = {
     'update_unit_types',  # Rent roll batch - populate floorplan/unit types
     'update_operating_expenses',  # OpEx batch - populate from OM/T12/operating statement
     'confirm_column_mapping',  # Column mapping - user confirmed in chat
+    'compute_rent_roll_delta',  # Delta computation - deterministic diff, no mutation
+    'delete_units',       # Unit deletion - user explicitly requested in chat (2-phase: confirm → execute)
 }
 
 
@@ -10745,7 +11121,91 @@ def get_document_content(
                 if embedding_rows:
                     # Combine embedding chunks into readable content
                     chunks = [row[0] for row in embedding_rows if row[0]]
-                    combined_content = "\n\n---\n\n".join(chunks)
+
+                    # When focus is set, filter chunks to only relevant ones
+                    if focus:
+                        _focus_patterns = {
+                            'rental_comps': [
+                                r'(?i)(comparable|comp)\s*(rental|properties|rentals)',
+                                r'(?i)rental\s*comps',
+                                r'(?i)(market|competitive)\s*survey',
+                                r'(?i)bedroom.{0,5}bath.{0,20}\$\d',
+                            ],
+                            'operating_expenses': [
+                                r'(?i)operating\s*expenses',
+                                r'(?i)T-?12',
+                                r'(?i)trailing\s*twelve',
+                                r'(?i)expense\s*summary',
+                            ],
+                            'rent_roll': [
+                                r'(?i)proforma\s*(average|range|rent)',
+                                r'(?i)rent\s*roll\s*summary',
+                                r'\d{3}\s+(residential|commercial|leasing)',
+                                r'(?i)lease\s+from.*lease\s+to',
+                                r'(?i)BD/BA.*Amenity.*Sq\.\s*Ft',
+                            ],
+                        }
+                        patterns = _focus_patterns.get(focus, [])
+                        if patterns:
+                            import re as _re
+                            filtered = [c for c in chunks if any(_re.search(p, c) for p in patterns)]
+                            if filtered:
+                                logger.info(f"[get_document_content] Focus '{focus}' filtered {len(chunks)} chunks → {len(filtered)}")
+                                chunks = filtered
+
+                                # Post-process rent_roll focus: extract unit-level rows and add structure
+                                if focus == 'rent_roll' and filtered:
+                                    import re as _re_local
+                                    unit_rows = []
+
+                                    # Chunks are often single-line (no newlines between unit rows)
+                                    # Use regex split to find unit boundaries
+                                    full_text = " ".join(filtered)
+
+                                    # Split on unit number boundaries: look-ahead for digit pattern + type
+                                    # This captures "100 commercial/vacant - - 1,101 $3,303.00 ..."
+                                    unit_pattern = r'(?=\b(\d{2,4})\s+(residential|commercial|leasing))'
+
+                                    # Find all unit row start positions
+                                    unit_starts = list(_re_local.finditer(unit_pattern, full_text))
+
+                                    if unit_starts:
+                                        unit_rows.append("Unit | Type | BD/BA | Amenity | SqFt | Rent | LeaseFrom | LeaseTo | ProformaRange | ProformaAvg | CurrentRPSF | ProformaRPSF")
+                                        unit_rows.append("---")
+
+                                        for i, match in enumerate(unit_starts):
+                                            start = match.start()
+                                            # End is the start of the next unit, or end of string
+                                            end = unit_starts[i + 1].start() if i + 1 < len(unit_starts) else len(full_text)
+                                            row_text = full_text[start:end].strip()
+                                            # Clean up: remove page headers/footers that might be embedded
+                                            row_text = _re_local.sub(r'Rent Roll Summary.*?Offering Memorandum', '', row_text).strip()
+                                            row_text = _re_local.sub(r'14105 Chadron Ave \| \d+', '', row_text).strip()
+                                            row_text = _re_local.sub(r'Unit Type BD/BA Amenity Sq\.\s*Ft\..*?Proforma RPSF', '', row_text).strip()
+                                            if row_text:
+                                                unit_rows.append(row_text)
+
+                                    if len(unit_rows) > 2:  # More than just header + separator
+                                        # Look for totals
+                                        totals_match = _re_local.search(r'(\d+ units.*?(?:AVERAGES|$))', full_text)
+                                        if totals_match:
+                                            unit_rows.append("---")
+                                            unit_rows.append(totals_match.group(1).strip())
+
+                                        filtered_text = f"RENT ROLL - UNIT LEVEL DATA ({len(unit_rows) - 2} unit rows)\nColumns: Unit# Type BD/BA Amenity SqFt CurrentRent LeaseFrom LeaseTo ProformaRange ProformaAverage CurrentRPSF ProformaRPSF\n\n" + "\n".join(unit_rows)
+                                        combined_content = filtered_text
+                                        logger.info(f"[get_document_content] Rent roll post-processed: {len(unit_rows) - 2} unit rows extracted from continuous text")
+                                    else:
+                                        combined_content = "\n\n---\n\n".join(filtered)
+                                        logger.info(f"[get_document_content] Rent roll post-processing found no unit rows, returning raw chunks")
+                                else:
+                                    combined_content = "\n\n---\n\n".join(filtered)
+                            else:
+                                combined_content = "\n\n---\n\n".join(chunks)
+                        else:
+                            combined_content = "\n\n---\n\n".join(chunks)
+                    else:
+                        combined_content = "\n\n---\n\n".join(chunks)
 
                     # Truncate if too long
                     if len(combined_content) > max_length:
@@ -10958,6 +11418,13 @@ def _extract_focused_content(text: str, focus: str, max_length: int) -> Optional
             r'(?i)(property|real\s*estate)\s*taxes',
             r'(?i)utilities',
             r'(?i)management\s*fee',
+        ],
+        'rent_roll': [
+            r'(?i)proforma\s*(average|range|rent)',
+            r'(?i)rent\s*roll\s*summary',
+            r'\d{3}\s+(residential|commercial|leasing)',  # Unit rows like "100 commercial/vacant"
+            r'(?i)lease\s+from.*lease\s+to',
+            r'(?i)BD/BA.*Amenity.*Sq\.\s*Ft',
         ],
     }
 

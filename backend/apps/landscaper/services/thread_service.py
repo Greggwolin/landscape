@@ -55,11 +55,16 @@ class ThreadService:
             Active ChatThread instance
         """
         # Try to find existing active thread
-        thread = ChatThread.objects.filter(
-            project_id=project_id,
-            page_context=page_context,
-            is_active=True
-        ).first()
+        lookup = {
+            'project_id': project_id,
+            'page_context': page_context,
+            'is_active': True,
+        }
+        if subtab_context:
+            lookup['subtab_context'] = subtab_context
+        else:
+            lookup['subtab_context__isnull'] = True
+        thread = ChatThread.objects.filter(**lookup).first()
 
         if thread:
             return thread
@@ -78,6 +83,7 @@ class ThreadService:
     def get_threads_for_project(
         project_id: int,
         page_context: Optional[str] = None,
+        subtab_context: Optional[str] = None,
         include_inactive: bool = False
     ) -> list:
         """
@@ -95,6 +101,9 @@ class ThreadService:
 
         if page_context:
             queryset = queryset.filter(page_context=page_context)
+
+        if subtab_context:
+            queryset = queryset.filter(subtab_context=subtab_context)
 
         if not include_inactive:
             queryset = queryset.filter(is_active=True)
@@ -169,14 +178,39 @@ class ThreadService:
             New ChatThread instance
         """
         # Close existing active thread(s) for this context
-        existing = ChatThread.objects.filter(
-            project_id=project_id,
-            page_context=page_context,
-            is_active=True
-        )
+        existing_lookup = {
+            'project_id': project_id,
+            'page_context': page_context,
+            'is_active': True,
+        }
+        if subtab_context:
+            existing_lookup['subtab_context'] = subtab_context
+        else:
+            existing_lookup['subtab_context__isnull'] = True
+        existing = ChatThread.objects.filter(**existing_lookup)
 
         for thread in existing:
             ThreadService.close_thread(thread.id, generate_summary=True)
+
+            # Archive to activity log
+            try:
+                from ..models import ActivityItem
+                msg_count = thread.messages.count()
+                if msg_count > 0:
+                    summary_text = thread.summary or f"Chat thread with {msg_count} messages"
+                    ActivityItem.objects.create(
+                        project_id=project_id,
+                        activity_type='status',
+                        title=thread.title or f"Landscaper: {page_context}" + (f" / {subtab_context}" if subtab_context else ""),
+                        summary=f"Archived chat ({msg_count} messages): {summary_text[:200]}",
+                        status='complete',
+                        source_type='thread',
+                        source_id=str(thread.id),
+                        details=[f"Page: {page_context}", f"Tab: {subtab_context or 'general'}", f"Messages: {msg_count}"],
+                    )
+                    logger.info(f"Archived thread {thread.id} to activity log ({msg_count} messages)")
+            except Exception as e:
+                logger.warning(f"Failed to archive thread {thread.id} to activity: {e}")
 
         # Create new thread
         new_thread = ChatThread.objects.create(

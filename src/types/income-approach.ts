@@ -311,7 +311,9 @@ export const LEGACY_NOI_BASIS_LABELS: Record<LegacyNOIBasis, string> = {
 // TILE COLORS
 // ============================================================================
 
-export const TILE_COLORS: Record<NOIBasis, { bg: string; border: string; text: string }> = {
+type TileColor = { bg: string; border: string; text: string };
+
+const TILE_COLORS_DARK: Record<NOIBasis, TileColor> = {
   f12_current: {
     bg: 'rgba(71, 85, 105, 0.2)',
     border: '#475569',
@@ -329,12 +331,50 @@ export const TILE_COLORS: Record<NOIBasis, { bg: string; border: string; text: s
   },
 };
 
+const TILE_COLORS_LIGHT: Record<NOIBasis, TileColor> = {
+  f12_current: {
+    bg: 'rgba(71, 85, 105, 0.08)',
+    border: '#475569',
+    text: '#334155',
+  },
+  f12_market: {
+    bg: 'rgba(13, 148, 136, 0.08)',
+    border: '#0D9488',
+    text: '#0F766E',
+  },
+  stabilized: {
+    bg: 'rgba(5, 150, 105, 0.08)',
+    border: '#059669',
+    text: '#047857',
+  },
+};
+
+/** @deprecated Use getTileColors(theme) instead for theme-aware colors */
+export const TILE_COLORS: Record<NOIBasis, TileColor> = TILE_COLORS_DARK;
+
+export function getTileColors(theme: 'light' | 'dark'): Record<NOIBasis, TileColor> {
+  return theme === 'light' ? TILE_COLORS_LIGHT : TILE_COLORS_DARK;
+}
+
 // DCF tile color (separate since it's a different valuation method)
-export const DCF_TILE_COLOR = {
+const DCF_TILE_COLOR_DARK: TileColor = {
   bg: 'rgba(124, 58, 237, 0.2)',
   border: '#7C3AED',
   text: '#c4b5fd',
 };
+
+const DCF_TILE_COLOR_LIGHT: TileColor = {
+  bg: 'rgba(124, 58, 237, 0.08)',
+  border: '#7C3AED',
+  text: '#6D28D9',
+};
+
+/** @deprecated Use getDCFTileColor(theme) instead for theme-aware colors */
+export const DCF_TILE_COLOR = DCF_TILE_COLOR_DARK;
+
+export function getDCFTileColor(theme: 'light' | 'dark'): TileColor {
+  return theme === 'light' ? DCF_TILE_COLOR_LIGHT : DCF_TILE_COLOR_DARK;
+}
 
 // ============================================================================
 // DCF TYPES

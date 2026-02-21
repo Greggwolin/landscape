@@ -193,16 +193,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 assumptions = ValueAddAssumptions(
                     project=project,
                     is_enabled=False,
-                    reno_cost_per_sf=Decimal('8.00'),
+                    reno_cost_per_sf=None,
                     reno_cost_basis='sf',
-                    relocation_incentive=Decimal('1500.00'),
+                    relocation_incentive=None,
                     renovate_all=True,
                     units_to_renovate=None,
-                    reno_starts_per_month=4,
-                    reno_start_month=3,
-                    months_to_complete=3,
-                    rent_premium_pct=Decimal('0.15'),
-                    relet_lag_months=2,
+                    reno_starts_per_month=None,
+                    reno_start_month=None,
+                    months_to_complete=None,
+                    rent_premium_pct=None,
+                    relet_lag_months=None,
                 )
                 serializer = ValueAddAssumptionsSerializer(assumptions)
                 return Response({
@@ -216,16 +216,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 assumptions = ValueAddAssumptions(
                     project=project,
                     is_enabled=False,
-                    reno_cost_per_sf=Decimal('8.00'),
+                    reno_cost_per_sf=None,
                     reno_cost_basis='sf',
-                    relocation_incentive=Decimal('1500.00'),
+                    relocation_incentive=None,
                     renovate_all=True,
                     units_to_renovate=None,
-                    reno_starts_per_month=4,
-                    reno_start_month=3,
-                    months_to_complete=3,
-                    rent_premium_pct=Decimal('0.15'),
-                    relet_lag_months=2,
+                    reno_starts_per_month=None,
+                    reno_start_month=None,
+                    months_to_complete=None,
+                    rent_premium_pct=None,
+                    relet_lag_months=None,
                 )
 
             serializer = ValueAddAssumptionsSerializer(assumptions)

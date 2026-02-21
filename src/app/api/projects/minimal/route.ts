@@ -31,6 +31,7 @@ type MinimalProjectRequest = {
   gross_sf?: number | null
   analysis_start_date?: string | null
   asking_price?: number | null
+  dms_template_id?: number | null
 }
 
 const normalizePerspective = (value?: string | null): AnalysisPerspective | null => {
@@ -131,6 +132,22 @@ export async function POST(request: NextRequest) {
     const jurisdictionState = state
     const jurisdictionCounty = county
 
+    // Resolve DMS template: use provided value, or look up the workspace default
+    let dmsTemplateId: number | null = null
+    if (body.dms_template_id && Number.isFinite(body.dms_template_id)) {
+      dmsTemplateId = body.dms_template_id
+    } else {
+      const defaultTemplate = await sql<{ template_id: number }[]>`
+        SELECT template_id FROM landscape.dms_templates
+        WHERE is_default = true
+        ORDER BY template_id ASC
+        LIMIT 1
+      `
+      if (defaultTemplate.length > 0) {
+        dmsTemplateId = defaultTemplate[0].template_id
+      }
+    }
+
     const inserted = await sql<{
       project_id: number
       project_name: string
@@ -165,6 +182,7 @@ export async function POST(request: NextRequest) {
         gross_sf,
         analysis_start_date,
         asking_price,
+        dms_template_id,
         analysis_mode,
         is_active,
         created_at,
@@ -194,6 +212,7 @@ export async function POST(request: NextRequest) {
         ${grossSf},
         ${body.analysis_start_date || null},
         ${askingPrice},
+        ${dmsTemplateId},
         'napkin',
         true,
         NOW(),

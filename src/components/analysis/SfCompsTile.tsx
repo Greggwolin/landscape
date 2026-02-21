@@ -6,10 +6,14 @@ import { ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { formatMoney, formatNumber } from '@/utils/formatters/number';
+import { DEFAULT_SFD_PRODUCTS, getProductBand } from '@/lib/napkin/sfdCompStats';
 
 type SfCompsTileProps = {
   projectId: number;
+  title?: string;
 };
+
+type LotSizeTier = 'low' | 'mid' | 'high' | 'none';
 
 function formatCurrencyCompact(value: number | null | undefined, fractionDigits = 0): string {
   if (value === null || value === undefined) return '—';
@@ -17,6 +21,15 @@ function formatCurrencyCompact(value: number | null | undefined, fractionDigits 
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits
   });
+}
+
+function percentile(sortedValues: number[], p: number): number | null {
+  if (sortedValues.length === 0) return null;
+  const index = p * (sortedValues.length - 1);
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sortedValues[lower];
+  return sortedValues[lower] + (sortedValues[upper] - sortedValues[lower]) * (index - lower);
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -28,18 +41,40 @@ function formatDate(value: string | null | undefined): string {
   }
 }
 
-export function SfCompsTile({ projectId }: SfCompsTileProps) {
+function formatSoldDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  try {
+    return format(parseISO(value), 'MMM d');
+  } catch (_err) {
+    return value;
+  }
+}
+
+function formatAsOfDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  try {
+    return format(parseISO(value), 'MMM d, yyyy');
+  } catch (_err) {
+    return value;
+  }
+}
+
+export function SfCompsTile({ projectId, title = 'Housing Price Comparables' }: SfCompsTileProps) {
   // Committed values used for the API query
   const [radiusMiles, setRadiusMiles] = useState<number>(3);
   const [soldWithinDays, setSoldWithinDays] = useState<number>(180);
+  const [minYearBuilt, setMinYearBuilt] = useState<number | undefined>(undefined);
 
   // Draft values for the input fields (updated on every keystroke)
   const [draftRadius, setDraftRadius] = useState<string>('3');
   const [draftDays, setDraftDays] = useState<string>('180');
+  const [draftMinYear, setDraftMinYear] = useState<string>('');
+  const [showAllSales, setShowAllSales] = useState(false);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useSfComps(projectId, {
     radiusMiles,
-    soldWithinDays
+    soldWithinDays,
+    ...(minYearBuilt !== undefined ? { minYearBuilt } : {})
   });
 
   // Commit radius value on blur or Enter
@@ -64,6 +99,21 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
     }
   }, [draftDays, soldWithinDays]);
 
+  const currentYear = new Date().getFullYear();
+  const commitMinYear = useCallback(() => {
+    const trimmed = draftMinYear.trim();
+    if (trimmed.length === 0) {
+      setMinYearBuilt(undefined);
+      return;
+    }
+    const value = parseInt(trimmed, 10);
+    if (Number.isFinite(value) && value >= 1900 && value <= currentYear) {
+      setMinYearBuilt(value);
+    } else {
+      setDraftMinYear(minYearBuilt ? String(minYearBuilt) : '');
+    }
+  }, [draftMinYear, minYearBuilt, currentYear]);
+
   const handleRadiusKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       commitRadius();
@@ -78,6 +128,13 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
     }
   }, [commitDays]);
 
+  const handleMinYearKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      commitMinYear();
+      (e.target as HTMLInputElement).blur();
+    }
+  }, [commitMinYear]);
+
   const sortedComps = useMemo(() => {
     if (!data?.comps) return [];
     return [...data.comps]
@@ -88,6 +145,54 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
       })
       .slice(0, 10);
   }, [data?.comps]);
+
+  const allSortedComps = useMemo(() => {
+    if (!data?.comps) return [];
+    return [...data.comps].sort((a, b) => {
+      const aDate = new Date(a.saleDate).getTime();
+      const bDate = new Date(b.saleDate).getTime();
+      return Number.isFinite(bDate) && Number.isFinite(aDate) ? bDate - aDate : 0;
+    });
+  }, [data?.comps]);
+
+  const lotSizePercentiles = useMemo(() => {
+    if (!data?.comps) return { p25: null, p75: null };
+    const lotSizes = data.comps
+      .map((comp) => comp.lotSqft)
+      .filter((value): value is number => value !== null && value !== undefined && value > 0)
+      .sort((a, b) => a - b);
+    return {
+      p25: percentile(lotSizes, 0.25),
+      p75: percentile(lotSizes, 0.75)
+    };
+  }, [data?.comps]);
+
+  const asOfLabel = useMemo(() => {
+    if (!data) return null;
+    const latestSaleDate = data.comps?.reduce((latest, comp) => {
+      if (!comp.saleDate) return latest;
+      return comp.saleDate > latest ? comp.saleDate : latest;
+    }, '');
+    return formatAsOfDate(latestSaleDate || data.asOfDate);
+  }, [data]);
+
+  const getLotSizeTier = useCallback((lotSqft: number | null | undefined): LotSizeTier => {
+    if (!lotSqft || !Number.isFinite(lotSqft)) return 'none';
+    const { p25, p75 } = lotSizePercentiles;
+    if (p25 === null || p75 === null) return 'none';
+    if (lotSqft <= p25) return 'low';
+    if (lotSqft >= p75) return 'high';
+    return 'mid';
+  }, [lotSizePercentiles]);
+
+  const lotSizeTierStyles: Record<LotSizeTier, { bg: string; border: string; dot: string }> = {
+    low: { bg: 'rgba(34, 197, 94, 0.12)', border: '#22c55e', dot: '#22c55e' },
+    mid: { bg: 'rgba(234, 179, 8, 0.12)', border: '#eab308', dot: '#eab308' },
+    high: { bg: 'rgba(239, 68, 68, 0.12)', border: '#ef4444', dot: '#ef4444' },
+    none: { bg: 'transparent', border: 'transparent', dot: '#9ca3af' }
+  };
+
+  const displayComps = showAllSales ? allSortedComps : sortedComps;
 
   const renderLoading = () => (
     <div className="d-flex align-items-center gap-3 py-3">
@@ -172,9 +277,9 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
   return (
     <div className="card h-100">
       <div className="card-header d-flex justify-content-between align-items-center">
-        <h5 className="mb-0">Housing Price Comparables</h5>
-        {data?.asOfDate && (
-          <span className="text-muted small">As of {formatDate(data.asOfDate)}</span>
+        <h5 className="mb-0">{title}</h5>
+        {asOfLabel && (
+          <span className="text-muted small">As of {asOfLabel}</span>
         )}
       </div>
       <div className="card-body">
@@ -183,7 +288,7 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
 
         {!isLoading && !isError && data && (
           <>
-            <div className="d-flex flex-wrap gap-3 align-items-center mb-3">
+            <div className="d-flex flex-wrap gap-3 align-items-end mb-3">
               <div>
                 <label className="text-muted small d-block mb-1">Radius (mi)</label>
                 <input
@@ -196,6 +301,21 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
                   onKeyDown={handleRadiusKeyDown}
                   className="form-control form-control-sm"
                   style={{ width: 70 }}
+                />
+              </div>
+              <div>
+                <label className="text-muted small d-block mb-1">Year Built</label>
+                <input
+                  type="number"
+                  min={1900}
+                  max={currentYear}
+                  placeholder="YYYY"
+                  value={draftMinYear}
+                  onChange={(e) => setDraftMinYear(e.target.value)}
+                  onBlur={commitMinYear}
+                  onKeyDown={handleMinYearKeyDown}
+                  className="form-control form-control-sm"
+                  style={{ width: 90 }}
                 />
               </div>
               <div>
@@ -213,8 +333,20 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
                   style={{ width: 70 }}
                 />
               </div>
-              <div className="text-muted small" style={{ alignSelf: 'flex-end', paddingBottom: 6 }}>
-                {isFetching ? 'Updating…' : `${data.stats.count} comps`}
+              <div className="d-flex align-items-center gap-2" style={{ paddingBottom: 6 }}>
+                <span className="text-muted small">
+                  {isFetching ? 'Updating…' : `${data.stats.count} comps`}
+                </span>
+                {data.stats.count > 10 && (
+                  <button
+                    type="button"
+                    className="btn btn-link btn-sm p-0"
+                    onClick={() => setShowAllSales((prev) => !prev)}
+                    style={{ color: 'var(--cui-primary)', textDecoration: 'none' }}
+                  >
+                    {showAllSales ? 'Hide All Sales' : 'Show All Sales'}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -227,64 +359,122 @@ export function SfCompsTile({ projectId }: SfCompsTileProps) {
                 <table className="table table-sm align-middle mb-0" style={{ fontSize: '0.8125rem', tableLayout: 'fixed', width: '100%' }}>
                   <thead>
                     <tr style={{ color: 'var(--cui-secondary-color)' }}>
-                      <th className="text-center" style={{ width: 55 }}>Sold</th>
-                      <th style={{ width: 200 }}>Address</th>
+                      <th className="text-center" style={{ width: 90 }}>Sold</th>
+                      <th style={{ width: 180 }}>Address</th>
+                      <th style={{ width: 100 }}>City</th>
                       <th className="text-center" style={{ width: 50 }}>Year</th>
+                      <th className="text-end" style={{ width: 65 }}>Lot SF</th>
+                      <th className="text-center" style={{ width: 55 }}>Band</th>
                       <th className="text-center" style={{ width: 35 }}>Bd</th>
                       <th className="text-center" style={{ width: 35 }}>Ba</th>
-                      <th className="text-end" style={{ width: 55 }}>SqFt</th>
-                      <th className="text-end" style={{ width: 55 }}>Lot</th>
-                      <th className="text-end" style={{ width: 75 }}>Price</th>
-                      <th className="text-end" style={{ width: 50 }}>$/SF</th>
+                      <th className="text-end" style={{ width: 60 }}>SqFt</th>
+                      <th className="text-end" style={{ width: 80 }}>Price</th>
+                      <th className="text-end" style={{ width: 55 }}>$/SF</th>
                       <th className="text-center" style={{ width: 30 }}></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedComps.map((comp) => (
-                      <tr key={comp.mlsId}>
-                        <td className="text-center text-muted">{formatDate(comp.saleDate)}</td>
-                        <td>
-                          <div
-                            className="text-truncate"
-                            title={`${comp.address || ''}, ${[comp.city, comp.state].filter(Boolean).join(', ')}`}
-                            style={{ maxWidth: 210, whiteSpace: 'nowrap' }}
-                          >
-                            <span className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>{comp.address || '—'}</span>
-                            <span className="text-muted">, {[comp.city, comp.state].filter(Boolean).join(', ')}</span>
-                          </div>
-                        </td>
-                        <td className="text-center text-muted">{comp.yearBuilt ?? '—'}</td>
-                        <td className="text-center text-muted">{comp.beds ?? '—'}</td>
-                        <td className="text-center text-muted">{comp.baths ?? '—'}</td>
-                        <td className="text-end text-muted">
-                          {comp.sqft != null ? formatNumber(comp.sqft) : '—'}
-                        </td>
-                        <td className="text-end text-muted">
-                          {comp.lotSqft != null ? formatNumber(comp.lotSqft) : '—'}
-                        </td>
-                        <td className="text-end fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                          {formatCurrencyCompact(comp.salePrice)}
-                        </td>
-                        <td className="text-end text-muted">
-                          {comp.pricePerSqft != null ? `$${comp.pricePerSqft}` : '—'}
-                        </td>
-                        <td className="text-center">
-                          {comp.url ? (
-                            <a
-                              href={comp.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: 'var(--cui-primary)' }}
-                              title="View on Redfin"
+                    {displayComps.map((comp) => {
+                      const lotTier = getLotSizeTier(comp.lotSqft);
+                      const tierStyle = lotSizeTierStyles[lotTier];
+                      const band = getProductBand(comp.lotSqft, DEFAULT_SFD_PRODUCTS);
+                      return (
+                        <tr key={comp.mlsId} style={tierStyle.bg !== 'transparent' ? { backgroundColor: tierStyle.bg } : undefined}>
+                          <td className="text-center text-muted">
+                            <span className="d-inline-flex align-items-center gap-1 justify-content-center">
+                              <span
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  backgroundColor: tierStyle.dot,
+                                  border: '1px solid rgba(0,0,0,0.08)',
+                                  flexShrink: 0
+                                }}
+                              />
+                              {formatSoldDate(comp.saleDate)}
+                            </span>
+                          </td>
+                          <td>
+                            <div
+                              className="text-truncate"
+                              title={comp.address || ''}
+                              style={{ maxWidth: 200, whiteSpace: 'nowrap' }}
                             >
-                              <ExternalLink size={14} />
-                            </a>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
+                              <span className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>{comp.address || '—'}</span>
+                            </div>
+                          </td>
+                          <td className="text-muted">
+                            <span className="text-truncate" title={[comp.city, comp.state].filter(Boolean).join(', ')}>
+                              {[comp.city, comp.state].filter(Boolean).join(', ') || '—'}
+                            </span>
+                          </td>
+                          <td className="text-center text-muted">{comp.yearBuilt ?? '—'}</td>
+                          <td className="text-end" style={{ color: 'var(--cui-body-color)' }}>
+                            <span className="d-inline-flex align-items-center gap-1 justify-content-end">
+                              <span
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  backgroundColor: tierStyle.dot,
+                                  flexShrink: 0
+                                }}
+                              />
+                              {comp.lotSqft != null ? formatNumber(comp.lotSqft) : '—'}
+                            </span>
+                          </td>
+                          <td className="text-center">
+                            {band ? (
+                              <span
+                                className="badge"
+                                style={{
+                                  fontSize: '0.7rem',
+                                  backgroundColor: 'var(--cui-tertiary-bg)',
+                                  border: '1px solid var(--cui-border-color)',
+                                  color: 'var(--cui-body-color)'
+                                }}
+                              >
+                                {band}
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+                            )}
+                          </td>
+                          <td className="text-center text-muted">{comp.beds ?? '—'}</td>
+                          <td className="text-center text-muted">{comp.baths ?? '—'}</td>
+                          <td className="text-end text-muted">
+                            {comp.sqft != null ? formatNumber(comp.sqft) : '—'}
+                          </td>
+                          <td className="text-end fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                            {formatCurrencyCompact(comp.salePrice)}
+                          </td>
+                          <td className="text-end text-muted">
+                            {comp.pricePerSqft != null ? `$${comp.pricePerSqft}` : '—'}
+                          </td>
+                          <td className="text-center">
+                            {comp.url ? (
+                              <a
+                                href={comp.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: 'var(--cui-primary)' }}
+                                title="View on Redfin"
+                              >
+                                <ExternalLink size={14} />
+                              </a>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+                {data.stats.count > 10 && !showAllSales && (
+                  <div className="text-end text-muted small mt-2">
+                    Showing {displayComps.length} of {data.stats.count} comps
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -53,6 +53,7 @@ export default function ProfileForm({
   const [isLoading, setIsLoading] = useState(false);
   const [docTypeOptions, setDocTypeOptions] = useState<string[]>([]);
   const [loadingDocTypes, setLoadingDocTypes] = useState(true);
+  const [hasLegacyDocType, setHasLegacyDocType] = useState(false);
 
   const {
     register,
@@ -74,42 +75,65 @@ export default function ProfileForm({
   });
 
   const currentTags = watch('tags');
+  const currentDocType = (initialProfile.doc_type as string) || docType || '';
 
-  // Fetch doc_type options from template
+  // Fetch doc_type options from the project's assigned template + custom overrides
   useEffect(() => {
     const fetchDocTypeOptions = async () => {
       try {
-        const params = new URLSearchParams({
-          project_id: projectId.toString(),
-        });
+        const response = await fetch(`/api/projects/${projectId}/dms/doc-types`);
 
-        if (workspaceId) {
-          params.append('workspace_id', workspaceId.toString());
-        }
-        if (projectType) {
-          params.append('project_type', projectType);
-        }
-
-        const response = await fetch(`/api/dms/templates/doc-types?${params.toString()}`);
-
+        let options: string[];
         if (response.ok) {
           const data = await response.json();
-          setDocTypeOptions(data.doc_type_options || ['general']);
+          options = data.doc_type_options || ['general'];
         } else {
-          // Fallback to common doc types
-          setDocTypeOptions(['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence']);
+          options = ['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence'];
+        }
+
+        // Edge case: if the document's current doc_type isn't in the template options,
+        // prepend it so the select can display it
+        if (currentDocType) {
+          const lowerOptions = new Set(options.map(o => o.toLowerCase()));
+          if (!lowerOptions.has(currentDocType.toLowerCase())) {
+            options = [currentDocType, ...options];
+            setHasLegacyDocType(true);
+          }
+        }
+
+        setDocTypeOptions(options);
+
+        // Re-apply form value after options load to fix async race condition
+        // (react-hook-form sets defaultValues on mount, but the <select> can't
+        // display a value that isn't in its options list yet)
+        if (currentDocType) {
+          const matched = options.find(o => o.toLowerCase() === currentDocType.toLowerCase());
+          if (matched) {
+            setValue('doc_type', matched, { shouldValidate: true });
+          }
         }
       } catch (error) {
         console.error('Error fetching doc type options:', error);
-        // Fallback to common doc types
-        setDocTypeOptions(['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence']);
+        const fallback = ['general', 'contract', 'invoice', 'report', 'drawing', 'permit', 'correspondence'];
+        if (currentDocType) {
+          const lowerFallback = new Set(fallback.map(o => o.toLowerCase()));
+          if (!lowerFallback.has(currentDocType.toLowerCase())) {
+            fallback.unshift(currentDocType);
+            setHasLegacyDocType(true);
+          }
+        }
+        setDocTypeOptions(fallback);
+        if (currentDocType) {
+          setValue('doc_type', currentDocType, { shouldValidate: true });
+        }
       } finally {
         setLoadingDocTypes(false);
       }
     };
 
     fetchDocTypeOptions();
-  }, [projectId, workspaceId, projectType]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true);
@@ -190,12 +214,18 @@ export default function ProfileForm({
                 }}
               >
                 <option value="">Select document type</option>
-                {docTypeOptions.map(option => (
+                {docTypeOptions.map((option, idx) => (
                   <option key={option} value={option}>
                     {option.charAt(0).toUpperCase() + option.slice(1)}
+                    {hasLegacyDocType && idx === 0 && option === currentDocType ? ' (custom)' : ''}
                   </option>
                 ))}
               </select>
+            )}
+            {hasLegacyDocType && (
+              <p className="mt-1 small" style={{ color: 'var(--cui-warning-color, #e5a700)' }}>
+                Current type not in template — selecting a template type will re-categorize this document.
+              </p>
             )}
             {errors.doc_type && (
               <p className="mt-1 small text-danger">{errors.doc_type.message}</p>

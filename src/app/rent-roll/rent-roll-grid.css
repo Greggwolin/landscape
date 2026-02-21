@@ -28,3 +28,88 @@
 .ag-theme-alpine-dark .ag-large-text-input {
   z-index: 1000 !important;
 }
+
+/* =================================================================
+   Delta Review — CSS variables for pending/accepted cell highlights
+   ================================================================= */
+
+:root {
+  --rr-pending-bg: rgba(255, 193, 7, 0.15);
+  --rr-pending-border: #ffc107;
+  --rr-accepted-bg: rgba(34, 197, 94, 0.15);
+  --rr-accepted-border: #22c55e;
+}
+
+/* Pending change highlighting for rent roll delta cells */
+.rr-pending-change {
+  background-color: var(--rr-pending-bg) !important;
+  border-bottom: 2px solid var(--rr-pending-border) !important;
+}
+
+/* Delta cell renderer — old / new value display */
+.rr-delta-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.rr-delta-old {
+  color: rgb(156 163 175); /* gray-400 — muted */
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.rr-delta-arrow {
+  color: rgb(107 114 128); /* gray-500 */
+  margin: 0 2px;
+  font-size: 0.75rem;
+}
+
+.rr-delta-new {
+  color: rgb(253 224 71); /* yellow-300 */
+  font-weight: 600;
+}
+
+.rr-delta-accepted {
+  color: rgb(134 239 172); /* green-300 */
+  font-weight: 600;
+}
+
+/* Row-level delta checkbox */
+.rr-delta-checkbox {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #22c55e;
+}
+
+/* Pending changes banner */
+.rr-pending-banner {
+  background-color: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.rr-pending-banner__text {
+  flex: 1;
+  color: rgb(253, 224, 71);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.rr-pending-banner__subtext {
+  color: rgba(253, 224, 71, 0.7);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.rr-pending-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+}

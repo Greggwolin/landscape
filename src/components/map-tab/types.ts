@@ -82,7 +82,7 @@ export interface LayerState {
 // Map State Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type BasemapStyle = 'satellite' | 'streets' | 'hybrid';
+export type BasemapStyle = 'satellite' | 'streets' | 'hybrid' | 'roadmap' | 'terrain';
 
 export type DrawTool = 'point' | 'line' | 'polygon' | 'edit' | 'delete' | null;
 
@@ -91,6 +91,7 @@ export interface MapViewState {
   zoom: number;
   pitch?: number;
   bearing?: number;
+  bounds?: [[number, number], [number, number]];
 }
 
 export interface MapTabState {
@@ -127,7 +128,17 @@ export interface MapCanvasProps {
   features: MapFeature[];
   activeTool: DrawTool;
   selectedFeatureId: string | null;
+  planParcels?: GeoJSON.FeatureCollection | null;
+  projectBoundary?: GeoJSON.Feature | null;
+  taxParcels?: GeoJSON.FeatureCollection | null;
+  saleComps?: GeoJSON.FeatureCollection | null;
+  rentComps?: GeoJSON.FeatureCollection | null;
+  parcelCollection?: GeoJSON.FeatureCollection | null;
+  parcelSubjectApn?: string | null;
+  parcelCompApns?: string[];
+  selectedRingRadius?: number | null;
   onMapClick?: (coordinates: [number, number]) => void;
+  onRingClick?: (radius: number, lngLat: [number, number]) => void;
   onFeatureClick?: (feature: MapFeature) => void;
   onFeatureCreate?: (geometry: GeoJSON.Geometry, type: FeatureType) => void;
   onViewStateChange?: (viewState: MapViewState) => void;

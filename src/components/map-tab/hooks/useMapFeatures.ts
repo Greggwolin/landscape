@@ -10,6 +10,28 @@ import { useState, useCallback } from 'react';
 const API_BASE =
   process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (typeof window !== 'undefined') {
+    try {
+      const tokensStr = localStorage.getItem('auth_tokens');
+      if (tokensStr) {
+        const tokens = JSON.parse(tokensStr);
+        if (typeof tokens?.access === 'string' && tokens.access.trim()) {
+          headers.Authorization = `Bearer ${tokens.access}`;
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  return headers;
+}
+
 export interface MapFeatureRecord {
   id: string;
   project_id: number;
@@ -57,15 +79,38 @@ export function useMapFeatures(projectId: number | undefined) {
     setError(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/api/v1/map/features/${projectId}/`,
-        { credentials: 'include' }
-      );
+      const headers = getAuthHeaders();
+      const hasAuthHeader = Boolean(headers.Authorization);
+
+      const fetchWithAuthFallback = async () => {
+        const response = await fetch(
+          `${API_BASE}/api/v1/map/features/${projectId}/`,
+          { credentials: 'include', headers }
+        );
+
+        if ((response.status === 401 || response.status === 403) && hasAuthHeader) {
+          return fetch(`${API_BASE}/api/v1/map/features/${projectId}/`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return response;
+      };
+
+      const response = await fetchWithAuthFallback();
 
       if (!response.ok) {
         if (response.status === 404) {
           // No features yet, that's OK
           setFeatures([]);
+          return;
+        }
+        if (response.status >= 500) {
+          // Server error - degrade gracefully and avoid hard failure
+          console.warn('Map features fetch failed with server error:', response.status);
+          setFeatures([]);
+          setError(`Failed to fetch features: ${response.status}`);
           return;
         }
         throw new Error(`Failed to fetch features: ${response.status}`);
@@ -95,7 +140,7 @@ export function useMapFeatures(projectId: number | undefined) {
       const response = await fetch(`${API_BASE}/api/v1/map/features/`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           project_id: projectId,
           feature_type: featureType.toLowerCase(),
@@ -139,7 +184,7 @@ export function useMapFeatures(projectId: number | undefined) {
         {
           method: 'PATCH',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(updates),
         }
       );
@@ -169,6 +214,7 @@ export function useMapFeatures(projectId: number | undefined) {
       {
         method: 'DELETE',
         credentials: 'include',
+        headers: getAuthHeaders(),
       }
     );
 

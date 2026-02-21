@@ -514,7 +514,7 @@
 .location-intelligence-overlay-stack {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   width: min(390px, calc(100% - 24px));
   z-index: 20;
   display: flex;
@@ -562,6 +562,38 @@
 
 .location-intelligence-overlay-body {
   background: var(--cui-card-bg);
+}
+
+/* =====================================================
+   Annotation Tools (Placeholder)
+   ===================================================== */
+
+.annotation-tools-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 1px solid var(--cui-border-color, #2d2d3a);
+}
+
+.annotation-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--cui-secondary-color, #6b7280);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: not-allowed;
+  opacity: 0.5;
+  text-align: left;
+}
+
+.annotation-tool-btn .layer-toggle-icon {
+  color: var(--cui-secondary-color, #6b7280);
 }
 
 .location-intelligence-overlay-demographics-body {
@@ -906,6 +938,43 @@
 
 .location-map-popup .maplibregl-popup-close-button:hover {
   background: var(--cui-tertiary-bg, #2d2d3a);
+}
+
+/* Comparable Popup Content */
+.comparable-popup-content {
+  padding: 12px;
+  min-width: 180px;
+}
+
+.comparable-popup-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 0.95em;
+  /* color set inline per-comparable */
+}
+
+.comparable-popup-address {
+  font-size: 0.85em;
+  color: var(--cui-secondary-color, #9ca3af);
+  margin-bottom: 2px;
+}
+
+.comparable-popup-details {
+  font-size: 0.85em;
+  color: var(--cui-body-color, #d1d5db);
+}
+
+.comparable-popup-rent {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--cui-body-color, #f9fafb);
+  margin-top: 6px;
+}
+
+.comparable-popup-distance {
+  font-size: 0.8em;
+  color: var(--cui-tertiary-color, var(--cui-secondary-color, #6b7280));
+  margin-top: 4px;
 }
 
 /* =====================================================

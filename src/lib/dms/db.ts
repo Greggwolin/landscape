@@ -205,15 +205,29 @@ export const dmsDb = {
       }
     }
 
-    // Update document
-    const updatedDoc = await sql<CoreDoc[]>`
-      UPDATE landscape.core_doc 
-      SET profile_json = ${JSON.stringify(newProfile)},
-          updated_by = ${changedBy || null},
-          updated_at = NOW()
-      WHERE doc_id = ${docId}
-      RETURNING *
-    `;
+    // Update document — sync doc_type column when profile contains doc_type
+    const newDocType = typeof newProfile.doc_type === 'string' && newProfile.doc_type.trim()
+      ? newProfile.doc_type.trim()
+      : null;
+
+    const updatedDoc = newDocType
+      ? await sql<CoreDoc[]>`
+          UPDATE landscape.core_doc
+          SET profile_json = ${JSON.stringify(newProfile)},
+              doc_type = ${newDocType},
+              updated_by = ${changedBy || null},
+              updated_at = NOW()
+          WHERE doc_id = ${docId}
+          RETURNING *
+        `
+      : await sql<CoreDoc[]>`
+          UPDATE landscape.core_doc
+          SET profile_json = ${JSON.stringify(newProfile)},
+              updated_by = ${changedBy || null},
+              updated_at = NOW()
+          WHERE doc_id = ${docId}
+          RETURNING *
+        `;
 
     // Create audit entry
     if (changedFields.length > 0) {

@@ -8,6 +8,7 @@ Provides:
 """
 
 import logging
+import re
 
 from rest_framework import viewsets, status
 
@@ -67,6 +68,268 @@ def _require_project_access(user, project_id: int) -> Project:
     if not _user_can_access_project(user, project):
         raise PermissionDenied("You do not have access to this project.")
     return project
+
+
+# ---------------------------------------------------------------------------
+# Tool-context-aware message history builder
+# ---------------------------------------------------------------------------
+
+def _build_message_with_tool_context(msg, is_recent: bool = True) -> dict:
+    """
+    Build a single message dict for Claude, enriching assistant messages
+    with tool call/result context from stored metadata.
+
+    Without this, Claude sees only the final text response from prior turns
+    and has no evidence that tools were called.  This causes hallucination
+    on continuation turns (e.g., user says "proceed" after a delete proposal
+    and Claude fabricates completion instead of actually calling tools).
+
+    Args:
+        msg: A ThreadMessage or ChatMessage ORM instance.
+        is_recent: If True, include full tool details.  If False (older
+                   messages), include a compact summary to save tokens.
+
+    Returns:
+        Dict with 'role' and 'content' keys suitable for the Claude API.
+    """
+    role = msg.role
+    content = msg.content or ''
+    metadata = msg.metadata or {}
+
+    # User messages and assistant messages without tool data pass through unchanged
+    tool_calls = metadata.get('tool_calls', [])
+    tool_executions = metadata.get('tool_executions', [])
+
+    # Strip hallucinated tool annotations from prior AI messages.
+    # Claude sometimes writes fake "[Tool calls executed...]" text instead
+    # of making actual tool_use API calls.  If this text appears in the
+    # message history, it reinforces the pattern.  Remove it.
+    if role == 'assistant' and not tool_executions:
+        # Remove fake tool call blocks
+        content = re.sub(
+            r'\[Tool calls executed.*?\]',
+            '',
+            content,
+            flags=re.DOTALL
+        )
+        # Remove lines starting with → that mimic tool results
+        content = re.sub(r'^→ .*$', '', content, flags=re.MULTILINE)
+        content = content.strip()
+
+    if role != 'assistant' or (not tool_calls and not tool_executions):
+        return {'role': role, 'content': content}
+
+    # --- Build tool context block ---
+    tool_lines = []
+
+    for i, tc in enumerate(tool_calls):
+        tool_name = tc.get('tool', 'unknown_tool')
+        tool_input = tc.get('input', {})
+
+        # Match to execution result by position
+        exec_result = tool_executions[i] if i < len(tool_executions) else None
+
+        if is_recent:
+            # Full detail for recent messages
+            # Summarize input (keep it compact)
+            input_summary = _summarize_tool_input(tool_input)
+            line = f"  Tool: {tool_name}({input_summary})"
+
+            if exec_result:
+                success = exec_result.get('success', False)
+                result_data = exec_result.get('result', {})
+                is_proposal = exec_result.get('is_proposal', False)
+
+                if is_proposal:
+                    line += f" → PROPOSED (awaiting confirmation)"
+                elif success:
+                    result_summary = _summarize_tool_result(tool_name, result_data)
+                    line += f" → {result_summary}"
+                else:
+                    error = exec_result.get('error', 'unknown error')
+                    line += f" → FAILED: {error}"
+            else:
+                line += " → (no result recorded)"
+        else:
+            # Compact summary for older messages
+            line = f"  {tool_name}"
+            if exec_result:
+                success = exec_result.get('success', False)
+                line += f" → {'OK' if success else 'FAILED'}"
+
+        tool_lines.append(line)
+
+    # Also include field_updates summary if present
+    field_updates = metadata.get('field_updates', [])
+    if field_updates:
+        for fu in field_updates:
+            fu_type = fu.get('type', fu.get('tool', 'update'))
+            created = fu.get('created', 0)
+            updated = fu.get('updated', 0)
+            total = fu.get('total', created + updated)
+            if total > 0:
+                tool_lines.append(f"  → Mutations applied: {fu_type} ({created} created, {updated} updated)")
+
+    if tool_lines:
+        tool_block = "\n[Tool calls executed in this turn:\n" + "\n".join(tool_lines) + "\n]"
+        enriched_content = content + tool_block
+
+        # Add explicit instruction for pending confirmations so Claude knows
+        # it must call the tool again (not hallucinate completion)
+        if is_recent and _has_pending_confirmation(tool_executions):
+            enriched_content += (
+                "\n[IMPORTANT: One or more tools returned action=confirm_required. "
+                "The operation was NOT executed — it is waiting for user confirmation. "
+                "If the user confirms, you MUST call the tool again with confirmed=true. "
+                "Do NOT say the action is complete until you receive a tool result "
+                "showing action=deleted or action=updated.]"
+            )
+    else:
+        enriched_content = content
+
+    return {'role': role, 'content': enriched_content}
+
+
+def _has_pending_confirmation(tool_executions: list) -> bool:
+    """Check if any tool execution returned confirm_required or pending_confirmation."""
+    for te in tool_executions:
+        result = te.get('result', {})
+        if isinstance(result, dict):
+            action = result.get('action', '')
+            status_val = result.get('status', '')
+            if action in ('confirm_required', 'proposed', 'pending') or \
+               status_val in ('pending_confirmation', 'pending', 'proposed'):
+                return True
+    return False
+
+
+def _summarize_tool_input(tool_input: dict, max_len: int = 120) -> str:
+    """Produce a compact string summary of tool input parameters."""
+    if not tool_input:
+        return ""
+
+    # For common patterns, produce readable summaries
+    parts = []
+    for key, val in tool_input.items():
+        if key == 'records' and isinstance(val, list):
+            parts.append(f"records=[{len(val)} items]")
+        elif key == 'reason':
+            # Truncate long reason strings
+            reason_str = str(val)
+            if len(reason_str) > 60:
+                reason_str = reason_str[:57] + '...'
+            parts.append(f"reason=\"{reason_str}\"")
+        elif isinstance(val, (list, dict)):
+            if isinstance(val, list):
+                parts.append(f"{key}=[{len(val)} items]")
+            else:
+                parts.append(f"{key}={{...}}")
+        else:
+            val_str = str(val)
+            if len(val_str) > 40:
+                val_str = val_str[:37] + '...'
+            parts.append(f"{key}={val_str}")
+
+    summary = ", ".join(parts)
+    if len(summary) > max_len:
+        summary = summary[:max_len - 3] + '...'
+    return summary
+
+
+def _summarize_tool_result(tool_name: str, result: dict, max_len: int = 200) -> str:
+    """Produce a compact summary of a tool execution result."""
+    if not result:
+        return "OK"
+
+    if not isinstance(result, dict):
+        result_str = str(result)
+        if len(result_str) > max_len:
+            return result_str[:max_len - 3] + '...'
+        return result_str
+
+    # Common patterns
+    success = result.get('success', None)
+    action = result.get('action', None)
+    status_val = result.get('status', None)
+    count = result.get('count', None)
+    created = result.get('created', None)
+    updated = result.get('updated', None)
+    total = result.get('total', None)
+
+    parts = []
+
+    # action and status are CRITICAL for two-phase flows (confirm_required, proposed, etc.)
+    # Include them FIRST so Claude sees them before generic success/count
+    if action is not None:
+        parts.append(f"action={action}")
+    if status_val is not None:
+        parts.append(f"status={status_val}")
+
+    if success is not None:
+        parts.append('success' if success else 'failed')
+    if count is not None:
+        parts.append(f"count={count}")
+    if created is not None or updated is not None:
+        parts.append(f"created={created or 0}, updated={updated or 0}")
+    if total is not None and created is None and updated is None:
+        parts.append(f"total={total}")
+
+    # Include message hint if present (e.g., "Call delete_units again with confirmed=true")
+    message = result.get('message', None)
+    if message and action in ('confirm_required', 'proposed', 'pending'):
+        # Truncate long messages
+        msg_str = str(message)
+        if len(msg_str) > 80:
+            msg_str = msg_str[:77] + '...'
+        parts.append(f'message="{msg_str}"')
+
+    # Include records count if present
+    records = result.get('records', None)
+    if isinstance(records, list) and len(records) > 0:
+        parts.append(f"{len(records)} records returned")
+
+    if parts:
+        summary = ", ".join(parts)
+    else:
+        # Fallback: stringify the whole result compactly
+        summary = str(result)
+
+    if len(summary) > max_len:
+        summary = summary[:max_len - 3] + '...'
+    return summary
+
+
+def _build_message_history_with_tool_context(
+    messages,
+    recent_window: int = 6,
+) -> list:
+    """
+    Build message history list with tool context injected into assistant messages.
+
+    This replaces the naive [{'role': msg.role, 'content': msg.content}] pattern
+    that stripped all tool context, causing Claude to hallucinate completed actions
+    on continuation turns.
+
+    Args:
+        messages: Iterable of ThreadMessage or ChatMessage ORM objects,
+                  ordered by created_at ASC.
+        recent_window: Number of most recent messages to include full tool
+                       detail for.  Older messages get compact summaries
+                       to manage token budget.
+
+    Returns:
+        List of dicts [{'role': str, 'content': str}, ...] suitable for
+        passing to get_landscaper_response().
+    """
+    msg_list = list(messages)
+    total = len(msg_list)
+    result = []
+
+    for i, msg in enumerate(msg_list):
+        is_recent = (total - i) <= recent_window
+        result.append(_build_message_with_tool_context(msg, is_recent=is_recent))
+
+    return result
 
 
 class ChatMessageViewSet(viewsets.ModelViewSet):
@@ -135,12 +398,9 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             user_message_serializer.is_valid(raise_exception=True)
             user_message = user_message_serializer.save()
 
-            # Get chat history for context
+            # Get chat history for context (with tool call/result context)
             messages = self.get_queryset()
-            message_history = [
-                {'role': msg.role, 'content': msg.content}
-                for msg in messages
-            ]
+            message_history = _build_message_history_with_tool_context(messages)
 
             # Get project context with full details
             project_context = {
@@ -1071,6 +1331,11 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         if page_context:
             queryset = queryset.filter(page_context=page_context)
 
+        # Filter by subtab_context
+        subtab_context = self.request.query_params.get('subtab_context')
+        if subtab_context:
+            queryset = queryset.filter(subtab_context=subtab_context)
+
         # Filter by active status
         include_closed = self.request.query_params.get('include_closed', 'false').lower() == 'true'
         if not include_closed:
@@ -1303,12 +1568,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 content=request.data.get('content', ''),
             )
 
-            # Get message history for context
-            messages = list(thread.messages.order_by('created_at')[:50])
-            message_history = [
-                {'role': msg.role, 'content': msg.content}
-                for msg in messages
-            ]
+            # Get message history for context (with tool call/result context)
+            # Use MOST RECENT 50 messages (not oldest 50) so the newest user
+            # message is always included for keyword-based tool filtering.
+            messages = list(
+                thread.messages.order_by('-created_at')[:50]
+            )[::-1]  # Reverse back to chronological order
+            message_history = _build_message_history_with_tool_context(messages)
 
             # Get project context
             project = Project.objects.get(project_id=thread.project_id)
@@ -1523,11 +1789,12 @@ class GlobalChatViewSet(viewsets.ViewSet):
                 project__isnull=True,
             ).order_by('-timestamp')[:10]
 
-            message_history = [
-                {'role': msg.role, 'content': msg.content}
-                for msg in reversed(list(recent_messages))
-                if msg.metadata.get('page_context') == page_context
+            # Filter by page_context, then build with tool context
+            filtered_messages = [
+                msg for msg in reversed(list(recent_messages))
+                if (msg.metadata or {}).get('page_context') == page_context
             ]
+            message_history = _build_message_history_with_tool_context(filtered_messages)
 
             # Generate AI response
             ai_response = get_landscaper_response(

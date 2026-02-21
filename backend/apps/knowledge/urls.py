@@ -40,11 +40,15 @@ urlpatterns = [
     path('documents/<int:doc_id>/classify/', extraction_views.classify_document, name='knowledge-classify-doc'),
     path('documents/<int:doc_id>/extractable-fields/', extraction_views.preview_extractable_fields, name='knowledge-extractable-fields'),
     path('projects/<int:project_id>/rent-roll/compare/', extraction_views.compare_rent_roll, name='knowledge-rent-roll-compare'),
+    path('projects/<int:project_id>/rent-roll/delta/', extraction_views.compute_rent_roll_delta_view, name='knowledge-rent-roll-delta'),
+    path('projects/<int:project_id>/rent-roll/pending-changes/', extraction_views.get_pending_rent_roll_changes_view, name='knowledge-rent-roll-pending-changes'),
+    path('projects/<int:project_id>/rent-roll/apply-delta/', extraction_views.apply_rent_roll_delta_view, name='knowledge-rent-roll-apply-delta'),
     path('projects/<int:project_id>/snapshots/', extraction_views.list_rent_roll_snapshots, name='knowledge-rent-roll-snapshots'),
     path('projects/<int:project_id>/rollback/<int:snapshot_id>/', extraction_views.rollback_rent_roll_commit, name='knowledge-rent-roll-rollback'),
     path('projects/<int:project_id>/extraction-jobs/', extraction_views.get_extraction_jobs, name='knowledge-extraction-jobs'),
     path('projects/<int:project_id>/extraction-jobs/<int:job_id>/', extraction_views.get_extraction_job, name='knowledge-extraction-job'),
     path('projects/<int:project_id>/extraction-jobs/<int:job_id>/cancel/', extraction_views.cancel_extraction_job, name='knowledge-cancel-extraction-job'),
+    path('projects/<int:project_id>/extract-queue/', extraction_views.manage_extract_queue, name='knowledge-extract-queue'),
 
     # Column discovery & field mapping (CC Prompt C3)
     path('projects/<int:project_id>/discover-columns/', extraction_views.discover_rent_roll_columns, name='knowledge-discover-columns'),

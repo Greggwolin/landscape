@@ -5,7 +5,7 @@
  * - Project selector dropdown (left)
  * - Property type pill (color-coded)
  * - Analysis type badge (CoreUI color)
- * - Version badge and Alpha Assistant button (right side)
+ * - Version badge (right side)
  *
  * Chevron collapse/expand for Landscaper is NOT here — it lives in the Landscaper panel header.
  *
@@ -16,11 +16,10 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CBadge } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilLifeRing } from '@coreui/icons';
+import { useSWRConfig } from 'swr';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
 import { VersionBadge } from '@/components/changelog';
@@ -31,27 +30,52 @@ import {
 import {
   PERSPECTIVE_LABELS,
   PURPOSE_LABELS,
+  deriveDimensionsFromAnalysisType,
   type AnalysisPerspective,
   type AnalysisPurpose,
 } from '@/types/project-taxonomy';
 
 interface ActiveProjectBarProps {
   projectId: number;
-  onAlphaAssistantClick?: () => void;
 }
 
 export function ActiveProjectBar({
   projectId,
-  onAlphaAssistantClick,
 }: ActiveProjectBarProps) {
-  const { projects, activeProject, selectProject } = useProjectContext();
+  const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { mutate } = useSWRConfig();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [overridePerspective, setOverridePerspective] = useState<AnalysisPerspective | null>(null);
+  const [overridePurpose, setOverridePurpose] = useState<AnalysisPurpose | null>(null);
 
   const project = useMemo(() => {
     return projects.find((p) => p.project_id === projectId) || activeProject;
   }, [projects, projectId, activeProject]);
+
+  const fallbackDimensions = useMemo(() => {
+    if (!project) return null;
+    return deriveDimensionsFromAnalysisType(project.analysis_type ?? undefined);
+  }, [project]);
+
+  const resolvedPerspective = project
+    ? ((project.analysis_perspective?.toUpperCase() as AnalysisPerspective | undefined)
+      ?? fallbackDimensions?.analysis_perspective)
+    : undefined;
+  const resolvedPurpose = project
+    ? ((project.analysis_purpose?.toUpperCase() as AnalysisPurpose | undefined)
+      ?? fallbackDimensions?.analysis_purpose)
+    : undefined;
+
+  const displayPerspective = overridePerspective ?? resolvedPerspective;
+  const displayPurpose = overridePurpose ?? resolvedPurpose;
+
+  useEffect(() => {
+    setOverridePerspective(null);
+    setOverridePurpose(null);
+  }, [projectId, project?.analysis_perspective, project?.analysis_purpose, project?.analysis_type]);
 
   const handleProjectChange = (newProjectId: number) => {
     const targetProject = projects.find((p) => p.project_id === newProjectId);
@@ -73,10 +97,71 @@ export function ActiveProjectBar({
   const ptLabelSource = ptCandidates.find((v) => !!v) || ptMatch;
   const ptLabel = getPropertyTypeLabel(ptLabelSource);
 
-  const perspective = project?.analysis_perspective?.toUpperCase() as AnalysisPerspective | undefined;
-  const purpose = project?.analysis_purpose?.toUpperCase() as AnalysisPurpose | undefined;
-  const perspectiveLabel = perspective ? PERSPECTIVE_LABELS[perspective] : null;
-  const purposeLabel = purpose ? PURPOSE_LABELS[purpose] : null;
+  const perspectiveLabel = displayPerspective ? PERSPECTIVE_LABELS[displayPerspective] : null;
+  const purposeLabel = displayPurpose ? PURPOSE_LABELS[displayPurpose] : null;
+
+  const updateAnalysisDimensions = async (
+    nextPerspective: AnalysisPerspective,
+    nextPurpose: AnalysisPurpose,
+    previousPerspective?: AnalysisPerspective,
+    previousPurpose?: AnalysisPurpose
+  ) => {
+    if (!project) return;
+
+    setIsUpdating(true);
+    try {
+      const payload: Record<string, unknown> = {
+        analysis_perspective: nextPerspective,
+        analysis_purpose: nextPurpose,
+      };
+
+      if (nextPerspective !== 'INVESTMENT') {
+        payload.value_add_enabled = false;
+      }
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update project analysis settings');
+      }
+
+      await Promise.all([
+        mutate(`/api/projects/${projectId}/profile`),
+        mutate(`/api/projects/${projectId}`),
+      ]);
+      refreshProjects();
+    } catch (error) {
+      setOverridePerspective(previousPerspective ?? null);
+      setOverridePurpose(previousPurpose ?? null);
+      console.error('Failed to update analysis settings:', error);
+      alert(`Failed to update analysis settings: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleTogglePerspective = () => {
+    if (!displayPerspective || !displayPurpose || isUpdating) return;
+    const previousPerspective = displayPerspective;
+    const previousPurpose = displayPurpose;
+    const nextPerspective = displayPerspective === 'INVESTMENT' ? 'DEVELOPMENT' : 'INVESTMENT';
+    setOverridePerspective(nextPerspective);
+    void updateAnalysisDimensions(nextPerspective, displayPurpose, previousPerspective, previousPurpose);
+  };
+
+  const handleTogglePurpose = () => {
+    if (!displayPerspective || !displayPurpose || isUpdating) return;
+    const previousPerspective = displayPerspective;
+    const previousPurpose = displayPurpose;
+    const nextPurpose = displayPurpose === 'VALUATION' ? 'UNDERWRITING' : 'VALUATION';
+    setOverridePurpose(nextPurpose);
+    void updateAnalysisDimensions(displayPerspective, nextPurpose, previousPerspective, previousPurpose);
+  };
 
   return (
     <div
@@ -157,54 +242,67 @@ export function ActiveProjectBar({
 
       {/* Perspective badge */}
       {perspectiveLabel && (
-        <CBadge
-          color="info"
-          style={{ fontSize: '0.75rem', borderRadius: '4px' }}
+        <button
+          type="button"
+          onClick={handleTogglePerspective}
+          disabled={isUpdating}
+          title="Toggle perspective"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            cursor: isUpdating ? 'not-allowed' : 'pointer',
+          }}
         >
-          {perspectiveLabel}
-        </CBadge>
+          <CBadge
+            color="info"
+            style={{
+              fontSize: '0.75rem',
+              borderRadius: '4px',
+              opacity: isUpdating ? 0.7 : 1,
+            }}
+          >
+            {perspectiveLabel}
+          </CBadge>
+        </button>
       )}
 
       {/* Purpose badge */}
       {purposeLabel && (
-        <CBadge
-          color="primary"
-          style={{ fontSize: '0.75rem', borderRadius: '4px' }}
+        <button
+          type="button"
+          onClick={handleTogglePurpose}
+          disabled={isUpdating}
+          title="Toggle purpose"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            cursor: isUpdating ? 'not-allowed' : 'pointer',
+          }}
         >
-          {purposeLabel}
-        </CBadge>
+          <CBadge
+            color="primary"
+            style={{
+              fontSize: '0.75rem',
+              borderRadius: '4px',
+              opacity: isUpdating ? 0.7 : 1,
+            }}
+          >
+            {purposeLabel}
+          </CBadge>
+        </button>
       )}
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Version badge - right side, before Alpha Assistant */}
+      {/* Version badge - right side */}
       <VersionBadge />
-
-      {/* Alpha Assistant button - right side */}
-      {onAlphaAssistantClick && (
-        <button
-          onClick={onAlphaAssistantClick}
-          className="alpha-assistant-trigger"
-          title="Alpha Assistant - Help & Feedback"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.375rem 0.75rem',
-            border: '1px solid var(--cui-border-color)',
-            borderRadius: '6px',
-            backgroundColor: 'var(--cui-body-bg)',
-            color: 'var(--cui-body-color)',
-            cursor: 'pointer',
-            fontSize: '0.8125rem',
-            fontWeight: 500,
-          }}
-        >
-          <CIcon icon={cilLifeRing} size="sm" />
-          <span>Alpha Tester</span>
-        </button>
-      )}
     </div>
   );
 }

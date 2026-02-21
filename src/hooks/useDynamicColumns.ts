@@ -31,7 +31,15 @@ export interface DynamicColumnsResponse {
   values: Record<string, Record<string, unknown>>; // {row_id: {column_key: value}}
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = new Error(`HTTP ${res.status}`) as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
+  return res.json();
+};
 
 /**
  * Hook to fetch dynamic columns with their values for a table.
@@ -48,7 +56,15 @@ export function useDynamicColumns(
 
   const { data, error, isLoading, mutate } = useSWR<DynamicColumnsResponse>(
     projectId ? `/api/projects/${projectId}/dynamic/columns/with_values/?${params}` : null,
-    fetcher
+    fetcher,
+    {
+      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+        // Don't retry on client errors (401, 403, 404)
+        if (err?.status === 401 || err?.status === 403 || err?.status === 404) return;
+        if (retryCount >= 3) return;
+        setTimeout(() => revalidate({ retryCount }), 5000);
+      },
+    }
   );
 
   return {

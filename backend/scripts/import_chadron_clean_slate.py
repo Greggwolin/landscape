@@ -201,7 +201,7 @@ def import_units(cursor, project_id, units_data, unit_type_map):
             bedrooms, bathrooms = 0, 0
 
         # Determine occupancy status
-        occupancy_status = 'VACANT' if unit['status'] == 'vacant' else 'OCCUPIED'
+        occupancy_status = 'vacant' if unit['status'] == 'vacant' else 'occupied'
 
         cursor.execute("""
             INSERT INTO landscape.tbl_multifamily_unit (

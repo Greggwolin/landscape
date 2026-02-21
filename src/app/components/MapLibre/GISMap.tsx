@@ -4,7 +4,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import maplibregl from 'maplibre-gl'
 import { parcelLoader } from '../../utils/parcelLoader'
 import { geocodeLocation, getZoomLevel, type GeocodingResult } from '../../../lib/geocoding'
-import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol'
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps'
+import { registerRasterDim } from '@/lib/maps/rasterDim'
 
 interface GISMapProps {
  projectId: number
@@ -103,6 +105,13 @@ const GISMap: React.FC<GISMapProps> = ({
  handleGeocode()
  }, [projectLocation])
 
+ // Recenter map once geocoding resolves
+ useEffect(() => {
+ if (!map.current || !geocodingResult) return
+ map.current.setCenter([geocodingResult.longitude, geocodingResult.latitude])
+ map.current.setZoom(getZoomLevel(geocodingResult))
+ }, [geocodingResult])
+
  // Dissolve parcel boundaries into a single boundary (simplified client-side approach)
  const dissolveParcelBoundaries = async (parcels: PinalParcel[]): Promise<GeoJSON.Geometry | null> => {
  try {
@@ -168,19 +177,30 @@ const GISMap: React.FC<GISMapProps> = ({
  // Initialize map with container ready check
  useEffect(() => {
  console.log('🎯 useEffect running...', { mode, projectId })
+ let cleanupRasterDim: (() => void) | null = null
 
  const createMap = () => {
  try {
- map.current = new maplibregl.Map({
- container: mapContainer.current!,
- style: getEsriHybridStyle(),
- center: geocodingResult
+ registerGoogleProtocol()
+ const hasProjectCoords = Number.isFinite(projectLocation?.latitude) && Number.isFinite(projectLocation?.longitude)
+ const initialCenter: [number, number] = hasProjectCoords
+ ? [projectLocation!.longitude as number, projectLocation!.latitude as number]
+ : geocodingResult
  ? [geocodingResult.longitude, geocodingResult.latitude]
- : [-111.927912, 33.028911], // Default: Anderson Road & Farrell Road intersection
- zoom: geocodingResult
+ : [-111.927912, 33.028911] // Default: Anderson Road & Farrell Road intersection
+ const initialZoom = hasProjectCoords
+ ? 14
+ : geocodingResult
  ? getZoomLevel(geocodingResult)
  : 13 // Default zoom level
+ map.current = new maplibregl.Map({
+ container: mapContainer.current!,
+ style: getGoogleBasemapStyle('hybrid'),
+ center: initialCenter,
+ zoom: initialZoom
  })
+
+ cleanupRasterDim = registerRasterDim(map.current, 0.3)
 
  // Map instance created, waiting for load event
 
@@ -236,6 +256,7 @@ const GISMap: React.FC<GISMapProps> = ({
 
  return () => {
  if (map.current) {
+ cleanupRasterDim?.()
  map.current.remove()
  map.current = null
  }

@@ -1,11 +1,17 @@
 'use client';
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilCloudUpload, cilSend } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
 import { useLandscaper } from '@/hooks/useLandscaper';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+import { useToast } from '@/hooks/use-toast';
+import {
+  useLandscaperCollision,
+  buildCollisionMessage,
+  type PendingCollision,
+} from '@/contexts/LandscaperCollisionContext';
 
 // ============================================
 // INTENT DETECTION SYSTEM
@@ -152,6 +158,14 @@ export interface DmsLandscaperMessage {
  content: string;
 }
 
+export interface DmsPendingVersionLink {
+  projectId: number;
+  sourceDocId: string;
+  sourceDocName: string;
+  targetDocId: string;
+  targetDocName: string;
+}
+
 interface DmsLandscaperPanelProps {
  onDropFiles: (files: File[]) => void;
  onQuerySubmit: (query: string) => Promise<{ count: number; limit?: number | null }>;
@@ -159,6 +173,9 @@ interface DmsLandscaperPanelProps {
  activeDocType?: string | null;
  isFiltering?: boolean;
  notice?: string | null;
+ pendingLink?: DmsPendingVersionLink | null;
+ onResolveLink?: (action: 'confirm' | 'cancel', link: DmsPendingVersionLink) => Promise<void>;
+ onDocumentsUpdated?: () => void;
 }
 
 export default function DmsLandscaperPanel({
@@ -167,8 +184,12 @@ export default function DmsLandscaperPanel({
  onClearQuery,
  activeDocType,
  isFiltering = false,
- notice
+ notice,
+ pendingLink,
+ onResolveLink,
+ onDocumentsUpdated,
 }: DmsLandscaperPanelProps) {
+ const { showToast } = useToast();
  const [input, setInput] = useState('');
  const [localMessages, setLocalMessages] = useState<DmsLandscaperMessage[]>([
  {
@@ -176,6 +197,16 @@ export default function DmsLandscaperPanel({
  content: 'Ask me about documents across all projects, IREM benchmarks, or real estate concepts.'
  }
  ]);
+ const [isHandlingCollision, setIsHandlingCollision] = useState(false);
+ const [isHandlingLink, setIsHandlingLink] = useState(false);
+ const [collisionError, setCollisionError] = useState<string | null>(null);
+ const lastCollisionIdRef = useRef<string | null>(null);
+ const lastLinkKeyRef = useRef<string | null>(null);
+
+ const {
+  pendingCollision,
+  clearCollision,
+ } = useLandscaperCollision();
 
  // Use unified Landscaper API for AI queries (projectId: null for global context)
  const {
@@ -201,6 +232,151 @@ export default function DmsLandscaperPanel({
  }, [localMessages, aiMessages]);
 
  const isSending = aiLoading;
+
+ const appendMessage = useCallback((message: DmsLandscaperMessage) => {
+  setLocalMessages((prev) => [...prev, message]);
+ }, []);
+
+ useEffect(() => {
+  if (!pendingCollision || pendingCollision.id === lastCollisionIdRef.current) return;
+  lastCollisionIdRef.current = pendingCollision.id;
+  appendMessage({
+   role: 'assistant',
+   content: buildCollisionMessage(
+    pendingCollision.file,
+    pendingCollision.matchType,
+    pendingCollision.existingDoc
+   ),
+  });
+ }, [pendingCollision, appendMessage]);
+
+ useEffect(() => {
+  if (!pendingCollision) {
+   lastCollisionIdRef.current = null;
+  }
+ }, [pendingCollision]);
+
+ useEffect(() => {
+  if (!pendingCollision) {
+   setCollisionError(null);
+   return;
+  }
+  setCollisionError(null);
+ }, [pendingCollision]);
+
+ useEffect(() => {
+  if (!pendingLink) return;
+  const linkKey = `${pendingLink.sourceDocId}-${pendingLink.targetDocId}`;
+  if (lastLinkKeyRef.current === linkKey) return;
+  lastLinkKeyRef.current = linkKey;
+  appendMessage({
+   role: 'assistant',
+   content: `Link "${pendingLink.sourceDocName}" as a new version of "${pendingLink.targetDocName}"?`,
+  });
+ }, [pendingLink, appendMessage]);
+
+ useEffect(() => {
+  if (!pendingLink) {
+   lastLinkKeyRef.current = null;
+  }
+ }, [pendingLink]);
+
+ const formatBytes = useCallback((value?: number | null) => {
+  if (!value || !Number.isFinite(value)) return null;
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+   size /= 1024;
+   unitIndex += 1;
+  }
+  const precision = size >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${size.toFixed(precision)} ${units[unitIndex]}`;
+ }, []);
+
+ const formatDate = useCallback((value?: string | number | null) => {
+  if (!value) return null;
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString();
+ }, []);
+
+ const buildVersionNotes = useCallback((collision: PendingCollision) => {
+  const { file, existingDoc, docType } = collision;
+  const lines: string[] = [];
+  lines.push(`New version of "${existingDoc.filename}".`);
+  if (existingDoc.version_number) {
+   lines.push(`Previous version: V${existingDoc.version_number}.`);
+  }
+  const docTypeLabel = existingDoc.doc_type || docType;
+  if (docTypeLabel) {
+   lines.push(`Document type: ${docTypeLabel}.`);
+  }
+  const oldSize = formatBytes(existingDoc.file_size_bytes);
+  const newSize = formatBytes(file.size);
+  if (oldSize && newSize) {
+   lines.push(`File size: ${oldSize} → ${newSize}.`);
+  } else if (newSize) {
+   lines.push(`File size: ${newSize}.`);
+  }
+  const oldDate = formatDate(existingDoc.uploaded_at);
+  const newDate = formatDate(file.lastModified);
+  if (oldDate && newDate) {
+   lines.push(`Updated: ${oldDate} → ${newDate}.`);
+  } else if (newDate) {
+   lines.push(`Updated: ${newDate}.`);
+  }
+  return lines.join(' ');
+ }, [formatBytes, formatDate]);
+
+ const handleCancelCollision = useCallback(() => {
+  if (!pendingCollision) return;
+  pendingCollision.onDiscard?.();
+  clearCollision();
+  setCollisionError(null);
+ }, [clearCollision, pendingCollision]);
+
+ const handleSaveVersion = useCallback(async (notesOverride?: string) => {
+  if (!pendingCollision || isHandlingCollision) return;
+  setIsHandlingCollision(true);
+  setCollisionError(null);
+  const notes = notesOverride ?? '';
+  try {
+   const formData = new FormData();
+   formData.append('file', pendingCollision.file);
+   if (notes.trim()) {
+    formData.append('version_notes', notes.trim());
+   }
+
+   const response = await fetch(
+    `/api/projects/${pendingCollision.projectId}/dms/docs/${pendingCollision.existingDoc.doc_id}/version`,
+    {
+     method: 'POST',
+     body: formData,
+    }
+   );
+
+   if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to upload new version');
+   }
+
+   const result = await response.json();
+   appendMessage({
+    role: 'assistant',
+    content: `Saved "${pendingCollision.file.name}" as V${result.version_no || result.new_version || 'new'} of "${pendingCollision.existingDoc.filename}".`,
+   });
+   showToast({ title: 'Saved as new version', message: pendingCollision.file.name, type: 'success' });
+   pendingCollision.onDiscard?.();
+   clearCollision();
+   onDocumentsUpdated?.();
+  } catch (error) {
+   console.error('[DMS_LANDSCAPER] Version upload error:', error);
+   setCollisionError(error instanceof Error ? error.message : 'Failed to upload new version');
+  } finally {
+   setIsHandlingCollision(false);
+  }
+ }, [appendMessage, clearCollision, isHandlingCollision, onDocumentsUpdated, pendingCollision, showToast]);
 
  const {
  getRootProps,
@@ -235,9 +411,88 @@ export default function DmsLandscaperPanel({
 
  const handleSend = useCallback(async () => {
  const query = input.trim();
- if (!query || isSending) return;
+ if (!query || isSending || isHandlingCollision || isHandlingLink) return;
 
  setInput('');
+
+ // -----------------------------------------
+ // Collision resolution (yes/no)
+ // -----------------------------------------
+ if (pendingCollision) {
+  const normalized = query.toLowerCase();
+  const isYes = /^(y|yes|yeah|yep|sure|ok|okay|upload|version)/.test(normalized);
+  const isNo = /^(n|no|nope|nah|cancel|discard|stop)/.test(normalized);
+
+  appendMessage({ role: 'user', content: query });
+
+  if (isYes) {
+   const autoNotes = buildVersionNotes(pendingCollision);
+   void handleSaveVersion(autoNotes);
+   return;
+  }
+  if (isNo) {
+   handleCancelCollision();
+   return;
+  }
+
+  appendMessage({
+   role: 'assistant',
+   content: 'Please reply "yes" to add a new version, or "cancel" to discard this upload.',
+  });
+  return;
+ }
+
+ // -----------------------------------------
+ // Link-version confirmation (yes/no)
+ // -----------------------------------------
+ if (pendingLink) {
+  const normalized = query.toLowerCase();
+  const isYes = /^(y|yes|yeah|yep|sure|ok|okay|link|confirm)/.test(normalized);
+  const isNo = /^(n|no|nope|nah|cancel|stop)/.test(normalized);
+
+  appendMessage({ role: 'user', content: query });
+
+  if (isYes) {
+   setIsHandlingLink(true);
+   try {
+    await onResolveLink?.('confirm', pendingLink);
+    appendMessage({
+     role: 'assistant',
+     content: `Linked "${pendingLink.sourceDocName}" as a new version of "${pendingLink.targetDocName}".`,
+    });
+    onDocumentsUpdated?.();
+   } catch (error) {
+    console.error('[DMS_LANDSCAPER] Link version error:', error);
+    appendMessage({
+     role: 'assistant',
+     content: 'There was an error linking those documents. Please try again.',
+    });
+   } finally {
+    setIsHandlingLink(false);
+   }
+   return;
+  }
+
+  if (isNo) {
+   setIsHandlingLink(true);
+   try {
+    await onResolveLink?.('cancel', pendingLink);
+    appendMessage({
+     role: 'assistant',
+     content: 'Okay, I will not link those documents.',
+    });
+   } finally {
+    setIsHandlingLink(false);
+   }
+   return;
+  }
+
+  appendMessage({
+   role: 'assistant',
+   content: 'Please reply "yes" to link as a new version, or "no" to cancel.',
+  });
+  return;
+ }
 
  // ============================================
  // INTENT DETECTION
@@ -285,7 +540,7 @@ export default function DmsLandscaperPanel({
  ...prev,
  {
  role: 'assistant',
- content: `I found ${result.count} ${countLabel}${limitNote}. They are listed at right.${result.count > 0 ? ' Want me to open one?' : ''}`
+ content: `I found ${result.count} ${countLabel}${limitNote}.${result.count > 0 ? ' Want me to open one?' : ''}`
  }
  ]);
  } catch (error) {
@@ -317,7 +572,22 @@ export default function DmsLandscaperPanel({
  }
  ]);
  }
- }, [input, isSending, sendAiMessage, onQuerySubmit]);
+ }, [
+  input,
+  isSending,
+  isHandlingCollision,
+  isHandlingLink,
+  pendingCollision,
+  pendingLink,
+  handleCancelCollision,
+  handleSaveVersion,
+  buildVersionNotes,
+  appendMessage,
+  onResolveLink,
+  onDocumentsUpdated,
+  sendAiMessage,
+  onQuerySubmit,
+ ]);
 
  return (
  <div
@@ -380,6 +650,91 @@ export default function DmsLandscaperPanel({
  ))}
  </div>
 
+ {pendingCollision && (
+ <div className="mt-3">
+ {collisionError && (
+ <div className="text-xs mb-2" style={{ color: 'var(--cui-danger)' }}>
+ {collisionError}
+ </div>
+ )}
+ <div className="flex flex-wrap gap-2">
+ <button
+ type="button"
+ disabled={isHandlingCollision}
+ onClick={() => {
+ appendMessage({ role: 'user', content: 'Yes' });
+ // Auto-generate version notes and upload directly
+ const autoNotes = buildVersionNotes(pendingCollision);
+ void handleSaveVersion(autoNotes);
+ }}
+ className="btn btn-primary btn-sm"
+ >
+ {isHandlingCollision ? 'Saving...' : 'Yes, add as new version'}
+ </button>
+ <button
+ type="button"
+ disabled={isHandlingCollision}
+ onClick={() => {
+ appendMessage({ role: 'user', content: 'Cancel' });
+ handleCancelCollision();
+ }}
+ className="btn btn-ghost-secondary btn-sm"
+ >
+ Cancel
+ </button>
+ </div>
+ </div>
+ )}
+
+ {pendingLink && (
+ <div className="mt-3 flex flex-wrap gap-2">
+ <button
+ type="button"
+ disabled={isHandlingLink}
+ onClick={async () => {
+ setIsHandlingLink(true);
+ try {
+ await onResolveLink?.('confirm', pendingLink);
+ appendMessage({
+ role: 'assistant',
+ content: `Linked "${pendingLink.sourceDocName}" as a new version of "${pendingLink.targetDocName}".`,
+ });
+ onDocumentsUpdated?.();
+ } catch (error) {
+ console.error('[DMS_LANDSCAPER] Link version error:', error);
+ appendMessage({
+ role: 'assistant',
+ content: 'There was an error linking those documents. Please try again.',
+ });
+ } finally {
+ setIsHandlingLink(false);
+ }
+ }}
+ className="px-3 py-1 rounded-md text-xs text-white"
+ style={{ backgroundColor: 'var(--cui-primary)' }}
+ >
+ Link as Version
+ </button>
+ <button
+ type="button"
+ disabled={isHandlingLink}
+ onClick={async () => {
+ setIsHandlingLink(true);
+ try {
+ await onResolveLink?.('cancel', pendingLink);
+ appendMessage({ role: 'assistant', content: 'Okay, I will not link those documents.' });
+ } finally {
+ setIsHandlingLink(false);
+ }
+ }}
+ className="px-3 py-1 rounded-md text-xs border"
+ style={{ borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+ >
+ Cancel
+ </button>
+ </div>
+ )}
+
  <div className="mt-3 flex items-center gap-2">
  <input
  type="text"
@@ -392,12 +747,13 @@ export default function DmsLandscaperPanel({
  void handleSend();
  }
  }}
+ disabled={isHandlingCollision || isHandlingLink}
  className="h-9 flex-1 rounded-md border border bg-body px-3 text-xs text-body"
- />
+/>
  <button
  type="button"
  onClick={() => void handleSend()}
- disabled={isSending || !input.trim()}
+ disabled={isSending || isHandlingCollision || isHandlingLink || !input.trim()}
  className="h-9 w-9 rounded-md bg-blue-600 text-white text-xs disabled:opacity-60"
  >
  <CIcon icon={cilSend} className="w-3 h-3" />

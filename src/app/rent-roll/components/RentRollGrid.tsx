@@ -14,6 +14,10 @@ import {
 } from '@/lib/api/multifamily'
 import { FloorplanUpdateDialog } from './FloorplanUpdateDialog'
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh'
+import { usePendingRentRollChanges } from '@/hooks/usePendingRentRollChanges'
+import { SemanticButton } from '@/components/ui/landscape'
+import CIcon from '@coreui/icons-react'
+import { cilPlus, cilTrash } from '@coreui/icons'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import '../rent-roll-grid.css'
@@ -184,6 +188,26 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     setTimeout(() => setNotification(null), 3000)
   }, [])
 
+  // Pending rent roll changes (delta highlighting)
+  const {
+    hasPending,
+    pendingByCell,
+    summary: pendingSummary,
+    documentName: pendingDocName,
+    acceptChange,
+    rejectChange,
+    acceptAll,
+    rejectAll,
+    refresh: refreshPending,
+    getFieldState,
+    toggleFieldAcceptance,
+    selectAllForUnit,
+    deselectAllForUnit,
+    getUnitSelectionState,
+    unitsWithChanges,
+    pendingCount,
+  } = usePendingRentRollChanges(projectId)
+
   const { data: response, error, mutate: mutateLeases } = useSWR(
     projectId ? `/api/multifamily/leases?project_id=${projectId}` : null,
     fetchLeases
@@ -218,7 +242,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       market_rent: unit.market_rent,
       other_features: unit.other_features,
       base_rent_monthly: Number(unit.current_rent) || 0,
-      lease_status: unit.occupancy_status === 'Vacant' ? 'VACANT' : 'ACTIVE',
+      lease_status: unit.occupancy_status?.toLowerCase() === 'vacant' ? 'VACANT' : 'ACTIVE',
       resident_name: null,
       _source: 'unit' as const
     }))
@@ -244,7 +268,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     mutateLeases()
     mutateUnits()
     mutateUnitTypes()
-  }, [mutateLeases, mutateUnits, mutateUnitTypes])
+    refreshPending()
+  }, [mutateLeases, mutateUnits, mutateUnitTypes, refreshPending])
 
   useLandscaperRefresh(
     projectId,
@@ -277,7 +302,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     // When showing units only, count occupied from occupancy_status
     const occupiedUnits = leases.length > 0
       ? leases.filter(l => l.lease_status === 'ACTIVE').length
-      : units.filter((u: Unit) => u.occupancy_status === 'Occupied').length
+      : units.filter((u: Unit) => u.occupancy_status?.toLowerCase() === 'occupied').length
     const vacantUnits = totalUnits - occupiedUnits
     const physicalOccupancyPct = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0
 
@@ -287,7 +312,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
           .filter(l => l.lease_status === 'ACTIVE')
           .reduce((sum, l) => sum + (Number(l.base_rent_monthly) || 0), 0)
       : units
-          .filter((u: Unit) => u.occupancy_status === 'Occupied')
+          .filter((u: Unit) => u.occupancy_status?.toLowerCase() === 'occupied')
           .reduce((sum, u: Unit) => sum + (Number(u.current_rent) || 0), 0)
 
     const annualScheduledRent = monthlyScheduledRent * 12
@@ -392,9 +417,186 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       console.error('Failed to delete:', error)
       showNotification(`❌ Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     }
-  }, [mutate, showNotification])
+  }, [mutateLeases, showNotification])
+
+  // Add row at specific index (used by inline Add pill)
+  const handleAddRowAt = useCallback(async (_rowIndex: number) => {
+    setIsAdding(true)
+
+    try {
+      // Create a unit
+      const newUnit = {
+        project_id: projectId,
+        unit_number: 'NEW-' + Date.now(),
+        unit_type: '1BR',
+        bedrooms: 1,
+        bathrooms: 1,
+        square_feet: 650,
+        market_rent: 1250,
+        renovation_status: 'ORIGINAL',
+      }
+
+      const createdUnit = await unitsAPI.create(newUnit)
+      const unitId = createdUnit.unit_id
+
+      // Create a lease for that unit
+      const today = new Date().toISOString().split('T')[0]
+      const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      const newLease = {
+        unit_id: unitId,
+        resident_name: null,
+        lease_start_date: today,
+        lease_end_date: nextYear,
+        lease_term_months: 12,
+        base_rent_monthly: 0,
+        lease_status: 'ACTIVE',
+      }
+
+      await leasesAPI.create(newLease)
+
+      await mutateLeases()
+      showNotification('✅ Created new unit successfully', 'success')
+    } catch (error) {
+      console.error('Failed to add row:', error)
+      showNotification(`❌ Failed to add unit: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
+    } finally {
+      setIsAdding(false)
+    }
+  }, [projectId, mutateLeases, showNotification])
+
+  // Helper: get pending change style overlay for a cell (yellow = pending, green = accepted)
+  const getPendingCellStyle = useCallback((params: any): Record<string, string> | null => {
+    if (!params.data?.unit_id || !params.colDef?.field) return null
+    const key = `${params.data.unit_id}:${params.colDef.field}`
+    const change = pendingByCell.get(key)
+    if (!change) return null
+
+    const state = getFieldState(change.unitId, change.field)
+    if (state === 'accepted') {
+      return {
+        backgroundColor: 'var(--rr-accepted-bg, rgba(34, 197, 94, 0.15))',
+        borderBottom: '2px solid var(--rr-accepted-border, #22c55e)',
+        cursor: 'pointer',
+      }
+    }
+    return {
+      backgroundColor: 'var(--rr-pending-bg, rgba(255, 193, 7, 0.15))',
+      borderBottom: '2px solid var(--rr-pending-border, #ffc107)',
+      cursor: 'pointer',
+    }
+  }, [pendingByCell, getFieldState])
+
+  // Helper: get pending change tooltip for a cell
+  const getPendingTooltip = useCallback((params: any): string | undefined => {
+    if (!params.data?.unit_id || !params.colDef?.field) return undefined
+    const key = `${params.data.unit_id}:${params.colDef.field}`
+    const change = pendingByCell.get(key)
+    if (!change) return undefined
+
+    const state = getFieldState(change.unitId, change.field)
+    if (state === 'accepted') {
+      return `Accepted: will update to ${change.newValue} — click to undo`
+    }
+    return `Pending: ${change.currentValue} → ${change.newValue} — click to accept`
+  }, [pendingByCell, getFieldState])
+
+  // Handle click on a cell with a pending change — toggles acceptance
+  const handlePendingCellClick = useCallback((params: any) => {
+    if (!params.data?.unit_id || !params.colDef?.field) return false
+    const key = `${params.data.unit_id}:${params.colDef.field}`
+    const change = pendingByCell.get(key)
+    if (!change) return false
+
+    toggleFieldAcceptance(change.unitId, params.colDef.field)
+    // Refresh this cell to update styling
+    if (params.api) {
+      params.api.refreshCells({
+        rowNodes: [params.node],
+        columns: [params.colDef.field],
+        force: true,
+      })
+    }
+    return true // Indicates we handled the click
+  }, [pendingByCell, toggleFieldAcceptance])
+
+  // Cell renderer for pending changes — shows "old / new" inline
+  const pendingCellRenderer = useCallback((params: any) => {
+    if (!params.data?.unit_id || !params.colDef?.field) return undefined
+    const key = `${params.data.unit_id}:${params.colDef.field}`
+    const change = pendingByCell.get(key)
+    if (!change) return undefined
+
+    const state = getFieldState(change.unitId, change.field)
+
+    // Format values for display
+    const fmtVal = (v: unknown): string => {
+      if (v === null || v === undefined || v === '') return '—'
+      if (typeof v === 'number') {
+        // Currency fields
+        if (['current_rent', 'base_rent_monthly', 'market_rent'].includes(change.field)) {
+          return `$${v.toLocaleString()}`
+        }
+        return v.toLocaleString()
+      }
+      return String(v)
+    }
+
+    const oldStr = fmtVal(change.currentValue)
+    const newStr = fmtVal(change.newValue)
+
+    if (state === 'accepted') {
+      // Accepted: show new value only, green
+      return <span className="rr-delta-accepted">{newStr}</span>
+    }
+
+    // Pending: show "old / new"
+    return (
+      <span className="rr-delta-pending">
+        <span className="rr-delta-old">{oldStr}</span>
+        <span className="rr-delta-arrow"> / </span>
+        <span className="rr-delta-new">{newStr}</span>
+      </span>
+    )
+  }, [pendingByCell, getFieldState])
 
   const columnDefs = useMemo<ColDef<Lease>[]>(() => [
+    // Row-level checkbox for delta review (only visible when changes are pending)
+    ...(hasPending ? [{
+      headerName: '',
+      field: '_delta_select' as any,
+      pinned: 'left' as const,
+      width: 40,
+      maxWidth: 40,
+      suppressSizeToFit: true,
+      sortable: false,
+      filter: false,
+      resizable: false,
+      cellRenderer: (params: any) => {
+        const unitId = params.data?.unit_id
+        if (!unitId || !unitsWithChanges.has(unitId)) return null
+        const state = getUnitSelectionState(unitId)
+        return (
+          <input
+            type="checkbox"
+            checked={state === 'all'}
+            ref={(el) => { if (el) el.indeterminate = state === 'some' }}
+            onChange={() => {
+              if (state === 'all') {
+                deselectAllForUnit(unitId)
+              } else {
+                selectAllForUnit(unitId)
+              }
+              // Refresh all cells in this row to update styling
+              if (params.api) {
+                params.api.refreshCells({ rowNodes: [params.node], force: true })
+              }
+            }}
+            className="rr-delta-checkbox"
+          />
+        )
+      },
+    }] : []),
     {
       field: 'unit_number',
       headerName: 'Unit',
@@ -402,7 +604,16 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 100,
       minWidth: 80,
-      cellStyle: { fontWeight: 'bold' },
+      cellStyle: (params) => {
+        const pending = getPendingCellStyle(params)
+        return { fontWeight: 'bold', ...(pending || {}) }
+      },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
     },
     {
       field: 'building_name',
@@ -421,7 +632,14 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       cellEditorParams: {
         values: unitTypeOptions.length > 0 ? unitTypeOptions : ['1BR', '2BR', '3BR', '4BR', 'Studio']
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.value
+      },
       cellStyle: (params) => {
+        const pending = getPendingCellStyle(params)
+        if (pending) return pending
         // Highlight if unit type exists in floorplans
         const hasFloorplan = unitTypeMap.has(params.value)
         return hasFloorplan
@@ -429,6 +647,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
           : {}
       },
       tooltipValueGetter: (params) => {
+        const pendingTip = getPendingTooltip(params)
+        if (pendingTip) return pendingTip
         const hasFloorplan = unitTypeMap.has(params.value)
         return hasFloorplan
           ? `✓ Floorplan defined with market rent`
@@ -447,6 +667,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         max: 10,
         precision: 0,  // Whole numbers only
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => {
         if (!params.value) return ''
         return params.value.toString()
@@ -464,6 +690,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         max: 5,
         precision: 1,  // Allows 1.5, 2.5, etc.
       },
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => {
         if (!params.value) return ''
         return params.value.toString()
@@ -490,6 +722,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 90,
       type: 'numericColumn',
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => params.value ? formatNumber(params.value) : '',
     },
     {
@@ -497,6 +735,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       headerName: 'Lease Start',
       editable: true,
       width: 120,
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => formatDate(params.value),
     },
     {
@@ -504,6 +748,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       headerName: 'Lease End',
       editable: true,
       width: 120,
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => formatDate(params.value),
     },
     {
@@ -512,6 +762,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 130,
       type: 'numericColumn',
+      cellRenderer: (params: any) => {
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return params.valueFormatted ?? params.value
+      },
+      tooltipValueGetter: getPendingTooltip,
       valueFormatter: (params) => params.value ? formatCurrency(params.value) : '$0',
     },
     {
@@ -521,6 +777,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       type: 'numericColumn',
       headerTooltip: 'Market Rent - Current Rent. Positive = below market (opportunity), Negative = above market (risk). Uses market rent from Floorplans.',
       cellStyle: (params) => {
+        const pending = getPendingCellStyle(params)
+        if (pending) return pending
         const unitType = params.data.unit_type
         const hasMarketRent = unitTypeMap.has(unitType)
 
@@ -571,6 +829,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         return marketRent - inPlaceRent
       },
       tooltipValueGetter: (params) => {
+        const pendingTip = getPendingTooltip(params)
+        if (pendingTip) return pendingTip
         if (!params.data) return ''
         const unitType = params.data.unit_type
         const floorplanData = unitTypeMap.get(unitType)
@@ -592,58 +852,89 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       editable: true,
       width: 150,
       minWidth: 130,
-      cellRenderer: (params: any) => <StatusBadge value={params.value} />,
+      cellRenderer: (params: any) => {
+        // Pending change display takes precedence over StatusBadge
+        const pending = pendingCellRenderer(params)
+        if (pending !== undefined) return pending
+        return <StatusBadge value={params.value} />
+      },
+      tooltipValueGetter: getPendingTooltip,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
         values: ['ACTIVE', 'NOTICE_GIVEN', 'EXPIRED', 'MONTH_TO_MONTH', 'CANCELLED'],
       },
     },
     {
-      headerName: 'Actions',
+      headerName: '',
       field: 'actions',
-      width: 180,
+      width: 80,
       pinned: 'right',
+      sortable: false,
+      filter: false,
+      resizable: false,
       cellRenderer: (params: any) => {
         const lease = params.data
-        const hasFloorplan = lease && unitTypeMap.has(lease.unit_type)
+        if (!lease) return null
 
         return (
-          <div className="flex gap-1">
-            {hasFloorplan && (
-              <button
-                onClick={async () => {
-                  const floorplanData = unitTypeMap.get(lease.unit_type)
-                  if (!floorplanData) return
-
-                  try {
-                    await unitsAPI.update(lease.unit_id, {
-                      bathrooms: floorplanData.bathrooms,
-                      square_feet: floorplanData.square_feet
-                    })
-                    await mutateLeases()
-                    showNotification('✅ Copied from floorplan', 'success')
-                  } catch (error) {
-                    showNotification('❌ Failed to copy', 'error')
-                  }
-                }}
-                className="px-2 py-1 text-xs font-medium rounded bg-green-900/50 text-green-300 hover:bg-green-800 border border-green-700"
-                title="Copy bath/SF from floorplan"
-              >
-                📋 Copy
-              </button>
-            )}
-            <button
-              onClick={() => handleDeleteRow(lease)}
-              className="px-2 py-1 text-xs font-medium rounded bg-red-900/50 text-red-300 hover:bg-red-800 border border-red-700"
-              title="Delete this row"
+          <div className="d-flex justify-content-end gap-2" style={{ height: '100%', alignItems: 'center', display: 'flex' }}>
+            <SemanticButton
+              intent="secondary-action"
+              variant="ghost"
+              size="sm"
+              className="p-1"
+              title="Add row below"
+              onClick={() => handleAddRowAt(params.node.rowIndex)}
             >
-              🗑️ Delete
-            </button>
+              <CIcon icon={cilPlus} size="sm" />
+            </SemanticButton>
+            <SemanticButton
+              intent="destructive-action"
+              variant="ghost"
+              size="sm"
+              className="p-1"
+              title="Delete this row"
+              onClick={() => handleDeleteRow(lease)}
+            >
+              <CIcon icon={cilTrash} size="sm" />
+            </SemanticButton>
           </div>
         )
       },
     },
-  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, unitTypeMap, mutate, showNotification])
+  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, handleAddRowAt, unitTypeMap, mutateLeases, showNotification, getPendingCellStyle, getPendingTooltip, pendingCellRenderer, hasPending, unitsWithChanges, getUnitSelectionState, selectAllForUnit, deselectAllForUnit])
+
+  // Context menu with pending change actions
+  const getContextMenuItems = useCallback((params: any) => {
+    const items: any[] = []
+
+    // Check if this cell has a pending change
+    if (params.node?.data?.unit_id && params.column?.colDef?.field) {
+      const key = `${params.node.data.unit_id}:${params.column.colDef.field}`
+      const change = pendingByCell.get(key)
+      if (change) {
+        items.push({
+          name: `Accept change (${change.currentValue} → ${change.newValue})`,
+          action: () => {
+            acceptChange(change.extractionId)
+            showNotification('Accepted change', 'success')
+          },
+        })
+        items.push({
+          name: 'Keep existing value',
+          action: () => {
+            rejectChange(change.extractionId)
+            showNotification('Kept existing value', 'success')
+          },
+        })
+        items.push('separator')
+      }
+    }
+
+    // Default AG-Grid items
+    items.push('copy', 'copyWithHeaders', 'separator', 'export')
+    return items
+  }, [pendingByCell, acceptChange, rejectChange, showNotification])
 
   // Auto-save on cell change
   const onCellValueChanged = useCallback(async (event: CellValueChangedEvent<Lease>) => {
@@ -795,7 +1086,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       event.node.setDataValue(field, oldValue)
       showNotification(`❌ Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     }
-  }, [mutate, showNotification, unitTypeMap])
+  }, [mutateLeases, showNotification, unitTypeMap])
 
   // Add new row
   const handleAddRow = useCallback(async () => {
@@ -841,12 +1132,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     } finally {
       setIsAdding(false)
     }
-  }, [projectId, mutate, showNotification])
+  }, [projectId, mutateLeases, showNotification])
 
   // Refresh data
   const handleRefresh = useCallback(async () => {
     await mutateLeases()
-  }, [mutate])
+  }, [mutateLeases])
 
   // Handle floorplan dialog confirmation
   const handleFloorplanConfirm = useCallback(async (
@@ -881,7 +1172,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       }
       showNotification(`❌ Failed to save: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     }
-  }, [pendingUpdate, mutate, showNotification])
+  }, [pendingUpdate, mutateLeases, showNotification])
 
   // Handle floorplan dialog cancellation
   const handleFloorplanCancel = useCallback(() => {
@@ -1023,6 +1314,36 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         </div>
       )}
 
+      {/* Pending Changes Banner */}
+      {hasPending && pendingSummary && (
+        <div className="px-6 pb-4">
+          <div className="rr-pending-banner">
+            <span className="text-yellow-400 text-xl">&#9670;</span>
+            <div className="flex-1">
+              <span className="rr-pending-banner__text">
+                {pendingCount} change{pendingCount !== 1 ? 's' : ''} pending
+                {pendingSummary.units_with_changes > 0 && ` across ${pendingSummary.units_with_changes} unit${pendingSummary.units_with_changes !== 1 ? 's' : ''}`}
+                {pendingDocName && <span className="rr-pending-banner__subtext"> from {pendingDocName}</span>}
+              </span>
+            </div>
+            <div className="rr-pending-banner__actions">
+              <button
+                onClick={acceptAll}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-green-700 text-white hover:bg-green-600"
+              >
+                Accept All
+              </button>
+              <button
+                onClick={rejectAll}
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-700 text-gray-200 hover:bg-gray-600 border border-gray-600"
+              >
+                Reject All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="flex justify-between items-center mb-4 px-6">
         <div>
@@ -1067,7 +1388,11 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
               suppressSizeToFit: true,  // Prevent auto-sizing that truncates
               minWidth: 80,              // Minimum column width
               wrapText: false,           // Keep single-line (no wrapping)
-              autoHeight: false          // Fixed row height
+              autoHeight: false,         // Fixed row height
+              cellStyle: (params) => {
+                const pendingStyle = getPendingCellStyle(params)
+                return pendingStyle || {}
+              },
             }}
             suppressColumnVirtualisation={true}  // Render all columns (no truncation)
             suppressHorizontalScroll={false}     // Enable horizontal scroll
@@ -1075,7 +1400,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
             theme="legacy"
             rowHeight={40}
             onGridReady={(params) => setGridApi(params.api)}
+            onCellClicked={(params) => {
+              // If this cell has a pending change, toggle acceptance on click
+              handlePendingCellClick(params)
+            }}
             onCellValueChanged={onCellValueChanged}
+            getContextMenuItems={getContextMenuItems}
             animateRows={true}
             enableCellTextSelection={true}
           />

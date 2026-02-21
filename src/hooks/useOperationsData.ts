@@ -260,6 +260,10 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
             existing.post_reno_rate = update.value;
           } else if (field === 'count') {
             existing.post_reno_count = update.value;
+          } else if (field === 'per_sf') {
+            existing.post_reno_per_sf = update.value;
+          } else if (field === 'growth_rate') {
+            existing.post_reno_growth_rate = update.value;
           } else {
             existing.post_reno_value = update.value;
           }
