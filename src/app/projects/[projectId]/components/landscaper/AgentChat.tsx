@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
+import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from '@/components/landscaper/ChatMessageBubble';
 
 interface AgentChatProps {
@@ -22,9 +22,9 @@ export function AgentChat({
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { messages, sendMessage, isLoading } = useLandscaper({
+  const { messages, sendMessage, isLoading } = useLandscaperThreads({
     projectId,
-    activeTab,  // Pass page context for tool filtering
+    pageContext: activeTab || 'home',  // Pass page context for tool filtering
   });
 
   // Track if user has sent a message - only auto-scroll after user interaction
@@ -64,7 +64,7 @@ export function AgentChat({
             </p>
           </div>
         ) : (
-          messages.map((msg: ChatMessage) => (
+          messages.map((msg: ThreadMessage) => (
             <ChatMessageBubble key={msg.messageId} message={msg} />
           ))
         )}

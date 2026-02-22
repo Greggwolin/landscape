@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { ChatMessage } from '@/hooks/useLandscaper';
+import { ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
 import MediaSummaryCard from './MediaSummaryCard';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface ChatMessageBubbleProps {
-  message: ChatMessage;
+  message: ThreadMessage;
   onConfirmMutation?: (mutationId: string) => Promise<void>;
   onRejectMutation?: (mutationId: string) => Promise<void>;
   onConfirmBatch?: (batchId: string) => Promise<void>;

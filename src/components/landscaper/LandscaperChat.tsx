@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { useLandscaper, ChatMessage } from '@/hooks/useLandscaper';
+import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 
@@ -46,9 +46,9 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
   const tabContextHint = getTabContextHint(activeTab);
 
-  const { messages, sendMessage, isLoading, loadHistory, error } = useLandscaper({
+  const { messages, sendMessage, isLoading, loadThreadMessages, error } = useLandscaperThreads({
     projectId: projectId.toString(),
-    activeTab,
+    pageContext: activeTab,
   });
 
   // Mutation handlers for Level 2 autonomy
@@ -61,14 +61,14 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       const data = await response.json();
       if (data.success) {
         // Refresh chat history to reflect updated state
-        loadHistory?.();
+        loadThreadMessages?.();
       } else {
         console.error('Failed to confirm mutation:', data.error);
       }
     } catch (error) {
       console.error('Error confirming mutation:', error);
     }
-  }, [loadHistory]);
+  }, [loadThreadMessages]);
 
   const handleRejectMutation = useCallback(async (mutationId: string) => {
     try {
@@ -78,12 +78,12 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       });
       const data = await response.json();
       if (data.success) {
-        loadHistory?.();
+        loadThreadMessages?.();
       }
     } catch (error) {
       console.error('Error rejecting mutation:', error);
     }
-  }, [loadHistory]);
+  }, [loadThreadMessages]);
 
   const handleConfirmBatch = useCallback(async (batchId: string) => {
     try {
@@ -93,14 +93,14 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       });
       const data = await response.json();
       if (data.success) {
-        loadHistory?.();
+        loadThreadMessages?.();
       } else {
         console.error('Failed to confirm batch:', data.error);
       }
     } catch (error) {
       console.error('Error confirming batch:', error);
     }
-  }, [loadHistory]);
+  }, [loadThreadMessages]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {
@@ -257,7 +257,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
             <p style={{ fontSize: '0.75rem', marginBottom: 0 }}>Budget, market analysis, assumptions, documents...</p>
           </div>
         ) : (
-          messages.map((msg: ChatMessage) => (
+          messages.map((msg: ThreadMessage) => (
             <ChatMessageBubble
               key={msg.messageId}
               message={msg}

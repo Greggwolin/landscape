@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { TrendingUp, CheckCircle, Info, Send, MessageSquare } from 'lucide-react';
 import type { BenchmarkCategory, AISuggestion } from '@/types/benchmarks';
 import AISuggestionsSection from './AISuggestionsSection';
-import { useLandscaper } from '@/hooks/useLandscaper';
+import { useLandscaperThreads } from '@/hooks/useLandscaperThreads';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
 interface Props {
@@ -71,9 +71,9 @@ function BenchmarkChatSection() {
     messages,
     isLoading,
     sendMessage,
-  } = useLandscaper({
-    projectId: null,
-    activeTab: 'benchmarks',
+  } = useLandscaperThreads({
+    projectId: '0',
+    pageContext: 'benchmarks',
   });
 
   // Auto-scroll to bottom when messages change

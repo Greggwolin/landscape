@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CButton, CFormTextarea, CSpinner } from '@coreui/react';
 import ChatMessageBubble from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
-import { ChatMessage } from '@/hooks/useLandscaper';
+import { ThreadMessage as ChatMessage } from '@/hooks/useLandscaperThreads';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 // Map tool names to the tables they affect (same as useLandscaper.ts)
