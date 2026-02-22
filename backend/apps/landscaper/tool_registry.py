@@ -18,6 +18,11 @@ UNIVERSAL_TOOLS = [
     "bulk_update_fields",
     "get_project_fields",
     "get_field_schema",
+    # Document read tools — always available so Landscaper can look up data
+    # from uploaded OMs, appraisals, T-12s etc. without needing the user
+    # to explicitly mention "document". Write/extraction tools remain gated.
+    "get_project_documents",
+    "get_document_content",
 ]
 
 # Tier 2: Extraction tools - only on Documents page or when document mentioned

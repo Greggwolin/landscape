@@ -6,7 +6,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useQuery } from '@tanstack/react-query';
 import { useSfComps, SfComp } from '@/hooks/analysis/useSfComps';
 import { formatMoney } from '@/utils/formatters/number';
-import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
 
 interface MarketCompetitorProduct {
@@ -78,7 +79,7 @@ export default function MarketMapView({
   const mapStyles = useMemo(() => ({
     hybrid: {
       label: 'Hybrid',
-      style: getEsriHybridStyle()
+      style: getGoogleBasemapStyle('hybrid')
     },
     light: {
       label: 'Light',
@@ -174,6 +175,7 @@ export default function MarketMapView({
     let cleanupRasterDim: (() => void) | null = null;
 
     try {
+      registerGoogleProtocol();
       // Initialize map centered on project
       const selectedStyle = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
       map.current = new maplibregl.Map({
@@ -183,7 +185,7 @@ export default function MarketMapView({
         zoom: 12
       });
 
-      cleanupRasterDim = registerRasterDim(map.current, 0.3);
+      cleanupRasterDim = registerRasterDim(map.current, 0.1);
 
       // Add navigation controls
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');

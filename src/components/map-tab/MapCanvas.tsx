@@ -167,6 +167,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const saleCompMarkersRef = useRef<maplibregl.Marker[]>([]);
   const rentCompMarkersRef = useRef<maplibregl.Marker[]>([]);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
+  const lastCenterRef = useRef<[number, number] | null>(null);
 
   // Expose map to parent component
   useImperativeHandle(ref, () => ({
@@ -225,7 +226,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       antialias: true,
     });
 
-    rasterDimCleanupRef.current = registerRasterDim(map.current, 0.3);
+    rasterDimCleanupRef.current = registerRasterDim(map.current, 0.1);
 
     // Add navigation controls
     map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
@@ -300,6 +301,19 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       map.current?.off('style.load', handleStyleLoad);
     };
   }, [basemap, mapLoaded]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Recenter Map When Center Prop Changes
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    const prev = lastCenterRef.current;
+    if (!prev || prev[0] !== center[0] || prev[1] !== center[1]) {
+      map.current.jumpTo({ center });
+      lastCenterRef.current = center;
+    }
+  }, [center, mapLoaded]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Update Cursor for Active Tool

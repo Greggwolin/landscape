@@ -40,7 +40,7 @@ export default function ValuationSalesCompMap({
     { value: 'google-terrain', label: 'Terrain' },
   ];
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(
-    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-roadmap'
+    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-hybrid'
   );
   const resolvedStyleUrl = activeBasemap;
 

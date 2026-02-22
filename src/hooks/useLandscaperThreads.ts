@@ -435,6 +435,13 @@ export function useLandscaperThreads({
           onFieldUpdate(data.field_updates);
         }
 
+        // Optimistically update thread title if backend generated one
+        if (data.thread_title && activeThread) {
+          setActiveThread((prev) =>
+            prev ? { ...prev, title: data.thread_title } : prev
+          );
+        }
+
         // Emit mutation events for auto-refresh
         emitMutationEventsIfNeeded(parseInt(projectId), data.assistant_message?.metadata);
 
