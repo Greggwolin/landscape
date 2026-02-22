@@ -16,7 +16,8 @@ import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import CIcon from '@coreui/icons-react';
 import { cilCloudUpload } from '@coreui/icons';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getEsriHybridStyle } from '@/lib/maps/esriHybrid';
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import {
   createSalesComparable,
   deleteSalesComparable,
@@ -34,7 +35,7 @@ import type {
 } from '@/types/valuation';
 import styles from './SalesCompDetailModal.module.css';
 
-const MAP_STYLE = getEsriHybridStyle();
+const MAP_STYLE = getGoogleBasemapStyle('hybrid');
 const DASH = '–';
 
 type OverlaySection = 'transaction' | 'property' | 'unit_mix';
@@ -633,6 +634,9 @@ export function SalesCompDetailModal({
   subjectLocation,
   subjectProperty,
 }: SalesCompDetailModalProps) {
+  useEffect(() => {
+    registerGoogleProtocol();
+  }, []);
   const isEditMode = comparableId != null;
   const mapRef = useRef<MapRef | null>(null);
   const modalBodyRef = useRef<HTMLDivElement | null>(null);

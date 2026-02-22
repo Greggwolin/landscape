@@ -83,7 +83,7 @@ export function LocationMap({
       antialias: true,
     });
 
-    const cleanupRasterDim = registerRasterDim(map.current, 0.3);
+    const cleanupRasterDim = registerRasterDim(map.current, 0.1);
 
     map.current.on('load', () => {
       setMapLoaded(true);

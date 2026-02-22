@@ -164,9 +164,9 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  // Use the URL directly (e.g., MapTiler)
  mapStyle = styleUrl;
  } else {
- // Default to Google roadmap
- mapStyle = getGoogleBasemapStyle('roadmap');
- }
+ // Default to Google hybrid
+ mapStyle = getGoogleBasemapStyle('hybrid');
+}
 
  const map = new maplibregl.Map({
  container: containerRef.current,
@@ -179,7 +179,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  scrollZoom: true,
  });
 
- const cleanupRasterDim = registerRasterDim(map, 0.3);
+ const cleanupRasterDim = registerRasterDim(map, 0.1);
 
  map.on('load', () => {
  setMapLoaded(true);

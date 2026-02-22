@@ -17,6 +17,38 @@ export async function PATCH(req: NextRequest, context: Params) {
 
     const updates = await req.json()
 
+    const needsMetadataUpdate =
+      updates.gis_metadata !== undefined ||
+      updates.location_lat !== undefined ||
+      updates.location_lon !== undefined
+
+    let mergedMetadata: Record<string, unknown> | null = null
+    if (needsMetadataUpdate) {
+      const existingMetadataRows = await sql<{ gis_metadata: Record<string, unknown> | null }[]>`
+        SELECT gis_metadata
+        FROM landscape.tbl_project
+        WHERE project_id = ${projectId}::bigint
+        LIMIT 1
+      `
+      const existingMetadata = existingMetadataRows?.[0]?.gis_metadata ?? {}
+      mergedMetadata = { ...(existingMetadata ?? {}) }
+
+      if (updates.gis_metadata && typeof updates.gis_metadata === 'object') {
+        mergedMetadata = { ...mergedMetadata, ...updates.gis_metadata }
+      }
+
+      if (updates.location_lat !== undefined || updates.location_lon !== undefined) {
+        mergedMetadata = {
+          ...mergedMetadata,
+          location_override: true,
+          location_override_at: new Date().toISOString(),
+          location_override_source: 'user',
+        }
+      }
+
+      updates.gis_metadata = mergedMetadata
+    }
+
     const perspective = updates.analysis_perspective as AnalysisPerspective | undefined
     const purpose = updates.analysis_purpose as AnalysisPurpose | undefined
     const hasPerspective = perspective !== undefined
@@ -104,7 +136,8 @@ export async function PATCH(req: NextRequest, context: Params) {
       'project_type_code',
       'project_type',
       'template_id',
-      'planning_efficiency'
+      'planning_efficiency',
+      'gis_metadata'
     ]
 
     // Build SET clause dynamically

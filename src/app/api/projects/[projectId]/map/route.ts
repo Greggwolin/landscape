@@ -32,13 +32,14 @@ export async function GET(
               location_lon AS lng,
               location_lat AS lat,
               COALESCE(stories, 3) as stories,
-              street_address,
+              COALESCE(street_address, project_address) as street_address,
               city,
               state,
               zip_code,
               jurisdiction_city,
               jurisdiction_state,
-              jurisdiction_county
+              jurisdiction_county,
+              gis_metadata
        FROM landscape.tbl_project
        WHERE project_id = $1`,
       [projectId]
@@ -53,47 +54,76 @@ export async function GET(
     let lng: number | null = normalizeCoordinate(project.lng);
     let lat: number | null = normalizeCoordinate(project.lat);
 
-    // Fallback geocoding if coordinates are missing
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
-      const fallbackCity = project.city || project.jurisdiction_city;
-      const fallbackState = project.state || project.jurisdiction_state;
-      const fallbackZip = project.zip_code;
-      const fallbackCounty = project.jurisdiction_county;
-      const addressParts = [
-        project.street_address,
-        fallbackCity,
-        fallbackState,
-        fallbackZip,
-        fallbackCounty
-      ].filter(Boolean);
+    const metadata = (project.gis_metadata ?? {}) as Record<string, unknown>;
+    const locationOverride = metadata?.location_override === true;
 
-      const primaryQuery = addressParts.length >= 2 ? addressParts.join(', ') : null;
-      const secondaryQuery = fallbackCity && fallbackState ? `${fallbackCity}, ${fallbackState}` : null;
+    const fallbackCity = project.city || project.jurisdiction_city;
+    const fallbackState = project.state || project.jurisdiction_state;
+    const fallbackZip = project.zip_code;
+    const fallbackCounty = project.jurisdiction_county;
+    const addressParts = [
+      project.street_address,
+      fallbackCity,
+      fallbackState,
+      fallbackZip,
+      fallbackCounty
+    ].filter(Boolean);
 
-      const tryGeocode = async (query: string | null) => {
-        if (!query) return null;
-        try {
-          return await geocodeLocation(query);
-        } catch (geoError) {
-          console.error('Geocoding failed for project map:', geoError);
-          return null;
+    const addressKey = addressParts.join('|');
+    const primaryQuery = addressParts.length >= 2 ? addressParts.join(', ') : null;
+    const secondaryQuery = fallbackCity && fallbackState ? `${fallbackCity}, ${fallbackState}` : null;
+
+    const cachedGeocode = metadata?.geocode_key === addressKey
+      && typeof (metadata as Record<string, unknown>)?.geocode_center === 'object'
+      ? (metadata as { geocode_center?: { lat?: number; lng?: number } }).geocode_center
+      : null;
+    const cachedLat = normalizeCoordinate(cachedGeocode?.lat);
+    const cachedLng = normalizeCoordinate(cachedGeocode?.lng);
+
+    const tryGeocode = async (query: string | null) => {
+      if (!query) return null;
+      try {
+        return await geocodeLocation(query);
+      } catch (geoError) {
+        console.error('Geocoding failed for project map:', geoError);
+        return null;
+      }
+    };
+
+    if (!locationOverride && primaryQuery) {
+      if (Number.isFinite(cachedLng) && Number.isFinite(cachedLat)) {
+        lng = cachedLng;
+        lat = cachedLat;
+      } else {
+        const geocode =
+          (await tryGeocode(primaryQuery)) ||
+          (await tryGeocode(secondaryQuery));
+
+        if (geocode) {
+          lat = geocode.latitude;
+          lng = geocode.longitude;
+          const nextMetadata = {
+            ...metadata,
+            location_override: false,
+            geocode_key: addressKey,
+            geocode_center: { lat, lng },
+            geocode_source: geocode.source || 'geocode',
+            geocode_at: new Date().toISOString(),
+          };
+          await pool.query(
+            `UPDATE landscape.tbl_project
+             SET location_lat = $1, location_lon = $2, gis_metadata = $3
+             WHERE project_id = $4`,
+            [lat, lng, JSON.stringify(nextMetadata), projectId]
+          );
         }
-      };
+      }
+    }
 
-      const geocode =
-        (await tryGeocode(primaryQuery)) ||
-        (await tryGeocode(secondaryQuery));
-
-      if (geocode) {
-        lat = geocode.latitude;
-        lng = geocode.longitude;
-        // Persist coordinates for future map fetches
-        await pool.query(
-          `UPDATE landscape.tbl_project
-           SET location_lat = $1, location_lon = $2
-           WHERE project_id = $3`,
-          [lat, lng, projectId]
-        );
+    if (!locationOverride && (!Number.isFinite(lng) || !Number.isFinite(lat))) {
+      if (Number.isFinite(cachedLng) && Number.isFinite(cachedLat)) {
+        lng = cachedLng;
+        lat = cachedLat;
       }
     }
 
@@ -144,7 +174,8 @@ export async function GET(
       context: {
         type: 'FeatureCollection',
         features: []
-      }
+      },
+      location_override: locationOverride
     };
 
     return NextResponse.json(payload);

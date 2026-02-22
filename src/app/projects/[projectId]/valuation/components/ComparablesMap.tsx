@@ -123,7 +123,7 @@ export function ComparablesMap({
         scrollZoom: false,
       });
 
-      cleanupRasterDim = registerRasterDim(newMap, 0.3);
+      cleanupRasterDim = registerRasterDim(newMap, 0.1);
 
       map.current = newMap;
 

@@ -53,6 +53,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [resettingLocation, setResettingLocation] = useState(false);
 
   // Create storage key with tabId to keep tab views independent
   const storageKey = `map-saved-view-${projectId}-${tabId}`;
@@ -91,7 +92,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   ];
   // Default to google-roadmap; if original styleUrl was 'aerial' the MapOblique now maps it to Google hybrid
   const [activeBasemap, setActiveBasemap] = useState<BasemapOption>(
-    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-roadmap'
+    styleUrl.startsWith('google-') ? (styleUrl as BasemapOption) : 'google-hybrid'
   );
   const resolvedStyleUrl = activeBasemap;
 
@@ -186,6 +187,39 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save location';
       setSaveError(message);
+    }
+  };
+
+  const handleResetLocation = async () => {
+    setSaveError(null);
+    setSaveSuccess(null);
+    setResettingLocation(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gis_metadata: {
+            location_override: false,
+            location_override_at: null,
+            location_override_source: 'geocode-reset'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Failed to reset location');
+      }
+
+      setPendingLocation(null);
+      setSaveSuccess('Location reset to geocoded');
+      await mutate();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reset location';
+      setSaveError(message);
+    } finally {
+      setResettingLocation(false);
     }
   };
 
@@ -358,7 +392,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
               </div>
               <div className="d-flex align-items-center gap-2 mt-2">
                 <span className="badge bg-light text-dark">
-                  {saving ? 'Saving...' : pendingLocation ? 'Pending update' : 'Ready'}
+                  {saving ? 'Saving...' : resettingLocation ? 'Resetting...' : pendingLocation ? 'Pending update' : 'Ready'}
                 </span>
                 {saveSuccess && (
                   <span className="text-success small">{saveSuccess}</span>
@@ -367,6 +401,20 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
                   <span className="text-danger small">{saveError}</span>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={handleResetLocation}
+                disabled={resettingLocation}
+                className="mt-2 px-3 py-1 text-sm rounded"
+                style={{
+                  backgroundColor: 'var(--cui-secondary-bg)',
+                  color: 'var(--cui-body-color)',
+                  border: '1px solid var(--cui-border-color)',
+                  cursor: resettingLocation ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Reset to Geocoded Location
+              </button>
             </div>
 
             {/* Reset View Button */}

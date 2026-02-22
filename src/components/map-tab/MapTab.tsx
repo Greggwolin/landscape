@@ -47,7 +47,8 @@ import {
   formatDemographicValue,
 } from '@/components/location-intelligence';
 import type { RingDemographics } from '@/components/location-intelligence';
-import { fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
+import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
+import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 
 import './map-tab.css';
 
@@ -60,6 +61,20 @@ const parseCoordinate = (value?: number | string | null): number | null => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   const parsed = parseFloat(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeLatLon = (lat: number | null, lon: number | null): { lat: number | null; lon: number | null } => {
+  if (lat === null || lon === null) return { lat, lon };
+  const latValid = Math.abs(lat) <= 90;
+  const lonValid = Math.abs(lon) <= 180;
+  if (latValid && lonValid) return { lat, lon };
+  const swappedLatValid = Math.abs(lon) <= 90;
+  const swappedLonValid = Math.abs(lat) <= 180;
+  if (swappedLatValid && swappedLonValid) return { lat: lon, lon: lat };
+  return {
+    lat: latValid ? lat : null,
+    lon: lonValid ? lon : null,
+  };
 };
 
 const buildBoundaryFeature = (geojson: Geometry, metadata: Record<string, unknown>): Feature<Geometry> => ({
@@ -89,16 +104,73 @@ function computeBboxParam(fc: FeatureCollection | null): string {
 
 export function MapTab({ project }: MapTabProps) {
   const projectId = project.project_id;
+  const isDevelopmentProject = useMemo(() => {
+    const perspective = typeof project.analysis_perspective === 'string'
+      ? project.analysis_perspective.toUpperCase()
+      : '';
+    const analysisType = typeof project.analysis_type === 'string'
+      ? project.analysis_type.toUpperCase()
+      : '';
+    const subtype = typeof project.property_subtype === 'string' ? project.property_subtype : '';
+
+    if (perspective === 'DEVELOPMENT') return true;
+    if (analysisType === 'DEVELOPMENT' || analysisType === 'FEASIBILITY') return true;
+    if (subtype && LAND_DEVELOPMENT_SUBTYPES.includes(subtype as (typeof LAND_DEVELOPMENT_SUBTYPES)[number])) {
+      return true;
+    }
+    return false;
+  }, [project.analysis_perspective, project.analysis_type, project.property_subtype]);
 
   // ───── Coordinates ─────
-  const projectLat = parseCoordinate(project.location_lat ?? project.latitude ?? null);
-  const projectLon = parseCoordinate(project.location_lon ?? project.longitude ?? null);
+  const { lat: projectLat, lon: projectLon } = useMemo(() => {
+    const primary = normalizeLatLon(
+      parseCoordinate(project.location_lat ?? null),
+      parseCoordinate(project.location_lon ?? null)
+    );
+    if (primary.lat !== null && primary.lon !== null) return primary;
+
+    const fallback = normalizeLatLon(
+      parseCoordinate(project.latitude ?? null),
+      parseCoordinate(project.longitude ?? null)
+    );
+    if (fallback.lat !== null && fallback.lon !== null) return fallback;
+
+    return {
+      lat: primary.lat ?? fallback.lat ?? null,
+      lon: primary.lon ?? fallback.lon ?? null,
+    };
+  }, [project.location_lat, project.location_lon, project.latitude, project.longitude]);
+
   const hasProjectCenter = projectLat !== null && projectLon !== null;
 
   const projectCenter = useMemo<[number, number]>(() => {
     if (projectLat !== null && projectLon !== null) return [projectLon, projectLat]; // MapLibre uses [lng, lat]
     return DEFAULT_MAP_CENTER;
   }, [projectLat, projectLon]);
+
+  const [resolvedCenter, setResolvedCenter] = useState<[number, number] | null>(
+    hasProjectCenter ? projectCenter : null
+  );
+
+  useEffect(() => {
+    if (!hasProjectCenter) return;
+    setResolvedCenter((prev) => {
+      if (!prev || prev[0] !== projectCenter[0] || prev[1] !== projectCenter[1]) {
+        return projectCenter;
+      }
+      return prev;
+    });
+  }, [hasProjectCenter, projectCenter]);
+
+  useEffect(() => {
+    if (!mapApiCenter) return;
+    setResolvedCenter((prev) => {
+      if (!prev || prev[0] !== mapApiCenter[0] || prev[1] !== mapApiCenter[1]) {
+        return mapApiCenter;
+      }
+      return prev;
+    });
+  }, [mapApiCenter]);
 
   // ───── Map UI State ─────
   const [basemap, setBasemap] = useState<BasemapStyle>('hybrid');
@@ -138,15 +210,19 @@ export function MapTab({ project }: MapTabProps) {
   const [selectedRingStats, setSelectedRingStats] = useState<RingDemographics | null>(null);
   const [isRingModalOpen, setIsRingModalOpen] = useState(false);
 
+  const hasResolvedCenter = resolvedCenter !== null;
+  const resolvedLat = resolvedCenter ? resolvedCenter[1] : null;
+  const resolvedLon = resolvedCenter ? resolvedCenter[0] : null;
+
   const {
     demographics,
     isLoading: demographicsLoading,
     error: demographicsError,
   } = useDemographics({
-    lat: projectLat ?? 0,
-    lon: projectLon ?? 0,
+    lat: resolvedLat ?? 0,
+    lon: resolvedLon ?? 0,
     projectId: String(projectId),
-    enabled: hasProjectCenter,
+    enabled: hasResolvedCenter,
   });
 
   const showToast = useCallback((message: string) => {
@@ -169,6 +245,9 @@ export function MapTab({ project }: MapTabProps) {
   // ─────────────────────────────────────────────────────────────────────────
 
   const [profileApn, setProfileApn] = useState<string>('');
+  const mapCenterRequestRef = useRef(false);
+  const [mapApiCenter, setMapApiCenter] = useState<[number, number] | null>(null);
+  const [mapLocationOverride, setMapLocationOverride] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -619,7 +698,7 @@ export function MapTab({ project }: MapTabProps) {
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m) return;
-    if (hasProjectCenter) return;
+    if (hasResolvedCenter) return;
 
     // Collect all loaded GeoJSON features for bounding
     const allFeatures: Feature[] = [];
@@ -641,7 +720,7 @@ export function MapTab({ project }: MapTabProps) {
     } catch {
       // ignore bbox calculation errors
     }
-  }, [planParcels, projectBoundary, taxParcels, saleComps, rentComps, hasProjectCenter]);
+  }, [planParcels, projectBoundary, taxParcels, saleComps, rentComps, hasResolvedCenter]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Update layer counts from loaded data
@@ -854,6 +933,70 @@ export function MapTab({ project }: MapTabProps) {
     return resolved || profileApn;
   }, [project, profileApn]);
 
+  useEffect(() => {
+    if (!subjectApn || !isDevelopmentProject || mapLocationOverride) return;
+
+    let active = true;
+
+    const resolveParcelCenter = async () => {
+      try {
+        const collection = await fetchParcelsByAPN([subjectApn]);
+        if (!active) return;
+        if (!collection.features?.length) return;
+
+        const centerFeature = turf.center(collection);
+        const coords = centerFeature.geometry?.coordinates as [number, number] | undefined;
+        if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return;
+
+        setResolvedCenter([coords[0], coords[1]]);
+      } catch (error) {
+        if (!active) return;
+        console.warn('Failed to resolve parcel center from APN:', error);
+      }
+    };
+
+    resolveParcelCenter();
+
+    return () => {
+      active = false;
+    };
+  }, [subjectApn, isDevelopmentProject, mapLocationOverride]);
+
+  useEffect(() => {
+    if (mapCenterRequestRef.current) return;
+
+    let active = true;
+    const controller = new AbortController();
+    mapCenterRequestRef.current = true;
+
+    const resolveMapCenter = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/map`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Map center lookup failed (${response.status})`);
+        }
+        const payload = await response.json();
+        const center = payload?.center as [number, number] | undefined;
+        if (!active || !center) return;
+        if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) return;
+        setMapApiCenter(center);
+        setMapLocationOverride(Boolean(payload?.location_override));
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to resolve project map center:', error);
+      }
+    };
+
+    resolveMapCenter();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
+
   const compApns = useMemo(() => {
     const apns: string[] = [];
     const features = saleComps?.features ?? [];
@@ -947,7 +1090,7 @@ export function MapTab({ project }: MapTabProps) {
       <div className="map-tab-content">
         <MapCanvas
           ref={mapCanvasRef}
-          center={projectCenter}
+          center={resolvedCenter ?? projectCenter}
           zoom={DEFAULT_MAP_ZOOM}
           basemap={basemap}
           layers={layerState}

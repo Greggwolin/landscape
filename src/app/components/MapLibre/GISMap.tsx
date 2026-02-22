@@ -200,7 +200,7 @@ const GISMap: React.FC<GISMapProps> = ({
  zoom: initialZoom
  })
 
- cleanupRasterDim = registerRasterDim(map.current, 0.3)
+ cleanupRasterDim = registerRasterDim(map.current, 0.1)
 
  // Map instance created, waiting for load event
 

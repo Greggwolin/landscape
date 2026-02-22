@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { getEsriHybridStyle } from '@/lib/maps/esriHybrid'
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol'
+import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps'
 import { registerRasterDim } from '@/lib/maps/rasterDim'
 
 export interface GeocodeResult {
@@ -133,15 +134,16 @@ const MapPinSelector = ({
       latitude && longitude ? [longitude, latitude] : DEFAULT_CENTER
     const initialZoom = latitude && longitude ? 14 : DEFAULT_ZOOM
 
+    registerGoogleProtocol()
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: getEsriHybridStyle(),
+      style: getGoogleBasemapStyle('hybrid'),
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: false
     })
 
-    cleanupRasterDim = registerRasterDim(map.current, 0.3)
+    cleanupRasterDim = registerRasterDim(map.current, 0.1)
 
     map.current.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
