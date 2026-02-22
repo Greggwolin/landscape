@@ -114,6 +114,10 @@ PAGE_TOOLS = {
         "search_cabinet_contacts",
         "get_knowledge_insights",
         "acknowledge_insight",
+        # Knowledge / RAG search
+        "query_platform_knowledge",
+        "get_knowledge_entities",
+        "get_knowledge_facts",
     ],
 
     "mf_property": [
@@ -194,6 +198,10 @@ PAGE_TOOLS = {
         "search_cabinet_contacts",
         "get_knowledge_insights",
         "acknowledge_insight",
+        # Knowledge / RAG search
+        "query_platform_knowledge",
+        "get_knowledge_entities",
+        "get_knowledge_facts",
     ],
 
     "land_planning": [

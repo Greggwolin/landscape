@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landscaper User Manual</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-2: #232733;
+    --border: #2e3340;
+    --text: #e1e4eb;
+    --text-muted: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-dim: rgba(108,140,255,0.12);
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --teal: #2dd4bf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* Layout */
+  .wrapper { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0 20px;
+    margin: 16px 0 8px;
+  }
+  .sidebar h2:first-child { margin-top: 0; }
+  .sidebar a {
+    display: block;
+    padding: 6px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .sidebar a:hover { color: var(--text); background: var(--accent-dim); }
+  .sidebar a.active { color: var(--accent); background: var(--accent-dim); border-right: 2px solid var(--accent); }
+  .sidebar .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar .logo span { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .sidebar .logo small { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .content {
+    flex: 1;
+    max-width: 860px;
+    padding: 40px 48px;
+  }
+
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  h1 + .subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 32px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 36px 0 12px; scroll-margin-top: 24px; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; color: var(--accent); }
+  p { margin-bottom: 12px; }
+
+  /* Cards for page sections */
+  .page-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .page-card-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .page-card-header:hover { background: var(--surface-2); }
+  .page-card-header .title-row { display: flex; align-items: center; gap: 10px; }
+  .page-card-header .title-row h3 { margin: 0; font-size: 15px; }
+  .page-card-header .arrow { color: var(--text-muted); font-size: 12px; transition: transform 0.2s; }
+  .page-card.open .arrow { transform: rotate(90deg); }
+  .page-card-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    padding: 0 18px;
+  }
+  .page-card.open .page-card-body {
+    max-height: 2000px;
+    padding: 0 18px 18px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-mf { background: rgba(108,140,255,0.15); color: var(--accent); }
+  .badge-land { background: rgba(45,212,191,0.15); color: var(--teal); }
+  .badge-shared { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .badge-count { background: var(--surface-2); color: var(--text-muted); font-weight: 500; }
+
+  .tool-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 12px;
+  }
+  .tool-tag {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--text-muted);
+  }
+
+  .example-block {
+    background: var(--surface-2);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+  .example-block .q { color: var(--accent); font-weight: 500; }
+  .example-block .a { color: var(--text-muted); margin-top: 4px; }
+
+  .tier-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .tier-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .tier-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tier-table tr:last-child td { border-bottom: none; }
+
+  .callout {
+    background: var(--accent-dim);
+    border: 1px solid rgba(108,140,255,0.25);
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .callout strong { color: var(--accent); }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .status-dot.green { background: var(--green); }
+  .status-dot.amber { background: var(--amber); }
+  .status-dot.red { background: var(--red); }
+
+  ul { margin: 8px 0 12px 20px; }
+  li { margin-bottom: 4px; font-size: 14px; }
+
+  code {
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  @media (max-width: 900px) {
+    .wrapper { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; }
+    .content { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar">
+    <div class="logo">
+      <span>Landscaper</span>
+      <small>AI Assistant User Manual</small>
+    </div>
+    <h2>Getting Started</h2>
+    <a href="#overview">Overview</a>
+    <a href="#ui-layout">UI Layout</a>
+    <a href="#threads">Chat Threads</a>
+    <a href="#mutations">Mutations &amp; Approvals</a>
+
+    <h2>How Focus Works</h2>
+    <a href="#focus-system">Page-Aware Focus</a>
+    <a href="#tool-tiers">Tool Tiers</a>
+
+    <h2>Multifamily Pages</h2>
+    <a href="#mf-home">Home / Overview</a>
+    <a href="#mf-property">Property</a>
+    <a href="#mf-operations">Operations</a>
+    <a href="#mf-valuation">Valuation</a>
+    <a href="#mf-capitalization">Capitalization</a>
+
+    <h2>Land Dev Pages</h2>
+    <a href="#land-home">Home / Overview</a>
+    <a href="#land-planning">Planning</a>
+    <a href="#land-budget">Budget</a>
+    <a href="#land-schedule">Schedule / Sales</a>
+    <a href="#land-valuation">Valuation</a>
+    <a href="#land-capitalization">Capitalization</a>
+
+    <h2>Shared Pages</h2>
+    <a href="#documents">Documents</a>
+    <a href="#map">Map</a>
+    <a href="#reports">Reports</a>
+    <a href="#ic">Investment Committee</a>
+
+    <h2>Reference</h2>
+    <a href="#data-lookup">Data Lookup Priority</a>
+    <a href="#calculated-metrics">Calculated Metrics</a>
+    <a href="#whatif">What-If Scenarios</a>
+    <a href="#tips">Tips &amp; Best Practices</a>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="content">
+    <h1>Landscaper User Manual</h1>
+    <p class="subtitle">How Landscape's AI assistant adapts to what you're working on</p>
+
+    <!-- =========================================================== -->
+    <h2 id="overview">Overview</h2>
+    <p>
+      Landscaper is an AI assistant embedded in the left panel of every project page in Landscape.
+      It's aware of the page you're on, the data in your project, and the documents you've uploaded.
+      It can read and write data, run calculations, extract information from documents, and manage
+      what-if scenarios.
+    </p>
+    <p>
+      Landscaper uses a <strong>Level 2 Autonomy</strong> model: it can read anything freely, but all
+      data changes are proposed as "mutations" that you must approve or reject before they take effect.
+    </p>
+
+    <!-- =========================================================== -->
+    <h2 id="ui-layout">UI Layout</h2>
+    <p>The Landscaper panel has four zones from top to bottom:</p>
+    <table class="tier-table">
+      <tr><th>Zone</th><th>Description</th></tr>
+      <tr><td><strong>Header Bar</strong></td><td>Shows "Landscaper" label, page context badge, New Chat (+) button, and thread list toggle</td></tr>
+      <tr><td><strong>Thread Title</strong></td><td>Shows current conversation title. Click to edit. Auto-generates after your first exchange.</td></tr>
+      <tr><td><strong>Messages</strong></td><td>Scrollable conversation. User messages on right, Landscaper on left. Mutation proposals appear as confirm/reject cards.</td></tr>
+      <tr><td><strong>Input</strong></td><td>Text input with Send button. Enter sends, Shift+Enter for new line.</td></tr>
+    </table>
+
+    <div class="callout">
+      <strong>Context Badge:</strong> The pill in the header (e.g., "Property", "Valuation · DCF")
+      tells you what focus mode Landscaper is in. This changes automatically as you navigate tabs.
+    </div>
+
+    <!-- =========================================================== -->
+    <h2 id="threads">Chat Threads</h2>
+    <p>
+      Each conversation with Landscaper is a separate thread. Threads are scoped to the project,
+      not to a specific page — so you can start a thread on the Property tab and continue it on Valuation.
+    </p>
+    <ul>
+      <li><strong>New Thread:</strong> Click the <code>+</code> button in the header</li>
+      <li><strong>Switch Threads:</strong> Click the menu icon (⋮) to see your thread list</li>
+      <li><strong>Rename Thread:</strong> Click the title bar above messages, or click the pencil icon</li>
+      <li><strong>Auto-Naming:</strong> After your first exchange, Landscaper generates a short title from the topic discussed</li>
+    </ul>
+    <p>Thread history is preserved — when you reopen a thread, Landscaper has full context of what was discussed.</p>
+
+    <!-- =========================================================== -->
+    <h2 id="mutations">Mutations &amp; Approvals</h2>
+    <p>
+      When Landscaper needs to change data (update a rent, add a unit, modify an expense), it proposes
+      the change as a <strong>mutation</strong>. You'll see a card showing exactly what will change, with
+      Confirm and Reject buttons.
+    </p>
+    <ul>
+      <li>Read operations (queries, lookups, calculations) execute immediately — no approval needed</li>
+      <li>Write operations (updates, creates, deletes) always require your confirmation</li>
+      <li>Batch mutations group multiple related changes into one approval</li>
+    </ul>
+
+    <!-- =========================================================== -->
+    <h2 id="focus-system">Page-Aware Focus</h2>
+    <p>
+      Landscaper adapts its capabilities based on the page you're viewing. On the Property tab, it
+      has tools for units, leases, and rent roll. On Valuation, it has cash flow and comparable
+      tools. This focus keeps responses fast and relevant — it's not trying to process 135 tools
+      when you only need 20.
+    </p>
+    <p>The system works in four tiers:</p>
+
+    <!-- =========================================================== -->
+    <h2 id="tool-tiers">Tool Tiers</h2>
+    <table class="tier-table">
+      <tr><th>Tier</th><th>Tools</th><th>When Available</th></tr>
+      <tr>
+        <td><strong>Universal</strong></td>
+        <td>Project fields, field schema, document read</td>
+        <td>Always — every page</td>
+      </tr>
+      <tr>
+        <td><strong>Page-Specific</strong></td>
+        <td>Varies (units, leases, comps, budget, etc.)</td>
+        <td>Only on the matching page/tab</td>
+      </tr>
+      <tr>
+        <td><strong>Extraction</strong></td>
+        <td>Document ingestion, column mapping, rent roll delta</td>
+        <td>Documents page, or when you mention "document", "upload", "rent roll", etc.</td>
+      </tr>
+      <tr>
+        <td><strong>What-If</strong></td>
+        <td>Scenario compute, compare, commit, undo</td>
+        <td>Valuation, Capitalization, Reports, and IC pages</td>
+      </tr>
+    </table>
+
+    <div class="callout">
+      <strong>Universal tools</strong> include <code>get_project_fields</code> (read any project field),
+      <code>get_project_documents</code> and <code>get_document_content</code> (search uploaded docs).
+      These are always available regardless of page, so Landscaper can always look up basic project data
+      and search your documents.
+    </div>
+
+    <!-- =========================================================== -->
+    <!-- MULTIFAMILY PAGES -->
+    <!-- =========================================================== -->
+    <h2 style="margin-top:48px;">Multifamily Pages</h2>
+
+    <div class="page-card" id="mf-home">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Home / Overview</h3>
+          <span class="badge badge-mf">MF</span>
+          <span class="badge badge-count">~10 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>The landing page for a multifamily project. Landscaper focuses on contacts, knowledge insights, and market intelligence from uploaded documents.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"Who are the contacts on this project?"</li>
+          <li>"Find a broker named Smith in the contact cabinet"</li>
+          <li>"What insights does the knowledge base have for this project?"</li>
+          <li>"What does the platform knowledge say about LA apartment market trends?"</li>
+          <li>"What's the project address?" (universal tool)</li>
+        </ul>
+        <p>When you ask about insights or market knowledge, Landscaper searches three sources in order: AI-generated insights, platform knowledge base (RAG search over uploaded market docs), then project documents.</p>
+        <div class="tool-list">
+          <span class="tool-tag">get_project_contacts_v2</span>
+          <span class="tool-tag">search_cabinet_contacts</span>
+          <span class="tool-tag">get_knowledge_insights</span>
+          <span class="tool-tag">acknowledge_insight</span>
+          <span class="tool-tag">query_platform_knowledge</span>
+          <span class="tool-tag">get_knowledge_entities</span>
+          <span class="tool-tag">get_knowledge_facts</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="mf-property">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Property</h3>
+          <span class="badge badge-mf">MF</span>
+          <span class="badge badge-count">~24 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>The physical description page — units, rent roll, leases, site attributes, and acquisition data.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the unit mix?" / "How many 2-bedroom units are there?"</li>
+          <li>"What's the average unit size excluding commercial spaces?"</li>
+          <li>"What's the FAR?" (calculates from gross_sf / lot_size_sf in the database)</li>
+          <li>"Show me the rent roll"</li>
+          <li>"Update unit 205's rent to $2,100" (proposes mutation)</li>
+          <li>"What are the rental comps?"</li>
+          <li>"What year was the building constructed?"</li>
+          <li>"Update the parking ratio to 1.5 spaces per unit"</li>
+        </ul>
+        <div class="example-block">
+          <div class="q">You: "What's the project FAR?"</div>
+          <div class="a">Landscaper: FAR = 138,504 GBA / 119,748 Site SF = 1.16</div>
+        </div>
+        <div class="tool-list">
+          <span class="tool-tag">get_unit_types</span>
+          <span class="tool-tag">update_unit_types</span>
+          <span class="tool-tag">get_units</span>
+          <span class="tool-tag">update_units</span>
+          <span class="tool-tag">get_leases</span>
+          <span class="tool-tag">update_leases</span>
+          <span class="tool-tag">get_rental_comparables</span>
+          <span class="tool-tag">update_rental_comparable</span>
+          <span class="tool-tag">get_property_attributes</span>
+          <span class="tool-tag">update_property_attributes</span>
+          <span class="tool-tag">get_acquisition</span>
+          <span class="tool-tag">update_acquisition</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="mf-operations">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Operations</h3>
+          <span class="badge badge-mf">MF</span>
+          <span class="badge badge-count">~14 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Operating income and expenses — rent revenue, other income, vacancy, and OpEx.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the total operating expense?" / "Break down OpEx by category"</li>
+          <li>"Update the insurance expense to $185,000"</li>
+          <li>"What are the vacancy assumptions?"</li>
+          <li>"Set economic vacancy to 5%"</li>
+          <li>"What's the gross potential rent?" / "Show other income sources"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">update_operating_expenses</span>
+          <span class="tool-tag">get_revenue_rent</span>
+          <span class="tool-tag">update_revenue_rent</span>
+          <span class="tool-tag">get_revenue_other</span>
+          <span class="tool-tag">update_revenue_other</span>
+          <span class="tool-tag">get_vacancy_assumptions</span>
+          <span class="tool-tag">update_vacancy_assumptions</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="mf-valuation">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Valuation</h3>
+          <span class="badge badge-mf">MF</span>
+          <span class="badge badge-count">~30+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Income approach (Direct Cap + DCF), sales comparables, and financial analysis. What-If scenario tools are also available here.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the indicated value by income approach?"</li>
+          <li>"Run a DCF at 7% discount rate"</li>
+          <li>"Show me the sales comps" / "Adjust comp #3 for location"</li>
+          <li>"What's the loss to lease?"</li>
+          <li>"Calculate Year 1 buyer NOI"</li>
+          <li>"What if cap rate increases to 5.5%?" (what-if scenario)</li>
+          <li>"Compare current scenario vs the conservative one"</li>
+        </ul>
+        <div class="example-block">
+          <div class="q">You: "What if we increase rents 3% and vacancy goes to 7%?"</div>
+          <div class="a">Landscaper: Creates a compound what-if scenario, computes the impact on NOI and value, and shows the delta.</div>
+        </div>
+        <div class="tool-list">
+          <span class="tool-tag">get_cashflow_results</span>
+          <span class="tool-tag">compute_cashflow_expression</span>
+          <span class="tool-tag">get_sales_comparables</span>
+          <span class="tool-tag">update_sales_comparable</span>
+          <span class="tool-tag">analyze_loss_to_lease</span>
+          <span class="tool-tag">calculate_year1_buyer_noi</span>
+          <span class="tool-tag">get_market_assumptions</span>
+          <span class="tool-tag">whatif_compute</span>
+          <span class="tool-tag">whatif_compound</span>
+          <span class="tool-tag">scenario_compare</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="mf-capitalization">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Capitalization</h3>
+          <span class="badge badge-mf">MF</span>
+          <span class="badge badge-count">~28+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Capital structure — debt, equity, and waterfall distributions. What-If tools available.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What are the current loan terms?"</li>
+          <li>"Add a senior loan at 5.25% for $15M"</li>
+          <li>"What's the equity structure?"</li>
+          <li>"Show me the waterfall tiers"</li>
+          <li>"What if we increase leverage to 75% LTV?"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_loans</span>
+          <span class="tool-tag">update_loan</span>
+          <span class="tool-tag">get_equity_structure</span>
+          <span class="tool-tag">update_equity_structure</span>
+          <span class="tool-tag">get_waterfall_tiers</span>
+          <span class="tool-tag">update_waterfall_tiers</span>
+          <span class="tool-tag">whatif_compute</span>
+          <span class="tool-tag">scenario_save</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========================================================== -->
+    <!-- LAND DEV PAGES -->
+    <!-- =========================================================== -->
+    <h2 style="margin-top:48px;">Land Development Pages</h2>
+
+    <div class="page-card" id="land-home">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Home / Overview</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~10 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Same capabilities as MF Home — contacts, knowledge insights, and universal project fields.</p>
+        <div class="tool-list">
+          <span class="tool-tag">get_project_contacts_v2</span>
+          <span class="tool-tag">search_cabinet_contacts</span>
+          <span class="tool-tag">get_knowledge_insights</span>
+          <span class="tool-tag">acknowledge_insight</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="land-planning">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Planning</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~26 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Master plan hierarchy — areas, phases, parcels, land use taxonomy, and milestones.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"Show me all areas and phases"</li>
+          <li>"How many parcels are in Phase 2?"</li>
+          <li>"Add a new 50-lot phase to Area B"</li>
+          <li>"What are the land use families and types?"</li>
+          <li>"Update the residential product for 60' lots"</li>
+          <li>"What milestones are coming up?"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_areas</span>
+          <span class="tool-tag">update_area</span>
+          <span class="tool-tag">get_phases</span>
+          <span class="tool-tag">update_phase</span>
+          <span class="tool-tag">get_parcels</span>
+          <span class="tool-tag">update_parcel</span>
+          <span class="tool-tag">get_land_use_families</span>
+          <span class="tool-tag">get_land_use_types</span>
+          <span class="tool-tag">get_residential_products</span>
+          <span class="tool-tag">get_milestones</span>
+          <span class="tool-tag">update_milestone</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="land-budget">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Budget</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~12 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Development budget — categories and line items.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the total development budget?"</li>
+          <li>"Break down costs by category"</li>
+          <li>"Add a grading line item for $2.5M"</li>
+          <li>"What's the per-lot infrastructure cost?"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_budget_categories</span>
+          <span class="tool-tag">update_budget_category</span>
+          <span class="tool-tag">get_budget_items</span>
+          <span class="tool-tag">update_budget_item</span>
+          <span class="tool-tag">delete_budget_item</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="land-schedule">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Schedule / Sales</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~18 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Absorption schedule, lot sale events, and competitive project tracking.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the absorption schedule for Phase 1?"</li>
+          <li>"How do our prices compare to competitive projects?"</li>
+          <li>"Show lot sale events for Area A"</li>
+          <li>"What are the absorption benchmarks?"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_absorption_schedule</span>
+          <span class="tool-tag">update_absorption_schedule</span>
+          <span class="tool-tag">get_absorption_benchmarks</span>
+          <span class="tool-tag">get_parcel_sale_events</span>
+          <span class="tool-tag">update_parcel_sale_event</span>
+          <span class="tool-tag">get_competitive_projects</span>
+          <span class="tool-tag">update_competitive_project</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="land-valuation">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Valuation</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~28+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Cash flow analysis with DCF, plus market assumptions. What-If tools available. Can also access hierarchy (areas, phases) for filtering.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the project IRR?"</li>
+          <li>"Run the cash flow model"</li>
+          <li>"What if lot prices increase 5%?"</li>
+          <li>"Compare base case vs aggressive absorption"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_cashflow_results</span>
+          <span class="tool-tag">compute_cashflow_expression</span>
+          <span class="tool-tag">update_cashflow_assumption</span>
+          <span class="tool-tag">get_market_assumptions</span>
+          <span class="tool-tag">get_areas</span>
+          <span class="tool-tag">get_phases</span>
+          <span class="tool-tag">whatif_compute</span>
+          <span class="tool-tag">scenario_compare</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="land-capitalization">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Capitalization</h3>
+          <span class="badge badge-land">LAND</span>
+          <span class="badge badge-count">~28+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Same capital structure tools as MF Capitalization — debt, equity, waterfall. What-If tools available.</p>
+        <div class="tool-list">
+          <span class="tool-tag">get_loans</span>
+          <span class="tool-tag">update_loan</span>
+          <span class="tool-tag">get_equity_structure</span>
+          <span class="tool-tag">update_equity_structure</span>
+          <span class="tool-tag">get_waterfall_tiers</span>
+          <span class="tool-tag">update_waterfall_tiers</span>
+          <span class="tool-tag">whatif_compute</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========================================================== -->
+    <!-- SHARED PAGES -->
+    <!-- =========================================================== -->
+    <h2 style="margin-top:48px;">Shared Pages</h2>
+
+    <div class="page-card" id="documents">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Documents</h3>
+          <span class="badge badge-shared">SHARED</span>
+          <span class="badge badge-count">~20 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Document management and extraction. This is the only page where the full extraction toolkit is loaded by default.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What documents have been uploaded?"</li>
+          <li>"Extract the rent roll from the offering memo"</li>
+          <li>"Analyze the rent roll columns and map them"</li>
+          <li>"What assertions were extracted from the appraisal?"</li>
+          <li>"Compute the rent roll delta between the OM and the database"</li>
+          <li>"Find contacts in this document and save them"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_project_documents</span>
+          <span class="tool-tag">get_document_content</span>
+          <span class="tool-tag">get_document_assertions</span>
+          <span class="tool-tag">ingest_document</span>
+          <span class="tool-tag">get_extraction_results</span>
+          <span class="tool-tag">analyze_rent_roll_columns</span>
+          <span class="tool-tag">confirm_column_mapping</span>
+          <span class="tool-tag">compute_rent_roll_delta</span>
+          <span class="tool-tag">extract_and_save_contacts</span>
+          <span class="tool-tag">get_knowledge_entities</span>
+          <span class="tool-tag">get_knowledge_facts</span>
+        </div>
+        <div class="callout">
+          <strong>Extraction keywords:</strong> On any other page, mention "document", "upload", "rent roll",
+          "T-12", "offering memo", "appraisal", "pdf", or "import" and extraction tools will be added
+          automatically.
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="map">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Map</h3>
+          <span class="badge badge-shared">SHARED</span>
+          <span class="badge badge-count">~10 tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>GIS and location context. Can read/update property site attributes.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"What's the site shape?"</li>
+          <li>"Update the location rating to 4"</li>
+          <li>"What are the site attributes?"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_property_attributes</span>
+          <span class="tool-tag">update_property_attributes</span>
+          <span class="tool-tag">update_site_attribute</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="reports">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Reports</h3>
+          <span class="badge badge-shared">SHARED</span>
+          <span class="badge badge-count">~28+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>Read-only access to cash flow results, unit types, and budget. What-If tools available for scenario comparison during report preparation.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"Summarize the cash flow results for the report"</li>
+          <li>"What are the key assumptions to include?"</li>
+          <li>"Compare the base case vs optimistic scenario for the report"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">get_cashflow_results</span>
+          <span class="tool-tag">get_unit_types</span>
+          <span class="tool-tag">get_budget_items</span>
+          <span class="tool-tag">whatif_compute</span>
+          <span class="tool-tag">scenario_compare</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-card" id="ic">
+      <div class="page-card-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="title-row">
+          <h3>Investment Committee</h3>
+          <span class="badge badge-shared">SHARED</span>
+          <span class="badge badge-count">~35+ tools</span>
+        </div>
+        <span class="arrow">▶</span>
+      </div>
+      <div class="page-card-body">
+        <p>IC review mode with the most tools of any page. Includes valuation, scenario, KPI, sensitivity analysis, and IC challenge/response workflow.</p>
+        <p><strong>What you can ask:</strong></p>
+        <ul>
+          <li>"Start an IC review session"</li>
+          <li>"Give me the next challenge question"</li>
+          <li>"Run a sensitivity grid on cap rate and vacancy"</li>
+          <li>"What are the KPI definitions?"</li>
+          <li>"Compare all saved scenarios"</li>
+        </ul>
+        <div class="tool-list">
+          <span class="tool-tag">ic_start_session</span>
+          <span class="tool-tag">ic_challenge_next</span>
+          <span class="tool-tag">ic_respond_challenge</span>
+          <span class="tool-tag">sensitivity_grid</span>
+          <span class="tool-tag">get_kpi_definitions</span>
+          <span class="tool-tag">get_cashflow_results</span>
+          <span class="tool-tag">scenario_compare</span>
+          <span class="tool-tag">scenario_diff</span>
+          <span class="tool-tag">whatif_compute</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- =========================================================== -->
+    <h2 id="data-lookup" style="margin-top:48px;">Data Lookup Priority</h2>
+    <p>When you ask Landscaper about property data, it follows this order:</p>
+    <table class="tier-table">
+      <tr><th>#</th><th>Source</th><th>Action</th></tr>
+      <tr><td>1</td><td><strong>Database</strong></td><td>Queries project fields, units, leases, etc. using available tools</td></tr>
+      <tr><td>2</td><td><strong>Uploaded Documents</strong></td><td>Searches OMs, appraisals, T-12s automatically — no permission needed</td></tr>
+      <tr><td>3</td><td><strong>Ask You</strong></td><td>Only if neither the database nor documents have the answer</td></tr>
+    </table>
+    <p>
+      Landscaper should never say "I don't have that data, would you like me to search documents?"
+      — it searches automatically. Financial assumptions (cap rate, discount rate, growth rates) always
+      come from the database, never from documents.
+    </p>
+
+    <!-- =========================================================== -->
+    <h2 id="calculated-metrics">Calculated Metrics</h2>
+    <p>These metrics are computed from database fields, not stored as separate values:</p>
+    <table class="tier-table">
+      <tr><th>Metric</th><th>Formula</th><th>Fields</th></tr>
+      <tr><td><strong>FAR</strong></td><td>gross_sf / lot_size_sf</td><td>Both on tbl_project</td></tr>
+      <tr><td><strong>Site Coverage</strong></td><td>building_footprint / lot_size_sf</td><td>Estimated from gross_sf / stories if footprint unavailable</td></tr>
+      <tr><td><strong>Density</strong></td><td>total_units / lot_size_acres</td><td>Both on tbl_project</td></tr>
+    </table>
+
+    <!-- =========================================================== -->
+    <h2 id="whatif">What-If Scenarios</h2>
+    <p>Available on Valuation, Capitalization, Reports, and IC pages. Scenarios let you test assumptions without changing actual data.</p>
+    <table class="tier-table">
+      <tr><th>Tool</th><th>What It Does</th></tr>
+      <tr><td><code>whatif_compute</code></td><td>Test a single assumption change and see the impact</td></tr>
+      <tr><td><code>whatif_compound</code></td><td>Stack multiple changes together</td></tr>
+      <tr><td><code>whatif_reset</code></td><td>Clear the active what-if state</td></tr>
+      <tr><td><code>scenario_save</code></td><td>Save current what-if as a named scenario</td></tr>
+      <tr><td><code>scenario_load</code></td><td>Load a previously saved scenario</td></tr>
+      <tr><td><code>scenario_compare</code></td><td>Side-by-side comparison of scenarios</td></tr>
+      <tr><td><code>scenario_diff</code></td><td>Show delta between two scenarios</td></tr>
+      <tr><td><code>whatif_commit</code></td><td>Apply what-if changes to the actual database</td></tr>
+      <tr><td><code>whatif_undo</code></td><td>Reverse the last committed change</td></tr>
+      <tr><td><code>sensitivity_grid</code></td><td>Matrix of outcomes across two variables</td></tr>
+    </table>
+
+    <!-- =========================================================== -->
+    <h2 id="tips">Tips &amp; Best Practices</h2>
+    <ul>
+      <li><strong>Be direct.</strong> "What's the NOI?" works better than "Can you tell me what the net operating income is for this property?"</li>
+      <li><strong>One question at a time</strong> gets better results than compound questions.</li>
+      <li><strong>Name your numbers.</strong> "Set cap rate to 5.25%" is clearer than "lower the cap rate a bit."</li>
+      <li><strong>Use the right page.</strong> If Landscaper can't do something, you might be on the wrong tab. Switch to the relevant page and try again.</li>
+      <li><strong>Mention "document"</strong> if you want to pull data from uploaded files while on a non-Documents page.</li>
+      <li><strong>What-if before committing.</strong> Test scenarios on Valuation before updating actual data.</li>
+      <li><strong>Review mutations carefully.</strong> Landscaper shows exactly what will change — read the diff before confirming.</li>
+    </ul>
+
+    <div class="callout" style="margin-top: 32px;">
+      <strong>Version:</strong> This manual reflects Landscaper configuration as of February 2026.
+      Tool availability may change as features are added.
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

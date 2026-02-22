@@ -4,7 +4,7 @@ import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import CIcon from '@coreui/icons-react';
 import { cilCloudUpload, cilSend } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
-import { useLandscaper } from '@/hooks/useLandscaper';
+import { useLandscaperThreads } from '@/hooks/useLandscaperThreads';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -208,14 +208,14 @@ export default function DmsLandscaperPanel({
   clearCollision,
  } = useLandscaperCollision();
 
- // Use unified Landscaper API for AI queries (projectId: null for global context)
+ // Use unified Landscaper API for AI queries (projectId: '0' for global context)
  const {
  messages: aiMessages,
  isLoading: aiLoading,
  sendMessage: sendAiMessage,
- } = useLandscaper({
- projectId: null,
- activeTab: 'dms',
+ } = useLandscaperThreads({
+ projectId: '0',
+ pageContext: 'documents',
  });
 
  // Combine local messages (document filter results) with AI messages
