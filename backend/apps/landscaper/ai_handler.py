@@ -5408,6 +5408,37 @@ The ONLY time to present options is when the user's request is genuinely ambiguo
 determine the correct action. "Find the bed/bath values in the rent roll" is not ambiguous — it
 means read the document and find the values.
 
+RESPONSE FORMAT — BE CONCISE:
+- For numerical/calculated answers, lead with the number and show the formula inline.
+  Good: "FAR = 138,504 GBA / 119,748 Site SF = 1.16"
+  Bad:  "The FAR is calculated by dividing gross building area by site area. The gross building
+        area is 138,504 SF and the site area is 119,748 SF. Therefore FAR = 138,504 / 119,748 = 1.16.
+        This means the building area is 16% larger than the lot."
+- Do not explain what a metric means unless the user asks.
+- Do not add editorial commentary ("this is typical for...", "this means...") unless asked.
+- Use labels from the data (GBA, Site SF, NRA) not verbose descriptions.
+
+DATA LOOKUP PRIORITY (CRITICAL):
+When the user asks about property data (site coverage, FAR, building specs, unit mix, rents,
+expenses, or any factual question about the property):
+  1. FIRST: Check the database using your tools (get_project_fields, get_units, get_property_attributes, etc.)
+  2. IF NOT IN DATABASE: Automatically search uploaded documents using get_project_documents and
+     get_document_content. Do NOT ask the user for permission — just search.
+  3. ONLY ASK THE USER if neither the database nor documents contain the answer.
+
+Never respond with "I don't have that data, would you like me to search documents?" — you already
+have document search tools available. Use them proactively. The user expects you to find data from
+ALL available sources before reporting that something is missing.
+
+CALCULATED METRICS (compute from DB fields on tbl_project — do NOT search documents for these):
+- FAR (Floor Area Ratio) = gross_sf / lot_size_sf. Both fields are on tbl_project.
+  Use get_project_fields to retrieve gross_sf and lot_size_sf, then divide.
+- Site Coverage = building_footprint_sf / lot_size_sf. If building_footprint is not stored,
+  estimate from gross_sf / number_of_stories.
+- Density = total_units / lot_size_acres.
+When the user asks for FAR, site coverage, or density, use get_project_fields to pull
+gross_sf, lot_size_sf, and lot_size_acres from the database and calculate. Show your math.
+
 FINANCIAL ASSUMPTIONS SOURCE OF TRUTH:
 Cap rate, discount rate, and growth rates must be read from database fields using tools.
 Do NOT pull these values from uploaded documents.
@@ -6127,12 +6158,15 @@ def get_landscaper_response(
     project_context_msg = _build_project_context_message(project_context)
     full_system = f"{system_prompt}\n\n---\n{project_context_msg}"
 
-    # Add rich project context (structured data from all tables including market/competitive)
+    # Add rich project context (structured data from relevant tables only)
+    # Pass page_context so only sections relevant to the current page are included.
+    # This keeps the system prompt compact and preserves model attention for
+    # conversation history.
     project_id = project_context.get('project_id')
     if project_id:
         try:
             from apps.knowledge.services.project_context import get_project_context
-            rich_context = get_project_context(project_id)
+            rich_context = get_project_context(project_id, page_context=page_context)
             if rich_context:
                 full_system += f"\n\n=== PROJECT DATA ===\n{rich_context}"
         except Exception as e:
@@ -6297,6 +6331,34 @@ def get_landscaper_response(
                     'role': role,
                     'content': content
                 })
+
+        # Hard cap: if system prompt exceeds budget, truncate the PROJECT DATA section
+        MAX_SYSTEM_CHARS = 60000  # ~15K tokens — leaves plenty of room for messages
+        if len(full_system) > MAX_SYSTEM_CHARS:
+            marker = "=== PROJECT DATA ==="
+            marker_pos = full_system.find(marker)
+            if marker_pos > 0:
+                # Keep everything before project data + truncated project data
+                pre_data = full_system[:marker_pos]
+                remaining_budget = MAX_SYSTEM_CHARS - len(pre_data) - 200  # 200 char buffer
+                post_data = full_system[marker_pos:]
+                if len(post_data) > remaining_budget:
+                    full_system = pre_data + post_data[:remaining_budget] + "\n[... project data truncated for token budget ...]"
+                    logger.warning(
+                        f"[PROMPT_SIZE] System prompt truncated from {len(pre_data) + len(post_data)} "
+                        f"to {len(full_system)} chars"
+                    )
+
+        # Log system prompt and message sizes
+        _sys_chars = len(full_system)
+        _sys_tokens_est = _sys_chars // 4  # rough estimate
+        _msg_chars = sum(len(m.get('content', '')) for m in claude_messages)
+        _msg_count = len(claude_messages)
+        logger.info(
+            f"[PROMPT_SIZE] system_prompt={_sys_chars} chars (~{_sys_tokens_est} tokens), "
+            f"messages={_msg_count} ({_msg_chars} chars), "
+            f"page_context={page_context}"
+        )
 
         # Make API call with tools if executor is provided
         api_kwargs = {

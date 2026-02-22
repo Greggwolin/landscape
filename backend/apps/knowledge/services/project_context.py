@@ -27,12 +27,111 @@ class ProjectContextService:
         self.project_id = project_id
         self._cache: Dict[str, Any] = {}
 
+    # Page-to-sections mapping: which data sections each page needs.
+    # 'profile' is always included (it's small).
+    PAGE_SECTION_MAP = {
+        # Multifamily pages
+        'mf_home':          ['profile', 'hierarchy', 'documents'],
+        'mf_property':      ['profile', 'hierarchy', 'units'],
+        'mf_operations':    ['profile', 'units', 'opex'],
+        'mf_valuation':     ['profile', 'units', 'opex', 'assumptions'],
+        'mf_capitalization': ['profile', 'assumptions'],
+        # Land dev pages
+        'land_home':        ['profile', 'hierarchy', 'documents'],
+        'land_budget':      ['profile', 'hierarchy', 'parcels', 'budget'],
+        'land_planning':    ['profile', 'hierarchy', 'parcels'],
+        'land_valuation':   ['profile', 'parcels', 'sales', 'assumptions'],
+        'land_capitalization': ['profile', 'assumptions'],
+        'land_schedule':    ['profile', 'hierarchy', 'parcels', 'budget'],
+        # Shared pages
+        'home':             ['profile', 'hierarchy', 'documents'],
+        'property':         ['profile', 'hierarchy', 'units', 'parcels'],
+        'operations':       ['profile', 'units', 'opex'],
+        'valuation':        ['profile', 'units', 'opex', 'parcels', 'sales', 'assumptions'],
+        'feasibility':      ['profile', 'parcels', 'budget', 'sales', 'assumptions'],
+        'capitalization':   ['profile', 'assumptions'],
+        'capital':          ['profile', 'assumptions'],
+        'budget':           ['profile', 'hierarchy', 'parcels', 'budget'],
+        'reports':          ['profile', 'units', 'opex', 'assumptions'],
+        'documents':        ['profile', 'documents'],
+        'map':              ['profile', 'hierarchy', 'parcels', 'market'],
+    }
+
+    # Section name → method mapping
+    SECTION_BUILDERS = None  # Initialized in _get_section_builders()
+
+    def _get_section_builders(self):
+        """Lazy init to avoid issues with method references at class parse time."""
+        if self.SECTION_BUILDERS is None:
+            ProjectContextService.SECTION_BUILDERS = {
+                'profile':     ('Project Profile',              self.get_project_profile),
+                'hierarchy':   ('Property Structure',           self.get_container_hierarchy),
+                'units':       ('Unit Mix & Rents',             self.get_unit_data),
+                'parcels':     ('Parcels & Land Use',           self.get_parcel_data),
+                'opex':        ('Operating Expenses',           self.get_operating_expenses),
+                'budget':      ('Budget Summary',               self.get_budget_summary),
+                'sales':       ('Sales & Absorption',           self.get_sales_data),
+                'market':      ('Market Competitive Data (Zonda)', self.get_competitive_data),
+                'assumptions': ('Financial Assumptions',        self.get_financial_assumptions),
+                'documents':   ('Uploaded Documents',           self.get_document_inventory),
+            }
+        return self.SECTION_BUILDERS
+
+    def get_context_for_page(self, page_context: str) -> str:
+        """
+        Assemble project context filtered to sections relevant for the given page.
+
+        This keeps the system prompt compact — typically 3-5 sections instead of 10 —
+        so conversation history gets more model attention.
+
+        Args:
+            page_context: Normalized page context (e.g. 'mf_property', 'land_budget')
+
+        Returns:
+            Formatted context string with only relevant sections.
+        """
+        # Normalize: strip prefixes if not in map
+        ctx = page_context.lower().strip() if page_context else ''
+        section_keys = self.PAGE_SECTION_MAP.get(ctx)
+
+        if not section_keys:
+            # Try stripping mf_/land_ prefix
+            for prefix in ('mf_', 'land_'):
+                if ctx.startswith(prefix):
+                    section_keys = self.PAGE_SECTION_MAP.get(ctx[len(prefix):])
+                    if section_keys:
+                        break
+
+        if not section_keys:
+            # Unknown page — return compact default (profile + hierarchy only)
+            section_keys = ['profile', 'hierarchy']
+
+        builders = self._get_section_builders()
+        sections = []
+
+        for key in section_keys:
+            entry = builders.get(key)
+            if not entry:
+                continue
+            title, method = entry
+            data = method()
+            if data:
+                sections.append(self._format_section(title, data))
+
+        if not sections:
+            return "No structured project data available in database."
+
+        return "\n\n".join(sections)
+
     def get_full_context(self) -> str:
         """
         Assemble complete project context as formatted string.
 
         Returns a multi-section context document covering all available
         project data from the database.
+
+        NOTE: Prefer get_context_for_page() when page_context is known,
+        to keep system prompts compact.
         """
         sections = []
 
@@ -81,7 +180,7 @@ class ProjectContextService:
         if assumptions:
             sections.append(self._format_section("Financial Assumptions", assumptions))
 
-        # 9. Document Inventory
+        # 10. Document Inventory
         docs = self.get_document_inventory()
         if docs:
             sections.append(self._format_section("Uploaded Documents", docs))
@@ -766,10 +865,25 @@ class ProjectContextService:
         return f"## {title}\n{content}"
 
 
-def get_project_context(project_id: int) -> str:
-    """Convenience function to get full project context."""
+def get_project_context(project_id: int, page_context: str = None) -> str:
+    """
+    Get project context, optionally filtered by page context.
+
+    When page_context is provided, only sections relevant to that page
+    are included. This keeps system prompts compact and improves model
+    attention to conversation history.
+
+    Args:
+        project_id: Project ID
+        page_context: Normalized page context (e.g. 'mf_property', 'land_budget').
+                      If None, returns full context (legacy behavior).
+    """
     service = ProjectContextService(project_id)
-    return service.get_full_context()
+
+    if not page_context:
+        return service.get_full_context()
+
+    return service.get_context_for_page(page_context)
 
 
 def get_project_context_summary(project_id: int) -> Dict[str, Any]:

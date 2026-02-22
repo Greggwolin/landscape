@@ -680,6 +680,118 @@ def handle_calculate_remaining_economic_life(
 
 
 # =============================================================================
+# Zoning / FAR / Site Coverage Tool
+# =============================================================================
+
+ZONING_TOOLS = [
+    {
+        "name": "get_zoning_info",
+        "description": """Get zoning, FAR (floor area ratio), and site coverage data for this project.
+
+Returns data from tbl_zoning_control including:
+- site_coverage_pct: Site coverage percentage
+- site_far: Floor area ratio (FAR)
+- max_stories: Maximum stories allowed
+- max_height_ft: Maximum height in feet
+- parking_ratio_per_1000sf: Required parking ratio
+- parking_stall_sf: Parking stall size
+- site_common_area_pct: Common area percentage
+- zoning_code, landuse_code: Zoning/land use codes
+- setback_notes: Setback requirements
+
+Use this tool when the user asks about FAR, floor area ratio, site coverage, zoning,
+density, height limits, setbacks, or parking requirements.
+""",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+]
+
+
+def handle_get_zoning_info(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get zoning and site coverage info for a project."""
+    try:
+        with connection.cursor() as cursor:
+            # Check if tbl_zoning_control exists and has data for this project
+            cursor.execute("""
+                SELECT
+                    zc.zoning_control_id,
+                    zc.site_coverage_pct,
+                    zc.site_far,
+                    zc.max_stories,
+                    zc.max_height_ft,
+                    zc.parking_ratio_per_1000sf,
+                    zc.parking_stall_sf,
+                    zc.site_common_area_pct,
+                    zc.zoning_code,
+                    zc.landuse_code,
+                    zc.setback_notes,
+                    zc.scenario_id
+                FROM landscape.tbl_zoning_control zc
+                WHERE zc.project_id = %s
+                ORDER BY zc.zoning_control_id
+            """, [project_id])
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+            if rows:
+                records = []
+                for row in rows:
+                    record = dict(zip(columns, row))
+                    # Convert Decimal fields
+                    for key in ['site_coverage_pct', 'site_far', 'max_height_ft',
+                                'parking_ratio_per_1000sf', 'parking_stall_sf',
+                                'site_common_area_pct']:
+                        if record.get(key) is not None:
+                            record[key] = float(record[key])
+                    records.append(record)
+
+                if len(records) == 1:
+                    return {'success': True, 'source': 'tbl_zoning_control', 'data': records[0]}
+                return {'success': True, 'source': 'tbl_zoning_control', 'count': len(records), 'records': records}
+
+            # Fallback: check tbl_project for land_to_building_ratio (related to FAR)
+            cursor.execute("""
+                SELECT land_to_building_ratio, net_rentable_area, site_area_sf, site_area_acres
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [project_id])
+
+            row = cursor.fetchone()
+            if row and any(v is not None for v in row):
+                data = {
+                    'land_to_building_ratio': float(row[0]) if row[0] else None,
+                    'net_rentable_area': float(row[1]) if row[1] else None,
+                    'site_area_sf': float(row[2]) if row[2] else None,
+                    'site_area_acres': float(row[3]) if row[3] else None,
+                }
+                return {
+                    'success': True,
+                    'source': 'tbl_project',
+                    'note': 'No zoning_control record found. Returning project-level site data.',
+                    'data': {k: v for k, v in data.items() if v is not None}
+                }
+
+            return {
+                'success': True,
+                'data': None,
+                'note': 'No zoning or FAR data found in database for this project. Try searching uploaded documents.'
+            }
+
+    except Exception as e:
+        logger.error(f"Error fetching zoning info: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# =============================================================================
 # Tool Registry
 # =============================================================================
 
@@ -690,4 +802,5 @@ PROPERTY_ATTRIBUTE_TOOL_HANDLERS = {
     'update_site_attribute': handle_update_site_attribute,
     'update_improvement_attribute': handle_update_improvement_attribute,
     'calculate_remaining_economic_life': handle_calculate_remaining_economic_life,
+    'get_zoning_info': handle_get_zoning_info,
 }

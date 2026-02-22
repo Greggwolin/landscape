@@ -1576,6 +1576,14 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             )[::-1]  # Reverse back to chronological order
             message_history = _build_message_history_with_tool_context(messages)
 
+            # DIAGNOSTIC: Log thread context being sent to AI
+            logger.info(
+                f"[THREAD_CONTEXT] thread={thread.id}, "
+                f"total_messages_in_thread={thread.messages.count()}, "
+                f"messages_sent_to_ai={len(message_history)}, "
+                f"roles={[m.get('role') for m in message_history]}"
+            )
+
             # Get project context
             project = Project.objects.get(project_id=thread.project_id)
             project_context = {
@@ -1646,11 +1654,31 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 logger.warning(f"Failed to embed messages: {e}")
 
             # Generate title after first exchange if needed
-            if thread.messages.count() == 2 and not thread.title:
+            generated_title = None
+            if thread.messages.count() >= 2 and not thread.title:
+                logger.info(f"[THREAD_TITLE] Attempting title generation for thread {thread.id}")
                 try:
                     ThreadService.maybe_generate_title_async(thread.id)
+                    # Reload to get the generated title
+                    thread.refresh_from_db()
+                    generated_title = thread.title
+                    logger.info(f"[THREAD_TITLE] Generated: {generated_title}")
                 except Exception as e:
-                    logger.warning(f"Failed to generate title: {e}")
+                    logger.warning(f"[THREAD_TITLE] AI title generation failed: {e}")
+
+                # Fallback: if AI title generation failed, use first words of user message
+                if not generated_title:
+                    try:
+                        words = user_message.content.strip().split()[:6]
+                        fallback_title = ' '.join(words)
+                        if len(fallback_title) > 50:
+                            fallback_title = fallback_title[:47] + '...'
+                        thread.title = fallback_title
+                        thread.save(update_fields=['title', 'updated_at'])
+                        generated_title = fallback_title
+                        logger.info(f"[THREAD_TITLE] Fallback title: {generated_title}")
+                    except Exception as e2:
+                        logger.warning(f"[THREAD_TITLE] Fallback also failed: {e2}")
 
             # Return response
             response_data = {
@@ -1658,6 +1686,9 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 'user_message': ThreadMessageSerializer(user_message).data,
                 'assistant_message': ThreadMessageSerializer(assistant_message).data,
             }
+
+            if generated_title:
+                response_data['thread_title'] = generated_title
 
             if ai_response.get('field_updates'):
                 response_data['field_updates'] = ai_response['field_updates']

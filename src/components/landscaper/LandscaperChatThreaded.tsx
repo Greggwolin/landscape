@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus } from '@coreui/icons';
+import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
@@ -65,6 +65,117 @@ function getPageContextHint(context: string): string {
     alpha_assistant: 'Help',
   };
   return hints[context] || 'General';
+}
+
+/**
+ * Editable thread title bar displayed above messages — similar to ChatGPT/Claude.
+ */
+function ThreadTitleBar({ title, onSave }: { title: string | null; onSave: (t: string) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const displayTitle = title || 'New conversation';
+
+  const startEdit = useCallback(() => {
+    setEditValue(title || '');
+    setIsEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [title]);
+
+  const saveEdit = useCallback(() => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== title) {
+      onSave(trimmed);
+    }
+    setIsEditing(false);
+  }, [editValue, title, onSave]);
+
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
+    else if (e.key === 'Escape') { cancelEdit(); }
+  }, [saveEdit, cancelEdit]);
+
+  return (
+    <div
+      className="d-flex align-items-center gap-2 border-bottom px-3"
+      style={{
+        minHeight: '36px',
+        borderColor: 'var(--cui-border-color)',
+        backgroundColor: 'var(--cui-body-bg)',
+      }}
+    >
+      {isEditing ? (
+        <>
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={saveEdit}
+            className="form-control form-control-sm flex-grow-1"
+            style={{
+              backgroundColor: 'var(--cui-tertiary-bg)',
+              color: 'var(--cui-body-color)',
+              fontSize: '0.8rem',
+              border: '1px solid var(--cui-primary)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={saveEdit}
+            className="btn btn-sm p-1"
+            style={{ border: 'none', backgroundColor: 'transparent' }}
+            title="Save"
+          >
+            <CIcon icon={cilCheck} size="sm" style={{ color: 'var(--cui-success)' }} />
+          </button>
+          <button
+            type="button"
+            onClick={cancelEdit}
+            className="btn btn-sm p-1"
+            style={{ border: 'none', backgroundColor: 'transparent' }}
+            title="Cancel"
+          >
+            <CIcon icon={cilX} size="sm" style={{ color: 'var(--cui-danger)' }} />
+          </button>
+        </>
+      ) : (
+        <>
+          <span
+            className="small text-truncate flex-grow-1"
+            style={{
+              color: title ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)',
+              fontSize: '0.8rem',
+              fontWeight: title ? 500 : 400,
+              fontStyle: title ? 'normal' : 'italic',
+              cursor: 'pointer',
+            }}
+            onClick={startEdit}
+            title={`${displayTitle} — click to edit`}
+          >
+            {displayTitle}
+          </span>
+          <button
+            type="button"
+            onClick={startEdit}
+            className="btn btn-sm p-1"
+            style={{ border: 'none', backgroundColor: 'transparent', opacity: 0.5 }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+            title="Edit title"
+          >
+            <CIcon icon={cilPencil} size="sm" style={{ color: 'var(--cui-secondary-color)' }} />
+          </button>
+        </>
+      )}
+    </div>
+  );
 }
 
 export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, LandscaperChatThreadedProps>(
@@ -478,6 +589,14 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           onNewThread={handleNewThread}
           onUpdateTitle={updateThreadTitle}
           isLoading={isThreadLoading}
+        />
+      )}
+
+      {/* Thread Title Bar — ChatGPT/Claude-style editable title */}
+      {activeThread && (
+        <ThreadTitleBar
+          title={activeThread.title}
+          onSave={(newTitle) => updateThreadTitle(activeThread.threadId, newTitle)}
         />
       )}
 

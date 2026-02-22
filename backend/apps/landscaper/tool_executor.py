@@ -104,6 +104,8 @@ ALLOWED_UPDATES = {
             'market', 'submarket', 'market_velocity_annual',
             # Sizing
             'acres_gross', 'target_units', 'total_units',
+            'gross_sf', 'lot_size_sf', 'lot_size_acres', 'net_rentable_area',
+            'building_count', 'number_of_stories', 'year_built',
             # Pricing
             'price_range_low', 'price_range_high',
             # Financial
@@ -124,6 +126,10 @@ ALLOWED_UPDATES = {
             'units': 'total_units',  # For operating properties
             'discount_rate': 'discount_rate_pct',
             'zip': 'zip_code',
+            'gross_building_sf': 'gross_sf',
+            'building_area': 'gross_sf',
+            'lot_size': 'lot_size_sf',
+            'site_area': 'lot_size_sf',
         },
         'pk_field': 'project_id',
         'schema': 'landscape'
