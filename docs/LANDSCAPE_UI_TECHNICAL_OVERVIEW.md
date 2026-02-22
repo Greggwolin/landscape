@@ -1,5 +1,5 @@
 # Landscape Application — UI Technical Overview
-Date generated: 2026-02-19
+Date generated: 2026-02-21
 
 ## Document Notes
 - This document is generated from the current repository state and does not validate runtime feature flags or production deployments.
@@ -10,8 +10,12 @@ Date generated: 2026-02-19
 - `docs/HEADER_COLOR_HIERARCHY.md` does not exist in this repo; styling notes are based on `src/styles/tokens.css` and related CoreUI files.
 
 ## Recent Changes Summary
-- Git log highlights recent UI work: operations routes and serializers, navigation layout + help panel + folder tab polish, and extraction/knowledge updates (`git log` entries: `4513c07`, `90b25a8`, `0e28026`).
-- The implementation status report (2026-02-18) notes DMS doc type/tag alignment, Knowledge Library consolidation into AdminModal, and the Folder-Tabs UI overhaul as the most recent major UI/UX changes.
+- Git log highlights recent UI work (Feb 21): CoreUI theme expansion and badge contrast fixes, DMS MediaPickerModal improvements, ProjectTab/PropertyTab/physical description enhancements, MapCanvas overhaul with GIS parcel improvements, valuation and reconciliation panel updates.
+- New contexts added since last update: `UploadStagingContext` for drag-drop file staging.
+- ReconciliationPanel is now a real component (was previously stubbed per Alpha audit).
+- New property sub-components: `PhysicalDescription`, `FloorPlanMatrix`, `IndicatedValueSummary`.
+- 407 legacy Next.js API routes still present; Django backend expanded to 23 apps.
+- Anthropic SDK pinned for Pydantic compatibility (Feb 21).
 
 ## 1. Navigation Architecture
 
@@ -225,13 +229,20 @@ Notable behaviors/state:
 - Uses `survey_completed_at` to switch between survey and chat.
 
 ## 3. Landscaper Panel
-- Primary component: `LandscaperPanel` (`src/components/landscaper/LandscaperPanel.tsx`) mounted in `ProjectLayoutClient`.
-- Chat experience: `LandscaperChatThreaded` (`src/components/landscaper/LandscaperChatThreaded.tsx`) with thread list, mutation confirmations, and tool result triggers.
-- Activity feed: `ActivityFeed` (`src/components/landscaper/ActivityFeed.tsx`) with API-driven items and fallback mock data.
+- Primary component: `LandscaperPanel` (`src/components/landscaper/LandscaperPanel.tsx`) mounted in `ProjectLayoutClient` as a 30/70 split layout with chat + activity feed + extraction UI.
+- Chat experience: `LandscaperChatThreaded` (`src/components/landscaper/LandscaperChatThreaded.tsx`) with thread list, mutation confirmations, and tool result triggers. 150s frontend timeout.
+- Thread management: `ThreadList` (`src/components/landscaper/ThreadList.tsx`) lists threads by page context; threads auto-generate titles via Claude Haiku.
+- Activity feed: `ActivityFeed` (`src/components/landscaper/ActivityFeed.tsx`) with API-driven items and fallback mock data (60s auto-refresh via `useActivityFeed`).
 - File drop handling: `DropZoneWrapper` (`src/components/ui/DropZoneWrapper.tsx`) routes dropped files into `FileDropContext` (`src/contexts/FileDropContext.tsx`), then `LandscaperPanel` consumes and uploads them via UploadThing and `POST /api/dms/docs`.
 - Extraction badge behavior: `ProjectLayoutClient` uses `useExtractionJobStatus` and `usePendingRentRollExtractions` to display rent roll processing/pending changes on the Property → Rent Roll subtab; badge clicks navigate to rent roll.
+- Mutation proposals: `MutationProposalCard` (`src/components/landscaper/MutationProposalCard.tsx`) shows proposed changes with confirm/reject buttons (Level 2 Autonomy).
+- What-If scenarios: `ScenarioHistoryPanel` and `ScenarioSaveModal` in `src/components/landscaper/` for scenario management.
+- Auto-refresh after mutations: `useLandscaperRefresh` hook wired to PropertyTab, ValuationTab, ProjectTab — watches units, leases, unit_types, operating_expenses, project fields.
 - Collision handling: `LandscaperCollisionContext` (`src/contexts/LandscaperCollisionContext.tsx`) wires upload collisions into chat; DMS audit notes that the collision-to-chat flow is not fully wired everywhere.
 - Knowledge Library access: `AdminModal` → `LandscaperAdminPanel` (`src/components/admin/LandscaperAdminPanel.tsx`) mounts `KnowledgeLibraryPanel` (`src/components/admin/knowledge-library/KnowledgeLibraryPanel.tsx`).
+- Admin configuration: Extraction Mappings CRUD panel, Custom Instructions panel, KPI Definition Manager. Model Configuration and Training Feedback sections are placeholders.
+- Backend: 50+ registered tools across 7 tool modules, page-scoped tool registry (reduces from 135 to 15-25 tools per page), 40+ Django API endpoints. AI handler uses `claude-3-5-sonnet-20241022` with 16,384 max tokens, 120s timeout, 5-iteration tool loop with 75s budget.
+- Known gaps: Activity feed mark-read not proxied through Next.js; RAG search not project-scoped (cross-project leakage risk); hardcoded `localhost:8000` URLs in ChatInterface.tsx and AdviceAdherencePanel.tsx; dual chat stacks not unified (main vs. knowledge chat).
 
 ## 4. Document Management System
 - Project-scoped DMS lives at `/projects/[projectId]/documents` and inside the Documents folder tab (`DocumentsTab`).
@@ -269,6 +280,7 @@ Notable behaviors/state:
 - `FileDropContext` (`src/contexts/FileDropContext.tsx`) for drag-drop uploads.
 - `LandscaperCollisionContext` (`src/contexts/LandscaperCollisionContext.tsx`) for DMS collision resolution.
 - `ScenarioContext` (`src/contexts/ScenarioContext.tsx`) for scenario selection.
+- `UploadStagingContext` (`src/contexts/UploadStagingContext.tsx`) for drag-drop file staging workflow.
 - Internal-only / deprecated contexts:
 - `ComplexityModeContext` (`src/contexts/ComplexityModeContext.tsx`) — internal-only; no user-facing toggle.
 - `ProjectModeContext` (`src/contexts/ProjectModeContext.tsx`) — deprecated; provider still wraps project layout but no consumers found.
@@ -277,7 +289,9 @@ Notable behaviors/state:
 - Login → Dashboard → select project → open `/projects/[projectId]` workspace via folder tabs.
 - Project workspace → Documents tab → upload files (DMS or drag-drop) → extraction processing → rent roll pending changes highlighted in Property → Rent Roll.
 - Operations tab → edit line items → auto-save and value-add toggle → refresh via Landscaper mutation events.
+- Valuation tab → Sales Comparison / Cost / Income approaches → ReconciliationPanel (now functional, was previously stubbed) with weights and narrative versioning.
 - Settings (AdminModal) → Landscaper tab → Knowledge Library or Extraction Mappings.
+- Landscaper chat → threaded conversations per page context → tool execution (50+ tools) → mutation proposals → user confirm/reject → auto-refresh affected tabs.
 
 ## Appendix A: File Structure
 - `src/app/` — App Router routes and layouts.

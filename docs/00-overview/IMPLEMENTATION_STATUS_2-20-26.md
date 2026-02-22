@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-18
-**Version:** 4.0
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh)
+**Last Updated:** 2026-02-21
+**Version:** 4.1
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul)
 
 ---
 
@@ -9,7 +9,24 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: DMS Extraction Doc Types + Tags + Knowledge Library (February 14, 2026)**
+### 🆕 **Latest Update: CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul (February 21, 2026)**
+
+**UI Polish, Valuation Workflow Completion, and GIS Improvements**
+
+Multiple targeted improvements across theming, valuation, property, and mapping:
+
+- ✅ **CoreUI theme expansion** - Badge contrast fixes, expanded theme token coverage for dark/light modes
+- ✅ **ReconciliationPanel** - No longer stubbed; functional reconciliation UI with weights and narrative versioning (was Alpha Blocker #1)
+- ✅ **IndicatedValueSummary** - New component summarizing final indicated values across all three approaches
+- ✅ **MapCanvas overhaul** - Refactored GIS parcel rendering, improved layer management
+- ✅ **Physical description enhancements** - `PhysicalDescription` and `FloorPlanMatrix` components for PropertyTab
+- ✅ **DMS MediaPickerModal** - Improved media selection and preview workflow
+- ✅ **ProjectTab/PropertyTab refinements** - Updated layouts and data display
+- ✅ **Anthropic SDK pin** - Pinned for Pydantic compatibility to prevent backend import errors
+- ✅ **UploadStagingContext** - New React context for drag-drop file staging workflow
+- 📁 **Location:** See git log for Feb 21 commits
+
+### Previous Update: DMS Extraction Doc Types + Tags + Knowledge Library (February 14, 2026)
 
 **Vocabulary Alignment, Subtype Classification, and Knowledge Library Consolidation**
 
@@ -373,7 +390,7 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 - 📁 **Location:** `services/financial_engine_py/` - See [MIGRATION_STATUS.md](../../../services/financial_engine_py/MIGRATION_STATUS.md)
 
 ### Current Capabilities
-✅ **Complete data layer** (151 active + 7 deprecated tables)
+✅ **Complete data layer** (353 tables, 42 views per Feb 12 schema export)
 ✅ **Python Financial Engine** - IRR, XIRR, NPV, DSCR, equity multiple (5-10x faster)
 ✅ **Dependency resolution engine** with circular detection
 ✅ **S-curve timing distribution** (4 profiles)
@@ -390,7 +407,7 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 
 ---
 
-## Current State Snapshot (2026-02-13)
+## Current State Snapshot (2026-02-21)
 
 ### 🆕 Latest Updates
 
