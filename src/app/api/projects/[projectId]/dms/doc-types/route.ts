@@ -1,9 +1,8 @@
 /**
  * GET /api/projects/[projectId]/dms/doc-types
  *
- * Returns the merged, deduplicated list of doc type options for a project:
- *   1. Template doc_type_options from the project's assigned dms_template
- *   2. Project-level custom additions from dms_project_doc_types
+ * Returns project-owned doc type list from dms_project_doc_types.
+ * These are seeded from the workspace template at project creation.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,75 +25,17 @@ export async function GET(
       );
     }
 
-    // 1. Look up the project's dms_template_id
-    const project = await sql<{ dms_template_id: number | null }[]>`
-      SELECT dms_template_id
-      FROM landscape.tbl_project
-      WHERE project_id = ${projectId}
-    `;
-
-    if (project.length === 0) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
-    }
-
-    const templateId = project[0].dms_template_id;
-
-    // 2. Fetch template doc_type_options
-    let templateDocTypes: string[] = [];
-    let templateName: string | null = null;
-
-    if (templateId) {
-      const template = await sql<{ template_name: string; doc_type_options: string[] | null }[]>`
-        SELECT template_name, doc_type_options
-        FROM landscape.dms_templates
-        WHERE template_id = ${templateId}
-      `;
-
-      if (template.length > 0) {
-        templateName = template[0].template_name;
-        templateDocTypes = template[0].doc_type_options || [];
-      }
-    }
-
-    // 3. Fetch project-level custom doc types
-    const customTypes = await sql<{ doc_type_name: string }[]>`
+    // Read from project-owned doc types (seeded at project creation from template)
+    const docTypes = await sql<{ doc_type_name: string }[]>`
       SELECT doc_type_name
       FROM landscape.dms_project_doc_types
       WHERE project_id = ${projectId}
-      ORDER BY display_order ASC
+      ORDER BY display_order, doc_type_name
     `;
-
-    // 4. Merge and deduplicate (case-insensitive)
-    const seen = new Set<string>();
-    const merged: string[] = [];
-
-    for (const dt of templateDocTypes) {
-      const lower = dt.toLowerCase();
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        merged.push(dt);
-      }
-    }
-
-    for (const row of customTypes) {
-      const lower = row.doc_type_name.toLowerCase();
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        merged.push(row.doc_type_name);
-      }
-    }
-
-    // Sort alphabetically
-    merged.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
     return NextResponse.json({
       success: true,
-      doc_type_options: merged,
-      template_id: templateId,
-      template_name: templateName,
+      doc_type_options: docTypes.map(r => r.doc_type_name),
     });
   } catch (error) {
     console.error('Error fetching project doc types:', error);

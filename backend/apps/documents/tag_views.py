@@ -277,19 +277,7 @@ def project_doc_types(request, project_id):
     """
     if request.method == 'GET':
         with connection.cursor() as cursor:
-            # Get template-sourced doc types
-            cursor.execute("""
-                SELECT unnest(t.doc_type_options) AS doc_type_name
-                FROM landscape.dms_templates t
-                WHERE t.project_id = %s
-                   OR (t.is_default = TRUE AND t.workspace_id = (
-                       SELECT workspace_id FROM landscape.tbl_project WHERE project_id = %s
-                   ))
-                ORDER BY doc_type_name
-            """, [project_id, project_id])
-            template_types = list({row[0] for row in cursor.fetchall()})
-
-            # Get custom project doc types
+            # Read directly from project-owned doc types (seeded at project creation)
             cursor.execute("""
                 SELECT id, doc_type_name, display_order, is_from_template
                 FROM landscape.dms_project_doc_types
@@ -297,26 +285,11 @@ def project_doc_types(request, project_id):
                 ORDER BY display_order, doc_type_name
             """, [project_id])
             columns = [col[0] for col in cursor.description]
-            custom_types = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-        # Merge: template types first, then any custom additions
-        custom_names = {c['doc_type_name'] for c in custom_types}
-        result = []
-
-        for dt in sorted(template_types):
-            result.append({
-                'doc_type_name': dt,
-                'is_from_template': True,
-                'display_order': 0,
-            })
-
-        for ct in custom_types:
-            if ct['doc_type_name'] not in set(template_types):
-                result.append(ct)
+            doc_types = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         return Response({
             'success': True,
-            'doc_types': result,
+            'doc_types': doc_types,
         })
 
     # POST: add custom doc type
