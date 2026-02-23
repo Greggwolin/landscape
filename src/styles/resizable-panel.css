@@ -63,13 +63,7 @@
    Active Project Bar
    ========================================================================== */
 
-.active-project-bar {
-  background-color: #F0F1F2;
-}
-
-[data-coreui-theme="dark"] .active-project-bar {
-  background-color: var(--cui-body-bg);
-}
+/* active-project-bar is always dark — see navigation.css */
 
 /* ==========================================================================
    Collapsed Landscaper Strip

@@ -120,13 +120,9 @@
   background-color: var(--cui-body-bg);
 }
 
-/* Project layout active project bar should follow card-header shading */
+/* Project layout active project bar — always dark mode */
 .active-project-bar {
-  background-color: var(--surface-card-header);
-}
-
-[data-coreui-theme="dark"] .active-project-bar {
-  background-color: #1f2a37 !important;
+  background-color: #1f2a37;
 }
 
 /* Project Tab Buttons */

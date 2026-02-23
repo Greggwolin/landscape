@@ -73,6 +73,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Fix Tailwind .collapse vs CoreUI .collapse conflict.
+ * Tailwind sets `.collapse { visibility: collapse }` as a utility class,
+ * but CoreUI uses `.collapse` / `.collapse.show` for accordion expand/collapse.
+ * Without this override, accordion body content is invisible when expanded.
+ */
+.accordion-collapse.collapse.show {
+  visibility: visible !important;
+}
+
 /* Override planning-tile styles with maximum specificity */
 @layer utilities {
   .planning-tile-active {
