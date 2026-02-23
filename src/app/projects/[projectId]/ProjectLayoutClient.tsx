@@ -16,7 +16,7 @@
 'use client';
 
 import React, { Suspense, useState, useCallback, useEffect } from 'react';
-import { CCard, CToast, CToastBody, CToaster } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody, CToast, CToastBody, CToaster } from '@coreui/react';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
@@ -55,10 +55,11 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     projects.find((p) => p.project_id === projectId) || activeProject;
 
   // Get folder navigation state
-  // Use property_subtype (most specific) → project_type → project_type_code (fallback)
-  const effectivePropertyType = currentProject?.property_subtype
+  // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
+  // property_subtype (e.g. 'RETAIL_NNN') is a lookup code, not recognized by getProjectCategory().
+  const effectivePropertyType = currentProject?.project_type_code
     || currentProject?.project_type
-    || currentProject?.project_type_code;
+    || currentProject?.property_subtype;
 
   const {
     currentFolder,
@@ -184,6 +185,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 
 
   const activeFolderConfig = folderConfig.folders.find((folder) => folder.id === currentFolder);
+  const hasSubTabs = (activeFolderConfig?.subTabs.length ?? 0) > 0;
   const activeSubTabConfig = activeFolderConfig?.subTabs.find((tab) => tab.id === currentTab);
   const landscaperContextLabel = activeSubTabConfig?.label || (
     activeFolderConfig ? formatFolderLabel(activeFolderConfig.label) : currentFolder
@@ -208,9 +210,12 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 
   return (
     <div className="project-layout-container">
-      {/* Full-width Active Project Bar - sticky below top nav */}
+      {/* Full-width Active Project Bar - sticky below top nav, with nav tiles */}
       <ActiveProjectBar
         projectId={projectId}
+        folders={folderConfig.folders}
+        currentFolder={currentFolder}
+        onFolderNavigate={handleNavigate}
       />
 
       {/* Two-column split below the project bar */}
@@ -260,7 +265,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             className="project-resizable-splitter"
             onPointerDown={handleResizeStart}
             style={{
-              width: '12px',
+              width: '6px',
               cursor: 'col-resize',
               display: 'flex',
               alignItems: 'center',
@@ -295,36 +300,56 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             gap: '0.25rem',
           }}
         >
-          {/* Content Card - Folder Tabs + Content */}
-          <CCard
-            className="project-content-card shadow-lg"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              minHeight: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              backgroundColor: 'transparent',
-            }}
-          >
-            {/* Folder Tabs Navigation */}
-            <FolderTabs
-              folders={folderConfig.folders}
-              currentFolder={currentFolder}
-              currentTab={currentTab}
-              onNavigate={handleNavigate}
-              subTabBadgeStates={{ 'rent-roll': rentRollBadgeState }}
-              onSubTabBadgeClick={handleSubTabBadgeClick}
-            />
-
-            {/* Content Area - with drop zone for file uploads */}
-            <DropZoneWrapper className="project-folder-content-wrapper">
-              <div className="project-folder-content" data-subtab={currentTab}>
-                {children}
-              </div>
-            </DropZoneWrapper>
-          </CCard>
+          {/* Folder Tabs + Content — CCard wrapper when subtabs exist */}
+          {hasSubTabs ? (
+            <CCard
+              className="project-content-card"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <CCardHeader className="project-subtab-header">
+                <FolderTabs
+                  folders={folderConfig.folders}
+                  currentFolder={currentFolder}
+                  currentTab={currentTab}
+                  onNavigate={handleNavigate}
+                  subTabBadgeStates={{ 'rent-roll': rentRollBadgeState }}
+                  onSubTabBadgeClick={handleSubTabBadgeClick}
+                />
+              </CCardHeader>
+              <CCardBody style={{ padding: 0, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <DropZoneWrapper className="project-folder-content-wrapper">
+                  <div className="project-folder-content" data-subtab={currentTab}>
+                    {children}
+                  </div>
+                </DropZoneWrapper>
+              </CCardBody>
+            </CCard>
+          ) : (
+            <div
+              className="project-content-card"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <DropZoneWrapper className="project-folder-content-wrapper">
+                <div className="project-folder-content" data-subtab={currentTab}>
+                  {children}
+                </div>
+              </DropZoneWrapper>
+            </div>
+          )}
         </div>
       </div>
 

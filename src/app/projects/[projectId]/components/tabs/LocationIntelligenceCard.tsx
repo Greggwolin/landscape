@@ -24,6 +24,7 @@ import {
 } from '@/components/location-intelligence';
 import type { LayerVisibility, RingDemographics, UserMapPoint } from '@/components/location-intelligence';
 import '@/components/location-intelligence/location-map.css';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 interface LocationIntelligenceCardProps {
   projectId: number;
@@ -77,10 +78,16 @@ const getComparablePopupHtml = (comp: RentalComparable, color: string): string =
   const sqftValue = Number(comp.avg_sqft || 0);
   const bedroomsValue = Number(comp.bedrooms || 0);
   const bathroomsValue = Number(comp.bathrooms || 0);
+  const addressLines = splitAddressLines(comp.address);
+  const addressHtml = addressLines
+    ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line1)}</div>${
+      addressLines.line2 ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line2)}</div>` : ''
+    }`
+    : '';
 
   return `<div class="comparable-popup-content">
-    <div class="comparable-popup-name" style="color: ${color};">${comp.property_name}</div>
-    ${comp.address ? `<div class="comparable-popup-address">${comp.address}</div>` : ''}
+    <div class="comparable-popup-name" style="color: ${color};">${escapeHtml(comp.property_name)}</div>
+    ${addressHtml}
     <div class="comparable-popup-details">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
     <div class="comparable-popup-rent">$${Math.round(rentValue).toLocaleString()}/mo</div>
     ${comp.distance_miles ? `<div class="comparable-popup-distance">${comp.distance_miles} mi away</div>` : ''}

@@ -34,8 +34,9 @@ interface OperationsTabProps {
 
 function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabProps) {
   // Align project-type resolution with folder tabs/navigation
+  // project_type_code ('RET', 'MF') is the canonical field for category routing
   const effectiveProjectType =
-    project.property_subtype || project.project_type || project.project_type_code;
+    project.project_type_code || project.project_type || project.property_subtype;
   const projectCategory = getProjectCategory(effectiveProjectType);
   const isIncome = isIncomeProperty(effectiveProjectType);
   const isLand = !isIncome;
@@ -283,17 +284,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     );
   }
 
-  // Unsupported project types
-  if (!isMultifamily) {
-    const projectTypeLabels: Record<string, string> = {
-      'OFF': 'Office',
-      'RET': 'Retail',
-      'IND': 'Industrial',
-      'MXD': 'Mixed-Use',
-      'LAND': 'Land Development',
-      'HOT': 'Hospitality'
-    };
-
+  // Land development projects use the Budget tab, not Operations
+  if (isLand) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="max-w-2xl mx-auto text-center p-8">
@@ -305,25 +297,11 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
                 </svg>
               </div>
               <h2 className="text-2xl font-semibold mb-3">
-                {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Operations Tab Coming Soon
+                Operations Not Available
               </h2>
-              <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
-                This project is a <strong>{projectTypeLabels[project.project_type_code || ''] || project.project_type_code}</strong> asset type.
-              </p>
               <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
-                The Operations tab is currently designed for multifamily projects only.
-                A dedicated template for {projectTypeLabels[project.project_type_code || '']?.toLowerCase() || 'this asset type'} properties is under development.
+                Land development projects use the Budget tab for cost planning and the Feasibility tab for financial analysis.
               </p>
-              <div className="p-4 rounded" style={{ backgroundColor: 'var(--cui-info-bg)', borderLeft: '4px solid var(--cui-info)' }}>
-                <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
-                  <strong>For now, use these alternatives:</strong>
-                </p>
-                <ul className="text-sm text-left ml-4" style={{ color: 'var(--cui-body-color)', listStyleType: 'disc' }}>
-                  <li>Budget tab for operating expense planning</li>
-                  <li>Financial Analysis for cash flow modeling</li>
-                  <li>Assumptions & Factors for expense inputs</li>
-                </ul>
-              </div>
             </CCardBody>
           </CCard>
         </div>

@@ -2,26 +2,27 @@
  * ActiveProjectBar Component
  *
  * Full-width sticky bar below the top nav containing:
- * - Project selector dropdown (left)
- * - Property type pill (color-coded)
- * - Analysis type badge (CoreUI color)
- * - Version badge (right side)
+ * - Left block: Project selector dropdown + analysis pills (stacked)
+ * - Center: Compact monochrome nav tiles (folder navigation)
+ * - Right: Version badge
  *
- * Chevron collapse/expand for Landscaper is NOT here — it lives in the Landscaper panel header.
+ * Nav tiles replace the old Row 1 colored folder tabs.
+ * Sub-tabs (Row 2) remain in the FolderTabs component inside the content card.
  *
- * @version 2.0
+ * @version 3.0
  * @created 2026-01-28
- * @updated 2026-02-08 - Renamed from StudioProjectBar, added pills, removed chevron
+ * @updated 2026-02-22 - Integrated nav tiles, removed "Active Project" label, two-row left block
  */
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CBadge } from '@coreui/react';
 import { useSWRConfig } from 'swr';
 import { useProjectContext } from '@/app/components/ProjectProvider';
-import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
+import { getProjectSwitchUrl, isTwoLineLabel } from '@/lib/utils/folderTabConfig';
+import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import { VersionBadge } from '@/components/changelog';
 import {
   getPropertyTypeTokenRef,
@@ -35,12 +36,54 @@ import {
   type AnalysisPurpose,
 } from '@/types/project-taxonomy';
 
+/* ── Nav tile button (memoized) ── */
+interface NavTileProps {
+  folder: FolderTab;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const NavTile = memo(function NavTile({ folder, isActive, onClick }: NavTileProps) {
+  const label = folder.label;
+  const twoLine = isTwoLineLabel(label);
+
+  return (
+    <button
+      type="button"
+      className={`bar-nav-tile ${twoLine ? 'bar-nav-tile-lines' : ''} ${isActive ? 'active' : ''}`}
+      data-folder={folder.id}
+      onClick={onClick}
+      aria-selected={isActive}
+      role="tab"
+    >
+      {twoLine ? (
+        <>
+          <span className="bar-nav-tile-primary">{label.primary}</span>
+          <span className="bar-nav-tile-secondary">{label.secondary}</span>
+        </>
+      ) : (
+        <span>{label as string}</span>
+      )}
+    </button>
+  );
+});
+
+/* ── Main component ── */
 interface ActiveProjectBarProps {
   projectId: number;
+  /** Folder configurations from useFolderNavigation */
+  folders: FolderTab[];
+  /** Currently active folder ID */
+  currentFolder: string;
+  /** Callback when user clicks a nav tile */
+  onFolderNavigate: (folder: string, tab: string) => void;
 }
 
 export function ActiveProjectBar({
   projectId,
+  folders,
+  currentFolder,
+  onFolderNavigate,
 }: ActiveProjectBarProps) {
   const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
   const router = useRouter();
@@ -89,16 +132,25 @@ export function ActiveProjectBar({
     router.push(targetUrl);
   };
 
-  // Resolve property type pill — try each field until one produces a valid token
-  const ptCandidates = [project?.property_subtype, project?.project_type, project?.project_type_code];
+  const handleFolderClick = (folder: FolderTab) => {
+    const defaultTab = folder.subTabs[0]?.id || 'overview';
+    onFolderNavigate(folder.id, defaultTab);
+  };
+
+  // Resolve property type pill — prefer project_type (e.g. "Multifamily") over subtype
+  const ptCandidates = [project?.project_type, project?.project_type_code, project?.property_subtype];
   const ptMatch = ptCandidates.find((v) => v && getPropertyTypeTokenRef(v));
   const ptTokenRef = getPropertyTypeTokenRef(ptMatch);
-  // For the label, prefer the most specific field that has a value
   const ptLabelSource = ptCandidates.find((v) => !!v) || ptMatch;
   const ptLabel = getPropertyTypeLabel(ptLabelSource);
 
   const perspectiveLabel = displayPerspective ? PERSPECTIVE_LABELS[displayPerspective] : null;
   const purposeLabel = displayPurpose ? PURPOSE_LABELS[displayPurpose] : null;
+
+  // Adaptive pill font size — shrink when the longest label would overflow
+  const pillLabels = [ptLabel, perspectiveLabel, purposeLabel].filter(Boolean) as string[];
+  const maxLen = Math.max(...pillLabels.map((l) => l.length), 0);
+  const pillFontSize = maxLen > 13 ? '0.68rem' : maxLen > 10 ? '0.72rem' : '0.78rem';
 
   const updateAnalysisDimensions = async (
     nextPerspective: AnalysisPerspective,
@@ -166,19 +218,19 @@ export function ActiveProjectBar({
   return (
     <div
       className="active-project-bar"
+      data-coreui-theme="dark"
       style={{
         display: 'flex',
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'stretch',
         gap: '0.75rem',
         padding: '0.5rem 1rem',
         flexShrink: 0,
         position: 'sticky',
-        top: '58px', // Height of TopNavigationBar
-        zIndex: 40,  // Below top nav (50), above content
-        backgroundColor: 'var(--surface-card-header)',
-        borderBottom: '1px solid var(--cui-border-color)',
-        /* Break out of parent app-shell/app-page padding to span full width */
+        top: '58px',
+        zIndex: 40,
+        backgroundColor: '#1f2a37',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         marginLeft: 'calc(-1 * var(--app-padding, 0.75rem))',
         marginRight: 'calc(-1 * var(--app-padding, 0.75rem))',
         marginTop: 'calc(-1 * var(--app-padding, 0.75rem))',
@@ -186,123 +238,148 @@ export function ActiveProjectBar({
         width: 'calc(100% + 2 * var(--app-padding, 0.75rem))',
       }}
     >
-      {/* Active Project label */}
-      <span
-        className="font-semibold"
-        style={{
-          color: 'var(--cui-body-color)',
-          fontSize: '0.875rem',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        Active Project
-      </span>
+      {/* Left block: Selector + Pills — fixed width, independent of panel state */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0, width: 296, overflow: 'hidden' }}>
+        {/* Project selector dropdown */}
+        <select
+          value={project?.project_id || ''}
+          onChange={(e) => handleProjectChange(Number(e.target.value))}
+          className="fw-medium rounded"
+          style={{
+            backgroundColor: '#111827',
+            color: '#e2e8f0',
+            border: '1px solid rgba(255,255,255,0.12)',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+            height: '36px',
+            width: '100%',
+            padding: '0 0.6rem',
+          }}
+        >
+          {projects.map((proj) => (
+            <option key={proj.project_id} value={proj.project_id}>
+              {proj.project_id} - {proj.project_name}
+            </option>
+          ))}
+        </select>
 
-      {/* Project selector dropdown */}
-      <select
-        value={project?.project_id || ''}
-        onChange={(e) => handleProjectChange(Number(e.target.value))}
-        className="px-3 py-1.5 fw-medium rounded"
-        style={{
-          backgroundColor: 'var(--cui-body-bg)',
-          borderColor: 'var(--cui-border-color)',
-          color: 'var(--cui-body-color)',
-          border: '1px solid var(--cui-border-color)',
-          cursor: 'pointer',
-          fontSize: '0.8125rem',
-          height: '32px',
-          minWidth: '180px',
-          flex: '0 1 auto',
-        }}
-      >
-        {projects.map((proj) => (
-          <option key={proj.project_id} value={proj.project_id}>
-            {proj.project_id} - {proj.project_name}
-          </option>
+        {/* Pills row — spread evenly under selector, constrained to parent width */}
+        <div style={{ display: 'flex', gap: '0.35rem', width: '100%', minWidth: 0, overflow: 'hidden' }}>
+          {/* Property Type Pill */}
+          {ptTokenRef && (
+            <span
+              style={{
+                flex: '1 1 0',
+                minWidth: 0,
+                textAlign: 'center',
+                backgroundColor: ptTokenRef.bgVar,
+                color: ptTokenRef.textVar,
+                padding: '0.2rem 0.4rem',
+                borderRadius: '4px',
+                fontSize: pillFontSize,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                lineHeight: '1.4',
+              }}
+            >
+              {ptLabel}
+            </span>
+          )}
+
+          {/* Perspective badge */}
+          {perspectiveLabel && (
+            <button
+              type="button"
+              onClick={handleTogglePerspective}
+              disabled={isUpdating}
+              title="Toggle perspective"
+              style={{
+                flex: '1 1 0',
+                minWidth: 0,
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <CBadge
+                color="info"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  fontSize: pillFontSize,
+                  borderRadius: '4px',
+                  opacity: isUpdating ? 0.7 : 1,
+                  lineHeight: '1.4',
+                  padding: '0.2rem 0.4rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {perspectiveLabel}
+              </CBadge>
+            </button>
+          )}
+
+          {/* Purpose badge */}
+          {purposeLabel && (
+            <button
+              type="button"
+              onClick={handleTogglePurpose}
+              disabled={isUpdating}
+              title="Toggle purpose"
+              style={{
+                flex: '1 1 0',
+                minWidth: 0,
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <CBadge
+                color="primary"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  minWidth: 0,
+                  fontSize: pillFontSize,
+                  borderRadius: '4px',
+                  opacity: isUpdating ? 0.7 : 1,
+                  lineHeight: '1.4',
+                  padding: '0.2rem 0.4rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {purposeLabel}
+              </CBadge>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Nav Tiles — compact monochrome folder navigation */}
+      <div className="bar-nav-tiles" role="tablist" aria-label="Main navigation">
+        {folders.map((folder) => (
+          <NavTile
+            key={folder.id}
+            folder={folder}
+            isActive={folder.id === currentFolder}
+            onClick={() => handleFolderClick(folder)}
+          />
         ))}
-      </select>
-
-      {/* Property Type Pill */}
-      {ptTokenRef && (
-        <span
-          style={{
-            backgroundColor: ptTokenRef.bgVar,
-            color: ptTokenRef.textVar,
-            padding: '2px 10px',
-            borderRadius: '4px',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-            lineHeight: '1.5',
-          }}
-        >
-          {ptLabel}
-        </span>
-      )}
-
-      {/* Perspective badge */}
-      {perspectiveLabel && (
-        <button
-          type="button"
-          onClick={handleTogglePerspective}
-          disabled={isUpdating}
-          title="Toggle perspective"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            display: 'inline-flex',
-            alignItems: 'center',
-            cursor: isUpdating ? 'not-allowed' : 'pointer',
-          }}
-        >
-          <CBadge
-            color="info"
-            style={{
-              fontSize: '0.75rem',
-              borderRadius: '4px',
-              opacity: isUpdating ? 0.7 : 1,
-            }}
-          >
-            {perspectiveLabel}
-          </CBadge>
-        </button>
-      )}
-
-      {/* Purpose badge */}
-      {purposeLabel && (
-        <button
-          type="button"
-          onClick={handleTogglePurpose}
-          disabled={isUpdating}
-          title="Toggle purpose"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            display: 'inline-flex',
-            alignItems: 'center',
-            cursor: isUpdating ? 'not-allowed' : 'pointer',
-          }}
-        >
-          <CBadge
-            color="primary"
-            style={{
-              fontSize: '0.75rem',
-              borderRadius: '4px',
-              opacity: isUpdating ? 0.7 : 1,
-            }}
-          >
-            {purposeLabel}
-          </CBadge>
-        </button>
-      )}
-
-      {/* Spacer */}
-      <div style={{ flex: 1 }} />
+      </div>
 
       {/* Version badge - right side */}
-      <VersionBadge />
+      <div style={{ flexShrink: 0, alignSelf: 'center' }}>
+        <VersionBadge />
+      </div>
     </div>
   );
 }

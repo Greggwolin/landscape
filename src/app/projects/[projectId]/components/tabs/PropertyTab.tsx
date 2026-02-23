@@ -583,10 +583,11 @@ const defaultColumns: ColumnConfig[] = [
 
 export default function PropertyTab({ project, activeTab = 'details' }: PropertyTabProps) {
   const projectId = project.project_id;
-  // Use property_subtype (most specific) → project_type → project_type_code (fallback)
-  const effectiveProjectType = project.property_subtype
+  // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
+  // property_subtype (e.g. 'RETAIL_NNN') is a lookup code, not recognized by getProjectCategory().
+  const effectiveProjectType = project.project_type_code
     || project.project_type
-    || project.project_type_code;
+    || project.property_subtype;
   const projectType = project.project_type_code; // Keep for display purposes
 
   // Check if this is an income property (multifamily, office, retail, etc.)
@@ -1574,8 +1575,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     );
   }
 
-  // Show empty state if no data for multifamily project
-  if (units.length === 0 && floorPlans.length === 0) {
+  // Determine if this is a unit-based property type (MF, office with suites, etc.)
+  // vs. single-asset types (retail, industrial, hotel) that don't use unit/floorPlan data
+  const isUnitBased = projectType === 'MF' || projectType === 'OFF';
+
+  // Show empty state only for unit-based property types with no data yet.
+  // Single-asset types (retail, industrial, hotel) always render PhysicalDescription.
+  if (isUnitBased && units.length === 0 && floorPlans.length === 0) {
     return (
       <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
         <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
@@ -1585,11 +1591,10 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             </svg>
           </div>
           <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
-            No Rent Roll Data Yet
+            No Property Data Yet
           </h2>
           <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
-            This multifamily project doesn't have any unit or floorplan data yet.
-            Upload a rent roll or manually add unit information to get started.
+            This project doesn&apos;t have any unit or floorplan data yet. Upload a rent roll or manually add unit information to get started.
           </p>
           <div className="rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
             <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
@@ -1606,13 +1611,16 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     );
   }
 
+  // Does this project have unit-level data (floor plans, rent roll)?
+  const hasUnitData = floorPlans.length > 0 || units.length > 0;
+
   // Render content based on activeTab (controlled by folder tabs)
   const renderDetailsContent = () => (
     <div>
-      {/* Two-column layout: Physical Description (40%) + Floor Plan Matrix & Landscaper (60%) */}
+      {/* Two-column layout: Physical Description + Floor Plan Matrix (when unit data exists) */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         {/* Left Column - Physical Description */}
-        <div className="w-full lg:w-[32%] flex-shrink-0">
+        <div className={`w-full ${hasUnitData ? 'lg:w-[32%]' : 'lg:w-full'} flex-shrink-0`}>
           <div
             className="shadow-lg"
             style={{
@@ -1635,8 +1643,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           </div>
         </div>
 
-        {/* Right Column - Floor Plan Matrix + Landscaper Analysis */}
-        <div className="w-full lg:w-3/5 space-y-4">
+        {/* Right Column - Floor Plan Matrix + Landscaper Analysis (only when unit data exists) */}
+        {hasUnitData && <div className="w-full lg:w-3/5 space-y-4">
           {/* Floor Plan Matrix */}
           <div
             className="shadow-lg overflow-hidden"
@@ -1803,7 +1811,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
           {/* Property Narrative - Below Floor Plan Matrix in right column */}
           <PropertyNarrative projectId={projectId} units={units} floorPlans={floorPlans} />
-        </div>
+        </div>}
       </div>
     </div>
   );

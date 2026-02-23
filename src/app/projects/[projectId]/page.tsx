@@ -29,10 +29,11 @@ function ProjectPageInner() {
     projects.find((p) => p.project_id === projectId) || activeProject;
 
   // Get folder navigation state
-  // Use property_subtype (most specific) → project_type → project_type_code (fallback)
-  const effectivePropertyType = currentProject?.property_subtype
+  // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
+  // property_subtype (e.g. 'RETAIL_NNN') is a lookup code, not recognized by getProjectCategory().
+  const effectivePropertyType = currentProject?.project_type_code
     || currentProject?.project_type
-    || currentProject?.project_type_code;
+    || currentProject?.property_subtype;
 
   const { currentFolder, currentTab, setFolderTab } = useFolderNavigation({
     propertyType: effectivePropertyType,

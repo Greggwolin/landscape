@@ -419,11 +419,11 @@ export default function ProjectTab({
 
   const renderMapCard = () => {
     return (
-      <CCard className="h-100" style={{ minHeight: '520px', display: 'flex', flexDirection: 'column', borderColor: 'var(--cui-border-color)' }}>
+      <CCard className="h-100" style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
         <CCardHeader className="d-flex align-items-center justify-content-between">
           <span className="fw-semibold">Map - 3D Oblique View</span>
         </CCardHeader>
-        <CCardBody style={{ padding: '12px', flex: 1 }}>
+        <CCardBody style={{ padding: '0.5rem', flex: 1 }}>
           <div style={{ height: '100%' }}>
             <ProjectTabMap
               projectId={String(project.project_id)}
@@ -932,7 +932,7 @@ export default function ProjectTab({
     <>
       <div
         className="d-flex flex-column"
-        style={{ gap: 'var(--component-gap)', padding: '0.5rem' }}
+        style={{ gap: '0.5rem' }}
       >
       {/* Section 1: Project Profile + Map - Side by side, no wrapper */}
       <CRow className="g-2" style={{ alignItems: 'stretch' }}>
@@ -957,7 +957,7 @@ export default function ProjectTab({
           </CCardHeader>
           <CCardBody style={{ padding: '0.5rem' }}>
             {/* Financial Summary Tiles - All in One Row */}
-            <CRow className="mb-0">
+            <CRow className="g-2 mb-0">
               <CCol>
                 <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-primary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   <div className="text-xl font-bold" style={{ color: 'var(--cui-primary)' }}>

@@ -35,10 +35,11 @@ interface MarketTabProps {
 export default function MarketTab({ project }: MarketTabProps) {
   const projectId = project.project_id;
 
-  // Determine project type using the same fallback chain as other components
-  const effectiveProjectType = project.property_subtype
+  // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
+  // property_subtype (e.g. 'RETAIL_NNN') is a lookup code, not recognized by getProjectCategory().
+  const effectiveProjectType = project.project_type_code
     || project.project_type
-    || project.project_type_code;
+    || project.property_subtype;
   const isIncome = isIncomeProperty(effectiveProjectType);
 
   // For income properties, delegate to PropertyTab with market activeTab

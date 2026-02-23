@@ -207,8 +207,9 @@ export function createFolderConfig(
 
     // ========================================
     // Position 2: Property
+    // Income: location, market-supply, property-details, rent-roll, acquisition
     // LAND: market, land-use, parcels, acquisition
-    // INCOME: details, acquisition, market, rent-roll, renovation (VALUE_ADD only)
+    // Funnel order: Macro Economy → Local Economy → Property Location → Property Attributes
     // ========================================
     {
       id: 'property',
@@ -216,16 +217,53 @@ export function createFolderConfig(
       color: TILE_COLORS.planning,
       subTabs: filterSubtabsByType(
         [
-          // Income property subtabs - match PropertyTab's internal CNav
+          // Location - economic indicators + AI-generated analysis (income properties)
           {
-            id: 'details',
-            label: 'Details',
+            id: 'location',
+            label: 'Location',
             projectTypes: [
               'multifamily',
               'office',
               'retail',
               'industrial',
               'hotel',
+              'mixed_use',
+            ],
+          },
+          // Market Supply/Demand - property-type-specific supply/demand overview (income)
+          {
+            id: 'market-supply',
+            label: 'Market',
+            projectTypes: [
+              'multifamily',
+              'office',
+              'retail',
+              'industrial',
+              'hotel',
+              'mixed_use',
+            ],
+          },
+          // Property Details (formerly "Details") - income properties
+          {
+            id: 'property-details',
+            label: 'Property Details',
+            projectTypes: [
+              'multifamily',
+              'office',
+              'retail',
+              'industrial',
+              'hotel',
+              'mixed_use',
+            ],
+          },
+          // Rent Roll - multifamily and multi-tenant property types only
+          // Single-tenant retail (NNN/SLB) does not have a rent roll
+          {
+            id: 'rent-roll',
+            label: 'Rent Roll',
+            projectTypes: [
+              'multifamily',
+              'office',
               'mixed_use',
             ],
           },
@@ -236,20 +274,8 @@ export function createFolderConfig(
             label: 'Acquisition',
             hideForPurpose: ['VALUATION'],
           },
-          { id: 'market', label: 'Market' },
-          {
-            id: 'rent-roll',
-            label: 'Rent Roll',
-            projectTypes: [
-              'multifamily',
-              'office',
-              'retail',
-              'industrial',
-              'hotel',
-              'mixed_use',
-            ],
-          },
-          // Land development subtabs
+          // Land development subtabs (preserved — unchanged)
+          { id: 'market', label: 'Market', projectTypes: ['land_development'] },
           {
             id: 'land-use',
             label: 'Land Use',
@@ -259,20 +285,6 @@ export function createFolderConfig(
             id: 'parcels',
             label: 'Parcels',
             projectTypes: ['land_development'],
-          },
-          // Renovation - VALUE_ADD analysis type only (income properties)
-          {
-            id: 'renovation',
-            label: 'Renovation',
-            projectTypes: [
-              'multifamily',
-              'office',
-              'retail',
-              'industrial',
-              'hotel',
-              'mixed_use',
-            ],
-            requiresValueAdd: true,
           },
         ],
         projectType,
@@ -309,12 +321,21 @@ export function createFolderConfig(
       label: isIncome ? 'Valuation' : { primary: 'Feasibility', secondary: 'Valuation' },
       color: TILE_COLORS.feasVal,
       subTabs: isIncome
-        ? [
-            { id: 'sales-comparison', label: 'Sales Comparison' },
-            { id: 'cost', label: 'Cost Approach' },
-            { id: 'income', label: 'Income Approach' },
-            { id: 'reconciliation', label: 'Reconciliation' },
-          ]
+        ? filterSubtabsByType(
+            [
+              { id: 'sales-comparison', label: 'Sales Comparison' },
+              { id: 'cost', label: 'Cost Approach' },
+              { id: 'income', label: 'Income Approach' },
+              { id: 'cash-flow', label: 'Cash Flow', analysisTypes: ['INVESTMENT'] as AnalysisTypeCode[] },
+              { id: 'comparable-sales', label: 'Comparable Sales', analysisTypes: ['INVESTMENT'] as AnalysisTypeCode[] },
+              { id: 'market-comps', label: 'Market Comps' },
+              { id: 'reconciliation', label: 'Reconciliation' },
+            ],
+            projectType,
+            analysisType,
+            valueAddEnabled,
+            analysisPurpose
+          )
         : [
             { id: 'cashflow', label: 'Cash Flow' },
             { id: 'returns', label: 'Returns' },
@@ -497,12 +518,12 @@ export function getDefaultSubTabId(
   // If folder has no subtabs (like home), return empty string
   if (!folder?.subTabs.length) return '';
 
-  // Special handling for property folder to match main branch behavior
+  // Special handling for property folder
   if (folderId === 'property') {
     const isIncome = isIncomeProperty(projectType);
     if (isIncome) {
-      // Income properties: default to 'details' subtab (first in PropertyTab)
-      return 'details';
+      // Income properties: default to 'location' subtab (funnel starts at macro)
+      return 'location';
     } else {
       // Land dev: default to 'market' subtab
       return 'market';
