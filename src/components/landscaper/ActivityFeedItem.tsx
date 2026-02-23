@@ -93,73 +93,87 @@ export function ActivityFeedItem({ item, projectId }: ActivityFeedItemProps) {
     }
   };
 
-  const content = (
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsOpen((v) => !v);
+  };
+
+  return (
     <div
       className={`
-        p-3 rounded-lg border transition-colors cursor-pointer
+        rounded-lg border transition-colors cursor-pointer
         hover:border-blue-300 dark:hover:border-blue-600
         ${!item.read ? 'border-l-4 border-l-teal-500' : ''}
-        ${config.bg}
       `}
       style={{ borderColor: 'var(--cui-border-color)' }}
+      onClick={handleToggle}
     >
-      <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2">
-          <span className={`text-sm ${config.color}`}>{config.icon}</span>
-          <h4 className="font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>
-            {item.title}
-          </h4>
-        </div>
+      {/* Title row — always visible */}
+      <div
+        className="d-flex align-items-center gap-2"
+        style={{ padding: '0.5rem 0.75rem' }}
+      >
+        <span className={`text-sm ${config.color}`}>{config.icon}</span>
+        <span className="font-medium text-sm flex-grow-1" style={{ color: 'var(--cui-body-color)' }}>
+          {item.title}
+        </span>
         {item.confidence && (
           <span className={`px-2 py-0.5 text-xs rounded-full ${confidenceColors[item.confidence]}`}>
             {item.confidence}
           </span>
         )}
+        <span
+          className="text-xs"
+          style={{ color: 'var(--cui-secondary-color)', transition: 'transform 0.15s', display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'none' }}
+        >
+          ▾
+        </span>
       </div>
 
-      <p className="text-xs mb-1" style={{ color: 'var(--cui-body-color)' }}>
-        {item.summary}
-      </p>
+      {/* Expanded details — shown on click */}
+      {isOpen && (
+        <div style={{ padding: '0 0.75rem 0.5rem' }}>
+          <p className="text-xs mb-1" style={{ color: 'var(--cui-body-color)' }}>
+            {item.summary}
+          </p>
 
-      {visibleDetails && visibleDetails.length > 0 && (
-        <ul className="text-xs space-y-0.5 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
-          {visibleDetails.slice(0, 2).map((detail, idx) => (
-            <li key={idx}>• {detail}</li>
-          ))}
-          {visibleDetails.length > 2 && (
-            <li>+{visibleDetails.length - 2} more</li>
+          {visibleDetails && visibleDetails.length > 0 && (
+            <ul className="text-xs space-y-0.5 mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+              {visibleDetails.map((detail, idx) => (
+                <li key={idx}>• {detail}</li>
+              ))}
+            </ul>
           )}
-        </ul>
-      )}
 
-      {item.blockedBy && (
-        <div className="mt-2 text-xs text-red-500">
-          Blocked: {item.blockedBy}
+          {item.blockedBy && (
+            <div className="mt-1 text-xs text-red-500">
+              Blocked: {item.blockedBy}
+            </div>
+          )}
+
+          {rollbackSnapshotId && (
+            <div className="mt-1">
+              <CButton
+                color="link"
+                size="sm"
+                disabled={isRollingBack}
+                onClick={handleRollback}
+              >
+                {isRollingBack ? 'Undoing...' : 'Undo'}
+              </CButton>
+            </div>
+          )}
+
+          <div className="mt-1 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+            {new Date(item.timestamp).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </div>
         </div>
       )}
-
-      {rollbackSnapshotId && (
-        <div className="mt-2">
-          <CButton
-            color="link"
-            size="sm"
-            disabled={isRollingBack}
-            onClick={handleRollback}
-          >
-            {isRollingBack ? 'Undoing...' : 'Undo'}
-          </CButton>
-        </div>
-      )}
-
-      <div className="mt-2 text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-        {new Date(item.timestamp).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-        })}
-      </div>
     </div>
   );
-
-  // Navigation is now handled by parent component
-  return content;
 }

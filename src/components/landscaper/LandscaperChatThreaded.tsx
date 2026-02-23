@@ -559,23 +559,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           />
         </button>
 
-        {/* Collapse/Expand toggle */}
-        {onToggleExpand && (
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="btn btn-sm d-flex align-items-center justify-content-center p-1"
-            style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
-            title={isExpanded ? 'Collapse chat' : 'Expand chat'}
-            {...hoverNeutralBackground}
-          >
-            <CIcon
-              icon={isExpanded ? cilChevronTop : cilChevronBottom}
-              size="sm"
-              style={{ color: 'var(--cui-secondary-color)' }}
-            />
-          </button>
-        )}
+        {/* Activity feed toggle chevron removed — feed has its own header toggle */}
       </div>
 
       {/* Thread List (collapsible) */}

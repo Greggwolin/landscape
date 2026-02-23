@@ -66,10 +66,14 @@ function buildCurrentPage(
   pathname: string | null,
   folder: string | null,
   tab: string | null,
+  subtab?: string | null,
 ): string | undefined {
   if (!pathname) return undefined;
 
   // --- Query-param-based detection (folder tabs) ---
+  if (folder && tab && subtab) {
+    return `${folder}_${tab}_${subtab}`;  // e.g. "valuation_income_lease-terms"
+  }
   if (folder && tab) {
     return `${folder}_${tab}`;        // e.g. "property_rent-roll", "valuation_income"
   }
@@ -121,11 +125,12 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
   // Expose raw folder/tab from URL for tab-aware consumers
   const activeFolder = searchParams?.get('folder') ?? null;
   const activeTab = searchParams?.get('tab') ?? null;
+  const activeSubTab = searchParams?.get('subtab') ?? null;
 
-  /** Resolve the current page from pathname + folder/tab query params. */
+  /** Resolve the current page from pathname + folder/tab/subtab query params. */
   const currentPage = useMemo(() => {
-    return buildCurrentPage(pathname, activeFolder, activeTab);
-  }, [pathname, activeFolder, activeTab]);
+    return buildCurrentPage(pathname, activeFolder, activeTab, activeSubTab);
+  }, [pathname, activeFolder, activeTab, activeSubTab]);
 
   // Determine if the user has manually dismissed help this session
   const userDismissedRef = useRef<boolean>(
