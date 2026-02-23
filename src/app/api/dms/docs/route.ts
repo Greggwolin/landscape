@@ -23,28 +23,62 @@ export async function POST(req: NextRequest) {
     // Validate request body
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
 
-    // Validate doc_type against template's doc_type_options
-    const template = await sql`
-      SELECT doc_type_options
-      FROM landscape.dms_templates
-      WHERE (project_id = ${system.project_id} OR workspace_id = ${system.workspace_id ?? null})
-        AND is_default = true
-      LIMIT 1
+    // Validate doc_type against project-owned doc types (dms_project_doc_types).
+    // If missing, auto-insert as a custom project doc type to prevent drift.
+    const docType = system.doc_type ?? 'general';
+    const projectDocTypes = await sql<{ doc_type_name: string }[]>`
+      SELECT doc_type_name
+      FROM landscape.dms_project_doc_types
+      WHERE project_id = ${system.project_id}
     `;
 
-    if (template.length > 0 && template[0].doc_type_options) {
-      const validDocTypes = template[0].doc_type_options;
-      const docType = system.doc_type ?? 'general';
+    if (projectDocTypes.length > 0) {
+      const validSet = new Set(projectDocTypes.map(row => row.doc_type_name.toLowerCase()));
+      if (!validSet.has(docType.toLowerCase())) {
+        await sql`
+          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+          VALUES (
+            ${system.project_id},
+            ${docType},
+            (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${system.project_id}),
+            FALSE
+          )
+          ON CONFLICT (project_id, doc_type_name) DO NOTHING
+        `;
+      }
+    } else {
+      // Fallback: if project doc types aren't seeded yet, use template options
+      const template = await sql`
+        SELECT doc_type_options
+        FROM landscape.dms_templates
+        WHERE (project_id = ${system.project_id} OR workspace_id = ${system.workspace_id ?? null})
+          AND is_default = true
+        LIMIT 1
+      `;
 
-      if (!validDocTypes.includes(docType)) {
-        return NextResponse.json(
-          {
-            error: 'Invalid doc_type',
-            details: `doc_type "${docType}" is not allowed. Valid options: ${validDocTypes.join(', ')}`,
-            valid_doc_types: validDocTypes
-          },
-          { status: 400 }
-        );
+      if (template.length > 0 && template[0].doc_type_options) {
+        const validDocTypes = template[0].doc_type_options;
+        if (!validDocTypes.includes(docType)) {
+          return NextResponse.json(
+            {
+              error: 'Invalid doc_type',
+              details: `doc_type "${docType}" is not allowed. Valid options: ${validDocTypes.join(', ')}`,
+              valid_doc_types: validDocTypes
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        await sql`
+          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+          VALUES (
+            ${system.project_id},
+            ${docType},
+            (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${system.project_id}),
+            FALSE
+          )
+          ON CONFLICT (project_id, doc_type_name) DO NOTHING
+        `;
       }
     }
 

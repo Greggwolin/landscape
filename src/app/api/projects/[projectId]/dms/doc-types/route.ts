@@ -26,12 +26,47 @@ export async function GET(
     }
 
     // Read from project-owned doc types (seeded at project creation from template)
-    const docTypes = await sql<{ doc_type_name: string }[]>`
+    let docTypes = await sql<{ doc_type_name: string }[]>`
       SELECT doc_type_name
       FROM landscape.dms_project_doc_types
       WHERE project_id = ${projectId}
       ORDER BY display_order, doc_type_name
     `;
+
+    // Backfill any doc_types already in use on documents but missing from the project list
+    const existingSet = new Set(docTypes.map(row => row.doc_type_name.toLowerCase()));
+    const docTypeRows = await sql<{ doc_type: string | null }[]>`
+      SELECT DISTINCT doc_type
+      FROM landscape.core_doc
+      WHERE project_id = ${projectId}
+        AND deleted_at IS NULL
+        AND doc_type IS NOT NULL
+    `;
+    const missingDocTypes = docTypeRows
+      .map(row => row.doc_type)
+      .filter((docType): docType is string => Boolean(docType))
+      .filter(docType => !existingSet.has(docType.toLowerCase()));
+
+    if (missingDocTypes.length > 0) {
+      for (const missing of missingDocTypes) {
+        await sql`
+          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+          VALUES (
+            ${projectId},
+            ${missing},
+            (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${projectId}),
+            FALSE
+          )
+          ON CONFLICT (project_id, doc_type_name) DO NOTHING
+        `;
+      }
+      docTypes = await sql<{ doc_type_name: string }[]>`
+        SELECT doc_type_name
+        FROM landscape.dms_project_doc_types
+        WHERE project_id = ${projectId}
+        ORDER BY display_order, doc_type_name
+      `;
+    }
 
     return NextResponse.json({
       success: true,
