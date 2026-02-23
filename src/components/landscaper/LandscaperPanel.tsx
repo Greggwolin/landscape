@@ -81,7 +81,7 @@ export function LandscaperPanel({
 }: LandscaperPanelProps) {
   // Internal state management with localStorage persistence
   const queryClient = useQueryClient();
-  const [isActivityExpanded, setActivityExpanded] = useState(true);
+  const [isActivityExpanded, setActivityExpanded] = useState(false);
   const [expandedSplitRatio, setExpandedSplitRatio] = useState(0.25);
   const [collapsedSplitRatio, setCollapsedSplitRatio] = useState(0.75);
   const [splitRatio, setSplitRatio] = useState(0.25);
@@ -117,7 +117,7 @@ export function LandscaperPanel({
   // Get files dropped anywhere in the project layout
   const { pendingFiles, consumeFiles } = useFileDrop();
 
-  const RESIZER_SIZE = 10;
+  const RESIZER_SIZE = 6;
   const MIN_CHAT_HEIGHT = 180;
   const MIN_ACTIVITY_HEIGHT = 160;
 
@@ -543,7 +543,7 @@ export function LandscaperPanel({
     const saved = localStorage.getItem('landscape-activity-expanded');
     const savedExpanded = localStorage.getItem('landscape-landscaper-split-expanded');
     const savedCollapsed = localStorage.getItem('landscape-landscaper-split-collapsed');
-    const nextIsExpanded = saved === null ? true : saved === 'true';
+    const nextIsExpanded = saved === null ? false : saved === 'true';
     const parsedExpanded = Number.parseFloat(savedExpanded ?? '');
     const parsedCollapsed = Number.parseFloat(savedCollapsed ?? '');
     const nextExpandedRatio = Number.isFinite(parsedExpanded) && parsedExpanded > 0 && parsedExpanded < 1
@@ -742,7 +742,7 @@ export function LandscaperPanel({
   return (
     <div
       {...getRootProps()}
-      className="flex flex-col h-full gap-3 relative"
+      className="flex flex-col h-full gap-1 relative"
       style={{
         borderRadius: 'var(--cui-card-border-radius)',
         border: isDragActive ? '2px dashed var(--cui-primary)' : '1px dashed transparent',
@@ -795,8 +795,8 @@ export function LandscaperPanel({
         <CCard
           className="flex flex-col min-h-0 shadow-lg overflow-hidden"
           style={{
-            height: hasMeasuredHeight ? `${chatHeight}px` : undefined,
-            flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
+            flex: '1 1 0',
+            minHeight: MIN_CHAT_HEIGHT,
           }}
         >
           <LandscaperChatThreaded
@@ -910,12 +910,13 @@ export function LandscaperPanel({
         {/* Extraction Queue (pending/failed items from dms_extract_queue) */}
         <ExtractionQueueSection projectId={projectId} />
 
-        {/* Activity Feed Card */}
+        {/* Activity Feed Card — collapsed: header only; expanded: grows to fit content */}
         <CCard
           className="shadow-lg overflow-hidden"
           style={{
-            height: hasMeasuredHeight ? `${activityHeight}px` : undefined,
-            flex: hasMeasuredHeight ? '0 0 auto' : '1 1 0',
+            flex: isActivityExpanded ? '0 0 auto' : '0 0 auto',
+            maxHeight: isActivityExpanded ? '50%' : undefined,
+            overflow: isActivityExpanded ? 'auto' : 'hidden',
           }}
         >
           <ActivityFeed

@@ -144,6 +144,21 @@
   text-decoration: underline;
 }
 
+.layer-item-label.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.layer-item-name.disabled {
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.layer-item.disabled .layer-item-name:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
 .layer-item-count {
   color: var(--cui-secondary-color, #9ca3af);
   font-size: 11px;
@@ -210,6 +225,178 @@
   font-size: 9px;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   County Parcel Panel
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-parcel-panel {
+  border-top: 1px solid var(--cui-border-color);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-tab-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.map-tab-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color);
+}
+
+.map-tab-panel-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.map-tab-panel-action {
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-body-color);
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.map-tab-panel-action:hover {
+  border-color: var(--cui-primary);
+  color: var(--cui-primary);
+}
+
+.map-tab-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.map-tab-panel-message {
+  color: var(--cui-secondary-color);
+  line-height: 1.4;
+}
+
+.map-tab-panel-error {
+  color: var(--cui-danger);
+  font-size: 12px;
+}
+
+.map-tab-panel-actions {
+  display: flex;
+  align-items: center;
+}
+
+.map-tab-panel-actions .btn {
+  width: 100%;
+}
+
+.map-tab-parcel-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.map-tab-parcel-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-tab-parcel-metric span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cui-secondary-color);
+}
+
+.map-tab-parcel-metric strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.map-tab-parcel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.map-tab-parcel-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--cui-border-color);
+  background: var(--cui-card-bg);
+}
+
+.map-tab-parcel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.map-tab-parcel-id {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--cui-body-color);
+}
+
+.map-tab-parcel-address {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  line-height: 1.3;
+}
+
+.map-tab-parcel-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.map-tab-parcel-acres {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  white-space: nowrap;
+}
+
+.map-tab-parcel-remove {
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-secondary-color);
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.map-tab-parcel-remove:hover {
+  border-color: var(--cui-danger);
+  color: var(--cui-danger);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -396,6 +583,20 @@
 
 .map-tab-marker:hover svg {
   transform: scale(1.1);
+}
+
+.map-subject-marker {
+  width: 14px;
+  height: 14px;
+  display: block;
+  border-radius: 50%;
+  background: var(--cui-warning);
+  border: 2px solid var(--cui-black);
+}
+
+.map-subject-marker svg {
+  width: 34px;
+  height: 34px;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -712,6 +913,100 @@
 .map-tab-popup-content strong {
   color: var(--cui-secondary-color, #9ca3af);
   font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   CoreUI-style Popovers (for map markers)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-popover .maplibregl-popup-content {
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--cui-popover-border-color, var(--cui-border-color));
+  background: var(--cui-popover-bg, var(--cui-card-bg));
+  color: var(--cui-body-color);
+  box-shadow: var(--cui-box-shadow, 0 6px 18px rgba(0, 0, 0, 0.35));
+}
+
+.map-tab-popover .maplibregl-popup-tip {
+  border-top-color: var(--cui-popover-bg, var(--cui-card-bg));
+}
+
+.map-tab-popover-header {
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  background: var(--cui-popover-header-bg, var(--cui-tertiary-bg));
+  color: var(--cui-popover-header-color, var(--cui-body-color));
+  border-bottom: 1px solid var(--cui-popover-border-color, var(--cui-border-color));
+}
+
+.map-tab-popover-body {
+  padding: 10px 14px 12px;
+  font-size: 12.5px;
+}
+
+.map-tab-popover-address {
+  font-size: 0.85em;
+  color: var(--cui-secondary-color);
+  margin-bottom: 6px;
+}
+
+.map-tab-popover-address-line + .map-tab-popover-address-line {
+  margin-top: 2px;
+}
+
+.map-tab-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.map-tab-popover-label {
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+}
+
+.map-tab-popover-value {
+  color: var(--cui-body-color);
+  font-weight: 600;
+  text-align: right;
+}
+
+.map-tab-popover-empty {
+  color: var(--cui-secondary-color);
+}
+
+.map-tab-popover-table-wrap {
+  margin-top: 8px;
+  border-top: 1px solid var(--cui-border-color);
+  padding-top: 8px;
+}
+
+.map-tab-popover-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.map-tab-popover-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+  padding: 4px 6px 6px 0;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.map-tab-popover-table td {
+  padding: 4px 6px 4px 0;
+  color: var(--cui-body-color);
+}
+
+.map-tab-popover-table tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--cui-border-color);
 }
 
 /* Compact popup (match demo ring popups styling) */

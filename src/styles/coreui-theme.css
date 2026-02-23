@@ -109,7 +109,7 @@
 
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #080A0C;
-  --landscaper-panel-icon-size: 2rem;
+  --landscaper-panel-icon-size: 1.5rem;
 }
 
 /* v1.0 · Dark header contrast fix — keep near other CoreUI var bridges */
@@ -192,7 +192,7 @@
   --validation-unit-price-color: #07FF8A;
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #FFFFFF;
-  --landscaper-panel-icon-size: 2rem;
+  --landscaper-panel-icon-size: 1.5rem;
   --cui-primary-text: #ffffff;
   --cui-danger-text: #ffffff;
 }
@@ -1095,4 +1095,77 @@ thead th,
   height: var(--landscaper-panel-icon-size);
   flex: 0 0 var(--landscaper-panel-icon-size);
   color: var(--landscaper-icon-color);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Project Profile — Two-Column Grid (Option C: softened)
+   ══════════════════════════════════════════════════════════ */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 0;
+  padding: 0.25rem;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 40%, transparent);
+}
+
+/* Right-column cells get a subtle left border */
+.profile-field:nth-child(even) {
+  border-left: 1px solid color-mix(in srgb, var(--cui-border-color) 40%, transparent);
+}
+
+/* Last row — no bottom border */
+.profile-field:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+/* Full-width spanning both columns */
+.profile-field--full {
+  grid-column: 1 / -1;
+  border-left: none;
+}
+
+.profile-field__label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--cui-tertiary-color, #94a3b8);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.1rem;
+}
+
+.profile-field__value {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--cui-body-color);
+  padding-left: 0.35rem;
+}
+
+.profile-field__value--empty {
+  color: var(--cui-tertiary-color, #64748b);
+  font-style: italic;
+}
+
+/* Sub-section card headers — lighter than standard CCardHeader */
+.sub-section-header.card-header {
+  background: color-mix(in srgb, var(--cui-card-cap-bg, #f0f1f2) 40%, var(--cui-card-bg, #fff)) !important;
+  color: var(--cui-secondary-color) !important;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-height: 33px;
+  display: flex;
+  align-items: center;
+}
+
+/* Sub-section accordion headers — lighter background */
+.sub-section-accordion .accordion-button {
+  background: color-mix(in srgb, var(--cui-card-cap-bg, #f0f1f2) 40%, var(--cui-card-bg, #fff)) !important;
+}
+.sub-section-accordion .accordion-button:not(.collapsed) {
+  background: color-mix(in srgb, var(--cui-card-cap-bg, #f0f1f2) 40%, var(--cui-card-bg, #fff)) !important;
 }

@@ -142,6 +142,18 @@
   --nav-tab-radius: 6px;
   --nav-tab-inactive-opacity: 0.75; /* All tabs show color, inactive slightly muted */
 
+  /* Active Project Bar */
+  --surface-bar: #e8eaed;
+
+  /* Nav Tiles (compact monochrome in ActiveProjectBar) */
+  --nav-tile-bg: var(--cui-tertiary-bg, #f0f4f7);
+  --nav-tile-color: var(--cui-secondary-color, #64748b);
+  --nav-tile-hover-bg: #dde1e6;
+  --nav-tile-hover-color: var(--cui-body-color, #1e293b);
+  --nav-tile-active-bg: #dbeafe;
+  --nav-tile-active-color: #1e40af;
+  --nav-tile-active-border: var(--cui-primary, #3b82f6);
+
   /* Spacing */
   --app-padding: 0.5rem;
   --component-gap: 0.5rem;
@@ -242,6 +254,18 @@
   --nav-hover-bg: rgba(255, 255, 255, 0.08);
   --nav-active-bg: rgba(255, 255, 255, 0.16);
   --nav-brand: var(--brand-primary);
+
+  /* Active Project Bar */
+  --surface-bar: #2a2e3a;
+
+  /* Nav Tiles — dark */
+  --nav-tile-bg: var(--cui-tertiary-bg, #1e293b);
+  --nav-tile-color: var(--cui-secondary-color, #94a3b8);
+  --nav-tile-hover-bg: #334155;
+  --nav-tile-hover-color: #cbd5e1;
+  --nav-tile-active-bg: #1e3a5f;
+  --nav-tile-active-color: #e2e8f0;
+  --nav-tile-active-border: var(--cui-primary, #3b82f6);
 
   /* Operations Tab - Dark mode (same input colors, adjusted backgrounds) */
   --ops-input-as-is: #63b3ed;

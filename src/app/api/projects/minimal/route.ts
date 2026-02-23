@@ -232,6 +232,24 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create project')
     }
 
+    const newProjectId = inserted[0].project_id
+
+    // Seed dms_project_doc_types from the resolved template
+    if (dmsTemplateId) {
+      await sql`
+        INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+        SELECT
+          ${newProjectId},
+          dt.doc_type_name,
+          dt.ord::int,
+          TRUE
+        FROM landscape.dms_templates t
+        CROSS JOIN LATERAL unnest(t.doc_type_options) WITH ORDINALITY AS dt(doc_type_name, ord)
+        WHERE t.template_id = ${dmsTemplateId}
+        ON CONFLICT (project_id, doc_type_name) DO NOTHING
+      `
+    }
+
     return NextResponse.json({
       project: inserted[0]
     })

@@ -19,6 +19,7 @@ import {
 } from '@coreui/react';
 import type { FeatureCollection, Feature, Geometry } from 'geojson';
 import * as turf from '@turf/turf';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 import type {
   MapTabProps,
@@ -48,6 +49,8 @@ import {
 } from '@/components/location-intelligence';
 import type { RingDemographics } from '@/components/location-intelligence';
 import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
+import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
+import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 
 import './map-tab.css';
@@ -60,6 +63,43 @@ const parseCoordinate = (value?: number | string | null): number | null => {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeCountyValue = (value?: string | null): CountyCode | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(' county', '').trim();
+  return normalized in COUNTY_PARCEL_SERVICES ? (normalized as CountyCode) : null;
+};
+
+const formatCountyLabel = (county: CountyCode): string =>
+  `${county.charAt(0).toUpperCase()}${county.slice(1)} County`;
+
+const getParcelIdFromProps = (props: Record<string, unknown>, featureId?: unknown): string => {
+  const candidate =
+    props.parcel_id ??
+    props.tax_parcel_id ??
+    props.PARCELID ??
+    props.APN ??
+    featureId;
+  if (candidate == null) return '';
+  const value = String(candidate).trim();
+  return value;
+};
+
+const getParcelAddressFromProps = (props: Record<string, unknown>): string => {
+  const candidate =
+    props.address ??
+    props.SITUS_ADDRESS ??
+    props.SITEADDRESS ??
+    props.situs_address ??
+    props.siteaddress;
+  return typeof candidate === 'string' ? candidate : '';
+};
+
+const getParcelAcresFromProps = (props: Record<string, unknown>): number | null => {
+  const candidate = props.acres ?? props.ACRES ?? props.GROSSAC ?? props.grossac;
+  const parsed = Number(candidate);
   return Number.isFinite(parsed) ? parsed : null;
 };
 
@@ -96,6 +136,22 @@ function computeBboxParam(fc: FeatureCollection | null): string {
   } catch {
     return '';
   }
+}
+
+function normalizeParcelFeatureCollection(collection: FeatureCollection): FeatureCollection {
+  const features = collection.features.map((feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const parcelId = getParcelIdFromProps(props, feature.id);
+    if (parcelId) {
+      props.parcel_id = parcelId;
+    }
+    return {
+      ...feature,
+      id: parcelId || feature.id,
+      properties: props,
+    };
+  });
+  return { ...collection, features };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,6 +207,8 @@ export function MapTab({ project }: MapTabProps) {
   const [resolvedCenter, setResolvedCenter] = useState<[number, number] | null>(
     hasProjectCenter ? projectCenter : null
   );
+  const [mapApiCenter, setMapApiCenter] = useState<[number, number] | null>(null);
+  const [mapLocationOverride, setMapLocationOverride] = useState(false);
 
   useEffect(() => {
     if (!hasProjectCenter) return;
@@ -197,13 +255,46 @@ export function MapTab({ project }: MapTabProps) {
   const [taxParcels, setTaxParcels] = useState<FeatureCollection | null>(null);
   const [taxLoading, setTaxLoading] = useState(false);
   const [taxError, setTaxError] = useState<string | null>(null);
+  const [parcelCountyOverride, setParcelCountyOverride] = useState<CountyCode | null>(null);
+  const [isCountyPromptOpen, setIsCountyPromptOpen] = useState(false);
+  const [parcelSelectionSaving, setParcelSelectionSaving] = useState(false);
+  const [parcelSelectionError, setParcelSelectionError] = useState<string | null>(null);
+  const [selectedTaxParcels, setSelectedTaxParcels] = useState<Record<string, Feature>>({});
 
   // ───── Toast ─────
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
 
-  const PARCEL_MIN_ZOOM = 17.5;
+  const PARCEL_MIN_ZOOM = 15;
+  const COUNTY_PARCEL_MIN_ZOOM = 15;
+
+  const autoCounty = useMemo(() => normalizeCountyValue(project.county ?? null), [project.county]);
+  const resolvedCounty = parcelCountyOverride ?? autoCounty;
+  const selectedTaxParcelIds = useMemo(() => Object.keys(selectedTaxParcels), [selectedTaxParcels]);
+  const taxParcelsLayerVisible = useMemo(() => {
+    const group = layers.find((layerGroup) => layerGroup.id === 'project-boundary');
+    const layer = group?.layers.find((entry) => entry.id === 'tax-parcels');
+    return Boolean(layer?.visible);
+  }, [layers]);
+  const isLosAngelesCounty = useMemo(() => {
+    const value = typeof project.county === 'string' ? project.county.toLowerCase() : '';
+    return value.includes('los angeles');
+  }, [project.county]);
+  const countyOptions = useMemo(
+    () => Object.keys(COUNTY_PARCEL_SERVICES) as CountyCode[],
+    []
+  );
+  const resolvedCountyLabel = useMemo(
+    () => (resolvedCounty ? formatCountyLabel(resolvedCounty) : 'Select county'),
+    [resolvedCounty]
+  );
+  const countyPromptMessage = useMemo(() => {
+    if (autoCounty) {
+      return `Project county detected as ${formatCountyLabel(autoCounty)}. Select a county to override.`;
+    }
+    return 'Select Maricopa or Pinal County to load parcel overlays.';
+  }, [autoCounty]);
 
   // ───── Demographics (Ring) State ─────
   const [selectedRingRadius, setSelectedRingRadius] = useState<number | null>(null);
@@ -232,6 +323,30 @@ export function MapTab({ project }: MapTabProps) {
   }, []);
 
   useEffect(() => {
+    setParcelCountyOverride(null);
+    setSelectedTaxParcels({});
+    setParcelSelectionError(null);
+  }, [projectId, autoCounty]);
+
+
+  const handleSelectCounty = useCallback((county: CountyCode) => {
+    setParcelCountyOverride(county);
+    setIsCountyPromptOpen(false);
+    setParcelSelectionError(null);
+    setLayers((prev) =>
+      prev.map((group) => {
+        if (group.id !== 'project-boundary') return group;
+        return {
+          ...group,
+          layers: group.layers.map((layer) =>
+            layer.id === 'tax-parcels' ? { ...layer, visible: true } : layer
+          ),
+        };
+      })
+    );
+  }, []);
+
+  useEffect(() => {
     if (!selectedRingRadius || !demographics?.rings?.length) {
       setSelectedRingStats(null);
       return;
@@ -246,8 +361,6 @@ export function MapTab({ project }: MapTabProps) {
 
   const [profileApn, setProfileApn] = useState<string>('');
   const mapCenterRequestRef = useRef(false);
-  const [mapApiCenter, setMapApiCenter] = useState<[number, number] | null>(null);
-  const [mapLocationOverride, setMapLocationOverride] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -429,10 +542,17 @@ export function MapTab({ project }: MapTabProps) {
     const bedroomsValue = Number(comp.bedrooms ?? 0);
     const bathroomsValue = Number(comp.bathrooms ?? 0);
     const addressValue = comp.address as string | undefined;
+    const addressLines = splitAddressLines(addressValue);
+    const addressHtml = addressLines
+      ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line1)}</div>${
+        addressLines.line2 ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line2)}</div>` : ''
+      }`
+      : '';
+    const nameValue = comp.property_name ?? comp.name ?? 'Rent Comp';
 
     return `<div class="comparable-popup-content">
-      <div class="comparable-popup-name" style="color: ${color};">${comp.property_name ?? comp.name ?? 'Rent Comp'}</div>
-      ${addressValue ? `<div class="comparable-popup-address">${addressValue}</div>` : ''}
+      <div class="comparable-popup-name" style="color: ${color};">${escapeHtml(nameValue)}</div>
+      ${addressHtml}
       <div class="comparable-popup-details">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
       <div class="comparable-popup-rent">$${Math.round(rentValue).toLocaleString()}/mo</div>
       ${comp.distance_miles ? `<div class="comparable-popup-distance">${comp.distance_miles} mi away</div>` : ''}
@@ -457,34 +577,88 @@ export function MapTab({ project }: MapTabProps) {
           return;
         }
 
-        const features = json.data
-          .map((row: Record<string, unknown>) => {
-            const lat = parseCoordinate(row.latitude as number | string | null | undefined);
-            const lng = parseCoordinate(row.longitude as number | string | null | undefined);
-            if (lat === null || lng === null) return null;
+        const grouped = new Map<string, {
+          lat: number;
+          lng: number;
+          name: string;
+          address?: string;
+          distance_miles?: number | null;
+          year_built?: number | null;
+          total_units?: number | null;
+          floorplans: Array<Record<string, unknown>>;
+        }>();
 
-            const name = (row.property_name as string) || (row.name as string) || 'Rent Comp';
-            const color = getComparableColor(name);
+        json.data.forEach((row: Record<string, unknown>) => {
+          const lat = parseCoordinate(row.latitude as number | string | null | undefined);
+          const lng = parseCoordinate(row.longitude as number | string | null | undefined);
+          if (lat === null || lng === null) return;
 
-            return {
-              type: 'Feature' as const,
-              id: `rent-${row.comparable_id ?? row.id ?? `${lng}-${lat}`}`,
-              properties: {
-                name,
-                asking_rent: row.asking_rent ?? row.askingRent ?? null,
-                effective_rent: row.effective_rent ?? row.effectiveRent ?? null,
-                unit_type: row.unit_type ?? row.unitType ?? null,
-                distance_miles: row.distance_miles ?? row.distance ?? null,
-                popup_html: buildRentCompPopupHtml(row, color),
-                color,
-              },
-              geometry: {
-                type: 'Point' as const,
-                coordinates: [lng, lat],
-              },
-            };
-          })
-          .filter(Boolean);
+          const name = (row.property_name as string) || (row.name as string) || 'Rent Comp';
+          const address = row.address as string | undefined;
+          const key = `${name}|${address ?? ''}|${lat}|${lng}`;
+
+          const entry = grouped.get(key) ?? {
+            lat,
+            lng,
+            name,
+            address,
+            distance_miles: row.distance_miles != null ? Number(row.distance_miles) : null,
+            year_built: row.year_built != null ? Number(row.year_built) : null,
+            total_units: row.total_units != null ? Number(row.total_units) : null,
+            floorplans: [],
+          };
+
+          if (row.distance_miles != null) {
+            const next = Number(row.distance_miles);
+            if (Number.isFinite(next)) {
+              entry.distance_miles = entry.distance_miles == null ? next : Math.min(entry.distance_miles, next);
+            }
+          }
+          if (row.year_built != null) {
+            const next = Number(row.year_built);
+            if (Number.isFinite(next)) {
+              entry.year_built = entry.year_built == null ? next : Math.min(entry.year_built, next);
+            }
+          }
+          if (row.total_units != null) {
+            const next = Number(row.total_units);
+            if (Number.isFinite(next)) {
+              entry.total_units = entry.total_units == null ? next : Math.max(entry.total_units, next);
+            }
+          }
+
+          entry.floorplans.push({
+            unit_type: row.unit_type ?? row.unitType ?? '',
+            bedrooms: row.bedrooms ?? null,
+            bathrooms: row.bathrooms ?? null,
+            avg_sqft: row.avg_sqft ?? row.avgSqft ?? null,
+            asking_rent: row.asking_rent ?? row.askingRent ?? null,
+            effective_rent: row.effective_rent ?? row.effectiveRent ?? null,
+          });
+
+          grouped.set(key, entry);
+        });
+
+        const features = Array.from(grouped.values()).map((entry, index) => {
+          const color = getComparableColor(entry.name);
+          return {
+            type: 'Feature' as const,
+            id: `rent-${index}-${entry.lng}-${entry.lat}`,
+            properties: {
+              name: entry.name,
+              address: entry.address ?? null,
+              distance_miles: entry.distance_miles ?? null,
+              year_built: entry.year_built ?? null,
+              total_units: entry.total_units ?? null,
+              floorplans: entry.floorplans,
+              color,
+            },
+            geometry: {
+              type: 'Point' as const,
+              coordinates: [entry.lng, entry.lat],
+            },
+          };
+        });
 
         setRentComps(
           features.length
@@ -587,6 +761,12 @@ export function MapTab({ project }: MapTabProps) {
 
   // 1. Plan Parcels
   useEffect(() => {
+    if (!isDevelopmentProject) {
+      setPlanParcels(null);
+      setPlanLoading(false);
+      setPlanError(null);
+      return undefined;
+    }
     const controller = new AbortController();
 
     const loadPlanParcels = async () => {
@@ -613,7 +793,7 @@ export function MapTab({ project }: MapTabProps) {
 
     loadPlanParcels();
     return () => controller.abort();
-  }, [projectId]);
+  }, [projectId, isDevelopmentProject]);
 
   // 2. Project Boundary
   useEffect(() => {
@@ -663,6 +843,7 @@ export function MapTab({ project }: MapTabProps) {
   const bboxParam = useMemo(() => computeBboxParam(planParcels), [planParcels]);
 
   useEffect(() => {
+    if (resolvedCounty) return;
     if (!bboxParam) return;
     const controller = new AbortController();
 
@@ -689,7 +870,7 @@ export function MapTab({ project }: MapTabProps) {
 
     loadTaxParcels();
     return () => controller.abort();
-  }, [bboxParam]);
+  }, [bboxParam, resolvedCounty]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Auto-fit bounds after GIS data loads
@@ -727,15 +908,21 @@ export function MapTab({ project }: MapTabProps) {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    const hasProjectLocation = Boolean(resolvedCenter ?? projectCenter);
     setLayers((prev) =>
       prev.map((group) => {
         if (group.id === 'project-boundary') {
           return {
             ...group,
             layers: group.layers.map((layer) => {
-              if (layer.id === 'plan-parcels') return { ...layer, count: planParcels?.features?.length ?? 0 };
+              if (layer.id === 'plan-parcels') {
+                return {
+                  ...layer,
+                  count: isDevelopmentProject ? planParcels?.features?.length ?? 0 : 0,
+                };
+              }
               if (layer.id === 'tax-parcels') return { ...layer, count: taxParcels?.features?.length ?? 0 };
-              if (layer.id === 'site-boundary') return { ...layer, count: projectBoundary ? 1 : 0 };
+              if (layer.id === 'site-boundary') return { ...layer, count: hasProjectLocation ? 1 : 0 };
               return layer;
             }),
           };
@@ -746,6 +933,7 @@ export function MapTab({ project }: MapTabProps) {
             layers: group.layers.map((layer) => {
               if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
               if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
+              if (layer.id === 'land-sales') return { ...layer, count: 0 };
               return layer;
             }),
           };
@@ -753,13 +941,16 @@ export function MapTab({ project }: MapTabProps) {
         return group;
       })
     );
-  }, [planParcels, taxParcels, projectBoundary, saleComps, rentComps]);
+  }, [planParcels, taxParcels, projectBoundary, saleComps, rentComps, projectCenter, resolvedCenter, isDevelopmentProject]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: Layer Panel
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleToggleLayer = useCallback((groupId: LayerGroupId, layerId: string) => {
+    if (layerId === 'tax-parcels' && !resolvedCounty) {
+      setTaxError('Select a county to load tax parcels.');
+    }
     setLayers((prev) =>
       prev.map((group) => {
         if (group.id !== groupId) return group;
@@ -771,7 +962,7 @@ export function MapTab({ project }: MapTabProps) {
         };
       })
     );
-  }, []);
+  }, [resolvedCounty]);
 
   const handleToggleGroup = useCallback((groupId: LayerGroupId) => {
     setLayers((prev) =>
@@ -791,6 +982,14 @@ export function MapTab({ project }: MapTabProps) {
     else if (layerId === 'tax-parcels') data = taxParcels;
     else if (layerId === 'site-boundary') data = projectBoundary;
 
+    if (!data && layerId === 'site-boundary') {
+      const fallbackCenter = resolvedCenter ?? projectCenter;
+      if (fallbackCenter) {
+        m.flyTo({ center: fallbackCenter, zoom: 16, speed: 0.8 });
+      }
+      return;
+    }
+
     if (!data) return;
 
     try {
@@ -802,7 +1001,7 @@ export function MapTab({ project }: MapTabProps) {
     } catch {
       // ignore
     }
-  }, [planParcels, taxParcels, projectBoundary]);
+  }, [planParcels, taxParcels, projectBoundary, projectCenter, resolvedCenter]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: Draw Toolbar
@@ -907,6 +1106,103 @@ export function MapTab({ project }: MapTabProps) {
 
   const handleFeatureClick = useCallback((feature: MapFeature) => {
     setSelectedFeatureId(feature.id);
+  }, []);
+
+  const handleTaxParcelToggle = useCallback((feature: Feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const parcelId = getParcelIdFromProps(props, feature.id);
+    if (!parcelId) return;
+
+    setParcelSelectionError(null);
+    setSelectedTaxParcels((prev) => {
+      const next = { ...prev };
+      if (next[parcelId]) {
+        delete next[parcelId];
+      } else {
+        next[parcelId] = feature;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleConfirmBoundary = useCallback(async () => {
+    if (!resolvedCounty) {
+      setIsCountyPromptOpen(true);
+      return;
+    }
+    if (selectedTaxParcelIds.length === 0) {
+      setParcelSelectionError('Select at least one parcel to confirm the boundary.');
+      return;
+    }
+
+    setParcelSelectionSaving(true);
+    setParcelSelectionError(null);
+
+    try {
+      const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://127.0.0.1:8000';
+      const features = selectedTaxParcelIds
+        .map((id) => selectedTaxParcels[id])
+        .filter(Boolean)
+        .map((feature) => {
+          const props = (feature.properties ?? {}) as Record<string, unknown>;
+          const parcelId = getParcelIdFromProps(props, feature.id);
+          return {
+            parcelId,
+            geom: feature.geometry,
+            properties: { ...props, PARCELID: parcelId },
+          };
+        });
+
+      const response = await fetch(`${djangoUrl}/api/gis/parcel-ingest/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          projectId,
+          county: resolvedCounty,
+          parcels: features,
+          source: 'county_parcel_feed',
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.text();
+        throw new Error(payload || `Parcel ingest failed (${response.status})`);
+      }
+
+      const payload = await response.json();
+      if (payload?.boundary?.geometry) {
+        setProjectBoundary(
+          buildBoundaryFeature(payload.boundary.geometry, {
+            acres: payload.boundary.acres,
+            source: payload.boundary.source,
+            created_at: payload.boundary.created_at,
+          })
+        );
+      }
+
+      showToast(`Boundary saved (${selectedTaxParcelIds.length} parcels)`);
+    } catch (error) {
+      console.error('Parcel ingest failed:', error);
+      setParcelSelectionError('Failed to save boundary. Please try again.');
+    } finally {
+      setParcelSelectionSaving(false);
+    }
+  }, [
+    getAuthHeaders,
+    projectId,
+    resolvedCounty,
+    selectedTaxParcelIds,
+    selectedTaxParcels,
+    showToast,
+  ]);
+
+  const handleRemoveSelectedParcel = useCallback((parcelId: string) => {
+    setSelectedTaxParcels((prev) => {
+      if (!prev[parcelId]) return prev;
+      const next = { ...prev };
+      delete next[parcelId];
+      return next;
+    });
   }, []);
 
   const handleViewStateChange = useCallback((viewState: MapViewState) => {
@@ -1023,10 +1319,25 @@ export function MapTab({ project }: MapTabProps) {
     return mapBounds.map((value) => value.toFixed(5)).join('|');
   }, [mapBounds]);
 
+  const countyParcelBoundsKey = useMemo(() => {
+    if (!mapBounds || !resolvedCounty) return '';
+    return `${resolvedCounty}:${mapBounds.map((value) => value.toFixed(5)).join('|')}`;
+  }, [mapBounds, resolvedCounty]);
+
   const [parcelCollection, setParcelCollection] = useState<FeatureCollection | null>(null);
   const lastParcelKeyRef = useRef<string>('');
+  const lastCountyParcelKeyRef = useRef<string>('');
+  const countyParcelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    lastCountyParcelKeyRef.current = '';
+    setTaxParcels(null);
+    setSelectedTaxParcels({});
+    setTaxError(null);
+  }, [resolvedCounty]);
+
+  useEffect(() => {
+    if (!isLosAngelesCounty) return;
     if (mapZoom < PARCEL_MIN_ZOOM || !mapBounds) return;
     if (!parcelBoundsKey) return;
     if (lastParcelKeyRef.current === parcelBoundsKey) return;
@@ -1051,7 +1362,78 @@ export function MapTab({ project }: MapTabProps) {
     return () => {
       active = false;
     };
-  }, [mapZoom, mapBounds, parcelBoundsKey]);
+  }, [mapZoom, mapBounds, parcelBoundsKey, isLosAngelesCounty]);
+
+  useEffect(() => {
+    if (!resolvedCounty) return;
+    if (!taxParcelsLayerVisible) return;
+    if (mapZoom < COUNTY_PARCEL_MIN_ZOOM || !mapBounds) {
+      setTaxParcels(null);
+      return;
+    }
+    if (!countyParcelBoundsKey) return;
+    if (lastCountyParcelKeyRef.current === countyParcelBoundsKey) return;
+
+    if (countyParcelTimerRef.current) {
+      clearTimeout(countyParcelTimerRef.current);
+    }
+
+    let active = true;
+    countyParcelTimerRef.current = setTimeout(() => {
+      const loadCountyParcels = async () => {
+        setTaxLoading(true);
+        setTaxError(null);
+        try {
+          const result = await queryParcelsByBounds(
+            resolvedCounty,
+            mapBounds,
+            getAuthHeaders()
+          );
+          if (!active) return;
+          const normalized = normalizeParcelFeatureCollection(result);
+          setTaxParcels(normalized);
+          lastCountyParcelKeyRef.current = countyParcelBoundsKey;
+        } catch (error) {
+          if (!active) return;
+          console.warn('Failed to fetch county parcels:', error);
+          setTaxParcels(null);
+          setTaxError('Unable to load county parcels');
+        } finally {
+          if (active) setTaxLoading(false);
+        }
+      };
+
+      void loadCountyParcels();
+    }, 300);
+
+    return () => {
+      active = false;
+      if (countyParcelTimerRef.current) {
+        clearTimeout(countyParcelTimerRef.current);
+      }
+    };
+  }, [
+    resolvedCounty,
+    taxParcelsLayerVisible,
+    mapZoom,
+    mapBounds,
+    countyParcelBoundsKey,
+    getAuthHeaders,
+    COUNTY_PARCEL_MIN_ZOOM,
+  ]);
+
+  const selectedParcelList = useMemo(
+    () => selectedTaxParcelIds.map((id) => selectedTaxParcels[id]).filter(Boolean),
+    [selectedTaxParcelIds, selectedTaxParcels]
+  );
+
+  const totalSelectedAcres = useMemo(() => {
+    return selectedParcelList.reduce((sum, feature) => {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const acres = getParcelAcresFromProps(props);
+      return sum + (acres ?? 0);
+    }, 0);
+  }, [selectedParcelList]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Loading indicator
@@ -1062,6 +1444,25 @@ export function MapTab({ project }: MapTabProps) {
 
   // Layer state wrapper for MapCanvas
   const layerState = useMemo(() => ({ groups: layers }), [layers]);
+  const panelLayerState = useMemo(() => {
+    const filteredGroups = layers
+      .map((group) => {
+        let filteredLayers = group.layers.map((layer) => ({ ...layer, disabled: false }));
+        if (!isDevelopmentProject) {
+          filteredLayers = filteredLayers.filter((layer) => layer.id !== 'plan-parcels');
+        }
+        filteredLayers = filteredLayers.filter((layer) => {
+          if (layer.id === 'tax-parcels') return true;
+          return layer.count === undefined || layer.count > 0;
+        });
+        return {
+          ...group,
+          layers: filteredLayers,
+        };
+      })
+      .filter((group) => group.layers.length > 0);
+    return { groups: filteredGroups };
+  }, [layers, isDevelopmentProject, resolvedCounty]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
@@ -1072,11 +1473,122 @@ export function MapTab({ project }: MapTabProps) {
       {/* ─── Sidebar: Layers + Draw Tools ─── */}
       <div className="map-tab-sidebar">
         <LayerPanel
-          layers={layerState}
+          layers={panelLayerState}
           onToggleLayer={handleToggleLayer}
           onToggleGroup={handleToggleGroup}
           onZoomToLayer={handleZoomToLayer}
         />
+        <div className="map-tab-parcel-panel">
+          <div className="map-tab-panel-header">
+            <div>
+              <div className="map-tab-panel-title">County Parcels</div>
+              <div className="map-tab-panel-subtitle">
+                {resolvedCountyLabel}
+              </div>
+            </div>
+            {!resolvedCounty && (
+              <button
+                type="button"
+                className="map-tab-panel-action"
+                onClick={() => setIsCountyPromptOpen(true)}
+              >
+                Select
+              </button>
+            )}
+          </div>
+          <div className="map-tab-panel-body">
+            {!resolvedCounty && (
+              <div className="map-tab-panel-message">
+                Select Maricopa or Pinal County to enable parcel overlays.
+              </div>
+            )}
+            {resolvedCounty && (
+              <>
+                {!taxParcelsLayerVisible && (
+                  <div className="map-tab-panel-message">
+                    Enable the Tax Parcels layer to view parcels and select boundaries.
+                  </div>
+                )}
+                {taxLoading && (
+                  <div className="map-tab-panel-message">Loading parcels…</div>
+                )}
+                {taxError && (
+                  <div className="map-tab-panel-error">{taxError}</div>
+                )}
+                <div className="map-tab-parcel-summary">
+                  <div className="map-tab-parcel-metric">
+                    <span>Selected</span>
+                    <strong>{selectedTaxParcelIds.length}</strong>
+                  </div>
+                  <div className="map-tab-parcel-metric">
+                    <span>Total Acres</span>
+                    <strong>{totalSelectedAcres.toFixed(2)}</strong>
+                  </div>
+                </div>
+                {selectedParcelList.length === 0 ? (
+                  <div className="map-tab-panel-message">
+                    Click parcels on the map to add them to the boundary.
+                  </div>
+                ) : (
+                  <div className="map-tab-parcel-list">
+                    {selectedParcelList.map((feature, index) => {
+                      const props = (feature.properties ?? {}) as Record<string, unknown>;
+                      const parcelId = getParcelIdFromProps(props, feature.id);
+                      const address = getParcelAddressFromProps(props);
+                      const addressLines = splitAddressLines(address);
+                      const acres = getParcelAcresFromProps(props);
+                      return (
+                        <div
+                          key={parcelId || feature.id?.toString() || `parcel-${index}`}
+                          className="map-tab-parcel-item"
+                        >
+                          <div className="map-tab-parcel-meta">
+                            <div className="map-tab-parcel-id">{parcelId || 'Parcel'}</div>
+                            {addressLines ? (
+                              <div className="map-tab-parcel-address">
+                                <div>{addressLines.line1}</div>
+                                {addressLines.line2 && <div>{addressLines.line2}</div>}
+                              </div>
+                            ) : address ? (
+                              <div className="map-tab-parcel-address">{address}</div>
+                            ) : null}
+                          </div>
+                          <div className="map-tab-parcel-actions">
+                            <div className="map-tab-parcel-acres">
+                              {acres != null ? `${acres.toFixed(2)} ac` : '—'}
+                            </div>
+                            {parcelId && (
+                              <button
+                                type="button"
+                                className="map-tab-parcel-remove"
+                                onClick={() => handleRemoveSelectedParcel(parcelId)}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {parcelSelectionError && (
+                  <div className="map-tab-panel-error">{parcelSelectionError}</div>
+                )}
+                <div className="map-tab-panel-actions">
+                  <CButton
+                    color="primary"
+                    size="sm"
+                    disabled={selectedTaxParcelIds.length === 0 || parcelSelectionSaving}
+                    onClick={handleConfirmBoundary}
+                  >
+                    {parcelSelectionSaving ? 'Saving...' : 'Confirm Boundary'}
+                  </CButton>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
         <div className="map-tab-tools">
           <div className="map-tab-tools-header">Draw / Measure</div>
           <DrawToolbar
@@ -1100,6 +1612,7 @@ export function MapTab({ project }: MapTabProps) {
           planParcels={planParcels}
           projectBoundary={projectBoundary}
           taxParcels={taxParcels}
+          selectedTaxParcelIds={selectedTaxParcelIds}
           saleComps={saleComps}
           rentComps={rentComps}
           parcelCollection={parcelCollection}
@@ -1109,6 +1622,7 @@ export function MapTab({ project }: MapTabProps) {
           onMapClick={handleMapClick}
           onRingClick={handleRingClick}
           onFeatureClick={handleFeatureClick}
+          onTaxParcelToggle={handleTaxParcelToggle}
           onViewStateChange={handleViewStateChange}
         />
 
@@ -1252,6 +1766,37 @@ export function MapTab({ project }: MapTabProps) {
         <CModalFooter>
           <CButton color="secondary" variant="outline" onClick={() => setIsRingModalOpen(false)}>
             Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* ─── County Parcel Modal ─── */}
+      <CModal
+        visible={isCountyPromptOpen}
+        onClose={() => setIsCountyPromptOpen(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>Select County</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div style={{ color: 'var(--cui-secondary-color)' }}>
+            {countyPromptMessage}
+          </div>
+        </CModalBody>
+        <CModalFooter className="d-flex flex-wrap gap-2">
+          {countyOptions.map((county) => (
+            <CButton
+              key={county}
+              color="primary"
+              variant={resolvedCounty === county ? undefined : 'outline'}
+              onClick={() => handleSelectCounty(county)}
+            >
+              {formatCountyLabel(county)}
+            </CButton>
+          ))}
+          <CButton color="secondary" variant="outline" onClick={() => setIsCountyPromptOpen(false)}>
+            Cancel
           </CButton>
         </CModalFooter>
       </CModal>

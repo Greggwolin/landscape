@@ -40,12 +40,13 @@ export function LayerPanel({
             {group.expanded && (
               <div className="layer-group-items">
                 {group.layers.map((layer) => (
-                  <div key={layer.id} className="layer-item">
-                    <label className="layer-item-label">
+                  <div key={layer.id} className={`layer-item ${layer.disabled ? 'disabled' : ''}`}>
+                    <label className={`layer-item-label ${layer.disabled ? 'disabled' : ''}`}>
                       <input
                         type="checkbox"
                         checked={layer.visible}
                         onChange={() => onToggleLayer(group.id, layer.id)}
+                        disabled={layer.disabled}
                         className="layer-item-checkbox"
                       />
                       <span
@@ -53,10 +54,11 @@ export function LayerPanel({
                         style={{ backgroundColor: layer.color }}
                       />
                       <span
-                        className="layer-item-name"
+                        className={`layer-item-name ${layer.disabled ? 'disabled' : ''}`}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          if (layer.disabled) return;
                           onZoomToLayer(group.id, layer.id);
                         }}
                       >

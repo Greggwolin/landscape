@@ -9,6 +9,7 @@ import { formatMoney } from '@/utils/formatters/number';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 interface MarketCompetitorProduct {
   lot_width_ft?: number | null;
@@ -276,6 +277,14 @@ export default function MarketMapView({
           ? `${formatShortCurrency(comp.price_min ?? null)}-${formatShortCurrency(comp.price_max ?? null)}`
           : '—';
         const lastSalePrice = getLastSalePrice(comp);
+        const addressLines = splitAddressLines(comp.comp_address);
+        const addressHtml = addressLines
+          ? `<div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 2px;">${escapeHtml(addressLines.line1)}</div>${
+            addressLines.line2
+              ? `<div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 6px;">${escapeHtml(addressLines.line2)}</div>`
+              : ''
+          }`
+          : '';
 
         el.addEventListener('click', (event) => {
           event.stopPropagation();
@@ -291,7 +300,7 @@ export default function MarketMapView({
               `<div style="padding: 10px; color: var(--cui-body-color);">
                 <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--cui-body-color);">${comp.comp_name}</div>
                 ${comp.builder_name ? `<div style="font-size: 12px; color: var(--cui-secondary-color); margin-bottom: 4px;">${comp.builder_name}</div>` : ''}
-                ${comp.comp_address ? `<div style="font-size: 11px; color: var(--cui-secondary-color); margin-bottom: 6px;">${comp.comp_address}</div>` : ''}
+                ${addressHtml}
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px;">
                   <div><span style="color: var(--cui-secondary-color);">${lotDisplay.label}:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${lotDisplay.value}</span></div>
                   <div><span style="color: var(--cui-secondary-color);">Units:</span> <span style="font-weight: 600; color: var(--cui-body-color);">${comp.total_units?.toLocaleString() || '—'}</span></div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { CCard, CCardHeader, CCardBody } from '@coreui/react';
+import { CCard, CCardHeader, CCardBody, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CButton, CFormInput, CFormLabel } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilLayers, cilTrash, cilActionRedo, cilPlus } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
@@ -60,12 +60,11 @@ function DMSViewInner({
   const { stageFiles, setDocTypes, stagedFiles } = useUploadStaging();
   const prevHadStagedRef = useRef(false);
 
-  // "+ Add Type" inline input state
-  const [isAddingType, setIsAddingType] = useState(false);
+  // "+ Add Type" modal state
+  const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [addTypeError, setAddTypeError] = useState<string | null>(null);
   const [isSubmittingType, setIsSubmittingType] = useState(false);
-  const addTypeInputRef = useRef<HTMLInputElement>(null);
 
   // Save-to-template prompt state
   const [saveToTemplatePrompt, setSaveToTemplatePrompt] = useState<{
@@ -691,22 +690,15 @@ function DMSViewInner({
     setSelectedDocIds(new Set(trashedDocuments.map((doc) => doc.doc_id)));
   };
 
-  // ─── "+ Add Type" handlers ───────────────────────────────────────
-  const handleStartAddType = useCallback(() => {
-    setIsAddingType(true);
+  // ─── "+ Add Type" modal handlers ─────────────────────────────────
+  const handleOpenAddTypeModal = useCallback(() => {
     setNewTypeName('');
     setAddTypeError(null);
-    // Auto-focus happens via useEffect below
+    setIsAddTypeModalOpen(true);
   }, []);
 
-  useEffect(() => {
-    if (isAddingType && addTypeInputRef.current) {
-      addTypeInputRef.current.focus();
-    }
-  }, [isAddingType]);
-
-  const handleCancelAddType = useCallback(() => {
-    setIsAddingType(false);
+  const handleCloseAddTypeModal = useCallback(() => {
+    setIsAddTypeModalOpen(false);
     setNewTypeName('');
     setAddTypeError(null);
   }, []);
@@ -714,7 +706,7 @@ function DMSViewInner({
   const handleSubmitAddType = useCallback(async () => {
     const trimmed = newTypeName.trim();
     if (!trimmed) {
-      handleCancelAddType();
+      handleCloseAddTypeModal();
       return;
     }
 
@@ -769,7 +761,7 @@ function DMSViewInner({
         },
       ]);
 
-      handleCancelAddType();
+      handleCloseAddTypeModal();
 
       // Show save-to-template prompt if project has an assigned template
       if (projectTemplate) {
@@ -785,7 +777,7 @@ function DMSViewInner({
     } finally {
       setIsSubmittingType(false);
     }
-  }, [newTypeName, allFilters, projectId, handleCancelAddType, projectTemplate]);
+  }, [newTypeName, allFilters, projectId, handleCloseAddTypeModal, projectTemplate]);
 
   const handleDeleteFilter = useCallback(async (customId: number, docTypeName: string) => {
     try {
@@ -1153,7 +1145,7 @@ function DMSViewInner({
                                 </div>
                               </div>
 
-                              {/* + Add Type button / inline input */}
+                              {/* + Add Type button */}
                               <div
                                 className="px-4 py-2 border-t"
                                 style={{
@@ -1161,59 +1153,67 @@ function DMSViewInner({
                                   backgroundColor: 'var(--cui-body-bg)'
                                 }}
                               >
-                                {isAddingType ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 relative">
-                                      <input
-                                        ref={addTypeInputRef}
-                                        type="text"
-                                        className="w-full px-3 py-1.5 text-sm rounded border"
-                                        style={{
-                                          borderColor: addTypeError ? 'var(--cui-danger)' : 'var(--cui-border-color)',
-                                          backgroundColor: 'var(--cui-body-bg)',
-                                          color: 'var(--cui-body-color)',
-                                          outline: 'none',
-                                        }}
-                                        placeholder="New document type..."
-                                        value={newTypeName}
-                                        onChange={(e) => {
-                                          setNewTypeName(e.target.value);
-                                          if (addTypeError) setAddTypeError(null);
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            void handleSubmitAddType();
-                                          } else if (e.key === 'Escape') {
-                                            handleCancelAddType();
-                                          }
-                                        }}
-                                        disabled={isSubmittingType}
-                                      />
-                                      {addTypeError && (
-                                        <p className="text-xs mt-0.5" style={{ color: 'var(--cui-danger)' }}>
-                                          {addTypeError}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {isSubmittingType && (
-                                      <div
-                                        className="animate-spin rounded-full h-4 w-4 border-2"
-                                        style={{ borderColor: 'var(--cui-primary)', borderTopColor: 'transparent' }}
-                                      />
-                                    )}
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={handleStartAddType}
-                                    className="flex items-center gap-1.5 text-sm py-1 transition-colors hover:opacity-80"
-                                    style={{ color: 'var(--cui-secondary-color)' }}
-                                  >
-                                    <CIcon icon={cilPlus} className="w-4 h-4" />
-                                    + Add Type
-                                  </button>
-                                )}
+                                <button
+                                  onClick={handleOpenAddTypeModal}
+                                  className="flex items-center gap-1.5 text-sm py-1 transition-colors hover:opacity-80"
+                                  style={{ color: 'var(--cui-secondary-color)' }}
+                                >
+                                  <CIcon icon={cilPlus} className="w-4 h-4" />
+                                  + Add Type
+                                </button>
                               </div>
+
+                              {/* Add Type Modal */}
+                              <CModal
+                                visible={isAddTypeModalOpen}
+                                onClose={handleCloseAddTypeModal}
+                                alignment="center"
+                                size="sm"
+                              >
+                                <CModalHeader>
+                                  <CModalTitle>Add Document Type</CModalTitle>
+                                </CModalHeader>
+                                <CModalBody>
+                                  <CFormLabel htmlFor="newDocTypeName">Type Name</CFormLabel>
+                                  <CFormInput
+                                    id="newDocTypeName"
+                                    type="text"
+                                    placeholder="e.g. Offering, Leases, Title & Survey"
+                                    value={newTypeName}
+                                    onChange={(e) => {
+                                      setNewTypeName(e.target.value);
+                                      if (addTypeError) setAddTypeError(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        void handleSubmitAddType();
+                                      }
+                                    }}
+                                    disabled={isSubmittingType}
+                                    invalid={!!addTypeError}
+                                    feedbackInvalid={addTypeError || undefined}
+                                    autoFocus
+                                  />
+                                </CModalBody>
+                                <CModalFooter>
+                                  <CButton
+                                    color="secondary"
+                                    variant="ghost"
+                                    onClick={handleCloseAddTypeModal}
+                                    disabled={isSubmittingType}
+                                  >
+                                    Cancel
+                                  </CButton>
+                                  <CButton
+                                    color="primary"
+                                    onClick={() => void handleSubmitAddType()}
+                                    disabled={isSubmittingType || !newTypeName.trim()}
+                                  >
+                                    {isSubmittingType ? 'Adding...' : 'Add Type'}
+                                  </CButton>
+                                </CModalFooter>
+                              </CModal>
 
                               {/* Save-to-template prompt */}
                               {saveToTemplatePrompt && (

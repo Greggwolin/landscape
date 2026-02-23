@@ -287,6 +287,76 @@
 }
 
 /* ==========================================================================
+   COMPACT NAV TILES — Integrated into ActiveProjectBar
+   Monochrome, stretch to fill bar height, token-driven colors.
+   Replaces Row 1 folder tabs in the new layout.
+   ========================================================================== */
+
+.bar-nav-tiles {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.bar-nav-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--nav-tile-color);
+  background: var(--nav-tile-bg);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.bar-nav-tile:hover {
+  background: var(--nav-tile-hover-bg);
+  color: var(--nav-tile-hover-color);
+}
+
+.bar-nav-tile:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cui-focus-ring-color) inset;
+}
+
+.bar-nav-tile.active {
+  background: var(--nav-tile-active-bg);
+  color: var(--nav-tile-active-color);
+  font-weight: 600;
+  border-color: var(--nav-tile-active-border);
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
+}
+
+/* Two-line tile variant (e.g. "Development / Sales") */
+.bar-nav-tile-lines {
+  flex-direction: column;
+  line-height: 1.15;
+  padding: 0.2rem 0.5rem;
+}
+
+.bar-nav-tile-primary {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.bar-nav-tile-secondary {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* ==========================================================================
    ROW 2: SUB-TABS - Extend Full Width
    ========================================================================== */
 
@@ -438,11 +508,34 @@
   overflow: hidden;
 }
 
+/* ── Subtab CCard header: standard height, darker CCardHeader shading ── */
+.project-subtab-header {
+  padding: 0 !important;
+  min-height: 41px;
+}
+
+/* When subtabs are in a CCardHeader, the header border-bottom
+   serves as the visual separator — remove the row2 duplicate */
+.project-subtab-header .folder-tabs-row2 {
+  border-bottom: none;
+  box-shadow: none;
+  min-height: 41px;
+  background: transparent;
+}
+
 .project-folder-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  /* top/left/right: 0 — layout container --app-padding handles edges,
+     splitter provides left gap. bottom: 0.5rem for scroll clearance. */
+  padding: 0 0 0.5rem 0;
   background-color: transparent;
+}
+
+/* Cards inside folder content already get spacing from flex gap;
+   zero out the global .card margin-bottom to prevent doubling */
+.project-folder-content .card {
+  margin-bottom: 0;
 }
 
 /* Sales tab - use white background throughout */

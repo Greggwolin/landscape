@@ -170,7 +170,7 @@ class Database:
             cur.execute(
                 """
                 SELECT geo_id, geo_level, geo_name, state_fips, county_fips,
-                       place_fips, cbsa_code, parent_geo_id, hierarchy
+                       place_fips, cbsa_code, tract_fips, parent_geo_id, hierarchy
                 FROM public.geo_xwalk
                 WHERE geo_level = 'CITY'
                   AND lower(usps_city) = lower(%s)
@@ -190,6 +190,7 @@ class Database:
             county_fips=row.get("county_fips"),
             place_fips=row.get("place_fips"),
             cbsa_code=row.get("cbsa_code"),
+            tract_fips=row.get("tract_fips"),
             parent_geo_id=row.get("parent_geo_id"),
             hierarchy=row.get("hierarchy") or {},
         )

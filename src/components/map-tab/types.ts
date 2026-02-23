@@ -62,6 +62,7 @@ export interface LayerItem {
   id: string;
   label: string;
   visible: boolean;
+  disabled?: boolean;
   count?: number;
   color?: string;
   data?: unknown[];
@@ -131,6 +132,7 @@ export interface MapCanvasProps {
   planParcels?: GeoJSON.FeatureCollection | null;
   projectBoundary?: GeoJSON.Feature | null;
   taxParcels?: GeoJSON.FeatureCollection | null;
+  selectedTaxParcelIds?: string[];
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;
   parcelCollection?: GeoJSON.FeatureCollection | null;
@@ -140,6 +142,7 @@ export interface MapCanvasProps {
   onMapClick?: (coordinates: [number, number]) => void;
   onRingClick?: (radius: number, lngLat: [number, number]) => void;
   onFeatureClick?: (feature: MapFeature) => void;
+  onTaxParcelToggle?: (feature: GeoJSON.Feature) => void;
   onFeatureCreate?: (geometry: GeoJSON.Geometry, type: FeatureType) => void;
   onViewStateChange?: (viewState: MapViewState) => void;
 }

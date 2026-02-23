@@ -1,10 +1,18 @@
 'use client';
 
 /**
- * ProjectProfileTile Component
+ * ProjectProfileTile Component — v2.0 (Two-Column Grid)
  *
- * Displays project profile metadata in a left-side summary panel
- * Shows all core project information with an EDIT button
+ * Displays project profile metadata in a two-column CSS grid layout.
+ * Field order matches approved mockup:
+ *   Line 1: Project Name | Address (2-line)
+ *   Line 2: Total Units | Gross Acres
+ *   Line 3: County | Market
+ *   Line 4: APN | Ownership
+ *   Line 5: Property Type | Subtype
+ *   Line 6: Perspective | Purpose
+ *   Line 7: Asking Price | Analysis Start Date
+ *   Line 8: Photos | (empty)
  */
 
 import React, { useState, useCallback } from 'react';
@@ -42,6 +50,25 @@ interface ProjectProfileTileProps {
 
 const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
 
+/** Format a two-line address: street on line 1, city/state/zip on line 2 */
+function formatAddress(profile: ProjectProfile): React.ReactNode | undefined {
+  const street = profile.address;
+  const parts = [profile.city, profile.state, profile.zip_code].filter(Boolean);
+  const cityLine = parts.length > 0
+    ? `${profile.city || ''}${profile.city && profile.state ? ', ' : ''}${profile.state || ''} ${profile.zip_code || ''}`.trim()
+    : '';
+
+  if (!street && !cityLine) return undefined;
+
+  return (
+    <>
+      {street && <>{street}</>}
+      {street && cityLine && <br />}
+      {cityLine && <>{cityLine}</>}
+    </>
+  );
+}
+
 export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectId }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [showPhotosModal, setShowPhotosModal] = useState(false);
@@ -77,24 +104,19 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
 
   // Listen for Landscaper field updates and auto-refresh
   const handleFieldUpdate = useCallback(() => {
-    mutate(); // Refresh profile data when Landscaper updates fields
-    refreshProjects(); // Also refresh global project list
+    mutate();
+    refreshProjects();
   }, [mutate, refreshProjects]);
 
   useFieldRefreshListener(projectId, handleFieldUpdate);
 
-  const handleEditClick = () => {
-    setIsEditModalOpen(true);
-  };
-
-  const handleModalClose = () => {
-    setIsEditModalOpen(false);
-  };
+  const handleEditClick = () => setIsEditModalOpen(true);
+  const handleModalClose = () => setIsEditModalOpen(false);
 
   const handleSaveSuccess = () => {
-    mutate(); // Refresh the profile data
-    mutatePriceSummary(); // Refresh the acquisition price summary
-    refreshProjects(); // Refresh the global projects list (for Dashboard, map, etc.)
+    mutate();
+    mutatePriceSummary();
+    refreshProjects();
     setIsEditModalOpen(false);
   };
 
@@ -109,53 +131,22 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
     }).format(value);
   };
 
-  // Render acquisition price section
-  const renderAcquisitionPriceSection = () => {
-    if (!priceSummary) return null;
-
+  // Determine acquisition price label & value
+  const getAcquisitionDisplay = (): { label: string; value: string | undefined } => {
+    if (!priceSummary) return { label: 'Asking Price', value: undefined };
     const { has_closing_date, total_acquisition_cost, asking_price } = priceSummary;
-
-    // If we have a calculated total (closing date exists), show read-only
     if (has_closing_date && total_acquisition_cost !== null) {
-      return (
-        <div
-          className="d-flex gap-3 py-2 border-bottom"
-          style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
-        >
-          <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
-            Acquisition Cost
-          </span>
-          <span style={{ color: 'var(--cui-secondary-color)' }}>
-            {formatCurrency(total_acquisition_cost)}
-            <small className="text-muted ms-2" style={{ fontSize: '0.75rem' }}>(from ledger)</small>
-          </span>
-        </div>
-      );
+      return { label: 'Acquisition Cost', value: formatCurrency(total_acquisition_cost) };
     }
-
-    // Otherwise, show asking price (editable via modal)
-    return (
-      <div
-        className="d-flex gap-3 py-2 border-bottom"
-        style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
-      >
-        <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
-          Asking Price
-        </span>
-        <span style={{ color: 'var(--cui-secondary-color)' }}>
-          {asking_price ? formatCurrency(asking_price) : <span className="text-muted fst-italic">Not specified</span>}
-        </span>
-      </div>
-    );
+    return { label: 'Asking Price', value: asking_price ? formatCurrency(asking_price) : undefined };
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <CCard className="project-profile-tile">
         <CCardHeader className="d-flex align-items-center justify-content-between">
-          <div className="d-flex justify-content-between align-items-center">
-            <span className="fw-semibold">Project Profile</span>
-          </div>
+          <span className="fw-semibold">Project Profile</span>
         </CCardHeader>
         <CCardBody>
           <div className="text-center text-muted py-4">Loading...</div>
@@ -164,34 +155,28 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
     );
   }
 
+  // Error state
   if (error || !profile) {
     return (
       <CCard className="project-profile-tile">
         <CCardHeader className="d-flex align-items-center justify-content-between">
-          <div className="d-flex justify-content-between align-items-center">
-            <span className="fw-semibold">Project Profile</span>
-          </div>
+          <span className="fw-semibold">Project Profile</span>
         </CCardHeader>
         <CCardBody>
-          <div className="text-center text-danger py-4">
-            Failed to load project profile
-          </div>
+          <div className="text-center text-danger py-4">Failed to load project profile</div>
         </CCardBody>
       </CCard>
     );
   }
 
+  const acq = getAcquisitionDisplay();
+
   return (
     <>
       <CCard
-        className="mb-3 h-100"
+        className="h-100"
         style={{
-          backgroundColor: 'var(--cui-body-bg)',
-          color: 'var(--cui-body-color)',
-          borderColor: 'var(--cui-border-color)',
-          borderRadius: '0.5rem',
           overflow: 'hidden',
-          height: '100%'
         }}
       >
         <CCardHeader className="d-flex align-items-center justify-content-between">
@@ -214,36 +199,20 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             Edit
           </button>
         </CCardHeader>
-        <CCardBody className="px-4 py-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
-          <div className="d-flex flex-column">
+        <CCardBody style={{ padding: 0 }}>
+          <div className="profile-grid">
+            {/* Line 1: Property Type | Subtype */}
             <ProfileField
-              label="Analysis Perspective"
-              value={
-                profile.analysis_perspective
-                  ? PERSPECTIVE_LABELS[profile.analysis_perspective]
-                  : undefined
-              }
+              label="Property Type"
+              value={profile.project_type || profile.project_type_code}
             />
-            <ProfileField
-              label="Analysis Purpose"
-              value={
-                profile.analysis_purpose
-                  ? PURPOSE_LABELS[profile.analysis_purpose]
-                  : undefined
-              }
-            />
-            {profile.value_add_enabled && (
-              <ProfileField
-                label="Value-Add"
-                value="Enabled"
-              />
-            )}
-            <ProfileField
-              label="Project Type"
-              value={profile.property_subtype}
-            />
-            {/* Acquisition Price Section */}
-            {renderAcquisitionPriceSection()}
+            <ProfileField label="Subtype" value={profile.property_subtype} />
+
+            {/* Line 2: Project Name | Address */}
+            <ProfileField label="Project Name" value={profile.project_name} />
+            <ProfileField label="Address" value={formatAddress(profile)} />
+
+            {/* Line 3: Units | Gross Acres */}
             <ProfileField
               label={getUnitsLabel(profile)}
               value={getUnitCount(profile) ? formatUnits(getUnitCount(profile)) : undefined}
@@ -252,59 +221,47 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
               label="Gross Acres"
               value={profile.gross_acres ? formatGrossAcres(profile.gross_acres) : undefined}
             />
-            <ProfileField
-              label="Address"
-              value={profile.address}
-            />
-            <ProfileField
-              label="City"
-              value={profile.city}
-            />
-            <ProfileField
-              label="County"
-              value={profile.county}
-            />
-            <ProfileField
-              label="State"
-              value={profile.state}
-            />
-            <ProfileField
-              label="Zip Code"
-              value={profile.zip_code}
-            />
+
+            {/* Line 4: County | Market */}
+            <ProfileField label="County" value={profile.county} />
             <ProfileField
               label="Market"
               value={formatMSADisplay(profile.msa_name, profile.state_abbreviation, profile.market)}
             />
+
+            {/* Line 5: APN | Ownership */}
+            <ProfileField label="APN" value={profile.apn} />
+            <ProfileField label="Ownership" value={profile.ownership_type} />
+
+            {/* Line 6: Perspective | Purpose */}
             <ProfileField
-              label="APN"
-              value={profile.apn}
+              label="Perspective"
+              value={profile.analysis_perspective ? PERSPECTIVE_LABELS[profile.analysis_perspective] : undefined}
             />
             <ProfileField
-              label="Ownership Type"
-              value={profile.ownership_type}
+              label="Purpose"
+              value={profile.analysis_purpose ? PURPOSE_LABELS[profile.analysis_purpose] : undefined}
             />
-            {/* Property Photos row */}
-            <div
-              className="d-flex gap-3 py-2"
-              style={{ borderColor: 'var(--cui-border-color)', fontSize: '0.9375rem' }}
-            >
-              <span className="fw-semibold" style={{ minWidth: '140px', color: 'var(--cui-body-color)' }}>
-                Property Photos
-              </span>
-              <span className="d-flex align-items-center gap-2">
-                <button
-                  type="button"
-                  className="studio-badge-info"
-                  onClick={() => setShowPhotosModal(true)}
-                >
-                  {photoCount > 0 ? 'Photos' : 'Add Photo'}
-                </button>
-                {photoCount > 0 && (
-                  <span style={{ fontSize: '0.7rem', color: 'var(--cui-secondary-color)' }}>{photoCount}</span>
-                )}
-              </span>
-            </div>
+
+            {/* Line 7: Asking Price | Analysis Start Date */}
+            <ProfileField label={acq.label} value={acq.value} />
+            <ProfileField
+              label="Analysis Start"
+              value={profile.analysis_start_date
+                ? new Date(profile.analysis_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : undefined}
+            />
+
+            {/* Line 8: Photos */}
+            <ProfileField label="Photos">
+              <button
+                type="button"
+                className="studio-badge-info"
+                onClick={() => setShowPhotosModal(true)}
+              >
+                {photoCount > 0 ? `Photos (${photoCount})` : 'Add Photo'}
+              </button>
+            </ProfileField>
           </div>
         </CCardBody>
       </CCard>

@@ -31,7 +31,10 @@ import ReportsTab from './components/tabs/ReportsTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import CapitalizationTab from './components/tabs/CapitalizationTab';
 import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
-import RenovationSubTab from './components/tabs/RenovationSubTab';
+// RenovationSubTab: removed from Property sub-tabs, will be integrated into Operations (layout TBD)
+// import RenovationSubTab from './components/tabs/RenovationSubTab';
+import LocationSubTab from './components/tabs/LocationSubTab';
+import MarketSupplySubTab from './components/tabs/MarketSupplySubTab';
 import { MapTab } from '@/components/map-tab';
 import { ICPage } from '@/components/ic/ICPage';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
@@ -123,36 +126,37 @@ function ProjectContentRouter({
 
       // ========================================
       // FOLDER 2: PROPERTY
+      // Income: location, market-supply, property-details, rent-roll, acquisition
       // Land: market, land-use, parcels, acquisition
-      // Income: details, acquisition, market, rent-roll, renovation (VALUE_ADD only)
-      // PropertyTab has working content with controlled activeTab prop
+      // Funnel: Macro Economy → Local Economy → Property Location → Attributes
       // ========================================
       case 'property': {
         // Determine if this is an income property using the same logic as folderTabConfig
-        const effectiveProjectType = project.property_subtype
+        // project_type_code ('RET', 'MF') is the canonical field for category routing
+        const effectiveProjectType = project.project_type_code
           || project.project_type
-          || project.project_type_code;
+          || project.property_subtype;
         const isIncome = isIncomeProperty(effectiveProjectType);
 
         switch (currentTab) {
+          // Location sub-tab - economic indicators + AI analysis (income)
+          case 'location':
+            return <LocationSubTab project={project} />;
+          // Market Supply/Demand sub-tab - property-type supply/demand overview (income)
+          case 'market-supply':
+            return <MarketSupplySubTab project={project} />;
+          // Property Details (formerly "details") - income properties
+          case 'property-details':
+            return <PropertyTab project={project} activeTab="details" />;
+          // Rent Roll - income properties
+          case 'rent-roll':
+            return <PropertyTab project={project} activeTab="rent-roll" />;
           // Acquisition sub-tab - ALL project types
           case 'acquisition':
             return <AcquisitionSubTab project={project} />;
-          // Renovation sub-tab - value-add enabled projects only.
-          case 'renovation':
-            if (!project.value_add_enabled) {
-              return <PropertyTab project={project} activeTab="details" />;
-            }
-            return <RenovationSubTab project={project} />;
-          // Market tab - uses MarketTab which handles both project types
-          // Land Dev: Competitive housing research (Redfin, Zonda), SFD pricing, market map
-          // Income/CRE: Rental comps, floor plans, market assumptions (via PropertyTab)
+          // Market tab - Land Dev only now (competitive housing research)
           case 'market':
             return <MarketTab project={project} />;
-          // Income property subtabs - pass activeTab to PropertyTab (controlled component)
-          case 'details':
-          case 'rent-roll':
-            return <PropertyTab project={project} activeTab={currentTab} />;
           // Land development subtabs
           case 'land-use':
             return <PlanningTab project={project} />;
@@ -163,7 +167,7 @@ function ProjectContentRouter({
             if (!isIncome) {
               return <PlanningTab project={project} />;
             }
-            return <PropertyTab project={project} activeTab="details" />;
+            return <LocationSubTab project={project} />;
         }
       }
 
@@ -206,7 +210,11 @@ function ProjectContentRouter({
       // ValuationTab has internal tab navigation for the 3 valuation approaches
       // ========================================
       case 'valuation':
-        // All subtabs route to ValuationTab - it has internal tab navigation
+        // Market Comps relocated from Property → Valuation/Income Approach
+        if (currentTab === 'market-comps') {
+          return <PropertyTab project={project} activeTab="market" />;
+        }
+        // All other subtabs route to ValuationTab - it has internal tab navigation
         return <ValuationTab project={project} activeTab={currentTab} />;
 
       // ========================================

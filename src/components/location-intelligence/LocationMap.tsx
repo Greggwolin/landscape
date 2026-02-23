@@ -361,6 +361,7 @@ export function LocationMap({
   // Fetch nearby block-group boundaries
   useEffect(() => {
     if (!mapLoaded) return;
+    if (!layers.blockGroups) return;
 
     const controller = new AbortController();
 
@@ -425,6 +426,10 @@ export function LocationMap({
       }
       if (map.current.getSource(BLOCK_GROUP_SOURCE_ID)) {
         map.current.removeSource(BLOCK_GROUP_SOURCE_ID);
+      }
+
+      if (!layers.blockGroups) {
+        return;
       }
 
       if (!blockGroupFeatures || !Array.isArray(blockGroupFeatures.features) || blockGroupFeatures.features.length === 0) {

@@ -6838,6 +6838,42 @@ def get_landscaper_response(
                                 f"{result.get('message', '')}"
                             )
 
+        # ─────────────────────────────────────────────────────────────
+        # AUTO-INGEST: Extract knowledge facts from document-sourced responses
+        # ─────────────────────────────────────────────────────────────
+        try:
+            if tool_calls_made:
+                # Identify document sources used during this response
+                doc_tool_names = {'get_document_content', 'get_document_assertions'}
+                source_docs = set()
+                for call_info in tool_calls_made:
+                    if call_info.get('tool') in doc_tool_names:
+                        doc_id = call_info.get('input', {}).get('doc_id')
+                        if doc_id:
+                            source_docs.add(int(doc_id))
+
+                if source_docs and final_content.strip():
+                    from apps.knowledge.services.ai_fact_extractor import extract_facts_from_response
+                    extraction_result = extract_facts_from_response(
+                        response_text=final_content,
+                        source_context={
+                            'project_id': project_id,
+                            'page_context': page_context,
+                            'document_sources': list(source_docs),
+                            'user_id': project_context.get('user_id'),
+                        }
+                    )
+                    if extraction_result.get('success') and extraction_result.get('facts_created', 0) > 0:
+                        fc = extraction_result['facts_created']
+                        ec = extraction_result['entities_created']
+                        final_content += (
+                            f"\n\n---\n📋 Saved {fc} fact{'s' if fc != 1 else ''} "
+                            f"({ec} propert{'ies' if ec != 1 else 'y'}) to knowledge base"
+                        )
+                        logger.info(f"[Knowledge Ingest] {fc} facts, {ec} entities for project {project_id}")
+        except Exception as e:
+            logger.error(f"[Knowledge Ingest] Auto-ingest failed (non-blocking): {e}", exc_info=True)
+
         # Check if response was truncated due to max_tokens limit
         if response.stop_reason == "max_tokens":
             logger.warning(f"[AI_HANDLER] Response truncated by max_tokens ({MAX_TOKENS}). Output tokens used: {total_output_tokens}")

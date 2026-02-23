@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 interface MapViewProps {
   latitude?: number;
@@ -49,12 +50,18 @@ export default function MapView({
       map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
       // Add marker at location
+      const addressLines = splitAddressLines(address);
+      const addressHtml = addressLines
+        ? `<div style="font-weight: 600;">${escapeHtml(addressLines.line1)}</div>${
+          addressLines.line2 ? `<div style="font-weight: 600;">${escapeHtml(addressLines.line2)}</div>` : ''
+        }`
+        : '<div style="font-weight: 600;">Project Location</div>';
       new maplibregl.Marker({ color: '#0066cc' })
         .setLngLat([longitude, latitude])
         .setPopup(
           new maplibregl.Popup({ offset: 25 }).setHTML(
             `<div style="padding: 8px;">
-              <strong>${address || 'Project Location'}</strong><br/>
+              ${addressHtml}
               <small>${latitude.toFixed(6)}, ${longitude.toFixed(6)}</small>
             </div>`
           )

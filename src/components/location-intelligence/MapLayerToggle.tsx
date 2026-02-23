@@ -50,29 +50,29 @@ const LAYER_OPTIONS: LayerOption[] = [
       </svg>
     ),
   },
-  {
-    key: 'blockGroups',
-    label: 'Parcels / Block Groups',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="7" height="7" />
-        <rect x="14" y="3" width="7" height="7" />
-        <rect x="3" y="14" width="7" height="7" />
-        <rect x="14" y="14" width="7" height="7" />
-      </svg>
-    ),
-  },
-  {
-    key: 'userPoints',
-    label: 'Rental Comparables',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 21h18" />
-        <path d="M5 21V9l4-4 4 4v12" />
-        <path d="M15 21V6l3-2 1 1v16" />
-      </svg>
-    ),
-  },
+  // {
+  //   key: 'blockGroups',
+  //   label: 'Parcels / Block Groups',
+  //   icon: (
+  //     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  //       <rect x="3" y="3" width="7" height="7" />
+  //       <rect x="14" y="3" width="7" height="7" />
+  //       <rect x="3" y="14" width="7" height="7" />
+  //       <rect x="14" y="14" width="7" height="7" />
+  //     </svg>
+  //   ),
+  // },
+  // {
+  //   key: 'userPoints',
+  //   label: 'Rental Comparables',
+  //   icon: (
+  //     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  //       <path d="M3 21h18" />
+  //       <path d="M5 21V9l4-4 4 4v12" />
+  //       <path d="M15 21V6l3-2 1 1v16" />
+  //     </svg>
+  //   ),
+  // },
 ];
 
 const ANNOTATION_TOOLS = [
