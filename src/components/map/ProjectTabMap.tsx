@@ -10,6 +10,7 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useProjectMapData } from '@/lib/map/hooks';
 import useSWRMutation from 'swr/mutation';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 export interface RentalComparable {
   comparable_id: number;
@@ -111,6 +112,14 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
     rentalComparables.forEach((comp, index) => {
       if (comp.latitude && comp.longitude) {
         const markerColor = comparableColors[comp.property_name] || defaultComparableColor;
+        const addressLines = splitAddressLines(comp.address);
+        const addressHtml = addressLines
+          ? `<div style="font-size: 0.85em; color: ${popupAddressColor}; margin-bottom: 2px;">${escapeHtml(addressLines.line1)}</div>${
+            addressLines.line2
+              ? `<div style="font-size: 0.85em; color: ${popupAddressColor}; margin-bottom: 2px;">${escapeHtml(addressLines.line2)}</div>`
+              : ''
+          }`
+          : '';
         base.push({
           id: `comp-${comp.comparable_id}`,
           coordinates: [comp.longitude, comp.latitude] as [number, number],
@@ -118,8 +127,8 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
           stroke: markerStrokeColor,
           label: `${index + 1}`,
           popup: `<div style="padding: 12px; min-width: 180px;">
-            <div style="font-weight: 600; color: ${markerColor}; margin-bottom: 4px; font-size: 0.95em;">${comp.property_name}</div>
-            ${comp.address ? `<div style="font-size: 0.85em; color: ${popupAddressColor}; margin-bottom: 2px;">${comp.address}</div>` : ''}
+            <div style="font-weight: 600; color: ${markerColor}; margin-bottom: 4px; font-size: 0.95em;">${escapeHtml(comp.property_name)}</div>
+            ${addressHtml}
             <div style="font-size: 0.85em; color: ${popupMetaColor};">${comp.bedrooms}BR/${comp.bathrooms}BA · ${comp.avg_sqft?.toLocaleString()} SF</div>
             <div style="font-size: 0.95em; font-weight: 600; color: ${popupPriceColor}; margin-top: 6px;">$${Math.round(comp.asking_rent || 0).toLocaleString()}/mo</div>
             ${comp.distance_miles ? `<div style="font-size: 0.8em; color: ${popupDistanceColor}; margin-top: 4px;">${comp.distance_miles} mi away</div>` : ''}

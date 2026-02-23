@@ -19,6 +19,7 @@ import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
 import type { GoogleBasemapType } from '@/lib/maps/googleBasemaps';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
 // Expose map instance to parent via ref
 export interface MapCanvasRef {
@@ -52,7 +53,8 @@ function safeRemoveSource(m: maplibregl.Map, sourceId: string) {
   if (m.getSource(sourceId)) m.removeSource(sourceId);
 }
 
-const PARCEL_MIN_ZOOM = 17.5;
+const PARCEL_MIN_ZOOM = 15;
+const TAX_PARCEL_MIN_ZOOM = 15;
 const ALL_PARCEL_SOURCE_ID = 'la-parcels-all';
 const SUBJECT_PARCEL_SOURCE_ID = 'la-parcels-subject';
 const COMPS_PARCEL_SOURCE_ID = 'la-parcels-comps';
@@ -95,6 +97,182 @@ const buildParcelColors = () => {
     neutralStroke,
     neutralFill,
   };
+};
+
+const getWhiteStroke = () =>
+  readCssVar('--cui-white') ||
+  readCssVar('--cui-body-color') ||
+  readCssVar('--cui-border-color');
+
+const buildPopoverRows = (rows: Array<{ label: string; value: string }>): string => {
+  return rows
+    .filter((row) => row.value)
+    .map(
+      (row) =>
+        `<div class="map-tab-popover-row"><span class="map-tab-popover-label">${escapeHtml(row.label)}</span><span class="map-tab-popover-value">${escapeHtml(row.value)}</span></div>`
+    )
+    .join('');
+};
+
+const buildPopoverHtml = (
+  title: string,
+  rows: Array<{ label: string; value: string }>
+): string => {
+  const safeTitle = escapeHtml(title);
+  const body = buildPopoverRows(rows);
+
+  return `
+    <div class="map-tab-popover">
+      <div class="map-tab-popover-header">${safeTitle}</div>
+      <div class="map-tab-popover-body">
+        ${body || '<div class="map-tab-popover-empty">No details available</div>'}
+      </div>
+    </div>
+  `;
+};
+
+const buildFloorplanTable = (floorplans: Array<Record<string, unknown>>): string => {
+  if (!floorplans.length) return '<div class="map-tab-popover-empty">No floorplans available</div>';
+
+  const rows = floorplans
+    .map((plan) => {
+      const unitType = escapeHtml(plan.unit_type ?? '');
+      const bedValue = plan.bedrooms != null ? Number(plan.bedrooms) : null;
+      const bathValue = plan.bathrooms != null ? Number(plan.bathrooms) : null;
+      const beds = Number.isFinite(bedValue) ? String(Math.round(bedValue as number)) : '';
+      const baths = Number.isFinite(bathValue)
+        ? Number.isInteger(bathValue as number)
+          ? String(Math.round(bathValue as number))
+          : String(bathValue)
+        : '';
+      const sqft = plan.avg_sqft != null ? escapeHtml(Number(plan.avg_sqft).toLocaleString()) : '';
+      const rentValue = plan.asking_rent ?? plan.effective_rent ?? null;
+      const rent = rentValue != null && Number.isFinite(Number(rentValue))
+        ? `$${Number(rentValue).toLocaleString()}`
+        : '';
+
+      return `
+        <tr>
+          <td>${unitType}</td>
+          <td>${beds}</td>
+          <td>${baths}</td>
+          <td>${sqft}</td>
+          <td>${rent}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="map-tab-popover-table-wrap">
+      <table class="map-tab-popover-table">
+        <thead>
+          <tr>
+            <th>Unit Type</th>
+            <th>Bed</th>
+            <th>Bath</th>
+            <th>SF</th>
+            <th>Rent</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
+};
+
+const getParcelIdFromProps = (
+  props: Record<string, unknown>,
+  featureId?: unknown
+): string => {
+  const candidate =
+    props.parcel_id ??
+    props.tax_parcel_id ??
+    props.PARCELID ??
+    props.APN ??
+    featureId;
+  if (candidate == null) return '';
+  const value = String(candidate).trim();
+  return value;
+};
+
+const resolveParcelProps = (props: Record<string, unknown>): Record<string, unknown> => {
+  const assessor = props.assessor_attrs;
+  if (assessor && typeof assessor === 'object' && !Array.isArray(assessor)) {
+    return assessor as Record<string, unknown>;
+  }
+  return props;
+};
+
+const buildParcelPopupHtml = (rawProps: Record<string, unknown>, parcelId: string): string => {
+  const props = resolveParcelProps(rawProps);
+  const owner = props.owner ?? props.OWNER_NAME ?? props.OWNERNME1 ?? '';
+  const address = props.address ?? props.SITUS_ADDRESS ?? props.SITEADDRESS ?? '';
+  const acresValue = props.acres ?? props.ACRES ?? props.GROSSAC ?? '';
+  const useCode = props.use_code ?? props.USE_CODE ?? props.USECD ?? '';
+  const useDesc = props.use_desc ?? props.USE_DESC ?? props.USEDSCRP ?? '';
+
+  const addressLines = typeof address === 'string' ? splitAddressLines(address) : null;
+  const addressHtml = addressLines
+    ? `
+      <div class="map-tab-popover-address">
+        <div class="map-tab-popover-address-line">${escapeHtml(addressLines.line1)}</div>
+        ${addressLines.line2 ? `<div class="map-tab-popover-address-line">${escapeHtml(addressLines.line2)}</div>` : ''}
+      </div>
+    `
+    : '';
+
+  const rows: Array<{ label: string; value: string }> = [];
+  if (parcelId) rows.push({ label: 'Parcel ID', value: parcelId });
+  if (owner) rows.push({ label: 'Owner', value: String(owner) });
+  if (acresValue !== '' && acresValue != null) {
+    const acresNum = Number(acresValue);
+    rows.push({
+      label: 'Acres',
+      value: Number.isFinite(acresNum) ? acresNum.toFixed(2) : String(acresValue),
+    });
+  }
+  if (useCode) rows.push({ label: 'Use Code', value: String(useCode) });
+  if (useDesc) rows.push({ label: 'Use Desc', value: String(useDesc) });
+
+  const usedKeys = new Set<string>([
+    'owner',
+    'OWNER_NAME',
+    'OWNERNME1',
+    'address',
+    'SITUS_ADDRESS',
+    'SITEADDRESS',
+    'acres',
+    'ACRES',
+    'GROSSAC',
+    'use_code',
+    'USE_CODE',
+    'USECD',
+    'use_desc',
+    'USE_DESC',
+    'USEDSCRP',
+  ]);
+
+  Object.entries(props).forEach(([key, value]) => {
+    if (usedKeys.has(key)) return;
+    if (value == null) return;
+    if (typeof value === 'object') return;
+    rows.push({ label: key, value: String(value) });
+  });
+
+  const rowsHtml = buildPopoverRows(rows);
+
+  return `
+    <div class="map-tab-popover">
+      <div class="map-tab-popover-header">${escapeHtml(parcelId ? `Parcel ${parcelId}` : 'Parcel')}</div>
+      <div class="map-tab-popover-body">
+        ${addressHtml}
+        ${rowsHtml || (!addressHtml ? '<div class="map-tab-popover-empty">No parcel details available</div>' : '')}
+      </div>
+    </div>
+  `;
 };
 
 const splitParcelFeatures = (
@@ -146,6 +324,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     planParcels,
     projectBoundary,
     taxParcels,
+    selectedTaxParcelIds,
     saleComps,
     rentComps,
     parcelCollection,
@@ -155,6 +334,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onMapClick,
     onRingClick,
     onFeatureClick,
+    onTaxParcelToggle,
     onViewStateChange,
   },
   ref
@@ -166,6 +346,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const saleCompMarkersRef = useRef<maplibregl.Marker[]>([]);
   const rentCompMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
 
@@ -179,6 +360,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const onMapClickRef = useRef(onMapClick);
   const onRingClickRef = useRef(onRingClick);
   const onFeatureClickRef = useRef(onFeatureClick);
+  const onTaxParcelToggleRef = useRef(onTaxParcelToggle);
   const onViewStateChangeRef = useRef(onViewStateChange);
 
   useEffect(() => {
@@ -192,6 +374,10 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   useEffect(() => {
     onFeatureClickRef.current = onFeatureClick;
   }, [onFeatureClick]);
+
+  useEffect(() => {
+    onTaxParcelToggleRef.current = onTaxParcelToggle;
+  }, [onTaxParcelToggle]);
 
   useEffect(() => {
     onViewStateChangeRef.current = onViewStateChange;
@@ -429,7 +615,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   }, [mapLoaded, styleRevision, planParcels, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Render Project Boundary (amber, dashed)
+  // Render Project Location (boundary polygon or point fallback)
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -438,10 +624,12 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     const srcId = 'project-boundary-src';
     const lineId = 'project-boundary-line';
     const fillId = 'project-boundary-fill';
+    const pointId = 'project-location-point';
 
     // Clean up previous
     safeRemoveLayer(map.current, lineId);
     safeRemoveLayer(map.current, fillId);
+    safeRemoveLayer(map.current, pointId);
     safeRemoveSource(map.current, srcId);
 
     // Check layer visibility
@@ -449,12 +637,19 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       .find((g) => g.id === 'project-boundary')
       ?.layers.find((l) => l.id === 'site-boundary');
 
-    if (!boundaryLayer?.visible || !projectBoundary) return;
+    if (!boundaryLayer?.visible) return;
+
+    const fallbackPoint: GeoJSON.Feature = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: center },
+      properties: {},
+    };
+    const feature = projectBoundary ?? fallbackPoint;
 
     // Wrap single Feature in a FeatureCollection for the source
     const fc: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: [projectBoundary],
+      features: [feature],
     };
 
     map.current.addSource(srcId, {
@@ -462,32 +657,47 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       data: fc,
     });
 
-    // Subtle fill
-    map.current.addLayer({
-      id: fillId,
-      type: 'fill',
-      source: srcId,
-      paint: {
-        'fill-color': LAYER_COLORS.siteBoundary,
-        'fill-opacity': 0.05,
-      },
-    });
+    const geomType = feature.geometry?.type;
+    if (geomType === 'Polygon' || geomType === 'MultiPolygon') {
+      // Subtle fill
+      map.current.addLayer({
+        id: fillId,
+        type: 'fill',
+        source: srcId,
+        paint: {
+          'fill-color': LAYER_COLORS.siteBoundary,
+          'fill-opacity': 0.05,
+        },
+      });
 
-    // Thick dashed stroke
-    map.current.addLayer({
-      id: lineId,
-      type: 'line',
-      source: srcId,
-      paint: {
-        'line-color': LAYER_COLORS.siteBoundary,
-        'line-width': 3,
-        'line-dasharray': [4, 3],
-        'line-opacity': 0.9,
-      },
-    });
+      // Thick dashed stroke
+      map.current.addLayer({
+        id: lineId,
+        type: 'line',
+        source: srcId,
+        paint: {
+          'line-color': LAYER_COLORS.siteBoundary,
+          'line-width': 3,
+          'line-dasharray': [4, 3],
+          'line-opacity': 0.9,
+        },
+      });
+    } else {
+      map.current.addLayer({
+        id: pointId,
+        type: 'circle',
+        source: srcId,
+        paint: {
+          'circle-color': LAYER_COLORS.siteBoundary,
+          'circle-radius': 6,
+          'circle-stroke-color': LAYER_COLORS.siteBoundary,
+          'circle-stroke-width': 2,
+        },
+      });
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded, styleRevision, projectBoundary, layers]);
+  }, [mapLoaded, styleRevision, projectBoundary, layers, center]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render Tax Parcels (blue, subtle reference overlay)
@@ -499,10 +709,16 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     const srcId = 'tax-parcels-src';
     const fillId = 'tax-parcels-fill';
     const lineId = 'tax-parcels-line';
+    const selectedFillId = 'tax-parcels-selected-fill';
+    const selectedHighlightId = 'tax-parcels-selected-highlight';
+    const selectedLineId = 'tax-parcels-selected-line';
 
     // Clean up previous
     safeRemoveLayer(map.current, fillId);
     safeRemoveLayer(map.current, lineId);
+    safeRemoveLayer(map.current, selectedFillId);
+    safeRemoveLayer(map.current, selectedHighlightId);
+    safeRemoveLayer(map.current, selectedLineId);
     safeRemoveSource(map.current, srcId);
 
     // Check layer visibility
@@ -517,13 +733,21 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       data: taxParcels,
     });
 
+    const whiteStroke = getWhiteStroke();
+
     map.current.addLayer({
       id: fillId,
       type: 'fill',
       source: srcId,
+      minzoom: TAX_PARCEL_MIN_ZOOM,
       paint: {
         'fill-color': LAYER_COLORS.taxParcels,
-        'fill-opacity': 0.05,
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.18,
+          0.08,
+        ],
       },
     });
 
@@ -531,15 +755,120 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       id: lineId,
       type: 'line',
       source: srcId,
+      minzoom: TAX_PARCEL_MIN_ZOOM,
       paint: {
-        'line-color': LAYER_COLORS.taxParcels,
-        'line-width': 1,
-        'line-opacity': 0.5,
+        'line-color': whiteStroke,
+        'line-width': 1.6,
+        'line-opacity': 1,
       },
     });
 
+    const selectedIds = (selectedTaxParcelIds ?? []).filter(Boolean);
+    if (selectedIds.length > 0) {
+      map.current.addLayer({
+        id: selectedFillId,
+        type: 'fill',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'fill-color': LAYER_COLORS.siteBoundary,
+          'fill-opacity': 0.3,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', selectedIds]],
+      });
+
+      map.current.addLayer({
+        id: selectedHighlightId,
+        type: 'line',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': LAYER_COLORS.taxParcels,
+          'line-width': 3.2,
+          'line-opacity': 1,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', selectedIds]],
+      });
+
+      map.current.addLayer({
+        id: selectedLineId,
+        type: 'line',
+        source: srcId,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'line-color': LAYER_COLORS.taxParcels,
+          'line-width': 2,
+          'line-opacity': 1,
+        },
+        filter: ['in', ['get', 'parcel_id'], ['literal', selectedIds]],
+      });
+    }
+
+    let hoveredId: string | number | null = null;
+
+    const handleMove = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      if (!map.current) return;
+      const feature = e.features?.[0];
+      const featureId = feature?.id;
+      if (featureId == null) return;
+      if (hoveredId !== null && hoveredId !== featureId) {
+        map.current.setFeatureState({ source: srcId, id: hoveredId }, { hover: false });
+      }
+      hoveredId = featureId;
+      map.current.setFeatureState({ source: srcId, id: featureId }, { hover: true });
+      map.current.getCanvas().style.cursor = 'pointer';
+    };
+
+    const handleLeave = () => {
+      if (!map.current) return;
+      if (hoveredId !== null) {
+        map.current.setFeatureState({ source: srcId, id: hoveredId }, { hover: false });
+      }
+      hoveredId = null;
+      if (!activeTool) map.current.getCanvas().style.cursor = '';
+    };
+
+    const handleClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      if (!map.current || !e.features?.length) return;
+      const feature = e.features[0];
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const parcelId = getParcelIdFromProps(props, feature.id);
+      if (!parcelId) return;
+
+      if (onTaxParcelToggleRef.current) {
+        onTaxParcelToggleRef.current({
+          type: 'Feature',
+          geometry: feature.geometry as GeoJSON.Geometry,
+          properties: props,
+          id: feature.id ?? parcelId,
+        });
+      }
+
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: true,
+        className: 'map-tab-popover',
+        maxWidth: '320px',
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(buildParcelPopupHtml(props, parcelId))
+        .addTo(map.current);
+    };
+
+    map.current.on('mousemove', fillId, handleMove);
+    map.current.on('mouseleave', fillId, handleLeave);
+    map.current.on('click', fillId, handleClick);
+
+    return () => {
+      if (!map.current) return;
+      map.current.off('mousemove', fillId, handleMove);
+      map.current.off('mouseleave', fillId, handleLeave);
+      map.current.off('click', fillId, handleClick);
+    };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapLoaded, styleRevision, taxParcels, layers]);
+  }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, activeTool]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // LA County Parcel Overlays (subject + comps)
@@ -549,6 +878,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     if (!map.current || !mapLoaded) return;
 
     const colors = buildParcelColors();
+    const whiteStroke = getWhiteStroke();
 
     const removeParcelLayers = () => {
       safeRemoveLayer(map.current!, ALL_PARCEL_FILL_ID);
@@ -591,7 +921,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         paint: {
           'fill-color': colors.neutralFill,
           'fill-opacity': 0.2,
-          'fill-outline-color': colors.neutralStroke,
+          'fill-outline-color': whiteStroke,
         },
       });
       map.current.addLayer({
@@ -600,8 +930,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         source: ALL_PARCEL_SOURCE_ID,
         minzoom: PARCEL_MIN_ZOOM,
         paint: {
-          'line-color': colors.neutralStroke,
-          'line-width': 1.8,
+          'line-color': whiteStroke,
+          'line-width': 1.6,
           'line-opacity': 0.9,
         },
       });
@@ -675,12 +1005,17 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       const apn = props.APN || props.apn || '';
       const ain = props.AIN || props.ain || '';
       const address = props.SitusFullAddress || props.situs_full_address || props.address || '';
+      const addressLines = typeof address === 'string' ? splitAddressLines(address) : null;
       const useDesc = props.UseDescription || props.use_description || '';
 
       const rows: string[] = [];
       if (apn) rows.push(`<strong>APN:</strong> ${apn}`);
       if (ain) rows.push(`<strong>AIN:</strong> ${ain}`);
-      if (address) rows.push(`<strong>Address:</strong> ${address}`);
+      if (addressLines) {
+        const line1 = escapeHtml(addressLines.line1);
+        const line2 = addressLines.line2 ? `<br/>${escapeHtml(addressLines.line2)}` : '';
+        rows.push(`${line1}${line2}`);
+      }
       if (useDesc) rows.push(`<strong>Use:</strong> ${useDesc}`);
       if (rows.length === 0) {
         rows.push('<em>No parcel details available</em>');
@@ -811,26 +1146,27 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       if (!map.current) return;
       const props = (feature.properties ?? {}) as Record<string, unknown>;
       const color = (props.color as string) || LAYER_COLORS.saleComps;
-      const popupHtml = props.popup_html || props.popupHtml;
+      const name = typeof props.name === 'string' ? props.name : '';
+      const price = Number(props.price ?? 0);
+      const pricePerUnit = Number(props.price_per_unit ?? 0);
+      const dateValue = props.date ? new Date(String(props.date)).toLocaleDateString() : '';
+      const typeValue = typeof props.type === 'string' ? props.type : '';
 
       const popup = new maplibregl.Popup({
         closeButton: true,
-        closeOnClick: true,
-        className: 'map-tab-popup',
+        closeOnClick: false,
+        className: 'map-tab-popover',
         maxWidth: '320px',
       });
 
-      if (popupHtml) {
-        popup.setHTML(String(popupHtml));
-      } else {
-        const rows: string[] = [];
-        if (props.name) rows.push(`<strong>${props.name}</strong>`);
-        if (props.price) rows.push(`Price: $${Number(props.price).toLocaleString()}`);
-        if (props.price_per_unit) rows.push(`$/Unit: $${Number(props.price_per_unit).toLocaleString()}`);
-        if (props.date) rows.push(`Date: ${props.date}`);
-        if (props.type) rows.push(`Type: ${props.type}`);
-        popup.setHTML(`<div class="map-tab-popup-content">${rows.length ? rows.join('<br/>') : '<em>No comp details</em>'}</div>`);
-      }
+      popup.setHTML(
+        buildPopoverHtml(name ? `Sale Comp: ${name}` : 'Sale Comp', [
+          { label: 'Price', value: Number.isFinite(price) && price > 0 ? `$${price.toLocaleString()}` : '' },
+          { label: '$/Unit', value: Number.isFinite(pricePerUnit) && pricePerUnit > 0 ? `$${pricePerUnit.toLocaleString()}` : '' },
+          { label: 'Date', value: dateValue },
+          { label: 'Type', value: typeValue },
+        ])
+      );
 
       const markerEl = document.createElement('div');
       markerEl.className = 'map-tab-marker';
@@ -857,41 +1193,28 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       if (!e.features?.length || !map.current) return;
       const props = e.features[0].properties || {};
 
-      const popupHtml = props.popup_html || props.popupHtml;
-      if (popupHtml) {
-        popupRef.current?.remove();
-        popupRef.current = new maplibregl.Popup({
-          closeButton: true,
-          closeOnClick: true,
-          className: 'map-tab-popup',
-          maxWidth: '320px',
-        })
-          .setLngLat(e.lngLat)
-          .setHTML(String(popupHtml))
-          .addTo(map.current);
-        return;
-      }
-
-      const rows: string[] = [];
-      if (props.name) rows.push(`<strong>${props.name}</strong>`);
-      if (props.price) rows.push(`Price: $${Number(props.price).toLocaleString()}`);
-      if (props.price_per_unit) rows.push(`$/Unit: $${Number(props.price_per_unit).toLocaleString()}`);
-      if (props.date) rows.push(`Date: ${props.date}`);
-      if (props.type) rows.push(`Type: ${props.type}`);
-
-      if (rows.length === 0) {
-        rows.push('<em>No comp details</em>');
-      }
+      const name = typeof props.name === 'string' ? props.name : '';
+      const price = Number(props.price ?? 0);
+      const pricePerUnit = Number(props.price_per_unit ?? 0);
+      const dateValue = props.date ? new Date(String(props.date)).toLocaleDateString() : '';
+      const typeValue = typeof props.type === 'string' ? props.type : '';
 
       popupRef.current?.remove();
       popupRef.current = new maplibregl.Popup({
         closeButton: true,
-        closeOnClick: true,
-        className: 'map-tab-popup',
-        maxWidth: '280px',
+        closeOnClick: false,
+        className: 'map-tab-popover',
+        maxWidth: '320px',
       })
         .setLngLat(e.lngLat)
-        .setHTML(`<div class="map-tab-popup-content">${rows.join('<br/>')}</div>`)
+        .setHTML(
+          buildPopoverHtml(name ? `Sale Comp: ${name}` : 'Sale Comp', [
+            { label: 'Price', value: Number.isFinite(price) && price > 0 ? `$${price.toLocaleString()}` : '' },
+            { label: '$/Unit', value: Number.isFinite(pricePerUnit) && pricePerUnit > 0 ? `$${pricePerUnit.toLocaleString()}` : '' },
+            { label: 'Date', value: dateValue },
+            { label: 'Type', value: typeValue },
+          ])
+        )
         .addTo(map.current);
     };
 
@@ -951,31 +1274,62 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
 
       const props = (feature.properties ?? {}) as Record<string, unknown>;
       const color = (props.color as string) || LAYER_COLORS.rentComps;
-      const popupHtml = props.popup_html || props.popupHtml;
 
       const markerEl = document.createElement('div');
       markerEl.className = 'map-tab-marker';
       markerEl.innerHTML = buildPinSvg(color);
       markerEl.style.cursor = 'pointer';
 
+      const name = typeof props.name === 'string' ? props.name : '';
+      const address = typeof props.address === 'string' ? props.address : '';
+      const addressLines = splitAddressLines(address);
+      const distance = Number(props.distance_miles ?? 0);
+      const yearBuilt = Number(props.year_built ?? 0);
+      const totalUnits = Number(props.total_units ?? 0);
+      const floorplans = Array.isArray(props.floorplans) ? (props.floorplans as Array<Record<string, unknown>>) : [];
+
       const popup = new maplibregl.Popup({
         closeButton: true,
-        closeOnClick: true,
-        className: 'map-tab-popup',
+        closeOnClick: false,
+        className: 'map-tab-popover',
         maxWidth: '280px',
       });
 
-      if (popupHtml) {
-        popup.setHTML(String(popupHtml));
-      } else {
-        const rows: string[] = [];
-        if (props.name) rows.push(`<strong>${props.name}</strong>`);
-        if (props.asking_rent) rows.push(`Asking Rent: $${Number(props.asking_rent).toLocaleString()}`);
-        if (props.effective_rent) rows.push(`Effective Rent: $${Number(props.effective_rent).toLocaleString()}`);
-        if (props.unit_type) rows.push(`Unit Type: ${props.unit_type}`);
-        if (props.distance_miles) rows.push(`Distance: ${Number(props.distance_miles).toFixed(2)} mi`);
-        popup.setHTML(`<div class="map-tab-popup-content">${rows.length ? rows.join('<br/>') : '<em>No rent comp details</em>'}</div>`);
-      }
+      const header = name ? `Rent Comp: ${name}` : 'Rent Comp';
+      const addressHtml = addressLines
+        ? `
+          <div class="map-tab-popover-address">
+            <div class="map-tab-popover-address-line">${escapeHtml(addressLines.line1)}</div>
+            ${addressLines.line2 ? `<div class="map-tab-popover-address-line">${escapeHtml(addressLines.line2)}</div>` : ''}
+          </div>
+        `
+        : '';
+      const rowsHtml = buildPopoverRows([
+        {
+          label: 'Distance',
+          value: Number.isFinite(distance) && distance > 0 ? `${distance.toFixed(2)} mi` : '',
+        },
+        {
+          label: 'Year Built',
+          value: Number.isFinite(yearBuilt) && yearBuilt > 0 ? String(yearBuilt) : '',
+        },
+        {
+          label: 'Units',
+          value: Number.isFinite(totalUnits) && totalUnits > 0 ? String(totalUnits) : '',
+        },
+      ]);
+      const floorplanHtml = buildFloorplanTable(floorplans);
+
+      popup.setHTML(`
+        <div class="map-tab-popover">
+          <div class="map-tab-popover-header">${escapeHtml(header)}</div>
+          <div class="map-tab-popover-body">
+            ${addressHtml}
+            ${rowsHtml || (!addressHtml ? '<div class="map-tab-popover-empty">No details available</div>' : '')}
+            ${floorplanHtml}
+          </div>
+        </div>
+      `);
 
       const marker = new maplibregl.Marker({ element: markerEl })
         .setLngLat([coords[0], coords[1]])
@@ -1006,33 +1360,43 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
 
-    const centerMarkerId = 'project-center';
-    safeRemoveLayer(map.current, centerMarkerId);
-    safeRemoveSource(map.current, centerMarkerId);
+    if (subjectMarkerRef.current) {
+      subjectMarkerRef.current.remove();
+      subjectMarkerRef.current = null;
+    }
 
-    map.current.addSource(centerMarkerId, {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Point',
-          coordinates: center,
-        },
-      },
+    const markerEl = document.createElement('div');
+    markerEl.className = 'map-subject-marker';
+    markerEl.style.cursor = 'pointer';
+
+    const subjectPopup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      className: 'map-tab-popover',
+      maxWidth: '280px',
+    }).setHTML(
+      buildPopoverHtml('Subject Property', [
+        { label: 'Latitude', value: Number.isFinite(center[1]) ? center[1].toFixed(6) : '' },
+        { label: 'Longitude', value: Number.isFinite(center[0]) ? center[0].toFixed(6) : '' },
+      ])
+    );
+
+    subjectMarkerRef.current = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
+      .setLngLat([center[0], center[1]])
+      .setPopup(subjectPopup)
+      .addTo(map.current);
+
+    markerEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (subjectMarkerRef.current?.getPopup()) {
+        subjectMarkerRef.current.togglePopup();
+      }
     });
 
-    map.current.addLayer({
-      id: centerMarkerId,
-      type: 'circle',
-      source: centerMarkerId,
-      paint: {
-        'circle-radius': 10,
-        'circle-color': '#fbbf24',
-        'circle-stroke-color': '#000',
-        'circle-stroke-width': 2,
-      },
-    });
+    return () => {
+      subjectMarkerRef.current?.remove();
+      subjectMarkerRef.current = null;
+    };
   }, [mapLoaded, styleRevision, center]);
 
   // ─────────────────────────────────────────────────────────────────────────

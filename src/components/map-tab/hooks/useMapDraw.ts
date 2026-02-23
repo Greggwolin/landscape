@@ -165,23 +165,29 @@ function calculateMeasurements(
   const measurements: Record<string, number> = {};
 
   if (feature.geometry.type === 'LineString') {
-    const length = turf.length(feature as turf.Feature<turf.LineString>, {
-      units: 'feet',
-    });
-    measurements.length_ft = Math.round(length);
-    measurements.length_miles = length / 5280;
+    const coords = (feature.geometry as GeoJSON.LineString).coordinates;
+    if (Array.isArray(coords) && coords.length >= 2) {
+      const length = turf.length(feature as turf.Feature<turf.LineString>, {
+        units: 'feet',
+      });
+      measurements.length_ft = Math.round(length);
+      measurements.length_miles = length / 5280;
+    }
   }
 
   if (feature.geometry.type === 'Polygon') {
-    const area = turf.area(feature as turf.Feature<turf.Polygon>); // square meters
-    measurements.area_sqft = Math.round(area * 10.7639); // sqm to sqft
-    measurements.area_acres = measurements.area_sqft / 43560;
+    const ring = (feature.geometry as GeoJSON.Polygon).coordinates?.[0];
+    if (Array.isArray(ring) && ring.length >= 4) {
+      const area = turf.area(feature as turf.Feature<turf.Polygon>); // square meters
+      measurements.area_sqft = Math.round(area * 10.7639); // sqm to sqft
+      measurements.area_acres = measurements.area_sqft / 43560;
 
-    const perimeter = turf.length(
-      turf.polygonToLine(feature as turf.Feature<turf.Polygon>),
-      { units: 'feet' }
-    );
-    measurements.perimeter_ft = Math.round(perimeter);
+      const perimeter = turf.length(
+        turf.polygonToLine(feature as turf.Feature<turf.Polygon>),
+        { units: 'feet' }
+      );
+      measurements.perimeter_ft = Math.round(perimeter);
+    }
   }
 
   return measurements;

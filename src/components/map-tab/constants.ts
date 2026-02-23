@@ -104,12 +104,12 @@ export function getDefaultLayerGroups(): LayerGroup[] {
   return [
     {
       id: 'project-boundary',
-      label: 'Project Boundary',
+      label: 'Project Location',
       expanded: true,
       layers: [
         {
           id: 'site-boundary',
-          label: 'Site Boundary',
+          label: 'Project Location',
           visible: true,
           color: LAYER_COLORS.siteBoundary,
         },
@@ -138,30 +138,30 @@ export function getDefaultLayerGroups(): LayerGroup[] {
           visible: false,
           color: LAYER_COLORS.demoRings,
         },
-        {
-          id: 'block-groups',
-          label: 'Block Groups',
-          visible: false,
-          color: LAYER_COLORS.blockGroups,
-        },
-        {
-          id: 'pois',
-          label: 'POIs',
-          visible: false,
-          color: LAYER_COLORS.pois,
-        },
-        {
-          id: 'user-points',
-          label: 'User Points',
-          visible: true,
-          color: LAYER_COLORS.userPoints,
-        },
+        // {
+        //   id: 'block-groups',
+        //   label: 'Block Groups',
+        //   visible: false,
+        //   color: LAYER_COLORS.blockGroups,
+        // },
+        // {
+        //   id: 'pois',
+        //   label: 'POIs',
+        //   visible: false,
+        //   color: LAYER_COLORS.pois,
+        // },
+        // {
+        //   id: 'user-points',
+        //   label: 'User Points',
+        //   visible: true,
+        //   color: LAYER_COLORS.userPoints,
+        // },
       ],
     },
     {
       id: 'comparables',
       label: 'Comparables',
-      expanded: false,
+      expanded: true,
       layers: [
         {
           id: 'sale-comps',
@@ -186,7 +186,7 @@ export function getDefaultLayerGroups(): LayerGroup[] {
     {
       id: 'annotations',
       label: 'Annotations',
-      expanded: false,
+      expanded: true,
       layers: [
         {
           id: 'drawn-shapes',

@@ -23,7 +23,7 @@ export const RING_COLORS: Record<number, { fill: string; stroke: string }> = {
 export const POINT_CATEGORIES: PointCategoryConfig[] = [
   { value: 'competitor', label: 'Competitor', color: '#ef4444', icon: 'building' },
   { value: 'amenity', label: 'Amenity', color: '#22c55e', icon: 'star' },
-  { value: 'poi', label: 'Point of Interest', color: '#3b82f6', icon: 'map-pin' },
+  // { value: 'poi', label: 'Point of Interest', color: '#3b82f6', icon: 'map-pin' },
   { value: 'custom', label: 'Custom', color: '#f59e0b', icon: 'flag' },
 ];
 
@@ -31,7 +31,7 @@ export const POINT_CATEGORIES: PointCategoryConfig[] = [
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   blockGroups: false,
   rings: true,
-  userPoints: true,
+  userPoints: false,
   satellite: false,
   hybrid: true,
 };
