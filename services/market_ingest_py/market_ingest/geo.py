@@ -26,6 +26,10 @@ class GeoResolver:
     def resolve_from_city_label(self, label: str) -> GeoRecord:
         """
         Resolve "Phoenix,AZ" into a GEO record.
+
+        If the city is not found in geo_xwalk, auto-bootstraps the full
+        geographic hierarchy (US → State → MSA → County → City) from
+        Census Bureau APIs.
         """
 
         parts = [part.strip() for part in label.split(",")]
@@ -33,7 +37,13 @@ class GeoResolver:
             raise ValueError("Project label must be in 'City,ST' format")
         city, state = parts
         logger.info("Resolving project city '{}' ({})", city, state)
-        return self.db.find_city(city, state)
+
+        try:
+            return self.db.find_city(city, state)
+        except KeyError:
+            logger.info("City '{}, {}' not in geo_xwalk — bootstrapping from Census APIs...", city, state)
+            from .geo_bootstrap import bootstrap_city
+            return bootstrap_city(city, state, self.db)
 
     def expand_targets(self, base_geo: GeoRecord) -> List[GeoTarget]:
         chain = self.db.expand_geo_chain(base_geo)

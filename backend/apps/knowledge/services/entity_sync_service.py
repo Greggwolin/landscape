@@ -268,6 +268,65 @@ class EntitySyncService:
 
         return entity
 
+    def get_or_create_property_entity(
+        self,
+        address: str,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        entity_subtype: str = 'comparable',
+        project_id: Optional[int] = None,
+        **extra_metadata
+    ) -> KnowledgeEntity:
+        """
+        Get or create a KnowledgeEntity for a property (comp or subject).
+
+        Args:
+            address: Street address or property name (required)
+            city: City name
+            state: State abbreviation
+            entity_subtype: 'comparable', 'subject', 'unit', 'parcel'
+            project_id: Associated project ID
+            **extra_metadata: Additional metadata fields
+
+        Returns:
+            KnowledgeEntity for the property
+
+        Canonical name format: "property:{NORMALIZED_ADDRESS}"
+        """
+        # Normalize address for canonical name
+        addr_normalized = address.strip().upper()
+        canonical_name = f"property:{addr_normalized}"
+
+        metadata = {
+            'address': address,
+            'city': city,
+            'state': state,
+            'entity_subtype': entity_subtype,
+            'project_id': project_id,
+            **extra_metadata
+        }
+        metadata = {k: v for k, v in metadata.items() if v is not None}
+
+        entity, created = KnowledgeEntity.objects.get_or_create(
+            canonical_name=canonical_name,
+            defaults={
+                'entity_type': 'property',
+                'entity_subtype': entity_subtype,
+                'metadata': metadata,
+                'created_by_id': self.user_id
+            }
+        )
+
+        if created:
+            logger.info(f"Created property entity: {canonical_name}")
+        else:
+            # Merge metadata if entity exists
+            if entity.metadata != metadata:
+                entity.metadata = {**entity.metadata, **metadata}
+                entity.save(update_fields=['metadata'])
+
+        return entity
+
     def get_project_entity(self, project_id: int) -> Optional[KnowledgeEntity]:
         """
         Get existing project entity, if it exists.
