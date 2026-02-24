@@ -16,7 +16,6 @@
 import { CCard, CCardBody } from '@coreui/react';
 import { useIncomeApproach } from '@/hooks/useIncomeApproach';
 import {
-  ValueTiles,
   AssumptionsPanel,
   DirectCapView,
 } from '@/components/valuation/income-approach';
@@ -54,12 +53,18 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
   if (isLoading) {
     return (
       <div
-        className="text-center py-20"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--cui-secondary-color)' }}
       >
         <div
-          className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 mb-4"
-          style={{ borderColor: 'var(--cui-primary)' }}
+          style={{
+            display: 'inline-block',
+            width: '3rem',
+            height: '3rem',
+            borderRadius: '9999px',
+            borderBottom: '2px solid var(--cui-primary)',
+            marginBottom: '1rem',
+            animation: 'spin 1s linear infinite',
+          }}
         />
         <p style={{ fontSize: '1rem' }}>Loading Income Approach data...</p>
       </div>
@@ -71,24 +76,26 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     return (
       <CCard style={{ borderColor: 'var(--cui-danger)' }}>
         <CCardBody
-          className="p-6 text-center"
-          style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
+          style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
         >
-          <div className="text-5xl mb-4">⚠️</div>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
           <h3
-            className="font-bold mb-2"
-            style={{ fontSize: '1.25rem' }}
+            style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}
           >
             Error Loading Income Approach Data
           </h3>
           <p style={{ fontSize: '0.9375rem', marginBottom: '1rem' }}>{error}</p>
           <button
             onClick={reload}
-            className="px-4 py-2 font-medium rounded"
             style={{
+              padding: '0.5rem 1rem',
+              fontWeight: 500,
+              borderRadius: '0.25rem',
               fontSize: '0.9375rem',
               backgroundColor: 'var(--cui-danger)',
               color: 'white',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             Try Again
@@ -114,38 +121,45 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
       {/* Saving indicator */}
       {isSaving && (
         <div
-          className="fixed top-4 right-4 z-50 px-3 py-2 rounded-lg flex items-center gap-2"
           style={{
+            position: 'fixed',
+            top: '1rem',
+            right: '1rem',
+            zIndex: 50,
+            padding: '0.5rem 0.75rem',
+            borderRadius: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
             backgroundColor: 'var(--cui-primary)',
             color: 'white',
           }}
         >
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Saving...</span>
+          <div
+            style={{
+              width: '1rem',
+              height: '1rem',
+              border: '2px solid white',
+              borderTop: '2px solid transparent',
+              borderRadius: '9999px',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+          <span style={{ fontSize: '0.875rem' }}>Saving...</span>
         </div>
       )}
 
-      {/* Value Tiles - Including DCF */}
-      <ValueTiles
-        tiles={data.value_tiles}
-        selectedBasis={selectedBasis}
-        onSelectBasis={setSelectedBasis}
-        unitCount={data.property_summary.unit_count}
-        dcfData={dcfData}
-        isDCFLoading={isDCFLoading}
-        activeMethod={activeMethod}
-        onMethodChange={setActiveMethod}
-      />
-
       {/* Two-Panel Layout: 30/70 Split */}
-      <div className="flex gap-6 mt-6" style={{ minHeight: '600px' }}>
+      <div className="d-flex" style={{ gap: '1.5rem', minHeight: '600px' }}>
         {/* Left Panel - Assumptions */}
         <div
-          className="flex-shrink-0 rounded-lg overflow-hidden"
           style={{
             width: '26%',
             minWidth: '280px',
             maxWidth: '340px',
+            flexShrink: 0,
+            borderRadius: '0.5rem',
+            overflow: 'hidden',
             backgroundColor: 'var(--cui-card-bg)',
             border: '1px solid var(--cui-border-color)',
           }}
@@ -157,11 +171,13 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
             onAssumptionChange={updateAssumption}
             isLoading={isLoading}
             isSaving={isSaving}
+            activeMethod={activeMethod}
+            onMethodChange={setActiveMethod}
           />
         </div>
 
         {/* Right Panel - Results (70%) */}
-        <div className="flex-1 min-w-0">
+        <div style={{ flex: 1, minWidth: 0 }}>
           {activeMethod === 'direct_cap' && selectedTile && (
             <DirectCapView
               calculation={selectedTile.calculation}

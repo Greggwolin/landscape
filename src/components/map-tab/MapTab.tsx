@@ -81,6 +81,9 @@ const getParcelIdFromProps = (props: Record<string, unknown>, featureId?: unknow
     props.tax_parcel_id ??
     props.PARCELID ??
     props.APN ??
+    props.OBJECTID ??
+    props.ObjectID ??
+    props.OBJECTID_1 ??
     featureId;
   if (candidate == null) return '';
   const value = String(candidate).trim();
@@ -160,6 +163,26 @@ function normalizeParcelFeatureCollection(collection: FeatureCollection): Featur
 
 export function MapTab({ project }: MapTabProps) {
   const projectId = project.project_id;
+  const initialCountyValue = useMemo(() => {
+    const candidate =
+      (project as Record<string, unknown>).county ??
+      (project as Record<string, unknown>).jurisdiction_county ??
+      null;
+    return typeof candidate === 'string' ? candidate : null;
+  }, [project]);
+  const [projectCounty, setProjectCounty] = useState<string | null>(initialCountyValue);
+  const lastProjectIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (lastProjectIdRef.current !== projectId) {
+      lastProjectIdRef.current = projectId;
+      setProjectCounty(initialCountyValue);
+      return;
+    }
+    if (initialCountyValue && initialCountyValue !== projectCounty) {
+      setProjectCounty(initialCountyValue);
+    }
+  }, [initialCountyValue, projectCounty, projectId]);
   const isDevelopmentProject = useMemo(() => {
     const perspective = typeof project.analysis_perspective === 'string'
       ? project.analysis_perspective.toUpperCase()
@@ -266,10 +289,13 @@ export function MapTab({ project }: MapTabProps) {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
 
-  const PARCEL_MIN_ZOOM = 15;
-  const COUNTY_PARCEL_MIN_ZOOM = 15;
+  const PARCEL_MIN_ZOOM = 12.5;
+  const COUNTY_PARCEL_MIN_ZOOM = 12.5;
 
-  const autoCounty = useMemo(() => normalizeCountyValue(project.county ?? null), [project.county]);
+  const autoCounty = useMemo(
+    () => normalizeCountyValue(projectCounty ?? null),
+    [projectCounty]
+  );
   const resolvedCounty = parcelCountyOverride ?? autoCounty;
   const selectedTaxParcelIds = useMemo(() => Object.keys(selectedTaxParcels), [selectedTaxParcels]);
   const taxParcelsLayerVisible = useMemo(() => {
@@ -277,10 +303,11 @@ export function MapTab({ project }: MapTabProps) {
     const layer = group?.layers.find((entry) => entry.id === 'tax-parcels');
     return Boolean(layer?.visible);
   }, [layers]);
+  const parcelOutlineEnabled = resolvedCounty === 'maricopa' && taxParcelsLayerVisible;
   const isLosAngelesCounty = useMemo(() => {
-    const value = typeof project.county === 'string' ? project.county.toLowerCase() : '';
+    const value = typeof projectCounty === 'string' ? projectCounty.toLowerCase() : '';
     return value.includes('los angeles');
-  }, [project.county]);
+  }, [projectCounty]);
   const countyOptions = useMemo(
     () => Object.keys(COUNTY_PARCEL_SERVICES) as CountyCode[],
     []
@@ -327,6 +354,34 @@ export function MapTab({ project }: MapTabProps) {
     setSelectedTaxParcels({});
     setParcelSelectionError(null);
   }, [projectId, autoCounty]);
+
+  useEffect(() => {
+    if (projectCounty) return;
+    const controller = new AbortController();
+
+    const loadProjectDetails = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/details`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const nextCounty = payload?.county ?? payload?.jurisdiction_county ?? null;
+        if (typeof nextCounty === 'string' && nextCounty.trim()) {
+          setProjectCounty(nextCounty);
+        }
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load project county:', error);
+      }
+    };
+
+    loadProjectDetails();
+
+    return () => {
+      controller.abort();
+    };
+  }, [projectCounty, projectId]);
 
 
   const handleSelectCounty = useCallback((county: CountyCode) => {
@@ -1613,6 +1668,7 @@ export function MapTab({ project }: MapTabProps) {
           projectBoundary={projectBoundary}
           taxParcels={taxParcels}
           selectedTaxParcelIds={selectedTaxParcelIds}
+          parcelOutlineEnabled={parcelOutlineEnabled}
           saleComps={saleComps}
           rentComps={rentComps}
           parcelCollection={parcelCollection}

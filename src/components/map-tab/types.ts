@@ -133,6 +133,7 @@ export interface MapCanvasProps {
   projectBoundary?: GeoJSON.Feature | null;
   taxParcels?: GeoJSON.FeatureCollection | null;
   selectedTaxParcelIds?: string[];
+  parcelOutlineEnabled?: boolean;
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;
   parcelCollection?: GeoJSON.FeatureCollection | null;

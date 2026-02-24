@@ -67,6 +67,8 @@ interface OperatingStatementProps {
   onDeleteExpenses?: (opexIds: number[]) => Promise<void>;
   /** Callback for inline item name changes (double-click edit) */
   onItemNameChange?: (opexId: number, categoryId: number, categoryName: string) => Promise<void>;
+  hideLossToLease?: boolean;
+  hidePostReno?: boolean;
 }
 
 interface SelectableExpenseRowProps {
@@ -197,13 +199,13 @@ function SelectableExpenseRow({
           </span>
         )}
       </div>
-      <div className="ops-cell num"></div>
-      <div className="ops-cell num">
+      <div className="ops-cell ops-input-cell">
         {isPercent ? (
           <InputCell
             value={row.as_is.rate}
             variant="as-is"
             format="percent"
+            className="ops-input-compact"
             onChange={(val) => onUpdateRow(row.line_item_key, 'as_is_rate', val)}
           />
         ) : (
@@ -211,17 +213,19 @@ function SelectableExpenseRow({
             value={row.as_is.rate ?? rowPerUnit}
             variant="as-is"
             format="currency"
+            className="ops-input-compact"
             onChange={(val) => onUpdateRow(row.line_item_key, 'as_is_rate', val)}
           />
         )}
       </div>
+      <div className="ops-cell num">—</div>
       <div className="ops-cell num ops-calc">
         {renderCurrency(row.as_is.total)}
       </div>
       <div className="ops-cell num ops-calc">
         {isPercent ? '' : renderPerSF(rowPerSF)}
       </div>
-      <div className="ops-cell num"></div>
+      <div className="ops-cell num ops-col-ltl"></div>
       <div className="ops-cell num ops-col-post">
         {valueAddEnabled ? (
           isPercent ? (
@@ -345,9 +349,11 @@ function DroppableParentRow({
           )}
         </div>
       </div>
-      <div className="ops-cell num"></div>
       <div className="ops-cell num">
         {showParentTotals ? <span className="ops-calc">{renderCurrency(rowPerUnit)}</span> : null}
+      </div>
+      <div className="ops-cell num">
+        {showParentTotals ? '—' : null}
       </div>
       <div className="ops-cell num ops-calc">
         {showParentTotals ? renderCurrency(row.as_is.total) : ''}
@@ -355,7 +361,7 @@ function DroppableParentRow({
       <div className="ops-cell num ops-calc">
         {showParentTotals ? renderPerSF(rowPerSF) : ''}
       </div>
-      <div className="ops-cell num"></div>
+      <div className="ops-cell num ops-col-ltl"></div>
       <div className="ops-cell num ops-col-post">
         {valueAddEnabled && showParentTotals ? <span className="ops-calc">{renderCurrency(rowPostRenoPerUnit)}</span> : null}
       </div>
@@ -462,22 +468,23 @@ function InlineAddRow({
           />
         )}
       </div>
-      <div className="ops-cell num"></div>
-      <div className="ops-cell num">
+      <div className="ops-cell ops-input-cell">
         <InputCell
           value={unitAmount}
           variant="as-is"
           format="currency"
+          className="ops-input-compact"
           onChange={setUnitAmount}
         />
       </div>
+      <div className="ops-cell num">—</div>
       <div className="ops-cell num ops-calc">
         {renderCurrency(annualTotal)}
       </div>
       <div className="ops-cell num ops-calc">
         {renderPerSF(perSF)}
       </div>
-      <div className="ops-cell num">
+      <div className="ops-cell num ops-col-ltl">
         <div className="ops-add-actions">
           <button
             type="button"
@@ -527,10 +534,25 @@ export function OperatingStatement({
   onCategoryChange,
   onAddExpense,
   onDeleteExpenses,
-  onItemNameChange
+  onItemNameChange,
+  hideLossToLease = false,
+  hidePostReno: hidePostRenoProp
 }: OperatingStatementProps) {
+  const hidePR = hidePostRenoProp ?? !valueAddEnabled;
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [savingItem, setSavingItem] = useState<number | null>(null);
+
+  // Compute grid-template-columns based on visible columns
+  const gridTemplateCols = [
+    '200px',                    // label
+    'minmax(60px, 70px)',       // units
+    'minmax(90px, 100px)',      // current
+    'minmax(100px, 120px)',     // annual
+    'minmax(70px, 80px)',       // $/SF
+    ...(hideLossToLease ? [] : ['minmax(100px, 110px)']),  // loss to lease
+    ...(hidePR ? [] : ['minmax(110px, 130px)']),      // post renovation rent/mo
+    ...(hidePR ? [] : ['minmax(90px, 110px)']),       // annual (reno)
+  ].join(' ');
 
   // Selection state
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
@@ -735,19 +757,29 @@ export function OperatingStatement({
   const rentalTotals = rentalRows.reduce(
     (acc, row) => {
       const count = row.as_is.count || 0;
+      const rate = row.as_is.rate || 0;
       const currentTotal = row.as_is.total || 0;
       const marketTotal = row.as_is.market_total || currentTotal;
       const lossToLease = marketTotal - currentTotal;
       const sf = row.as_is.sf || 0;
+      const postRenoRate = row.post_reno?.rate || 0;
+      const postRenoTotal = row.post_reno?.total || 0;
       return {
         count: acc.count + count,
         annual: acc.annual + currentTotal,
         lossToLease: acc.lossToLease + lossToLease,
-        totalSF: acc.totalSF + (sf * count)
+        totalSF: acc.totalSF + (sf * count),
+        weightedRent: acc.weightedRent + (rate * count),
+        weightedPostRenoRent: acc.weightedPostRenoRent + (postRenoRate * count),
+        postRenoAnnual: acc.postRenoAnnual + postRenoTotal
       };
     },
-    { count: 0, annual: 0, lossToLease: 0, totalSF: 0 }
+    { count: 0, annual: 0, lossToLease: 0, totalSF: 0, weightedRent: 0, weightedPostRenoRent: 0, postRenoAnnual: 0 }
   );
+
+  const avgCurrentRent = rentalTotals.count > 0 ? rentalTotals.weightedRent / rentalTotals.count : 0;
+  const avgRentPerSF = rentalTotals.totalSF > 0 ? rentalTotals.annual / rentalTotals.totalSF : (totalSF > 0 ? rentalTotals.annual / totalSF : 0);
+  const avgPostRenoRent = rentalTotals.count > 0 ? rentalTotals.weightedPostRenoRent / rentalTotals.count : 0;
 
   const otherIncomeTotal = otherIncomeRows.reduce(
     (acc, row) => acc + (row.as_is.total || 0),
@@ -798,16 +830,34 @@ export function OperatingStatement({
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="ops-statement-scroll">
-        <div className={`ops-statement-grid ${valueAddEnabled ? '' : 'ops-hide-post'}`}>
+        <div
+          className={`ops-statement-grid${hideLossToLease ? ' ops-hide-ltl' : ''}${hidePR ? ' ops-hide-post' : ''}`}
+          style={{ gridTemplateColumns: gridTemplateCols }}
+        >
+          {/* Group header row — only visible when post-reno columns shown */}
+          {!hidePR && (
+            <div className="ops-row ops-header-group-row">
+              <div className="ops-header-group-spacer" />
+              <div className="ops-header-group-spacer" />
+              <div className="ops-header-group-spacer" />
+              <div className="ops-header-group-spacer" />
+              <div className="ops-header-group-spacer" />
+              {!hideLossToLease && <div className="ops-header-group-spacer ops-col-ltl" />}
+              <div className="ops-header-group-span ops-col-post" style={{ gridColumn: 'span 2' }}>
+                Post Renovation
+              </div>
+            </div>
+          )}
+          {/* Column header row */}
           <div className="ops-row ops-header-row">
             <div className="ops-cell ops-header-cell">Revenue</div>
             <div className="ops-cell ops-header-cell num">Units</div>
-            <div className="ops-cell ops-header-cell num">Current</div>
+            <div className="ops-cell ops-header-cell num">Rent/Mo</div>
             <div className="ops-cell ops-header-cell num">Annual</div>
             <div className="ops-cell ops-header-cell num">$/SF</div>
-            <div className="ops-cell ops-header-cell num">Loss to Lease</div>
-            <div className="ops-cell ops-header-cell num ops-col-post">Post-Reno</div>
-            <div className="ops-cell ops-header-cell num ops-col-reno">Reno Total</div>
+            <div className="ops-cell ops-header-cell num ops-col-ltl">Loss to Lease</div>
+            <div className="ops-cell ops-header-cell num ops-col-post">Rent / Mo</div>
+            <div className="ops-cell ops-header-cell num ops-col-reno">Annual</div>
           </div>
 
           {rentalRows.map((row) => {
@@ -826,7 +876,7 @@ export function OperatingStatement({
                 <div className="ops-cell num">{currentRate > 0 ? formatCurrency(currentRate) : '—'}</div>
                 <div className="ops-cell num ops-calc font-semibold">{currentTotal > 0 ? formatCurrency(currentTotal) : '—'}</div>
                 <div className="ops-cell num">{perSF ? formatPerSF(perSF) : '—'}</div>
-                <div className="ops-cell num ops-loss-to-lease">{lossToLease > 0 ? formatCurrency(lossToLease) : '—'}</div>
+                <div className="ops-cell num ops-loss-to-lease ops-col-ltl">{lossToLease > 0 ? formatCurrency(lossToLease) : '—'}</div>
                 <div className="ops-cell num ops-col-post">{valueAddEnabled ? (postRenoRate > 0 ? formatCurrency(postRenoRate) : '—') : null}</div>
                 <div className="ops-cell num ops-col-reno">{valueAddEnabled ? (postRenoTotal > 0 ? formatCurrency(postRenoTotal) : '—') : null}</div>
               </div>
@@ -843,7 +893,7 @@ export function OperatingStatement({
                 <div className="ops-cell ops-section-fill"></div>
                 <div className="ops-cell ops-section-fill"></div>
                 <div className="ops-cell ops-section-fill"></div>
-                <div className="ops-cell ops-section-fill"></div>
+                <div className="ops-cell ops-section-fill ops-col-ltl"></div>
                 <div className="ops-cell ops-section-fill ops-col-post"></div>
                 <div className="ops-cell ops-section-fill ops-col-reno"></div>
               </div>
@@ -854,7 +904,7 @@ export function OperatingStatement({
                 <div className="ops-cell num">—</div>
                 <div className="ops-cell num ops-calc font-semibold">{formatCurrency(otherIncomeTotal)}</div>
                 <div className="ops-cell num">—</div>
-                <div className="ops-cell num">—</div>
+                <div className="ops-cell num ops-col-ltl">—</div>
                 <div className="ops-cell num ops-col-post">{valueAddEnabled ? '—' : null}</div>
                 <div className="ops-cell num ops-col-reno">{valueAddEnabled ? '—' : null}</div>
               </div>
@@ -867,8 +917,7 @@ export function OperatingStatement({
                 return (
                   <div key={row.line_item_key} className="ops-row ops-child-row">
                     <div className="ops-cell">{row.label}</div>
-                    <div className="ops-cell num">—</div>
-                    <div className="ops-cell num">
+                    <div className={`ops-cell ${isParent ? 'num' : 'ops-input-cell'}`}>
                       {isParent ? (
                         <span className="ops-calc">—</span>
                       ) : onUpdateOtherIncome ? (
@@ -876,15 +925,17 @@ export function OperatingStatement({
                           value={row.as_is.rate}
                           variant="as-is"
                           format="currency"
+                          className="ops-input-compact"
                           onChange={(val) => onUpdateOtherIncome(row.line_item_key, 'as_is_rate', val)}
                         />
                       ) : (
                         formatCurrency(row.as_is.rate || 0)
                       )}
                     </div>
+                    <div className="ops-cell num">—</div>
                     <div className="ops-cell num ops-calc font-semibold">{(row.as_is.total || 0) > 0 ? formatCurrency(row.as_is.total || 0) : '—'}</div>
                     <div className="ops-cell num">—</div>
-                    <div className="ops-cell num">—</div>
+                    <div className="ops-cell num ops-col-ltl">—</div>
                     <div className="ops-cell num ops-col-post">
                       {valueAddEnabled ? (
                         isParent ? '—' : (
@@ -911,12 +962,12 @@ export function OperatingStatement({
           <div className="ops-row ops-egi-row">
             <div className="ops-cell font-bold">Potential Rental Income</div>
             <div className="ops-cell num font-semibold">{rentalTotals.count}</div>
-            <div className="ops-cell num font-semibold">—</div>
+            <div className="ops-cell num font-semibold">{avgCurrentRent > 0 ? formatCurrency(avgCurrentRent) : '—'}</div>
             <div className="ops-cell num font-bold ops-positive">{formatCurrency(potentialGrossIncome)}</div>
-            <div className="ops-cell num font-semibold">—</div>
-            <div className="ops-cell num ops-loss-to-lease">{rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}</div>
-            <div className="ops-cell num ops-col-post">{valueAddEnabled ? '—' : null}</div>
-            <div className="ops-cell num ops-col-reno">{valueAddEnabled ? '—' : null}</div>
+            <div className="ops-cell num font-semibold">{avgRentPerSF > 0 ? formatPerSF(avgRentPerSF) : '—'}</div>
+            <div className="ops-cell num ops-loss-to-lease ops-col-ltl">{rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}</div>
+            <div className="ops-cell num ops-col-post">{valueAddEnabled ? (avgPostRenoRent > 0 ? formatCurrency(avgPostRenoRent) : '—') : null}</div>
+            <div className="ops-cell num ops-col-reno">{valueAddEnabled ? (rentalTotals.postRenoAnnual > 0 ? formatCurrency(rentalTotals.postRenoAnnual) : '—') : null}</div>
           </div>
 
           <div className="ops-row ops-section-row ops-vacancy-header">
@@ -927,7 +978,7 @@ export function OperatingStatement({
             <div className="ops-cell ops-section-fill"></div>
             <div className="ops-cell ops-section-fill"></div>
             <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-fill"></div>
+            <div className="ops-cell ops-section-fill ops-col-ltl"></div>
             <div className="ops-cell ops-section-fill ops-col-post"></div>
             <div className="ops-cell ops-section-fill ops-col-reno"></div>
           </div>
@@ -972,7 +1023,7 @@ export function OperatingStatement({
                 <div className="ops-cell num ops-vacancy-value">{rate > 0 ? `(${formatCurrency(Math.abs(rate * grossPotentialRent / 12))})` : '—'}</div>
                 <div className="ops-cell num ops-vacancy-value font-semibold">{amount !== 0 ? `(${formatCurrency(Math.abs(amount))})` : '—'}</div>
                 <div className="ops-cell num ops-vacancy-value">{perSF > 0 ? `(${formatPerSF(perSF)})` : '—'}</div>
-                <div className="ops-cell num ops-loss-to-lease">{vacancyLossToLease > 0 ? formatCurrency(vacancyLossToLease) : '—'}</div>
+                <div className="ops-cell num ops-loss-to-lease ops-col-ltl">{vacancyLossToLease > 0 ? formatCurrency(vacancyLossToLease) : '—'}</div>
                 <div className="ops-cell num ops-col-post">
                   {valueAddEnabled ? (
                     onUpdateVacancy ? (
@@ -1001,7 +1052,7 @@ export function OperatingStatement({
             <div className="ops-cell num font-semibold">—</div>
             <div className="ops-cell num font-bold ops-positive">{formatCurrency(effectiveGrossIncome)}</div>
             <div className="ops-cell num font-semibold">—</div>
-            <div className="ops-cell num ops-loss-to-lease">{rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}</div>
+            <div className="ops-cell num ops-loss-to-lease ops-col-ltl">{rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}</div>
             <div className="ops-cell num ops-col-post">{valueAddEnabled ? '—' : null}</div>
             <div className="ops-cell num ops-col-reno">{valueAddEnabled ? '—' : null}</div>
           </div>
@@ -1014,7 +1065,7 @@ export function OperatingStatement({
             <div className="ops-cell ops-section-fill"></div>
             <div className="ops-cell ops-section-fill"></div>
             <div className="ops-cell ops-section-fill"></div>
-            <div className="ops-cell ops-section-controls-cell">
+            <div className="ops-cell ops-section-controls-cell ops-col-ltl">
               <div className="ops-section-controls">
                 <span className="ops-section-hint">Click rows to select, drag to recategorize</span>
                 <DetailSummaryToggle value={viewMode} onChange={setViewMode} />
@@ -1079,22 +1130,22 @@ export function OperatingStatement({
 
           <div className="ops-row ops-subtotal-row">
             <div className="ops-cell">Total Operating Expenses</div>
-            <div className="ops-cell num"></div>
             <div className="ops-cell num ops-negative">({renderCurrency(opexPerUnit)})</div>
+            <div className="ops-cell num">—</div>
             <div className="ops-cell num ops-negative font-semibold">({renderCurrency(expenseTotals.as_is_total)})</div>
             <div className="ops-cell num ops-calc">{renderPerSF(opexPerSF)}</div>
-            <div className="ops-cell num"></div>
+            <div className="ops-cell num ops-col-ltl"></div>
             <div className="ops-cell num ops-negative ops-col-post">{valueAddEnabled ? `(${renderCurrency(opexPostRenoPerUnit)})` : null}</div>
             <div className="ops-cell num ops-negative font-semibold ops-col-reno">{valueAddEnabled ? `(${renderCurrency(expenseTotals.post_reno_total)})` : null}</div>
           </div>
 
           <div className="ops-row ops-noi-row">
             <div className="ops-cell font-bold">Net Operating Income</div>
-            <div className="ops-cell num"></div>
             <div className="ops-cell num">{formatCurrency(netPerUnit)}</div>
+            <div className="ops-cell num">—</div>
             <div className="ops-cell num font-bold">{formatCurrency(asIsNOI)}</div>
             <div className="ops-cell num">{formatPerSF(netPerSF)}</div>
-            <div className="ops-cell num"></div>
+            <div className="ops-cell num ops-col-ltl"></div>
             <div className="ops-cell num ops-col-post"></div>
             <div className="ops-cell num ops-col-reno">{valueAddEnabled ? formatCurrency(postRenoNOI) : null}</div>
           </div>

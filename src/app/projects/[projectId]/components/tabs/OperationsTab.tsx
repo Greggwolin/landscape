@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useMemo, useEffect, useCallback } from 'react';
+import React, { memo, useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { CCard, CCardBody } from '@coreui/react';
 import { ComplexityTier } from '@/contexts/ComplexityModeContext';
 import OpExHierarchy from '@/app/components/OpExHierarchy';
@@ -65,6 +65,29 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     saveAll,
     reload
   } = useOperationsData(project.project_id);
+
+  // Column visibility state (lifted here so chooser can render in header)
+  const [hideLossToLease, setHideLossToLease] = useState(false);
+  const [hidePostReno, setHidePostReno] = useState(!showPostRehab);
+  const [showColumnChooser, setShowColumnChooser] = useState(false);
+  const columnChooserRef = useRef<HTMLDivElement>(null);
+
+  // Close column chooser on outside click
+  useEffect(() => {
+    if (!showColumnChooser) return;
+    const handleClick = (e: MouseEvent) => {
+      if (columnChooserRef.current && !columnChooserRef.current.contains(e.target as Node)) {
+        setShowColumnChooser(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showColumnChooser]);
+
+  // Sync hidePostReno with valueAddEnabled
+  useEffect(() => {
+    if (!showPostRehab) setHidePostReno(true);
+  }, [showPostRehab]);
 
   const rentalRows: LineItemRow[] = rentalIncome?.rows || [];
   const unitCount = propertySummary?.unit_count || 0;
@@ -370,34 +393,85 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         isSaving={isSaving}
         isDirty={isDirty}
         onSave={saveAll}
-      />
+      >
+        <div ref={columnChooserRef} style={{ position: 'relative' }}>
+          <button
+            className="ops-pill"
+            onClick={() => setShowColumnChooser(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            Columns
+          </button>
+          {showColumnChooser && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: '0.25rem',
+              background: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: '0.375rem',
+              padding: '0.5rem',
+              zIndex: 20,
+              minWidth: 180,
+              fontSize: '0.8125rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0.35rem', cursor: 'pointer', color: 'var(--cui-body-color)' }}>
+                <input type="checkbox" checked={!hideLossToLease} onChange={() => setHideLossToLease(prev => !prev)} />
+                Loss to Lease
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0.35rem', cursor: 'pointer', color: showPostRehab ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)' }}>
+                <input type="checkbox" checked={!hidePostReno} onChange={() => { if (showPostRehab) setHidePostReno(prev => !prev); }} disabled={!showPostRehab} />
+                Post-Reno Rent / Annual
+              </label>
+            </div>
+          )}
+        </div>
+      </OperationsHeader>
       <CCardBody className="p-0">
         <div className="ops-container">
       {valueAddError && (
         <div
-          className="rounded-lg px-4 py-2 border flex items-center gap-2"
           style={{
             backgroundColor: 'var(--cui-warning-bg)',
-            borderColor: 'var(--cui-warning)'
+            border: '1px solid var(--cui-warning)',
+            borderRadius: '0.5rem',
+            padding: '0.5rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
           }}
         >
-          <svg className="w-4 h-4" style={{ color: 'var(--cui-warning)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg style={{ width: 16, height: 16, flexShrink: 0, color: 'var(--cui-warning)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-sm" style={{ color: 'var(--cui-warning)' }}>{valueAddError}</span>
+          <span style={{ color: 'var(--cui-warning)', fontSize: '0.875rem' }}>{valueAddError}</span>
         </div>
       )}
 
       {/* Error Banner */}
       {error && (
         <div
-          className="rounded-lg px-6 py-4 border flex items-center gap-3"
           style={{
             backgroundColor: 'var(--cui-danger-bg)',
-            borderColor: 'var(--cui-danger)'
+            border: '1px solid var(--cui-danger)',
+            borderRadius: '0.5rem',
+            padding: '0.75rem 1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
           }}
         >
-          <svg className="w-5 h-5" style={{ color: 'var(--cui-danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg style={{ width: 20, height: 20, flexShrink: 0, color: 'var(--cui-danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span style={{ color: 'var(--cui-danger)' }}>{error}</span>
@@ -427,6 +501,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         onAddExpense={handleAddExpense}
         onDeleteExpenses={handleDeleteExpenses}
         onItemNameChange={handleItemNameChange}
+        hideLossToLease={hideLossToLease}
+        hidePostReno={hidePostReno}
       />
 
       {/* Sticky Summary Bar */}

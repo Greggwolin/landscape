@@ -252,33 +252,34 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
 
   return (
     <div
-      className="rounded-lg border flex flex-col"
+      className="card d-flex flex-column"
       style={{
         backgroundColor: 'var(--cui-card-bg)',
         borderColor: 'var(--cui-border-color)',
-        height: '500px'
+        height: '500px',
       }}
     >
       {/* Header */}
       <div
-        className="px-4 py-3 border-b flex items-center justify-between"
+        className="card-header d-flex align-items-center justify-content-between"
         style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
+          padding: '0.75rem 1rem',
+          backgroundColor: 'var(--surface-card-header)',
+          borderBottom: '1px solid var(--cui-border-color)',
         }}
       >
-        <div className="flex items-center gap-3">
-          <div className="text-xl">🔍</div>
+        <div className="d-flex align-items-center" style={{ gap: '0.75rem' }}>
+          <div style={{ fontSize: '1.25rem' }}>🔍</div>
           <div>
             <h3
-              className="text-base font-semibold"
-              style={{ color: 'var(--cui-body-color)' }}
+              className="mb-0"
+              style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}
             >
               Adjustment Analysis
             </h3>
             <p
-              className="text-xs"
-              style={{ color: 'var(--cui-secondary-color)' }}
+              className="mb-0"
+              style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}
             >
               {adjustmentType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} - {comparable.property_name || comparable.address}
             </p>
@@ -289,7 +290,7 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
           color="secondary"
           size="sm"
           onClick={onClose}
-          className="!p-0 text-xl hover:opacity-70 transition-opacity"
+          style={{ padding: 0, fontSize: '1.25rem', opacity: 0.7, transition: 'opacity 0.2s' }}
         >
           ✕
         </LandscapeButton>
@@ -297,16 +298,24 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
 
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto p-4 space-y-3"
-        style={{ scrollbarWidth: 'thin' }}
+        className="flex-fill"
+        style={{
+          overflowY: 'auto',
+          padding: '1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          scrollbarWidth: 'thin',
+        }}
       >
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`p-3 rounded-lg text-sm ${
-              msg.role === 'assistant' ? '' : 'ml-4'
-            }`}
             style={{
+              padding: '0.75rem',
+              borderRadius: 'var(--cui-border-radius)',
+              fontSize: '0.875rem',
+              marginLeft: msg.role === 'user' ? '1rem' : undefined,
               backgroundColor:
                 msg.role === 'assistant'
                   ? 'rgba(59, 130, 246, 0.1)'
@@ -315,21 +324,23 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
                 msg.role === 'assistant'
                   ? '1px solid rgba(59, 130, 246, 0.3)'
                   : '1px solid var(--cui-border-color)',
-              color: 'var(--cui-body-color)'
+              color: 'var(--cui-body-color)',
             }}
           >
             <div
-              className="text-xs font-semibold mb-2"
               style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                marginBottom: '0.5rem',
                 color:
                   msg.role === 'assistant'
                     ? 'rgba(59, 130, 246, 1)'
-                    : 'var(--cui-secondary-color)'
+                    : 'var(--cui-secondary-color)',
               }}
             >
               {msg.role === 'assistant' ? '🤖 Landscaper' : 'You'}
             </div>
-            <div className="whitespace-pre-line leading-relaxed">
+            <div style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}>
               {msg.content}
             </div>
           </div>
@@ -337,7 +348,7 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
 
         {/* Revised Suggestion Button */}
         {revisedValue !== null && (
-          <div className="flex justify-center pt-2">
+          <div className="d-flex justify-content-center" style={{ paddingTop: '0.5rem' }}>
             <LandscapeButton
               color="success"
               size="sm"
@@ -351,19 +362,24 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
 
       {/* Quick Actions */}
       <div
-        className="p-3 border-t"
+        className="card-footer"
         style={{
+          padding: '0.75rem',
           backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
+          borderTop: '1px solid var(--cui-border-color)',
         }}
       >
         <div
-          className="text-xs font-semibold mb-2"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          style={{
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            marginBottom: '0.5rem',
+            color: 'var(--cui-secondary-color)',
+          }}
         >
           QUICK ACTIONS
         </div>
-        <div className="space-y-2">
+        <div className="d-flex flex-column" style={{ gap: '0.5rem' }}>
           {quickActions.map((action, idx) => (
             <LandscapeButton
               key={idx}
@@ -371,7 +387,12 @@ Our ${((aiSuggestion.suggested_pct || 0) * 100).toFixed(0)}% adjustment falls wi
               color="secondary"
               size="sm"
               onClick={() => handleQuickAction(action)}
-              className="w-full text-left px-3 py-2 text-xs"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.5rem 0.75rem',
+                fontSize: '0.75rem',
+              }}
             >
               {action.label}
             </LandscapeButton>

@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.core.files.storage import default_storage
 from django.utils import timezone
-from django.db.models import Q, Max
+from django.db.models import Q, Max, Value
+from django.db.models.functions import Coalesce
 from django.db import connection, transaction
 from .models import (
     Document,
@@ -1088,8 +1089,14 @@ def upload_new_version(request, project_id, doc_id):
         root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
 
         chain = _get_version_chain(project_id, root_doc_id)
-        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        max_version = chain.aggregate(
+            max_version=Max(Coalesce('version_no', Value(1)))
+        ).get('max_version') or 1
         new_version_no = max_version + 1
+
+        if root_doc.version_no in (None, 0):
+            root_doc.version_no = 1
+            root_doc.save(update_fields=['version_no'])
 
         old_facts, old_embeddings = _get_extraction_counts(existing_doc.doc_id)
 
@@ -1287,8 +1294,14 @@ def link_document_version(request, project_id, doc_id):
         root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
 
         chain = _get_version_chain(project_id, root_doc_id)
-        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        max_version = chain.aggregate(
+            max_version=Max(Coalesce('version_no', Value(1)))
+        ).get('max_version') or 1
         new_version_no = max_version + 1
+
+        if root_doc.version_no in (None, 0):
+            root_doc.version_no = 1
+            root_doc.save(update_fields=['version_no'])
 
         profile_json = source_doc.profile_json or {}
         if not isinstance(profile_json, dict):
@@ -1352,8 +1365,14 @@ def restore_document_version(request, project_id, doc_id):
         root_doc = Document.objects.get(doc_id=root_doc_id, project_id=project_id)
 
         chain = _get_version_chain(project_id, root_doc_id)
-        max_version = chain.aggregate(max_version=Max('version_no')).get('max_version') or 0
+        max_version = chain.aggregate(
+            max_version=Max(Coalesce('version_no', Value(1)))
+        ).get('max_version') or 1
         new_version_no = max_version + 1
+
+        if root_doc.version_no in (None, 0):
+            root_doc.version_no = 1
+            root_doc.save(update_fields=['version_no'])
 
         profile_json = source_doc.profile_json or {}
         if not isinstance(profile_json, dict):

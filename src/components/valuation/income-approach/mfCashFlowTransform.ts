@@ -291,28 +291,16 @@ export function transformMFDcfToGrid(
     },
   ];
 
-  // Insert renovation capex rows when value-add is active
-  if (isValueAdd) {
-    expenseRows.push(
-      {
-        id: 'reno_capex',
-        label: 'Renovation CapEx',
-        values: buildRowValues(data.projections, 'reno_capex'),
-        indent: 1,
-      },
-      {
-        id: 'relocation_cost',
-        label: 'Relocation Costs',
-        values: buildRowValues(data.projections, 'relocation_cost'),
-        indent: 1,
-      }
-    );
-  }
-
+  // Total Operating Expenses — EXCLUDES renovation capex & relocation costs
+  // (those are shown below the NOI line in the Cap-X Value-Add section)
   expenseRows.push({
     id: 'total_opex',
     label: 'Total Operating Expenses',
-    values: buildRowValues(data.projections, 'total_opex'),
+    values: isValueAdd
+      ? buildComputedRowValues(data.projections, (p) =>
+          toNumber(p.total_opex) - toNumber(p.reno_capex) - toNumber(p.relocation_cost)
+        )
+      : buildRowValues(data.projections, 'total_opex'),
     isSubtotal: true,
   });
 
@@ -322,7 +310,8 @@ export function transformMFDcfToGrid(
     rows: expenseRows,
   };
 
-  // NOI Section
+  // NOI Section — when value-add is active, NOI excludes renovation capex
+  // & relocation costs (they appear in the Cap-X Value-Add section below)
   const noiSection: CashFlowSection = {
     id: 'noi',
     label: 'Net Operating Income',
@@ -330,11 +319,45 @@ export function transformMFDcfToGrid(
       {
         id: 'noi',
         label: 'NOI',
-        values: buildRowValues(data.projections, 'noi'),
+        values: isValueAdd
+          ? buildComputedRowValues(data.projections, (p) =>
+              toNumber(p.noi) + toNumber(p.reno_capex) + toNumber(p.relocation_cost)
+            )
+          : buildRowValues(data.projections, 'noi'),
         isTotal: true,
       },
     ],
   };
+
+  // Cap-X Value-Add Section (below NOI, only when value-add is active)
+  const capexValueAddSection: CashFlowSection | null = isValueAdd
+    ? {
+        id: 'capex_valueadd',
+        label: 'Cap-X Value-Add',
+        rows: [
+          {
+            id: 'reno_capex',
+            label: 'Renovation',
+            values: buildRowValues(data.projections, 'reno_capex'),
+            indent: 1,
+          },
+          {
+            id: 'relocation_cost',
+            label: 'Tenant Relocation',
+            values: buildRowValues(data.projections, 'relocation_cost'),
+            indent: 1,
+          },
+          {
+            id: 'total_capex_valueadd',
+            label: 'Total Cap-X Value-Add',
+            values: buildComputedRowValues(data.projections, (p) =>
+              toNumber(p.reno_capex) + toNumber(p.relocation_cost)
+            ),
+            isSubtotal: true,
+          },
+        ],
+      }
+    : null;
 
   // Reversion Section — Net Reversion shows only in last period
   const reversionSection: CashFlowSection = {
@@ -345,6 +368,7 @@ export function transformMFDcfToGrid(
         id: 'net_reversion',
         label: 'Net Reversion',
         values: buildRowValues(data.projections, 'net_reversion'),
+        indent: 1,
       },
     ],
   };
@@ -357,6 +381,7 @@ export function transformMFDcfToGrid(
   const totalCashFlowSection: CashFlowSection = {
     id: 'total_cash_flow',
     label: totalCashFlowLabel,
+    hideHeader: true,
     rows: [
       {
         id: 'total_cash_flow',
@@ -387,10 +412,17 @@ export function transformMFDcfToGrid(
     ],
   };
 
-  return {
-    periods,
-    sections: [revenueSection, expenseSection, noiSection, reversionSection, totalCashFlowSection, dcfSection],
-  };
+  const sections: CashFlowSection[] = [
+    revenueSection,
+    expenseSection,
+    noiSection,
+    ...(capexValueAddSection ? [capexValueAddSection] : []),
+    reversionSection,
+    totalCashFlowSection,
+    dcfSection,
+  ];
+
+  return { periods, sections };
 }
 
 // ============================================================================
@@ -617,10 +649,11 @@ const TERMINAL_ROW_FIELD_MAP: Record<string, string> = {
   base_opex: 'base_opex',
   management_fee: 'management_fee',
   replacement_reserves: 'replacement_reserves',
-  reno_capex: 'reno_capex',
-  relocation_cost: 'relocation_cost',
-  total_opex: 'total_opex',
-  noi: 'noi',
+  total_opex: 'total_opex',           // Display value (excludes reno in value-add)
+  noi: 'noi',                          // Display value (excludes reno in value-add)
+  reno_capex: 'reno_capex',           // Now in Cap-X Value-Add section
+  relocation_cost: 'relocation_cost', // Now in Cap-X Value-Add section
+  total_capex_valueadd: '__computed__', // Sum of reno_capex + relocation_cost
 };
 
 /**
@@ -665,18 +698,35 @@ function appendTerminalYear(
         .reduce((sum, [, val]) => sum + (val || 0), 0);
 
       // Get terminal value (if this row maps to a terminal field)
-      const terminalValue = fieldKey !== undefined
-        ? (row.id === 'egi'
-            ? computeEgiValue({
-                gpr: terminalData.gpr,
-                vacancy_loss: terminalData.vacancy_loss,
-                credit_loss: terminalData.credit_loss,
-                other_income: terminalData.other_income,
-              })
-            : ['vacancy_loss', 'credit_loss', 'reno_vacancy_loss'].includes(row.id)
-              ? toNegative(terminalData[fieldKey])
-              : toNumber(terminalData[fieldKey]))
-        : undefined;
+      let terminalValue: number | undefined;
+      if (fieldKey === undefined) {
+        terminalValue = undefined;
+      } else if (row.id === 'egi') {
+        terminalValue = computeEgiValue({
+          gpr: terminalData.gpr,
+          vacancy_loss: terminalData.vacancy_loss,
+          credit_loss: terminalData.credit_loss,
+          other_income: terminalData.other_income,
+        });
+      } else if (['vacancy_loss', 'credit_loss', 'reno_vacancy_loss'].includes(row.id)) {
+        terminalValue = toNegative(terminalData[fieldKey]);
+      } else if (row.id === 'total_opex') {
+        // Display total_opex excludes reno costs in value-add mode
+        terminalValue = toNumber(terminalData.total_opex)
+          - toNumber(terminalData.reno_capex)
+          - toNumber(terminalData.relocation_cost);
+      } else if (row.id === 'noi') {
+        // Display NOI excludes reno costs in value-add mode
+        terminalValue = toNumber(terminalData.noi)
+          + toNumber(terminalData.reno_capex)
+          + toNumber(terminalData.relocation_cost);
+      } else if (fieldKey === '__computed__') {
+        // Computed rows (e.g. total_capex_valueadd)
+        terminalValue = toNumber(terminalData.reno_capex)
+          + toNumber(terminalData.relocation_cost);
+      } else {
+        terminalValue = toNumber(terminalData[fieldKey]);
+      }
 
       const newValues = { ...row.values };
       if (terminalValue !== undefined) {

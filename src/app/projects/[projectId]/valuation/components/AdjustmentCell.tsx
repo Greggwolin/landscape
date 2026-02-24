@@ -62,10 +62,11 @@ export function AdjustmentCell({
 
   return (
     <td
-      className="py-1 px-4 text-center border-l"
       style={{
-        borderColor: 'var(--cui-border-color)',
-        whiteSpace: 'nowrap'
+        padding: '0.25rem 1rem',
+        textAlign: 'center',
+        borderLeft: '1px solid var(--cui-border-color)',
+        whiteSpace: 'nowrap',
       }}
     >
       <input
@@ -81,7 +82,7 @@ export function AdjustmentCell({
           }
         }}
         placeholder="-"
-        className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+        className="comparables-grid-input"
         style={{
           color: 'var(--cui-body-color)',
           outline: 'none',
@@ -92,7 +93,7 @@ export function AdjustmentCell({
           backgroundColor: 'transparent',
           fontSize: '13px',
           lineHeight: '1.2',
-          minHeight: '20px'
+          minHeight: '20px',
         }}
       />
     </td>

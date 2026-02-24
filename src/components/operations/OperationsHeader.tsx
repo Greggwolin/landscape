@@ -10,6 +10,7 @@ interface OperationsHeaderProps {
   isSaving?: boolean;
   isDirty?: boolean;
   onSave?: () => void;
+  children?: React.ReactNode;
 }
 
 /**
@@ -23,13 +24,15 @@ export function OperationsHeader({
   totalSF,
   isSaving = false,
   isDirty = false,
-  onSave
+  onSave,
+  children
 }: OperationsHeaderProps) {
   return (
     <CCardHeader className="ops-header d-flex justify-content-between align-items-center">
       <span className="fw-semibold">Operating Statement · {projectName}</span>
       <div className="ops-header-right">
         <div className="ops-header-pills">
+          {children}
           <span className="ops-pill">
             Units: <b>{unitCount.toLocaleString()}</b>
           </span>

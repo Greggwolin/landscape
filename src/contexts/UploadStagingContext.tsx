@@ -234,6 +234,47 @@ export function UploadStagingProvider({
 
       dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'uploading' } });
 
+      // Collision: save as new version instead of creating a duplicate doc
+      if (staged.collision && projectId) {
+        try {
+          const formData = new FormData();
+          formData.append('file', staged.file);
+          if (staged.collision.matchType === 'both' || staged.collision.matchType === 'content') {
+            formData.append(
+              'version_notes',
+              `Exact duplicate content detected for V${staged.collision.existingDoc.version_number}. No differences found.`
+            );
+          }
+
+          const response = await fetch(
+            `/api/projects/${projectId}/dms/docs/${staged.collision.existingDoc.doc_id}/version`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || 'Failed to upload new version');
+          }
+
+          dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
+          return;
+        } catch (error) {
+          console.error(`[STAGING] Version upload error for ${staged.file.name}:`, error);
+          dispatch({
+            type: 'UPDATE_FILE',
+            id,
+            updates: {
+              status: 'error',
+              errorMessage: error instanceof Error ? error.message : 'Version upload failed',
+            },
+          });
+          return;
+        }
+      }
+
       // Route B: Cost Library stub
       if (effectiveRoute === 'library') {
         dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });

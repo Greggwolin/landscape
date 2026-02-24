@@ -1,0 +1,11 @@
+[    1462ms] [WARNING] Image with src "/logo-invert.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[    3478ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:8000/api/v1/map/features/17/:0
+[    3478ms] [ERROR] Error fetching map features: Error: Failed to fetch features: 401
+    at useMapFeatures.useCallback[fetchFeatures] (webpack-internal:///(app-pages-browser)/./src/components/map-tab/hooks/useMapFeatures.ts:35:27) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[    3485ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:8000/api/v1/map/features/17/:0
+[    3486ms] [ERROR] Error fetching map features: Error: Failed to fetch features: 401
+    at useMapFeatures.useCallback[fetchFeatures] (webpack-internal:///(app-pages-browser)/./src/components/map-tab/hooks/useMapFeatures.ts:35:27) @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[    5815ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/api/gis/ingest-parcels?project_id=17:0
+[   61148ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr' failed:  @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/use-websocket.js:41
+[   64616ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/projects/17/extractions/pending:0
+[   64674ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/projects/17/extraction-jobs:0

@@ -96,6 +96,43 @@ const ADJUSTMENT_SECTIONS_LAND: AdjustmentSectionDef[] = [
   }
 ];
 
+/* ── Shared cell styles ────────────────────────────────── */
+const stickyLabel: React.CSSProperties = {
+  padding: '0.25rem 1rem',
+  fontWeight: 500,
+  position: 'sticky',
+  left: 0,
+  zIndex: 10,
+  color: 'var(--cui-secondary-color)',
+  backgroundColor: 'var(--cui-card-bg)',
+};
+const dataCell: React.CSSProperties = {
+  padding: '0.25rem 1rem',
+  textAlign: 'center',
+  borderLeft: '1px solid var(--cui-border-color)',
+  whiteSpace: 'nowrap',
+};
+const dataCellBody: React.CSSProperties = { ...dataCell, color: 'var(--cui-body-color)' };
+const dataCellMuted: React.CSSProperties = { ...dataCell, color: 'var(--cui-secondary-color)' };
+const dataCellMedium: React.CSSProperties = { ...dataCellBody, fontWeight: 500 };
+const dataCellCompact: React.CSSProperties = { ...dataCell, padding: '0.25rem 0.5rem' };
+const adjStickyLabel: React.CSSProperties = {
+  padding: '0.5rem 1rem',
+  fontWeight: 600,
+  position: 'sticky',
+  left: 0,
+  zIndex: 10,
+  color: 'var(--cui-body-color)',
+};
+const adjDataCell: React.CSSProperties = {
+  padding: '0.5rem 1rem',
+  textAlign: 'center',
+  borderLeft: '1px solid var(--cui-border-color)',
+};
+const adjBoldCell: React.CSSProperties = { ...adjDataCell, fontWeight: 700 };
+const adjPriceCell: React.CSSProperties = { ...adjDataCell, fontWeight: 700, fontSize: '1rem', padding: '0.75rem 1rem' };
+const rowBorderStyle: React.CSSProperties = { borderBottom: '1px solid var(--cui-border-color)' };
+
 export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdit, onDelete, onRefresh, onAddComp, mode = 'multifamily' }: ComparablesGridProps) {
   const ADJUSTMENT_SECTIONS = mode === 'land' ? ADJUSTMENT_SECTIONS_LAND : ADJUSTMENT_SECTIONS_MF;
   const [openSections, setOpenSections] = useState<Record<AdjustmentSectionKey, boolean>>({
@@ -512,8 +549,10 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
         step={step}
         value={getFieldDisplayValue(comp, field)}
         placeholder={placeholder}
-        className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
         style={{
+          width: '100%',
+          padding: '0 0.25rem',
+          textAlign: 'center',
           color: 'var(--cui-body-color)',
           outline: 'none',
           boxShadow: 'none',
@@ -523,7 +562,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
           backgroundColor: 'transparent',
           fontSize: '13px',
           lineHeight: '1.2',
-          height: '18px'
+          height: '18px',
         }}
         onChange={(event) => {
           setPendingFieldValue(comp.comparable_id, field, event.target.value);
@@ -738,17 +777,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     return (
     <td
       key={`subject-${adjType}`}
-      className="py-1 px-4 text-center border-l"
-      style={{
-        borderColor: 'var(--cui-border-color)',
-        whiteSpace: 'nowrap'
-      }}
+      style={dataCell}
     >
       {adjType === 'property_rights' ? (
         <select
           value={subjectOwnership}
           onChange={(event) => setSubjectOwnership(event.target.value)}
-          className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+          className="comparables-grid-input"
           style={{
             color: 'var(--cui-body-color)',
             outline: 'none',
@@ -781,7 +816,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
           onChange={(event) => handleSubjectAdjustmentChange(valueKey, event.target.value)}
           onBlur={handleDeferredBlur}
           placeholder={placeholder}
-          className="w-full px-1 py-0 text-center border-0 rounded-none bg-transparent focus:border-0 focus:outline-none"
+          className="comparables-grid-input"
           style={{
             color: 'var(--cui-body-color)',
             outline: 'none',
@@ -810,13 +845,11 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
   ) => {
     const paddingLeft = 16 + indentLevel * 12;
     return (
-      <tr key={`${sectionKey}-${adjType}`} className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+      <tr key={`${sectionKey}-${adjType}`} style={rowBorderStyle}>
         <td
-          className="py-1 px-4 font-medium sticky left-0 z-10"
           style={{
-            color: 'var(--cui-secondary-color)',
-            backgroundColor: 'var(--cui-card-bg)',
-            paddingLeft: `${paddingLeft}px`
+            ...stickyLabel,
+            paddingLeft: `${paddingLeft}px`,
           }}
         >
           {label}
@@ -835,12 +868,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
           : comparables.map(comp => (
             <td
               key={`${sectionKey}-${adjType}-${comp.comparable_id}`}
-              className="py-1 px-4 text-center border-l"
-              style={{
-                color: 'var(--cui-secondary-color)',
-                borderColor: 'var(--cui-border-color)',
-                whiteSpace: 'nowrap'
-              }}
+              style={dataCellMuted}
             >
               -
             </td>
@@ -852,55 +880,72 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
   return (
     <>
-      <div className="space-y-4 comparables-grid">
+      <div className="comparables-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              zIndex: 1040,
+            }}
             onClick={() => setDeleteModalOpen(null)}
           />
 
           {/* Modal */}
           <div
-            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] rounded-lg shadow-2xl z-50"
-            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '600px',
+              borderRadius: 'var(--cui-border-radius)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+              zIndex: 1050,
+              backgroundColor: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+            }}
           >
             {/* Header */}
             <div
-              className="px-6 py-4 border-b"
               style={{
+                padding: '1rem 1.5rem',
+                borderBottom: '1px solid var(--cui-border-color)',
                 backgroundColor: 'var(--cui-tertiary-bg)',
-                borderColor: 'var(--cui-border-color)'
               }}
             >
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+              <h3 className="mb-0" style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
                 Delete Comparable?
               </h3>
             </div>
 
             {/* Content */}
-            <div className="p-6">
-              <p className="mb-4" style={{ color: 'var(--cui-body-color)' }}>
+            <div style={{ padding: '1.5rem' }}>
+              <p style={{ marginBottom: '1rem', color: 'var(--cui-body-color)' }}>
                 You're about to remove <strong>{deleteModalOpen.comp.property_name}</strong> from your analysis.
               </p>
 
               {/* AI Analysis */}
               <div
-                className="p-4 rounded mb-4"
                 style={{
+                  padding: '1rem',
+                  borderRadius: 'var(--cui-border-radius)',
+                  marginBottom: '1rem',
                   backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  border: '1px solid rgba(59, 130, 246, 0.3)'
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
                 }}
               >
-                <div className="flex items-start gap-3">
-                  <div className="text-2xl">🤖</div>
+                <div className="d-flex" style={{ gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '1.5rem' }}>🤖</div>
                   <div>
-                    <div className="font-semibold mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: 'var(--cui-body-color)' }}>
                       AI Analysis
                     </div>
-                    <div className="text-sm" style={{ color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
                       {(() => {
                         const comp = deleteModalOpen.comp;
                         const totalAdj = Math.abs(getTotalAdjustmentPct(comp) * 100);
@@ -909,10 +954,10 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                         if (totalAdj > 25) {
                           return (
                             <>
-                              <p className="mb-2">
-                                <strong>You're right, this objectively isn't a good comp.</strong> This property requires <strong>{totalAdj.toFixed(0)}%</strong> in total adjustments, which exceeds the 25% threshold for reliable comparability.
+                              <p style={{ marginBottom: '0.5rem' }}>
+                                <strong>You&apos;re right, this objectively isn&apos;t a good comp.</strong> This property requires <strong>{totalAdj.toFixed(0)}%</strong> in total adjustments, which exceeds the 25% threshold for reliable comparability.
                               </p>
-                              <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
                                 Removing it will improve the reliability of your indicated value calculation.
                               </p>
                             </>
@@ -920,22 +965,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                         } else if (totalAdj > 15) {
                           return (
                             <>
-                              <p className="mb-2">
+                              <p style={{ marginBottom: '0.5rem' }}>
                                 This comparable requires <strong>{totalAdj.toFixed(0)}%</strong> in adjustments, which is moderate but still within acceptable range. Consider whether the specific characteristics justify removal.
                               </p>
-                              <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                                I'll note your reasoning to improve future comparable selection.
+                              <p style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                                I&apos;ll note your reasoning to improve future comparable selection.
                               </p>
                             </>
                           );
                         } else {
                           return (
                             <>
-                              <p className="mb-2">
+                              <p style={{ marginBottom: '0.5rem' }}>
                                 This is actually a <strong>good comparable</strong> - it only requires <strong>{totalAdj.toFixed(0)}%</strong> in total adjustments. Are you sure you want to remove it?
                               </p>
-                              <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                                I'll learn from your decision to better understand subtle comparability factors.
+                              <p style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                                I&apos;ll learn from your decision to better understand subtle comparability factors.
                               </p>
                             </>
                           );
@@ -947,21 +992,23 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </div>
 
               <div
-                className="text-xs p-3 rounded"
                 style={{
+                  fontSize: '0.75rem',
+                  padding: '0.75rem',
+                  borderRadius: 'var(--cui-border-radius)',
                   backgroundColor: 'rgba(234, 179, 8, 0.1)',
                   border: '1px solid rgba(234, 179, 8, 0.3)',
-                  color: 'var(--cui-body-color)'
+                  color: 'var(--cui-body-color)',
                 }}
               >
-                <strong>Note:</strong> This comparable will be retained in my persistent knowledge along with metadata about why it wasn't suitable, helping me learn more nuanced comparative analysis for future projects.
+                <strong>Note:</strong> This comparable will be retained in my persistent knowledge along with metadata about why it wasn&apos;t suitable, helping me learn more nuanced comparative analysis for future projects.
               </div>
             </div>
 
             {/* Footer */}
             <div
-              className="px-6 py-4 border-t flex justify-end gap-3"
-              style={{ borderColor: 'var(--cui-border-color)' }}
+              className="d-flex justify-content-end"
+              style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--cui-border-color)', gap: '0.75rem' }}
             >
               <LandscapeButton
                 color="secondary"
@@ -984,14 +1031,15 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
       {/* Comparables Table */}
       <div
-        className="rounded-lg border overflow-hidden"
+        className="card"
         style={{
           backgroundColor: 'var(--cui-card-bg)',
-          borderColor: 'var(--cui-border-color)'
+          borderColor: 'var(--cui-border-color)',
+          overflow: 'hidden',
         }}
       >
-        <div className="overflow-x-auto">
-          <table className="text-sm" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
             {/* Column widths */}
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
@@ -1006,27 +1054,31 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
             <thead>
               {/* Main header row - Comp numbers with Edit/Save */}
               <tr
-                className="border-b"
                 style={{
                   backgroundColor: 'var(--cui-tertiary-bg)',
-                  borderColor: 'var(--cui-border-color)'
+                  borderBottom: '1px solid var(--cui-border-color)',
                 }}
               >
                 <th
-                  className="text-left py-1 px-2 font-semibold sticky left-0 z-10"
                   style={{
+                    textAlign: 'left',
+                    padding: '0.25rem 0.5rem',
+                    fontWeight: 600,
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 10,
                     color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-card-header-bg)'
+                    backgroundColor: 'var(--cui-card-header-bg)',
                   }}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
                     <span>Comparable Sale</span>
                     <LandscapeButton
                       variant="ghost"
                       color="primary"
                       size="sm"
                       onClick={onAddComp}
-                      className="!p-0 transition-opacity hover:opacity-70"
+                      style={{ padding: 0, transition: 'opacity 0.2s' }}
                       title="Add Comparable"
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1036,27 +1088,31 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                   </div>
                 </th>
                 <th
-                  className="text-center py-1 px-2 font-semibold border-l"
                   style={{
+                    textAlign: 'center',
+                    padding: '0.25rem 0.5rem',
+                    fontWeight: 600,
+                    borderLeft: '1px solid var(--cui-border-color)',
                     color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)'
                   }}
                 >
-                  <div className="flex flex-col items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
+                  <div className="d-flex flex-column align-items-center" style={{ gap: '0.5rem', whiteSpace: 'nowrap' }}>
                     <span>Subject</span>
                   </div>
                 </th>
                 {comparables.map((comp, idx) => (
                   <th
                     key={`comp-header-${comp.comparable_id}`}
-                    className="text-center py-1 px-2 font-semibold border-l"
                     style={{
+                      textAlign: 'center',
+                      padding: '0.25rem 0.5rem',
+                      fontWeight: 600,
+                      borderLeft: '1px solid var(--cui-border-color)',
                       color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)'
                     }}
                   >
-                    <div className="flex flex-col items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
-                      <span className="flex items-center gap-2">
+                    <div className="d-flex flex-column align-items-center" style={{ gap: '0.5rem', whiteSpace: 'nowrap' }}>
+                      <span className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
                         Comp {idx + 1}
                         {onEdit && (
                           <LandscapeButton
@@ -1064,7 +1120,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                             color="secondary"
                             size="sm"
                             onClick={() => onEdit(comp)}
-                            className="!p-0 transition-opacity hover:opacity-70"
+                            style={{ padding: 0, transition: 'opacity 0.2s' }}
                             title="Edit comparable"
                           >
                             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: 0.5 }}>
@@ -1077,7 +1133,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                           color="secondary"
                           size="sm"
                           onClick={() => handleDeleteClick(comp.comparable_id)}
-                          className="!p-0 transition-opacity hover:opacity-70"
+                          style={{ padding: 0, transition: 'opacity 0.2s' }}
                           title="Delete comparable"
                         >
                           <svg className="icon" width="14" height="14" viewBox="0 0 512 512" style={{ opacity: 0.5 }}>
@@ -1092,7 +1148,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                           </svg>
                         </LandscapeButton>
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
                       </div>
                     </div>
                   </th>
@@ -1102,27 +1158,21 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
             <tbody>
               {/* Photo Row */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)',
-                  }}
+                  style={stickyLabel}
                 >
                   Photo
                 </td>
                 <td
-                  className="py-1 px-4 text-center border-l"
-                  style={{ borderColor: 'var(--cui-border-color)' }}
+                  style={dataCell}
                 >
                   {/* Subject — no photo */}
                 </td>
                 {comparables.map((comp) => (
                   <td
                     key={`photo-${comp.comparable_id}`}
-                    className="py-1 px-2 text-center border-l"
-                    style={{ borderColor: 'var(--cui-border-color)' }}
+                    style={dataCellCompact}
                   >
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <EntityMediaDisplay
@@ -1139,36 +1189,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Location - Distance and Bearing */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   Location
                 </td>
                 <td
                   key="subject-location"
-                  className="py-1 px-4 text-center border-l text-sm"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={{ ...dataCellMuted, fontSize: '0.875rem' }}
                 >
                   {subjectCityLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`loc-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l text-sm"
-                    style={{
-                      color: 'var(--cui-secondary-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={{ ...dataCellMuted, fontSize: '0.875rem' }}
                   >
                     {renderEditableInput(comp, 'city', { type: 'text', placeholder: 'City' })}
                   </td>
@@ -1176,36 +1212,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Date */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   Date
                 </td>
                 <td
                   key="subject-date"
-                  className="py-1 px-4 text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellBody}
                 >
                   {subjectAnalysisDateLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`date-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellBody}
                   >
                     {renderEditableInput(comp, 'sale_date', {
                       type: 'text',
@@ -1216,36 +1238,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Sale Price */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   Sale Price
                 </td>
                 <td
                   key="subject-sale-price"
-                  className="py-1 px-4 font-medium text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellMedium}
                 >
                   N/A
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`price-${comp.comparable_id}`}
-                    className="py-1 px-4 font-medium text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellMedium}
                   >
                     {renderEditableInput(comp, 'sale_price', {
                       type: 'text',
@@ -1257,36 +1265,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Price/Unit (or Price/Acre for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Price/Unit')}
                 </td>
                 <td
                   key="subject-ppu"
-                  className="py-1 px-4 font-medium text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellMedium}
                 >
                   N/A
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`ppu-${comp.comparable_id}`}
-                    className="py-1 px-4 font-medium text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellMedium}
                   >
                     {renderEditableInput(comp, 'price_per_unit', {
                       type: 'text',
@@ -1298,36 +1292,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Price/SF (or Price/Front Foot for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Price/SF')}
                 </td>
                 <td
                   key="subject-psf"
-                  className="py-1 px-4 font-medium text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellMedium}
                 >
                   N/A
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`psf-${comp.comparable_id}`}
-                    className="py-1 px-4 font-medium text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellMedium}
                   >
                     {renderEditableInput(comp, 'price_per_sf', {
                       type: 'text',
@@ -1339,36 +1319,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Units (or Acres for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Units')}
                 </td>
                 <td
                   key="subject-units"
-                  className="py-1 px-4 text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellBody}
                 >
                   {subjectUnitsLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`units-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellBody}
                   >
                     {renderEditableInput(comp, 'units', {
                       type: 'text',
@@ -1380,36 +1346,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Building SF (or Zoning for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Building SF')}
                 </td>
                 <td
                   key="subject-building-sf"
-                  className="py-1 px-4 text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellBody}
                 >
                   {subjectBuildingSfLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`bsf-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellBody}
                   >
                     {renderEditableInput(comp, 'building_sf', {
                       type: 'text',
@@ -1421,36 +1373,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Cap Rate (or Entitlements for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Cap Rate')}
                 </td>
                 <td
                   key="subject-cap-rate"
-                  className="py-1 px-4 text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellBody}
                 >
                   N/A
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`cap-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellBody}
                   >
                     {renderEditableInput(comp, 'cap_rate', {
                       type: 'text',
@@ -1462,36 +1400,22 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               </tr>
 
               {/* Year Built (or Utilities for land) */}
-              <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+              <tr style={rowBorderStyle}>
                 <td
-                  className="py-1 px-4 font-medium sticky left-0 z-10"
-                  style={{
-                    color: 'var(--cui-secondary-color)',
-                    backgroundColor: 'var(--cui-card-bg)'
-                  }}
+                  style={stickyLabel}
                 >
                   {getFieldLabel('Year Built')}
                 </td>
                 <td
                   key="subject-year-built"
-                  className="py-1 px-4 text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)',
-                    whiteSpace: 'nowrap'
-                  }}
+                  style={dataCellBody}
                 >
                   {subjectYearBuiltLabel}
                 </td>
                 {comparables.map(comp => (
                 <td
                     key={`year-${comp.comparable_id}`}
-                    className="py-1 px-4 text-center border-l"
-                    style={{
-                      color: 'var(--cui-body-color)',
-                      borderColor: 'var(--cui-border-color)',
-                      whiteSpace: 'nowrap'
-                    }}
+                    style={dataCellBody}
                   >
                     {renderEditableInput(comp, 'year_built', {
                       type: 'text',
@@ -1508,14 +1432,15 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
       {/* Adjustments Table - Separate table */}
       <div
-        className="rounded-lg border overflow-hidden"
+        className="card"
         style={{
           backgroundColor: 'var(--cui-card-bg)',
-          borderColor: 'var(--cui-border-color)'
+          borderColor: 'var(--cui-border-color)',
+          overflow: 'hidden',
         }}
       >
-        <div className="overflow-x-auto">
-          <table className="text-sm" style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
             <colgroup>
               <col style={{ width: '220px', minWidth: '220px' }} />
               <col style={compColumnStyle} />
@@ -1526,31 +1451,27 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
             <thead>
               <tr
-                className="border-b"
                 style={{
                   backgroundColor: 'var(--cui-card-header-bg)',
-                  borderColor: 'var(--cui-border-color)'
+                  borderBottom: '1px solid var(--cui-border-color)',
                 }}
               >
                 <td
-                  className="py-2 px-4 font-semibold sticky left-0 z-10"
                   style={{
-                    color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-card-header-bg)'
+                    ...adjStickyLabel,
+                    backgroundColor: 'var(--cui-card-header-bg)',
                   }}
                 >
                   Adjustments
                 </td>
                 <td
-                  className="border-l"
                   style={{
-                    borderColor: 'var(--cui-border-color)',
-                    backgroundColor: 'var(--cui-card-header-bg)'
+                    borderLeft: '1px solid var(--cui-border-color)',
+                    backgroundColor: 'var(--cui-card-header-bg)',
                   }}
                 >
                   <div
-                    className="text-xs font-semibold text-center"
-                    style={{ color: 'var(--cui-secondary-color)' }}
+                    style={{ fontSize: '0.75rem', fontWeight: 600, textAlign: 'center', color: 'var(--cui-secondary-color)' }}
                   >
                     Subject
                   </div>
@@ -1558,14 +1479,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                 {comparables.map(comp => (
                   <td
                     key={`adj-header-${comp.comparable_id}`}
-                    className="border-l"
                     style={{
-                      borderColor: 'var(--cui-border-color)',
-                      backgroundColor: 'var(--cui-card-header-bg)'
+                      borderLeft: '1px solid var(--cui-border-color)',
+                      backgroundColor: 'var(--cui-card-header-bg)',
                     }}
                   >
                     {adjustmentsCollapsed && (
-                      <div className="text-xs font-semibold" style={{ color: 'var(--cui-secondary-color)' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)' }}>
                         {formatTotalAdjustment(getTotalAdjustmentPct(comp))}
                       </div>
                     )}
@@ -1578,26 +1498,28 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               {ADJUSTMENT_SECTIONS.map(section => (
                 <React.Fragment key={`section-${section.key}`}>
                   <tr
-                    className="border-b"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-subheader-bg)' }}
+                    style={{ ...rowBorderStyle, backgroundColor: 'var(--cui-card-subheader-bg)' }}
                   >
                     <td
-                      className="py-2 px-4 font-semibold sticky left-0 z-10"
                       style={{
-                        color: 'var(--cui-body-color)',
-                        backgroundColor: 'var(--cui-card-subheader-bg)'
+                        ...adjStickyLabel,
+                        backgroundColor: 'var(--cui-card-subheader-bg)',
                       }}
                     >
                       <button
                         type="button"
                         onClick={() => toggleSection(section.key)}
                         aria-expanded={openSections[section.key]}
-                        className="w-full flex items-center gap-2 text-left"
-                        style={{ color: 'var(--cui-body-color)' }}
+                        className="d-flex align-items-center w-100"
+                        style={{ gap: '0.5rem', textAlign: 'left', color: 'var(--cui-body-color)', background: 'none', border: 'none', padding: 0, font: 'inherit' }}
                       >
                         <span
-                          className={`inline-block transition-transform duration-150 ${openSections[section.key] ? 'rotate-90' : ''}`}
-                          style={{ fontSize: '12px' }}
+                          style={{
+                            display: 'inline-block',
+                            fontSize: '12px',
+                            transition: 'transform 0.15s ease-in-out',
+                            transform: openSections[section.key] ? 'rotate(90deg)' : 'rotate(0deg)',
+                          }}
                           aria-hidden="true"
                         >
                           ▶
@@ -1605,17 +1527,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                         <span>{section.label}</span>
                       </button>
                     </td>
-                    <td
-                      className="py-2 px-4 border-l text-center"
-                      style={{ borderColor: 'var(--cui-border-color)' }}
-                    >
+                    <td style={adjDataCell}>
                       {/* Subject spacer */}
                     </td>
                     {comparables.map(comp => (
                       <td
                         key={`section-${section.key}-${comp.comparable_id}`}
-                        className="py-2 px-4 border-l text-center"
-                        style={{ borderColor: 'var(--cui-border-color)' }}
+                        style={adjDataCell}
                       >
                         {/* Spacer cell */}
                       </td>
@@ -1629,27 +1547,21 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
               ))}
 
               <tr
-                className="border-b"
                 style={{
-                  borderColor: 'var(--cui-border-color)',
-                  backgroundColor: 'var(--cui-tertiary-bg)'
+                  ...rowBorderStyle,
+                  backgroundColor: 'var(--cui-tertiary-bg)',
                 }}
               >
                 <td
-                  className="py-2 px-4 font-semibold sticky left-0 z-10"
                   style={{
-                    color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-tertiary-bg)'
+                    ...adjStickyLabel,
+                    backgroundColor: 'var(--cui-tertiary-bg)',
                   }}
                 >
                   Total Adjustments
                 </td>
                 <td
-                  className="py-2 px-4 font-bold text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)'
-                  }}
+                  style={{ ...adjBoldCell, color: 'var(--cui-body-color)' }}
                 >
                   N/A
                 </td>
@@ -1658,14 +1570,13 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
                   return (
                     <td
                       key={`total-${comp.comparable_id}`}
-                      className="py-2 px-4 font-bold text-center border-l"
                       style={{
+                        ...adjBoldCell,
                         color: totalAdjustmentPct > 0
                           ? 'var(--cui-success)'
                           : totalAdjustmentPct < 0
                           ? 'var(--cui-danger)'
                           : 'var(--cui-body-color)',
-                        borderColor: 'var(--cui-border-color)'
                       }}
                     >
                       {totalAdjustmentPct > 0 ? '+' : ''}
@@ -1677,31 +1588,23 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
 
               <tr style={{ backgroundColor: 'var(--surface-subheader)' }}>
                 <td
-                  className="py-3 px-4 font-semibold sticky left-0 z-10"
                   style={{
-                    color: 'var(--cui-body-color)',
-                    backgroundColor: 'var(--cui-tertiary-bg)'
+                    ...adjStickyLabel,
+                    padding: '0.75rem 1rem',
+                    backgroundColor: 'var(--cui-tertiary-bg)',
                   }}
                 >
                   Adjusted Price/Unit
                 </td>
                 <td
-                  className="py-3 px-4 font-bold text-base text-center border-l"
-                  style={{
-                    color: 'var(--cui-body-color)',
-                    borderColor: 'var(--cui-border-color)'
-                  }}
+                  style={{ ...adjPriceCell, color: 'var(--cui-body-color)' }}
                 >
                   N/A
                 </td>
                 {comparables.map(comp => (
                   <td
                     key={`adj-price-${comp.comparable_id}`}
-                    className="py-3 px-4 font-bold text-base text-center border-l"
-                    style={{
-                      color: 'var(--cui-primary)',
-                      borderColor: 'var(--cui-border-color)'
-                    }}
+                    style={{ ...adjPriceCell, color: 'var(--cui-primary)' }}
                   >
                     {formatCurrency(getAdjustedPricePerUnit(comp))}
                   </td>
@@ -1713,6 +1616,20 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
       </div>
       </div>
       <style jsx global>{`
+        .comparables-grid-input {
+          width: 100%;
+          padding: 0 0.25rem;
+          text-align: center;
+          border: none;
+          border-radius: 0;
+          background-color: transparent;
+          outline: none;
+          box-shadow: none;
+          color: var(--cui-body-color);
+          font-size: 13px;
+          line-height: 1.2;
+          min-height: 20px;
+        }
         .comparables-grid input,
         .comparables-grid input[type="text"],
         .comparables-grid input[type="number"] {

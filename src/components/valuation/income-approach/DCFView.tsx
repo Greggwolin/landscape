@@ -60,9 +60,18 @@ export function DCFView({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto mb-2" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '16rem' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              width: '2rem',
+              height: '2rem',
+              margin: '0 auto 0.5rem',
+              borderRadius: '9999px',
+              borderBottom: '2px solid var(--cui-primary)',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
           <p style={{ color: 'var(--cui-secondary-color)' }}>Calculating DCF...</p>
         </div>
       </div>
@@ -71,7 +80,7 @@ export function DCFView({
 
   if (!data) {
     return (
-      <div className="text-center py-8" style={{ color: 'var(--cui-secondary-color)' }}>
+      <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--cui-secondary-color)' }}>
         No DCF data available
       </div>
     );
@@ -92,41 +101,7 @@ export function DCFView({
   const sensitivity_matrix = monthlyData?.sensitivity_matrix ?? annualSensitivityMatrix;
 
   return (
-    <div className="space-y-6">
-      {/* Method Toggle */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onMethodChange?.('direct_cap')}
-          className="px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
-          style={{
-            backgroundColor: 'var(--cui-tertiary-bg)',
-            color: 'var(--cui-secondary-color)',
-            border: '1px solid var(--cui-border-color)',
-          }}
-        >
-          Direct Capitalization
-        </button>
-        <button
-          className="px-4 py-2 text-sm font-medium rounded-lg"
-          style={{
-            backgroundColor: dcfColors.border,
-            color: 'white',
-          }}
-        >
-          DCF Analysis
-        </button>
-        <span
-          className="ml-2 text-xs px-2 py-1 rounded"
-          style={{
-            backgroundColor: dcfColors.bg,
-            color: dcfColors.text,
-          }}
-        >
-          {assumptions.hold_period_years}-Year Hold
-        </span>
-      </div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Cash Flow Grid (if monthly data available) OR Legacy Table */}
       {gridData ? (
         <CashFlowGrid
@@ -150,38 +125,44 @@ export function DCFView({
       )}
 
       {/* Exit Analysis + Valuation Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
         {/* Exit Analysis Card */}
         <div
-          className="rounded-lg p-4"
           style={{
+            borderRadius: '0.5rem',
+            padding: '1rem',
             backgroundColor: 'var(--cui-card-bg)',
             border: '1px solid var(--cui-border-color)',
           }}
         >
-          <h4 className="font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
+          <h4 style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--cui-body-color)' }}>
             Exit Analysis
           </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Terminal NOI (Yr {assumptions.hold_period_years + 1})</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(exit_analysis.terminal_noi)}</span>
             </div>
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Exit Cap Rate</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatPercent(assumptions.terminal_cap_rate)}</span>
             </div>
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Gross Exit Value</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(exit_analysis.exit_value)}</span>
             </div>
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Less: Selling Costs ({formatPercent(assumptions.selling_costs_pct)})</span>
               <span style={{ color: 'var(--cui-danger)' }}>({formatCurrency(exit_analysis.selling_costs)})</span>
             </div>
             <div
-              className="flex justify-between pt-2 border-t font-semibold"
-              style={{ borderColor: 'var(--cui-border-color)' }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                paddingTop: '0.5rem',
+                borderTop: '1px solid var(--cui-border-color)',
+                fontWeight: 600,
+              }}
             >
               <span style={{ color: 'var(--cui-body-color)' }}>Net Reversion</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(exit_analysis.net_reversion)}</span>
@@ -191,48 +172,53 @@ export function DCFView({
 
         {/* Valuation Summary Card */}
         <div
-          className="rounded-lg p-4"
           style={{
+            borderRadius: '0.5rem',
+            padding: '1rem',
             backgroundColor: dcfColors.bg,
             border: `1px solid ${dcfColors.border}`,
           }}
         >
-          <h4 className="font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
+          <h4 style={{ fontWeight: 600, marginBottom: '0.75rem', color: 'var(--cui-body-color)' }}>
             DCF Valuation
           </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Discount Rate</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{formatPercent(assumptions.discount_rate)}</span>
             </div>
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Hold Period</span>
               <span style={{ color: 'var(--cui-body-color)' }}>{assumptions.hold_period_years} years</span>
             </div>
             <div
-              className="flex justify-between pt-2 border-t"
-              style={{ borderColor: 'var(--cui-border-color)' }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                paddingTop: '0.5rem',
+                borderTop: '1px solid var(--cui-border-color)',
+              }}
             >
-              <span className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>Present Value</span>
-              <span className="font-bold text-lg" style={{ color: dcfColors.text }}>
+              <span style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>Present Value</span>
+              <span style={{ fontWeight: 700, fontSize: '1.125rem', color: dcfColors.text }}>
                 {formatCurrency(metrics.present_value)}
               </span>
             </div>
             {metrics.irr !== null && (
-              <div className="flex justify-between">
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--cui-secondary-color)' }}>IRR</span>
-                <span className="font-semibold" style={{ color: dcfColors.text }}>
+                <span style={{ fontWeight: 600, color: dcfColors.text }}>
                   {formatPercent(metrics.irr)}
                 </span>
               </div>
             )}
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Price per Unit</span>
               <span style={{ color: 'var(--cui-body-color)' }}>
                 {metrics.price_per_unit ? formatPerUnit(metrics.price_per_unit) : '—'}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--cui-secondary-color)' }}>Price per SF</span>
               <span style={{ color: 'var(--cui-body-color)' }}>
                 {metrics.price_per_sf ? formatPerSF(metrics.price_per_sf) : '—'}
@@ -280,46 +266,60 @@ function LegacyCashFlowTable({
       ? projections
       : [...projections.slice(0, 3), null, ...projections.slice(-2)];
 
+  const cellPad: React.CSSProperties = { padding: '0.5rem 0.75rem' };
+  const cellRight: React.CSSProperties = { ...cellPad, textAlign: 'right' };
+  const cellLeft: React.CSSProperties = { ...cellPad, textAlign: 'left' };
+
   return (
     <div
-      className="rounded-lg overflow-hidden"
       style={{
+        borderRadius: '0.5rem',
+        overflow: 'hidden',
         backgroundColor: 'var(--cui-card-bg)',
         border: '1px solid var(--cui-border-color)',
       }}
     >
       <div
-        className="px-4 py-3 border-b flex items-center justify-between"
-        style={{ borderColor: 'var(--cui-border-color)' }}
+        style={{
+          padding: '0.75rem 1rem',
+          borderBottom: '1px solid var(--cui-border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
       >
-        <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+        <h3 style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>
           Cash Flow Projections
         </h3>
         {projections.length > 5 && (
           <button
             onClick={() => setShowAllYears(!showAllYears)}
-            className="text-sm px-2 py-1 rounded"
             style={{
+              fontSize: '0.875rem',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.25rem',
               color: dcfColors.text,
               backgroundColor: dcfColors.bg,
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             {showAllYears ? 'Show Summary' : `Show All ${projections.length} Years`}
           </button>
         )}
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-              <th className="px-3 py-2 text-left" style={{ color: 'var(--cui-secondary-color)' }}>Year</th>
-              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>GPR</th>
-              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>Vacancy</th>
-              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>EGI</th>
-              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>OpEx</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>NOI</th>
-              <th className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>PV Factor</th>
-              <th className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>PV of NOI</th>
+              <th style={{ ...cellLeft, color: 'var(--cui-secondary-color)' }}>Year</th>
+              <th style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>GPR</th>
+              <th style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>Vacancy</th>
+              <th style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>EGI</th>
+              <th style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>OpEx</th>
+              <th style={{ ...cellRight, color: 'var(--cui-body-color)', fontWeight: 600 }}>NOI</th>
+              <th style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>PV Factor</th>
+              <th style={{ ...cellRight, color: dcfColors.text, fontWeight: 600 }}>PV of NOI</th>
             </tr>
           </thead>
           <tbody>
@@ -327,7 +327,7 @@ function LegacyCashFlowTable({
               if (period === null) {
                 return (
                   <tr key="ellipsis" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                    <td colSpan={8} className="px-3 py-2 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+                    <td colSpan={8} style={{ ...cellPad, textAlign: 'center', color: 'var(--cui-secondary-color)' }}>
                       ...
                     </td>
                   </tr>
@@ -344,19 +344,19 @@ function LegacyCashFlowTable({
                 backgroundColor: 'var(--cui-tertiary-bg)',
               }}
             >
-              <td className="px-3 py-2 font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+              <td style={{ ...cellPad, fontWeight: 600, color: 'var(--cui-body-color)' }}>
                 Exit (Yr {projections.length})
               </td>
-              <td colSpan={4} className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+              <td colSpan={4} style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>
                 Terminal NOI: {formatCurrencyCompact(exit_analysis.terminal_noi)}
               </td>
-              <td className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+              <td style={{ ...cellRight, fontWeight: 600, color: 'var(--cui-body-color)' }}>
                 {formatCurrencyCompact(exit_analysis.net_reversion)}
               </td>
-              <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+              <td style={{ ...cellRight, color: 'var(--cui-secondary-color)' }}>
                 {(1 / Math.pow(1 + assumptions.discount_rate, projections.length)).toFixed(4)}
               </td>
-              <td className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>
+              <td style={{ ...cellRight, fontWeight: 600, color: dcfColors.text }}>
                 {formatCurrencyCompact(exit_analysis.pv_reversion)}
               </td>
             </tr>
@@ -367,10 +367,10 @@ function LegacyCashFlowTable({
                 backgroundColor: dcfColors.bg,
               }}
             >
-              <td colSpan={7} className="px-3 py-3 font-bold text-right" style={{ color: 'var(--cui-body-color)' }}>
-                PRESENT VALUE
+              <td colSpan={7} style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--cui-body-color)' }}>
+                Present Value
               </td>
-              <td className="px-3 py-3 text-right font-bold text-lg" style={{ color: dcfColors.text }}>
+              <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, fontSize: '1.125rem', color: dcfColors.text }}>
                 {formatCurrency(metrics.present_value)}
               </td>
             </tr>
@@ -386,6 +386,7 @@ function LegacyCashFlowTable({
  */
 function LegacyCashFlowRow({ period, isLast, theme }: { period: any; isLast: boolean; theme: 'light' | 'dark' }) {
   const dcfColors = getDCFTileColor(theme);
+  const cp: React.CSSProperties = { padding: '0.5rem 0.75rem', textAlign: 'right' };
   return (
     <tr
       style={{
@@ -393,28 +394,28 @@ function LegacyCashFlowRow({ period, isLast, theme }: { period: any; isLast: boo
         backgroundColor: isLast ? 'var(--cui-tertiary-bg)' : undefined,
       }}
     >
-      <td className="px-3 py-2 font-medium" style={{ color: 'var(--cui-body-color)' }}>
+      <td style={{ padding: '0.5rem 0.75rem', fontWeight: 500, color: 'var(--cui-body-color)' }}>
         {period.year}
       </td>
-      <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-body-color)' }}>
+      <td style={{ ...cp, color: 'var(--cui-body-color)' }}>
         {formatCurrencyCompact(period.gpr)}
       </td>
-      <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-danger)' }}>
+      <td style={{ ...cp, color: 'var(--cui-danger)' }}>
         ({formatCurrencyCompact(period.vacancy_loss)})
       </td>
-      <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-body-color)' }}>
+      <td style={{ ...cp, color: 'var(--cui-body-color)' }}>
         {formatCurrencyCompact(period.egi)}
       </td>
-      <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-danger)' }}>
+      <td style={{ ...cp, color: 'var(--cui-danger)' }}>
         ({formatCurrencyCompact(period.total_opex)})
       </td>
-      <td className="px-3 py-2 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+      <td style={{ ...cp, fontWeight: 600, color: 'var(--cui-body-color)' }}>
         {formatCurrencyCompact(period.noi)}
       </td>
-      <td className="px-3 py-2 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
+      <td style={{ ...cp, color: 'var(--cui-secondary-color)' }}>
         {period.pv_factor.toFixed(4)}
       </td>
-      <td className="px-3 py-2 text-right font-semibold" style={{ color: dcfColors.text }}>
+      <td style={{ ...cp, fontWeight: 600, color: dcfColors.text }}>
         {formatCurrencyCompact(period.pv_noi)}
       </td>
     </tr>
@@ -444,32 +445,37 @@ function DCFSensitivityMatrix({
   // Get exit cap rates from first row (all rows have same columns)
   const exitCapRates = data[0]?.exit_cap_rates || [];
 
+  const sPad: React.CSSProperties = { padding: '0.5rem 0.75rem' };
+  const sRight: React.CSSProperties = { ...sPad, textAlign: 'right' };
+
   return (
     <div
-      className="rounded-lg overflow-hidden"
       style={{
+        borderRadius: '0.5rem',
+        overflow: 'hidden',
         backgroundColor: 'var(--cui-card-bg)',
         border: '1px solid var(--cui-border-color)',
       }}
     >
       <div
-        className="px-4 py-3 border-b"
-        style={{ borderColor: 'var(--cui-border-color)' }}
+        style={{
+          padding: '0.75rem 1rem',
+          borderBottom: '1px solid var(--cui-border-color)',
+        }}
       >
-        <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+        <h3 style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>
           Sensitivity Analysis
         </h3>
-        <p className="text-xs mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
+        <p style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: 'var(--cui-secondary-color)' }}>
           Present Value at different Discount Rates (rows) and Exit Cap Rates (columns)
         </p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
               <th
-                className="px-3 py-2 text-left"
-                style={{ color: 'var(--cui-secondary-color)' }}
+                style={{ ...sPad, textAlign: 'left', color: 'var(--cui-secondary-color)' }}
               >
                 Discount ↓ / Exit Cap →
               </th>
@@ -478,8 +484,8 @@ function DCFSensitivityMatrix({
                 return (
                   <th
                     key={cap}
-                    className="px-3 py-2 text-right"
                     style={{
+                      ...sRight,
                       color: isSelectedCap ? dcfColors.text : 'var(--cui-secondary-color)',
                       fontWeight: isSelectedCap ? 'bold' : 'normal',
                     }}
@@ -502,8 +508,9 @@ function DCFSensitivityMatrix({
                   }}
                 >
                   <td
-                    className="px-3 py-2 font-medium"
                     style={{
+                      ...sPad,
+                      fontWeight: 500,
                       color: isSelectedRow ? dcfColors.text : 'var(--cui-body-color)',
                     }}
                   >
@@ -515,8 +522,8 @@ function DCFSensitivityMatrix({
                     return (
                       <td
                         key={colIdx}
-                        className="px-3 py-2 text-right"
                         style={{
+                          ...sRight,
                           color: isSelectedCell ? dcfColors.text : 'var(--cui-body-color)',
                           fontWeight: isSelectedCell ? 'bold' : 'normal',
                           backgroundColor: isSelectedCell ? dcfColors.border + '40' : undefined,

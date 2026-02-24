@@ -1,6 +1,6 @@
 export const COUNTY_PARCEL_SERVICES = {
   maricopa: {
-    url: 'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/Parcels/MapServer/0',
+    url: 'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/MaricopaDynamicQueryService/MapServer/3',
     idField: 'APN',
     ownerField: 'OWNER_NAME',
     addressField: 'PHYSICAL_ADDRESS',

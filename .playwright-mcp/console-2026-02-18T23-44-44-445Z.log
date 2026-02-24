@@ -1,0 +1,65 @@
+[     668ms] [ERROR] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+%s%s https://react.dev/link/hydration-mismatch 
+
+  ...
+    <CoreUIThemeProvider>
+      <ToastProvider>
+        <ProjectProvider>
+          <IssueReporterProvider>
+            <HelpLandscaperProvider>
+              <Suspense>
+                <HelpLandscaperProviderInner>
+                  <NavigationLayout>
+                    <div className="flex min-h...">
+                      <TopNavigationBar onSettingsClick={function onSettingsClick}>
+                        <header className="sticky top..." style={{...}}>
+                          <div className="flex items..." style={{height:"58px", ...}}>
+                            <LinkComponent>
+                            <div className="flex items...">
+                              <LinkComponent>
+                              <button>
+                              <button
+                                type="button"
+                                onClick={function HelpLandscaperProviderInner.useCallback[toggleHelp]}
+                                className="rounded-full p-2 transition-colors"
+                                style={{
++                                 color: "var(--nav-text)"
+-                                 color: "var(--nav-text)"
++                                 backgroundColor: "var(--nav-active-bg)"
+-                                 background-color: "transparent"
+                                }}
+                                onMouseEnter={function onMouseEnter}
+                                onMouseLeave={function onMouseLeave}
+                                aria-label="Help"
+                                title="Help"
+                              >
+                              ...
+                      <main
++                       className="flex-1 app-shell help-content-compressed"
+-                       className="flex-1 app-shell help-content-normal"
+                      >
+                      <HelpLandscaperPanel>
+                        <div
++                         className="help-panel help-panel--open"
+-                         className={"help-panel "}
+                        >
+                      ...
+            ...
+        ...
+ @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[     679ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:8000/api/auth/profile/:0
+[     684ms] [WARNING] Image with src "/logo-invert.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/shared/lib/utils/warn-once.js:15
+[    2859ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8000/api/dynamic-columns/?project_id=17&table_name=multifamily_unit:0
+[    2873ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8000/api/dynamic-columns/?project_id=17&table_name=multifamily_unit:0
+[  296202ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/projects/17?folder=property&tab=rent-roll&_rsc=7dywq:0
+[  297379ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/projects/17?folder=property&tab=rent-roll&_rsc=7dywq:0
+[  298269ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/projects/17?folder=property&tab=rent-roll:0
