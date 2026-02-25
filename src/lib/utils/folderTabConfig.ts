@@ -380,7 +380,7 @@ export function createFolderConfig(
 
     // ========================================
     // Position 7: Documents
-    // Subtabs: all (DMS), extractions (Intelligence)
+    // Subtabs: all (DMS), intelligence (Intelligence)
     // ========================================
     {
       id: 'documents',
@@ -388,7 +388,7 @@ export function createFolderConfig(
       color: TILE_COLORS.documents,
       subTabs: [
         { id: 'all', label: 'All Documents' },
-        { id: 'extractions', label: 'Intelligence' },
+        { id: 'intelligence', label: 'Intelligence' },
       ],
     },
 

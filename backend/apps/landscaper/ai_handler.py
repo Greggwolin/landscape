@@ -5318,6 +5318,155 @@ LANDSCAPER_TOOLS.append(ALPHA_FEEDBACK_TOOL)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Analysis Draft Tools (conversational project creation)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DRAFT_TOOLS = [
+    {
+        "name": "create_analysis_draft",
+        "description": (
+            "Create a new analysis draft to stage a deal for conversational underwriting. "
+            "Use this when the user describes a new deal they want to analyze. "
+            "Extract all available information from their description and pass it here. "
+            "The draft is a staging area — no project is created yet."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "draft_name": {
+                    "type": "string",
+                    "description": "Short name for the draft, typically the address or property name"
+                },
+                "property_type": {
+                    "type": "string",
+                    "enum": ["MF", "LAND", "OFF", "RET", "IND", "HTL", "MXU"],
+                    "description": "Property type code inferred from user description"
+                },
+                "perspective": {
+                    "type": "string",
+                    "enum": ["INVESTMENT", "DEVELOPMENT"],
+                    "description": "Analysis perspective inferred from context (buying/holding = INVESTMENT, building = DEVELOPMENT)"
+                },
+                "purpose": {
+                    "type": "string",
+                    "enum": ["VALUATION", "UNDERWRITING"],
+                    "description": "Analysis purpose inferred from context (what is it worth = VALUATION, should we do this deal = UNDERWRITING)"
+                },
+                "value_add_enabled": {
+                    "type": "boolean",
+                    "description": "True if user mentions renovation, repositioning, or value-add"
+                },
+                "address": {"type": "string", "description": "Property street address"},
+                "city": {"type": "string", "description": "City"},
+                "state": {"type": "string", "description": "State (2-letter code preferred)"},
+                "zip_code": {"type": "string", "description": "ZIP code if provided"},
+                "inputs": {
+                    "type": "object",
+                    "description": (
+                        "All deal assumptions parsed from user description. Structure varies by property type. "
+                        "Common fields: unit_count, avg_sf, avg_monthly_rent, vacancy_pct, going_in_cap, "
+                        "opex_per_unit, ltv, debt_rate, loan_term_years, amortization_years, gp_equity_pct, "
+                        "pref_return_pct, exit_cap, hold_years, disposition_cost_pct, rent_growth_pct, "
+                        "expense_growth_pct, loan_origination_fee_pct, acquisition_fee_pct, asset_mgmt_fee_pct."
+                    )
+                }
+            },
+            "required": ["draft_name", "property_type", "inputs"]
+        }
+    },
+    {
+        "name": "update_analysis_draft",
+        "description": (
+            "Update an existing analysis draft with new or modified inputs. "
+            "Use this as the conversation progresses and the user provides additional assumptions. "
+            "The inputs object is merged with existing inputs (new keys added, existing keys overwritten)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "draft_id": {
+                    "type": "integer",
+                    "description": "ID of the draft to update"
+                },
+                "inputs": {
+                    "type": "object",
+                    "description": "Additional or updated deal assumptions to merge into the draft"
+                },
+                "perspective": {
+                    "type": "string",
+                    "enum": ["INVESTMENT", "DEVELOPMENT"],
+                    "description": "Update perspective if user corrects the inference"
+                },
+                "purpose": {
+                    "type": "string",
+                    "enum": ["VALUATION", "UNDERWRITING"],
+                    "description": "Update purpose if user corrects the inference"
+                },
+                "value_add_enabled": {
+                    "type": "boolean",
+                    "description": "Update value-add flag"
+                }
+            },
+            "required": ["draft_id", "inputs"]
+        }
+    },
+    {
+        "name": "run_draft_calculations",
+        "description": (
+            "Run financial calculations on a draft's inputs and return key metrics. "
+            "Use this to show the user intermediate or final results during the conversation. "
+            "Results are stored in the draft's calc_snapshot for reference. "
+            "Call this after collecting enough inputs for meaningful numbers "
+            "(at minimum: income + expenses + cap rate for a value conclusion)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "draft_id": {
+                    "type": "integer",
+                    "description": "ID of the draft to calculate"
+                },
+                "calc_type": {
+                    "type": "string",
+                    "enum": ["quick_value", "unleveraged", "leveraged", "full_waterfall"],
+                    "description": (
+                        "Level of calculation to run. quick_value = NOI/cap only. "
+                        "unleveraged = add reversion. leveraged = add debt service. "
+                        "full_waterfall = add equity waterfall."
+                    )
+                }
+            },
+            "required": ["draft_id"]
+        }
+    },
+    {
+        "name": "convert_draft_to_project",
+        "description": (
+            "Convert an analysis draft into a full Landscape project. "
+            "Only call this when the user explicitly asks to save the draft as a project. "
+            "Do NOT call this automatically — the user must opt in."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "draft_id": {
+                    "type": "integer",
+                    "description": "ID of the draft to convert"
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Name for the new project (defaults to draft_name if not provided)"
+                }
+            },
+            "required": ["draft_id"]
+        }
+    },
+]
+
+LANDSCAPER_TOOLS.extend(DRAFT_TOOLS)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # System Prompts by Project Type
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -5976,6 +6125,19 @@ You can help with:
 - Budget analysis and cost estimation
 - Cash flow projections
 - Investment return calculations
+
+## Conversational Deal Analysis
+
+You can help users explore a deal idea conversationally before creating a full project.
+Use the analysis draft tools to stage inputs incrementally:
+
+1. **Gather basics first**: property type, location, unit count / SF, rents or lot prices.
+2. **Create a draft** with `create_analysis_draft` once you have at least a name and property type.
+3. **Add details progressively** via `update_analysis_draft` — merge new assumptions as the conversation evolves.
+4. **Run quick numbers** with `run_draft_calculations` whenever the user asks "what does that look like?" or similar.
+5. **Convert to project** with `convert_draft_to_project` when the user is ready to move forward.
+
+Keep the conversation natural — don't ask for all inputs upfront. Collect 2-3 data points at a time, run calculations to show progress, and iterate.
 {BASE_INSTRUCTIONS}"""
 }
 

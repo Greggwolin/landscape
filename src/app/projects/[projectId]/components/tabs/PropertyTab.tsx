@@ -197,7 +197,7 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
   // If no comparable data, show a helpful message
   if (validComparables.length === 0) {
     return (
-      <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+      <p style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
         No rental comparables available. Use Landscaper to extract comp data from your OM or add comparables manually.
       </p>
     );
@@ -257,16 +257,23 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
   }
 
   return (
-    <div className="space-y-2 text-sm" style={{ color: 'var(--cui-body-color)' }}>
+    <div
+      style={{
+        color: 'var(--cui-body-color)',
+        fontSize: '0.875rem',
+        display: 'grid',
+        gap: '0.5rem',
+      }}
+    >
       <p>
-        <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Market Summary:</span>{' '}
+        <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Market Summary:</span>{' '}
         Analyzed {validComparables.length} unit types across {comparablesByProperty.length} properties.
-        Average asking rent is <span className="font-semibold">{formatCurrency(avgCompRent)}/mo</span> (range: {formatCurrency(minRent)}-{formatCurrency(maxRent)}).
-        {avgRentPerSqft > 0 && <> Average rent per SF: <span className="font-semibold">${avgRentPerSqft.toFixed(2)}/SF</span>.</>}
+        Average asking rent is <span style={{ fontWeight: 600 }}>{formatCurrency(avgCompRent)}/mo</span> (range: {formatCurrency(minRent)}-{formatCurrency(maxRent)}).
+        {avgRentPerSqft > 0 && <> Average rent per SF: <span style={{ fontWeight: 600 }}>${avgRentPerSqft.toFixed(2)}/SF</span>.</>}
       </p>
 
       <p>
-        <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>By Unit Type:</span>{' '}
+        <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>By Unit Type:</span>{' '}
         {Array.from(byBedroom.entries())
           .sort((a, b) => a[0] - b[0])
           .map(([beds, data]) => (
@@ -279,7 +286,7 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
 
       {nearestComp && (
         <p>
-          <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Nearest Comp:</span>{' '}
+          <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Nearest Comp:</span>{' '}
           {nearestComp.propertyName} ({nearestComp.distance} mi) — {formatCurrency(nearestComp.rentRange.min)}-{formatCurrency(nearestComp.rentRange.max)}/mo
           {nearestComp.yearBuilt && `, built ${nearestComp.yearBuilt}`}
           {nearestComp.totalUnits && `, ${nearestComp.totalUnits} units`}.
@@ -288,7 +295,7 @@ function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: 
 
       {marketGapText && (
         <p>
-          <span className="font-semibold" style={{ color: 'var(--cui-primary)' }}>Position:</span>{' '}
+          <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Position:</span>{' '}
           {marketGapText}
         </p>
       )}
@@ -1864,7 +1871,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   );
 
   const renderMarketContent = () => (
-    <div className="space-y-4">
+    <div style={{ display: 'grid', gap: '1rem' }}>
       <LocationIntelligenceCard
         projectId={project.project_id}
         projectName={project.project_name}
@@ -1875,103 +1882,170 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       />
 
       {/* Comparable Rentals with Map */}
-      <div className="overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)', borderRadius: 'var(--cui-border-radius, 0.375rem)' }}>
-        <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-            <div className="flex items-center gap-3">
-              <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-700/40">
+      <div
+        style={{
+          overflow: 'hidden',
+          backgroundColor: 'var(--cui-card-bg)',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: 'var(--cui-border-radius, 0.375rem)',
+        }}
+      >
+        <div
+          className="d-flex align-items-center justify-content-between"
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: 'var(--surface-card-header)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
+            <div className="d-flex align-items-center" style={{ gap: '0.75rem' }}>
+              <h3 style={{ color: 'var(--cui-body-color)', fontSize: '1rem', margin: 0, fontWeight: 600 }}>Comparable Rentals</h3>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.125rem 0.5rem',
+                  borderRadius: '999px',
+                  backgroundColor: 'var(--cui-info-bg)',
+                  color: 'var(--cui-info)',
+                  border: '1px solid var(--cui-info)',
+                }}
+              >
                 {comparablesByProperty.length} properties • {comparables.length} unit types
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
               <button
                 onClick={expandAll}
-                className="text-xs px-2 py-1 rounded transition-colors"
-                style={{ color: 'var(--cui-secondary-color)' }}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  color: 'var(--cui-secondary-color)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--cui-border-color)',
+                  transition: 'background-color 0.15s ease',
+                }}
               >
                 Expand All
               </button>
               <button
                 onClick={collapseAll}
-                className="text-xs px-2 py-1 rounded transition-colors"
-                style={{ color: 'var(--cui-secondary-color)' }}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  color: 'var(--cui-secondary-color)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--cui-border-color)',
+                  transition: 'background-color 0.15s ease',
+                }}
               >
                 Collapse All
               </button>
             </div>
           </div>
-          <div className="d-flex" style={{ backgroundColor: 'var(--cui-card-bg)', gap: '1rem', padding: '1rem' }}>
+          <div className="d-flex" style={{ backgroundColor: 'var(--cui-card-bg)', gap: '1rem', padding: '1rem', alignItems: 'stretch' }}>
             {/* Left: Collapsible Property Groups */}
-            <div className="space-y-1 pr-1 overflow-y-auto" style={{ flex: '0 0 50%', maxHeight: '500px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: '0.125rem',
+                paddingRight: '0.25rem',
+                flex: '0 0 50%',
+                alignContent: 'start',
+              }}
+            >
               {comparablesByProperty.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                <div style={{ textAlign: 'center', padding: '2rem 0', fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
                   <p>No rental comparables available.</p>
-                  <p className="text-xs mt-1">Ask Landscaper to extract comps from your OM.</p>
+                  <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Ask Landscaper to extract comps from your OM.</p>
                 </div>
               ) : (
                 comparablesByProperty.map((property, propIdx) => {
                   const isExpanded = expandedProperties.has(property.propertyName);
                   const isHighlighted = highlightedProperty === property.propertyName;
                   const propertyColor = propertyColors[property.propertyName];
+                  const unitTypeRows = Array.isArray(property.unitTypes)
+                    ? property.unitTypes.filter((unit): unit is RentalComparable => Boolean(unit))
+                    : [];
                   return (
                     <div
                       key={property.propertyName}
                       id={`property-${property.propertyName.replace(/\s+/g, '-')}`}
-                      className="border rounded-lg overflow-hidden transition-all duration-300"
                       style={{
-                        borderColor: isHighlighted ? propertyColor || '#3b82f6' : '#374151',
-                        boxShadow: isHighlighted ? `0 0 0 2px ${propertyColor || '#3b82f6'}40` : 'none',
+                        border: `1px solid ${isHighlighted ? (propertyColor || 'var(--cui-primary)') : 'var(--cui-border-color)'}`,
+                        borderRadius: '0.5rem',
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        boxShadow: isHighlighted ? '0 0 0 2px rgba(var(--cui-primary-rgb), 0.25)' : 'none',
                       }}
                     >
                       {/* Property Header - Clickable */}
                       <button
                         onClick={() => toggleProperty(property.propertyName)}
-                        className="w-full flex items-center justify-between px-3 py-2 transition-colors text-left"
-                        style={{ backgroundColor: propIdx % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}
+                        className="d-flex align-items-center justify-content-between"
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          transition: 'background-color 0.15s ease',
+                          textAlign: 'left',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          border: 'none',
+                        }}
                       >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="d-flex align-items-center" style={{ gap: '0.5rem', minWidth: 0, flex: 1 }}>
                           {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cui-secondary-color)' }} />
+                            <ChevronDown size={16} style={{ color: 'var(--cui-secondary-color)', flexShrink: 0 }} />
                           ) : (
-                            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cui-secondary-color)' }} />
+                            <ChevronRight size={16} style={{ color: 'var(--cui-secondary-color)', flexShrink: 0 }} />
                           )}
                           {/* Color dot */}
                           {propertyColor && (
                             <span
-                              className="w-3 h-3 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: propertyColor }}
+                              style={{ width: '0.75rem', height: '0.75rem', borderRadius: '999px', flexShrink: 0, backgroundColor: propertyColor }}
                             />
                           )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate" style={{ color: 'var(--cui-body-color)' }}>{property.propertyName}</span>
-                              <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>({property.unitTypes.length} types)</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+                              <span
+                                style={{
+                                  color: 'var(--cui-body-color)',
+                                  fontSize: '0.875rem',
+                                  fontWeight: 500,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {property.propertyName}
+                              </span>
+                              <span style={{ color: 'var(--cui-tertiary-color)', fontSize: '0.75rem' }}>({unitTypeRows.length} types)</span>
                             </div>
                             {property.address && (
-                              <div className="flex items-center gap-1 text-xs truncate" style={{ color: 'var(--cui-secondary-color)' }}>
-                                <MapPin className="w-3 h-3 flex-shrink-0" />
-                                <span className="truncate">{property.address}</span>
+                              <div className="d-flex align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                                <MapPin size={12} style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property.address}</span>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0 text-xs">
+                        <div className="d-flex align-items-center" style={{ gap: '0.75rem', flexShrink: 0, fontSize: '0.75rem' }}>
                           {property.distance && (
-                            <span className="text-blue-400 font-medium">{property.distance} mi</span>
+                            <span style={{ color: 'var(--cui-info)', fontWeight: 500 }}>{property.distance} mi</span>
                           )}
                           {property.yearBuilt && (
-                            <span className="flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                              <Calendar className="w-3 h-3" />
+                            <span className="d-flex align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)' }}>
+                              <Calendar size={12} />
                               {property.yearBuilt}
                             </span>
                           )}
                           {property.totalUnits && (
-                            <span className="flex items-center gap-1" style={{ color: 'var(--cui-secondary-color)' }}>
-                              <Building2 className="w-3 h-3" />
+                            <span className="d-flex align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)' }}>
+                              <Building2 size={12} />
                               {property.totalUnits}
                             </span>
                           )}
-                          <span className="text-green-400 font-medium">
+                          <span style={{ color: 'var(--cui-success)', fontWeight: 500 }}>
                             {property.rentRange.min === property.rentRange.max
                               ? formatCurrency(property.rentRange.min)
                               : `${formatCurrency(property.rentRange.min)} - ${formatCurrency(property.rentRange.max)}`
@@ -1983,34 +2057,63 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                       {/* Expanded Unit Types */}
                       {isExpanded && (
                         <div style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderTop: '1px solid var(--cui-border-color)' }}>
-                          <table className="w-full text-xs">
+                          <table style={{ width: '100%', fontSize: '0.75rem' }}>
                             <thead>
                               <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                                <th className="text-left px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)', minWidth: '140px' }}>Unit Type</th>
-                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
-                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
-                                <th className="text-center px-2 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
-                                <th className="text-right px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>Rent</th>
-                                <th className="text-right px-3 py-1.5 font-medium" style={{ color: 'var(--cui-secondary-color)' }}>$/SF</th>
+                                <th style={{ textAlign: 'left', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)', minWidth: '140px' }}>Unit Type</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Bed</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Bath</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>SF</th>
+                                <th style={{ textAlign: 'right', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Rent</th>
+                                <th style={{ textAlign: 'right', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>$/SF</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {property.unitTypes.map((unit, idx) => (
-                                <tr
-                                  key={unit.comparable_id}
-                                  className="last:border-b-0"
-                                  style={{ borderBottom: '1px solid var(--cui-border-color-translucent)', backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}
-                                >
-                                  <td className="px-3 py-1.5" style={{ color: 'var(--cui-body-color)' }}>{unit.unit_type || `${unit.bedrooms}BR/${unit.bathrooms}BA`}</td>
-                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</td>
-                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</td>
-                                  <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.avg_sqft)}</td>
-                                  <td className="px-3 py-1.5 text-right font-medium" style={{ color: 'var(--cui-success)' }}>{formatCurrency(unit.asking_rent)}</td>
-                                  <td className="px-3 py-1.5 text-right" style={{ color: 'var(--cui-secondary-color)' }}>
-                                    {unit.avg_sqft > 0 ? `$${(unit.asking_rent / unit.avg_sqft).toFixed(2)}` : '—'}
+                              {unitTypeRows.length === 0 ? (
+                                <tr>
+                                  <td
+                                    colSpan={6}
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      textAlign: 'center',
+                                      color: 'var(--cui-secondary-color)',
+                                      fontStyle: 'italic',
+                                    }}
+                                  >
+                                    No comparable floorplan rows available.
                                   </td>
                                 </tr>
-                              ))}
+                              ) : (
+                                unitTypeRows.map((unit, idx) => {
+                                  const isLastRow = idx === unitTypeRows.length - 1;
+                                  const askingRent = Number(unit.asking_rent);
+                                  const avgSqft = Number(unit.avg_sqft);
+                                  const rentPerSf = avgSqft > 0 && Number.isFinite(askingRent)
+                                    ? `$${(askingRent / avgSqft).toFixed(2)}`
+                                    : '—';
+
+                                  return (
+                                    <tr
+                                      key={`${property.propertyName}-${unit.comparable_id}-${idx}`}
+                                      style={{
+                                        borderBottom: isLastRow ? 'none' : '1px solid var(--cui-border-color-translucent)',
+                                        backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--cui-secondary-bg)',
+                                      }}
+                                    >
+                                      <td style={{ padding: '0.375rem 0.75rem', color: 'var(--cui-body-color)' }}>
+                                        {unit.unit_type || `${formatNumber(unit.bedrooms)}BR/${formatNumber(unit.bathrooms)}BA`}
+                                      </td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.avg_sqft)}</td>
+                                      <td style={{ padding: '0.375rem 0.75rem', textAlign: 'right', color: 'var(--cui-success)', fontWeight: 500 }}>{formatCurrency(unit.asking_rent)}</td>
+                                      <td style={{ padding: '0.375rem 0.75rem', textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
+                                        {rentPerSf}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -2023,28 +2126,32 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
             {/* Right: Competitive Market Graph (old map panel archived at tabs/archive/ComparableRentalsMapTemplate.tsx) */}
             <div
-              className="rounded-lg overflow-hidden"
               style={{
                 flex: '1 1 50%',
                 minHeight: '500px',
+                minWidth: 0,
                 backgroundColor: 'var(--cui-tertiary-bg)',
                 border: '1px solid var(--cui-border-color)',
-                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                overflow: 'hidden',
+                display: 'flex',
               }}
             >
               {comparables.length > 0 ? (
-                <CompetitiveMarketCharts
-                  comparables={comparables}
-                  floorPlans={floorPlans}
-                  subjectPropertyName={project.project_name}
-                  onPropertyClick={handlePropertyClick}
-                  onColorsAssigned={handleColorsAssigned}
-                  selectedProperty={highlightedProperty}
-                />
+                <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+                  <CompetitiveMarketCharts
+                    comparables={comparables}
+                    floorPlans={floorPlans}
+                    subjectPropertyName={project.project_name}
+                    onPropertyClick={handlePropertyClick}
+                    onColorsAssigned={handleColorsAssigned}
+                    selectedProperty={highlightedProperty}
+                  />
+                </div>
               ) : (
                 <div
                   className="h-100 d-flex align-items-center justify-content-center"
-                  style={{ color: 'var(--cui-secondary-color)' }}
+                  style={{ color: 'var(--cui-secondary-color)', width: '100%' }}
                 >
                   No chart data available.
                 </div>
@@ -2055,19 +2162,23 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
       {/* Landscaper Analysis - Comp-based market insights */}
       <div
-        className="rounded-lg p-4"
-        style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+        style={{
+          backgroundColor: 'var(--cui-card-bg)',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: '0.5rem',
+          padding: '1rem',
+        }}
       >
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0">
-            <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="d-flex align-items-start" style={{ gap: '0.75rem' }}>
+          <div style={{ flexShrink: 0 }}>
+            <svg style={{ color: 'var(--cui-primary)', width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>Landscaper Analysis</h4>
-              <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+          <div style={{ flex: 1 }}>
+            <div className="d-flex align-items-center" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <h4 style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>Landscaper Analysis</h4>
+              <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
                 {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
               </span>
             </div>

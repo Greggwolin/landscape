@@ -319,7 +319,7 @@ export function createTileConfig(projectType: string | undefined): TileConfig[] 
       tabKey: isIncome ? 'documents' : undefined,
       subtabs: [
         { id: 'all', label: 'All Documents', route: '/documents' },
-        { id: 'extractions', label: 'Extractions', route: '/documents/extractions' },
+        { id: 'intelligence', label: 'Intelligence', route: '/documents/intelligence' },
       ],
     },
 

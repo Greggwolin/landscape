@@ -4,7 +4,7 @@ URL configuration for projects app.
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProjectViewSet, AnalysisTypeConfigViewSet
+from .views import ProjectViewSet, AnalysisTypeConfigViewSet, AnalysisDraftViewSet
 from .views_preferences import UserPreferenceViewSet
 from apps.market_intel.views import RentComparableViewSet, MarketRateAnalysisViewSet, MarketCompetitiveProjectViewSet, MarketMacroDataViewSet
 
@@ -12,6 +12,7 @@ router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'user-preferences', UserPreferenceViewSet, basename='user-preference')
 router.register(r'config/analysis-types', AnalysisTypeConfigViewSet, basename='analysis-type-config')
+router.register(r'drafts', AnalysisDraftViewSet, basename='analysis-draft')
 
 # Custom URL patterns for nested resources
 urlpatterns = [

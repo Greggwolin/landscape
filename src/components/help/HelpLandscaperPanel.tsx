@@ -79,7 +79,7 @@ const PAGE_LABELS: Record<string, string> = {
   // Documents
   documents: 'Documents',
   documents_all: 'All Documents',
-  documents_extractions: 'Extractions',
+  documents_intelligence: 'Intelligence',
 
   // Map
   map: 'Map',

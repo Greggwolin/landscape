@@ -10722,6 +10722,7 @@ def execute_tool(
     source_message_id: Optional[str] = None,
     propose_only: bool = True,
     thread_id: Optional[str] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Execute a tool call from Claude using the registry pattern.
@@ -10739,6 +10740,7 @@ def execute_tool(
         project_id: The project ID to operate on
         source_message_id: Optional message ID for linking proposals to chat
         propose_only: If True, mutations return proposals instead of executing
+        user_id: Optional authenticated user ID (needed for draft tools)
 
     Returns:
         Dict with execution results or proposal details
@@ -10767,6 +10769,7 @@ def execute_tool(
             propose_only=propose_only,
             source_message_id=source_message_id,
             thread_id=thread_id,
+            user_id=user_id,
         )
     except Exception as e:
         logger.error(f"Error executing tool {tool_name}: {e}", exc_info=True)
@@ -12797,6 +12800,429 @@ def handle_log_alpha_feedback(
             'success': False,
             'error': f"Failed to log feedback: {str(e)}"
         }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Analysis Draft Tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _format_calc_results(inputs: dict, results: dict) -> str:
+    """Format calculation results as a readable summary for Claude."""
+    lines = ["**Draft Calculation Results**", ""]
+
+    # Revenue
+    if 'pgi' in results:
+        lines.append(f"Potential Gross Income (PGI): ${results['pgi']:,.0f}")
+    if 'vacancy_amount' in results:
+        lines.append(f"Less Vacancy ({inputs.get('vacancy_pct', 5)}%): (${results['vacancy_amount']:,.0f})")
+    if 'egi' in results:
+        lines.append(f"Effective Gross Income (EGI): ${results['egi']:,.0f}")
+
+    # Expenses
+    if 'total_expenses' in results:
+        lines.append(f"Total Operating Expenses: (${results['total_expenses']:,.0f})")
+        if 'expense_ratio' in results:
+            lines.append(f"  Expense Ratio: {results['expense_ratio']:.1f}%")
+
+    # NOI
+    if 'noi' in results:
+        lines.append(f"**Net Operating Income (NOI): ${results['noi']:,.0f}**")
+        if inputs.get('unit_count'):
+            lines.append(f"  NOI/Unit: ${results['noi'] / inputs['unit_count']:,.0f}")
+
+    # Valuation
+    if 'value_at_cap' in results:
+        lines.append("")
+        lines.append(f"Value at {inputs.get('going_in_cap', 'N/A')}% Cap: ${results['value_at_cap']:,.0f}")
+        if inputs.get('unit_count'):
+            lines.append(f"  Price/Unit: ${results['value_at_cap'] / inputs['unit_count']:,.0f}")
+
+    # Debt
+    if 'loan_amount' in results:
+        lines.append("")
+        lines.append(f"Loan Amount ({inputs.get('ltv', 'N/A')}% LTV): ${results['loan_amount']:,.0f}")
+    if 'annual_debt_service' in results:
+        lines.append(f"Annual Debt Service: ${results['annual_debt_service']:,.0f}")
+    if 'dscr' in results:
+        lines.append(f"DSCR: {results['dscr']:.2f}x")
+
+    # Equity
+    if 'equity_required' in results:
+        lines.append(f"Equity Required: ${results['equity_required']:,.0f}")
+    if 'cash_on_cash' in results:
+        lines.append(f"Cash-on-Cash Return: {results['cash_on_cash']:.2f}%")
+
+    # Exit / IRR
+    if 'exit_value' in results:
+        lines.append("")
+        lines.append(f"Exit Value ({inputs.get('exit_cap', 'N/A')}% Cap, Yr {inputs.get('hold_years', 'N/A')}): ${results['exit_value']:,.0f}")
+    if 'irr' in results:
+        lines.append(f"Estimated Leveraged IRR: {results['irr']:.2f}%")
+
+    return "\n".join(lines)
+
+
+@register_tool('create_analysis_draft', is_mutation=True)
+def handle_create_analysis_draft(tool_input, project_id, user_id=None, propose_only=True, **kwargs):
+    """Create a new analysis draft from conversational inputs."""
+    if not user_id:
+        return {'success': False, 'error': 'Authentication required to create drafts.'}
+
+    draft_name = tool_input.get('draft_name', 'Untitled Draft')
+    property_type = (tool_input.get('property_type') or 'MF').upper()
+    perspective = (tool_input.get('perspective') or 'INVESTMENT').upper()
+    purpose = (tool_input.get('purpose') or 'UNDERWRITING').upper()
+    value_add = tool_input.get('value_add_enabled', False)
+    inputs_data = tool_input.get('inputs', {})
+    address = tool_input.get('address')
+    city = tool_input.get('city')
+    state = tool_input.get('state')
+    zip_code = tool_input.get('zip_code')
+
+    if propose_only:
+        summary_parts = [f"**{draft_name}** ({property_type})"]
+        if address:
+            summary_parts.append(f"Location: {address}, {city or ''} {state or ''} {zip_code or ''}")
+        if inputs_data:
+            summary_parts.append(f"Inputs: {len(inputs_data)} assumptions captured")
+        return {
+            'success': True,
+            'proposal': True,
+            'action': 'create_analysis_draft',
+            'summary': '\n'.join(summary_parts),
+            'description': f"Create new analysis draft: {draft_name}",
+            'params': tool_input,
+        }
+
+    try:
+        from apps.projects.models import AnalysisDraft
+        draft = AnalysisDraft.objects.create(
+            user_id=user_id,
+            draft_name=draft_name,
+            property_type=property_type,
+            perspective=perspective,
+            purpose=purpose,
+            value_add_enabled=value_add,
+            inputs=inputs_data,
+            address=address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
+            status='active',
+        )
+        return {
+            'success': True,
+            'draft_id': draft.draft_id,
+            'draft_name': draft.draft_name,
+            'status': draft.status,
+            'message': f"Draft '{draft_name}' created (ID {draft.draft_id}). You can continue adding details.",
+        }
+    except Exception as e:
+        logger.error(f"[DRAFT] Failed to create draft: {e}", exc_info=True)
+        return {'success': False, 'error': f"Failed to create draft: {str(e)}"}
+
+
+@register_tool('update_analysis_draft', is_mutation=True)
+def handle_update_analysis_draft(tool_input, project_id, user_id=None, propose_only=True, **kwargs):
+    """Update an existing analysis draft with new inputs or metadata."""
+    if not user_id:
+        return {'success': False, 'error': 'Authentication required.'}
+
+    draft_id = tool_input.get('draft_id')
+    if not draft_id:
+        return {'success': False, 'error': 'draft_id is required.'}
+
+    try:
+        from apps.projects.models import AnalysisDraft
+        draft = AnalysisDraft.objects.get(draft_id=draft_id, user_id=user_id)
+    except AnalysisDraft.DoesNotExist:
+        return {'success': False, 'error': f'Draft {draft_id} not found or not owned by you.'}
+
+    if draft.status != 'active':
+        return {'success': False, 'error': f'Draft is {draft.status} and cannot be updated.'}
+
+    # Build update payload
+    updates = {}
+    for field in ('draft_name', 'property_type', 'perspective', 'purpose',
+                  'value_add_enabled', 'address', 'city', 'state', 'zip_code'):
+        if field in tool_input:
+            updates[field] = tool_input[field]
+
+    # Merge inputs (shallow merge — new keys added, existing keys overwritten)
+    if 'inputs' in tool_input and isinstance(tool_input['inputs'], dict):
+        merged = dict(draft.inputs or {})
+        merged.update(tool_input['inputs'])
+        updates['inputs'] = merged
+
+    if 'calc_snapshot' in tool_input and isinstance(tool_input['calc_snapshot'], dict):
+        updates['calc_snapshot'] = tool_input['calc_snapshot']
+
+    if not updates:
+        return {'success': False, 'error': 'No fields to update.'}
+
+    if propose_only:
+        changed = list(updates.keys())
+        return {
+            'success': True,
+            'proposal': True,
+            'action': 'update_analysis_draft',
+            'summary': f"Update draft #{draft_id}: {', '.join(changed)}",
+            'description': f"Update {len(changed)} field(s) on draft '{draft.draft_name}'",
+            'params': tool_input,
+        }
+
+    try:
+        for key, val in updates.items():
+            setattr(draft, key, val)
+        draft.save()
+        return {
+            'success': True,
+            'draft_id': draft.draft_id,
+            'updated_fields': list(updates.keys()),
+            'message': f"Draft '{draft.draft_name}' updated.",
+        }
+    except Exception as e:
+        logger.error(f"[DRAFT] Failed to update draft {draft_id}: {e}", exc_info=True)
+        return {'success': False, 'error': f"Failed to update draft: {str(e)}"}
+
+
+@register_tool('run_draft_calculations')
+def handle_run_draft_calculations(tool_input, project_id, user_id=None, **kwargs):
+    """Run quick financial calculations on draft inputs."""
+    if not user_id:
+        return {'success': False, 'error': 'Authentication required.'}
+
+    draft_id = tool_input.get('draft_id')
+    if not draft_id:
+        return {'success': False, 'error': 'draft_id is required.'}
+
+    try:
+        from apps.projects.models import AnalysisDraft
+        draft = AnalysisDraft.objects.get(draft_id=draft_id, user_id=user_id)
+    except AnalysisDraft.DoesNotExist:
+        return {'success': False, 'error': f'Draft {draft_id} not found or not owned by you.'}
+
+    inputs = dict(draft.inputs or {})
+    # Allow override_inputs to temporarily override for what-if exploration
+    override = tool_input.get('override_inputs')
+    if override and isinstance(override, dict):
+        inputs.update(override)
+
+    results = {}
+
+    # ── Revenue ──────────────────────────────────────────────────────────
+    unit_count = inputs.get('unit_count')
+    avg_rent = inputs.get('avg_monthly_rent')
+    if unit_count and avg_rent:
+        pgi = float(unit_count) * float(avg_rent) * 12
+        results['pgi'] = pgi
+
+        vacancy_pct = float(inputs.get('vacancy_pct', 5)) / 100
+        vacancy_amount = pgi * vacancy_pct
+        results['vacancy_amount'] = vacancy_amount
+        results['egi'] = pgi - vacancy_amount
+
+    # ── Expenses ─────────────────────────────────────────────────────────
+    opex_per_unit = inputs.get('opex_per_unit')
+    opex_ratio = inputs.get('opex_ratio')
+    if opex_per_unit and unit_count:
+        total_expenses = float(opex_per_unit) * float(unit_count)
+        results['total_expenses'] = total_expenses
+        if 'egi' in results:
+            results['expense_ratio'] = (total_expenses / results['egi']) * 100
+    elif opex_ratio and 'egi' in results:
+        total_expenses = results['egi'] * (float(opex_ratio) / 100)
+        results['total_expenses'] = total_expenses
+        results['expense_ratio'] = float(opex_ratio)
+
+    # ── NOI ──────────────────────────────────────────────────────────────
+    if 'egi' in results and 'total_expenses' in results:
+        results['noi'] = results['egi'] - results['total_expenses']
+    elif 'egi' in results:
+        # No expense data yet — use EGI as proxy NOI
+        results['noi'] = results['egi']
+
+    # ── Cap Rate Valuation ───────────────────────────────────────────────
+    going_in_cap = inputs.get('going_in_cap')
+    if going_in_cap and 'noi' in results:
+        cap_decimal = float(going_in_cap) / 100
+        if cap_decimal > 0:
+            results['value_at_cap'] = results['noi'] / cap_decimal
+
+    # ── Debt ─────────────────────────────────────────────────────────────
+    ltv = inputs.get('ltv')
+    debt_rate = inputs.get('debt_rate')
+    if ltv and 'value_at_cap' in results:
+        loan_amount = results['value_at_cap'] * (float(ltv) / 100)
+        results['loan_amount'] = loan_amount
+
+        if debt_rate:
+            amort_years = inputs.get('amortization_years', 30)
+            monthly_rate = (float(debt_rate) / 100) / 12
+            n_payments = int(amort_years) * 12
+            if monthly_rate > 0 and n_payments > 0:
+                monthly_pmt = loan_amount * (
+                    monthly_rate * (1 + monthly_rate) ** n_payments
+                ) / ((1 + monthly_rate) ** n_payments - 1)
+                annual_ds = monthly_pmt * 12
+                results['annual_debt_service'] = annual_ds
+
+                if 'noi' in results and annual_ds > 0:
+                    results['dscr'] = results['noi'] / annual_ds
+
+    # ── Equity ───────────────────────────────────────────────────────────
+    if 'value_at_cap' in results and 'loan_amount' in results:
+        equity = results['value_at_cap'] - results['loan_amount']
+        results['equity_required'] = equity
+        if 'noi' in results and 'annual_debt_service' in results and equity > 0:
+            btcf = results['noi'] - results['annual_debt_service']
+            results['cash_on_cash'] = (btcf / equity) * 100
+
+    # ── Exit / IRR ───────────────────────────────────────────────────────
+    exit_cap = inputs.get('exit_cap')
+    hold_years = inputs.get('hold_years')
+    if exit_cap and hold_years and 'noi' in results:
+        growth = float(inputs.get('noi_growth_pct', 2)) / 100
+        exit_noi = results['noi'] * ((1 + growth) ** int(hold_years))
+        exit_cap_decimal = float(exit_cap) / 100
+        if exit_cap_decimal > 0:
+            results['exit_value'] = exit_noi / exit_cap_decimal
+
+        # Simple leveraged IRR approximation
+        if 'equity_required' in results and results['equity_required'] > 0 and 'exit_value' in results:
+            equity = results['equity_required']
+            annual_cf = results.get('noi', 0) - results.get('annual_debt_service', 0)
+            # Remaining loan balance (approximate — interest-only simplification)
+            remaining_loan = results.get('loan_amount', 0)
+            terminal_equity = results['exit_value'] - remaining_loan
+
+            # Build cash flow series: [-equity, cf, cf, ..., cf + terminal_equity]
+            cashflows = [-equity]
+            for yr in range(int(hold_years)):
+                cf = annual_cf * ((1 + growth) ** yr)
+                if yr == int(hold_years) - 1:
+                    cf += terminal_equity
+                cashflows.append(cf)
+
+            # Newton's method IRR
+            irr = _simple_irr(cashflows)
+            if irr is not None:
+                results['irr'] = irr * 100
+
+    if not results:
+        return {
+            'success': False,
+            'error': 'Not enough inputs to calculate. Need at least unit_count and avg_monthly_rent.',
+        }
+
+    # Save snapshot back to draft
+    try:
+        draft.calc_snapshot = results
+        draft.save(update_fields=['calc_snapshot', 'updated_at'])
+    except Exception as e:
+        logger.warning(f"[DRAFT] Could not save calc_snapshot: {e}")
+
+    return {
+        'success': True,
+        'draft_id': draft.draft_id,
+        'results': results,
+        'formatted': _format_calc_results(inputs, results),
+    }
+
+
+def _simple_irr(cashflows, guess=0.10, tol=1e-6, max_iter=100):
+    """Newton's method IRR solver."""
+    rate = guess
+    for _ in range(max_iter):
+        npv = sum(cf / (1 + rate) ** i for i, cf in enumerate(cashflows))
+        dnpv = sum(-i * cf / (1 + rate) ** (i + 1) for i, cf in enumerate(cashflows))
+        if abs(dnpv) < 1e-12:
+            return None
+        rate -= npv / dnpv
+        if abs(npv) < tol:
+            return rate
+    return None
+
+
+@register_tool('convert_draft_to_project', is_mutation=True)
+def handle_convert_draft_to_project(tool_input, project_id, user_id=None, propose_only=True, **kwargs):
+    """Convert an analysis draft to a full project."""
+    if not user_id:
+        return {'success': False, 'error': 'Authentication required.'}
+
+    draft_id = tool_input.get('draft_id')
+    if not draft_id:
+        return {'success': False, 'error': 'draft_id is required.'}
+
+    try:
+        from apps.projects.models import AnalysisDraft
+        draft = AnalysisDraft.objects.get(draft_id=draft_id, user_id=user_id)
+    except AnalysisDraft.DoesNotExist:
+        return {'success': False, 'error': f'Draft {draft_id} not found or not owned by you.'}
+
+    if draft.status != 'active':
+        return {'success': False, 'error': f'Draft is {draft.status} and cannot be converted.'}
+
+    if propose_only:
+        return {
+            'success': True,
+            'proposal': True,
+            'action': 'convert_draft_to_project',
+            'summary': f"Convert draft '{draft.draft_name}' (ID {draft_id}) to a full project",
+            'description': (
+                f"This will create a new project from draft '{draft.draft_name}' "
+                f"with {len(draft.inputs or {})} assumptions. The draft will be "
+                f"marked as converted."
+            ),
+            'params': tool_input,
+        }
+
+    # Phase 4: actual conversion logic
+    # For now, create the project with basic fields from the draft
+    try:
+        from apps.projects.models import Project
+
+        # Map draft fields to project fields
+        project_type_map = {
+            'MF': 'MF', 'LAND': 'LAND', 'OFF': 'OFF',
+            'RET': 'RET', 'IND': 'IND', 'HTL': 'HTL', 'MXU': 'MXU',
+        }
+        project_type_code = project_type_map.get(draft.property_type, 'MF')
+
+        project = Project.objects.create(
+            project_name=draft.draft_name,
+            project_type_code=project_type_code,
+            analysis_perspective=draft.perspective,
+            analysis_purpose=draft.purpose,
+            value_add_enabled=draft.value_add_enabled or False,
+            project_address=draft.address or '',
+            jurisdiction_city=draft.city or '',
+            jurisdiction_state=draft.state or '',
+            zip_code=draft.zip_code or '',
+            location_lat=draft.latitude,
+            location_lon=draft.longitude,
+            total_units=draft.inputs.get('unit_count') if draft.inputs else None,
+            is_active=True,
+        )
+
+        # Mark draft as converted
+        draft.status = 'converted'
+        draft.converted_project_id = project.project_id
+        draft.save(update_fields=['status', 'converted_project_id', 'updated_at'])
+
+        return {
+            'success': True,
+            'draft_id': draft.draft_id,
+            'project_id': project.project_id,
+            'project_name': project.project_name,
+            'message': (
+                f"Project '{project.project_name}' created (ID {project.project_id}). "
+                f"Draft marked as converted."
+            ),
+        }
+    except Exception as e:
+        logger.error(f"[DRAFT] Failed to convert draft {draft_id}: {e}", exc_info=True)
+        return {'success': False, 'error': f"Failed to convert draft: {str(e)}"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

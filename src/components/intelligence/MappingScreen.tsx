@@ -133,6 +133,9 @@ export default function MappingScreen({
 
     if (intakeUuid && sourceColumns.length > 0) {
       void load();
+    } else {
+      // No columns to map — stop loading immediately (Task 4: separate loading from empty)
+      setLoading(false);
     }
   }, [intakeUuid, sourceColumns]);
 
@@ -238,6 +241,25 @@ export default function MappingScreen({
         <CSpinner size="sm" className="me-2" />
         <span style={{ color: 'var(--cui-secondary-color)' }}>Loading mapping suggestions...</span>
       </div>
+    );
+  }
+
+  // Empty state — no extractable columns found (Task 2)
+  if (suggestions.length === 0 && sourceColumns.length === 0) {
+    return (
+      <CCard>
+        <CCardBody className="text-center py-5">
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📄</div>
+          <h5 className="mb-2">No Extractable Fields Found</h5>
+          <p className="text-body-secondary mb-3" style={{ maxWidth: '420px', margin: '0 auto' }}>
+            This document did not produce any extractable columns.
+            It may be a scanned image, an unsupported format, or contain no tabular data.
+          </p>
+          <CButton color="secondary" variant="outline" onClick={onCancel}>
+            ← Back
+          </CButton>
+        </CCardBody>
+      </CCard>
     );
   }
 

@@ -66,7 +66,7 @@ PAGE_CONTEXT_MAP: Dict[str, List[str]] = {
     # ── Documents (no sub-tabs in nav config) ──────────────────────
     "documents":                    ["documents"],
     "documents_all":                ["documents"],
-    "documents_extractions":        ["documents"],
+    "documents_intelligence":       ["documents"],
 
     # ── Map (no sub-tabs) ──────────────────────────────────────────
     "map":                          ["map"],

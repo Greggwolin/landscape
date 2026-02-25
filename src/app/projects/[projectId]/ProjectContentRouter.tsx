@@ -273,13 +273,13 @@ function ProjectContentRouter({
 
       // ========================================
       // FOLDER 7: DOCUMENTS
-      // Subtabs: all, extractions (Intelligence)
+      // Subtabs: all, intelligence (Intelligence)
       // ========================================
       case 'documents':
         switch (currentTab) {
           case 'all':
             return <DocumentsTab project={project} />;
-          case 'extractions':
+          case 'intelligence':
             return <IntelligenceTab project={project} />;
           default:
             return <DocumentsTab project={project} />;

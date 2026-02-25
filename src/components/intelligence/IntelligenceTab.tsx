@@ -3,7 +3,7 @@
 /**
  * IntelligenceTab — Document intake workflow hub (Intelligence v1)
  *
- * Replaces the "extractions" subtab in Documents folder.
+ * Replaces the "intelligence" subtab in Documents folder.
  * Shows active/recent intake sessions and their status,
  * with drill-down into MappingScreen and ValueValidationScreen.
  */

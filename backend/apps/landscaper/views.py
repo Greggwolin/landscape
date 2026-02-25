@@ -425,8 +425,9 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             }
 
             # Create tool executor bound to this project
+            _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             def tool_executor_fn(tool_name, tool_input, project_id=None):
-                return execute_tool(tool_name, tool_input, project_id or project.project_id)
+                return execute_tool(tool_name, tool_input, project_id or project.project_id, user_id=_uid)
 
             # Get page context for context-aware tool filtering
             page_context = request.data.get('page_context')
@@ -1617,11 +1618,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             )
 
             # Create tool executor bound to this project and thread
+            _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             def tool_executor_fn(tool_name, tool_input, project_id=None):
                 return execute_tool(
                     tool_name, tool_input,
                     project_id or project.project_id,
                     thread_id=str(thread.id),
+                    user_id=_uid,
                 )
 
             # Generate AI response with context-aware tool filtering
@@ -1813,9 +1816,10 @@ class GlobalChatViewSet(viewsets.ViewSet):
                     logger.warning(f"Failed to fetch document context: {e}")
 
             # Create tool executor for global context
+            _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
             def tool_executor_fn(tool_name, tool_input, project_id=None):
                 # For global context, pass project_id=0 as sentinel
-                return execute_tool(tool_name, tool_input, project_id or 0)
+                return execute_tool(tool_name, tool_input, project_id or 0, user_id=_uid)
 
             # Get message history for context (last 10 messages in this page_context)
             recent_messages = ChatMessage.objects.filter(

@@ -353,7 +353,63 @@ class AnalysisTypeConfig(models.Model):
         return tiles
 
 
+class AnalysisDraft(models.Model):
+    """
+    Staging area for conversational project creation.
+
+    Holds deal inputs collected by Landscaper during chat before the user
+    commits to creating a full project. Drafts persist across chat sessions
+    so users can resume later.
+
+    Lifecycle: active → converted | archived
+    """
+    draft_id = models.BigAutoField(primary_key=True)
+    user_id = models.BigIntegerField()  # Not FK to auth_user to avoid coupling
+    draft_name = models.CharField(max_length=200, blank=True, null=True)
+
+    # Inferred taxonomy (may be null until Landscaper determines them)
+    property_type = models.CharField(max_length=50, blank=True, null=True)
+    perspective = models.CharField(max_length=50, blank=True, null=True)
+    purpose = models.CharField(max_length=50, blank=True, null=True)
+    value_add_enabled = models.BooleanField(default=False)
+
+    # Core data
+    inputs = models.JSONField(default=dict)
+    calc_snapshot = models.JSONField(default=dict, blank=True)
+
+    # Location (extracted from user input)
+    address = models.TextField(blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=50, blank=True, null=True)
+    zip_code = models.CharField(max_length=20, blank=True, null=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, blank=True, null=True)
+
+    # Linkage
+    chat_thread_id = models.BigIntegerField(blank=True, null=True)
+    converted_project_id = models.BigIntegerField(blank=True, null=True)
+
+    # Lifecycle
+    status = models.CharField(max_length=20, default='active')
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tbl_analysis_draft'
+        managed = False  # Table created by RunSQL migration
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Draft: {self.draft_name or 'Untitled'} ({self.status})"
+
+
 # Phase 5: Import User model to make it available to Django
 from .models_user import User, UserProfile, APIKey, PasswordResetToken
 
-__all__ = ['Project', 'AnalysisTypeConfig', 'ANALYSIS_TYPE_CHOICES', 'User', 'UserProfile', 'APIKey', 'PasswordResetToken']
+__all__ = [
+    'Project', 'AnalysisTypeConfig', 'ANALYSIS_TYPE_CHOICES',
+    'AnalysisDraft',
+    'User', 'UserProfile', 'APIKey', 'PasswordResetToken',
+]

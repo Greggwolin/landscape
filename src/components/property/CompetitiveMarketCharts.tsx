@@ -1,23 +1,22 @@
 'use client';
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
-// Color palette for comparable properties (distinct, visible on dark bg)
+// Color palette for comparable properties using CoreUI semantic tokens
 const COMPARABLE_COLORS = [
-  '#f97316', // orange
-  '#22c55e', // green
-  '#a855f7', // purple
-  '#ef4444', // red
-  '#06b6d4', // cyan
-  '#eab308', // yellow
-  '#ec4899', // pink
-  '#14b8a6', // teal
-  '#f59e0b', // amber
-  '#8b5cf6', // violet
+  'rgba(var(--cui-primary-rgb), 0.95)',
+  'rgba(var(--cui-success-rgb), 0.95)',
+  'rgba(var(--cui-info-rgb), 0.95)',
+  'rgba(var(--cui-warning-rgb), 0.95)',
+  'rgba(var(--cui-danger-rgb), 0.95)',
+  'rgba(var(--cui-primary-rgb), 0.7)',
+  'rgba(var(--cui-success-rgb), 0.7)',
+  'rgba(var(--cui-info-rgb), 0.7)',
+  'rgba(var(--cui-warning-rgb), 0.7)',
+  'rgba(var(--cui-danger-rgb), 0.7)',
 ];
 
-const SUBJECT_COLOR = '#321fdb'; // CoreUI primary blue
+const SUBJECT_COLOR = 'var(--cui-primary)';
 
 interface RentalComparable {
   comparable_id: number;
@@ -91,32 +90,44 @@ interface LineChartProps {
   yLabel: string;
   isBedroomMode: boolean;
   onPropertyClick?: (propertyName: string) => void;
-  theme: 'light' | 'dark';
   selectedProperty?: string | null;
 }
 
-function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, theme, selectedProperty }: LineChartProps) {
+function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, selectedProperty }: LineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const [containerWidth, setContainerWidth] = useState(900);
+  const [containerSize, setContainerSize] = useState({ width: 900, height: 500 });
 
-  // Measure container width on mount and resize
+  // Measure chart container so SVG fills available space.
   useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
+    const updateSize = () => {
+      if (!containerRef.current) return;
+      const { offsetWidth, offsetHeight } = containerRef.current;
+      const measuredWidth = offsetWidth > 0 ? offsetWidth : 900;
+      const measuredHeight = offsetHeight > 0 ? offsetHeight : 500;
+      setContainerSize({
+        width: measuredWidth,
+        height: measuredHeight,
+      });
     };
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+
+    updateSize();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => updateSize());
+      if (containerRef.current) observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  const width = containerWidth;
-  const height = 336;
-  const padding = { top: 20, right: 30, bottom: 55, left: 75 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
+  const width = containerSize.width;
+  const height = containerSize.height;
+  const padding = { top: 40, right: 60, bottom: 65, left: 75 };
+  const chartWidth = Math.max(width - padding.left - padding.right, 1);
+  const chartHeight = Math.max(height - padding.top - padding.bottom, 1);
 
   // Calculate scales from lines data
   const { xMin, xMax, yMin, yMax, xTicks, yTicks } = useMemo(() => {
@@ -262,27 +273,17 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
     onPropertyClick?.(propertyName);
   };
 
-  // Theme-aware colors
-  const colors = theme === 'light'
-    ? {
-        background: '#f8fafc',
-        gridLine: '#e2e8f0',
-        axis: '#94a3b8',
-        text: '#64748b',
-        legendText: '#475569',
-        subjectStroke: '#60a5fa',
-      }
-    : {
-        background: '#1e1e2f',
-        gridLine: '#374151',
-        axis: '#6b7280',
-        text: '#9ca3af',
-        legendText: '#9ca3af',
-        subjectStroke: '#93c5fd',
-      };
+  const colors = {
+    background: 'var(--cui-card-bg)',
+    gridLine: 'var(--cui-border-color-translucent)',
+    axis: 'var(--cui-border-color)',
+    text: 'var(--cui-secondary-color)',
+    legendText: 'var(--cui-secondary-color)',
+    subjectStroke: 'var(--cui-body-bg)',
+  };
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
       <svg width={width} height={height}>
         {/* Background */}
         <rect x={padding.left} y={padding.top} width={chartWidth} height={chartHeight} fill={colors.background} />
@@ -337,7 +338,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
         <text x={width / 2} y={height - 5} textAnchor="middle" fill={colors.text} fontSize="12">
           {xLabel}
         </text>
-        <text x={16} y={height / 2} textAnchor="middle" fill={colors.text} fontSize="12" transform={`rotate(-90, 16, ${height / 2})`}>
+        <text x={padding.left - 12} y={padding.top - 10} textAnchor="end" fill={colors.text} fontSize="12">
           {yLabel}
         </text>
 
@@ -395,7 +396,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
                 r={9}
                 fill={line.color}
                 opacity={1}
-                stroke="#fff"
+                stroke="var(--cui-body-bg)"
                 strokeWidth={2}
                 style={{ cursor: 'pointer' }}
                 onMouseEnter={(e) => handleMouseEnter(point, line, e)}
@@ -439,7 +440,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
         ))}
 
         {/* Legend - top right */}
-        <g transform={`translate(${width - padding.right - 100}, ${padding.top + 10})`}>
+        <g transform={`translate(${padding.left + 10}, ${padding.top + 10})`}>
           <line x1={-10} y1={0} x2={5} y2={0} stroke={colors.axis} strokeWidth="2" opacity={0.7} />
           <circle cx={0} cy={0} r={4} fill={colors.axis} opacity={0.9} />
           <text x={12} y={4} fill={colors.legendText} fontSize="11">Comparables</text>
@@ -456,15 +457,13 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
             position: 'absolute',
             left: tooltip.x + 15,
             top: tooltip.y - 10,
-            backgroundColor: theme === 'light' ? '#ffffff' : '#1f2937',
-            border: `1px solid ${theme === 'light' ? '#e2e8f0' : '#374151'}`,
+            backgroundColor: 'var(--cui-card-bg)',
+            border: '1px solid var(--cui-border-color)',
             borderRadius: '6px',
             padding: '8px 12px',
             pointerEvents: 'none',
             zIndex: 100,
-            boxShadow: theme === 'light'
-              ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              : '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+            boxShadow: 'var(--cui-box-shadow)',
             minWidth: '180px',
             maxHeight: '300px',
             overflowY: 'auto',
@@ -474,7 +473,7 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
             <div
               key={`${item.propertyName}-${item.bedrooms}-${item.rent}-${idx}`}
               style={{
-                borderBottom: idx < tooltip.items.length - 1 ? `1px solid ${theme === 'light' ? '#e2e8f0' : '#374151'}` : 'none',
+                borderBottom: idx < tooltip.items.length - 1 ? '1px solid var(--cui-border-color)' : 'none',
                 paddingBottom: idx < tooltip.items.length - 1 ? '6px' : 0,
                 marginBottom: idx < tooltip.items.length - 1 ? '6px' : 0,
               }}
@@ -489,14 +488,14 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, them
                     flexShrink: 0,
                   }}
                 />
-                <span style={{ fontWeight: 600, color: theme === 'light' ? '#1e293b' : '#f3f4f6', fontSize: '11px' }}>
+                <span style={{ fontWeight: 600, color: 'var(--cui-body-color)', fontSize: '11px' }}>
                   {item.propertyName}
-                  {item.isSubject && <span style={{ color: '#3b82f6', marginLeft: '4px' }}>(Subject)</span>}
+                  {item.isSubject && <span style={{ color: 'var(--cui-primary)', marginLeft: '4px' }}>(Subject)</span>}
                 </span>
               </div>
-              <div style={{ color: theme === 'light' ? '#64748b' : '#9ca3af', fontSize: '10px', lineHeight: 1.4, paddingLeft: '14px' }}>
+              <div style={{ color: 'var(--cui-secondary-color)', fontSize: '10px', lineHeight: 1.4, paddingLeft: '14px' }}>
                 <div>{item.bedrooms} bed / {item.bathrooms} bath • {item.sqft.toLocaleString()} SF</div>
-                <div style={{ color: '#22c55e', fontWeight: 500 }}>${item.rent.toLocaleString()}/mo</div>
+                <div style={{ color: 'var(--cui-success)', fontWeight: 500 }}>${item.rent.toLocaleString()}/mo</div>
               </div>
             </div>
           ))}
@@ -514,9 +513,6 @@ export function CompetitiveMarketCharts({
   onColorsAssigned,
   selectedProperty,
 }: CompetitiveMarketChartsProps) {
-  const { theme } = useTheme();
-  const [viewMode, setViewMode] = useState<'sqft' | 'bedrooms'>('sqft');
-
   // Preserve last valid data to prevent flicker during parent re-renders
   const stableDataRef = useRef<{ comparables: RentalComparable[]; floorPlans: FloorPlan[] } | null>(null);
 
@@ -581,7 +577,7 @@ export function CompetitiveMarketCharts({
       lines.push({
         propertyName,
         isSubject: false,
-        color: propertyColors[propertyName] || '#6b7280',
+        color: propertyColors[propertyName] || 'var(--cui-secondary-color)',
         points: comps.map(comp => {
           const sqft = Number(comp.avg_sqft);
           const rent = Number(comp.asking_rent);
@@ -656,7 +652,7 @@ export function CompetitiveMarketCharts({
       lines.push({
         propertyName,
         isSubject: false,
-        color: propertyColors[propertyName] || '#6b7280',
+        color: propertyColors[propertyName] || 'var(--cui-secondary-color)',
         points: comps.map((comp, idx) => {
           const beds = Number(comp.bedrooms);
           const rent = Number(comp.asking_rent);
@@ -714,70 +710,42 @@ export function CompetitiveMarketCharts({
     return lines;
   }, [stableComparables, stableFloorPlans, subjectPropertyName, propertyColors]);
 
-  const activeLines = viewMode === 'sqft' ? sqftChartLines : bedroomChartLines;
+  const useBedroomMode = sqftChartLines.length === 0 && bedroomChartLines.length > 0;
+  const activeLines = useBedroomMode ? bedroomChartLines : sqftChartLines;
 
-  // Theme-aware container and button colors
-  const containerBg = theme === 'light' ? '#f1f5f9' : '#1a1a2e';
-  const buttonBorder = theme === 'light' ? '#cbd5e1' : '#4b5563';
-  const buttonInactiveText = theme === 'light' ? '#64748b' : '#9ca3af';
-  const emptyStateText = theme === 'light' ? '#64748b' : '#9ca3af';
+  const containerBg = 'var(--cui-tertiary-bg)';
+  const emptyStateText = 'var(--cui-secondary-color)';
 
   if (sqftChartLines.length === 0 && bedroomChartLines.length === 0) {
     return (
-      <div style={{ height: '300px', width: '100%', backgroundColor: containerBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: emptyStateText, borderRadius: '8px' }}>
+      <div style={{ height: '100%', minHeight: '300px', width: '100%', backgroundColor: containerBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: emptyStateText, borderRadius: '8px' }}>
         <p>No data available for charts</p>
       </div>
     );
   }
 
   return (
-    <div style={{ width: '100%', backgroundColor: containerBg, padding: '16px', borderRadius: '8px' }}>
-      {/* Chart */}
-      <LineChart
-        lines={activeLines}
-        xLabel={viewMode === 'sqft' ? 'Square Feet' : 'Bedrooms'}
-        yLabel="Monthly Rent"
-        isBedroomMode={viewMode === 'bedrooms'}
-        onPropertyClick={onPropertyClick}
-        theme={theme}
-        selectedProperty={selectedProperty}
-      />
-
-      {/* Toggle selector - bottom left */}
-      <div style={{ display: 'flex', gap: '0', marginTop: '12px' }}>
-        <button
-          onClick={() => setViewMode('sqft')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '12px',
-            fontWeight: 500,
-            border: `1px solid ${buttonBorder}`,
-            borderRadius: '4px 0 0 4px',
-            backgroundColor: viewMode === 'sqft' ? '#3b82f6' : 'transparent',
-            color: viewMode === 'sqft' ? 'white' : buttonInactiveText,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          By Unit Size
-        </button>
-        <button
-          onClick={() => setViewMode('bedrooms')}
-          style={{
-            padding: '6px 14px',
-            fontSize: '12px',
-            fontWeight: 500,
-            border: `1px solid ${buttonBorder}`,
-            borderLeft: 'none',
-            borderRadius: '0 4px 4px 0',
-            backgroundColor: viewMode === 'bedrooms' ? '#3b82f6' : 'transparent',
-            color: viewMode === 'bedrooms' ? 'white' : buttonInactiveText,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          By Bedrooms
-        </button>
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        backgroundColor: containerBg,
+        borderRadius: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, height: '100%' }}>
+        <LineChart
+          lines={activeLines}
+          xLabel={useBedroomMode ? 'Bedrooms' : 'Square Feet'}
+          yLabel="Rent"
+          isBedroomMode={useBedroomMode}
+          onPropertyClick={onPropertyClick}
+          selectedProperty={selectedProperty}
+        />
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ Converts Django ORM models to/from JSON for the REST API.
 """
 
 from rest_framework import serializers
-from .models import Project, AnalysisTypeConfig
+from .models import Project, AnalysisTypeConfig, AnalysisDraft
 from .primary_measure import sync_primary_measure_on_legacy_update
 from .models_user import UserPreference
 
@@ -330,3 +330,50 @@ class AnalysisTypeLandscaperContextSerializer(serializers.Serializer):
     analysis_type = serializers.CharField()
     context = serializers.CharField(allow_null=True)
     required_inputs = serializers.DictField()
+
+
+# ========================================================================
+# Analysis Draft Serializers
+# ========================================================================
+
+class AnalysisDraftSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for AnalysisDraft model.
+    Used for create, update, and detail views.
+    """
+
+    class Meta:
+        model = AnalysisDraft
+        fields = [
+            'draft_id', 'user_id', 'draft_name',
+            'property_type', 'perspective', 'purpose', 'value_add_enabled',
+            'inputs', 'calc_snapshot',
+            'address', 'city', 'state', 'zip_code', 'latitude', 'longitude',
+            'chat_thread_id', 'converted_project_id',
+            'status',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['draft_id', 'user_id', 'created_at', 'updated_at']
+
+    def validate_status(self, value):
+        if value not in ('active', 'converted', 'archived'):
+            raise serializers.ValidationError("Status must be 'active', 'converted', or 'archived'.")
+        return value
+
+    def validate_perspective(self, value):
+        if value and value.upper() not in ('INVESTMENT', 'DEVELOPMENT'):
+            raise serializers.ValidationError("Perspective must be INVESTMENT or DEVELOPMENT.")
+        return value.upper() if value else value
+
+    def validate_purpose(self, value):
+        if value and value.upper() not in ('VALUATION', 'UNDERWRITING'):
+            raise serializers.ValidationError("Purpose must be VALUATION or UNDERWRITING.")
+        return value.upper() if value else value
+
+    def validate_property_type(self, value):
+        valid = ('MF', 'LAND', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
+        if value and value.upper() not in valid:
+            raise serializers.ValidationError(
+                f"Property type must be one of: {', '.join(valid)}."
+            )
+        return value.upper() if value else value

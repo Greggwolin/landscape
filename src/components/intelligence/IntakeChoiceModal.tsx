@@ -88,7 +88,7 @@ export default function IntakeChoiceModal({
         if (firstUuid) {
           // Navigate to Intelligence tab with the intake_uuid to open MappingScreen
           router.push(
-            `/projects/${projectId}?folder=documents&tab=extractions&intakeUuid=${firstUuid}`
+            `/projects/${projectId}?folder=documents&tab=intelligence&intakeUuid=${firstUuid}`
           );
         }
         return;

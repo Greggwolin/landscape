@@ -14,7 +14,7 @@ from django.db import connection
 from decimal import Decimal
 import math
 
-from .models import Project, AnalysisTypeConfig
+from .models import Project, AnalysisTypeConfig, AnalysisDraft
 from .serializers import (
     ProjectSerializer,
     ProjectListSerializer,
@@ -22,6 +22,7 @@ from .serializers import (
     AnalysisTypeConfigListSerializer,
     AnalysisTypeTilesSerializer,
     AnalysisTypeLandscaperContextSerializer,
+    AnalysisDraftSerializer,
 )
 from apps.multifamily.models import MultifamilyUnitType, ValueAddAssumptions
 from apps.multifamily.serializers import ValueAddAssumptionsSerializer
@@ -365,3 +366,82 @@ class AnalysisTypeConfigViewSet(viewsets.ReadOnlyModelViewSet):
             }
         })
         return Response(serializer.data)
+
+
+class AnalysisDraftViewSet(viewsets.ModelViewSet):
+    """
+    CRUD endpoints for analysis drafts.
+
+    Drafts are unsaved projects-in-progress where Landscaper accumulates
+    deal inputs during conversational analysis before the user commits
+    to creating a project.
+
+    LIST:   GET    /api/drafts/                — List user's active drafts
+    CREATE: POST   /api/drafts/                — Create a new draft
+    GET:    GET    /api/drafts/{draft_id}/      — Get draft detail
+    UPDATE: PATCH  /api/drafts/{draft_id}/      — Update draft inputs/taxonomy/calc
+    DELETE: DELETE /api/drafts/{draft_id}/      — Delete draft
+
+    Custom actions:
+    ARCHIVE: POST  /api/drafts/{draft_id}/archive/   — Set status to archived
+    CONVERT: POST  /api/drafts/{draft_id}/convert/   — Placeholder for project conversion
+    """
+
+    serializer_class = AnalysisDraftSerializer
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+    lookup_field = 'draft_id'
+
+    def get_queryset(self):
+        """Filter to current user's drafts. Default to active only."""
+        user = self.request.user
+        if not user.is_authenticated:
+            return AnalysisDraft.objects.none()
+
+        qs = AnalysisDraft.objects.filter(user_id=user.id)
+
+        # Filter by status if provided, otherwise active only
+        filter_status = self.request.query_params.get('status')
+        if filter_status:
+            qs = qs.filter(status=filter_status)
+        else:
+            qs = qs.filter(status='active')
+
+        return qs
+
+    def perform_create(self, serializer):
+        """Set user_id from authenticated user."""
+        serializer.save(user_id=self.request.user.id)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, draft_id=None):
+        """Archive a draft (soft delete)."""
+        draft = self.get_object()
+        if draft.status == 'converted':
+            return Response(
+                {'error': 'Cannot archive a converted draft.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        draft.status = 'archived'
+        draft.save(update_fields=['status', 'updated_at'])
+        return Response(self.get_serializer(draft).data)
+
+    @action(detail=True, methods=['post'])
+    def convert(self, request, draft_id=None):
+        """
+        Placeholder for draft-to-project conversion.
+        Full implementation in Phase 4 (requires project creation + data write).
+        """
+        draft = self.get_object()
+        if draft.status != 'active':
+            return Response(
+                {'error': 'Only active drafts can be converted.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Phase 4 will implement the actual conversion logic
+        return Response(
+            {
+                'message': 'Conversion endpoint ready. Full implementation in Phase 4.',
+                'draft_id': draft.draft_id,
+            },
+            status=status.HTTP_501_NOT_IMPLEMENTED,
+        )
