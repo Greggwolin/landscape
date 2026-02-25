@@ -30,6 +30,18 @@ from .views_instructions import (
     KpiDefinitionByTypeView,
 )
 from .views_help import HelpChatView
+from .views import (
+    IntakeStartView,
+    IntakeMappingSuggestionsView,
+    IntakeLockMappingView,
+    IntakeExtractedValuesView,
+    IntakeCommitValuesView,
+    IntakeReExtractView,
+    # Override management views (Phase 6)
+    OverrideListView,
+    OverrideToggleView,
+    OverrideRevertView,
+)
 
 # Project-scoped endpoints
 urlpatterns = [
@@ -311,5 +323,65 @@ urlpatterns = [
         'landscaper/kpi-definitions/by-type/<str:type_code>/',
         KpiDefinitionByTypeView.as_view(),
         name='landscaper-kpi-definitions-by-type'
+    ),
+
+    # ========================================================================
+    # Intake Session Endpoints (Intelligence v1)
+    # ========================================================================
+
+    path(
+        'intake/start/',
+        IntakeStartView.as_view(),
+        name='intake-start'
+    ),
+    path(
+        'intake/<uuid:intake_uuid>/mapping_suggestions/',
+        IntakeMappingSuggestionsView.as_view(),
+        name='intake-mapping-suggestions'
+    ),
+    path(
+        'intake/<uuid:intake_uuid>/lock_mapping/',
+        IntakeLockMappingView.as_view(),
+        name='intake-lock-mapping'
+    ),
+    path(
+        'intake/<uuid:intake_uuid>/extracted_values/',
+        IntakeExtractedValuesView.as_view(),
+        name='intake-extracted-values'
+    ),
+    path(
+        'intake/<uuid:intake_uuid>/commit_values/',
+        IntakeCommitValuesView.as_view(),
+        name='intake-commit-values'
+    ),
+    path(
+        'intake/<uuid:intake_uuid>/re_extract/',
+        IntakeReExtractView.as_view(),
+        name='intake-re-extract'
+    ),
+
+    # ========================================================================
+    # Override Management Endpoints (Phase 6 — Red Dot Governance)
+    # ========================================================================
+
+    # List overrides for a project (includes overriddenFieldKeys for red dots)
+    path(
+        'landscaper/projects/<int:project_id>/overrides/',
+        OverrideListView.as_view(),
+        name='landscaper-overrides'
+    ),
+
+    # Toggle an override on
+    path(
+        'landscaper/projects/<int:project_id>/overrides/toggle/',
+        OverrideToggleView.as_view(),
+        name='landscaper-override-toggle'
+    ),
+
+    # Revert an override
+    path(
+        'landscaper/overrides/<int:override_id>/revert/',
+        OverrideRevertView.as_view(),
+        name='landscaper-override-revert'
     ),
 ]

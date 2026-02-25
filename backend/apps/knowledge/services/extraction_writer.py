@@ -53,7 +53,8 @@ class ExtractionWriter:
         scope_id: Optional[int] = None,
         source_doc_id: Optional[int] = None,
         source_page: Optional[int] = None,
-        created_by: str = 'landscaper'
+        created_by: str = 'landscaper',
+        value_source: str = 'ai_extraction',
     ) -> Tuple[bool, str]:
         """
         Write a validated extraction to the production table.
@@ -72,7 +73,7 @@ class ExtractionWriter:
             if mapping.is_row_based:
                 success, message = self._write_row_based(mapping, value, scope_id, source_doc_id, source_page)
             else:
-                success, message = self._write_column(mapping, value, scope_id, source_doc_id)
+                success, message = self._write_column(mapping, value, scope_id, source_doc_id, value_source=value_source)
 
             # Create Entity-Fact record after successful write
             if success and _should_create_fact(field_key):
@@ -160,18 +161,29 @@ class ExtractionWriter:
             source_id=doc.doc_id,
         )
 
+    # Tables that have a value_source column (added by Intelligence v1 migration)
+    VALUE_SOURCE_TABLES = {
+        'tbl_project', 'core_fin_fact_budget', 'tbl_project_assumption',
+        'tbl_operating_expenses', 'tbl_multifamily_unit',
+        'tbl_multifamily_unit_type', 'tbl_acreage_allocation',
+    }
+
     def _write_column(
         self,
         mapping: FieldMapping,
         value: Any,
         scope_id: Optional[int] = None,
         source_doc_id: Optional[int] = None,
+        value_source: str = 'ai_extraction',
     ) -> Tuple[bool, str]:
         """Write to a direct column on a table."""
 
         table = mapping.table_name
         column = mapping.column_name
         converted_value = self._convert_value(value, mapping.field_type)
+        # Build value_source SET clause for tables that support it
+        vs_clause = ", value_source = %s" if table in self.VALUE_SOURCE_TABLES else ""
+        vs_params = [value_source] if table in self.VALUE_SOURCE_TABLES else []
 
         # Determine the row to update based on scope
         if mapping.scope == 'project':
@@ -179,10 +191,10 @@ class ExtractionWriter:
                 # Update tbl_project directly
                 sql = f"""
                     UPDATE landscape.{table}
-                    SET {column} = %s, updated_at = NOW()
+                    SET {column} = %s, updated_at = NOW(){vs_clause}
                     WHERE project_id = %s
                 """
-                params = [converted_value, self.project_id]
+                params = [converted_value] + vs_params + [self.project_id]
             elif table == 'tbl_multifamily_property':
                 # Insert or update the property record
                 sql = f"""
@@ -211,34 +223,34 @@ class ExtractionWriter:
                 # Generic project-scoped table update
                 sql = f"""
                     UPDATE landscape.{table}
-                    SET {column} = %s, updated_at = NOW()
+                    SET {column} = %s, updated_at = NOW(){vs_clause}
                     WHERE project_id = %s
                 """
-                params = [converted_value, self.project_id]
+                params = [converted_value] + vs_params + [self.project_id]
 
         elif mapping.scope == 'unit_type' and scope_id:
             sql = f"""
                 UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW()
+                SET {column} = %s, updated_at = NOW(){vs_clause}
                 WHERE unit_type_id = %s AND project_id = %s
             """
-            params = [converted_value, scope_id, self.project_id]
+            params = [converted_value] + vs_params + [scope_id, self.project_id]
 
         elif mapping.scope == 'lot_or_product' and scope_id:
             sql = f"""
                 UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW()
+                SET {column} = %s, updated_at = NOW(){vs_clause}
                 WHERE lot_id = %s AND project_id = %s
             """
-            params = [converted_value, scope_id, self.project_id]
+            params = [converted_value] + vs_params + [scope_id, self.project_id]
 
         elif mapping.scope == 'phase' and scope_id:
             sql = f"""
                 UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW()
+                SET {column} = %s, updated_at = NOW(){vs_clause}
                 WHERE phase_id = %s AND project_id = %s
             """
-            params = [converted_value, scope_id, self.project_id]
+            params = [converted_value] + vs_params + [scope_id, self.project_id]
 
         elif mapping.scope == 'mf_property':
             # Multifamily property - upsert to tbl_multifamily_property
@@ -253,19 +265,19 @@ class ExtractionWriter:
             # Property acquisition - update existing row (seeded on project creation)
             sql = f"""
                 UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW()
+                SET {column} = %s, updated_at = NOW(){vs_clause}
                 WHERE project_id = %s
             """
-            params = [converted_value, self.project_id]
+            params = [converted_value] + vs_params + [self.project_id]
 
         elif mapping.scope == 'market':
             # Market rate analysis - update existing row (seeded on project creation)
             sql = f"""
                 UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW()
+                SET {column} = %s, updated_at = NOW(){vs_clause}
                 WHERE project_id = %s
             """
-            params = [converted_value, self.project_id]
+            params = [converted_value] + vs_params + [self.project_id]
 
         elif mapping.scope == 'unit':
             # Individual unit - upsert from chunked rent roll extraction

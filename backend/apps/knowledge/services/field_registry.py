@@ -256,6 +256,64 @@ class FieldRegistry:
             return self._landdev_registry.get(field_key)
         return None
 
+    def resolve_field_key(
+        self,
+        field_key: Optional[str],
+        property_type: str = 'multifamily',
+        target_table: Optional[str] = None,
+        target_field: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Resolve a field_key (possibly an alias, label, or None) to a canonical registry key.
+
+        Resolution order:
+          1. Direct key lookup
+          2. Lowercased + underscored label match
+          3. target_table + target_field reverse lookup
+          4. Alias map from mapping_suggestion_service
+
+        Returns the canonical field_key or None if unresolvable.
+        """
+        registry = self.get_all_mappings(property_type)
+
+        # 1. Direct
+        if field_key and field_key in registry:
+            return field_key
+
+        # 2. Normalize: lowercase, replace spaces/hyphens with underscores
+        if field_key:
+            normalized = field_key.strip().lower().replace(' ', '_').replace('-', '_')
+            if normalized in registry:
+                return normalized
+            # Try matching by label
+            for key, mapping in registry.items():
+                if mapping.label and mapping.label.strip().lower().replace(' ', '_').replace('-', '_') == normalized:
+                    return key
+
+        # 3. Reverse lookup by target_table + target_field
+        if target_table and target_field:
+            for key, mapping in registry.items():
+                if mapping.db_target:
+                    # db_target format: "table.column"
+                    parts = mapping.db_target.split('.')
+                    if len(parts) == 2:
+                        tbl, col = parts
+                        if tbl == target_table and col == target_field:
+                            return key
+
+        # 4. Alias map from mapping suggestion service
+        if field_key:
+            try:
+                from apps.landscaper.services.mapping_suggestion_service import _ALIAS_MAP
+                normalized = field_key.strip().lower().replace(' ', '_').replace('-', '_')
+                alias_key = _ALIAS_MAP.get(normalized)
+                if alias_key and alias_key in registry:
+                    return alias_key
+            except ImportError:
+                pass
+
+        return None
+
     def get_all_mappings(self, property_type: str = 'multifamily') -> Dict[str, FieldMapping]:
         """Get all mappings for a property type."""
         self._ensure_loaded()
@@ -463,3 +521,76 @@ def get_fields_for_extraction_prompt(property_type: str = 'multifamily') -> str:
         req = "(required)" if f.required else "(optional)"
         lines.append(f"- {f.field_key}: {f.label} [{f.field_type}] {req}")
     return "\n".join(lines)
+
+
+def merge_dynamic_fields(project_id: int, property_type: str = 'multifamily') -> Dict[str, FieldMapping]:
+    """
+    Merge static registry fields with project-specific dynamic columns.
+
+    Queries DynamicColumnDefinition for active, accepted columns and converts
+    them to FieldMapping objects so the extraction pipeline treats them
+    identically to static registry fields.
+
+    Args:
+        project_id: The project to load dynamic columns for
+        property_type: Property type for the static registry base
+
+    Returns:
+        Merged dict of {field_key: FieldMapping} with dynamic columns overlaid
+    """
+    from django.apps import apps
+
+    # Start with a copy of the static registry
+    static = dict(get_registry().get_all_mappings(property_type))
+
+    # Data type mapping from DynamicColumnDefinition choices to registry types
+    dtype_map = {
+        'text': 'text',
+        'number': 'number',
+        'currency': 'currency',
+        'percent': 'percent',
+        'boolean': 'boolean',
+        'date': 'date',
+    }
+
+    try:
+        DynamicColumnDefinition = apps.get_model('dynamic', 'DynamicColumnDefinition')
+        dyn_cols = DynamicColumnDefinition.objects.filter(
+            project_id=project_id,
+            is_active=True,
+            is_proposed=False,
+        )
+
+        for dc in dyn_cols:
+            field_key = f"dyn_{dc.column_key}"
+            mapping = FieldMapping(
+                property_type=property_type,
+                field_key=field_key,
+                label=dc.display_label,
+                field_type=dtype_map.get(dc.data_type, 'text'),
+                required=False,
+                default=None,
+                extractability='medium',
+                extract_policy='propose_for_validation',
+                source_priority='doc>user>benchmark',
+                scope=dc.scope if hasattr(dc, 'scope') and dc.scope else 'project',
+                evidence_types=[],
+                db_write_type='dynamic',
+                resolved=True,
+                resolved_table='tbl_dynamic_column_value',
+                resolved_column=dc.column_key,
+                selector_json={'column_definition_id': dc.pk, 'table_name': dc.table_name},
+                db_target=f'tbl_dynamic_column_value.{dc.column_key}',
+                field_role='input',
+                analytical_tier_default='supporting',
+            )
+            static[field_key] = mapping
+
+        logger.info(
+            f"Merged {dyn_cols.count()} dynamic columns for project {project_id} "
+            f"into {len(static)} total fields"
+        )
+    except Exception as e:
+        logger.warning(f"Failed to merge dynamic fields for project {project_id}: {e}")
+
+    return static

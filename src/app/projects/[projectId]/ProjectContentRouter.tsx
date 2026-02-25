@@ -38,6 +38,7 @@ import MarketSupplySubTab from './components/tabs/MarketSupplySubTab';
 import { MapTab } from '@/components/map-tab';
 import { ICPage } from '@/components/ic/ICPage';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
+import IntelligenceTab from '@/components/intelligence/IntelligenceTab';
 
 interface Project {
   project_id: number;
@@ -272,14 +273,14 @@ function ProjectContentRouter({
 
       // ========================================
       // FOLDER 7: DOCUMENTS
-      // Subtabs: all, extractions
+      // Subtabs: all, extractions (Intelligence)
       // ========================================
       case 'documents':
         switch (currentTab) {
           case 'all':
             return <DocumentsTab project={project} />;
           case 'extractions':
-            return <ComingSoon folder="documents" tab="extractions" icon="📄" />;
+            return <IntelligenceTab project={project} />;
           default:
             return <DocumentsTab project={project} />;
         }

@@ -11,6 +11,7 @@ import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import StagingTray from '@/components/dms/staging/StagingTray';
+import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
 import { UploadStagingProvider, useUploadStaging } from '@/contexts/UploadStagingContext';
 import type { DMSDocument } from '@/types/dms';
 import { useToast } from '@/hooks/use-toast';
@@ -57,7 +58,7 @@ function DMSViewInner({
   const defaultWorkspaceId = 1;
   const { showToast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const { stageFiles, setDocTypes, stagedFiles } = useUploadStaging();
+  const { stageFiles, setDocTypes, stagedFiles, pendingIntakeDocs, clearPendingIntakeDocs } = useUploadStaging();
   const prevHadStagedRef = useRef(false);
 
   // "+ Add Type" modal state
@@ -1406,6 +1407,14 @@ function DMSViewInner({
 
       {/* Staging Tray */}
       <StagingTray />
+
+      {/* Intake Choice Modal — appears when extract-route uploads complete */}
+      <IntakeChoiceModal
+        visible={pendingIntakeDocs.length > 0}
+        projectId={projectId}
+        docs={pendingIntakeDocs}
+        onClose={clearPendingIntakeDocs}
+      />
     </div>
   );
 }

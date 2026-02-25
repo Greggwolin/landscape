@@ -16,6 +16,7 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
+import IntakeChoiceModal, { type PendingIntakeDoc } from '@/components/intelligence/IntakeChoiceModal';
 import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
@@ -108,6 +109,9 @@ export function LandscaperPanel({
   const [showMediaPreview, setShowMediaPreview] = useState(false);
   const [mediaPreviewDocId, setMediaPreviewDocId] = useState<number | null>(null);
   const [mediaPreviewDocName, setMediaPreviewDocName] = useState<string>('');
+
+  // Intake choice modal state (post-upload)
+  const [landscaperIntakeDocs, setLandscaperIntakeDocs] = useState<PendingIntakeDoc[]>([]);
 
   // Extraction job status
   const { rentRollJob, cancelJob: cancelExtractionJob } = useExtractionJobStatus(projectId);
@@ -247,6 +251,14 @@ export function LandscaperPanel({
 
       if (createdDocs.length > 0) {
         setDropNotice(`Uploaded ${createdDocs.length} document${createdDocs.length > 1 ? 's' : ''} to project.`);
+
+        // Surface intake choice modal for uploaded docs
+        setLandscaperIntakeDocs(
+          createdDocs.map((docId, i) => ({
+            docId,
+            docName: files[i]?.name || `Document ${docId}`,
+          }))
+        );
 
         // Trigger AI extraction using Python backend (comprehensive extraction service)
         if (files.length > 0 && createdDocs.length > 0) {
@@ -986,6 +998,14 @@ export function LandscaperPanel({
           }}
         />
       )}
+
+      {/* Intake Choice Modal — post-upload routing decision */}
+      <IntakeChoiceModal
+        visible={landscaperIntakeDocs.length > 0}
+        projectId={projectId}
+        docs={landscaperIntakeDocs}
+        onClose={() => setLandscaperIntakeDocs([])}
+      />
     </div>
   );
 }

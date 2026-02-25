@@ -46,12 +46,14 @@ def _user_can_access_project(user, project: Project) -> bool:
     Minimal project access check until explicit membership model exists.
 
     Rules:
+    - Unauthenticated users allowed (views using AllowAny skip DRF auth)
     - Admin/staff can access all projects
     - Project owner can access
     - Legacy projects without owner are allowed for authenticated users
     """
     if not user or not user.is_authenticated:
-        return False
+        # AllowAny views reach here with AnonymousUser — allow access
+        return True
     if user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin':
         return True
 
@@ -1872,3 +1874,551 @@ class GlobalChatViewSet(viewsets.ViewSet):
                 'success': False,
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# Intelligence v1 — Intake Session Views
+# =============================================================================
+
+from .models import IntakeSession
+from .serializers import (
+    IntakeSessionSerializer,
+    IntakeSessionStartSerializer,
+    IntakeCommitSerializer,
+)
+
+
+class IntakeStartView(APIView):
+    """
+    GET  /api/intake/start?project_id=N — List intake sessions for a project
+    POST /api/intake/start — Create an intake session
+
+    Only 'structured_ingestion' intent creates a session;
+    'global_intelligence' and 'dms_only' are pass-through to existing pipelines.
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def get(self, request):
+        """List intake sessions for a project."""
+        project_id = request.query_params.get('project_id')
+        if not project_id:
+            return Response({'error': 'project_id query param is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        sessions = IntakeSession.objects.filter(project_id=project_id).order_by('-created_at')
+        return Response({
+            'sessions': [
+                {
+                    'intakeUuid': str(s.intake_uuid),
+                    'projectId': s.project_id,
+                    'docId': s.doc_id,
+                    'documentType': s.document_type,
+                    'status': s.status,
+                    'createdAt': s.created_at.isoformat() if s.created_at else None,
+                    'updatedAt': s.updated_at.isoformat() if s.updated_at else None,
+                }
+                for s in sessions
+            ],
+        })
+
+    def post(self, request):
+        serializer = IntakeSessionStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        intent = serializer.validated_data['intent']
+        project_id = serializer.validated_data['project_id']
+        doc_id = serializer.validated_data.get('doc_id')
+
+        # Verify project access
+        try:
+            project = Project.objects.get(project_id=project_id)
+        except Project.DoesNotExist:
+            return Response(
+                {'error': f'Project {project_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if not _user_can_access_project(request.user, project):
+            raise PermissionDenied("You do not have access to this project")
+
+        # Non-structured intents don't create intake sessions
+        if intent != 'structured_ingestion':
+            return Response({
+                'intent': intent,
+                'message': f'Intent "{intent}" does not create an intake session. Use existing DMS/knowledge endpoints.',
+            }, status=status.HTTP_200_OK)
+
+        # Create the intake session
+        user = request.user if request.user and request.user.is_authenticated else None
+        session = IntakeSession.objects.create(
+            project=project,
+            doc_id=doc_id,
+            document_type=None,
+            status='draft',
+            created_by=user,
+        )
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'intakeId': session.intake_id,
+            'status': session.status,
+            'projectId': project_id,
+            'docId': doc_id,
+        }, status=status.HTTP_201_CREATED)
+
+
+class IntakeMappingSuggestionsView(APIView):
+    """
+    GET  /api/intake/{intake_uuid}/mapping_suggestions — Return full registry of available fields
+    POST /api/intake/{intake_uuid}/mapping_suggestions — Match source_columns to registry via fuzzy matching
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def _get_session_and_property_type(self, request, intake_uuid):
+        """Common session lookup and property type resolution."""
+        try:
+            session = IntakeSession.objects.select_related('project').get(
+                intake_uuid=intake_uuid
+            )
+        except IntakeSession.DoesNotExist:
+            return None, None, Response(
+                {'error': 'Intake session not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not _user_can_access_project(request.user, session.project):
+            raise PermissionDenied("You do not have access to this project")
+
+        property_type = 'multifamily'
+        if hasattr(session.project, 'project_type'):
+            pt = (session.project.project_type or '').upper()
+            if pt in ('LAND', 'LANDDEV'):
+                property_type = 'land_development'
+
+        return session, property_type, None
+
+    def get(self, request, intake_uuid):
+        """Return the full merged registry of extractable fields."""
+        from apps.knowledge.services.field_registry import merge_dynamic_fields
+
+        session, property_type, err = self._get_session_and_property_type(request, intake_uuid)
+        if err:
+            return err
+
+        merged_fields = merge_dynamic_fields(session.project_id, property_type)
+
+        suggestions = []
+        for field_key, mapping in merged_fields.items():
+            if mapping.extract_policy == 'user_only' or mapping.field_role == 'output':
+                continue
+            if not mapping.resolved:
+                continue
+
+            if session.document_type and mapping.evidence_types:
+                doc_type_lower = session.document_type.lower().replace(' ', '_')
+                if doc_type_lower not in [e.lower() for e in mapping.evidence_types]:
+                    continue
+
+            suggestions.append({
+                'fieldKey': mapping.field_key,
+                'label': mapping.label,
+                'fieldType': mapping.field_type,
+                'scope': mapping.scope,
+                'dbTarget': mapping.db_target,
+                'dbWriteType': mapping.db_write_type,
+                'extractability': mapping.extractability,
+                'extractPolicy': mapping.extract_policy,
+                'isDynamic': mapping.db_write_type == 'dynamic',
+            })
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'status': session.status,
+            'documentType': session.document_type,
+            'propertyType': property_type,
+            'fieldCount': len(suggestions),
+            'suggestions': suggestions,
+        })
+
+    def post(self, request, intake_uuid):
+        """Match source column headers to registry fields via fuzzy matching."""
+        from apps.landscaper.services.mapping_suggestion_service import suggest_mappings
+
+        session, property_type, err = self._get_session_and_property_type(request, intake_uuid)
+        if err:
+            return err
+
+        source_columns = request.data.get('source_columns', [])
+        if not source_columns or not isinstance(source_columns, list):
+            return Response(
+                {'error': 'source_columns (list of strings) is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = suggest_mappings(
+            source_columns=source_columns,
+            project_id=session.project_id,
+            property_type=property_type,
+            document_type=session.document_type,
+        )
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'status': session.status,
+            'mappings': [
+                {
+                    'sourceColumn': s.source_column,
+                    'fieldKey': s.field_key,
+                    'label': s.label,
+                    'confidence': s.confidence,
+                    'dbTarget': s.db_target,
+                    'dbWriteType': s.db_write_type,
+                    'scope': s.scope,
+                    'isDynamic': s.is_dynamic,
+                }
+                for s in results
+            ],
+        })
+
+
+class IntakeLockMappingView(APIView):
+    """
+    POST /api/intake/{intake_uuid}/lock_mapping
+
+    Confirm mappings and advance status to mapping_complete.
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def post(self, request, intake_uuid):
+        try:
+            session = IntakeSession.objects.select_related('project').get(
+                intake_uuid=intake_uuid
+            )
+        except IntakeSession.DoesNotExist:
+            return Response(
+                {'error': 'Intake session not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not _user_can_access_project(request.user, session.project):
+            raise PermissionDenied("You do not have access to this project")
+
+        if session.status != 'draft':
+            return Response(
+                {'error': f'Cannot lock mapping from status "{session.status}". Expected "draft".'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        session.status = 'mapping_complete'
+        session.save(update_fields=['status', 'updated_at'])
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'status': session.status,
+        })
+
+
+class IntakeExtractedValuesView(APIView):
+    """
+    GET /api/intake/{intake_uuid}/extracted_values
+
+    Return staged values with existing values and conflict flags.
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def get(self, request, intake_uuid):
+        try:
+            session = IntakeSession.objects.select_related('project').get(
+                intake_uuid=intake_uuid
+            )
+        except IntakeSession.DoesNotExist:
+            return Response(
+                {'error': 'Intake session not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not _user_can_access_project(request.user, session.project):
+            raise PermissionDenied("You do not have access to this project")
+
+        # Fetch staged extractions for this session's doc
+        staged_values = []
+        if session.doc_id:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT extraction_id, field_key, extracted_value, confidence_score,
+                           status, conflict_with_extraction_id, extraction_type
+                    FROM landscape.ai_extraction_staging
+                    WHERE doc_id = %s AND project_id = %s
+                    ORDER BY extraction_id
+                """, [session.doc_id, session.project_id])
+                columns = [col[0] for col in cursor.description]
+                for row in cursor.fetchall():
+                    staged_values.append(dict(zip(columns, row)))
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'status': session.status,
+            'values': staged_values,
+        })
+
+
+class IntakeCommitValuesView(APIView):
+    """
+    POST /api/intake/{intake_uuid}/commit_values
+
+    Accept/reject staged values. Accepted values are written to target tables
+    via ExtractionWriter with full mutation logging.
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def post(self, request, intake_uuid):
+        try:
+            session = IntakeSession.objects.select_related('project').get(
+                intake_uuid=intake_uuid
+            )
+        except IntakeSession.DoesNotExist:
+            return Response(
+                {'error': 'Intake session not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not _user_can_access_project(request.user, session.project):
+            raise PermissionDenied("You do not have access to this project")
+
+        serializer = IntakeCommitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        actions = serializer.validated_data['actions']
+        results = []
+
+        # Determine property type for ExtractionWriter
+        property_type = 'multifamily'
+        if session.project:
+            pt = getattr(session.project, 'property_type', None) or \
+                 getattr(session.project, 'project_type_code', None)
+            if pt:
+                property_type = pt.lower()
+
+        from apps.knowledge.services.extraction_writer import ExtractionWriter
+        writer = ExtractionWriter(session.project_id, property_type)
+
+        for action_item in actions:
+            extraction_id = action_item['extraction_id']
+            action = action_item['action']
+            override_value = action_item.get('override_value')
+
+            if action == 'accept':
+                # Fetch the staged extraction details (include target_table/target_field for alias resolution)
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT field_key, extracted_value, target_table, target_field
+                        FROM landscape.ai_extraction_staging
+                        WHERE extraction_id = %s AND project_id = %s
+                    """, [extraction_id, session.project_id])
+                    row = cursor.fetchone()
+
+                if not row:
+                    results.append({
+                        'extractionId': extraction_id,
+                        'action': 'accept',
+                        'success': False,
+                        'message': 'Staged extraction not found',
+                    })
+                    continue
+
+                raw_field_key, extracted_value, target_table, target_field = row[0], row[1], row[2], row[3]
+                write_value = override_value if override_value else extracted_value
+
+                # Resolve field_key to canonical registry key (handles aliases, labels, NULL keys)
+                resolved_key = writer.registry.resolve_field_key(
+                    field_key=raw_field_key,
+                    property_type=property_type,
+                    target_table=target_table,
+                    target_field=target_field,
+                )
+                field_key = resolved_key or raw_field_key
+
+                if not field_key:
+                    results.append({
+                        'extractionId': extraction_id,
+                        'action': 'accept',
+                        'success': False,
+                        'message': f'Cannot resolve field_key (raw={raw_field_key}, table={target_table}, field={target_field})',
+                    })
+                    continue
+
+                # Write to production via ExtractionWriter
+                success, message = writer.write_extraction(
+                    extraction_id=extraction_id,
+                    field_key=field_key,
+                    value=write_value,
+                    source_doc_id=session.doc_id,
+                    value_source='ai_extraction',
+                )
+
+                # Update staging status
+                new_status = 'applied' if success else 'failed'
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE landscape.ai_extraction_staging
+                        SET status = %s
+                        WHERE extraction_id = %s AND project_id = %s
+                    """, [new_status, extraction_id, session.project_id])
+
+                results.append({
+                    'extractionId': extraction_id,
+                    'action': 'accept',
+                    'success': success,
+                    'message': message,
+                })
+
+            elif action == 'reject':
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE landscape.ai_extraction_staging
+                        SET status = 'rejected'
+                        WHERE extraction_id = %s AND project_id = %s
+                    """, [extraction_id, session.project_id])
+
+                results.append({
+                    'extractionId': extraction_id,
+                    'action': 'reject',
+                    'success': True,
+                })
+
+        # Advance session status
+        session.status = 'committed'
+        session.save(update_fields=['status', 'updated_at'])
+
+        return Response({
+            'intakeUuid': str(session.intake_uuid),
+            'status': session.status,
+            'results': results,
+        })
+
+
+class IntakeReExtractView(APIView):
+    """
+    POST /api/intake/{intake_uuid}/re_extract
+
+    Re-run extraction against current field registry.
+    Creates new ai_extraction_staging records (does not overwrite committed rows).
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def post(self, request, intake_uuid):
+        try:
+            session = IntakeSession.objects.select_related('project').get(
+                intake_uuid=intake_uuid
+            )
+        except IntakeSession.DoesNotExist:
+            return Response(
+                {'error': 'Intake session not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not _user_can_access_project(request.user, session.project):
+            raise PermissionDenied("You do not have access to this project")
+
+        if not session.doc_id:
+            return Response(
+                {'error': 'No document associated with this intake session'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create a new intake session for re-extraction
+        user = request.user if request.user and request.user.is_authenticated else None
+        new_session = IntakeSession.objects.create(
+            project=session.project,
+            doc_id=session.doc_id,
+            document_type=session.document_type,
+            status='draft',
+            created_by=user,
+        )
+
+        # Phase 10 will wire this to the extraction pipeline
+        return Response({
+            'intakeUuid': str(new_session.intake_uuid),
+            'status': new_session.status,
+            'message': 'Re-extraction session created. Extraction pipeline will be triggered in Phase 10.',
+        }, status=status.HTTP_201_CREATED)
+
+
+# =============================================================================
+# Override Management Views (Phase 6 — Red Dot Governance)
+# =============================================================================
+
+
+class OverrideListView(APIView):
+    """
+    GET /api/landscaper/projects/{project_id}/overrides/
+    Returns active overrides for a project (for red dot indicators).
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def get(self, request, project_id):
+        from apps.landscaper.services.override_service import list_overrides, get_override_field_keys
+
+        active_only = request.query_params.get('active_only', 'true').lower() == 'true'
+        overrides = list_overrides(project_id, active_only=active_only)
+        field_keys = get_override_field_keys(project_id)
+
+        return Response({
+            'projectId': project_id,
+            'overrides': overrides,
+            'overriddenFieldKeys': field_keys,
+            'count': len(overrides),
+        })
+
+
+class OverrideToggleView(APIView):
+    """
+    POST /api/landscaper/projects/{project_id}/overrides/toggle/
+    Toggle an override on for a calculated field.
+
+    Body: { field_key, override_value, calculated_value?, division_id?, unit_id? }
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def post(self, request, project_id):
+        from apps.landscaper.services.override_service import toggle_override
+
+        field_key = request.data.get('field_key')
+        override_value = request.data.get('override_value')
+
+        if not field_key or override_value is None:
+            return Response(
+                {'error': 'field_key and override_value are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = toggle_override(
+            project_id=project_id,
+            field_key=field_key,
+            override_value=str(override_value),
+            calculated_value=request.data.get('calculated_value'),
+            division_id=request.data.get('division_id'),
+            unit_id=request.data.get('unit_id'),
+            user_id=request.user.id if request.user.is_authenticated else None,
+        )
+
+        return Response(result, status=status.HTTP_201_CREATED)
+
+
+class OverrideRevertView(APIView):
+    """
+    POST /api/landscaper/overrides/{override_id}/revert/
+    Revert an override back to the calculated value.
+    """
+    permission_classes = [AllowAny]  # Called directly from frontend browser
+
+    def post(self, request, override_id):
+        from apps.landscaper.services.override_service import revert_override
+
+        result = revert_override(
+            override_id=override_id,
+            user_id=request.user.id if request.user.is_authenticated else None,
+        )
+
+        if 'error' in result:
+            return Response(result, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(result)

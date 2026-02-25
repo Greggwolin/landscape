@@ -1,0 +1,197 @@
+'use client';
+
+/**
+ * IntakeChoiceModal — Post-upload routing decision.
+ *
+ * Appears after documents are uploaded, giving the user 4 choices:
+ *   1. Cancel — dismiss without doing anything
+ *   2. Global Intelligence — fire-and-forget intake/start with intent=global_intelligence
+ *   3. DMS Only — no further action, document stays in DMS
+ *   4. Structured Ingestion — calls intake/start, navigates to MappingScreen with intake_uuid
+ */
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CButton,
+  CSpinner,
+} from '@coreui/react';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+export interface PendingIntakeDoc {
+  docId: number;
+  docName: string;
+}
+
+interface IntakeChoiceModalProps {
+  visible: boolean;
+  projectId: number;
+  docs: PendingIntakeDoc[];
+  onClose: () => void;
+}
+
+type IntakeIntent = 'global_intelligence' | 'dms_only' | 'structured_ingestion';
+
+export default function IntakeChoiceModal({
+  visible,
+  projectId,
+  docs,
+  onClose,
+}: IntakeChoiceModalProps) {
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleChoice = async (intent: IntakeIntent) => {
+    if (intent === 'dms_only') {
+      // No intake session needed — just close
+      onClose();
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (intent === 'structured_ingestion') {
+        // Structured ingestion: call intake/start for each doc, navigate to MappingScreen
+        // with the first returned intake_uuid.
+        const results = await Promise.all(
+          docs.map(async (doc) => {
+            try {
+              const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  project_id: projectId,
+                  doc_id: doc.docId,
+                  intent,
+                }),
+              });
+              if (res.status === 201) {
+                const data = await res.json();
+                return data.intakeUuid as string;
+              }
+              return null;
+            } catch (err) {
+              console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err);
+              return null;
+            }
+          })
+        );
+
+        const firstUuid = results.find((u) => u != null);
+        onClose();
+        if (firstUuid) {
+          // Navigate to Intelligence tab with the intake_uuid to open MappingScreen
+          router.push(
+            `/projects/${projectId}?folder=documents&tab=extractions&intakeUuid=${firstUuid}`
+          );
+        }
+        return;
+      }
+
+      // Global Intelligence: fire-and-forget
+      await Promise.all(
+        docs.map((doc) =>
+          fetch(`${DJANGO_API_URL}/api/intake/start/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: projectId,
+              doc_id: doc.docId,
+              intent,
+            }),
+          }).catch((err) =>
+            console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err)
+          )
+        )
+      );
+    } finally {
+      setSubmitting(false);
+      onClose();
+    }
+  };
+
+  if (!visible || docs.length === 0) return null;
+
+  const docLabel =
+    docs.length === 1
+      ? docs[0].docName
+      : `${docs.length} documents`;
+
+  return (
+    <CModal visible={visible} onClose={onClose} alignment="center" size="lg">
+      <CModalHeader closeButton>
+        <CModalTitle>What would you like to do with {docLabel}?</CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        <p className="text-body-secondary mb-4">
+          Choose how Landscape should process {docs.length === 1 ? 'this document' : 'these documents'}:
+        </p>
+
+        <div className="d-flex flex-column gap-3">
+          {/* Structured Ingestion */}
+          <button
+            type="button"
+            className="btn btn-outline-primary text-start p-3 d-flex align-items-start gap-3"
+            disabled={submitting}
+            onClick={() => handleChoice('structured_ingestion')}
+          >
+            <span style={{ fontSize: '1.5rem' }}>🧩</span>
+            <div>
+              <div className="fw-semibold">Structured Ingestion</div>
+              <div className="text-body-secondary small">
+                Extract fields, map to project schema, review values, then commit.
+                Best for rent rolls, T-12s, and offering memoranda.
+              </div>
+            </div>
+          </button>
+
+          {/* Global Intelligence */}
+          <button
+            type="button"
+            className="btn btn-outline-info text-start p-3 d-flex align-items-start gap-3"
+            disabled={submitting}
+            onClick={() => handleChoice('global_intelligence')}
+          >
+            <span style={{ fontSize: '1.5rem' }}>🌐</span>
+            <div>
+              <div className="fw-semibold">Global Intelligence</div>
+              <div className="text-body-secondary small">
+                Run broad extraction to populate the knowledge base.
+                Good for appraisals, market studies, and general documents.
+              </div>
+            </div>
+          </button>
+
+          {/* DMS Only */}
+          <button
+            type="button"
+            className="btn btn-outline-secondary text-start p-3 d-flex align-items-start gap-3"
+            disabled={submitting}
+            onClick={() => handleChoice('dms_only')}
+          >
+            <span style={{ fontSize: '1.5rem' }}>📁</span>
+            <div>
+              <div className="fw-semibold">DMS Only</div>
+              <div className="text-body-secondary small">
+                Store in the document management system without extraction.
+                Good for surveys, title reports, and legal documents.
+              </div>
+            </div>
+          </button>
+        </div>
+      </CModalBody>
+      <CModalFooter>
+        {submitting && <CSpinner size="sm" className="me-2" />}
+        <CButton color="secondary" variant="ghost" disabled={submitting} onClick={onClose}>
+          Cancel
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+}

@@ -23,7 +23,6 @@ import {
   createStagedFile,
   type StagedFile,
   type StagingRoute,
-  type StagingStatus,
   type CollisionInfo,
 } from '@/components/dms/staging/classifyFile';
 
@@ -33,6 +32,11 @@ import {
 
 export interface StageFilesOptions {
   suggestedDocType?: string;
+}
+
+export interface PendingIntakeDoc {
+  docId: number;
+  docName: string;
 }
 
 interface UploadStagingContextValue {
@@ -50,6 +54,9 @@ interface UploadStagingContextValue {
   setDocTypes: (types: string[]) => void;
   projectId: number | null;
   workspaceId: number;
+  /** Docs that completed upload on an 'extract' route, awaiting intake choice */
+  pendingIntakeDocs: PendingIntakeDoc[];
+  clearPendingIntakeDocs: () => void;
 }
 
 const StagingContext = createContext<UploadStagingContextValue | null>(null);
@@ -99,6 +106,11 @@ export function UploadStagingProvider({
   const [stagedFiles, dispatch] = useReducer(stagingReducer, []);
   const [isTrayOpen, setIsTrayOpen] = React.useState(false);
   const [docTypes, setDocTypes] = React.useState<string[]>([]);
+  const [pendingIntakeDocs, setPendingIntakeDocs] = React.useState<PendingIntakeDoc[]>([]);
+
+  const clearPendingIntakeDocs = useCallback(() => {
+    setPendingIntakeDocs([]);
+  }, []);
 
   // Track whether we're currently analyzing to prevent concurrent runs
   const analyzeQueueRef = useRef<StagedFile[]>([]);
@@ -324,10 +336,15 @@ export function UploadStagingProvider({
 
         const docResult = await response.json();
 
-        // 3. If extract route and not a collision/duplicate, extraction is
-        //    already queued by the POST /api/dms/docs endpoint.
-        //    Route 'reference' documents also get created but the endpoint
-        //    handles extraction queueing based on doc_type.
+        // 3. Track extract-routed docs for intake choice modal.
+        //    Instead of auto-firing intake, surface the doc info so the
+        //    parent component can show IntakeChoiceModal.
+        if (effectiveRoute === 'extract' && docResult.doc?.doc_id) {
+          setPendingIntakeDocs(prev => [
+            ...prev,
+            { docId: docResult.doc.doc_id, docName: staged.file.name },
+          ]);
+        }
 
         console.log(
           `[STAGING] Upload complete: ${staged.file.name} → doc_id=${docResult.doc?.doc_id}`
@@ -414,6 +431,8 @@ export function UploadStagingProvider({
     setDocTypes,
     projectId,
     workspaceId,
+    pendingIntakeDocs,
+    clearPendingIntakeDocs,
   };
 
   return (
