@@ -44,17 +44,24 @@ export default function ValuationSalesCompMap({
   );
   const resolvedStyleUrl = activeBasemap;
 
-  // Color comps by selected state
+  // Unique color palette for comps (distinguishable, colorblind-friendly)
+  const COMP_COLORS = [
+    '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
+    '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990',
+    '#dcbeff', '#9A6324', '#800000', '#aaffc3', '#808000',
+  ];
+
+  // Color each comp uniquely by index
   const compsWithColor = useMemo(() => {
     if (!data) return null;
 
     return {
       ...data.comps,
-      features: data.comps.features.map((f) => ({
+      features: data.comps.features.map((f, idx) => ({
         ...f,
         properties: {
           ...f.properties,
-          color: f.properties.selected ? '#10b981' : '#f59e0b'
+          color: COMP_COLORS[idx % COMP_COLORS.length]
         }
       }))
     };
@@ -73,21 +80,19 @@ export default function ValuationSalesCompMap({
 
   // Auto-fit bounds to show all markers on mount
   useEffect(() => {
-    if (!data || !mapRef.current) return;
+    if (!data) return;
 
-    // Calculate bounds from all marker coordinates
+    // Calculate bounds from subject + all comp coordinates
     let minLng = data.center[0];
     let maxLng = data.center[0];
     let minLat = data.center[1];
     let maxLat = data.center[1];
 
-    // Include all comp coordinates
     data.comps.features.forEach((f) => {
       if (f.geometry.type === 'Polygon') {
         const coords = f.geometry.coordinates[0][0];
         const lng = coords[0] as number;
         const lat = coords[1] as number;
-
         minLng = Math.min(minLng, lng);
         maxLng = Math.max(maxLng, lng);
         minLat = Math.min(minLat, lat);
@@ -95,41 +100,46 @@ export default function ValuationSalesCompMap({
       }
     });
 
-    // Expand bounds by 10% on each side (120% total view)
+    // Expand bounds by 15% on each side for comfortable padding
     const lngRange = maxLng - minLng;
     const latRange = maxLat - minLat;
-    const expandedMinLng = minLng - (lngRange * 0.1);
-    const expandedMaxLng = maxLng + (lngRange * 0.1);
-    const expandedMinLat = minLat - (latRange * 0.1);
-    const expandedMaxLat = maxLat + (latRange * 0.1);
-
     const bounds: [[number, number], [number, number]] = [
-      [expandedMinLng, expandedMinLat],
-      [expandedMaxLng, expandedMaxLat]
+      [minLng - lngRange * 0.15, minLat - latRange * 0.15],
+      [maxLng + lngRange * 0.15, maxLat + latRange * 0.15]
     ];
 
-    // Delay to ensure map is fully initialized and loaded
-    setTimeout(() => {
-      mapRef.current?.fitBounds(bounds, { padding: 100, pitch: 30, bearing: 0 });
-    }, 500);
+    // Retry fitBounds until map ref is ready (handles async map init)
+    let attempts = 0;
+    const tryFit = () => {
+      if (mapRef.current) {
+        mapRef.current.fitBounds(bounds, { padding: 60, pitch: 0, bearing: 0 });
+      } else if (attempts < 10) {
+        attempts++;
+        setTimeout(tryFit, 300);
+      }
+    };
+    // Start after a brief delay for initial render
+    setTimeout(tryFit, 200);
   }, [data]);
 
   if (isLoading) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border"
+        className="card d-flex align-items-center justify-content-center"
         style={{
           height,
           backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
         }}
       >
         <div className="text-center">
           <div
-            className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 mb-3"
-            style={{ borderColor: 'var(--cui-primary)' }}
-          />
-          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+            className="spinner-border spinner-border-sm mb-3"
+            role="status"
+            style={{ color: 'var(--cui-primary)' }}
+          >
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
             Loading comparables map...
           </p>
         </div>
@@ -140,16 +150,15 @@ export default function ValuationSalesCompMap({
   if (error || !data || !compsWithColor) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border"
+        className="card d-flex align-items-center justify-content-center"
         style={{
           height,
           backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
         }}
       >
-        <div className="text-center p-6">
-          <div className="text-4xl mb-3">🗺️</div>
-          <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+        <div className="text-center p-4">
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🗺️</div>
+          <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
             Comparables map data unavailable
           </p>
         </div>
@@ -159,7 +168,7 @@ export default function ValuationSalesCompMap({
 
   return (
     <div
-      className="rounded-lg border overflow-hidden"
+      className="card overflow-hidden"
       style={{
         height,
         backgroundColor: 'var(--cui-card-bg)',
@@ -168,48 +177,25 @@ export default function ValuationSalesCompMap({
     >
       {/* Header */}
       <div
-        className="px-4 py-3 border-b flex items-center justify-between"
-        style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
-        }}
+        className="card-header d-flex align-items-center justify-content-between"
+        style={{ backgroundColor: 'var(--surface-card-header)' }}
       >
-        <div>
-          <h3
-            className="text-sm font-semibold"
-            style={{ color: 'var(--cui-body-color)' }}
-          >
-            Comparable Locations - 3D View
-          </h3>
-          <p
-            className="text-xs mt-1"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            Click a building to select/deselect comparable
-          </p>
-        </div>
+        <h5
+          className="mb-0"
+          style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}
+        >
+          Comparable Locations
+        </h5>
         <button
           onClick={() => mapRef.current?.flyToSubject(data.center)}
-          className="px-3 py-1 text-xs font-medium rounded transition-opacity"
-          style={{
-            backgroundColor: 'var(--cui-primary)',
-            color: 'white',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
+          className="btn btn-sm btn-primary"
         >
           Reset View
         </button>
       </div>
 
       {/* Map */}
-      <div className="px-4 pb-4" style={{ height: 'calc(100% - 110px)', position: 'relative' }}>
+      <div className="p-3" style={{ height: 'calc(100% - 110px)', position: 'relative' }}>
         {/* Basemap Switcher */}
         <div
           className="btn-group btn-group-sm"
@@ -232,7 +218,7 @@ export default function ValuationSalesCompMap({
             </button>
           ))}
         </div>
-        <div className="h-full rounded-lg overflow-hidden">
+        <div style={{ height: '100%', borderRadius: '0.5rem', overflow: 'hidden' }}>
         <MapOblique
           ref={mapRef}
           center={data.center}
@@ -248,6 +234,7 @@ export default function ValuationSalesCompMap({
             },
             ...data.comps.features.map((f, idx) => {
               const props = f.properties;
+              const compColor = COMP_COLORS[idx % COMP_COLORS.length];
               const formatShortCurrency = (value?: number | null) => {
                 if (value == null || !Number.isFinite(value)) return '';
                 if (Math.abs(value) >= 1_000_000) {
@@ -262,31 +249,32 @@ export default function ValuationSalesCompMap({
               const priceLabel = formatShortCurrency(props.price);
               const unitLabel = formatShortCurrency(props.price_per_unit);
               const priceLine = priceLabel
-                ? `${priceLabel}${unitLabel ? `&nbsp;&nbsp;<span style="color:#94a3b8;">${unitLabel} / unit</span>` : ''}`
+                ? `${priceLabel}${unitLabel ? `&nbsp;&nbsp;<span style="color: var(--cui-secondary-color);">${unitLabel} / unit</span>` : ''}`
                 : '';
 
               const popupHTML = `
-                <div style="padding: 10px 12px; min-width: 220px; color: #f8fafc; font-family: system-ui, -apple-system, Segoe UI, sans-serif;">
-                  <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #ffffff;">
-                    <span style="color:#cbd5f5; font-weight:600;">Name:</span> ${props.name || `Comp ${idx + 1}`}
+                <div style="padding: 10px 12px; min-width: 220px; color: var(--cui-body-color); font-family: system-ui, -apple-system, Segoe UI, sans-serif;">
+                  <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--cui-body-color);">
+                    <span style="color: var(--cui-primary); font-weight:600;">Name:</span> ${props.name || `Comp ${idx + 1}`}
                   </div>
-                  ${priceLine ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
-                    <span style="color:#cbd5f5; font-weight:600;">Price:</span> ${priceLine}
+                  ${priceLine ? `<div style="font-size: 13px; color: var(--cui-body-color); margin-bottom: 6px;">
+                    <span style="color: var(--cui-primary); font-weight:600;">Price:</span> ${priceLine}
                   </div>` : ''}
-                  ${props.date ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
-                    <span style="color:#cbd5f5; font-weight:600;">Date:</span> ${new Date(props.date).toLocaleDateString()}
+                  ${props.date ? `<div style="font-size: 13px; color: var(--cui-body-color); margin-bottom: 6px;">
+                    <span style="color: var(--cui-primary); font-weight:600;">Date:</span> ${new Date(props.date).toLocaleDateString()}
                   </div>` : ''}
                 </div>
               `;
 
               return {
                 id: `comp-${idx}`,
-                coordinates: f.geometry.type === 'Polygon'
-                  ? [(f.geometry.coordinates[0][0][0] as number), (f.geometry.coordinates[0][0][1] as number)]
-                  : [0, 0],
-                color: props.selected ? '#10b981' : '#f59e0b',
-                stroke: '#000000',
-                label: `Comp ${idx + 1}`,
+                coordinates: (f.geometry.type === 'Polygon'
+                  ? [f.geometry.coordinates[0][0][0] as number, f.geometry.coordinates[0][0][1] as number]
+                  : [0, 0]) as [number, number],
+                color: compColor,
+                stroke: '#ffffff',
+                label: `${idx + 1}`,
+                variant: 'numbered' as const,
                 popup: popupHTML
               };
             })
@@ -300,45 +288,51 @@ export default function ValuationSalesCompMap({
 
       {/* Legend */}
       <div
-        className="px-4 py-3 border-t flex items-center gap-6 text-xs"
+        className="d-flex align-items-center flex-wrap px-3 py-2"
         style={{
+          gap: '0.75rem',
+          fontSize: '0.75rem',
           backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)'
+          borderTop: '1px solid var(--cui-border-color)'
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="d-flex align-items-center" style={{ gap: '0.375rem' }}>
           <div
             style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#2d8cf0',
-              borderRadius: '2px'
+              width: '14px',
+              height: '14px',
+              backgroundColor: 'var(--cui-warning)',
+              borderRadius: '50%',
+              border: '2px solid var(--cui-body-color)'
             }}
           />
-          <span style={{ color: 'var(--cui-secondary-color)' }}>Subject Property</span>
+          <span style={{ color: 'var(--cui-secondary-color)' }}>Subject</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#f59e0b',
-              borderRadius: '2px'
-            }}
-          />
-          <span style={{ color: 'var(--cui-secondary-color)' }}>Comparable (Unselected)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            style={{
-              width: '12px',
-              height: '12px',
-              backgroundColor: '#10b981',
-              borderRadius: '2px'
-            }}
-          />
-          <span style={{ color: 'var(--cui-secondary-color)' }}>Comparable (Selected)</span>
-        </div>
+        {data.comps.features.map((f, idx) => (
+          <div key={idx} className="d-flex align-items-center" style={{ gap: '0.375rem' }}>
+            <div
+              style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: COMP_COLORS[idx % COMP_COLORS.length],
+                borderRadius: '50%',
+                border: '2px solid #fff',
+                color: '#fff',
+                fontSize: '9px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+              }}
+            >
+              {idx + 1}
+            </div>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>
+              {f.properties.name || `Comp ${idx + 1}`}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

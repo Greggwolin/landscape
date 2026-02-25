@@ -139,181 +139,249 @@ export function IndicatedValueSummary({
 
   return (
     <div
-      className="rounded-lg border h-full flex flex-col"
+      className="card"
       style={{
         backgroundColor: 'var(--cui-card-bg)',
         borderColor: 'var(--cui-border-color)',
-        minHeight: '600px',
-        maxHeight: '800px'
       }}
     >
       {/* Header */}
       <div
-        className="px-4 py-3 border-b flex items-center gap-3"
-        style={{
-          backgroundColor: 'var(--surface-card-header)',
-          borderColor: 'var(--cui-border-color)'
-        }}
+        className="card-header d-flex align-items-center justify-content-between"
+        style={{ backgroundColor: 'var(--surface-card-header)' }}
       >
-        <div className="text-2xl">📊</div>
-        <h3
-          className="text-lg font-semibold"
-          style={{ color: 'var(--cui-body-color)' }}
+        <h5
+          className="mb-0"
+          style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}
         >
           Indicated Value - Sales Comparison
-        </h3>
+        </h5>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-6" style={{ scrollbarWidth: 'thin' }}>
+      {/* Two-column layout: Landscaper narrative (left) + Value summary (right) */}
+      <div className="d-flex" style={{ minHeight: '400px' }}>
 
-      {/* Comparables Table */}
-      <div className="mb-6 overflow-x-auto">
-        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--cui-border-color)' }}>
-              <th className="text-left py-2 px-3 font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                Property
-              </th>
-              <th className="text-center py-2 px-3 font-semibold" colSpan={2} style={{ color: 'var(--cui-body-color)' }}>
-                Price / Unit
-              </th>
-            </tr>
-            <tr style={{ borderBottom: '2px solid var(--cui-border-color)' }}>
-              <th className="text-left py-2 px-3" style={{ color: 'var(--cui-body-color)' }}></th>
-              <th className="text-right py-2 px-3 font-normal" style={{ color: 'var(--cui-body-color)' }}>
-                Raw
-              </th>
-              <th className="text-right py-2 px-3 font-normal" style={{ color: 'var(--cui-body-color)' }}>
-                Adjusted
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {compsWithLiveAdj.map(({ comp, liveAdjusted }) => (
-              <tr
-                key={comp.comparable_id}
-                style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}
-              >
-                <td className="py-2 px-3" style={{ color: 'var(--cui-body-color)' }}>
-                  Comp #{comp.comp_number}: {comp.property_name}
-                </td>
-                <td className="py-2 px-3 text-right" style={{ color: 'var(--cui-body-color)' }}>
-                  {formatCurrency(Number(comp.price_per_unit))}
-                </td>
-                <td className="py-2 px-3 text-right font-semibold" style={{ color: 'var(--cui-body-color)' }}>
-                  {formatCurrency(liveAdjusted)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Weighted Average */}
-      <div
-        className="p-4 rounded mb-6"
-        style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderLeft: '4px solid var(--cui-primary)'
-        }}
-      >
-        <div className="flex justify-between items-center">
-          <span
-            className="text-base font-medium"
-            style={{ color: 'var(--cui-body-color)' }}
-          >
-            Weighted Average Price/Unit
-          </span>
-          <span
-            className="text-lg font-bold"
-            style={{ color: 'var(--cui-primary)' }}
-          >
-            {formatCurrency(weightedAvg)}/unit
-          </span>
-        </div>
+        {/* Left: Landscaper Narrative */}
         <div
-          className="text-xs mt-2"
-          style={{ color: 'var(--cui-secondary-color)' }}
+          style={{
+            flex: 1,
+            borderRight: '1px solid var(--cui-border-color)',
+            padding: '1rem 1.25rem',
+            overflowY: 'auto',
+          }}
         >
-          Based on {compsWithLiveAdj.length} adjusted comparables
-        </div>
-      </div>
-
-      {/* Total Indicated Value */}
-      <div
-        className="p-5 rounded mb-6"
-        style={{
-          backgroundColor: 'var(--cui-success-bg)',
-          border: '2px solid var(--cui-success)'
-        }}
-      >
-        <div className="flex justify-between items-center mb-2">
-          <span
-            className="text-lg font-bold"
-            style={{ color: 'var(--cui-body-color)' }}
-          >
-            Total Indicated Value
-          </span>
-          <span
-            className="text-2xl font-bold"
-            style={{ color: 'var(--cui-success)' }}
-          >
-            {formatLargeCurrency(indicatedValue)}
-          </span>
-        </div>
-        <div
-          className="text-sm"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          {formatCurrency(weightedAvg)}/unit × {subjectUnits} units
-        </div>
-      </div>
-
-      {/* Subject Comparison */}
-      <div className="space-y-3">
-        <div
-          className="flex justify-between items-center text-sm"
-          style={{ color: 'var(--cui-secondary-color)' }}
-        >
-          <span className="flex items-center gap-2">
-            Subject {priceLabel}
-            {priceSource === 'calculated' && (
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded"
-                style={{
-                  backgroundColor: 'var(--cui-success-bg)',
-                  color: 'var(--cui-success)',
-                }}
-              >
-                Closed
-              </span>
-            )}
-          </span>
-          <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>
-            {effectivePrice > 0 ? formatLargeCurrency(effectivePrice) : '—'}
-          </span>
-        </div>
-
-        {effectivePrice > 0 && indicatedValue > 0 && (
-          <div
-            className="flex justify-between items-center text-sm"
-            style={{ color: 'var(--cui-secondary-color)' }}
-          >
-            <span>Variance</span>
-            <span
+          <div className="d-flex align-items-center mb-3" style={{ gap: '0.5rem' }}>
+            <div
               style={{
-                color: variance > 0 ? 'var(--cui-warning)' : 'var(--cui-success)',
-                fontWeight: 600
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--cui-primary), var(--cui-info))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {variance > 0 ? '+' : ''}{variance.toFixed(1)}%
-              {variance > 0 ? ' above' : ' below'} indicated value
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Value Conclusion Narrative
             </span>
           </div>
-        )}
-      </div>
+          <div
+            style={{
+              fontSize: '0.8125rem',
+              lineHeight: 1.7,
+              color: 'var(--cui-secondary-color)',
+            }}
+          >
+            {compsWithLiveAdj.length > 0 ? (
+              <>
+                <p style={{ marginBottom: '0.75rem' }}>
+                  The Sales Comparison Approach analyzed {compsWithLiveAdj.length} comparable
+                  {compsWithLiveAdj.length !== 1 ? ' sales' : ' sale'} to derive an indicated value
+                  for the subject property.
+                </p>
+                <p style={{ marginBottom: '0.75rem' }}>
+                  After applying adjustments for location, condition, size, and market conditions,
+                  the adjusted price per unit ranged from{' '}
+                  <strong style={{ color: 'var(--cui-body-color)' }}>
+                    {formatCurrency(Math.min(...compsWithLiveAdj.map(c => c.liveAdjusted!)))}
+                  </strong>
+                  {' '}to{' '}
+                  <strong style={{ color: 'var(--cui-body-color)' }}>
+                    {formatCurrency(Math.max(...compsWithLiveAdj.map(c => c.liveAdjusted!)))}
+                  </strong>
+                  {' '}per unit, yielding a weighted average of{' '}
+                  <strong style={{ color: 'var(--cui-body-color)' }}>
+                    {formatCurrency(weightedAvg)}
+                  </strong>
+                  {' '}per unit.
+                </p>
+                <p style={{ marginBottom: '0.75rem' }}>
+                  Applied to the subject&apos;s {subjectUnits} units, the Sales Comparison
+                  Approach indicates a value of{' '}
+                  <strong style={{ color: 'var(--cui-success)' }}>
+                    {formatLargeCurrency(indicatedValue)}
+                  </strong>.
+                </p>
+                {effectivePrice > 0 && indicatedValue > 0 && (
+                  <p>
+                    The subject&apos;s {priceLabel.toLowerCase()} of {formatLargeCurrency(effectivePrice)} represents
+                    a {Math.abs(variance).toFixed(1)}% {variance > 0 ? 'premium over' : 'discount to'} the
+                    indicated value.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p style={{ fontStyle: 'italic' }}>
+                Add comparable sales and adjustments to generate the value conclusion narrative.
+              </p>
+            )}
+          </div>
+        </div>
 
+        {/* Right: Value Summary */}
+        <div
+          style={{
+            flex: 1,
+            padding: '1rem 1.25rem',
+            overflowY: 'auto',
+          }}
+        >
+
+          {/* Comparables Table */}
+          <div style={{ marginBottom: '1rem', overflowX: 'auto' }}>
+            <table style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--cui-border-color)' }}>
+                  <th style={{ textAlign: 'left', padding: '0.375rem 0.5rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+                    Property
+                  </th>
+                  <th style={{ textAlign: 'right', padding: '0.375rem 0.5rem', fontWeight: 400, color: 'var(--cui-body-color)' }}>
+                    Raw
+                  </th>
+                  <th style={{ textAlign: 'right', padding: '0.375rem 0.5rem', fontWeight: 400, color: 'var(--cui-body-color)' }}>
+                    Adjusted
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {compsWithLiveAdj.map(({ comp, liveAdjusted }) => (
+                  <tr
+                    key={comp.comparable_id}
+                    style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}
+                  >
+                    <td style={{ padding: '0.375rem 0.5rem', color: 'var(--cui-body-color)' }}>
+                      Comp #{comp.comp_number}: {comp.property_name}
+                    </td>
+                    <td style={{ padding: '0.375rem 0.5rem', textAlign: 'right', color: 'var(--cui-body-color)' }}>
+                      {formatCurrency(Number(comp.price_per_unit))}
+                    </td>
+                    <td style={{ padding: '0.375rem 0.5rem', textAlign: 'right', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+                      {formatCurrency(liveAdjusted)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Weighted Average */}
+          <div
+            style={{
+              padding: '0.75rem 1rem',
+              borderRadius: '0.375rem',
+              marginBottom: '1rem',
+              backgroundColor: 'var(--cui-tertiary-bg)',
+              borderLeft: '4px solid var(--cui-primary)'
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-center">
+              <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--cui-body-color)' }}>
+                Weighted Average Price/Unit
+              </span>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--cui-primary)' }}>
+                {formatCurrency(weightedAvg)}/unit
+              </span>
+            </div>
+            <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: 'var(--cui-secondary-color)' }}>
+              Based on {compsWithLiveAdj.length} adjusted comparables
+            </div>
+          </div>
+
+          {/* Total Indicated Value */}
+          <div
+            style={{
+              padding: '1rem',
+              borderRadius: '0.375rem',
+              marginBottom: '1rem',
+              backgroundColor: 'var(--cui-success-bg)',
+              border: '2px solid var(--cui-success)'
+            }}
+          >
+            <div className="d-flex justify-content-between align-items-center" style={{ marginBottom: '0.25rem' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--cui-body-color)' }}>
+                Total Indicated Value
+              </span>
+              <span style={{ fontSize: '1.375rem', fontWeight: 700, color: 'var(--cui-success)' }}>
+                {formatLargeCurrency(indicatedValue)}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--cui-secondary-color)' }}>
+              {formatCurrency(weightedAvg)}/unit × {subjectUnits} units
+            </div>
+          </div>
+
+          {/* Subject Comparison */}
+          <div className="d-flex flex-column" style={{ gap: '0.5rem' }}>
+            <div
+              className="d-flex justify-content-between align-items-center"
+              style={{ fontSize: '0.8125rem', color: 'var(--cui-secondary-color)' }}
+            >
+              <span className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+                Subject {priceLabel}
+                {priceSource === 'calculated' && (
+                  <span
+                    style={{
+                      fontSize: '0.625rem',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '0.25rem',
+                      backgroundColor: 'var(--cui-success-bg)',
+                      color: 'var(--cui-success)',
+                    }}
+                  >
+                    Closed
+                  </span>
+                )}
+              </span>
+              <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>
+                {effectivePrice > 0 ? formatLargeCurrency(effectivePrice) : '—'}
+              </span>
+            </div>
+
+            {effectivePrice > 0 && indicatedValue > 0 && (
+              <div
+                className="d-flex justify-content-between align-items-center"
+                style={{ fontSize: '0.8125rem', color: 'var(--cui-secondary-color)' }}
+              >
+                <span>Variance</span>
+                <span
+                  style={{
+                    color: variance > 0 ? 'var(--cui-warning)' : 'var(--cui-success)',
+                    fontWeight: 600
+                  }}
+                >
+                  {variance > 0 ? '+' : ''}{variance.toFixed(1)}%
+                  {variance > 0 ? ' above' : ' below'} indicated value
+                </span>
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
     </div>
   );

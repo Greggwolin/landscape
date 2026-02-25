@@ -133,28 +133,32 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
   }, [pathname, activeFolder, activeTab, activeSubTab]);
 
   // Determine if the user has manually dismissed help this session
-  const userDismissedRef = useRef<boolean>(
-    typeof window !== 'undefined'
-      ? sessionStorage.getItem(HELP_DISMISSED_KEY) === 'true'
-      : false,
-  );
+  const userDismissedRef = useRef<boolean>(false);
 
   // Default open on workspace pages unless user dismissed it this session
   const isWorkspace = isWorkspacePage(pathname);
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const dismissed = sessionStorage.getItem(HELP_DISMISSED_KEY) === 'true';
-    return isWorkspace && !dismissed;
-  });
+  // Always start closed to match server render (avoids hydration mismatch)
+  const [isOpen, setIsOpen] = useState(false);
 
-  // When navigating INTO a workspace page from a non-workspace page,
-  // auto-open the panel (unless user previously dismissed it this session).
+  // After hydration, open on workspace pages if not dismissed
+  const hasMountedRef = useRef(false);
   const prevIsWorkspaceRef = useRef(isWorkspace);
   useEffect(() => {
+    const dismissed = sessionStorage.getItem(HELP_DISMISSED_KEY) === 'true';
+    userDismissedRef.current = dismissed;
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      // Initial mount: auto-open on workspace pages
+      if (isWorkspace && !dismissed) {
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    // Subsequent navigation: entered workspace from outside
     const wasWorkspace = prevIsWorkspaceRef.current;
     prevIsWorkspaceRef.current = isWorkspace;
-
-    // Entered workspace from outside
     if (isWorkspace && !wasWorkspace && !userDismissedRef.current) {
       setIsOpen(true);
     }

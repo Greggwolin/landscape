@@ -1,0 +1,89 @@
+[    3865ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/projects/42?folder=reports&tab=investment_committee:0
+[    4286ms] ModuleBuildError: Module build failed (from ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js):
+Error:   x Nullish coalescing operator(??) requires parens when mixing with logical operators
+    ,-[/Users/5150east/landscape/src/components/ic/ICPage.tsx:76:1]
+ 73 |         label: (result.label as string) || '',
+ 74 |         assumption_key: '',
+ 75 |         original_value: result.current_value as number || '',
+ 76 |         override_value: result.user_value ?? result.suggested_value as number || '',
+    :                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 77 |         unit: (result.unit as string) || '',
+ 78 |         deltas,
+ 79 |       };
+    `----
+
+
+Caused by:
+    Syntax Error
+    at processResult (file:///Users/5150east/landscape/node_modules/next/dist/compiled/webpack/bundle5.js:29:407086)
+    at <unknown> (file:///Users/5150east/landscape/node_modules/next/dist/compiled/webpack/bundle5.js:29:408881)
+    at <unknown> (file:///Users/5150east/landscape/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:8645)
+    at <unknown> (file:///Users/5150east/landscape/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:5019)
+    at r.callback (file:///Users/5150east/landscape/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js:1:4039)
+[    4283ms] [ERROR] ./src/components/ic/ICPage.tsx
+Error:   x Nullish coalescing operator(??) requires parens when mixing with logical operators
+    ,-[/Users/5150east/landscape/src/components/ic/ICPage.tsx:76:1]
+ 73 |         label: (result.label as string) || '',
+ 74 |         assumption_key: '',
+ 75 |         original_value: result.current_value as number || '',
+ 76 |         override_value: result.user_value ?? result.suggested_value as number || '',
+    :                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 77 |         unit: (result.unit as string) || '',
+ 78 |         deltas,
+ 79 |       };
+    `----
+
+Caused by:
+    Syntax Error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/next-devtools/userspace/pages/pages-dev-overlay-setup.js:76
+[    4299ms] [ERROR] ./src/components/ic/ICPage.tsx
+Error:   x Nullish coalescing operator(??) requires parens when mixing with logical operators
+    ,-[/Users/5150east/landscape/src/components/ic/ICPage.tsx:76:1]
+ 73 |         label: (result.label as string) || '',
+ 74 |         assumption_key: '',
+ 75 |         original_value: result.current_value as number || '',
+ 76 |         override_value: result.user_value ?? result.suggested_value as number || '',
+    :                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 77 |         unit: (result.unit as string) || '',
+ 78 |         deltas,
+ 79 |       };
+    `----
+
+Caused by:
+    Syntax Error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/next-devtools/userspace/pages/pages-dev-overlay-setup.js:76
+[    4333ms] [ERROR] ./src/components/ic/ICPage.tsx
+Error:   x Nullish coalescing operator(??) requires parens when mixing with logical operators
+    ,-[/Users/5150east/landscape/src/components/ic/ICPage.tsx:76:1]
+ 73 |         label: (result.label as string) || '',
+ 74 |         assumption_key: '',
+ 75 |         original_value: result.current_value as number || '',
+ 76 |         override_value: result.user_value ?? result.suggested_value as number || '',
+    :                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 77 |         unit: (result.unit as string) || '',
+ 78 |         deltas,
+ 79 |       };
+    `----
+
+Caused by:
+    Syntax Error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/next-devtools/userspace/pages/pages-dev-overlay-setup.js:76
+[   14389ms] [ERROR] ./src/components/ic/ICPage.tsx
+Error:   x Nullish coalescing operator(??) requires parens when mixing with logical operators
+    ,-[/Users/5150east/landscape/src/components/ic/ICPage.tsx:76:1]
+ 73 |         label: (result.label as string) || '',
+ 74 |         assumption_key: '',
+ 75 |         original_value: result.current_value as number || '',
+ 76 |         override_value: result.user_value ?? result.suggested_value as number || '',
+    :                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 77 |         unit: (result.unit as string) || '',
+ 78 |         deltas,
+ 79 |       };
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/components/ic/ICPage.tsx
+./src/app/projects/[projectId]/ProjectContentRouter.tsx
+./src/app/projects/[projectId]/page.tsx @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/next-devtools/userspace/pages/pages-dev-overlay-setup.js:76
+[   15967ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/_next/static/webpack/34b7de47de5d900f.webpack.hot-update.json:0
+[   15967ms] [WARNING] [Fast Refresh] performing full reload because your application had an unrecoverable error @ webpack-internal:///(pages-dir-browser)/./node_modules/next/dist/client/dev/hot-reloader/pages/hot-reloader-pages.js:347

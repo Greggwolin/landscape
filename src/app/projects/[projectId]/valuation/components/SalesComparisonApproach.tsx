@@ -58,10 +58,14 @@ export function SalesComparisonApproach({
   onRefresh,
   mode = 'multifamily'
 }: SalesComparisonApproachProps) {
+  // Show all comps except explicitly-tagged land comps.
+  // Comps with NULL/empty property_type are assumed to match the subject.
   const displayComparables = useMemo(
     () => comparables.filter((comp) => {
       const pt = (comp.property_type ?? '').toUpperCase();
-      return pt !== '' && pt !== 'LAND' && IMPROVED_PROPERTY_TYPES.includes(pt);
+      if (pt === 'LAND') return false;
+      // Allow NULL/empty (assumed same type as subject) or any recognised improved type
+      return pt === '' || IMPROVED_PROPERTY_TYPES.includes(pt);
     }),
     [comparables]
   );

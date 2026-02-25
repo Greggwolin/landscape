@@ -16,7 +16,7 @@ class ParcelServiceConfig:
 
 COUNTY_PARCEL_SERVICES: Dict[str, ParcelServiceConfig] = {
     "maricopa": ParcelServiceConfig(
-        url="https://gis.mcassessor.maricopa.gov/arcgis/rest/services/Parcels/MapServer/0",
+        url="https://gis.mcassessor.maricopa.gov/arcgis/rest/services/MaricopaDynamicQueryService/MapServer/3",
         id_field="APN",
         owner_field="OWNER_NAME",
         address_field="PHYSICAL_ADDRESS",

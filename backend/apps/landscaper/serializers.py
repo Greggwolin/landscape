@@ -358,3 +358,51 @@ class ExtractionLogReviewSerializer(serializers.Serializer):
 
     was_accepted = serializers.BooleanField(required=True)
     rejection_reason = serializers.CharField(required=False, allow_blank=True)
+
+
+# =============================================================================
+# Intelligence v1 — Intake Session Serializers
+# =============================================================================
+
+class IntakeSessionSerializer(serializers.ModelSerializer):
+    """Read serializer for IntakeSession."""
+
+    intakeUuid = serializers.UUIDField(source='intake_uuid', read_only=True)
+    projectId = serializers.IntegerField(source='project_id', read_only=True)
+    docId = serializers.IntegerField(source='doc_id', read_only=True)
+    documentType = serializers.CharField(source='document_type', read_only=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        from .models import IntakeSession
+        model = IntakeSession
+        fields = [
+            'intakeUuid', 'projectId', 'docId', 'documentType',
+            'status', 'createdAt', 'updatedAt',
+        ]
+
+
+class IntakeSessionStartSerializer(serializers.Serializer):
+    """Serializer for POST /api/intake/start."""
+
+    project_id = serializers.IntegerField(required=True)
+    doc_id = serializers.IntegerField(required=False, allow_null=True)
+    intent = serializers.ChoiceField(
+        choices=['global_intelligence', 'dms_only', 'structured_ingestion'],
+        default='structured_ingestion'
+    )
+
+
+class IntakeCommitActionSerializer(serializers.Serializer):
+    """Single action within a commit request."""
+
+    extraction_id = serializers.IntegerField(required=True)
+    action = serializers.ChoiceField(choices=['accept', 'reject'])
+    override_value = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class IntakeCommitSerializer(serializers.Serializer):
+    """Serializer for POST /api/intake/{uuid}/commit_values."""
+
+    actions = IntakeCommitActionSerializer(many=True)

@@ -72,6 +72,8 @@ export default function StagingRow({
 }: StagingRowProps) {
   const effectiveDocType = sf.userDocType || sf.classifiedDocType || 'General';
   const effectiveRoute = sf.userRoute || sf.route;
+  const hasCollision = Boolean(sf.collision);
+  const isExactDuplicate = sf.collision?.matchType === 'both' || sf.collision?.matchType === 'content';
   const confLevel = confidenceLabel(sf.confidence);
   const confColors = CONFIDENCE_COLORS[confLevel];
 
@@ -206,6 +208,7 @@ export default function StagingRow({
         <select
           value={effectiveDocType}
           onChange={e => onSetDocType(sf.id, e.target.value)}
+          disabled={hasCollision}
           className="form-select form-select-sm"
           style={{
             width: 'auto',
@@ -246,6 +249,7 @@ export default function StagingRow({
               key={r}
               type="button"
               onClick={() => onSetRoute(sf.id, r)}
+              disabled={hasCollision}
               className="btn btn-sm"
               style={{
                 fontSize: '0.65rem',
@@ -253,6 +257,7 @@ export default function StagingRow({
                 backgroundColor: effectiveRoute === r ? 'var(--cui-primary)' : 'transparent',
                 color: effectiveRoute === r ? '#fff' : 'var(--cui-secondary-color)',
                 border: effectiveRoute === r ? 'none' : '1px solid var(--cui-border-color)',
+                opacity: hasCollision ? 0.5 : 1,
               }}
               title={
                 r === 'extract' ? 'Extract to project fields'
@@ -273,7 +278,7 @@ export default function StagingRow({
           style={{ fontSize: '0.75rem', padding: '2px 8px' }}
           title="Remove from staging"
         >
-          Remove
+          {hasCollision ? 'Discard' : 'Remove'}
         </button>
 
         {/* Confirm */}
@@ -283,7 +288,7 @@ export default function StagingRow({
           className="btn btn-primary btn-sm"
           style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}
         >
-          {effectiveRoute === 'library' ? 'Stage for Library' : 'Add to Project'}
+          {hasCollision ? 'Save Version' : effectiveRoute === 'library' ? 'Stage for Library' : 'Add to Project'}
         </button>
       </div>
 
@@ -307,7 +312,9 @@ export default function StagingRow({
           {/* Collision warning */}
           {sf.collision && (
             <span className="text-xs" style={{ color: 'var(--cui-warning)' }}>
-              &#9888; V{sf.collision.existingDoc.version_number} already exists &mdash; saving as new version
+              {isExactDuplicate
+                ? `\u26A0 Exact duplicate of V${sf.collision.existingDoc.version_number} — no differences detected.`
+                : `\u26A0 V${sf.collision.existingDoc.version_number} already exists — saving as new version.`}
             </span>
           )}
         </div>

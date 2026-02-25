@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" data-coreui-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Home Mockup — Two-Column Profile</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* CoreUI Variable Simulation */
+  :root {
+    --cui-body-bg: #f1f5f9;
+    --cui-body-color: #1e293b;
+    --cui-secondary-color: #64748b;
+    --cui-tertiary-color: #94a3b8;
+    --cui-border-color: #d8dbe0;
+    --cui-card-bg: #ffffff;
+    --cui-primary: #3b82f6;
+    --cui-secondary-bg: #ebedef;
+    --cui-tertiary-bg: #f0f4f7;
+    --cui-focus-ring-color: rgba(59, 130, 246, 0.25);
+    --surface-bar: #e8eaed;
+    --surface-card-header: #f0f1f2;
+    --surface-subheader: #f7f7fb;
+    --tile-border: #cbd5e1;
+    --nav-tile-bg: var(--cui-tertiary-bg);
+    --nav-tile-color: var(--cui-secondary-color);
+    --nav-tile-hover-bg: #dde1e6;
+    --nav-tile-hover-color: var(--cui-body-color);
+    --nav-tile-active-bg: #dbeafe;
+    --nav-tile-active-color: #1e40af;
+    --nav-tile-active-border: var(--cui-primary);
+    --pill-type-bg: rgba(37,99,235,0.1); --pill-type-color: #2563eb; --pill-type-border: rgba(37,99,235,0.25);
+    --pill-persp-bg: rgba(14,165,233,0.1); --pill-persp-color: #0284c7; --pill-persp-border: rgba(14,165,233,0.2);
+    --pill-purpose-bg: rgba(99,102,241,0.1); --pill-purpose-color: #4f46e5; --pill-purpose-border: rgba(99,102,241,0.2);
+  }
+  [data-coreui-theme="dark"] {
+    --cui-body-bg: #0b1220;
+    --cui-body-color: #e2e8f0;
+    --cui-secondary-color: #94a3b8;
+    --cui-tertiary-color: #64748b;
+    --cui-border-color: #1e293b;
+    --cui-card-bg: #111827;
+    --cui-primary: #3b82f6;
+    --cui-secondary-bg: #2a2e3a;
+    --cui-tertiary-bg: #1e293b;
+    --cui-focus-ring-color: rgba(59, 130, 246, 0.35);
+    --surface-bar: #2a2e3a;
+    --surface-card-header: #121827;
+    --surface-subheader: #1f2a37;
+    --tile-border: #4b5563;
+    --nav-tile-bg: var(--cui-tertiary-bg);
+    --nav-tile-color: var(--cui-secondary-color);
+    --nav-tile-hover-bg: #334155;
+    --nav-tile-hover-color: #cbd5e1;
+    --nav-tile-active-bg: #1e3a5f;
+    --nav-tile-active-color: #e2e8f0;
+    --nav-tile-active-border: var(--cui-primary);
+    --pill-type-bg: rgba(96,165,250,0.2); --pill-type-color: #93c5fd; --pill-type-border: rgba(96,165,250,0.3);
+    --pill-persp-bg: rgba(56,189,248,0.15); --pill-persp-color: #7dd3fc; --pill-persp-border: rgba(56,189,248,0.25);
+    --pill-purpose-bg: rgba(129,140,248,0.15); --pill-purpose-color: #a5b4fc; --pill-purpose-border: rgba(129,140,248,0.25);
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--cui-body-bg); color: var(--cui-body-color); min-height: 100vh; }
+
+  /* Top Nav — always dark */
+  .top-nav { height: 48px; background: #111827; border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 1rem; font-size: 0.875rem; font-weight: 600; color: #94a3b8; gap: 0.5rem; }
+  .top-nav .logo { color: #60a5fa; font-size: 1rem; }
+
+  /* Active Project Bar */
+  .active-bar { display: flex; align-items: stretch; gap: 0.75rem; padding: 0.5rem 1rem; background: var(--surface-bar); border-bottom: 1px solid var(--cui-border-color); position: sticky; top: 48px; z-index: 40; }
+  .bar-left { display: flex; flex-direction: column; gap: 0.35rem; flex-shrink: 0; }
+  .project-selector { height: 36px; min-width: 220px; padding: 0 0.6rem; font-size: 0.875rem; font-weight: 500; background: var(--cui-card-bg); color: var(--cui-body-color); border: 1px solid var(--cui-border-color); border-radius: 5px; cursor: pointer; }
+  .pills-row { display: flex; gap: 0.35rem; }
+  .pill { flex: 1; text-align: center; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; cursor: pointer; line-height: 1.4; }
+  .pill-type { background: var(--pill-type-bg); color: var(--pill-type-color); border: 1px solid var(--pill-type-border); }
+  .pill-persp { background: var(--pill-persp-bg); color: var(--pill-persp-color); border: 1px solid var(--pill-persp-border); }
+  .pill-purpose { background: var(--pill-purpose-bg); color: var(--pill-purpose-color); border: 1px solid var(--pill-purpose-border); }
+  .nav-tiles { display: flex; gap: 3px; flex: 1; min-width: 0; align-items: stretch; }
+  .nav-tile { display: flex; align-items: center; justify-content: center; flex: 1 1 0; min-width: 0; padding: 0 0.6rem; font-size: 1rem; font-weight: 500; color: var(--nav-tile-color); background: var(--nav-tile-bg); border: 1px solid transparent; border-radius: 5px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .nav-tile:hover { background: var(--nav-tile-hover-bg); color: var(--nav-tile-hover-color); }
+  .nav-tile.active { background: var(--nav-tile-active-bg); color: var(--nav-tile-active-color); font-weight: 600; border-color: var(--nav-tile-active-border); box-shadow: 0 1px 4px var(--cui-focus-ring-color); }
+  .version-badge { flex-shrink: 0; align-self: center; font-size: 0.625rem; color: var(--cui-tertiary-color); padding: 0.15rem 0.5rem; border: 1px solid var(--cui-border-color); border-radius: 4px; }
+
+  /* Content area */
+  .content-area { display: flex; flex: 1; padding: 0.5rem; gap: 0.5rem; }
+
+  /* Landscaper */
+  .landscaper { width: 320px; flex-shrink: 0; background: var(--cui-card-bg); border: 1px solid var(--cui-border-color); border-radius: 8px; height: calc(100vh - 140px); display: flex; flex-direction: column; }
+  .landscaper-header { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--cui-border-color); font-size: 0.8rem; font-weight: 600; color: var(--cui-body-color); display: flex; align-items: center; gap: 0.5rem; }
+  .landscaper-header .ctx-pill { font-size: 0.65rem; padding: 0.1rem 0.4rem; background: var(--pill-type-bg); color: var(--pill-type-color); border-radius: 3px; }
+  .landscaper-body { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--cui-tertiary-color); font-size: 0.8rem; padding: 1rem; text-align: center; }
+
+  /* Right column */
+  .right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+  /* ══════════════════════════════════════════
+     PROJECT HOME — Cards
+     ══════════════════════════════════════════ */
+  .card { background: var(--cui-card-bg); border: 1px solid var(--cui-border-color); border-radius: 8px; overflow: hidden; }
+  .card-header { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--cui-border-color); background: var(--surface-card-header); display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; font-weight: 600; }
+  .card-body { padding: 0.75rem; }
+
+  /* Top row — Profile + Map */
+  .top-row { display: flex; gap: 0.5rem; }
+  .profile-col { flex: 0 0 45%; }
+  .map-col { flex: 1; }
+
+  /* ══════════════════════════════════════════
+     TWO-COLUMN PROFILE GRID
+     ══════════════════════════════════════════ */
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .profile-field {
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--cui-border-color);
+  }
+  /* Right column fields get a left border for visual separation */
+  .profile-field:nth-child(even) {
+    border-left: 1px solid var(--cui-border-color);
+  }
+  .profile-field .pf-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--cui-tertiary-color);
+    letter-spacing: 0.03em;
+    margin-bottom: 0.15rem;
+  }
+  .profile-field .pf-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--cui-body-color);
+    padding-left: 0.5rem;
+  }
+  .profile-field .pf-value.empty {
+    color: var(--cui-tertiary-color);
+    font-style: italic;
+  }
+  /* Full-width field spanning both columns */
+  .profile-field.full-width {
+    grid-column: 1 / -1;
+    border-left: none;
+  }
+
+
+  /* Edit button */
+  .btn-edit { font-size: 0.7rem; padding: 0.2rem 0.65rem; border-radius: 999px; font-weight: 600; background: var(--cui-primary); color: #fff; border: none; cursor: pointer; }
+  .btn-photo { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; background: rgba(96,165,250,0.15); color: var(--pill-type-color); border: 1px solid var(--pill-type-border); cursor: pointer; }
+
+  /* Map placeholder */
+  .map-placeholder { height: 100%; min-height: 280px; background: var(--cui-tertiary-bg); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--cui-tertiary-color); font-size: 0.875rem; }
+
+  /* Financial summary tiles */
+  .fin-tiles { display: flex; gap: 0.4rem; }
+  .fin-tile { flex: 1; text-align: center; padding: 0.5rem 0.25rem; border-radius: 6px; border: 1px solid var(--tile-border); background: var(--cui-tertiary-bg); }
+  .fin-tile .ft-value { font-size: 1rem; font-weight: 700; color: var(--cui-body-color); }
+  .fin-tile .ft-label { font-size: 0.65rem; color: var(--cui-secondary-color); margin-top: 0.15rem; }
+
+  /* Macro conditions */
+  .macro-tiles { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .macro-tile { flex: 1 1 calc(25% - 0.3rem); min-width: 100px; text-align: center; padding: 0.4rem 0.25rem; border-radius: 6px; border: 1px solid var(--tile-border); background: var(--cui-tertiary-bg); }
+  .macro-tile .mt-value { font-size: 0.875rem; font-weight: 600; color: var(--cui-body-color); }
+  .macro-tile .mt-label { font-size: 0.6rem; color: var(--cui-secondary-color); margin-top: 0.1rem; }
+
+  /* Contacts placeholder */
+  .contacts-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem; }
+  .contact-card { padding: 0.5rem; border-radius: 6px; border: 1px solid var(--cui-border-color); background: var(--cui-tertiary-bg); }
+  .contact-card .cc-name { font-size: 0.8rem; font-weight: 600; color: var(--cui-body-color); }
+  .contact-card .cc-role { font-size: 0.65rem; color: var(--cui-tertiary-color); }
+  .contact-card .cc-info { font-size: 0.7rem; color: var(--cui-secondary-color); margin-top: 0.2rem; }
+
+  /* Demo controls */
+  .demo-controls { position: fixed; bottom: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 100; }
+  .demo-btn { padding: 0.4rem 0.8rem; font-size: 0.75rem; background: var(--cui-tertiary-bg); color: var(--cui-body-color); border: 1px solid var(--cui-border-color); border-radius: 5px; cursor: pointer; }
+  .demo-btn:hover { background: var(--nav-tile-hover-bg); }
+
+  /* Annotation callouts */
+  .callout { position: relative; }
+  .callout::after { content: attr(data-callout); position: absolute; top: -1.2rem; right: 0; font-size: 0.6rem; color: #f59e0b; font-weight: 700; white-space: nowrap; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<!-- Top Nav -->
+<div class="top-nav"><span class="logo">&#9670;</span> Landscape</div>
+
+<!-- Active Project Bar -->
+<div class="active-bar">
+  <div class="bar-left">
+    <select class="project-selector">
+      <option>7 - Chadron Terrace Apartments</option>
+    </select>
+    <div class="pills-row">
+      <span class="pill pill-type">Multifamily</span>
+      <span class="pill pill-persp">Investment</span>
+      <span class="pill pill-purpose">Valuation</span>
+    </div>
+  </div>
+  <div class="nav-tiles">
+    <button class="nav-tile active">Project</button>
+    <button class="nav-tile">Property</button>
+    <button class="nav-tile">Operations</button>
+    <button class="nav-tile">Valuation</button>
+    <button class="nav-tile">Capitalization</button>
+    <button class="nav-tile">Reports</button>
+    <button class="nav-tile">Documents</button>
+    <button class="nav-tile">Map</button>
+  </div>
+  <span class="version-badge">v0.9.2</span>
+</div>
+
+<!-- Content Area -->
+<div class="content-area">
+  <!-- Landscaper -->
+  <div class="landscaper">
+    <div class="landscaper-header">Landscaper <span class="ctx-pill">Project</span></div>
+    <div class="landscaper-body">Ask me about this project...</div>
+  </div>
+
+  <!-- Right Column — Project Home -->
+  <div class="right-col">
+
+    <!-- Row 1: Profile + Map -->
+    <div class="top-row">
+      <!-- Project Profile — TWO COLUMN LAYOUT -->
+      <div class="profile-col">
+        <div class="card" style="height: 100%;">
+          <div class="card-header">
+            <span>Project Profile</span>
+            <button class="btn-edit">Edit</button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="profile-grid">
+              <!-- Line 1: Property Type | Subtype -->
+              <div class="profile-field">
+                <span class="pf-label">Property Type</span>
+                <span class="pf-value">Multifamily</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Subtype</span>
+                <span class="pf-value">Garden-Style MF</span>
+              </div>
+              <!-- Line 2: Project Name | Address -->
+              <div class="profile-field">
+                <span class="pf-label">Project Name</span>
+                <span class="pf-value">Chadron Terrace Apartments</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Address</span>
+                <span class="pf-value">1200 N Chadron Ave<br>Chadron, NE 69337</span>
+              </div>
+              <!-- Line 3: Total Units | Gross Acres -->
+              <div class="profile-field">
+                <span class="pf-label">Total Units</span>
+                <span class="pf-value">132</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Gross Acres</span>
+                <span class="pf-value">8.42</span>
+              </div>
+              <!-- Line 4: County | Market -->
+              <div class="profile-field">
+                <span class="pf-label">County</span>
+                <span class="pf-value">Dawes</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Market</span>
+                <span class="pf-value">Chadron, NE MSA</span>
+              </div>
+              <!-- Line 5: APN | Ownership -->
+              <div class="profile-field">
+                <span class="pf-label">APN</span>
+                <span class="pf-value">170254200</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Ownership</span>
+                <span class="pf-value">Fee Simple</span>
+              </div>
+              <!-- Analysis fields below -->
+              <div class="profile-field">
+                <span class="pf-label">Perspective</span>
+                <span class="pf-value">Investment</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Purpose</span>
+                <span class="pf-value">Valuation</span>
+              </div>
+              <div class="profile-field">
+                <span class="pf-label">Asking Price</span>
+                <span class="pf-value">$14,250,000</span>
+              </div>
+              <div class="profile-field" style="border-bottom: none;">
+                <span class="pf-label">Photos</span>
+                <span class="pf-value"><button class="btn-photo">Photos (3)</button></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div class="map-col">
+        <div class="card" style="height: 100%;">
+          <div class="card-header"><span>Location</span></div>
+          <div class="card-body" style="padding: 0;">
+            <div class="map-placeholder">Map — Chadron, NE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Financial Summary -->
+    <div class="card">
+      <div class="card-header"><span>Financial Summary</span></div>
+      <div class="card-body">
+        <div class="fin-tiles">
+          <div class="fin-tile"><div class="ft-value">$14.3M</div><div class="ft-label">Asking Price</div></div>
+          <div class="fin-tile"><div class="ft-value">$107,955</div><div class="ft-label">Price / Unit</div></div>
+          <div class="fin-tile"><div class="ft-value">$148.52</div><div class="ft-label">Price / SF</div></div>
+          <div class="fin-tile"><div class="ft-value">6.8%</div><div class="ft-label">Current Cap</div></div>
+          <div class="fin-tile"><div class="ft-value">7.4%</div><div class="ft-label">Proforma Cap</div></div>
+          <div class="fin-tile"><div class="ft-value">$971K</div><div class="ft-label">NOI (Current)</div></div>
+          <div class="fin-tile"><div class="ft-value">$1.06M</div><div class="ft-label">NOI (Proforma)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Macro Conditions -->
+    <div class="card">
+      <div class="card-header"><span>Macro Conditions</span></div>
+      <div class="card-body">
+        <div class="macro-tiles">
+          <div class="macro-tile"><div class="mt-value">4.3%</div><div class="mt-label">10Y Treasury</div></div>
+          <div class="macro-tile"><div class="mt-value">7.1%</div><div class="mt-label">30Y Mortgage</div></div>
+          <div class="macro-tile"><div class="mt-value">3.2%</div><div class="mt-label">CPI (YoY)</div></div>
+          <div class="macro-tile"><div class="mt-value">4.1%</div><div class="mt-label">Unemployment</div></div>
+          <div class="macro-tile"><div class="mt-value">2.5%</div><div class="mt-label">GDP Growth</div></div>
+          <div class="macro-tile"><div class="mt-value">5.4%</div><div class="mt-label">Vacancy Rate</div></div>
+          <div class="macro-tile"><div class="mt-value">3.8%</div><div class="mt-label">Rent Growth</div></div>
+          <div class="macro-tile"><div class="mt-value">N/A</div><div class="mt-label">SOFR</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Property Contacts -->
+    <div class="card">
+      <div class="card-header"><span>Property Contacts</span></div>
+      <div class="card-body">
+        <div class="contacts-grid">
+          <div class="contact-card">
+            <div class="cc-name">John Smith</div>
+            <div class="cc-role">Listing Broker</div>
+            <div class="cc-info">CBRE | (402) 555-1234</div>
+          </div>
+          <div class="contact-card">
+            <div class="cc-name">Sarah Johnson</div>
+            <div class="cc-role">Property Manager</div>
+            <div class="cc-info">Pinnacle Mgmt | (308) 555-5678</div>
+          </div>
+          <div class="contact-card">
+            <div class="cc-name">Mike Davis</div>
+            <div class="cc-role">Appraiser</div>
+            <div class="cc-info">Midwest Valuation | (402) 555-9012</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Demo controls -->
+<div class="demo-controls">
+  <button class="demo-btn" onclick="document.documentElement.dataset.coreuiTheme = document.documentElement.dataset.coreuiTheme === 'dark' ? 'light' : 'dark'">Toggle Light/Dark</button>
+</div>
+
+</body>
+</html>

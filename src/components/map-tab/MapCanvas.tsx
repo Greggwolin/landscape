@@ -53,8 +53,8 @@ function safeRemoveSource(m: maplibregl.Map, sourceId: string) {
   if (m.getSource(sourceId)) m.removeSource(sourceId);
 }
 
-const PARCEL_MIN_ZOOM = 15;
-const TAX_PARCEL_MIN_ZOOM = 15;
+const PARCEL_MIN_ZOOM = 12.5;
+const TAX_PARCEL_MIN_ZOOM = 12.5;
 const ALL_PARCEL_SOURCE_ID = 'la-parcels-all';
 const SUBJECT_PARCEL_SOURCE_ID = 'la-parcels-subject';
 const COMPS_PARCEL_SOURCE_ID = 'la-parcels-comps';
@@ -64,6 +64,10 @@ const SUBJECT_PARCEL_FILL_ID = 'la-parcels-subject-fill';
 const SUBJECT_PARCEL_LINE_ID = 'la-parcels-subject-line';
 const COMPS_PARCEL_FILL_ID = 'la-parcels-comps-fill';
 const COMPS_PARCEL_LINE_ID = 'la-parcels-comps-line';
+const MARICOPA_PARCEL_OUTLINE_SOURCE_ID = 'maricopa-parcel-outline';
+const MARICOPA_PARCEL_OUTLINE_LAYER_ID = 'maricopa-parcel-outline-layer';
+const MARICOPA_PARCEL_OUTLINE_TILES =
+  'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/ParcelOutline/MapServer/tile/{z}/{y}/{x}';
 
 const normalizeParcelId = (value: string) => value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
@@ -192,6 +196,9 @@ const getParcelIdFromProps = (
     props.tax_parcel_id ??
     props.PARCELID ??
     props.APN ??
+    props.OBJECTID ??
+    props.ObjectID ??
+    props.OBJECTID_1 ??
     featureId;
   if (candidate == null) return '';
   const value = String(candidate).trim();
@@ -325,6 +332,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     projectBoundary,
     taxParcels,
     selectedTaxParcelIds,
+    parcelOutlineEnabled,
     saleComps,
     rentComps,
     parcelCollection,
@@ -382,6 +390,42 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   useEffect(() => {
     onViewStateChangeRef.current = onViewStateChange;
   }, [onViewStateChange]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Maricopa Parcel Outline (raster tile overlay)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    safeRemoveLayer(map.current, MARICOPA_PARCEL_OUTLINE_LAYER_ID);
+    safeRemoveSource(map.current, MARICOPA_PARCEL_OUTLINE_SOURCE_ID);
+
+    if (!parcelOutlineEnabled) return;
+
+    map.current.addSource(MARICOPA_PARCEL_OUTLINE_SOURCE_ID, {
+      type: 'raster',
+      tiles: [MARICOPA_PARCEL_OUTLINE_TILES],
+      tileSize: 256,
+    });
+
+    const beforeId = map.current.getLayer('tax-parcels-fill')
+      ? 'tax-parcels-fill'
+      : undefined;
+
+    map.current.addLayer(
+      {
+        id: MARICOPA_PARCEL_OUTLINE_LAYER_ID,
+        type: 'raster',
+        source: MARICOPA_PARCEL_OUTLINE_SOURCE_ID,
+        minzoom: TAX_PARCEL_MIN_ZOOM,
+        paint: {
+          'raster-opacity': 0.85,
+        },
+      },
+      beforeId
+    );
+  }, [mapLoaded, styleRevision, parcelOutlineEnabled]);
 
   const clearMarkers = (refList: React.MutableRefObject<maplibregl.Marker[]>) => {
     refList.current.forEach((marker) => marker.remove());
@@ -696,7 +740,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       });
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapLoaded, styleRevision, projectBoundary, layers, center]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -867,7 +911,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       map.current.off('click', fillId, handleClick);
     };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapLoaded, styleRevision, taxParcels, layers, selectedTaxParcelIds, activeTool]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1350,7 +1394,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       if (!map.current) return;
       clearMarkers(rentCompMarkersRef);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapLoaded, styleRevision, rentComps, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1640,7 +1684,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     map.current.on('click', 'user-features-fill', handleFillClick);
     map.current.on('click', 'user-features-point', handlePointClick);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [mapLoaded, styleRevision, layers, features, selectedFeatureId]);
 
   // ─────────────────────────────────────────────────────────────────────────

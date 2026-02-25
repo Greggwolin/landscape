@@ -612,6 +612,10 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null);
 
+  // Rent Roll sorting state
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
   // Dynamic EAV columns disabled for alpha — base columns cover all active fields.
   // Re-enable when EAV value population is implemented.
   const [dynamicColumnDefs, setDynamicColumnDefs] = useState<any[]>([]);
@@ -970,9 +974,10 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       if (!resizingRef.current) return;
-      const delta = moveEvent.clientX - resizingRef.current.startX;
-      const newWidth = Math.max(60, resizingRef.current.startWidth + delta);
-      setColumnWidths(prev => ({ ...prev, [resizingRef.current!.colId]: newWidth }));
+      const ref = resizingRef.current;
+      const delta = moveEvent.clientX - ref.startX;
+      const newWidth = Math.max(60, ref.startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [ref.colId]: newWidth }));
     };
 
     const onMouseUp = () => {
@@ -1159,6 +1164,49 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     const baseCols = columns.filter(col => col.visible);
     return [...baseCols, ...pendingExtraColumns];
   }, [columns, pendingExtraColumns]);
+
+  // Sorted units for rent roll table
+  const sortedUnits = useMemo(() => {
+    if (!sortColumn) return units;
+    return [...units].sort((a, b) => {
+      const aVal = getUnitValueForColumn(a, sortColumn, dynamicValues);
+      const bVal = getUnitValueForColumn(b, sortColumn, dynamicValues);
+      // Nulls/empty last
+      const aEmpty = aVal === null || aVal === undefined || aVal === '';
+      const bEmpty = bVal === null || bVal === undefined || bVal === '';
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      // Numeric comparison
+      const aNum = Number(aVal);
+      const bNum = Number(bVal);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+      // String comparison
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      const cmp = aStr.localeCompare(bStr);
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+  }, [units, sortColumn, sortDirection, dynamicValues]);
+
+  const handleSortClick = useCallback((columnId: string) => {
+    setSortColumn(prev => {
+      if (prev === columnId) {
+        // Toggle direction, or clear on third click
+        if (sortDirection === 'asc') {
+          setSortDirection('desc');
+          return columnId;
+        } else {
+          setSortDirection('asc');
+          return null; // Reset sort
+        }
+      }
+      setSortDirection('asc');
+      return columnId;
+    });
+  }, [sortDirection]);
 
   // Render table cell content based on column
   const renderCellContent = (unit: Unit, columnId: string) => {
@@ -1622,7 +1670,6 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         {/* Left Column - Physical Description */}
         <div className={`w-full ${hasUnitData ? 'lg:w-[32%]' : 'lg:w-full'} flex-shrink-0`}>
           <div
-            className="shadow-lg"
             style={{
               backgroundColor: 'var(--cui-card-bg)',
               border: '1px solid var(--cui-border-color)',
@@ -1647,7 +1694,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         {hasUnitData && <div className="w-full lg:w-3/5 space-y-4">
           {/* Floor Plan Matrix */}
           <div
-            className="shadow-lg overflow-hidden"
+            className="overflow-hidden"
             style={{
               backgroundColor: 'var(--cui-card-bg)',
               border: '1px solid var(--cui-border-color)',
@@ -1828,7 +1875,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       />
 
       {/* Comparable Rentals with Map */}
-      <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <div className="overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)', borderRadius: 'var(--cui-border-radius, 0.375rem)' }}>
         <div className="border-b flex items-center justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
             <div className="flex items-center gap-3">
               <h3 className="font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Comparable Rentals</h3>
@@ -2008,7 +2055,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
       {/* Landscaper Analysis - Comp-based market insights */}
       <div
-        className="rounded-lg p-4 shadow-lg"
+        className="rounded-lg p-4"
         style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
       >
         <div className="flex items-start gap-3">
@@ -2051,7 +2098,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const renderRentRollContent = () => (
     <div className="space-y-4">
       {/* Detailed Rent Roll Table */}
-      <div className="shadow-lg overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)' }}>
+      <div className="overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)', borderRadius: 'var(--cui-border-radius, 0.375rem)' }}>
 
         {/* KPI Tiles */}
         <div className="px-4 py-3 grid grid-cols-6 gap-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
@@ -2210,10 +2257,20 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     style={{
                       color: 'var(--cui-secondary-color)',
                       position: 'relative',
+                      cursor: 'pointer',
+                      userSelect: 'none',
                       ...(columnWidths[col.id] ? { width: columnWidths[col.id] } : {}),
                     }}
+                    onClick={() => handleSortClick(col.id)}
                   >
-                    {col.label}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {col.label}
+                      {sortColumn === col.id && (
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8, lineHeight: 1 }}>
+                          {sortDirection === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </span>
                     <div
                       onMouseDown={(e) => handleResizeStart(col.id, e)}
                       style={{
@@ -2233,7 +2290,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               </tr>
             </thead>
             <tbody>
-              {units.map((unit, index) => (
+              {sortedUnits.map((unit, index) => (
                 <tr key={unit.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
                   {visibleColumns.map(col => (
                     <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}

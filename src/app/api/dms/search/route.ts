@@ -23,7 +23,7 @@ async function databaseSearch(params: any) {
       conditions.push(sql`folder_id = ${filters.folder_id}`);
     }
     if (filters?.doc_type) {
-      conditions.push(sql`doc_type = ${filters.doc_type}`);
+      conditions.push(sql`LOWER(doc_type) = LOWER(${filters.doc_type})`);
     }
     if (filters?.discipline) {
       conditions.push(sql`discipline = ${filters.discipline}`);
@@ -55,6 +55,33 @@ async function databaseSearch(params: any) {
       conditions.push(sql`searchable_text ILIKE ${'%' + query + '%'}`);
     }
 
+    // Latest version filter (only when project_id is provided)
+    const latestDocsCte = filters?.project_id
+      ? sql`
+        WITH latest_docs AS (
+          SELECT d.doc_id
+          FROM landscape.core_doc d
+          JOIN (
+            SELECT
+              COALESCE(parent_doc_id, doc_id) AS root_id,
+              MAX(COALESCE(version_no, 1)) AS max_version
+            FROM landscape.core_doc
+            WHERE project_id = ${filters.project_id}
+              AND deleted_at IS NULL
+            GROUP BY COALESCE(parent_doc_id, doc_id)
+          ) v
+            ON v.root_id = COALESCE(d.parent_doc_id, d.doc_id)
+           AND COALESCE(d.version_no, 1) = v.max_version
+          WHERE d.project_id = ${filters.project_id}
+            AND d.deleted_at IS NULL
+        )
+      `
+      : sql``;
+
+    if (filters?.project_id) {
+      conditions.push(sql`doc_id IN (SELECT doc_id FROM latest_docs)`);
+    }
+
     // Build full query
     const whereClause = conditions.length > 0
       ? sql`WHERE ${conditions.reduce((acc, cond, idx) =>
@@ -64,6 +91,7 @@ async function databaseSearch(params: any) {
 
     // Get documents
     const docs = await sql`
+      ${latestDocsCte}
       SELECT
         doc_id,
         project_id,
@@ -101,6 +129,7 @@ async function databaseSearch(params: any) {
 
     // Get total count
     const countResult = await sql<{ count: number }[]>`
+      ${latestDocsCte}
       SELECT COUNT(*) as count
       FROM landscape.mv_doc_search
       ${whereClause}
@@ -112,6 +141,7 @@ async function databaseSearch(params: any) {
 
     if (requestedFacets?.includes('doc_type')) {
       const facetResult = await sql<{ doc_type: string; count: number }[]>`
+        ${latestDocsCte}
         SELECT doc_type, COUNT(*) as count
         FROM landscape.mv_doc_search
         ${whereClause}
@@ -125,6 +155,7 @@ async function databaseSearch(params: any) {
 
     if (requestedFacets?.includes('discipline')) {
       const facetResult = await sql<{ discipline: string; count: number }[]>`
+        ${latestDocsCte}
         SELECT discipline, COUNT(*) as count
         FROM landscape.mv_doc_search
         ${whereClause}
@@ -138,6 +169,7 @@ async function databaseSearch(params: any) {
 
     if (requestedFacets?.includes('status')) {
       const facetResult = await sql<{ status: string; count: number }[]>`
+        ${latestDocsCte}
         SELECT status, COUNT(*) as count
         FROM landscape.mv_doc_search
         ${whereClause}
@@ -151,6 +183,7 @@ async function databaseSearch(params: any) {
 
     if (requestedFacets?.includes('project_name')) {
       const facetResult = await sql<{ project_name: string; count: number }[]>`
+        ${latestDocsCte}
         SELECT project_name, COUNT(*) as count
         FROM landscape.mv_doc_search
         ${whereClause}

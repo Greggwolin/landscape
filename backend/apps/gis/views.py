@@ -173,11 +173,15 @@ def _normalize_feature_collection(
     fc: Dict[str, Any],
 ) -> Dict[str, Any]:
     features: List[Dict[str, Any]] = []
-    for feature in fc.get("features", []) or []:
+    for index, feature in enumerate(fc.get("features", []) or []):
         props = feature.get("properties") or {}
         parcel_id = props.get(service.id_field)
         if parcel_id is None or parcel_id == "":
-            continue
+            parcel_id = props.get("OBJECTID") or props.get("ObjectID") or props.get("OBJECTID_1")
+        if parcel_id is None or parcel_id == "":
+            parcel_id = feature.get("id")
+        if parcel_id is None or parcel_id == "":
+            parcel_id = f"parcel-{index}"
 
         parcel_id_str = str(parcel_id)
         normalized_props = {

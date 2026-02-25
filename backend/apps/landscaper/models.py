@@ -753,3 +753,142 @@ class ExtractionLog(models.Model):
     def __str__(self):
         status = 'pending' if self.was_accepted is None else ('accepted' if self.was_accepted else 'rejected')
         return f"Log {self.log_id}: {self.source_pattern_matched} ({status})"
+
+
+# =============================================================================
+# Intelligence v1 — Intake Session & Model Override
+# =============================================================================
+
+class IntakeSession(models.Model):
+    """
+    Tracks document intake workflow sessions for Landscaper Intelligence v1.
+
+    Workflow: draft → mapping_complete → values_complete → committed | abandoned
+    Uses bigint PK internally, UUID for API/URL references.
+
+    Maps to landscape.tbl_intake_session table.
+    """
+
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('mapping_complete', 'Mapping Complete'),
+        ('values_complete', 'Values Complete'),
+        ('committed', 'Committed'),
+        ('abandoned', 'Abandoned'),
+    ]
+
+    intake_id = models.BigAutoField(primary_key=True)
+    intake_uuid = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text='External-facing UUID for API URLs'
+    )
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='intake_sessions'
+    )
+    doc = models.ForeignKey(
+        'documents.Document',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='doc_id',
+        related_name='intake_sessions'
+    )
+    document_type = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='Document type classification (OM, T-12, Rent Roll, etc.)'
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default='draft'
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='created_by',
+        related_name='intake_sessions_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_intake_session'
+        ordering = ['-created_at']
+        verbose_name = 'Intake Session'
+        verbose_name_plural = 'Intake Sessions'
+
+    def __str__(self):
+        return f"Intake {self.intake_uuid} ({self.status})"
+
+
+class ModelOverride(models.Model):
+    """
+    Calculated field overrides — red dot governance for Landscaper Intelligence v1.
+
+    When a user overrides a calculated field, the override is tracked here.
+    Toggling is_active=False reverts to the calculated value.
+
+    Maps to landscape.tbl_model_override table.
+    """
+
+    override_id = models.BigAutoField(primary_key=True)
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='model_overrides'
+    )
+    division_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text='FK to tbl_division.division_id (no ORM model exists)'
+    )
+    unit_id = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='FK to tbl_multifamily_unit.unit_id'
+    )
+    field_key = models.CharField(
+        max_length=100,
+        help_text='Field registry key being overridden'
+    )
+    calculated_value = models.TextField(
+        null=True,
+        blank=True,
+        help_text='The platform-calculated value at time of override'
+    )
+    override_value = models.TextField(
+        help_text='The user-specified override value'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='True = override active; False = reverted to calculated'
+    )
+    toggled_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='toggled_by',
+        related_name='model_overrides_toggled'
+    )
+    toggled_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_model_override'
+        ordering = ['-toggled_at']
+        verbose_name = 'Model Override'
+        verbose_name_plural = 'Model Overrides'
+
+    def __str__(self):
+        status = 'active' if self.is_active else 'reverted'
+        return f"Override {self.field_key} ({status})"

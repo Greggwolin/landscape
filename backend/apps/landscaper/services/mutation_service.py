@@ -325,6 +325,11 @@ MUTABLE_FIELDS = {
     "knowledge_insights": [
         "acknowledged", "acknowledged_at", "user_action", "metadata",
     ],
+    # Override governance table
+    "tbl_model_override": [
+        "field_key", "calculated_value", "override_value", "is_active",
+        "toggled_by", "division_id", "unit_id",
+    ],
 }
 
 # Primary key column for each table
@@ -384,6 +389,8 @@ PK_COLUMNS = {
     "ai_extraction_staging": "extraction_id",
     "ai_correction_log": "id",
     "knowledge_insights": "insight_id",
+    # Override governance table
+    "tbl_model_override": "override_id",
 }
 
 # High-risk fields that require extra confirmation (significant financial impact)
@@ -484,6 +491,7 @@ class MutationService:
         source_documents: Optional[List[str]] = None,
         batch_id: Optional[str] = None,
         sequence: int = 0,
+        source_type: Optional[str] = 'user_manual',
     ) -> Dict[str, Any]:
         """
         Create a mutation proposal for user confirmation.
@@ -536,13 +544,13 @@ class MutationService:
                     INSERT INTO landscape.pending_mutations
                     (mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                      current_value, proposed_value, reason, source_message_id, source_documents,
-                     is_high_risk, expires_at, batch_id, sequence_in_batch)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s, %s, %s, %s)
+                     is_high_risk, expires_at, batch_id, sequence_in_batch, source_type)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
                     RETURNING created_at
                 """, [
                     mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                     current_json, proposed_json, reason, source_message_id, source_docs_json,
-                    is_high_risk, expires_at, batch_id, sequence
+                    is_high_risk, expires_at, batch_id, sequence, source_type
                 ])
                 row = cursor.fetchone()
                 created_at = row[0] if row else timezone.now()
@@ -561,6 +569,7 @@ class MutationService:
                     reason=reason,
                     source_message_id=source_message_id,
                     source_documents=source_documents,
+                    source_type=source_type,
                 )
 
             return {
@@ -591,6 +600,7 @@ class MutationService:
         proposals: List[Dict[str, Any]],
         source_message_id: Optional[str] = None,
         source_documents: Optional[List[str]] = None,
+        source_type: Optional[str] = 'user_manual',
     ) -> Dict[str, Any]:
         """
         Create multiple mutation proposals as a batch.
@@ -600,6 +610,7 @@ class MutationService:
                       field_name, proposed_value, current_value, reason, record_id
             source_message_id: Chat message ID that triggered this batch
             source_documents: Document IDs that informed these proposals
+            source_type: Origin of this mutation (ai_extraction, user_manual, benchmark, etc.)
 
         Returns:
             Dict with batch_id and list of created mutations
@@ -621,6 +632,7 @@ class MutationService:
                 source_documents=source_documents,
                 batch_id=batch_id,
                 sequence=i,
+                source_type=source_type or prop.get("source_type"),
             )
             results.append(result)
 
@@ -659,7 +671,7 @@ class MutationService:
         with connection.cursor() as cursor:
             cursor.execute("""
                 SELECT project_id, mutation_type, table_name, field_name, record_id,
-                       current_value, proposed_value, reason, status, expires_at
+                       current_value, proposed_value, reason, status, expires_at, source_type
                 FROM landscape.pending_mutations
                 WHERE mutation_id = %s
                 FOR UPDATE
@@ -671,7 +683,7 @@ class MutationService:
                 return {"success": False, "error": "Mutation not found"}
 
             (project_id, mutation_type, table_name, field_name, record_id,
-             current_value, proposed_value, reason, status, expires_at) = row
+             current_value, proposed_value, reason, status, expires_at, source_type) = row
 
             logger.info(f"[MUTATION] Found: type={mutation_type}, table={table_name}, status={status}, project={project_id}")
 
@@ -721,6 +733,7 @@ class MutationService:
                         action="confirmed",
                         reason=reason,
                         confirmed_by=user_id,
+                        source_type=source_type,
                     )
                     logger.info(f"[MUTATION] Audit logged, transaction will commit on function exit")
 
@@ -1583,6 +1596,7 @@ class MutationService:
         source_documents: Optional[List[str]] = None,
         error_message: Optional[str] = None,
         confirmed_by: Optional[str] = None,
+        source_type: Optional[str] = None,
     ) -> None:
         """Log an entry to the mutation audit trail."""
         try:
@@ -1591,15 +1605,15 @@ class MutationService:
                     INSERT INTO landscape.mutation_audit_log
                     (mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                      old_value, new_value, action, reason, source_message_id, source_documents,
-                     error_message, confirmed_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s)
+                     error_message, confirmed_by, source_type)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s::jsonb, %s, %s, %s)
                 """, [
                     mutation_id, project_id, mutation_type, table_name, field_name, record_id,
                     json.dumps(old_value, cls=DecimalEncoder) if old_value is not None else None,
                     json.dumps(new_value, cls=DecimalEncoder) if new_value is not None else None,
                     action, reason, source_message_id,
                     json.dumps(source_documents) if source_documents else None,
-                    error_message, confirmed_by
+                    error_message, confirmed_by, source_type
                 ])
         except Exception as e:
             logger.error(f"Failed to log audit entry: {e}")
@@ -1661,3 +1675,76 @@ def get_current_value(
     except Exception as e:
         logger.warning(f"Failed to get current value for {table_name}.{field_name}: {e}")
         return None
+
+
+class MutationLoggingMixin:
+    """
+    DRF view mixin that logs direct user edits to the mutation audit trail.
+
+    Usage:
+        class MyViewSet(MutationLoggingMixin, ModelViewSet):
+            mutation_table = 'tbl_project'
+            mutation_type = 'field_update'
+
+    Automatically logs update/partial_update/destroy actions with
+    source_type='user_manual' to mutation_audit_log.
+    """
+
+    mutation_table: Optional[str] = None
+    mutation_type: str = 'field_update'
+
+    def perform_update(self, serializer):
+        """Capture old values, perform update, log audit."""
+        instance = serializer.instance
+        project_id = self._resolve_project_id(instance)
+        old_values = {}
+
+        # Capture before-values for changed fields
+        for field_name in serializer.validated_data:
+            old_values[field_name] = getattr(instance, field_name, None)
+
+        super().perform_update(serializer)
+
+        # Log each changed field
+        table = self.mutation_table or instance._meta.db_table
+        for field_name, old_val in old_values.items():
+            new_val = getattr(instance, field_name, None)
+            if str(old_val) != str(new_val):
+                MutationService._log_audit(
+                    mutation_id=None,
+                    project_id=project_id,
+                    mutation_type=self.mutation_type,
+                    table_name=table,
+                    action='direct_write',
+                    field_name=field_name,
+                    record_id=str(instance.pk),
+                    old_value=old_val,
+                    new_value=new_val,
+                    reason='Direct user edit via API',
+                    source_type='user_manual',
+                )
+
+    def perform_destroy(self, instance):
+        """Log deletion before destroying."""
+        project_id = self._resolve_project_id(instance)
+        table = self.mutation_table or instance._meta.db_table
+
+        MutationService._log_audit(
+            mutation_id=None,
+            project_id=project_id,
+            mutation_type='field_update',
+            table_name=table,
+            action='direct_delete',
+            record_id=str(instance.pk),
+            reason='Direct user delete via API',
+            source_type='user_manual',
+        )
+        super().perform_destroy(instance)
+
+    def _resolve_project_id(self, instance) -> int:
+        """Extract project_id from the instance."""
+        if hasattr(instance, 'project_id'):
+            return instance.project_id
+        if hasattr(instance, 'project'):
+            return instance.project.pk if instance.project else 0
+        return 0

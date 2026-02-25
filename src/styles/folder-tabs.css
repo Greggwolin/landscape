@@ -526,9 +526,7 @@
 .project-folder-content {
   flex: 1;
   overflow-y: auto;
-  /* top/left/right: 0 — layout container --app-padding handles edges,
-     splitter provides left gap. bottom: 0.5rem for scroll clearance. */
-  padding: 0 0 0.5rem 0;
+  padding: 0.75rem;
   background-color: transparent;
 }
 

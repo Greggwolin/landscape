@@ -21,7 +21,7 @@ export async function GET(
     // Fetch subject property
     const projectResult = await pool.query(
       `SELECT project_name, location_lon as lng, location_lat as lat,
-              COALESCE(stories, 3) as stories
+              COALESCE(stories, 3) as stories, project_type_code
        FROM landscape.tbl_project
        WHERE project_id = $1`,
       [projectId]
@@ -33,15 +33,20 @@ export async function GET(
 
     const subject = projectResult.rows[0];
 
-    // Fetch comparables with their actual coordinates
+    // Determine project type so we can exclude land comps for
+    // improved-property valuations (mirrors Django summary logic)
+    const projectType = (subject.project_type_code || '').toUpperCase();
+
+    // Fetch comparables with their actual coordinates.
+    // For non-land projects, exclude explicitly-tagged land comps.
     const compsResult = await pool.query(
       `SELECT comparable_id, property_name, address, city, state,
               sale_price, sale_date, units, building_sf, price_per_unit,
               latitude, longitude
        FROM landscape.tbl_sales_comparables
        WHERE project_id = $1
-       ORDER BY comparable_id
-       LIMIT 10`,
+         ${projectType !== 'LAND' ? "AND (property_type IS NULL OR property_type NOT IN ('LAND','land','Land'))" : ''}
+       ORDER BY comp_number NULLS LAST, comparable_id`,
       [projectId]
     );
 

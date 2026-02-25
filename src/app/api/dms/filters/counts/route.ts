@@ -21,17 +21,31 @@ export async function GET(request: NextRequest) {
 
     const project = parseInt(projectId);
 
-    // Query doc_type counts (exclude soft-deleted documents)
+    // Query doc_type counts (latest version only)
     const docTypeCounts = await sql`
-      SELECT
-        COALESCE(doc_type, 'general') AS doc_type,
-        COUNT(*) as count
-      FROM landscape.core_doc
-      WHERE project_id = ${project}
-        AND status NOT IN ('deleted', 'archived')
-        AND deleted_at IS NULL
-      GROUP BY COALESCE(doc_type, 'general')
-      ORDER BY COALESCE(doc_type, 'general') ASC
+      WITH latest_docs AS (
+        SELECT d.doc_id, COALESCE(d.doc_type, 'general') AS doc_type
+        FROM landscape.core_doc d
+        JOIN (
+          SELECT
+            COALESCE(parent_doc_id, doc_id) AS root_id,
+            MAX(COALESCE(version_no, 1)) AS max_version
+          FROM landscape.core_doc
+          WHERE project_id = ${project}
+            AND status NOT IN ('deleted', 'archived')
+            AND deleted_at IS NULL
+          GROUP BY COALESCE(parent_doc_id, doc_id)
+        ) v
+          ON v.root_id = COALESCE(d.parent_doc_id, d.doc_id)
+         AND COALESCE(d.version_no, 1) = v.max_version
+        WHERE d.project_id = ${project}
+          AND d.status NOT IN ('deleted', 'archived')
+          AND d.deleted_at IS NULL
+      )
+      SELECT doc_type, COUNT(*) as count
+      FROM latest_docs
+      GROUP BY doc_type
+      ORDER BY doc_type ASC
     `;
 
     // Query smart filters (active only)

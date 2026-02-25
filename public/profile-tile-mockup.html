@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Profile Tile Layout Comparison</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #e6e7eb; padding: 2rem; }
+  h1 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.5rem; color: #1e293b; }
+  .compare { display: flex; gap: 1.5rem; align-items: flex-start; }
+  .option { flex: 1; min-width: 0; }
+  .option-label { font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* Card shell */
+  .card { border: 1px solid rgba(8,10,12,0.176); border-radius: 6px; background: #fff; overflow: hidden; }
+  .card-header { padding: 8px 16px; background: #f0f1f2; border-bottom: 1px solid #e5e7eb; font-weight: 700; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
+  .edit-btn { font-size: 0.7rem; padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600; background: #3b82f6; color: #fff; border: none; cursor: pointer; }
+
+  /* ===== OPTION A: Current (stacked label above value, grid lines) ===== */
+  .grid-current { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .grid-current .cell { padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; }
+  .grid-current .cell:nth-child(even) { border-left: 1px solid #e5e7eb; }
+  .grid-current .cell-label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.03em; margin-bottom: 0.1rem; }
+  .grid-current .cell-value { font-size: 0.875rem; font-weight: 500; color: #1e293b; padding-left: 0.5rem; }
+
+  /* ===== OPTION B: Inline label:value, row separators only ===== */
+  .grid-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0.25rem 0; }
+  .grid-inline .cell { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.35rem 0.75rem; border-bottom: 1px solid #f0f1f2; }
+  .grid-inline .cell:nth-child(even) { border-left: 1px solid #f0f1f2; }
+  .grid-inline .cell-label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; white-space: nowrap; min-width: 5.5rem; flex-shrink: 0; }
+  .grid-inline .cell-value { font-size: 0.85rem; font-weight: 500; color: #1e293b; }
+
+  /* ===== OPTION C: Stacked but softened ===== */
+  .grid-soft { display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 0.35rem; }
+  .grid-soft .cell { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f4f5f6; border-radius: 3px; }
+  .grid-soft .cell:nth-child(even) { /* no left border */ }
+  .grid-soft .cell-label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.03em; margin-bottom: 0.1rem; }
+  .grid-soft .cell-value { font-size: 0.85rem; font-weight: 500; color: #1e293b; }
+
+  .badge { display: inline-block; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: rgba(59,130,246,0.12); color: #2563eb; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Project Profile Tile — Layout Options</h1>
+
+<div class="compare">
+
+  <!-- OPTION A: Current -->
+  <div class="option">
+    <div class="option-label">A — Current (stacked, grid lines)</div>
+    <div class="card">
+      <div class="card-header">Project Profile <button class="edit-btn">Edit</button></div>
+      <div class="grid-current">
+        <div class="cell"><div class="cell-label">Property Type</div><div class="cell-value">Multifamily</div></div>
+        <div class="cell"><div class="cell-label">Subtype</div><div class="cell-value">Garden-Style Apartment</div></div>
+        <div class="cell"><div class="cell-label">Project Name</div><div class="cell-value">Chadron Terrace</div></div>
+        <div class="cell"><div class="cell-label">Address</div><div class="cell-value">14105 Chadron Avenue<br>Hawthorne, CA 90250</div></div>
+        <div class="cell"><div class="cell-label">Units</div><div class="cell-value">113</div></div>
+        <div class="cell"><div class="cell-label">Gross Acres</div><div class="cell-value">3 ac</div></div>
+        <div class="cell"><div class="cell-label">County</div><div class="cell-value">Los Angeles</div></div>
+        <div class="cell"><div class="cell-label">Market</div><div class="cell-value">Los Angeles-Long Beach-Anaheim, CA</div></div>
+        <div class="cell"><div class="cell-label">APN</div><div class="cell-value">4052-022-015</div></div>
+        <div class="cell"><div class="cell-label">Ownership</div><div class="cell-value">Fee Simple</div></div>
+        <div class="cell"><div class="cell-label">Perspective</div><div class="cell-value">Investment</div></div>
+        <div class="cell"><div class="cell-label">Purpose</div><div class="cell-value">Valuation</div></div>
+        <div class="cell"><div class="cell-label">Acquisition Cost</div><div class="cell-value">$0</div></div>
+        <div class="cell"><div class="cell-label">Photos</div><div class="cell-value"><span class="badge">Photos (12)</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B: Inline label:value -->
+  <div class="option">
+    <div class="option-label">B — Inline (label left, value right)</div>
+    <div class="card">
+      <div class="card-header">Project Profile <button class="edit-btn">Edit</button></div>
+      <div class="grid-inline">
+        <div class="cell"><span class="cell-label">Property Type</span><span class="cell-value">Multifamily</span></div>
+        <div class="cell"><span class="cell-label">Subtype</span><span class="cell-value">Garden-Style Apt</span></div>
+        <div class="cell"><span class="cell-label">Project Name</span><span class="cell-value">Chadron Terrace</span></div>
+        <div class="cell"><span class="cell-label">Address</span><span class="cell-value">14105 Chadron Ave, Hawthorne, CA</span></div>
+        <div class="cell"><span class="cell-label">Units</span><span class="cell-value">113</span></div>
+        <div class="cell"><span class="cell-label">Gross Acres</span><span class="cell-value">3 ac</span></div>
+        <div class="cell"><span class="cell-label">County</span><span class="cell-value">Los Angeles</span></div>
+        <div class="cell"><span class="cell-label">Market</span><span class="cell-value">LA-Long Beach-Anaheim</span></div>
+        <div class="cell"><span class="cell-label">APN</span><span class="cell-value">4052-022-015</span></div>
+        <div class="cell"><span class="cell-label">Ownership</span><span class="cell-value">Fee Simple</span></div>
+        <div class="cell"><span class="cell-label">Perspective</span><span class="cell-value">Investment</span></div>
+        <div class="cell"><span class="cell-label">Purpose</span><span class="cell-value">Valuation</span></div>
+        <div class="cell"><span class="cell-label">Acq. Cost</span><span class="cell-value">$0</span></div>
+        <div class="cell"><span class="cell-label">Photos</span><span class="cell-value"><span class="badge">Photos (12)</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C: Stacked but softened -->
+  <div class="option">
+    <div class="option-label">C — Stacked, softened borders</div>
+    <div class="card">
+      <div class="card-header">Project Profile <button class="edit-btn">Edit</button></div>
+      <div class="grid-soft">
+        <div class="cell"><div class="cell-label">Property Type</div><div class="cell-value">Multifamily</div></div>
+        <div class="cell"><div class="cell-label">Subtype</div><div class="cell-value">Garden-Style Apartment</div></div>
+        <div class="cell"><div class="cell-label">Project Name</div><div class="cell-value">Chadron Terrace</div></div>
+        <div class="cell"><div class="cell-label">Address</div><div class="cell-value">14105 Chadron Avenue<br>Hawthorne, CA 90250</div></div>
+        <div class="cell"><div class="cell-label">Units</div><div class="cell-value">113</div></div>
+        <div class="cell"><div class="cell-label">Gross Acres</div><div class="cell-value">3 ac</div></div>
+        <div class="cell"><div class="cell-label">County</div><div class="cell-value">Los Angeles</div></div>
+        <div class="cell"><div class="cell-label">Market</div><div class="cell-value">Los Angeles-Long Beach-Anaheim, CA</div></div>
+        <div class="cell"><div class="cell-label">APN</div><div class="cell-value">4052-022-015</div></div>
+        <div class="cell"><div class="cell-label">Ownership</div><div class="cell-value">Fee Simple</div></div>
+        <div class="cell"><div class="cell-label">Perspective</div><div class="cell-value">Investment</div></div>
+        <div class="cell"><div class="cell-label">Purpose</div><div class="cell-value">Valuation</div></div>
+        <div class="cell"><div class="cell-label">Acquisition Cost</div><div class="cell-value">$0</div></div>
+        <div class="cell"><div class="cell-label">Photos</div><div class="cell-value"><span class="badge">Photos (12)</span></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

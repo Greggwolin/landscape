@@ -74,12 +74,12 @@ export function MapAccordion({ projectId }: MapAccordionProps) {
         className="d-flex align-items-center justify-content-between w-100"
         style={{
           padding: '0.75rem 1rem',
-          backgroundColor: 'var(--cui-secondary-bg)',
+          backgroundColor: 'var(--surface-card-header)',
           border: 'none',
           cursor: 'pointer',
           color: 'var(--cui-body-color)',
-          fontWeight: 500,
-          fontSize: '0.9375rem',
+          fontWeight: 600,
+          fontSize: '1.125rem',
           borderRadius: isOpen ? '0.5rem 0.5rem 0 0' : '0.5rem'
         }}
       >

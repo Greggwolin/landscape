@@ -20,7 +20,12 @@ import { formatCurrency } from '@/types/income-approach';
 function ChevronIcon({ isOpen }: { isOpen: boolean }) {
   return (
     <svg
-      className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+      style={{
+        width: '1rem',
+        height: '1rem',
+        transition: 'transform 0.2s',
+        transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      }}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -31,8 +36,13 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 }
 
 // Consistent input width for alignment
-const INPUT_WIDTH = 'w-24';
-const SELECT_WIDTH = 'w-[7.5rem]';
+const INPUT_STYLE: React.CSSProperties = { width: '6rem', flexShrink: 0 };
+const SELECT_STYLE: React.CSSProperties = { width: '7.5rem', flexShrink: 0 };
+
+interface ExtendedAssumptionsPanelProps extends AssumptionsPanelProps {
+  activeMethod?: 'direct_cap' | 'dcf';
+  onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
+}
 
 export function AssumptionsPanel({
   assumptions,
@@ -40,7 +50,9 @@ export function AssumptionsPanel({
   operatingExpenses,
   onAssumptionChange,
   isSaving,
-}: AssumptionsPanelProps) {
+  activeMethod = 'direct_cap',
+  onMethodChange,
+}: ExtendedAssumptionsPanelProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     income: true,
     expenses: true,
@@ -57,12 +69,10 @@ export function AssumptionsPanel({
   if (!assumptions || !rentRoll || !operatingExpenses) {
     return (
       <div
-        className="h-full overflow-y-auto p-4"
-        style={{ backgroundColor: 'var(--cui-card-bg)' }}
+        style={{ height: '100%', overflowY: 'auto', padding: '1rem', backgroundColor: 'var(--cui-card-bg)' }}
       >
         <h2
-          className="text-lg font-semibold mb-4"
-          style={{ color: 'var(--cui-body-color)' }}
+          style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--cui-body-color)' }}
         >
           Assumptions
         </h2>
@@ -73,43 +83,92 @@ export function AssumptionsPanel({
 
   return (
     <div
-      className="h-full overflow-y-auto"
-      style={{ backgroundColor: 'var(--cui-card-bg)' }}
+      style={{ height: '100%', overflowY: 'auto', backgroundColor: 'var(--cui-card-bg)' }}
     >
       {/* Main header - canonical card header background */}
       <div
-        className="px-4 py-2 flex items-center justify-between"
         style={{
+          padding: '0.375rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           backgroundColor: 'var(--cui-card-header-bg)',
           borderBottom: '1px solid var(--cui-border-color)',
         }}
       >
         <h2
-          className="text-sm font-semibold"
-          style={{ color: 'var(--cui-body-color)' }}
+          style={{
+            margin: 0,
+            fontSize: '0.9375rem',
+            fontWeight: 600,
+            color: 'var(--cui-body-color)',
+          }}
         >
           Assumptions
         </h2>
-        {/* Saving indicator */}
-        {isSaving && (
-          <div
-            className="text-xs flex items-center gap-1"
-            style={{ color: 'var(--cui-primary)' }}
+
+        {/* Method toggle + saving indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <button
+            type="button"
+            onClick={() => onMethodChange?.('direct_cap')}
+            style={{
+              padding: '0.2rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              borderRadius: '0.25rem',
+              border: '1px solid',
+              cursor: 'pointer',
+              borderColor: activeMethod === 'direct_cap' ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+              backgroundColor: activeMethod === 'direct_cap' ? 'var(--cui-primary)' : 'transparent',
+              color: activeMethod === 'direct_cap' ? 'white' : 'var(--cui-secondary-color)',
+            }}
           >
-            <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
+            Direct Cap
+          </button>
+          <button
+            type="button"
+            onClick={() => onMethodChange?.('dcf')}
+            style={{
+              padding: '0.2rem 0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              borderRadius: '0.25rem',
+              border: '1px solid',
+              cursor: 'pointer',
+              borderColor: activeMethod === 'dcf' ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+              backgroundColor: activeMethod === 'dcf' ? 'var(--cui-primary)' : 'transparent',
+              color: activeMethod === 'dcf' ? 'white' : 'var(--cui-secondary-color)',
+            }}
+          >
+            Cash Flow
+          </button>
+
+          {isSaving && (
+            <div
+              style={{
+                marginLeft: '0.25rem',
+                width: '0.75rem',
+                height: '0.75rem',
+                border: '2px solid var(--cui-primary)',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+              }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Sections - no horizontal padding so headers span full width */}
-      <div className="pb-4">
+      <div style={{ paddingBottom: '1rem' }}>
         {/* Income Section */}
         <AccordionSection
           title="Income"
           isOpen={openSections.income}
           onToggle={() => toggleSection('income')}
         >
-          <div className="flex flex-col">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <AssumptionRow>
               <ReadOnlyField
                 label="Gross Potential Rent"
@@ -178,7 +237,7 @@ export function AssumptionsPanel({
           isOpen={openSections.expenses}
           onToggle={() => toggleSection('expenses')}
         >
-          <div className="flex flex-col">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <AssumptionRow>
               <ReadOnlyField
                 label="Operating Expenses"
@@ -227,7 +286,7 @@ export function AssumptionsPanel({
           isOpen={openSections.capitalization}
           onToggle={() => toggleSection('capitalization')}
         >
-          <div className="flex flex-col">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <AssumptionRow>
               <PercentInput
                 label="Going-In Cap Rate"
@@ -270,7 +329,7 @@ export function AssumptionsPanel({
           isOpen={openSections.dcf}
           onToggle={() => toggleSection('dcf')}
         >
-          <div className="flex flex-col">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <AssumptionRow>
               <NumberInput
                 label="Hold Period"
@@ -347,8 +406,15 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
       {/* Section header - shaded background spanning full width */}
       <button
         onClick={onToggle}
-        className="w-full px-4 py-2 flex items-center justify-between text-left focus:outline-none"
         style={{
+          width: '100%',
+          padding: '0.5rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          textAlign: 'left',
+          cursor: 'pointer',
+          outline: 'none',
           color: 'var(--cui-body-color)',
           background: 'var(--cui-card-subheader-bg)',
           border: 'none',
@@ -356,12 +422,12 @@ function AccordionSection({ title, isOpen, onToggle, children }: AccordionSectio
           borderBottom: '1px solid var(--cui-border-color)',
         }}
       >
-        <span className="font-semibold text-sm">{title}</span>
+        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{title}</span>
         <ChevronIcon isOpen={isOpen} />
       </button>
       {/* QK-22: Replaced CCollapse with simple conditional - CCollapse had CSS conflicts */}
       {isOpen && (
-        <div className="px-4 pt-2 pb-3 space-y-2">{children}</div>
+        <div style={{ padding: '0.5rem 1rem 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>{children}</div>
       )}
     </div>
   );
@@ -380,17 +446,29 @@ interface ReadOnlyFieldProps {
 // ReadOnlyField - NO lock icon, just plain text aligned with inputs
 function ReadOnlyField({ label, value, tooltip }: ReadOnlyFieldProps) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
       <label
-        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--cui-secondary-color)',
+        }}
         title={tooltip || label}
       >
         {label}
       </label>
       <span
-        className={`${INPUT_WIDTH} shrink-0 text-right pr-2 text-sm font-medium`}
-        style={{ color: 'var(--cui-body-color)' }}
+        style={{
+          ...INPUT_STYLE,
+          textAlign: 'right',
+          paddingRight: '0.5rem',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          color: 'var(--cui-body-color)',
+        }}
       >
         {value}
       </span>
@@ -449,10 +527,16 @@ function PercentInput({
   const displayValue = isFocused ? localValue : `${localValue}%`;
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
       <label
-        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--cui-secondary-color)',
+        }}
         title={tooltip || label}
       >
         {label}
@@ -463,8 +547,12 @@ function PercentInput({
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
+          ...INPUT_STYLE,
+          padding: '1px 0.5rem',
+          textAlign: 'right',
+          fontSize: '0.875rem',
+          borderRadius: '0.25rem',
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
           border: '1px solid var(--cui-border-color)',
@@ -514,10 +602,16 @@ function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
   const displayValue = isFocused ? localValue : `$${localValue}`;
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
       <label
-        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--cui-secondary-color)',
+        }}
         title={label}
       >
         {label}
@@ -528,8 +622,12 @@ function CurrencyInput({ label, value, onChange }: CurrencyInputProps) {
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
+          ...INPUT_STYLE,
+          padding: '1px 0.5rem',
+          textAlign: 'right',
+          fontSize: '0.875rem',
+          borderRadius: '0.25rem',
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
           border: '1px solid var(--cui-border-color)',
@@ -583,10 +681,16 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
   const displayValue = isFocused ? localValue : (suffix ? `${localValue} ${suffix}` : localValue);
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
       <label
-        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--cui-secondary-color)',
+        }}
         title={label}
       >
         {label}
@@ -597,8 +701,12 @@ function NumberInput({ label, value, onChange, min = 0, max = 100, suffix }: Num
         onChange={handleChange}
         onFocus={() => setIsFocused(true)}
         onBlur={handleBlur}
-        className={`${INPUT_WIDTH} shrink-0 px-2 py-px text-right text-sm rounded`}
         style={{
+          ...INPUT_STYLE,
+          padding: '1px 0.5rem',
+          textAlign: 'right',
+          fontSize: '0.875rem',
+          borderRadius: '0.25rem',
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
           border: '1px solid var(--cui-border-color)',
@@ -619,10 +727,16 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
   const safeValue = value ?? options[0]?.value ?? '';
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
       <label
-        className="text-[13px] font-medium whitespace-nowrap overflow-hidden text-ellipsis"
-        style={{ color: 'var(--cui-secondary-color)' }}
+        style={{
+          fontSize: '0.8125rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--cui-secondary-color)',
+        }}
         title={label}
       >
         {label}
@@ -630,8 +744,11 @@ function SelectInput({ label, value, onChange, options }: SelectInputProps) {
       <select
         value={safeValue}
         onChange={(e) => onChange(e.target.value)}
-        className={`${SELECT_WIDTH} shrink-0 px-2 py-px text-sm rounded`}
         style={{
+          ...SELECT_STYLE,
+          padding: '1px 0.5rem',
+          fontSize: '0.875rem',
+          borderRadius: '0.25rem',
           backgroundColor: 'var(--cui-body-bg)',
           color: 'var(--cui-body-color)',
           border: '1px solid var(--cui-border-color)',
@@ -654,7 +771,7 @@ interface AssumptionRowProps {
 
 function AssumptionRow({ children }: AssumptionRowProps) {
   return (
-    <div className="py-0.5">{children}</div>
+    <div style={{ paddingTop: '2px', paddingBottom: '2px' }}>{children}</div>
   );
 }
 

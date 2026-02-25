@@ -510,13 +510,15 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
         if property_type:
             sales_comps = sales_comps.filter(property_type=property_type)
 
-        # For MF/CRE projects, exclude land comps from the summary calc
-        # (land comps have different price scales and skew the average)
+        # For MF/CRE projects, exclude explicitly-tagged land comps from
+        # the summary (land comps have different price scales and skew the
+        # average).  Comps with NULL or empty property_type are assumed to
+        # be the same type as the project and are kept.
         project_type = (project.project_type_code or '').upper()
         if project_type != 'LAND':
             sales_comps = sales_comps.exclude(
                 property_type__in=LAND_TYPES
-            ).exclude(property_type__isnull=True).exclude(property_type='')
+            )
 
         # Calculate sales comparison summary
         sales_comparison_summary = {

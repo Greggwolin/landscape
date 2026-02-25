@@ -380,13 +380,16 @@ export function createFolderConfig(
 
     // ========================================
     // Position 7: Documents
-    // No subtabs - content handled by DMSView
+    // Subtabs: all (DMS), extractions (Intelligence)
     // ========================================
     {
       id: 'documents',
       label: 'Documents',
       color: TILE_COLORS.documents,
-      subTabs: [],
+      subTabs: [
+        { id: 'all', label: 'All Documents' },
+        { id: 'extractions', label: 'Intelligence' },
+      ],
     },
 
     // ========================================

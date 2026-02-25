@@ -74,67 +74,37 @@ export function DirectCapView({
   const useMultiColumn = allTiles && visibleTiles.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Method Toggle (placeholder for DCF in Phase 2) */}
-      <div className="flex items-center gap-2">
-        <button
-          className="px-4 py-2 text-sm font-medium rounded-lg"
-          style={{
-            backgroundColor: 'var(--cui-primary)',
-            color: 'white',
-          }}
-        >
-          Direct Capitalization
-        </button>
-        <button
-          type="button"
-          onClick={() => onMethodChange?.('dcf')}
-          className="px-4 py-2 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
-          style={{
-            backgroundColor: 'var(--cui-tertiary-bg)',
-            color: 'var(--cui-secondary-color)',
-            border: '1px solid var(--cui-border-color)',
-          }}
-        >
-          DCF Analysis
-        </button>
-        <span
-          className="ml-2 text-xs px-2 py-1 rounded"
-          style={{
-            backgroundColor: 'var(--cui-warning-bg)',
-            color: 'var(--cui-warning)',
-          }}
-        >
-          {NOI_BASIS_LABELS[selectedBasis]} Basis
-        </span>
-      </div>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Pro Forma P&L Table */}
       <div
-        className="rounded-lg overflow-hidden"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          border: '1px solid var(--cui-border-color)',
-        }}
+        className="card"
+        style={{ overflow: 'hidden' }}
       >
         <div
-          className="px-4 py-3 border-b flex items-center justify-between"
           style={{
-            borderColor: 'var(--cui-border-color)',
-            backgroundColor: 'var(--cui-card-header-bg)',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '1px solid var(--cui-border-color)',
+            backgroundColor: 'var(--surface-card-header, var(--cui-card-header-bg))',
           }}
         >
           <h3
-            className="text-sm font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--cui-body-color)' }}
+            style={{
+              margin: 0,
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              color: 'var(--cui-body-color)',
+            }}
           >
-            Year 1 Pro Forma P&L
+            Year 1 Pro Forma P&amp;L
           </h3>
 
           {/* Column Toggle Buttons */}
           {allTiles && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs mr-2" style={{ color: 'var(--cui-secondary-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', marginRight: '0.5rem', color: 'var(--cui-secondary-color)' }}>
                 Columns:
               </span>
               {orderedBases.map((basis) => {
@@ -144,8 +114,11 @@ export function DirectCapView({
                   <button
                     key={basis}
                     onClick={() => toggleColumn(basis)}
-                    className="px-2 py-1 text-xs rounded transition-all"
                     style={{
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.75rem',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
                       backgroundColor: isVisible ? colors.bg : 'transparent',
                       border: `1px solid ${isVisible ? colors.border : 'var(--cui-border-color)'}`,
                       color: isVisible ? colors.text : 'var(--cui-secondary-color)',
@@ -160,7 +133,7 @@ export function DirectCapView({
           )}
         </div>
 
-        <div className="p-4 overflow-x-auto">
+        <div style={{ padding: '1rem', overflowX: 'auto' }}>
           {useMultiColumn ? (
             <MultiColumnPLTable
               tiles={visibleTiles}
@@ -171,7 +144,7 @@ export function DirectCapView({
               theme={theme}
             />
           ) : (
-            <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
+            <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
               <thead>
                 <tr
                   style={{
@@ -180,19 +153,24 @@ export function DirectCapView({
                     borderBottom: '1px solid var(--cui-border-color)',
                   }}
                 >
-                  <th className="text-left py-2 w-1/2"></th>
-                  <th className="text-right py-2 w-1/6">Amount</th>
-                  <th className="text-right py-2 w-1/6">$/Unit</th>
-                  <th className="text-right py-2 w-1/6">$/SF</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem 0', width: '50%' }}></th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem 0', width: '16.67%' }}>Amount</th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem 0', width: '16.67%' }}>$/Unit</th>
+                  <th style={{ textAlign: 'right', padding: '0.5rem 0', width: '16.67%' }}>$/SF</th>
                 </tr>
               </thead>
               <tbody>
-                {/* REVENUE SECTION */}
+                {/* Revenue Section */}
                 <tr>
                   <td
                     colSpan={4}
-                    className="pt-4 pb-2 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--cui-primary)' }}
+                    style={{
+                      paddingTop: '1rem',
+                      paddingBottom: '0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--cui-primary)',
+                    }}
                   >
                     Revenue
                   </td>
@@ -234,12 +212,17 @@ export function DirectCapView({
                   totalSf={totalSf}
                 />
 
-                {/* OPERATING EXPENSES SECTION */}
+                {/* Operating Expenses Section */}
                 <tr>
                   <td
                     colSpan={4}
-                    className="pt-6 pb-2 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--cui-primary)' }}
+                    style={{
+                      paddingTop: '1.5rem',
+                      paddingBottom: '0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--cui-primary)',
+                    }}
                   >
                     Operating Expenses
                   </td>
@@ -277,15 +260,15 @@ export function DirectCapView({
 
                 {/* Expense Ratio */}
                 <tr style={{ color: 'var(--cui-secondary-color)' }}>
-                  <td className="py-1 text-xs">Expense Ratio</td>
-                  <td className="text-right py-1 text-xs" colSpan={3}>
+                  <td style={{ padding: '0.25rem 0', fontSize: '0.75rem' }}>Expense Ratio</td>
+                  <td style={{ textAlign: 'right', padding: '0.25rem 0', fontSize: '0.75rem' }} colSpan={3}>
                     {formatPercent(calculation.expense_ratio, 1)}
                   </td>
                 </tr>
 
                 {/* NOI */}
                 <TotalRow
-                  label="NET OPERATING INCOME"
+                  label="Net Operating Income"
                   amount={calculation.noi}
                   unitCount={unitCount}
                   totalSf={totalSf}
@@ -296,73 +279,61 @@ export function DirectCapView({
         </div>
       </div>
 
-      {/* Valuation Section */}
+      {/* Valuation Section — flex rows like DCF */}
       <div
-        className="rounded-lg overflow-hidden"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          border: '1px solid var(--cui-border-color)',
-        }}
+        className="card"
+        style={{ padding: '1rem' }}
       >
-        <div
-          className="px-4 py-3 border-b"
-          style={{ borderColor: 'var(--cui-border-color)' }}
+        <h4
+          style={{
+            margin: '0 0 0.75rem 0',
+            fontWeight: 600,
+            color: 'var(--cui-body-color)',
+          }}
         >
-          <h3
-            className="text-sm font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--cui-body-color)' }}
+          Valuation ({NOI_BASIS_LABELS[selectedBasis]} Basis)
+        </h4>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>NOI to Capitalize</span>
+            <span style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(calculation.noi)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--cui-secondary-color)' }}>Capitalization Rate</span>
+            <span style={{ color: 'var(--cui-body-color)' }}>{formatPercent(capRate)}</span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              paddingTop: '0.5rem',
+              borderTop: '1px solid var(--cui-border-color)',
+            }}
           >
-            Valuation ({NOI_BASIS_LABELS[selectedBasis]} Basis)
-          </h3>
-        </div>
-
-        <div className="p-4">
-          <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
-            <tbody>
-              <tr style={{ color: 'var(--cui-body-color)' }}>
-                <td className="py-2">NOI to Capitalize</td>
-                <td className="text-right py-2">{formatCurrency(calculation.noi)}</td>
-              </tr>
-              <tr style={{ color: 'var(--cui-body-color)' }}>
-                <td className="py-2">Capitalization Rate</td>
-                <td className="text-right py-2">{formatPercent(capRate)}</td>
-              </tr>
-              <tr
-                className="border-t-2"
-                style={{
-                  borderColor: 'var(--cui-primary)',
-                  color: 'var(--cui-body-color)',
-                }}
-              >
-                <td className="py-3 font-bold text-lg">INDICATED VALUE</td>
-                <td
-                  className="text-right py-3 font-bold text-lg"
-                  style={{ color: 'var(--cui-success)' }}
-                >
-                  {value ? formatCurrency(value) : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            <span style={{ fontWeight: 700, color: 'var(--cui-body-color)' }}>Indicated Value</span>
+            <span style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--cui-success)' }}>
+              {value ? formatCurrency(value) : '—'}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Key Metrics */}
       <div
-        className="rounded-lg p-4"
-        style={{
-          backgroundColor: 'var(--cui-card-bg)',
-          border: '1px solid var(--cui-border-color)',
-        }}
+        className="card"
+        style={{ padding: '1rem' }}
       >
-        <h3
-          className="text-sm font-semibold uppercase tracking-wider mb-4"
-          style={{ color: 'var(--cui-body-color)' }}
+        <h4
+          style={{
+            margin: '0 0 1rem 0',
+            fontWeight: 600,
+            color: 'var(--cui-body-color)',
+          }}
         >
           Key Metrics
-        </h3>
+        </h4>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
           <MetricCard label="Price per Unit" value={formatCurrency(keyMetrics.price_per_unit)} />
           <MetricCard label="Price per SF" value={formatPerSF(keyMetrics.price_per_sf)} />
           <MetricCard label="Gross Rent Multiplier" value={formatMultiple(keyMetrics.grm)} />
@@ -400,30 +371,20 @@ interface TableRowProps {
 function TableRow({ label, amount, unitCount, totalSf, isNegative }: TableRowProps) {
   const perUnit = unitCount > 0 ? amount / unitCount : 0;
   const perSf = totalSf > 0 ? amount / totalSf : 0;
+  const color = isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)';
 
   return (
-    <tr
-      style={{
-        color: isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)',
-      }}
-    >
-      <td
-        className="py-1.5 pl-4"
-        style={{
-          fontSize: '13px',
-          fontWeight: 500,
-          fontFamily: 'inherit',
-        }}
-      >
+    <tr style={{ color }}>
+      <td style={{ padding: '0.375rem 0 0.375rem 1rem', fontSize: '0.8125rem', fontWeight: 500 }}>
         {label}
       </td>
-      <td className="text-right py-1.5">
+      <td style={{ textAlign: 'right', padding: '0.375rem 0' }}>
         {isNegative ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount)}
       </td>
-      <td className="text-right py-1.5">
+      <td style={{ textAlign: 'right', padding: '0.375rem 0' }}>
         {isNegative ? `(${formatCurrency(Math.abs(perUnit))})` : formatCurrency(perUnit)}
       </td>
-      <td className="text-right py-1.5">${perSf.toFixed(2)}</td>
+      <td style={{ textAlign: 'right', padding: '0.375rem 0' }}>${perSf.toFixed(2)}</td>
     </tr>
   );
 }
@@ -441,24 +402,17 @@ function SubtotalRow({ label, amount, unitCount, totalSf }: SubtotalRowProps) {
 
   return (
     <tr
-      className="border-t"
       style={{
-        borderColor: 'var(--cui-border-color)',
+        borderTop: '1px solid var(--cui-border-color)',
         color: 'var(--cui-body-color)',
       }}
     >
-      <td
-        className="py-2 font-medium"
-        style={{
-          fontSize: '13px',
-          fontFamily: 'inherit',
-        }}
-      >
+      <td style={{ padding: '0.5rem 0', fontSize: '0.8125rem', fontWeight: 500 }}>
         {label}
       </td>
-      <td className="text-right py-2 font-medium">{formatCurrency(amount)}</td>
-      <td className="text-right py-2 font-medium">{formatCurrency(perUnit)}</td>
-      <td className="text-right py-2 font-medium">${perSf.toFixed(2)}</td>
+      <td style={{ textAlign: 'right', padding: '0.5rem 0', fontWeight: 500 }}>{formatCurrency(amount)}</td>
+      <td style={{ textAlign: 'right', padding: '0.5rem 0', fontWeight: 500 }}>{formatCurrency(perUnit)}</td>
+      <td style={{ textAlign: 'right', padding: '0.5rem 0', fontWeight: 500 }}>${perSf.toFixed(2)}</td>
     </tr>
   );
 }
@@ -476,37 +430,21 @@ function TotalRow({ label, amount, unitCount, totalSf }: TotalRowProps) {
 
   return (
     <tr
-      className="border-t-2 border-b-2"
       style={{
-        borderColor: 'var(--cui-primary)',
+        borderTop: '2px solid var(--cui-primary)',
         backgroundColor: 'var(--cui-tertiary-bg)',
       }}
     >
-      <td
-        className="py-3 font-bold"
-        style={{
-          color: 'var(--cui-body-color)',
-          fontFamily: 'inherit',
-        }}
-      >
+      <td style={{ padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-body-color)' }}>
         {label}
       </td>
-      <td
-        className="text-right py-3 font-bold"
-        style={{ color: 'var(--cui-success)' }}
-      >
+      <td style={{ textAlign: 'right', padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-success)' }}>
         {formatCurrency(amount)}
       </td>
-      <td
-        className="text-right py-3 font-bold"
-        style={{ color: 'var(--cui-success)' }}
-      >
+      <td style={{ textAlign: 'right', padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-success)' }}>
         {formatCurrency(perUnit)}
       </td>
-      <td
-        className="text-right py-3 font-bold"
-        style={{ color: 'var(--cui-success)' }}
-      >
+      <td style={{ textAlign: 'right', padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-success)' }}>
         ${perSf.toFixed(2)}
       </td>
     </tr>
@@ -525,19 +463,16 @@ interface MetricCardProps {
 function MetricCard({ label, value }: MetricCardProps) {
   return (
     <div
-      className="p-3 rounded"
-      style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+      style={{
+        padding: '0.75rem',
+        borderRadius: '0.25rem',
+        backgroundColor: 'var(--cui-tertiary-bg)',
+      }}
     >
-      <div
-        className="text-xs mb-1"
-        style={{ color: 'var(--cui-secondary-color)' }}
-      >
+      <div style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--cui-secondary-color)' }}>
         {label}
       </div>
-      <div
-        className="text-lg font-semibold"
-        style={{ color: 'var(--cui-body-color)' }}
-      >
+      <div style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
         {value}
       </div>
     </div>
@@ -569,7 +504,7 @@ function MultiColumnPLTable({
   const colCount = tiles.length;
 
   return (
-    <table className="w-full text-sm" style={{ fontFamily: 'monospace' }}>
+    <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
       <thead>
         <tr
           style={{
@@ -578,15 +513,16 @@ function MultiColumnPLTable({
             borderBottom: '1px solid var(--cui-border-color)',
           }}
         >
-          <th className="text-left py-2" style={{ width: '40%' }}></th>
+          <th style={{ textAlign: 'left', padding: '0.5rem 0', width: '40%' }}></th>
           {tiles.map((tile) => {
             const colors = tileColors[tile.id];
             const isSelected = tile.id === selectedBasis;
             return (
               <th
                 key={tile.id}
-                className="text-right py-2 px-2"
                 style={{
+                  textAlign: 'right',
+                  padding: '0.5rem',
                   color: colors.text,
                   fontWeight: isSelected ? 'bold' : 'normal',
                   borderBottom: isSelected ? `2px solid ${colors.border}` : undefined,
@@ -603,8 +539,13 @@ function MultiColumnPLTable({
         <tr>
           <td
             colSpan={colCount + 1}
-            className="pt-4 pb-2 text-xs font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--cui-primary)' }}
+            style={{
+              paddingTop: '1rem',
+              paddingBottom: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--cui-primary)',
+            }}
           >
             Revenue
           </td>
@@ -652,8 +593,13 @@ function MultiColumnPLTable({
         <tr>
           <td
             colSpan={colCount + 1}
-            className="pt-6 pb-2 text-xs font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--cui-primary)' }}
+            style={{
+              paddingTop: '1.5rem',
+              paddingBottom: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--cui-primary)',
+            }}
           >
             Operating Expenses
           </td>
@@ -692,12 +638,14 @@ function MultiColumnPLTable({
 
         {/* Expense Ratio */}
         <tr style={{ color: 'var(--cui-secondary-color)' }}>
-          <td className="py-1 text-xs pl-4">Expense Ratio</td>
+          <td style={{ padding: '0.25rem 0 0.25rem 1rem', fontSize: '0.75rem' }}>Expense Ratio</td>
           {tiles.map((tile) => (
             <td
               key={tile.id}
-              className="text-right py-1 text-xs px-2"
               style={{
+                textAlign: 'right',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
                 fontWeight: tile.id === selectedBasis ? 'bold' : 'normal',
               }}
             >
@@ -708,7 +656,7 @@ function MultiColumnPLTable({
 
         {/* NOI */}
         <MultiColTotalRow
-          label="NET OPERATING INCOME"
+          label="Net Operating Income"
           values={tiles.map((t) => t.calculation.noi)}
           tileIds={tiles.map((t) => t.id)}
           selectedBasis={selectedBasis}
@@ -719,31 +667,34 @@ function MultiColumnPLTable({
         <tr>
           <td
             colSpan={colCount + 1}
-            className="pt-6 pb-2 text-xs font-semibold uppercase tracking-wider"
-            style={{ color: 'var(--cui-primary)' }}
+            style={{
+              paddingTop: '1.5rem',
+              paddingBottom: '0.5rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--cui-primary)',
+            }}
           >
             Valuation
           </td>
         </tr>
 
         <tr style={{ color: 'var(--cui-secondary-color)' }}>
-          <td className="py-1 pl-4">Cap Rate</td>
+          <td style={{ padding: '0.25rem 0 0.25rem 1rem' }}>Cap Rate</td>
           {tiles.map((tile) => (
-            <td key={tile.id} className="text-right py-1 px-2">
+            <td key={tile.id} style={{ textAlign: 'right', padding: '0.25rem 0.5rem' }}>
               {formatPercent(tile.cap_rate)}
             </td>
           ))}
         </tr>
 
         <tr
-          className="border-t-2"
-          style={{ borderColor: 'var(--cui-primary)' }}
+          style={{ borderTop: '2px solid var(--cui-primary)' }}
         >
           <td
-            className="py-3 font-bold"
-            style={{ color: 'var(--cui-body-color)' }}
+            style={{ padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-body-color)' }}
           >
-            INDICATED VALUE
+            Indicated Value
           </td>
           {tiles.map((tile) => {
             const colors = tileColors[tile.id];
@@ -751,8 +702,10 @@ function MultiColumnPLTable({
             return (
               <td
                 key={tile.id}
-                className="text-right py-3 font-bold px-2"
                 style={{
+                  textAlign: 'right',
+                  padding: '0.75rem 0.5rem',
+                  fontWeight: 700,
                   color: isSelected ? 'var(--cui-success)' : colors.text,
                   fontSize: isSelected ? '1.1em' : '1em',
                 }}
@@ -765,9 +718,9 @@ function MultiColumnPLTable({
 
         {/* Price per Unit */}
         <tr style={{ color: 'var(--cui-secondary-color)' }}>
-          <td className="py-1 pl-4 text-xs">Price per Unit</td>
+          <td style={{ padding: '0.25rem 0 0.25rem 1rem', fontSize: '0.75rem' }}>Price per Unit</td>
           {tiles.map((tile) => (
-            <td key={tile.id} className="text-right py-1 px-2 text-xs">
+            <td key={tile.id} style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
               {tile.price_per_unit ? formatCurrency(tile.price_per_unit) : '—'}
             </td>
           ))}
@@ -775,9 +728,9 @@ function MultiColumnPLTable({
 
         {/* Price per SF */}
         <tr style={{ color: 'var(--cui-secondary-color)' }}>
-          <td className="py-1 pl-4 text-xs">Price per SF</td>
+          <td style={{ padding: '0.25rem 0 0.25rem 1rem', fontSize: '0.75rem' }}>Price per SF</td>
           {tiles.map((tile) => (
-            <td key={tile.id} className="text-right py-1 px-2 text-xs">
+            <td key={tile.id} style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
               {tile.price_per_sf ? `$${tile.price_per_sf.toFixed(2)}` : '—'}
             </td>
           ))}
@@ -802,22 +755,11 @@ interface MultiColRowProps {
 
 function MultiColRow({ label, values, rates, tileIds, selectedBasis, isNegative }: MultiColRowProps) {
   return (
-    <tr
-      style={{
-        color: isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)',
-      }}
-    >
-      <td
-        className="py-1.5 pl-4"
-        style={{
-          fontSize: '13px',
-          fontWeight: 500,
-          fontFamily: 'inherit',
-        }}
-      >
+    <tr style={{ color: isNegative ? 'var(--cui-danger)' : 'var(--cui-body-color)' }}>
+      <td style={{ padding: '0.375rem 0 0.375rem 1rem', fontSize: '0.8125rem', fontWeight: 500 }}>
         {label}
         {rates && rates[0] !== undefined && (
-          <span className="text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>
+          <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem', color: 'var(--cui-secondary-color)' }}>
             ({formatPercent(rates[0], 1)})
           </span>
         )}
@@ -827,8 +769,7 @@ function MultiColRow({ label, values, rates, tileIds, selectedBasis, isNegative 
         return (
           <td
             key={tileIds[idx]}
-            className="text-right py-1.5 px-2"
-            style={{ fontWeight: isSelected ? 'bold' : 'normal' }}
+            style={{ textAlign: 'right', padding: '0.375rem 0.5rem', fontWeight: isSelected ? 'bold' : 'normal' }}
           >
             {isNegative
               ? `(${formatCurrency(Math.abs(amount))})`
@@ -850,19 +791,12 @@ interface MultiColSubtotalRowProps {
 function MultiColSubtotalRow({ label, values, tileIds, selectedBasis }: MultiColSubtotalRowProps) {
   return (
     <tr
-      className="border-t"
       style={{
-        borderColor: 'var(--cui-border-color)',
+        borderTop: '1px solid var(--cui-border-color)',
         color: 'var(--cui-body-color)',
       }}
     >
-      <td
-        className="py-2 font-medium"
-        style={{
-          fontSize: '13px',
-          fontFamily: 'inherit',
-        }}
-      >
+      <td style={{ padding: '0.5rem 0', fontSize: '0.8125rem', fontWeight: 500 }}>
         {label}
       </td>
       {values.map((amount, idx) => {
@@ -870,8 +804,7 @@ function MultiColSubtotalRow({ label, values, tileIds, selectedBasis }: MultiCol
         return (
           <td
             key={tileIds[idx]}
-            className="text-right py-2 font-medium px-2"
-            style={{ fontWeight: isSelected ? 'bold' : 'normal' }}
+            style={{ textAlign: 'right', padding: '0.5rem', fontWeight: isSelected ? 'bold' : 'normal' }}
           >
             {formatCurrency(amount)}
           </td>
@@ -893,16 +826,12 @@ function MultiColTotalRow({ label, values, tileIds, selectedBasis, theme }: Mult
   const tileColors = getTileColors(theme);
   return (
     <tr
-      className="border-t-2 border-b-2"
       style={{
-        borderColor: 'var(--cui-primary)',
+        borderTop: '2px solid var(--cui-primary)',
         backgroundColor: 'var(--cui-tertiary-bg)',
       }}
     >
-      <td
-        className="py-3 font-bold"
-        style={{ color: 'var(--cui-body-color)', fontFamily: 'inherit' }}
-      >
+      <td style={{ padding: '0.75rem 0', fontWeight: 700, color: 'var(--cui-body-color)' }}>
         {label}
       </td>
       {values.map((amount, idx) => {
@@ -911,8 +840,10 @@ function MultiColTotalRow({ label, values, tileIds, selectedBasis, theme }: Mult
         return (
           <td
             key={tileIds[idx]}
-            className="text-right py-3 font-bold px-2"
             style={{
+              textAlign: 'right',
+              padding: '0.75rem 0.5rem',
+              fontWeight: 700,
               color: isSelected ? 'var(--cui-success)' : colors.text,
             }}
           >

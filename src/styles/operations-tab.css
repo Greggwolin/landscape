@@ -10,10 +10,19 @@
 .ops-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 20px;
+  gap: 0.75rem;
+  padding: 0.75rem;
   min-height: 100%;
   background-color: var(--cui-body-bg);
+}
+
+/* Align Operations CCard header flush with Landscaper header */
+.project-folder-content > .card:has(.ops-container) {
+  margin-top: -0.75rem;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+  width: fit-content;
+  min-width: 0;
 }
 
 /* =============================================================================
@@ -22,6 +31,9 @@
 
 .ops-header {
   padding: 0.5rem 1rem;
+  min-height: 41px;
+  display: flex;
+  align-items: center;
 }
 
 .ops-header-pills {
@@ -175,7 +187,6 @@
   border: 1px solid var(--cui-border-color);
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 .ops-income-card {
@@ -239,11 +250,11 @@
 
 /* Drop target highlighting */
 .ops-expense-card .droppable-parent-row.drop-target-active {
-  background-color: rgba(59, 130, 246, 0.15) !important;
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.15) !important;
 }
 
 .ops-expense-card .droppable-parent-row.drop-target-available {
-  background-color: rgba(59, 130, 246, 0.05);
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.05);
 }
 
 .ops-section-header {
@@ -378,17 +389,8 @@
 
 .ops-statement-grid {
   display: grid;
-  grid-template-columns:
-    200px
-    minmax(60px, 70px)
-    minmax(90px, 100px)
-    minmax(100px, 120px)
-    minmax(70px, 80px)
-    minmax(100px, 110px)
-    minmax(90px, 100px)
-    minmax(100px, 120px);
+  /* grid-template-columns set via inline style for dynamic column visibility */
   width: max-content;
-  min-width: 100%;
   font-size: 0.8125rem;
 }
 
@@ -415,6 +417,34 @@
   padding: 0.65rem 0.75rem;
   font-size: 0.9rem;
   border-bottom: 1px solid var(--cui-border-color);
+  /* When two-tier header is active, all cells align text to bottom */
+  align-self: end;
+}
+
+/* Two-tier grouped header — top row with "Post Renovation" spanning two columns */
+.ops-header-group-row {
+  display: contents;
+}
+
+.ops-header-group-spacer {
+  background: var(--surface-card-header);
+  padding: 0;
+  height: 0;
+  border: none;
+  line-height: 0;
+  font-size: 0;
+  overflow: hidden;
+}
+
+.ops-header-group-span {
+  background: var(--surface-card-header);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.35rem 0.75rem 0.15rem;
+  border-bottom: none;
+  letter-spacing: 0.01em;
 }
 
 .ops-section-cell {
@@ -480,7 +510,7 @@
   bottom: -0.25rem;
   left: 0;
   transform: translateY(100%);
-  background: #111;
+  background: var(--cui-dark);
   color: #fff;
   padding: 0.2rem 0.45rem;
   border-radius: 0.25rem;
@@ -591,17 +621,17 @@
 
 .ops-drag-handle {
   cursor: grab;
-  color: #9ca3af;
+  color: var(--cui-secondary-color);
 }
 
 .ops-drop-hint {
   margin-left: 0.5rem;
-  color: #3b82f6;
+  color: var(--cui-info);
   font-size: 0.75rem;
 }
 
 .unclassified-badge {
-  background-color: #ef4444;
+  background-color: var(--cui-danger);
   color: white;
   padding: 2px 6px;
   border-radius: 4px;
@@ -616,16 +646,21 @@
   color: var(--cui-secondary-color);
 }
 
+/* Column visibility — hide cells when columns are toggled off */
+.ops-hide-ltl .ops-col-ltl {
+  display: none;
+}
+
 .ops-hide-post .ops-col-post,
 .ops-hide-post .ops-col-reno {
-  visibility: hidden;
+  display: none;
 }
 
 .ops-saving-toast {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background-color: #1f2937;
+  background-color: var(--cui-dark);
   color: white;
   padding: 12px 20px;
   border-radius: 8px;
@@ -982,7 +1017,6 @@
   border: 1px solid var(--cui-border-color);
   border-radius: 0.75rem;
   padding: 1.25rem;
-  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.35);
 }
 
 .ops-value-add-section + .ops-value-add-section {
@@ -1628,7 +1662,6 @@
   border-radius: 0.75rem;
   position: sticky;
   bottom: 0;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 .ops-summary-item {
@@ -1664,7 +1697,6 @@
   border: 1px solid var(--cui-border-color);
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 .ops-noi-card {
@@ -1672,7 +1704,6 @@
   border: 1px solid var(--cui-primary);
   border-radius: 0.75rem;
   overflow: hidden;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 /* =============================================================================
@@ -1714,7 +1745,7 @@
 }
 
 .draggable-opex-row:hover {
-  background-color: rgba(59, 130, 246, 0.08);
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.08);
 }
 
 .draggable-opex-row.dragging {
@@ -1728,28 +1759,28 @@
 }
 
 .droppable-parent-row.drop-target-available {
-  background-color: rgba(59, 130, 246, 0.05);
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.05);
 }
 
 .droppable-parent-row.drop-target-active {
   background-color: rgba(59, 130, 246, 0.15);
-  outline: 2px dashed #3b82f6;
+  outline: 2px dashed var(--cui-info);
   outline-offset: -2px;
 }
 
 /* Unclassified section highlighting */
 .unclassified-section {
-  background-color: rgba(239, 68, 68, 0.08) !important;
+  background-color: rgba(var(--cui-danger-rgb, 239, 68, 68), 0.08) !important;
 }
 
 .unclassified-section td:first-child {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--cui-danger);
 }
 
 /* Unclassified badge */
 .unclassified-badge {
   display: inline-block;
-  background-color: #ef4444;
+  background-color: var(--cui-danger);
   color: white;
   padding: 2px 6px;
   border-radius: 4px;
@@ -1790,11 +1821,11 @@
 
 /* Selected row highlight */
 .ops-row-selected > .ops-cell {
-  background-color: rgba(59, 130, 246, 0.12) !important;
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.12) !important;
 }
 
 .ops-row-selected:hover > .ops-cell {
-  background-color: rgba(59, 130, 246, 0.18) !important;
+  background-color: rgba(var(--cui-info-rgb, 59, 130, 246), 0.18) !important;
 }
 
 /* Category action buttons container */
@@ -1830,13 +1861,13 @@
 .ops-action-add:hover {
   border-color: var(--cui-success);
   color: var(--cui-success);
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(var(--cui-success-rgb, 34, 197, 94), 0.08);
 }
 
 .ops-action-delete:hover {
   border-color: var(--cui-danger);
   color: var(--cui-danger);
-  background: rgba(239, 68, 68, 0.08);
+  background: rgba(var(--cui-danger-rgb, 239, 68, 68), 0.08);
 }
 
 /* =============================================================================
@@ -1844,7 +1875,7 @@
    ============================================================================= */
 
 .ops-add-row > .ops-cell {
-  background-color: rgba(34, 197, 94, 0.06);
+  background-color: rgba(var(--cui-success-rgb, 34, 197, 94), 0.06);
   border-bottom: 1px dashed var(--cui-border-color);
 }
 

@@ -55,20 +55,21 @@ export async function POST(request: NextRequest) {
     const nextVersion =
       (parseInt(String(versionResult[0]?.max_version ?? 0)) || 0) + 1;
 
-    // Insert
+    // Insert (id uses sequence, Django doesn't set column default)
     const insertResult = await sql`
       INSERT INTO landscape.tbl_narrative_version (
-        project_id, approach_type, version_number,
+        id, project_id, approach_type, version_number,
         content, content_html, content_plain,
-        status, data_snapshot, created_at
+        status, data_snapshot, created_at, updated_at
       ) VALUES (
+        nextval('landscape.tbl_narrative_version_id_seq'),
         ${projectId}, ${approachType}, ${nextVersion},
         ${JSON.stringify(analysis)}::jsonb,
         ${analysis.summary || ''},
         ${(analysis.summary || '').replace(/<[^>]*>/g, '')},
         'draft',
         ${JSON.stringify(dataSnapshot)}::jsonb,
-        NOW()
+        NOW(), NOW()
       )
       RETURNING id, version_number
     `;

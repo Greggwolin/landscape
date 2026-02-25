@@ -1,0 +1,17 @@
+[    1882ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/projects/17?folder=property&tab=rent-roll:0
+[    1919ms] Error: Minified React error #418; visit https://reactjs.org/docs/error-decoder.html?invariant=418 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at lh (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:46552)
+    at i (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:121107)
+    at oO (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:99091)
+    at oM (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:98961)
+    at oS (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:94034)
+    at x (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:130756)
+    at MessagePort.T (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:131286)
+[    1919ms] Error: Minified React error #423; visit https://reactjs.org/docs/error-decoder.html?invariant=423 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at i (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:120766)
+    at oO (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:99091)
+    at oM (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:98961)
+    at ox (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:95732)
+    at oS (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:94287)
+    at x (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:130756)
+    at MessagePort.T (http://localhost:3000/_next/static/chunks/framework-a95d8ce202680067.js:1:131286)

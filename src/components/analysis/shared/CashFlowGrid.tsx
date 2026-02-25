@@ -50,6 +50,7 @@ export interface CashFlowSection {
   id: string;
   label: string; // "REVENUE", "EXPENSES", etc.
   rows: CashFlowRow[];
+  hideHeader?: boolean; // Skip rendering the section header row
 }
 
 export interface CashFlowGridProps {
@@ -249,7 +250,7 @@ export function CashFlowGrid({
           borderRadius: showTimeScaleToggle || headerActions ? '0 0 0.375rem 0.375rem' : '0.375rem',
         }}
       >
-        <CTable small bordered hover style={tableStyle}>
+        <CTable small borderless style={tableStyle}>
           <colgroup>
             <col style={{ width: `${DEFAULT_LABEL_WIDTH}px` }} />
             {periods.map((_, idx) => (
@@ -302,33 +303,41 @@ export function CashFlowGrid({
             {sections.map((section) => (
               <React.Fragment key={section.id}>
                 {/* Section Header Row */}
-                <tr>
-                  <td
-                    colSpan={colCount}
-                    style={{
-                      fontWeight: 700,
-                      fontSize: '0.8125rem',
-                      paddingLeft: `${INDENT.SECTION_HEADER}px`,
-                      paddingTop: '12px',
-                      paddingBottom: '4px',
-                      borderBottom: 'none',
-                      backgroundColor: 'var(--cui-body-bg)',
-                    }}
-                  >
-                    {section.label}
-                  </td>
-                </tr>
+                {!section.hideHeader && (
+                  <tr>
+                    <td
+                      colSpan={colCount}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.8125rem',
+                        paddingLeft: `${INDENT.SECTION_HEADER}px`,
+                        paddingTop: '12px',
+                        paddingBottom: '4px',
+                        borderBottom: 'none',
+                        backgroundColor: 'var(--cui-body-bg)',
+                      }}
+                    >
+                      {section.label}
+                    </td>
+                  </tr>
+                )}
 
                 {/* Section Rows */}
-                {section.rows.map((row) => (
-                  <DataRow
-                    key={row.id}
-                    row={row}
-                    periods={periods}
-                    formatValue={formatValue}
-                    hideTotalColumn={hideTotalColumn}
-                  />
-                ))}
+                {section.rows.map((row, rowIdx) => {
+                  // Underline rows immediately before a subtotal or total row
+                  const nextRow = section.rows[rowIdx + 1];
+                  const isBeforeTotal = !!nextRow && (nextRow.isSubtotal || nextRow.isTotal);
+                  return (
+                    <DataRow
+                      key={row.id}
+                      row={row}
+                      periods={periods}
+                      formatValue={formatValue}
+                      hideTotalColumn={hideTotalColumn}
+                      isBeforeTotal={isBeforeTotal}
+                    />
+                  );
+                })}
               </React.Fragment>
             ))}
           </tbody>
@@ -347,11 +356,13 @@ interface DataRowProps {
   periods: CashFlowPeriod[];
   formatValue: (value: number, row: CashFlowRow) => string;
   hideTotalColumn: boolean;
+  isBeforeTotal?: boolean;
 }
 
-function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
+function DataRow({ row, periods, formatValue, hideTotalColumn, isBeforeTotal }: DataRowProps) {
   const isSubtotalOrTotal = row.isSubtotal || row.isTotal;
-  const textDecoration = row.bottomBorder ? 'underline' : undefined;
+  // Accounting-style underline: black, 0.5rem left margin (right-justified), value cells only
+  const showUnderline = row.bottomBorder || isBeforeTotal;
 
   // Calculate row total if not provided
   const rowTotal =
@@ -371,7 +382,7 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
 
   return (
     <tr style={{ backgroundColor: rowBg }}>
-      {/* Label Cell */}
+      {/* Label Cell — no underline */}
       <td
         style={{
           paddingLeft: `${getIndent(row.indent)}px`,
@@ -392,11 +403,11 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
           <td
             key={period.id}
             style={{
+              position: 'relative',
               textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
               fontWeight: isSubtotalOrTotal ? 600 : 400,
               color: value < 0 ? 'var(--cui-danger)' : undefined,
-              textDecoration,
               borderTop,
               ...(isRef
                 ? {
@@ -409,6 +420,18 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
             }}
           >
             {formatValue(value, row)}
+            {showUnderline && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  left: '0.5rem',
+                  height: '1px',
+                  backgroundColor: 'var(--cui-body-color)',
+                }}
+              />
+            )}
           </td>
         );
       })}
@@ -417,17 +440,29 @@ function DataRow({ row, periods, formatValue, hideTotalColumn }: DataRowProps) {
       {!hideTotalColumn && !row.hideTotal && (
         <td
           style={{
+            position: 'relative',
             textAlign: 'right',
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 600,
             backgroundColor: 'var(--cui-light-bg-subtle)',
             borderLeft: '2px solid var(--cui-border-color)',
             color: rowTotal < 0 ? 'var(--cui-danger)' : undefined,
-            textDecoration,
             borderTop,
           }}
         >
           {formatValue(rowTotal, row)}
+          {showUnderline && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                left: '0.5rem',
+                height: '1px',
+                backgroundColor: 'var(--cui-body-color)',
+              }}
+            />
+          )}
         </td>
       )}
 

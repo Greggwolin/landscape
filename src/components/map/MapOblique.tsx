@@ -40,7 +40,7 @@ export interface MarkerData {
  label?: string;
  popup?: string; // HTML content for popup
  tooltip?: string; // alias for popup
- variant?: 'pin' | 'dot';
+ variant?: 'pin' | 'dot' | 'numbered';
  isActive?: boolean;
  onHover?: () => void;
  onLeave?: () => void;
@@ -359,6 +359,20 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  el.innerHTML = `
  <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
  <circle cx="16" cy="16" r="14" fill="var(--cui-warning)" stroke="var(--cui-body-color)" stroke-width="3"/>
+ </svg>
+ `;
+ } else if (variant === 'numbered') {
+ // Numbered circle marker with comp number inside
+ const size = 28;
+ el.style.width = `${size}px`;
+ el.style.height = `${size}px`;
+ const fillColor = m.color || 'var(--cui-info)';
+ const labelText = m.label || '';
+ el.innerHTML = `
+ <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+ <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="${fillColor}" stroke="#fff" stroke-width="2"/>
+ <text x="${size/2}" y="${size/2}" text-anchor="middle" dominant-baseline="central"
+   fill="#fff" font-size="12" font-weight="700" font-family="system-ui, sans-serif">${labelText}</text>
  </svg>
  `;
  } else {

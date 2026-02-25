@@ -31,7 +31,7 @@ export const POINT_CATEGORIES: PointCategoryConfig[] = [
 export const DEFAULT_LAYER_VISIBILITY: LayerVisibility = {
   blockGroups: false,
   rings: true,
-  userPoints: false,
+  userPoints: true,
   satellite: false,
   hybrid: true,
 };
