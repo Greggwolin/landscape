@@ -45,6 +45,7 @@ export async function GET(
         start_period,
         payment_frequency,
         notes,
+        source,
         created_at,
         updated_at
       FROM landscape.tbl_operating_expenses
@@ -98,7 +99,7 @@ export async function POST(
     // Upsert operating expenses
     for (const expense of expenses) {
       if (expense.opex_id) {
-        // Update existing
+        // Update existing — preserve source/provenance (don't overwrite ingestion flag)
         await sql`
           UPDATE landscape.tbl_operating_expenses
           SET
@@ -114,12 +115,13 @@ export async function POST(
             payment_frequency = ${expense.payment_frequency || 'MONTHLY'},
             notes = ${expense.notes || null},
             statement_discriminator = ${discriminator},
+            source = COALESCE(${expense.source || null}, source),
             updated_at = NOW()
           WHERE opex_id = ${expense.opex_id}
             AND project_id = ${projectIdNum}
         `;
       } else {
-        // Insert new
+        // Insert new — default source to 'user' for manually created rows
         await sql`
           INSERT INTO landscape.tbl_operating_expenses (
             project_id,
@@ -134,7 +136,8 @@ export async function POST(
             start_period,
             payment_frequency,
             notes,
-            statement_discriminator
+            statement_discriminator,
+            source
           ) VALUES (
             ${projectIdNum},
             ${expense.expense_category},
@@ -148,7 +151,8 @@ export async function POST(
             ${expense.start_period},
             ${expense.payment_frequency || 'MONTHLY'},
             ${expense.notes || null},
-            ${discriminator}
+            ${discriminator},
+            ${expense.source || 'user'}
           )
         `;
       }

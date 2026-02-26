@@ -210,6 +210,9 @@ PAGE_TOOLS = {
         "query_platform_knowledge",
         "get_knowledge_entities",
         "get_knowledge_facts",
+        # Land dev ingestion
+        "configure_project_hierarchy",
+        "create_land_dev_containers",
     ],
 
     "land_planning": [
@@ -234,6 +237,11 @@ PAGE_TOOLS = {
         "get_milestones",
         "update_milestone",
         "delete_milestone",
+        # Land dev ingestion tools (2026-02-26)
+        "configure_project_hierarchy",
+        "create_land_dev_containers",
+        "update_lot_mix",
+        "update_land_use_budget",
     ],
 
     "land_budget": [
@@ -485,43 +493,21 @@ def get_tools_for_page(
     project_id: Optional[int] = None,
 ) -> List[str]:
     """
-    Get the list of tool names available for a given page context.
+    Return ALL tool names — full-context agent has access to every tool.
 
-    Args:
-        page_context: The current normalized page identifier (e.g., "mf_valuation")
-        include_extraction: Include extraction tools (user mentioned document)
-        is_admin: Include admin/config tools
-        project_id: Optional project ID for checking active extraction workflows
+    DESIGN INTENT (2026-02-26 refactor):
+    Page-scoping was removed to transform Landscaper from a tab assistant into a
+    full-context project agent. All 169 compressed tool schemas (~17K tokens) are
+    sent on every turn. The page_context is still accepted for logging/analytics
+    and may be used as a soft hint in the system prompt, but it no longer gates
+    tool availability.
 
-    Returns:
-        List of tool names to include in Claude's tool set
+    The tier lists (UNIVERSAL_TOOLS, EXTRACTION_TOOLS, WHATIF_TOOLS, etc.) are
+    retained as documentation of the original groupings.
     """
-    tools: Set[str] = set()
-
-    # Always include universal tools
-    tools.update(UNIVERSAL_TOOLS)
-
-    # Add page-specific tools
-    if page_context in PAGE_TOOLS:
-        tools.update(PAGE_TOOLS[page_context])
-
-    # Add what-if tools on valuation/capitalization/reports pages
-    if page_context in WHATIF_PAGES:
-        tools.update(WHATIF_TOOLS)
-
-    # Add extraction tools if on Documents page or document mentioned
-    # Also force-include if an active extraction workflow is awaiting delta review
-    if not include_extraction and project_id:
-        include_extraction = _has_active_extraction_workflow(project_id)
-
-    if include_extraction or page_context == "documents":
-        tools.update(EXTRACTION_TOOLS)
-
-    # Add admin tools if admin context
-    if is_admin:
-        tools.update(ADMIN_TOOLS)
-
-    return list(tools)
+    # Full-context agent: return ALL tool names from the schema list
+    from .tool_schemas import LANDSCAPER_TOOLS
+    return [t["name"] for t in LANDSCAPER_TOOLS]
 
 
 def should_include_extraction_tools(user_message: str) -> bool:

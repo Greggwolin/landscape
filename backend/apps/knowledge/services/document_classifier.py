@@ -9,6 +9,10 @@ Classifies documents into types based on content analysis:
 - comp_report: Rental/sales comparable analyses
 - site_plan: Development site plans
 - proforma: Financial projections
+- community_master_plan: Master-planned community documents
+- lot_offering: Finished lot marketing / builder takedown packages
+- absorption_report: Market absorption and sales velocity studies
+- land_development_budget: Land development budgets and cost estimates
 """
 
 import re
@@ -30,6 +34,11 @@ class DocumentType(Enum):
     COMP_REPORT = 'comp_report'
     SITE_PLAN = 'site_plan'
     PROFORMA = 'proforma'
+    # Land development document types
+    COMMUNITY_MASTER_PLAN = 'community_master_plan'
+    LOT_OFFERING = 'lot_offering'
+    ABSORPTION_REPORT = 'absorption_report'
+    LAND_DEVELOPMENT_BUDGET = 'land_development_budget'
     UNKNOWN = 'unknown'
 
     @classmethod
@@ -49,6 +58,20 @@ class DocumentType(Enum):
             'market_data': cls.COMP_REPORT,
             'site_plan': cls.SITE_PLAN,
             'proforma': cls.PROFORMA,
+            # Land development aliases
+            'community_master_plan': cls.COMMUNITY_MASTER_PLAN,
+            'master_plan': cls.COMMUNITY_MASTER_PLAN,
+            'mpc': cls.COMMUNITY_MASTER_PLAN,
+            'lot_offering': cls.LOT_OFFERING,
+            'finished_lot_marketing': cls.LOT_OFFERING,
+            'builder_takedown': cls.LOT_OFFERING,
+            'lot_marketing': cls.LOT_OFFERING,
+            'absorption_report': cls.ABSORPTION_REPORT,
+            'absorption_study': cls.ABSORPTION_REPORT,
+            'market_absorption': cls.ABSORPTION_REPORT,
+            'land_development_budget': cls.LAND_DEVELOPMENT_BUDGET,
+            'land_budget': cls.LAND_DEVELOPMENT_BUDGET,
+            'development_budget': cls.LAND_DEVELOPMENT_BUDGET,
         }
         return mapping.get(value.lower(), cls.UNKNOWN)
 
@@ -133,6 +156,39 @@ DOCUMENT_PRIORITY_BY_FIELD_TYPE = {
         DocumentType.PROFORMA: 5,
         DocumentType.COMP_REPORT: 6,
         DocumentType.SITE_PLAN: 7,
+        DocumentType.COMMUNITY_MASTER_PLAN: 8,
+        DocumentType.LOT_OFFERING: 9,
+        DocumentType.ABSORPTION_REPORT: 10,
+        DocumentType.LAND_DEVELOPMENT_BUDGET: 11,
+        DocumentType.UNKNOWN: 99,
+    },
+    # Land dev fields - Master Plan and Lot Offering are sources of truth
+    'land_use': {
+        DocumentType.COMMUNITY_MASTER_PLAN: 1,
+        DocumentType.SITE_PLAN: 2,
+        DocumentType.LOT_OFFERING: 3,
+        DocumentType.APPRAISAL: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    'lot_inventory': {
+        DocumentType.LOT_OFFERING: 1,
+        DocumentType.COMMUNITY_MASTER_PLAN: 2,
+        DocumentType.SITE_PLAN: 3,
+        DocumentType.APPRAISAL: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    'absorption': {
+        DocumentType.ABSORPTION_REPORT: 1,
+        DocumentType.COMMUNITY_MASTER_PLAN: 2,
+        DocumentType.LOT_OFFERING: 3,
+        DocumentType.APPRAISAL: 4,
+        DocumentType.UNKNOWN: 99,
+    },
+    'development_cost': {
+        DocumentType.LAND_DEVELOPMENT_BUDGET: 1,
+        DocumentType.COMMUNITY_MASTER_PLAN: 2,
+        DocumentType.APPRAISAL: 3,
+        DocumentType.PROFORMA: 4,
         DocumentType.UNKNOWN: 99,
     },
 }
@@ -242,6 +298,10 @@ DOCTYPE_TO_EVIDENCE = {
     DocumentType.COMP_REPORT: 'comp_report',
     DocumentType.SITE_PLAN: 'site_plan',
     DocumentType.PROFORMA: 'proforma',
+    DocumentType.COMMUNITY_MASTER_PLAN: 'community_master_plan',
+    DocumentType.LOT_OFFERING: 'lot_offering',
+    DocumentType.ABSORPTION_REPORT: 'absorption_report',
+    DocumentType.LAND_DEVELOPMENT_BUDGET: 'land_development_budget',
 }
 
 # Maps CSV evidence_types to DocumentType
@@ -257,6 +317,11 @@ DOCTYPE_TO_TEMPLATE_MAPPING = {
     'comp_report': ['Market Data', 'Property Data', 'Reports, Studies'],
     'site_plan': ['Entitlements', 'Diligence', 'Sets'],
     'proforma': ['Property Data', 'Diligence', 'Operations'],
+    # Land development document types
+    'community_master_plan': ['Entitlements', 'Property Data', 'Reports, Studies'],
+    'lot_offering': ['Property Data', 'Leases', 'Operations'],
+    'absorption_report': ['Market Data', 'Reports, Studies', 'Property Data'],
+    'land_development_budget': ['Property Data', 'Operations', 'Accounting'],
     'unknown': ['Property Data', 'Other', 'general'],
 }
 
@@ -365,6 +430,59 @@ CLASSIFICATION_PATTERNS = {
         (r'investor\s+returns', 0.80, 'Investor returns'),
         (r'cash[\s-]?on[\s-]?cash', 0.75, 'CoC returns'),
         (r'waterfall', 0.75, 'Waterfall distribution'),
+    ],
+    # ── Land Development Document Types ──────────────────────────────────
+    DocumentType.COMMUNITY_MASTER_PLAN: [
+        (r'master\s+plan(ned)?\s+community', 0.95, 'Master Planned Community title'),
+        (r'community\s+master\s+plan', 0.95, 'Community master plan'),
+        (r'land\s+use\s+plan', 0.90, 'Land use plan'),
+        (r'planned\s+(unit\s+)?development', 0.85, 'PUD reference'),
+        (r'specific\s+plan', 0.85, 'Specific plan'),
+        (r'phasing\s+plan', 0.80, 'Phasing plan'),
+        (r'development\s+agreement', 0.80, 'Development agreement'),
+        (r'entitlement', 0.75, 'Entitlement reference'),
+        (r'zoning\s+(?:change|amendment|designation)', 0.80, 'Zoning change'),
+        (r'annexation', 0.75, 'Annexation reference'),
+        (r'acreage\s+allocation', 0.80, 'Acreage allocation'),
+        (r'open\s+space.*(?:acres|%)', 0.75, 'Open space allocation'),
+    ],
+    DocumentType.LOT_OFFERING: [
+        (r'finished\s+lot', 0.95, 'Finished lot reference'),
+        (r'lot\s+(?:offering|marketing)', 0.95, 'Lot offering/marketing'),
+        (r'builder\s+takedown', 0.90, 'Builder takedown'),
+        (r'lot\s+(?:price|pricing)\s+schedule', 0.90, 'Lot pricing schedule'),
+        (r'lot\s+(?:premium|size|width|depth)', 0.80, 'Lot specifications'),
+        (r'lot\s+inventory', 0.85, 'Lot inventory'),
+        (r'(?:product|lot)\s+mix', 0.80, 'Product/lot mix'),
+        (r'builder\s+(?:agreement|contract)', 0.80, 'Builder agreement'),
+        (r'takedown\s+schedule', 0.85, 'Takedown schedule'),
+        (r'lot\s+delivery', 0.80, 'Lot delivery'),
+        (r'(?:\d+)\s*(?:x|by)\s*(?:\d+).*lot', 0.75, 'Lot dimension pattern'),
+    ],
+    DocumentType.ABSORPTION_REPORT: [
+        (r'absorption\s+(?:rate|study|report|analysis)', 0.95, 'Absorption study title'),
+        (r'(?:sales|market)\s+velocity', 0.90, 'Sales velocity'),
+        (r'permits?\s+(?:per|activity)', 0.85, 'Permit activity'),
+        (r'(?:new\s+home|lot)\s+sales\s+per\s+(?:month|year)', 0.90, 'Sales rate'),
+        (r'competitive\s+(?:market|supply|project)', 0.85, 'Competitive supply'),
+        (r'(?:subdivision|community)\s+(?:starts?|closings?)', 0.80, 'Subdivision activity'),
+        (r'(?:housing|lot)\s+demand', 0.80, 'Housing/lot demand'),
+        (r'(?:active|selling)\s+(?:communities|subdivisions)', 0.80, 'Active communities'),
+        (r'metrostudy|zonda|rlb|(?:market\s+intelligence)', 0.85, 'Data source'),
+        (r'(?:quarterly|annual)\s+(?:sales|starts)\s+data', 0.80, 'Periodic sales data'),
+    ],
+    DocumentType.LAND_DEVELOPMENT_BUDGET: [
+        (r'(?:land\s+)?development\s+budget', 0.95, 'Development budget title'),
+        (r'(?:land\s+)?development\s+cost', 0.90, 'Development cost'),
+        (r'infrastructure\s+cost', 0.85, 'Infrastructure cost'),
+        (r'(?:grading|earthwork|mass\s+grade)', 0.85, 'Grading costs'),
+        (r'(?:utility|water|sewer)\s+(?:cost|infrastructure)', 0.80, 'Utility infrastructure'),
+        (r'(?:street|road|paving)\s+(?:cost|improvement)', 0.80, 'Street improvements'),
+        (r'(?:hard|soft)\s+cost', 0.80, 'Hard/soft costs'),
+        (r'(?:impact|development)\s+(?:fee|assessment)', 0.80, 'Impact fees'),
+        (r'cost\s+per\s+(?:lot|acre|unit)', 0.85, 'Unit cost metrics'),
+        (r'(?:construction|development)\s+draw', 0.80, 'Draw schedule'),
+        (r'(?:total|estimated)\s+(?:development|improvement)\s+cost', 0.90, 'Total dev cost'),
     ],
 }
 
@@ -647,6 +765,11 @@ class DocumentClassifier:
             DocumentType.COMP_REPORT: [r'comp', r'survey', r'market\s*data'],
             DocumentType.SITE_PLAN: [r'site\s*plan', r'civil', r'plat'],
             DocumentType.PROFORMA: [r'proforma', r'pro\s*forma', r'projection'],
+            # Land development types
+            DocumentType.COMMUNITY_MASTER_PLAN: [r'master\s*plan', r'mpc', r'specific\s*plan', r'land\s*use\s*plan'],
+            DocumentType.LOT_OFFERING: [r'lot\s*offer', r'lot\s*market', r'builder\s*takedown', r'finished\s*lot'],
+            DocumentType.ABSORPTION_REPORT: [r'absorption', r'velocity', r'sales\s*study'],
+            DocumentType.LAND_DEVELOPMENT_BUDGET: [r'dev(elopment)?\s*budget', r'land\s*budget', r'infra.*cost'],
         }
 
         for doc_type, type_patterns in patterns.items():

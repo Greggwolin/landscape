@@ -76,6 +76,9 @@ export interface LineItemRow {
   children?: LineItemRow[];
   is_expanded?: boolean;
 
+  // Provenance tracking
+  source?: 'ingestion' | 'user' | 'user_modified';
+
   // Drag-and-drop support for OpEx categorization
   opex_id?: number;
   parent_category?: string;

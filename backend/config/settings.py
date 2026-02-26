@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "apps.location_intelligence",  # Location Intelligence (ring demographics, POIs)
     "apps.valuation",  # Valuation approaches (Sales Comparison, Cost Approach)
     "apps.dynamic",  # Dynamic columns (EAV pattern for extensible fields)
+    "apps.landdev",  # Land development planning engine
 ]
 
 MIDDLEWARE = [

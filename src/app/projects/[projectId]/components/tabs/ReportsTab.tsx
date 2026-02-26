@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { CCard, CCardBody, CButton, CButtonGroup, CNav, CNavItem, CNavLink } from '@coreui/react';
 import { PropertySummaryView } from '@/components/reports/PropertySummaryView';
 import { ExtractionHistoryReport } from '@/components/reports/ExtractionHistoryReport';
 import CIcon from '@coreui/icons-react';
 import { cilDescription, cilSpreadsheet, cilHome, cilHistory } from '@coreui/icons';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface Project {
   project_id: number;
@@ -21,6 +22,12 @@ type ReportType = 'summary' | 'cashflow' | 'rentroll' | 'extraction-history';
 export default function ReportsTab({ project }: ReportsTabProps) {
   const [scenario, setScenario] = useState<'current' | 'proforma'>('current');
   const [reportType, setReportType] = useState<ReportType>('summary');
+
+  // Force child remount on Landscaper mutations via key increment
+  const [refreshKey, setRefreshKey] = useState(0);
+  const watchedTables = useMemo(() => ['project', 'cashflow'], []);
+  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  useLandscaperRefresh(project.project_id, watchedTables, handleRefresh);
 
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8001';
 
@@ -134,7 +141,7 @@ export default function ReportsTab({ project }: ReportsTabProps) {
 
       {/* Report Content */}
       {reportType === 'summary' && (
-        <PropertySummaryView propertyId={String(project.project_id)} scenario={scenario} />
+        <PropertySummaryView key={refreshKey} propertyId={String(project.project_id)} scenario={scenario} />
       )}
       {reportType === 'cashflow' && (
         <CCard>
@@ -157,7 +164,7 @@ export default function ReportsTab({ project }: ReportsTabProps) {
         </CCard>
       )}
       {reportType === 'extraction-history' && (
-        <ExtractionHistoryReport projectId={project.project_id} />
+        <ExtractionHistoryReport key={refreshKey} projectId={project.project_id} />
       )}
     </div>
   );

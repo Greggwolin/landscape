@@ -59,7 +59,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           'bad_debt_pct',
           'concessions_pct',
           'management_fee_pct',
-          'replacement_reserve_pct'
+          'replacement_reserve_pct',
+          'vacancy_override_pct'
         )
     `;
 
@@ -253,10 +254,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     };
 
     // 5. Get vacancy deductions from assumptions
-    // Physical vacancy is calculated from rent roll if detailed data exists, otherwise from assumptions
-    const physicalVacancyRate = calculatedPhysicalVacancy !== null
-      ? calculatedPhysicalVacancy
-      : assumptions.physical_vacancy_pct;
+    // Physical vacancy: user override > rent roll calculation > assumption
+    const hasVacancyOverride = assumptions.vacancy_override_pct !== undefined;
+    const physicalVacancyRate = hasVacancyOverride
+      ? assumptions.vacancy_override_pct
+      : calculatedPhysicalVacancy !== null
+        ? calculatedPhysicalVacancy
+        : assumptions.physical_vacancy_pct;
 
     const creditLossRate = assumptions.bad_debt_pct;
     const concessionsRate = assumptions.concessions_pct;
@@ -270,9 +274,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           line_item_key: 'physical_vacancy',
           label: 'Physical Vacancy',
           level: 0,
-          is_calculated: hasDetailedRentRoll, // Calculated if rent roll exists
-          is_readonly: hasDetailedRentRoll, // Read-only if calculated from rent roll
+          is_calculated: hasDetailedRentRoll && !hasVacancyOverride, // Calculated unless overridden
+          is_readonly: hasDetailedRentRoll && !hasVacancyOverride, // Read-only unless overridden
           is_percentage: true,
+          source: hasDetailedRentRoll
+            ? (hasVacancyOverride ? 'user_modified' as const : 'ingestion' as const)
+            : undefined,
           as_is: {
             rate: physicalVacancyRate,
             total: -(currentGPRTotal * physicalVacancyRate),
@@ -349,7 +356,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         oe.unit_amount,
         oe.amount_per_sf,
         oe.escalation_rate,
-        oe.statement_discriminator
+        oe.statement_discriminator,
+        oe.source
       FROM core_unit_cost_category c
       LEFT JOIN tbl_operating_expenses oe
         ON c.category_id = oe.category_id
@@ -425,6 +433,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         parent_id: row.parent_id,
         level: 0,
         is_calculated: row.is_calculated,
+        source: row.source || undefined,
+        opex_id: row.opex_id ? parseInt(row.opex_id, 10) : undefined,
         as_is: {
           rate: unitAmount,
           total: annualTotal
@@ -567,12 +577,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           amount_per_sf,
           escalation_rate,
           statement_discriminator,
+          source,
           updated_at,
           category_id,
           COALESCE(parent_category, 'unclassified') as parent_category
         FROM tbl_operating_expenses
         WHERE project_id = ${projectIdNum}
-          AND LOWER(COALESCE(expense_type, '')) NOT IN ('management', 'management fee', 'property management')
           AND LOWER(COALESCE(parent_category, '')) != 'management'
         ORDER BY parent_category, expense_category, updated_at DESC
       `;
@@ -726,6 +736,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           label: group.label,
           level: 1,
           is_calculated: false,
+          source: selectedRow.source || 'user',
           parent_category: parentCat,
           is_draggable: true, // All expense items are draggable between categories
           as_is: {

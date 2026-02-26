@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import PlanningContent from '@/app/components/Planning/PlanningContent';
 import { CCard, CCardBody } from '@coreui/react';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface Project {
   project_id: number;
@@ -16,6 +17,12 @@ interface PlanningTabProps {
 
 export default function PlanningTab({ project }: PlanningTabProps) {
   const isLandDevelopment = project.project_type_code === 'LAND';
+
+  // Force child remount on Landscaper mutations via key increment
+  const [refreshKey, setRefreshKey] = useState(0);
+  const watchedTables = useMemo(() => ['areas', 'phases', 'parcels', 'milestones', 'land_use'], []);
+  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  useLandscaperRefresh(project.project_id, watchedTables, handleRefresh);
 
   // Show message for non-land development projects
   if (!isLandDevelopment) {
@@ -74,6 +81,6 @@ export default function PlanningTab({ project }: PlanningTabProps) {
   }
 
   return (
-    <PlanningContent projectId={project.project_id} projectIdStr={project.project_id.toString()} />
+    <PlanningContent key={refreshKey} projectId={project.project_id} projectIdStr={project.project_id.toString()} />
   );
 }
