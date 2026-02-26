@@ -1,7 +1,15 @@
-/* MapLibre GL CSS - must be first */
+/* ===== LAYER 1: Tailwind resets + utilities (lowest priority) ===== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== LAYER 2: Third-party CSS ===== */
+/* MapLibre GL CSS */
 @import 'maplibre-gl/dist/maplibre-gl.css';
 /* Leaflet base styles for the GIS page */
 @import 'leaflet/dist/leaflet.css';
+
+/* ===== LAYER 3: App tokens + component patterns (override Tailwind) ===== */
 @import '../styles/tokens.css';
 @import '../styles/component-patterns.css';
 @import '../styles/folder-tabs.css';
@@ -68,10 +76,6 @@
   color: var(--cui-body-color) !important;
   font-size: 10px !important;
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /*
  * Fix Tailwind .collapse vs CoreUI .collapse conflict.

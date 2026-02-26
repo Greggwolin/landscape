@@ -41,3 +41,7 @@ export { EGISubtotalBar } from './EGISubtotalBar';
 export { NOITotalBar } from './NOITotalBar';
 export { SummaryBar } from './SummaryBar';
 export { OperationsHeader } from './OperationsHeader';
+
+// Chart Components
+export { IncomeTreemap } from './IncomeTreemap';
+export { ExpenseTreemap } from './ExpenseTreemap';

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy_financial as npf
@@ -64,6 +64,11 @@ class RevolverPeriod:
     release_payments_by_product: Dict[int, float]
     ending_balance: float
     loan_activity: float
+    # Additional tracking fields
+    interest_capitalized: float = 0.0
+    parcels_released: int = 0
+    cumulative_parcels_released: int = 0
+    remaining_parcels: int = 0
 
 
 @dataclass
@@ -78,6 +83,10 @@ class RevolverResult:
     peak_balance: float
     peak_balance_pct: float
     iterations_to_converge: int
+    # Additional summary fields
+    maturity_shortfall: float = 0.0
+    total_parcels: int = 0
+    total_parcels_released: int = 0
 
 
 @dataclass
@@ -142,6 +151,19 @@ class DebtServiceEngine:
         peak_balance = max((p.ending_balance for p in periods), default=0.0)
         peak_balance_pct = peak_balance / commitment if commitment else 0.0
 
+        total_parcels = sum(
+            sum(p.lots_sold_by_product.values()) for p in period_data
+        )
+        total_released = periods[-1].cumulative_parcels_released if periods else 0
+
+        # Maturity shortfall: balance remaining at term end
+        term_end = params.loan_start_period + params.loan_term_months
+        maturity_shortfall = 0.0
+        for p in periods:
+            if p.period_index == term_end - 1:
+                maturity_shortfall = p.ending_balance
+                break
+
         return RevolverResult(
             periods=periods,
             commitment_amount=commitment,
@@ -153,6 +175,9 @@ class DebtServiceEngine:
             peak_balance=peak_balance,
             peak_balance_pct=peak_balance_pct,
             iterations_to_converge=iterations,
+            maturity_shortfall=maturity_shortfall,
+            total_parcels=total_parcels,
+            total_parcels_released=total_released,
         )
 
     def calculate_term(
@@ -294,12 +319,12 @@ class DebtServiceEngine:
         => fee = commitment * fee_pct
 
         The interest_reserve_inflator (e.g. 1.2) represents a cushion
-        percentage: the reserve is sized so that (inflator − 1) of its
+        percentage: the reserve is sized so that (inflator - 1) of its
         value remains as an unused buffer after all interest is paid.
 
-            cushion = inflator − 1          (e.g. 0.20 for a 1.2 inflator)
-            reserve = total_interest / (1 − cushion)
-                    = total_interest / (2 − inflator)
+            cushion = inflator - 1          (e.g. 0.20 for a 1.2 inflator)
+            reserve = total_interest / (1 - cushion)
+                    = total_interest / (2 - inflator)
 
         Returns: (commitment_amount, interest_reserve, origination_fee, iterations)
         """
@@ -309,7 +334,7 @@ class DebtServiceEngine:
         denom = 1.0 - ltc * fee_pct
 
         # Convert inflator to effective multiplier.
-        # inflator=1.2 → 20% cushion → multiplier = 1/(2−1.2) = 1.25
+        # inflator=1.2 -> 20% cushion -> multiplier = 1/(2-1.2) = 1.25
         effective_multiplier = 1.0 / (2.0 - params.interest_reserve_inflator)
 
         prev_reserve = 0.0
@@ -354,20 +379,35 @@ class DebtServiceEngine:
         """
         Generate the period-by-period loan schedule.
 
-        The interest reserve is held as a separate escrow by the lender.
-        It is funded from commitment capacity but does NOT add to the
-        outstanding loan balance.  Interest accrues on the loan balance
-        and capitalises (adds to balance).  The reserve pays interest to
-        the lender, reducing reserve_balance but NOT loan balance.
+        Interest reserve is a segregated escrow funded from commitment
+        capacity.  Each month, the reserve pays accrued interest so it
+        does NOT capitalize onto the loan balance.  Only when the reserve
+        is exhausted does unpaid interest capitalize.
+
+        Release payments use pro-rata commitment allocation:
+            release_price = (commitment / total_parcels) * release_pct * acceleration
+        Capped at outstanding balance.
 
         Cost draws use reverse-fill ordering: later periods draw their
         full costs first, and the first cost period receives whatever
-        commitment capacity remains (the residual).  This matches the
-        Lotbank Excel model convention.
+        commitment capacity remains (the residual).
         """
         periods: List[RevolverPeriod] = []
         monthly_rate = params.interest_rate_annual / 12 if params.interest_rate_annual else 0.0
         term_end = params.loan_start_period + params.loan_term_months
+
+        # --- Pre-calculate release price per lot (pro-rata of commitment) ---
+        total_parcels = sum(
+            sum(p.lots_sold_by_product.values()) for p in period_data
+        )
+        if total_parcels > 0:
+            pro_rata_allocation = commitment / total_parcels
+            release_price_per_lot = max(
+                pro_rata_allocation * params.release_price_pct * params.repayment_acceleration,
+                params.release_price_minimum,
+            )
+        else:
+            release_price_per_lot = 0.0
 
         # --- Pass 1: Pre-allocate cost draws using reverse-fill ordering ---
         # Available commitment capacity for cost draws (after reserve/fee/closing)
@@ -398,6 +438,7 @@ class DebtServiceEngine:
         # --- Pass 2: Generate period-by-period schedule ---
         reserve_balance = 0.0
         ending_balance = 0.0
+        cumulative_parcels = 0
 
         for period in period_data:
             period_index = period.period_index
@@ -414,40 +455,46 @@ class DebtServiceEngine:
             cost_draw = 0.0
             accrued_interest = 0.0
             interest_reserve_draw = 0.0
+            interest_capitalized = 0.0
             release_payments = 0.0
             release_payments_by_product: Dict[int, float] = {}
+            parcels_this_period = 0
 
+            # Cost draws: only during loan term
             if params.loan_start_period <= period_index < term_end:
-                # Interest accrues on beginning balance only (before any
-                # draws or origination costs in this period)
+                cost_draw = draw_by_period.get(period_index, 0.0)
+                balance += cost_draw
+
+            # Interest accrues on beginning balance whenever balance > 0
+            # (continues past term_end if balance remains)
+            if period_index >= params.loan_start_period and beginning_balance > 0:
                 accrued_interest = beginning_balance * monthly_rate
 
-                cost_draw = draw_by_period.get(period_index, 0.0)
-                balance += cost_draw + accrued_interest
-
-                # Reserve pays interest to lender (reduces reserve, NOT loan balance)
+                # Reserve pays interest first — does NOT capitalize
                 if reserve_balance > 0 and accrued_interest > 0:
                     interest_reserve_draw = min(accrued_interest, reserve_balance)
                     reserve_balance -= interest_reserve_draw
 
-                # Release payments from lot sales reduce loan balance
-                release_payments = 0.0
-                for product_id, lots_sold in period.lots_sold_by_product.items():
-                    cost_per_lot = period.cost_per_lot_by_product.get(product_id, 0.0)
-                    release_price = self._calculate_release_price(
-                        cost_per_lot,
-                        params.release_price_pct,
-                        params.repayment_acceleration,
-                        params.release_price_minimum,
-                    )
-                    payment = release_price * lots_sold
-                    release_payments_by_product[product_id] = payment
-                    release_payments += payment
+                # Only the portion NOT covered by reserve capitalizes
+                interest_capitalized = accrued_interest - interest_reserve_draw
+                balance += interest_capitalized
 
-                if release_payments > 0:
-                    release_payments = min(release_payments, max(balance, 0.0))
+            # Release payments: whenever parcels sell (even past term_end)
+            if period_index >= params.loan_start_period:
+                parcels_this_period = sum(period.lots_sold_by_product.values())
+                if parcels_this_period > 0 and release_price_per_lot > 0:
+                    uncapped_release = release_price_per_lot * parcels_this_period
+                    release_payments = min(uncapped_release, max(balance, 0.0))
                     balance -= release_payments
 
+                    # Track per-product breakdown (pro-rate cap across products)
+                    cap_ratio = release_payments / uncapped_release if uncapped_release > 0 else 0.0
+                    for product_id, lots_sold in period.lots_sold_by_product.items():
+                        release_payments_by_product[product_id] = (
+                            release_price_per_lot * lots_sold * cap_ratio
+                        )
+
+            cumulative_parcels += parcels_this_period
             ending_balance = max(balance, 0.0)
             loan_activity = ending_balance - beginning_balance
 
@@ -465,6 +512,10 @@ class DebtServiceEngine:
                     release_payments_by_product=release_payments_by_product,
                     ending_balance=ending_balance,
                     loan_activity=loan_activity,
+                    interest_capitalized=interest_capitalized,
+                    parcels_released=parcels_this_period,
+                    cumulative_parcels_released=cumulative_parcels,
+                    remaining_parcels=total_parcels - cumulative_parcels,
                 )
             )
 
@@ -472,10 +523,10 @@ class DebtServiceEngine:
 
     @staticmethod
     def _calculate_release_price(
-        cost_per_lot: float,
+        pro_rata_allocation: float,
         release_price_pct: float,
         repayment_acceleration: float,
         minimum_release: float,
     ) -> float:
-        """Release price per lot = max(cost * release_pct * acceleration, minimum)."""
-        return max(cost_per_lot * release_price_pct * repayment_acceleration, minimum_release)
+        """Release price per lot = max(pro_rata * release_pct * acceleration, minimum)."""
+        return max(pro_rata_allocation * release_price_pct * repayment_acceleration, minimum_release)

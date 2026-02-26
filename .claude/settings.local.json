@@ -583,7 +583,12 @@
       "Bash(npx neonctl connection-string --branch feature/landscaper-intelligence-v1 --role-name neondb_owner --database-name land_v2)",
       "Bash(BRANCH_URL=\"postgresql://neondb_owner:npg_bps3EShU9WFM@ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech/land_v2?sslmode=require\")",
       "Bash(npx neonctl branches list --project-id silent-boat-73842844)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(git push origin main)",
+      "Bash(git push -u origin feature/alpha-prep)",
+      "Bash(./venv/bin/python manage.py shell -c \":*)",
+      "Bash(./venv/bin/python manage.py check --database default)",
+      "Bash(npm run build)"
     ],
     "deny": [],
     "ask": [],

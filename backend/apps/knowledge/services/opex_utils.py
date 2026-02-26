@@ -599,39 +599,55 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             if cursor.fetchone() is None:
                 account_id = None
 
+    # ── Derive unit_amount (source of truth) and annual_amount ─────────
+    # Priority: explicit unit_amount/per_unit from selector > computed from amount ÷ unit_count.
+    # annual_amount is stored as a convenience (= unit_amount × unit_count) but unit_amount
+    # is authoritative. When unit count changes, consumers should recompute totals from unit_amount.
     unit_amount = None
     amount_per_sf = None
-    if unit_count:
+
+    # 1. Explicit $/unit from caller takes priority
+    if selector.get('unit_amount') is not None:
+        try:
+            unit_amount = Decimal(str(selector['unit_amount'])).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError):
+            pass
+    if selector.get('per_unit') is not None:
+        try:
+            unit_amount = Decimal(str(selector['per_unit'])).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError):
+            pass
+
+    # 2. If no explicit $/unit, derive from annual amount ÷ unit count
+    if unit_amount is None and unit_count:
         try:
             unit_amount = (dec_amount / Decimal(str(unit_count))).quantize(Decimal('0.01'))
         except (InvalidOperation, ZeroDivisionError):
             unit_amount = None
-    if total_sf:
+
+    # 3. If we have unit_amount and unit_count, recompute annual_amount to stay consistent
+    if unit_amount is not None and unit_count:
+        try:
+            dec_amount = (unit_amount * Decimal(str(unit_count))).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError):
+            pass  # keep original dec_amount
+
+    # 4. Per-SF: explicit or derived
+    if selector.get('amount_per_sf') is not None:
+        try:
+            amount_per_sf = Decimal(str(selector['amount_per_sf'])).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError):
+            pass
+    if selector.get('per_sf') is not None:
+        try:
+            amount_per_sf = Decimal(str(selector['per_sf'])).quantize(Decimal('0.01'))
+        except (InvalidOperation, ValueError):
+            pass
+    if amount_per_sf is None and total_sf:
         try:
             amount_per_sf = (dec_amount / Decimal(str(total_sf))).quantize(Decimal('0.01'))
         except (InvalidOperation, ZeroDivisionError):
             amount_per_sf = None
-
-    if selector.get('unit_amount') is not None:
-        try:
-            unit_amount = Decimal(str(selector.get('unit_amount'))).quantize(Decimal('0.01'))
-        except (InvalidOperation, ValueError):
-            unit_amount = unit_amount
-    if selector.get('per_unit') is not None:
-        try:
-            unit_amount = Decimal(str(selector.get('per_unit'))).quantize(Decimal('0.01'))
-        except (InvalidOperation, ValueError):
-            unit_amount = unit_amount
-    if selector.get('amount_per_sf') is not None:
-        try:
-            amount_per_sf = Decimal(str(selector.get('amount_per_sf'))).quantize(Decimal('0.01'))
-        except (InvalidOperation, ValueError):
-            amount_per_sf = amount_per_sf
-    if selector.get('per_sf') is not None:
-        try:
-            amount_per_sf = Decimal(str(selector.get('per_sf'))).quantize(Decimal('0.01'))
-        except (InvalidOperation, ValueError):
-            amount_per_sf = amount_per_sf
 
     with conn.cursor() as cursor:
         # Match by expense_category (exact label match) - this preserves distinct

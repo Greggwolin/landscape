@@ -202,6 +202,11 @@ urlpatterns = [
         InterestReserveCalculationView.as_view(),
         name='loan-interest-reserve-calculate',
     ),
+    path(
+        'projects/<int:project_id>/loans/<int:loan_id>/calculate/',
+        LoanViewSet.as_view({'post': 'calculate'}),
+        name='loan-calculate',
+    ),
 
     # Budget Variance endpoints
     path('budget/variance/<int:project_id>/', get_project_variance_summary, name='budget-variance-summary'),

@@ -23,6 +23,7 @@ UNIVERSAL_TOOLS = [
     # to explicitly mention "document". Write/extraction tools remain gated.
     "get_project_documents",
     "get_document_content",
+    "get_document_page",
     # Draft tools — available in all contexts (global + project-scoped)
     # so users can start a conversational deal analysis from anywhere.
     "create_analysis_draft",
@@ -35,6 +36,7 @@ UNIVERSAL_TOOLS = [
 EXTRACTION_TOOLS = [
     "get_project_documents",
     "get_document_content",
+    "get_document_page",
     "get_document_assertions",
     "ingest_document",
     "get_extraction_results",

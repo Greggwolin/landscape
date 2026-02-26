@@ -61,7 +61,7 @@
   padding: 1.5rem;
   border-radius: 0.5rem;
   border: 2px solid var(--cui-border-color);
-  background-color: var(--cui-card-bg);
+  background-color: var(--surface-bg);
   color: var(--cui-body-color);
   transition: all 0.2s ease;
   cursor: pointer;
@@ -69,7 +69,7 @@
 
 .planning-tile:hover {
   border-color: var(--cui-primary);
-  background-color: var(--cui-card-cap-bg);
+  background-color: rgba(var(--cui-primary-rgb), 0.04);
 }
 
 .planning-tile-active {

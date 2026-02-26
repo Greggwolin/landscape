@@ -10,7 +10,9 @@ import {
   OperatingStatement,
   SummaryBar,
   OperationsHeader,
-  LineItemRow
+  LineItemRow,
+  IncomeTreemap,
+  ExpenseTreemap,
 } from '@/components/operations';
 import { getProjectCategory, isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/operations-tab.css';
@@ -384,7 +386,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
   const grossPotentialRent = totals?.gross_potential_rent || 0;
 
   return (
-    <CCard>
+    <div className="d-flex gap-3 align-items-start">
+    <CCard style={{ flexShrink: 0 }}>
       {/* Header */}
       <OperationsHeader
         projectName={project.project_name}
@@ -516,6 +519,19 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         </div>
       </CCardBody>
     </CCard>
+
+      {/* Right: Treemap Charts — fills remaining space */}
+      <div style={{ flex: '1 1 0', minWidth: '280px' }} className="d-flex flex-column gap-3">
+        <IncomeTreemap
+          rentalRows={rentalRows}
+          grossPotentialRent={grossPotentialRent}
+        />
+        <ExpenseTreemap
+          opexRows={opexRows}
+          totalOperatingExpenses={totals?.total_operating_expenses || 0}
+        />
+      </div>
+    </div>
   );
 }
 

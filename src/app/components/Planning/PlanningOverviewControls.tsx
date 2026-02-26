@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { mutate } from 'swr';
 import { CFormSwitch } from '@coreui/react';
+import { ExportButton } from '@/components/admin';
 
 interface GranularitySettings {
   level1Enabled: boolean;
@@ -23,9 +24,10 @@ const LABEL_OPTIONS = {
 
 interface Props {
   projectId?: number | null;
+  projectIdStr?: string;
 }
 
-export default function PlanningOverviewControls({ projectId }: Props) {
+export default function PlanningOverviewControls({ projectId, projectIdStr }: Props) {
   const [settings, setSettings] = useState<GranularitySettings>({
     level1Enabled: true,
     level1Label: 'Area',
@@ -195,9 +197,10 @@ export default function PlanningOverviewControls({ projectId }: Props) {
 
   if (loading) {
     return (
-      <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-        <div className="px-3 py-2 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+      <div className="rounded border" style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)' }}>
+        <div className="px-3 py-2 border-b d-flex justify-content-between align-items-center" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+          <h2 className="text-sm font-semibold mb-0" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+          {projectIdStr && <ExportButton tabName="Planning" projectId={projectIdStr} size="sm" />}
         </div>
         <div className="p-6 text-center" style={{ color: 'var(--cui-body-color)' }}>
           Loading...
@@ -209,17 +212,18 @@ export default function PlanningOverviewControls({ projectId }: Props) {
   const tileStyle: React.CSSProperties = {
     border: '1px solid var(--cui-border-color)',
     borderRadius: '16px',
-    backgroundColor: 'var(--surface-card)',
+    backgroundColor: 'var(--surface-bg)',
     boxShadow: '0 1px 3px rgba(15,23,42,0.08)'
   }
 
   return (
-    <div className="rounded border" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
-      <div className="px-3 py-2 border-b" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
-        <h2 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+    <div className="rounded border" style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)' }}>
+      <div className="px-3 py-2 border-b d-flex justify-content-between align-items-center" style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+        <h2 className="text-base font-semibold mb-0" style={{ color: 'var(--cui-body-color)' }}>Planning Overview</h2>
+        {projectIdStr && <ExportButton tabName="Planning" projectId={projectIdStr} size="sm" />}
       </div>
 
-      <div className="p-6 space-y-5">
+      <div className="p-3 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -283,7 +287,7 @@ export default function PlanningOverviewControls({ projectId }: Props) {
                       className="h-10 flex-1 max-w-[220px] rounded border px-2 text-sm"
                       style={{
                         borderColor: 'var(--cui-border-color)',
-                        backgroundColor: enabled ? 'var(--cui-body-bg)' : 'rgb(243,244,246)',
+                        backgroundColor: enabled ? 'var(--surface-bg)' : 'rgb(243,244,246)',
                         color: 'var(--cui-body-color)',
                         cursor: enabled ? 'pointer' : 'not-allowed'
                       }}
@@ -355,7 +359,7 @@ export default function PlanningOverviewControls({ projectId }: Props) {
                     className="h-full w-full rounded border px-2 text-sm text-center font-semibold"
                     style={{
                       borderColor: 'var(--cui-border-color)',
-                      backgroundColor: 'var(--cui-body-bg)',
+                      backgroundColor: 'var(--surface-bg)',
                       color: 'var(--cui-body-color)'
                     }}
                   />

@@ -370,9 +370,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     };
 
     const getAnnualTotal = (row: typeof opexResult[number]): number => {
-      const annualAmount = parseNumber(row.annual_amount);
-      if (annualAmount && annualAmount !== 0) return annualAmount;
-
+      // Priority: unit_amount is the source of truth.
+      // annual_amount is a legacy fallback for data written before this convention.
       const unitAmount = parseNumber(row.unit_amount);
       if (unitAmount && unitCount > 0) {
         return unitAmount * unitCount;
@@ -382,6 +381,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       if (perSfAmount && totalSF > 0) {
         return perSfAmount * totalSF;
       }
+
+      // Legacy fallback: direct annual_amount (e.g., lump-sum or pre-migration data)
+      const annualAmount = parseNumber(row.annual_amount);
+      if (annualAmount && annualAmount !== 0) return annualAmount;
 
       return 0;
     };
@@ -565,6 +568,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           escalation_rate,
           statement_discriminator,
           updated_at,
+          category_id,
           COALESCE(parent_category, 'unclassified') as parent_category
         FROM tbl_operating_expenses
         WHERE project_id = ${projectIdNum}
@@ -607,9 +611,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       };
 
       const getAnnualTotal = (row: typeof legacyRows[number]): number => {
-        const annualAmount = parseNumber(row.annual_amount);
-        if (annualAmount && annualAmount !== 0) return annualAmount;
-
+        // Priority: unit_amount is the source of truth (same as outer getAnnualTotal).
         const unitAmount = parseNumber(row.unit_amount);
         if (unitAmount && unitCount > 0) {
           return unitAmount * unitCount;
@@ -619,6 +621,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         if (perSfAmount && totalSF > 0) {
           return perSfAmount * totalSF;
         }
+
+        // Legacy fallback
+        const annualAmount = parseNumber(row.annual_amount);
+        if (annualAmount && annualAmount !== 0) return annualAmount;
 
         return 0;
       };
@@ -641,7 +647,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           : deriveParentCategory(row.expense_type, row.expense_category);
         const parentCategory = derivedParent || 'unclassified';
         const label = formatExpenseLabel(row.expense_category || row.expense_type || '');
-        const key = `${normalizeKey(row.expense_category)}|${normalizeKey(row.expense_type)}|${parentCategory}`;
+        // Use category_id as primary key when available — prevents distinct line items
+        // with the same expense_category text from being collapsed (e.g., multiple
+        // "Administrative" or "Repairs & Maintenance" entries from OM extraction).
+        const key = row.category_id
+          ? `cat_${row.category_id}|${parentCategory}`
+          : `${normalizeKey(row.expense_category)}|${normalizeKey(row.expense_type)}|${parentCategory}`;
         const scenario = row.statement_discriminator || 'default';
         const updatedAt = row.updated_at ? new Date(row.updated_at).getTime() : 0;
 
@@ -780,6 +791,61 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Always use legacy opex rows when they exist - they have parent_category grouping
     // for the drag-and-drop categorization UI
     const legacyRows = await mapLegacyOpexRows();
+
+    // 7b. Merge user input overrides from tbl_operations_user_inputs
+    // This table stores manual edits made via the Operations page UI.
+    // User inputs take priority over extracted/AI-written values.
+    const userInputsResult = await sql`
+      SELECT line_item_key, as_is_rate, as_is_value, as_is_count,
+             post_reno_rate, post_reno_value, post_reno_per_sf
+      FROM tbl_operations_user_inputs
+      WHERE project_id = ${projectIdNum}
+        AND section = 'operating_expenses'
+    `;
+
+    if (userInputsResult.length > 0) {
+      const userInputMap = new Map<string, typeof userInputsResult[number]>();
+      userInputsResult.forEach(row => {
+        userInputMap.set(row.line_item_key, row);
+      });
+
+      // Walk through legacyRows (parent categories) and their children
+      legacyRows.forEach(parentRow => {
+        if (parentRow.children && Array.isArray(parentRow.children)) {
+          parentRow.children.forEach((child: any) => {
+            const override = userInputMap.get(child.line_item_key);
+            if (!override) return;
+
+            // as_is_rate maps to unit_amount (annual $/unit, same as tbl_operating_expenses.unit_amount)
+            // Annual total = rate × unitCount  (no ×12; the rate is already annual)
+            const overrideRate = parseNumber(override.as_is_rate);
+            if (overrideRate !== null) {
+              child.as_is.rate = overrideRate;
+              child.as_is.total = overrideRate * unitCount;
+            }
+
+            // post_reno_rate override (also annual $/unit)
+            const postRenoRate = parseNumber(override.post_reno_rate);
+            if (postRenoRate !== null) {
+              child.post_reno.rate = postRenoRate;
+              child.post_reno.total = postRenoRate * unitCount;
+            }
+          });
+
+          // Recalculate parent totals after child overrides
+          const parentAsIsTotal = parentRow.children.reduce(
+            (sum: number, child: any) => sum + (child.as_is?.total || 0), 0
+          );
+          const parentPostRenoTotal = parentRow.children.reduce(
+            (sum: number, child: any) => sum + (child.post_reno?.total || 0), 0
+          );
+          parentRow.as_is.total = parentAsIsTotal;
+          parentRow.as_is.rate = unitCount > 0 ? parentAsIsTotal / unitCount / 12 : null;
+          parentRow.post_reno.total = parentPostRenoTotal;
+          parentRow.post_reno.rate = unitCount > 0 ? parentPostRenoTotal / unitCount / 12 : null;
+        }
+      });
+    }
 
     // Calculate EGI first (needed for Management Fee calculation)
     const grossPotentialRent = rentalIncome.section_total.as_is;

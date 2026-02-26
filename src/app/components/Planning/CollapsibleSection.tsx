@@ -61,7 +61,7 @@ export default function CollapsibleSection({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
 
-          <h3 className="text-base font-semibold" style={{ color: 'var(--cui-body-color)' }}>{title}</h3>
+          <h3 className="text-sm font-semibold mb-0" style={{ color: 'var(--cui-body-color)' }}>{title}</h3>
         </button>
 
         {headerActions && (

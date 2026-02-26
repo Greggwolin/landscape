@@ -2,10 +2,13 @@
 ViewSets for debt/loan APIs.
 """
 
+import logging
+
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,6 +16,8 @@ from rest_framework.views import APIView
 from apps.calculations.loan_sizing_service import LoanSizingService
 from apps.projects.models import Project
 from .models_debt import Loan, LoanContainer, LoanFinanceStructure, DebtDrawSchedule
+
+logger = logging.getLogger(__name__)
 from .serializers_debt import (
     LoanListSerializer,
     LoanDetailSerializer,
@@ -87,6 +92,36 @@ class LoanViewSet(viewsets.ModelViewSet):
                 'updated_at',
             ]
         )
+
+    @action(detail=True, methods=['post'], url_path='calculate')
+    def calculate(self, request, project_id=None, loan_id=None):
+        """
+        Run construction loan calculation with iterative reserve solver.
+
+        POST /api/projects/{project_id}/loans/{loan_id}/calculate/
+
+        Optional body:
+            {"container_ids": [1, 2, 3]}  — scope to specific villages/phases
+        """
+        try:
+            from apps.calculations.construction_loan_service import ConstructionLoanService
+            container_ids = request.data.get('container_ids')
+            service = ConstructionLoanService(
+                project_id=int(project_id),
+                loan_id=int(loan_id),
+            )
+            result = service.calculate_and_store(container_ids=container_ids)
+
+            if not result.get('success'):
+                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(f"Error calculating construction loan {loan_id} for project {project_id}")
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class DebtDrawScheduleViewSet(viewsets.ModelViewSet):

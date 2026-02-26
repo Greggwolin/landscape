@@ -1,6 +1,7 @@
 const withVar = (v) => `var(${v})`;
 
 module.exports = {
+  // prefix: 'tw-',  // TODO: Re-enable after batch class migration (see scripts/migrate-tailwind-prefix.mjs)
   content: [
     './src/app/**/*.{ts,tsx}',
     './src/components/**/*.{ts,tsx}',
@@ -88,7 +89,7 @@ module.exports = {
   },
   darkMode: ['class', '[data-theme="dark"]'],
   plugins: [
-    require('@tailwindcss/forms'),
+    // require('@tailwindcss/forms'),  // DISABLED: overrides CoreUI form-control/select/button defaults
     require('@tailwindcss/typography'),
     require('tailwindcss-animate'),
   ],

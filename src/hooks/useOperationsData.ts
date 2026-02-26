@@ -149,6 +149,9 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
     setData(prev => {
       if (!prev) return prev;
 
+      const unitCount = prev.property_summary?.unit_count || 0;
+      const totalSF = prev.property_summary?.total_sf || 0;
+
       const updateSection = (sectionData: SectionData): SectionData => {
         const updateRow = (row: LineItemRow): LineItemRow => {
           if (row.line_item_key !== lineItemKey) {
@@ -172,8 +175,16 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
               [asIsField]: value
             };
             // Recalculate total if rate changed
-            if (asIsField === 'rate' && updatedRow.as_is.count) {
-              updatedRow.as_is.total = (value || 0) * updatedRow.as_is.count * 12;
+            if (asIsField === 'rate') {
+              // For rental rows, count is per-unit-type; for opex, use project unit_count
+              const count = updatedRow.as_is.count || unitCount;
+              if (count > 0) {
+                // For percentage rows (vacancy etc.), total = rate × base (handled elsewhere)
+                // For opex/income rows, rate is annual $/unit, total = rate × count
+                if (!updatedRow.is_percentage) {
+                  updatedRow.as_is.total = (value || 0) * count;
+                }
+              }
             }
           } else if (field.startsWith('post_reno_')) {
             const postRenoField = field.replace('post_reno_', '');
@@ -183,20 +194,52 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
               total: updatedRow.post_reno?.total || 0
             };
             // Recalculate total if rate changed
-            if (postRenoField === 'rate' && updatedRow.as_is.count) {
-              updatedRow.post_reno = {
-                ...updatedRow.post_reno,
-                total: (value || 0) * updatedRow.as_is.count * 12
-              };
+            if (postRenoField === 'rate') {
+              const count = updatedRow.as_is?.count || unitCount;
+              if (count > 0 && !updatedRow.is_percentage) {
+                updatedRow.post_reno = {
+                  ...updatedRow.post_reno,
+                  total: (value || 0) * count
+                };
+              }
             }
           }
 
           return updatedRow;
         };
 
+        // Update individual rows first
+        const updatedRows = sectionData.rows.map(updateRow);
+
+        // Recalculate parent totals from children for hierarchical sections
+        const recalcedRows = updatedRows.map(row => {
+          if (row.children && row.children.length > 0) {
+            const asIsTotal = row.children.reduce(
+              (sum: number, child: LineItemRow) => sum + (child.as_is?.total || 0), 0
+            );
+            const postRenoTotal = row.children.reduce(
+              (sum: number, child: LineItemRow) => sum + (child.post_reno?.total || 0), 0
+            );
+            return {
+              ...row,
+              as_is: {
+                ...row.as_is,
+                rate: unitCount > 0 ? asIsTotal / unitCount / 12 : null,
+                total: asIsTotal
+              },
+              post_reno: {
+                ...row.post_reno,
+                rate: unitCount > 0 ? postRenoTotal / unitCount / 12 : null,
+                total: postRenoTotal
+              }
+            };
+          }
+          return row;
+        });
+
         return {
           ...sectionData,
-          rows: sectionData.rows.map(updateRow)
+          rows: recalcedRows
         };
       };
 

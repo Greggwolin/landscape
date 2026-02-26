@@ -5,6 +5,7 @@ import { useProjectConfig } from '@/hooks/useProjectConfig'
 import { fetchJson } from '@/lib/fetchJson'
 import PlanningOverviewControls from './PlanningOverviewControls'
 import CollapsibleSection from './CollapsibleSection'
+import { ExportButton } from '@/components/admin'
 
 interface Parcel {
   parcel_id: number;
@@ -39,8 +40,8 @@ interface Phase {
   label?: string;
 }
 
-type Props = { projectId?: number | null }
-const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
+type Props = { projectId?: number | null; projectIdStr?: string }
+const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) => {
   const [parcels, setParcels] = useState<Parcel[]>([])
   const [phases, setPhases] = useState<Phase[]>([])
   const [loading, setLoading] = useState(true)
@@ -549,9 +550,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
   }
 
   return (
-    <div className="space-y-4 min-h-screen" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+    <div className="space-y-4">
       {/* Planning Overview with Granularity Controls */}
-      <PlanningOverviewControls projectId={projectId} />
+      <PlanningOverviewControls projectId={projectId} projectIdStr={projectIdStr} />
 
       {/* Plan Areas and Phases Overview - Read-only rollups from Parcel Detail */}
       <div className={`grid gap-4 transition-all duration-300 ${
@@ -565,30 +566,44 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           itemCount={areaCards.length}
           defaultExpanded={areaCards.length > 0}
         >
-          <div className="p-4">
+          <div className="p-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {areaCards.map(({ key, areaNo, title, stats }) => (
-                <div
-                  key={key}
-                  className={`planning-tile text-center min-w-[140px] ${
-                    selectedAreaFilters.includes(areaNo) ? 'planning-tile-active' : ''
-                  }`}
-                  onClick={() => toggleAreaFilter(areaNo)}
-                >
+              {areaCards.map(({ key, areaNo, title, stats }, idx) => {
+                const tileColors = [
+                  'var(--cui-primary)',
+                  'var(--cui-success)',
+                  'var(--cui-info)',
+                  'var(--cui-warning)',
+                  'var(--cui-danger)',
+                  'var(--cui-primary)',
+                ];
+                const accentColor = tileColors[idx % tileColors.length];
+                const isActive = selectedAreaFilters.includes(areaNo);
+                return (
                   <div
-                    className="planning-tile-header whitespace-nowrap"
-                    title={title}
+                    key={key}
+                    className={`planning-tile text-center ${isActive ? 'planning-tile-active' : ''}`}
+                    style={{
+                      padding: '0.875rem 1rem',
+                      borderLeft: `3px solid ${accentColor}`,
+                    }}
+                    onClick={() => toggleAreaFilter(areaNo)}
                   >
-                    {title}
+                    <div
+                      className="planning-tile-header whitespace-nowrap"
+                      title={title}
+                    >
+                      {title}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="planning-tile-stat">{stats.grossAcres} acres</div>
+                      <div className="planning-tile-stat">{stats.phases} {level2LabelPlural}</div>
+                      <div className="planning-tile-stat">{stats.parcels} {level3LabelPlural}</div>
+                      <div className="planning-tile-stat">{stats.units} units</div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <div className="planning-tile-stat">{stats.grossAcres} acres</div>
-                    <div className="planning-tile-stat">{stats.phases} {level2LabelPlural}</div>
-                    <div className="planning-tile-stat">{stats.parcels} {level3LabelPlural}</div>
-                    <div className="planning-tile-stat">{stats.units} units</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </CollapsibleSection>
@@ -599,10 +614,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           itemCount={filteredPhases.length}
           defaultExpanded={true}
         >
-          <div className="p-4">
+          <div className="p-3">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+                <thead style={{ backgroundColor: 'var(--surface-subheader)' }}>
                   <tr className="border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
                     <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '12%' }}>{level2Label}</th>
                     <th className="text-left py-2 px-2 font-medium" style={{ color: 'var(--cui-body-color)', width: '35%' }}>Land Uses</th>
@@ -661,22 +676,22 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
           </>
         }
       >
-        <div className="p-4">
+        <div className="p-3">
           <div>
           <table className="w-full text-sm">
-            <thead style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-              <tr>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Area</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Parcel</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Product</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Units</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>DUA</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>FF/Acre</th>
-                <th className="text-center px-2 py-2 font-medium text-[15px]" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--surface-subheader)', borderBottom: '1px solid var(--cui-border-color)' }}>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Area</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Parcel</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Product</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Acres</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Units</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>DUA</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>FF/Acre</th>
+                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -708,7 +723,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null }) => {
         >
           <div
             className="rounded-lg p-6 max-w-md w-full mx-4"
-            style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)', border: '1px solid' }}
+            style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', border: '1px solid' }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--cui-body-color)' }}>
@@ -1099,7 +1114,7 @@ const EditableParcelRow: React.FC<{
   return (
     <tr className={`border-b transition-colors ${!editing ? 'cursor-pointer' : ''}`} style={{
       borderColor: 'var(--cui-border-color)',
-      backgroundColor: editing ? 'rgba(13, 110, 253, 0.08)' : (index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)')
+      backgroundColor: editing ? 'rgba(13, 110, 253, 0.08)' : 'var(--surface-bg)'
     }}
     onClick={() => {
       if (!editing) {
@@ -1113,7 +1128,7 @@ const EditableParcelRow: React.FC<{
     }}
     onMouseLeave={(e) => {
       if (!editing) {
-        e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'rgba(0, 0, 0, 0.02)';
+        e.currentTarget.style.backgroundColor = 'var(--surface-bg)';
       }
     }}>
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{parcel.area_no}</td>
@@ -1124,7 +1139,7 @@ const EditableParcelRow: React.FC<{
           <select
             className="w-32 rounded px-2 py-1 text-xs"
             style={{
-              backgroundColor: 'var(--cui-body-bg)',
+              backgroundColor: 'var(--surface-bg)',
               borderColor: 'var(--cui-border-color)',
               color: 'var(--cui-body-color)',
               border: '1px solid'
@@ -1155,7 +1170,7 @@ const EditableParcelRow: React.FC<{
           <select
             className="w-40 rounded px-2 py-1 text-xs"
             style={{
-              backgroundColor: 'var(--cui-body-bg)',
+              backgroundColor: 'var(--surface-bg)',
               borderColor: 'var(--cui-border-color)',
               color: 'var(--cui-body-color)',
               border: '1px solid'
@@ -1195,7 +1210,7 @@ const EditableParcelRow: React.FC<{
             <select
               className="w-32 rounded px-2 py-1 text-xs"
               style={{
-                backgroundColor: 'var(--cui-body-bg)',
+                backgroundColor: 'var(--surface-bg)',
                 borderColor: 'var(--cui-border-color)',
                 color: 'var(--cui-body-color)',
                 border: '1px solid'
@@ -1230,7 +1245,7 @@ const EditableParcelRow: React.FC<{
         {editing ? (
           <input className="w-20 rounded px-2 py-1 text-center" inputMode="decimal"
             style={{
-              backgroundColor: 'var(--cui-body-bg)',
+              backgroundColor: 'var(--surface-bg)',
               borderColor: 'var(--cui-border-color)',
               color: 'var(--cui-body-color)',
               border: '1px solid'
@@ -1250,7 +1265,7 @@ const EditableParcelRow: React.FC<{
             return currentFamilyName === 'Residential' ? (
               <input className="w-20 rounded px-2 py-1 text-center" inputMode="decimal"
                 style={{
-                  backgroundColor: 'var(--cui-body-bg)',
+                  backgroundColor: 'var(--surface-bg)',
                   borderColor: 'var(--cui-border-color)',
                   color: 'var(--cui-body-color)',
                   border: '1px solid'
@@ -1349,10 +1364,10 @@ const EditableParcelRow: React.FC<{
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenDetail && onOpenDetail();
+                setEditing(true);
               }}
             >
-              Detail
+              Edit
             </button>
             <button
               className="px-1.5 py-0.5 text-xs text-white rounded transition-colors"
@@ -1430,7 +1445,7 @@ const PhaseRow: React.FC<{
       <tr className={`border-b transition-colors cursor-pointer`}
         style={{
           borderColor: 'var(--cui-border-color)',
-          backgroundColor: isSelected ? 'var(--cui-primary)' : (index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)'),
+          backgroundColor: isSelected ? 'var(--cui-primary)' : 'var(--surface-bg)',
           opacity: isSelected ? 0.9 : 1
         }}
         onClick={() => onToggleFilter(phase.phase_name)}
@@ -1445,7 +1460,7 @@ const PhaseRow: React.FC<{
           if (isSelected) {
             e.currentTarget.style.opacity = '0.9';
           } else {
-            e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)';
+            e.currentTarget.style.backgroundColor = 'var(--surface-bg)';
           }
         }}>
         {/* Phase column */}
@@ -1502,16 +1517,20 @@ const PhaseRow: React.FC<{
               Notes
             </button>
 
-            {/* Reports chip */}
+            {/* Filter chip */}
             <button
-              className="px-2.5 py-1 rounded-full text-xs font-medium cursor-help transition-all border-0 hover:opacity-80"
+              className="px-2.5 py-1 rounded-full text-xs font-medium transition-all border-0 hover:opacity-80"
               style={{
-                backgroundColor: 'var(--cui-tertiary-bg)',
-                color: 'var(--cui-secondary-color)'
+                backgroundColor: 'var(--surface-bg)',
+                color: 'var(--cui-secondary-color)',
+                cursor: 'pointer'
               }}
-              title="Coming soon"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFilter(phase.phase_name);
+              }}
             >
-              Reports
+              Filter
             </button>
           </div>
         </td>
@@ -1519,7 +1538,7 @@ const PhaseRow: React.FC<{
 
       {/* Expanded description row */}
       {expanded && (
-        <tr style={{ backgroundColor: index % 2 === 0 ? 'var(--cui-body-bg)' : 'var(--cui-tertiary-bg)' }}>
+        <tr style={{ backgroundColor: 'var(--surface-bg)' }}>
           <td colSpan={5} className="px-4 py-3">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -1530,7 +1549,7 @@ const PhaseRow: React.FC<{
               <textarea
                 className="w-full rounded px-3 py-2 text-sm"
                 style={{
-                  backgroundColor: 'var(--cui-body-bg)',
+                  backgroundColor: 'var(--surface-bg)',
                   borderColor: 'var(--cui-border-color)',
                   color: 'var(--cui-body-color)',
                   border: '1px solid'

@@ -36,7 +36,7 @@ from apps.calculations.engines.lotbank_engine import (
     LotbankParams,
     LotbankProduct,
 )
-from apps.financial.models_debt import Loan
+from apps.financial.models_debt import Loan, LoanContainer
 
 class LandDevCashFlowService:
     """
@@ -1541,7 +1541,8 @@ class LandDevCashFlowService:
                 continue
             for parcel in period_sale.get('parcels', []):
                 phase_id = parcel.get('containerId')
-                division_id = phase_to_division.get(phase_id)
+                # Fall back to phase_id when division mapping is unavailable
+                division_id = phase_to_division.get(phase_id, phase_id)
                 if division_id is None:
                     continue
                 units = int(parcel.get('units') or 0)

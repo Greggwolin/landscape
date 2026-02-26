@@ -753,7 +753,9 @@ def upsert_operating_expense(
     is_recoverable: bool = False,
     notes: str = None,
     unit_amount: Optional[float] = None,
-    amount_per_sf: Optional[float] = None
+    amount_per_sf: Optional[float] = None,
+    unit_count: Optional[int] = None,
+    total_sf: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Upsert an operating expense record for a project.
@@ -761,6 +763,9 @@ def upsert_operating_expense(
     Maps the expense_label to the appropriate account_id using OPEX_ACCOUNT_MAPPING.
     If a record already exists for this project/account combo, it updates it.
     Otherwise creates a new record.
+
+    unit_amount is the source of truth. If only annual_amount is provided,
+    unit_amount is derived as annual_amount / unit_count.
 
     Args:
         project_id: Project to add expense to
@@ -770,6 +775,8 @@ def upsert_operating_expense(
         escalation_rate: Annual escalation rate (default 3%)
         is_recoverable: Whether expense is tenant-recoverable
         notes: Optional notes about the expense
+        unit_count: Project unit count (for $/unit derivation)
+        total_sf: Project total SF (for $/SF derivation)
 
     Returns:
         Dict with success status and created/updated record info
@@ -788,6 +795,10 @@ def upsert_operating_expense(
             selector['unit_amount'] = unit_amount
         if amount_per_sf is not None:
             selector['amount_per_sf'] = amount_per_sf
+        if unit_count is not None:
+            selector['unit_count'] = unit_count
+        if total_sf is not None:
+            selector['total_sf'] = total_sf
 
         result = upsert_opex_entry(connection, project_id, expense_label, annual_amount, selector)
         if result.get('success'):
@@ -1237,7 +1248,9 @@ def _log_rental_comp_activity(
 def bulk_upsert_operating_expenses(
     project_id: int,
     expenses: List[Dict[str, Any]],
-    source_document: str = None
+    source_document: str = None,
+    unit_count: int = None,
+    total_sf: float = None
 ) -> Dict[str, Any]:
     """
     Bulk upsert multiple operating expenses for a project.
@@ -1251,6 +1264,8 @@ def bulk_upsert_operating_expenses(
             - escalation_rate: Optional (default 3%)
             - is_recoverable: Optional (default False)
         source_document: Optional document name for activity logging
+        unit_count: Project unit count (for deriving $/unit from annual amounts)
+        total_sf: Project total SF (for deriving $/SF)
 
     Returns:
         Dict with success status, created/updated counts, and details
@@ -1302,7 +1317,9 @@ def bulk_upsert_operating_expenses(
                 is_recoverable=expense.get('is_recoverable', False),
                 notes=expense.get('notes'),
                 unit_amount=unit_amount,
-                amount_per_sf=amount_per_sf
+                amount_per_sf=amount_per_sf,
+                unit_count=unit_count,
+                total_sf=total_sf
             )
         except Exception as e:
             result = {
@@ -1340,13 +1357,39 @@ def bulk_upsert_operating_expenses(
             expenses=[r for r in results if r.get('success')]
         )
 
+    # ── Post-write verification ──────────────────────────────────────────
+    # Query the actual DB state so Claude can confirm what really landed.
+    verification = {}
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT expense_category, annual_amount
+                FROM landscape.tbl_operating_expenses
+                WHERE project_id = %s
+                  AND (annual_amount IS NOT NULL AND annual_amount != 0)
+                ORDER BY annual_amount DESC
+            """, [project_id])
+            rows = cursor.fetchall()
+            db_total = sum(r[1] for r in rows)
+            verification = {
+                'db_line_items': len(rows),
+                'db_total': float(db_total),
+                'db_expenses': [
+                    {'label': r[0], 'amount': float(r[1])} for r in rows
+                ]
+            }
+    except Exception as e:
+        logger.warning(f"[bulk_upsert_operating_expenses] verification query failed: {e}")
+        verification = {'error': str(e)}
+
     summary = {
         'success': error_count == 0 and (created_count + updated_count) > 0,
         'created': created_count,
         'updated': updated_count,
         'errors': error_count,
         'results': results,
-        'summary': f"Created {created_count}, updated {updated_count}, errors {error_count}"
+        'summary': f"Created {created_count}, updated {updated_count}, errors {error_count}",
+        'verification': verification,
     }
     logger.info(
         "[bulk_upsert_operating_expenses] done project_id=%s created=%s updated=%s errors=%s success=%s",
@@ -1603,10 +1646,33 @@ def handle_update_operating_expenses(
             source_documents=[source_doc] if source_doc else None,
         )
     else:
+        # Fetch unit_count and total_sf so upsert_opex_entry can derive unit_amount
+        _unit_count = None
+        _total_sf = None
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COALESCE(p.total_units, (
+                        SELECT COUNT(*) FROM landscape.tbl_multifamily_unit u
+                        WHERE u.project_id = p.project_id
+                    )) as unit_count,
+                    COALESCE(p.gross_sf, 0) as total_sf
+                    FROM landscape.tbl_project p
+                    WHERE p.project_id = %s
+                """, [project_id])
+                row = cursor.fetchone()
+                if row:
+                    _unit_count = int(row[0]) if row[0] else None
+                    _total_sf = float(row[1]) if row[1] else None
+        except Exception as e:
+            logger.warning(f"[update_operating_expenses] Could not fetch unit_count: {e}")
+
         result = bulk_upsert_operating_expenses(
             project_id=project_id,
             expenses=expenses,
-            source_document=source_doc
+            source_document=source_doc,
+            unit_count=_unit_count,
+            total_sf=_total_sf
         )
         logger.info(
             "[update_operating_expenses] completed project_id=%s created=%s updated=%s errors=%s success=%s",
@@ -11393,6 +11459,141 @@ def get_document_content(
         }
 
 
+@register_tool('get_document_page')
+def handle_get_document_page(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get content from a specific page of a document."""
+    doc_id = tool_input.get('doc_id')
+    page_number = tool_input.get('page_number')
+    page_range_end = tool_input.get('page_range_end', page_number)
+
+    if not doc_id or not page_number:
+        return {'success': False, 'error': 'doc_id and page_number are required'}
+
+    try:
+        with connection.cursor() as cursor:
+            # Verify doc belongs to project
+            cursor.execute("""
+                SELECT doc_id, doc_name FROM landscape.core_doc
+                WHERE doc_id = %s AND project_id = %s
+            """, [doc_id, project_id])
+            doc = cursor.fetchone()
+            if not doc:
+                return {'success': False, 'error': f'Document {doc_id} not found in project'}
+
+            doc_name = doc[1]
+
+            # Try user_document_chunks first (has page_number)
+            cursor.execute("""
+                SELECT chunk_index, content, page_number, section_path
+                FROM landscape.tbl_user_document_chunks
+                WHERE document_id = %s
+                  AND page_number >= %s AND page_number <= %s
+                ORDER BY chunk_index
+            """, [doc_id, page_number, page_range_end])
+            rows = cursor.fetchall()
+
+            if not rows:
+                # Fallback: try knowledge_embeddings with source_id
+                cursor.execute("""
+                    SELECT content_text
+                    FROM landscape.knowledge_embeddings
+                    WHERE source_type = 'document_chunk'
+                      AND source_id = %s
+                      AND (superseded_by_version IS NULL OR superseded_by_version = 0)
+                    ORDER BY embedding_id
+                """, [doc_id])
+                all_chunks = cursor.fetchall()
+
+                if not all_chunks:
+                    return {
+                        'success': False,
+                        'error': f'No page-level content available for document {doc_id}. '
+                                 f'Try get_document_content instead.'
+                    }
+
+                # Estimate page from chunk position (rough: ~2 chunks per page)
+                chunks_per_page = max(1, len(all_chunks) // 20)  # assume ~20 pages
+                start_idx = (page_number - 1) * chunks_per_page
+                end_idx = page_range_end * chunks_per_page
+                page_chunks = all_chunks[start_idx:end_idx]
+
+                if not page_chunks:
+                    return {
+                        'success': True,
+                        'doc_id': doc_id,
+                        'doc_name': doc_name,
+                        'page_number': page_number,
+                        'content': None,
+                        'message': f'Page {page_number} not found. Document has ~{len(all_chunks)} chunks across ~{len(all_chunks) // chunks_per_page} pages.',
+                        'total_chunks': len(all_chunks),
+                        'source': 'embeddings_estimated'
+                    }
+
+                content = "\n\n".join(row[0] for row in page_chunks if row[0])
+                return {
+                    'success': True,
+                    'doc_id': doc_id,
+                    'doc_name': doc_name,
+                    'page_number': page_number,
+                    'content': content,
+                    'chunks_returned': len(page_chunks),
+                    'total_chunks': len(all_chunks),
+                    'source': 'embeddings_estimated',
+                    'message': f'Page position estimated from {len(all_chunks)} total chunks.'
+                }
+
+            # Build content from page-matched chunks
+            content_parts = []
+            pages_found = set()
+            for chunk_idx, content, pg, section in rows:
+                pages_found.add(pg)
+                header = f"--- Page {pg}"
+                if section:
+                    header += f" | {section}"
+                header += " ---"
+                content_parts.append(header)
+                content_parts.append(content)
+
+            content = "\n\n".join(content_parts)
+
+            # If we got nothing for the exact page, check what pages exist
+            if not content.strip():
+                cursor.execute("""
+                    SELECT DISTINCT page_number FROM landscape.tbl_user_document_chunks
+                    WHERE document_id = %s AND page_number IS NOT NULL
+                    ORDER BY page_number
+                """, [doc_id])
+                available = [r[0] for r in cursor.fetchall()]
+                return {
+                    'success': True,
+                    'doc_id': doc_id,
+                    'doc_name': doc_name,
+                    'page_number': page_number,
+                    'content': None,
+                    'message': f'Page {page_number} has no content. Available pages: {available}',
+                    'available_pages': available
+                }
+
+            return {
+                'success': True,
+                'doc_id': doc_id,
+                'doc_name': doc_name,
+                'page_number': page_number,
+                'pages_returned': sorted(pages_found),
+                'content': content,
+                'chunks_returned': len(rows),
+                'source': 'document_chunks'
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting document page: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 def _extract_focused_content(text: str, focus: str, max_length: int) -> Optional[str]:
     """
     Extract focused sections from document text based on the focus type.
@@ -12810,6 +13011,62 @@ def _format_calc_results(inputs: dict, results: dict) -> str:
     """Format calculation results as a readable summary for Claude."""
     lines = ["**Draft Calculation Results**", ""]
 
+    # Land development draft output
+    if 'gross_lot_revenue' in results or 'calc_level' in results:
+        calc_level = results.get('calc_level')
+        calc_label = results.get('calc_level_name')
+        if calc_level is not None:
+            if calc_label:
+                lines.append(f"Calc Level: {calc_level} ({calc_label})")
+            else:
+                lines.append(f"Calc Level: {calc_level}")
+
+        if 'gross_lot_revenue' in results:
+            lines.append(f"Gross Lot Revenue: ${results['gross_lot_revenue']:,.0f}")
+        if 'intract_deduction' in results:
+            lines.append(f"In-Tract Deduction: (${results['intract_deduction']:,.0f})")
+        if 'net_revenue_to_developer' in results:
+            lines.append(f"Net Revenue to Developer: ${results['net_revenue_to_developer']:,.0f}")
+        if 'revenue_per_lot' in results:
+            lines.append(f"Net Revenue per Lot: ${results['revenue_per_lot']:,.0f}")
+
+        if 'total_dev_cost' in results:
+            lines.append("")
+            lines.append(f"Total Development Cost: ${results['total_dev_cost']:,.0f}")
+        if 'cost_per_lot' in results:
+            lines.append(f"Cost per Lot: ${results['cost_per_lot']:,.0f}")
+        if 'gross_profit' in results:
+            lines.append(f"Gross Profit: ${results['gross_profit']:,.0f}")
+        if 'gross_margin' in results:
+            lines.append(f"Gross Margin: {results['gross_margin']:.2f}%")
+
+        if 'unleveraged_irr' in results:
+            lines.append("")
+            lines.append(f"Unleveraged IRR (annualized): {results['unleveraged_irr']:.2f}%")
+        if 'unleveraged_npv' in results:
+            lines.append(f"Unleveraged NPV: ${results['unleveraged_npv']:,.0f}")
+
+        if 'residual_land_value' in results:
+            lines.append("")
+            lines.append(f"Residual Land Value: ${results['residual_land_value']:,.0f}")
+        if 'rlv_per_acre' in results:
+            lines.append(f"RLV per Acre: ${results['rlv_per_acre']:,.0f}")
+        if 'rlv_per_lot' in results:
+            lines.append(f"RLV per Lot: ${results['rlv_per_lot']:,.0f}")
+
+        if 'leveraged_irr' in results:
+            lines.append("")
+            lines.append(f"Leveraged IRR (annualized): {results['leveraged_irr']:.2f}%")
+
+        missing = results.get('missing_for_next_level') or []
+        if missing:
+            lines.append("")
+            lines.append("Missing for Next Level:")
+            for item in missing:
+                lines.append(f"- {item}")
+
+        return "\n".join(lines)
+
     # Revenue
     if 'pgi' in results:
         lines.append(f"Potential Gross Income (PGI): ${results['pgi']:,.0f}")
@@ -12840,11 +13097,19 @@ def _format_calc_results(inputs: dict, results: dict) -> str:
     # Debt
     if 'loan_amount' in results:
         lines.append("")
-        lines.append(f"Loan Amount ({inputs.get('ltv', 'N/A')}% LTV): ${results['loan_amount']:,.0f}")
+        sized_by = results.get('loan_sized_by', 'LTV')
+        actual_ltv = results.get('actual_ltv')
+        if sized_by == 'DSCR constraint' and actual_ltv is not None:
+            lines.append(f"Loan Amount (sized by DSCR constraint, {actual_ltv:.1f}% actual LTV): ${results['loan_amount']:,.0f}")
+            lines.append(f"  Requested LTV: {inputs.get('ltv', 'N/A')}% → constrained to {actual_ltv:.1f}%")
+        else:
+            lines.append(f"Loan Amount ({inputs.get('ltv', 'N/A')}% LTV): ${results['loan_amount']:,.0f}")
     if 'annual_debt_service' in results:
         lines.append(f"Annual Debt Service: ${results['annual_debt_service']:,.0f}")
     if 'dscr' in results:
         lines.append(f"DSCR: {results['dscr']:.2f}x")
+        if 'loan_sized_by' in results:
+            lines.append(f"  Loan sized by: {results['loan_sized_by']}")
 
     # Equity
     if 'equity_required' in results:
@@ -12862,6 +13127,632 @@ def _format_calc_results(inputs: dict, results: dict) -> str:
     return "\n".join(lines)
 
 
+def _to_float(value: Any) -> Optional[float]:
+    """Best-effort numeric cast for conversational inputs."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().replace(',', '').replace('$', '')
+        if cleaned.endswith('%'):
+            cleaned = cleaned[:-1]
+        if not cleaned:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
+def _to_int(value: Any) -> Optional[int]:
+    num = _to_float(value)
+    if num is None:
+        return None
+    return int(round(num))
+
+
+def _to_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return False
+
+
+def _to_int_list(value: Any) -> List[int]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        values = value
+    elif isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+            values = parsed if isinstance(parsed, list) else raw.split(',')
+        except Exception:
+            values = raw.split(',')
+    else:
+        return []
+
+    out: List[int] = []
+    for item in values:
+        num = _to_int(item)
+        if num is not None and num > 0:
+            out.append(num)
+    return out
+
+
+def _normalize_draft_property_type(value: Optional[str]) -> str:
+    """Normalize conversational property type aliases to DB-accepted codes."""
+    normalized = (value or 'MF').upper().replace(' ', '_')
+    if normalized in {'LAND_DEVELOPMENT', 'LAND_DEV', 'LAND'}:
+        return 'LAND'
+    if normalized in {'MULTIFAMILY', 'MULTI_FAMILY', 'APARTMENT', 'MF'}:
+        return 'MF'
+    if normalized in {'OFFICE', 'OFF'}:
+        return 'OFF'
+    if normalized in {'RETAIL', 'RET'}:
+        return 'RET'
+    if normalized in {'INDUSTRIAL', 'IND'}:
+        return 'IND'
+    return normalized
+
+
+def _calc_multifamily_draft(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Existing multifamily draft calculation chain."""
+    results: Dict[str, Any] = {}
+
+    # ── Revenue ──────────────────────────────────────────────────────────
+    unit_count = inputs.get('unit_count')
+    avg_rent = inputs.get('avg_monthly_rent')
+    if unit_count and avg_rent:
+        pgi = float(unit_count) * float(avg_rent) * 12
+        results['pgi'] = pgi
+
+        vacancy_pct = float(inputs.get('vacancy_pct', 5)) / 100
+        vacancy_amount = pgi * vacancy_pct
+        results['vacancy_amount'] = vacancy_amount
+        results['egi'] = pgi - vacancy_amount
+
+    # ── Expenses ─────────────────────────────────────────────────────────
+    opex_per_unit = inputs.get('opex_per_unit')
+    opex_ratio = inputs.get('opex_ratio')
+    if opex_per_unit and unit_count:
+        total_expenses = float(opex_per_unit) * float(unit_count)
+        results['total_expenses'] = total_expenses
+        if 'egi' in results:
+            results['expense_ratio'] = (total_expenses / results['egi']) * 100
+    elif opex_ratio and 'egi' in results:
+        total_expenses = results['egi'] * (float(opex_ratio) / 100)
+        results['total_expenses'] = total_expenses
+        results['expense_ratio'] = float(opex_ratio)
+
+    # ── NOI ──────────────────────────────────────────────────────────────
+    if 'egi' in results and 'total_expenses' in results:
+        results['noi'] = results['egi'] - results['total_expenses']
+    elif 'egi' in results:
+        # No expense data yet — use EGI as proxy NOI
+        results['noi'] = results['egi']
+
+    # ── Cap Rate Valuation ───────────────────────────────────────────────
+    going_in_cap = inputs.get('going_in_cap')
+    if going_in_cap and 'noi' in results:
+        cap_decimal = float(going_in_cap) / 100
+        if cap_decimal > 0:
+            results['value_at_cap'] = results['noi'] / cap_decimal
+
+    # ── Debt (with DSCR constraint sizing) ─────────────────────────────
+    ltv = inputs.get('ltv')
+    debt_rate = inputs.get('debt_rate')
+    dscr_constraint = inputs.get('dscr_constraint')  # ratio, e.g. 1.20
+
+    if ltv and 'value_at_cap' in results:
+        value = results['value_at_cap']
+        loan_amount_ltv = value * (float(ltv) / 100)
+
+        if debt_rate:
+            amort_years = inputs.get('amortization_years', 30)
+            monthly_rate = (float(debt_rate) / 100) / 12
+            n_payments = int(amort_years) * 12
+
+            if monthly_rate > 0 and n_payments > 0:
+                # Payment factor: monthly payment per $1 of loan
+                pmt_factor = (
+                    monthly_rate * (1 + monthly_rate) ** n_payments
+                ) / ((1 + monthly_rate) ** n_payments - 1)
+
+                # LTV-based debt service
+                annual_ds_ltv = loan_amount_ltv * pmt_factor * 12
+                implied_dscr = results['noi'] / annual_ds_ltv if 'noi' in results and annual_ds_ltv > 0 else None
+
+                # DSCR constraint check
+                if (dscr_constraint and implied_dscr is not None
+                        and float(dscr_constraint) > 0
+                        and implied_dscr < float(dscr_constraint)):
+                    # DSCR is the binding constraint — back-solve for max loan
+                    max_annual_ds = results['noi'] / float(dscr_constraint)
+                    max_monthly_pmt = max_annual_ds / 12
+                    # loan = monthly_payment / pmt_factor
+                    loan_amount_dscr = max_monthly_pmt / pmt_factor
+                    loan_amount = loan_amount_dscr
+                    annual_ds = max_annual_ds
+                    results['loan_sized_by'] = 'DSCR constraint'
+                    results['actual_ltv'] = (loan_amount / value) * 100
+                else:
+                    # LTV is the binding constraint (or no DSCR constraint provided)
+                    loan_amount = loan_amount_ltv
+                    annual_ds = annual_ds_ltv
+                    results['loan_sized_by'] = 'LTV'
+                    results['actual_ltv'] = float(ltv)
+
+                results['loan_amount'] = loan_amount
+                results['annual_debt_service'] = annual_ds
+
+                if 'noi' in results and annual_ds > 0:
+                    results['dscr'] = results['noi'] / annual_ds
+        else:
+            # No debt rate — just store LTV-based loan amount
+            results['loan_amount'] = loan_amount_ltv
+            results['loan_sized_by'] = 'LTV'
+            results['actual_ltv'] = float(ltv)
+
+    # ── Equity ───────────────────────────────────────────────────────────
+    if 'value_at_cap' in results and 'loan_amount' in results:
+        equity = results['value_at_cap'] - results['loan_amount']
+        results['equity_required'] = equity
+        if 'noi' in results and 'annual_debt_service' in results and equity > 0:
+            btcf = results['noi'] - results['annual_debt_service']
+            results['cash_on_cash'] = (btcf / equity) * 100
+
+    # ── Exit / IRR ───────────────────────────────────────────────────────
+    exit_cap = inputs.get('exit_cap')
+    hold_years = inputs.get('hold_years')
+    if exit_cap and hold_years and 'noi' in results:
+        growth = float(inputs.get('noi_growth_pct', 2)) / 100
+        exit_noi = results['noi'] * ((1 + growth) ** int(hold_years))
+        exit_cap_decimal = float(exit_cap) / 100
+        if exit_cap_decimal > 0:
+            results['exit_value'] = exit_noi / exit_cap_decimal
+
+        # Simple leveraged IRR approximation
+        if 'equity_required' in results and results['equity_required'] > 0 and 'exit_value' in results:
+            equity = results['equity_required']
+            annual_cf = results.get('noi', 0) - results.get('annual_debt_service', 0)
+            # Remaining loan balance (approximate — interest-only simplification)
+            remaining_loan = results.get('loan_amount', 0)
+            terminal_equity = results['exit_value'] - remaining_loan
+
+            # Build cash flow series: [-equity, cf, cf, ..., cf + terminal_equity]
+            cashflows = [-equity]
+            for yr in range(int(hold_years)):
+                cf = annual_cf * ((1 + growth) ** yr)
+                if yr == int(hold_years) - 1:
+                    cf += terminal_equity
+                cashflows.append(cf)
+
+            # Newton's method IRR
+            irr = _simple_irr(cashflows)
+            if irr is not None:
+                results['irr'] = irr * 100
+
+    if not results:
+        return {
+            'error': 'Not enough inputs to calculate. Need at least unit_count and avg_monthly_rent.',
+        }
+
+    return results
+
+
+def _calc_land_development(inputs: Dict[str, Any], override_inputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Draft-mode land development engine with progressive calc levels."""
+    merged: Dict[str, Any] = dict(inputs or {})
+    if override_inputs and isinstance(override_inputs, dict):
+        merged.update(override_inputs)
+
+    results: Dict[str, Any] = {}
+    calc_level = 0
+    calc_level_name = 'insufficient_data'
+
+    total_acres = _to_float(merged.get('total_acres'))
+    density_per_acre = _to_float(merged.get('density_per_acre'))
+    total_lots = _to_float(merged.get('total_lots'))
+    total_lots_source = 'total_lots'
+    if (total_lots is None or total_lots <= 0) and total_acres and density_per_acre:
+        total_lots = total_acres * density_per_acre
+        total_lots_source = 'total_acres*density_per_acre'
+    if total_lots is None or total_lots <= 0:
+        num_phases = _to_int(merged.get('num_phases'))
+        parcels_per_phase = _to_float(merged.get('parcels_per_phase'))
+        lots_per_parcel = _to_float(merged.get('lots_per_parcel'))
+        if num_phases and parcels_per_phase and lots_per_parcel:
+            total_lots = float(num_phases) * parcels_per_phase * lots_per_parcel
+            total_lots_source = 'num_phases*parcels_per_phase*lots_per_parcel'
+
+    if total_lots and total_lots > 0:
+        results['total_lots'] = round(total_lots, 4)
+        results['total_lots_source'] = total_lots_source
+    if total_acres:
+        results['total_acres'] = total_acres
+    if density_per_acre:
+        results['density_per_acre'] = density_per_acre
+
+    lot_width_ft = _to_float(merged.get('lot_width_ft'))
+    finished_lot_value_per_ff = _to_float(merged.get('finished_lot_value_per_ff'))
+    intract_cost_per_ff = _to_float(merged.get('intract_cost_per_ff'))
+    avg_lot_price = _to_float(merged.get('avg_lot_price'))
+    avg_intract_cost = _to_float(merged.get('avg_intract_cost'))
+
+    has_front_foot_pricing = (
+        lot_width_ft is not None
+        and finished_lot_value_per_ff is not None
+        and intract_cost_per_ff is not None
+    )
+    has_flat_pricing = avg_lot_price is not None and avg_intract_cost is not None
+
+    if has_front_foot_pricing:
+        gross_revenue_per_lot = lot_width_ft * finished_lot_value_per_ff
+        intract_cost_per_lot = lot_width_ft * intract_cost_per_ff
+        pricing_mode = 'front_foot'
+    elif has_flat_pricing:
+        gross_revenue_per_lot = avg_lot_price
+        intract_cost_per_lot = avg_intract_cost
+        pricing_mode = 'flat'
+    else:
+        gross_revenue_per_lot = None
+        intract_cost_per_lot = None
+        pricing_mode = None
+
+    missing_for_next_level: List[str] = []
+    if not total_lots or total_lots <= 0:
+        missing_for_next_level.append('total_lots (or total_acres + density_per_acre)')
+    if not (has_front_foot_pricing or has_flat_pricing):
+        missing_for_next_level.append(
+            'lot_width_ft + finished_lot_value_per_ff + intract_cost_per_ff (or avg_lot_price + avg_intract_cost)'
+        )
+
+    if missing_for_next_level:
+        results['calc_level'] = calc_level
+        results['calc_level_name'] = calc_level_name
+        results['missing_for_next_level'] = missing_for_next_level
+        return results
+
+    # LEVEL 1 — BASIC
+    gross_lot_revenue = total_lots * gross_revenue_per_lot
+    intract_deduction = total_lots * intract_cost_per_lot
+    net_revenue_to_developer = gross_lot_revenue - intract_deduction
+    revenue_per_lot = net_revenue_to_developer / total_lots if total_lots > 0 else 0
+
+    results.update({
+        'pricing_mode': pricing_mode,
+        'gross_revenue_per_lot': gross_revenue_per_lot,
+        'intract_cost_per_lot': intract_cost_per_lot,
+        'gross_lot_revenue': gross_lot_revenue,
+        'intract_deduction': intract_deduction,
+        'net_revenue_to_developer': net_revenue_to_developer,
+        'revenue_per_lot': revenue_per_lot,
+    })
+    calc_level = 1
+    calc_level_name = 'basic'
+
+    # LEVEL 2 — COSTS
+    cost_keys = (
+        'entitlement_cost', 'hard_cost_total', 'hard_cost_per_lot',
+        'soft_cost_total', 'soft_cost_pct', 'contingency_pct', 'sales_commission_pct'
+    )
+    has_any_cost_input = any(_to_float(merged.get(k)) is not None for k in cost_keys)
+    if not has_any_cost_input:
+        results['calc_level'] = calc_level
+        results['calc_level_name'] = calc_level_name
+        results['missing_for_next_level'] = [
+            'entitlement_cost',
+            'hard_cost_total or hard_cost_per_lot',
+            'soft_cost_total or soft_cost_pct',
+            'sales_commission_pct',
+        ]
+        return results
+
+    entitlement_cost = _to_float(merged.get('entitlement_cost')) or 0.0
+    hard_cost_total = _to_float(merged.get('hard_cost_total'))
+    hard_cost_per_lot = _to_float(merged.get('hard_cost_per_lot'))
+    if hard_cost_total is None and hard_cost_per_lot is not None:
+        hard_cost_total = hard_cost_per_lot * total_lots
+    total_hard = hard_cost_total or 0.0
+
+    soft_cost_total = _to_float(merged.get('soft_cost_total'))
+    soft_cost_pct = _to_float(merged.get('soft_cost_pct'))
+    if soft_cost_total is None and soft_cost_pct is not None and total_hard > 0:
+        soft_cost_total = total_hard * (soft_cost_pct / 100.0)
+    total_soft = soft_cost_total or 0.0
+
+    contingency_pct = _to_float(merged.get('contingency_pct'))
+    if contingency_pct is None:
+        contingency_pct = 5.0
+    contingency = (total_hard + total_soft) * (contingency_pct / 100.0)
+
+    total_dev_cost = entitlement_cost + total_hard + total_soft + contingency
+
+    sales_commission_pct = _to_float(merged.get('sales_commission_pct')) or 0.0
+    sales_commission_amount = gross_lot_revenue * (sales_commission_pct / 100.0)
+
+    gross_profit = net_revenue_to_developer - total_dev_cost - sales_commission_amount
+    gross_margin = (gross_profit / gross_lot_revenue) * 100 if gross_lot_revenue else None
+    cost_per_lot = total_dev_cost / total_lots if total_lots else None
+
+    results.update({
+        'entitlement_cost': entitlement_cost,
+        'total_hard': total_hard,
+        'total_soft': total_soft,
+        'contingency_pct': contingency_pct,
+        'contingency': contingency,
+        'total_dev_cost': total_dev_cost,
+        'sales_commission_pct': sales_commission_pct,
+        'sales_commission_amount': sales_commission_amount,
+        'gross_profit': gross_profit,
+        'gross_margin': gross_margin,
+        'cost_per_lot': cost_per_lot,
+    })
+    calc_level = 2
+    calc_level_name = 'costs'
+
+    # LEVEL 3 — TIMELINE + UNLEVERAGED IRR
+    entitlement_months = _to_int(merged.get('entitlement_months'))
+    development_months_per_phase = _to_int(merged.get('development_months_per_phase'))
+    if entitlement_months is None:
+        entitlement_months = 0
+    if development_months_per_phase is None or development_months_per_phase <= 0:
+        results['calc_level'] = calc_level
+        results['calc_level_name'] = calc_level_name
+        results['missing_for_next_level'] = [
+            'development_months_per_phase',
+            'entitlement_months',
+        ]
+        return results
+
+    phase_start_months = _to_int_list(merged.get('phase_start_months'))
+    num_phases = _to_int(merged.get('num_phases'))
+    if num_phases is None or num_phases <= 0:
+        num_phases = len(phase_start_months) if phase_start_months else 1
+
+    parcels_per_phase = _to_float(merged.get('parcels_per_phase'))
+    lots_per_parcel = _to_float(merged.get('lots_per_parcel'))
+    builder_absorption_monthly = _to_float(merged.get('builder_absorption_monthly'))
+    builder_intract_months = _to_int(merged.get('builder_intract_months')) or 0
+
+    if not phase_start_months:
+        first_start = max(1, entitlement_months + 1)
+        phase_start_months = [first_start]
+        for phase_idx in range(1, num_phases):
+            prior_start = phase_start_months[-1]
+            next_start = prior_start + development_months_per_phase
+
+            if builder_absorption_monthly and builder_absorption_monthly > 0 and lots_per_parcel and lots_per_parcel > 0:
+                sellout_months = lots_per_parcel / builder_absorption_monthly
+                prior_completion = prior_start + development_months_per_phase - 1
+                target_completion = prior_completion + builder_intract_months + sellout_months
+                next_start = max(
+                    next_start,
+                    int(math.ceil(target_completion - development_months_per_phase + 1))
+                )
+
+            phase_start_months.append(max(1, next_start))
+    elif len(phase_start_months) < num_phases:
+        while len(phase_start_months) < num_phases:
+            phase_start_months.append(
+                phase_start_months[-1] + development_months_per_phase
+            )
+    else:
+        phase_start_months = phase_start_months[:num_phases]
+
+    if parcels_per_phase and lots_per_parcel:
+        phase_lots = [parcels_per_phase * lots_per_parcel for _ in range(num_phases)]
+        target_total = sum(phase_lots)
+        if total_lots and total_lots > 0:
+            adjustment = total_lots - target_total
+            phase_lots[-1] += adjustment
+    else:
+        base = total_lots / num_phases
+        phase_lots = [base for _ in range(num_phases)]
+
+    phase_end_months = [
+        start + development_months_per_phase - 1 for start in phase_start_months
+    ]
+    horizon_months = max(max(phase_end_months), entitlement_months, 1)
+    monthly_cashflows = [0.0 for _ in range(horizon_months)]
+
+    if entitlement_cost > 0:
+        if entitlement_months > 0:
+            monthly_entitlement_cost = entitlement_cost / entitlement_months
+            for month in range(1, entitlement_months + 1):
+                monthly_cashflows[month - 1] -= monthly_entitlement_cost
+        else:
+            monthly_cashflows[0] -= entitlement_cost
+
+    phase_cost_pool = total_dev_cost - entitlement_cost
+    revenue_escalation_annual = _to_float(merged.get('revenue_escalation_annual')) or 0.0
+    cost_escalation_annual = _to_float(merged.get('cost_escalation_annual')) or 0.0
+    phase_schedule = []
+
+    for idx in range(num_phases):
+        phase_lot_count = phase_lots[idx]
+        phase_start = phase_start_months[idx]
+        phase_end = phase_end_months[idx]
+
+        if total_lots and total_lots > 0:
+            phase_dev_cost = phase_cost_pool * (phase_lot_count / total_lots)
+        else:
+            phase_dev_cost = phase_cost_pool / num_phases
+
+        monthly_dev_cost = phase_dev_cost / development_months_per_phase
+        for month in range(phase_start, phase_end + 1):
+            monthly_cashflows[month - 1] -= monthly_dev_cost
+
+        years_elapsed = (phase_end - 1) / 12.0
+        revenue_factor = (1 + (revenue_escalation_annual / 100.0)) ** years_elapsed
+        cost_factor = (1 + (cost_escalation_annual / 100.0)) ** years_elapsed
+
+        phase_gross_lot_revenue = phase_lot_count * gross_revenue_per_lot * revenue_factor
+        phase_intract_deduction = phase_lot_count * intract_cost_per_lot * cost_factor
+        phase_commission = phase_gross_lot_revenue * (sales_commission_pct / 100.0)
+        phase_net_to_developer = phase_gross_lot_revenue - phase_intract_deduction - phase_commission
+        monthly_cashflows[phase_end - 1] += phase_net_to_developer
+
+        phase_schedule.append({
+            'phase_number': idx + 1,
+            'start_month': phase_start,
+            'completion_month': phase_end,
+            'lots': phase_lot_count,
+            'gross_revenue': phase_gross_lot_revenue,
+            'intract_deduction': phase_intract_deduction,
+            'sales_commission': phase_commission,
+            'net_to_developer': phase_net_to_developer,
+            'revenue_factor': revenue_factor,
+            'cost_factor': cost_factor,
+        })
+
+    results.update({
+        'entitlement_months': entitlement_months,
+        'development_months_per_phase': development_months_per_phase,
+        'phase_start_months': phase_start_months,
+        'num_phases': num_phases,
+        'phase_schedule': phase_schedule,
+        'timeline_months': horizon_months,
+        'monthly_cashflows': monthly_cashflows,
+        'revenue_escalation_annual': revenue_escalation_annual,
+        'cost_escalation_annual': cost_escalation_annual,
+    })
+
+    if any(cf < 0 for cf in monthly_cashflows) and any(cf > 0 for cf in monthly_cashflows):
+        monthly_irr = _simple_irr(monthly_cashflows, guess=0.01)
+        if monthly_irr is not None and monthly_irr > -1:
+            results['unleveraged_irr_monthly'] = monthly_irr * 100
+            results['unleveraged_irr'] = (((1 + monthly_irr) ** 12) - 1) * 100
+
+    discount_rate = _to_float(merged.get('discount_rate'))
+    if discount_rate is not None:
+        monthly_discount_rate = (discount_rate / 100.0) / 12.0
+        results['unleveraged_npv'] = _simple_npv(monthly_cashflows, monthly_discount_rate)
+
+    calc_level = 3
+    calc_level_name = 'timeline_unleveraged'
+
+    # LEVEL 4 — RLV
+    solve_for_land_value = _to_bool(merged.get('solve_for_land_value'))
+    if solve_for_land_value and discount_rate is not None:
+        residual_land_value = results.get('unleveraged_npv')
+        if residual_land_value is not None:
+            results['residual_land_value'] = residual_land_value
+            if total_acres and total_acres > 0:
+                results['rlv_per_acre'] = residual_land_value / total_acres
+            if total_lots and total_lots > 0:
+                results['rlv_per_lot'] = residual_land_value / total_lots
+            calc_level = 4
+            calc_level_name = 'residual_land_value'
+
+    # LEVEL 5 — LEVERAGED (simplified construction loan napkin model)
+    loan_ltc_pct = _to_float(merged.get('loan_ltc_pct'))
+    loan_interest_rate = _to_float(merged.get('loan_interest_rate'))
+    loan_origination_fee_pct = _to_float(merged.get('loan_origination_fee_pct')) or 0.0
+    interest_reserve_months = _to_int(merged.get('interest_reserve_months')) or 0
+    reserve_multiplier = _to_float(merged.get('reserve_multiplier')) or 1.0
+
+    if loan_ltc_pct and loan_interest_rate and total_dev_cost > 0:
+        ltc_decimal = loan_ltc_pct / 100.0
+        commitment = total_dev_cost * ltc_decimal
+        origination_fee = commitment * (loan_origination_fee_pct / 100.0)
+        monthly_interest_rate = (loan_interest_rate / 100.0) / 12.0
+
+        outstanding_balance = 0.0
+        total_interest = 0.0
+        equity_cashflows: List[float] = []
+        for month_idx, project_cf in enumerate(monthly_cashflows):
+            project_outflow = max(0.0, -project_cf)
+            project_inflow = max(0.0, project_cf)
+
+            draw_request = project_outflow * ltc_decimal
+            available_commitment = max(0.0, commitment - outstanding_balance)
+            debt_draw = min(draw_request, available_commitment)
+            outstanding_balance += debt_draw
+            equity_outflow = project_outflow - debt_draw
+
+            interest = outstanding_balance * monthly_interest_rate
+            total_interest += interest
+            month_number = month_idx + 1
+            if interest_reserve_months > 0 and month_number <= interest_reserve_months:
+                outstanding_balance += interest * reserve_multiplier
+            else:
+                equity_outflow += interest
+
+            debt_repayment = min(outstanding_balance, project_inflow)
+            outstanding_balance -= debt_repayment
+            equity_inflow = project_inflow - debt_repayment
+            equity_cashflows.append(equity_inflow - equity_outflow)
+
+        if equity_cashflows:
+            equity_cashflows[0] -= origination_fee
+        else:
+            equity_cashflows = [-origination_fee]
+
+        if outstanding_balance > 0:
+            equity_cashflows.append(-outstanding_balance)
+            outstanding_balance = 0.0
+
+        results.update({
+            'loan_commitment': commitment,
+            'loan_origination_fee': origination_fee,
+            'loan_interest_rate': loan_interest_rate,
+            'loan_ltc_pct': loan_ltc_pct,
+            'total_interest': total_interest,
+            'equity_cashflows': equity_cashflows,
+        })
+
+        if any(cf < 0 for cf in equity_cashflows) and any(cf > 0 for cf in equity_cashflows):
+            leveraged_monthly_irr = _simple_irr(equity_cashflows, guess=0.01)
+            if leveraged_monthly_irr is not None and leveraged_monthly_irr > -1:
+                results['leveraged_irr_monthly'] = leveraged_monthly_irr * 100
+                results['leveraged_irr'] = (((1 + leveraged_monthly_irr) ** 12) - 1) * 100
+
+        calc_level = 5
+        calc_level_name = 'leveraged'
+
+    if calc_level == 1:
+        missing_for_next_level = [
+            'entitlement_cost',
+            'hard_cost_total or hard_cost_per_lot',
+            'soft_cost_total or soft_cost_pct',
+            'sales_commission_pct',
+        ]
+    elif calc_level == 2:
+        missing_for_next_level = [
+            'entitlement_months',
+            'development_months_per_phase',
+        ]
+    elif calc_level == 3:
+        missing_for_next_level = []
+        if not solve_for_land_value:
+            missing_for_next_level.extend(['solve_for_land_value', 'discount_rate'])
+        elif discount_rate is None:
+            missing_for_next_level.append('discount_rate')
+        if not (loan_ltc_pct and loan_interest_rate):
+            missing_for_next_level.append('loan_ltc_pct + loan_interest_rate (optional for leveraged mode)')
+    elif calc_level == 4:
+        missing_for_next_level = []
+        if not (loan_ltc_pct and loan_interest_rate):
+            missing_for_next_level.extend(['loan_ltc_pct', 'loan_interest_rate'])
+    else:
+        missing_for_next_level = []
+
+    results['calc_level'] = calc_level
+    results['calc_level_name'] = calc_level_name
+    results['missing_for_next_level'] = missing_for_next_level
+    return results
+
+
 @register_tool('create_analysis_draft', is_mutation=True)
 def handle_create_analysis_draft(tool_input, project_id, user_id=None, propose_only=True, **kwargs):
     """Create a new analysis draft from conversational inputs."""
@@ -12869,7 +13760,7 @@ def handle_create_analysis_draft(tool_input, project_id, user_id=None, propose_o
         return {'success': False, 'error': 'Authentication required to create drafts.'}
 
     draft_name = tool_input.get('draft_name', 'Untitled Draft')
-    property_type = (tool_input.get('property_type') or 'MF').upper()
+    property_type = _normalize_draft_property_type(tool_input.get('property_type'))
     perspective = (tool_input.get('perspective') or 'INVESTMENT').upper()
     purpose = (tool_input.get('purpose') or 'UNDERWRITING').upper()
     value_add = tool_input.get('value_add_enabled', False)
@@ -12946,7 +13837,10 @@ def handle_update_analysis_draft(tool_input, project_id, user_id=None, propose_o
     for field in ('draft_name', 'property_type', 'perspective', 'purpose',
                   'value_add_enabled', 'address', 'city', 'state', 'zip_code'):
         if field in tool_input:
-            updates[field] = tool_input[field]
+            if field == 'property_type':
+                updates[field] = _normalize_draft_property_type(tool_input[field])
+            else:
+                updates[field] = tool_input[field]
 
     # Merge inputs (shallow merge — new keys added, existing keys overwritten)
     if 'inputs' in tool_input and isinstance(tool_input['inputs'], dict):
@@ -13003,117 +13897,21 @@ def handle_run_draft_calculations(tool_input, project_id, user_id=None, **kwargs
         return {'success': False, 'error': f'Draft {draft_id} not found or not owned by you.'}
 
     inputs = dict(draft.inputs or {})
-    # Allow override_inputs to temporarily override for what-if exploration
-    override = tool_input.get('override_inputs')
-    if override and isinstance(override, dict):
-        inputs.update(override)
+    override_inputs = tool_input.get('override_inputs')
+    if not isinstance(override_inputs, dict):
+        override_inputs = None
 
-    results = {}
+    effective_inputs = dict(inputs)
+    if override_inputs:
+        effective_inputs.update(override_inputs)
 
-    # ── Revenue ──────────────────────────────────────────────────────────
-    unit_count = inputs.get('unit_count')
-    avg_rent = inputs.get('avg_monthly_rent')
-    if unit_count and avg_rent:
-        pgi = float(unit_count) * float(avg_rent) * 12
-        results['pgi'] = pgi
-
-        vacancy_pct = float(inputs.get('vacancy_pct', 5)) / 100
-        vacancy_amount = pgi * vacancy_pct
-        results['vacancy_amount'] = vacancy_amount
-        results['egi'] = pgi - vacancy_amount
-
-    # ── Expenses ─────────────────────────────────────────────────────────
-    opex_per_unit = inputs.get('opex_per_unit')
-    opex_ratio = inputs.get('opex_ratio')
-    if opex_per_unit and unit_count:
-        total_expenses = float(opex_per_unit) * float(unit_count)
-        results['total_expenses'] = total_expenses
-        if 'egi' in results:
-            results['expense_ratio'] = (total_expenses / results['egi']) * 100
-    elif opex_ratio and 'egi' in results:
-        total_expenses = results['egi'] * (float(opex_ratio) / 100)
-        results['total_expenses'] = total_expenses
-        results['expense_ratio'] = float(opex_ratio)
-
-    # ── NOI ──────────────────────────────────────────────────────────────
-    if 'egi' in results and 'total_expenses' in results:
-        results['noi'] = results['egi'] - results['total_expenses']
-    elif 'egi' in results:
-        # No expense data yet — use EGI as proxy NOI
-        results['noi'] = results['egi']
-
-    # ── Cap Rate Valuation ───────────────────────────────────────────────
-    going_in_cap = inputs.get('going_in_cap')
-    if going_in_cap and 'noi' in results:
-        cap_decimal = float(going_in_cap) / 100
-        if cap_decimal > 0:
-            results['value_at_cap'] = results['noi'] / cap_decimal
-
-    # ── Debt ─────────────────────────────────────────────────────────────
-    ltv = inputs.get('ltv')
-    debt_rate = inputs.get('debt_rate')
-    if ltv and 'value_at_cap' in results:
-        loan_amount = results['value_at_cap'] * (float(ltv) / 100)
-        results['loan_amount'] = loan_amount
-
-        if debt_rate:
-            amort_years = inputs.get('amortization_years', 30)
-            monthly_rate = (float(debt_rate) / 100) / 12
-            n_payments = int(amort_years) * 12
-            if monthly_rate > 0 and n_payments > 0:
-                monthly_pmt = loan_amount * (
-                    monthly_rate * (1 + monthly_rate) ** n_payments
-                ) / ((1 + monthly_rate) ** n_payments - 1)
-                annual_ds = monthly_pmt * 12
-                results['annual_debt_service'] = annual_ds
-
-                if 'noi' in results and annual_ds > 0:
-                    results['dscr'] = results['noi'] / annual_ds
-
-    # ── Equity ───────────────────────────────────────────────────────────
-    if 'value_at_cap' in results and 'loan_amount' in results:
-        equity = results['value_at_cap'] - results['loan_amount']
-        results['equity_required'] = equity
-        if 'noi' in results and 'annual_debt_service' in results and equity > 0:
-            btcf = results['noi'] - results['annual_debt_service']
-            results['cash_on_cash'] = (btcf / equity) * 100
-
-    # ── Exit / IRR ───────────────────────────────────────────────────────
-    exit_cap = inputs.get('exit_cap')
-    hold_years = inputs.get('hold_years')
-    if exit_cap and hold_years and 'noi' in results:
-        growth = float(inputs.get('noi_growth_pct', 2)) / 100
-        exit_noi = results['noi'] * ((1 + growth) ** int(hold_years))
-        exit_cap_decimal = float(exit_cap) / 100
-        if exit_cap_decimal > 0:
-            results['exit_value'] = exit_noi / exit_cap_decimal
-
-        # Simple leveraged IRR approximation
-        if 'equity_required' in results and results['equity_required'] > 0 and 'exit_value' in results:
-            equity = results['equity_required']
-            annual_cf = results.get('noi', 0) - results.get('annual_debt_service', 0)
-            # Remaining loan balance (approximate — interest-only simplification)
-            remaining_loan = results.get('loan_amount', 0)
-            terminal_equity = results['exit_value'] - remaining_loan
-
-            # Build cash flow series: [-equity, cf, cf, ..., cf + terminal_equity]
-            cashflows = [-equity]
-            for yr in range(int(hold_years)):
-                cf = annual_cf * ((1 + growth) ** yr)
-                if yr == int(hold_years) - 1:
-                    cf += terminal_equity
-                cashflows.append(cf)
-
-            # Newton's method IRR
-            irr = _simple_irr(cashflows)
-            if irr is not None:
-                results['irr'] = irr * 100
-
-    if not results:
-        return {
-            'success': False,
-            'error': 'Not enough inputs to calculate. Need at least unit_count and avg_monthly_rent.',
-        }
+    property_type = (draft.property_type or '').upper().replace(' ', '_')
+    if property_type in ('LAND_DEVELOPMENT', 'LAND_DEV', 'LAND'):
+        results = _calc_land_development(inputs, override_inputs)
+    else:
+        results = _calc_multifamily_draft(effective_inputs)
+        if results.get('error'):
+            return {'success': False, 'error': results['error']}
 
     # Save snapshot back to draft
     try:
@@ -13126,7 +13924,7 @@ def handle_run_draft_calculations(tool_input, project_id, user_id=None, **kwargs
         'success': True,
         'draft_id': draft.draft_id,
         'results': results,
-        'formatted': _format_calc_results(inputs, results),
+        'formatted': _format_calc_results(effective_inputs, results),
     }
 
 
@@ -13142,6 +13940,11 @@ def _simple_irr(cashflows, guess=0.10, tol=1e-6, max_iter=100):
         if abs(npv) < tol:
             return rate
     return None
+
+
+def _simple_npv(cashflows, discount_rate_per_period=0.0):
+    """Discount a periodic cash flow stream at a periodic rate."""
+    return sum(cf / (1 + discount_rate_per_period) ** i for i, cf in enumerate(cashflows))
 
 
 @register_tool('convert_draft_to_project', is_mutation=True)
