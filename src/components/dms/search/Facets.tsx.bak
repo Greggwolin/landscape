@@ -1,0 +1,195 @@
+'use client';
+
+import React from 'react';
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+
+interface FacetValue {
+ value: string;
+ count: number;
+ selected?: boolean;
+}
+
+interface Facet {
+ name: string;
+ displayName: string;
+ values: FacetValue[];
+ expanded?: boolean;
+}
+
+interface FacetsProps {
+ facets: Record<string, Record<string, number>>;
+ selectedFilters: Record<string, string[]>;
+ onFilterChange: (facetName: string, value: string, selected: boolean) => void;
+ onClearFilters: () => void;
+ expandedFacets?: string[];
+ onToggleExpanded?: (facetName: string) => void;
+}
+
+const FACET_CONFIG = {
+ doc_type: { displayName: 'Document Type', icon: '📄' },
+ discipline: { displayName: 'Discipline', icon: '🏗️' },
+ status: { displayName: 'Status', icon: '📊' },
+ priority: { displayName: 'Priority', icon: '⚡' },
+ tags: { displayName: 'Tags', icon: '🏷️' },
+ project_name: { displayName: 'Project', icon: '🏘️' },
+ workspace_name: { displayName: 'Workspace', icon: '📁' }
+};
+
+export default function Facets({  facets,  selectedFilters,  onFilterChange,  onClearFilters,
+ expandedFacets = [],
+ onToggleExpanded }: FacetsProps) {
+ const hasActiveFilters = Object.values(selectedFilters).some(filters => filters.length > 0);
+
+ const getFacetConfig = (facetName: string) => {
+ return FACET_CONFIG[facetName as keyof typeof FACET_CONFIG] || {  displayName: facetName,  icon: '📋'  };
+ };
+
+ const isExpanded = (facetName: string) => {
+ return expandedFacets.includes(facetName);
+ };
+
+ const toggleExpanded = (facetName: string) => {
+ onToggleExpanded?.(facetName);
+ };
+
+ const renderFacetValue = (facetName: string, value: string, count: number) => {
+ const isSelected = selectedFilters[facetName]?.includes(value) || false;
+  return (
+ <label
+ key={value}
+ className="tw-flex tw-items-center tw-justify-between py-1.5 px-2 rounded hover:bg-body-tertiary tw-cursor-pointer group"
+ >
+ <div className="tw-flex tw-items-center tw-flex-1 tw-min-w-0">
+ <input
+ type="checkbox"
+ checked={isSelected}
+ onChange={(e) => onFilterChange(facetName, value, e.target.checked)}
+ className="h-4 w-4 tw-text-blue-600 focus:ring-blue-500 border rounded mr-2 tw-flex-shrink-0"
+ />
+ <span className="tw-text-sm text-body-secondary tw-truncate tw-flex-1 tw-min-w-0" title={value}>
+ {value || 'Unspecified'}
+ </span>
+ </div>
+ <span className="tw-text-xs text-body-tertiary ml-2 tw-flex-shrink-0 tw-font-medium">
+ {count.toLocaleString()}
+ </span>
+ </label>
+ );
+ };
+
+ if (Object.keys(facets).length === 0) {
+ return (
+ <div className="bg-body tw-rounded-lg border border p-4">
+ <div className="text-center text-body-tertiary tw-text-sm">
+ No filters available
+ </div>
+ </div>
+ );
+ }
+
+ return (
+ <div className="tw-space-y-4">
+ {/* Header */}
+ <div className="tw-flex tw-items-center tw-justify-between">
+ <h3 className="tw-text-lg tw-font-semibold text-body">
+ Filters
+ </h3>
+ {hasActiveFilters && (
+ <button
+ onClick={onClearFilters}
+ className="tw-text-sm tw-text-blue-600 hover:tw-text-blue-700 tw-font-medium"
+ >
+ Clear All
+ </button>
+ )}
+ </div>
+
+ {/* Active Filters Summary */}
+ {hasActiveFilters && (
+ <div className="tw-bg-blue-50 tw-rounded-lg p-3 border tw-border-blue-200">
+ <div className="tw-text-sm tw-font-medium tw-text-blue-800 mb-2">
+ Active Filters
+ </div>
+ <div className="tw-flex tw-flex-wrap gap-1">
+ {Object.entries(selectedFilters).map(([facetName, values]) =>
+ values.map(value => (
+ <span
+ key={`${facetName}-${value}`}
+ className="tw-inline-flex tw-items-center gap-1 tw-bg-blue-100 tw-text-blue-800 tw-text-xs px-2 py-1 tw-rounded-full"
+ >
+ {getFacetConfig(facetName).displayName}: {value}
+ <button
+ onClick={() => onFilterChange(facetName, value, false)}
+ className="tw-text-blue-600 hover:tw-text-blue-800"
+ >
+ ×
+ </button>
+ </span>
+ ))
+ )}
+ </div>
+ </div>
+ )}
+
+ {/* Facet Groups */}
+ <div className="tw-space-y-3">
+ {Object.entries(facets).map(([facetName, facetValues]) => {
+ const config = getFacetConfig(facetName);
+ const expanded = isExpanded(facetName);
+ const valueEntries = Object.entries(facetValues).sort((a, b) => b[1] - a[1]);
+ const visibleEntries = expanded ? valueEntries : valueEntries.slice(0, 5);
+ const hasMore = valueEntries.length > 5;
+
+ return (
+ <div
+ key={facetName}
+ className="bg-body tw-rounded-lg border border"
+ >
+ {/* Facet Header */}
+ <div className="p-3 tw-border-b border">
+ <div className="tw-flex tw-items-center tw-justify-between">
+ <div className="tw-flex tw-items-center gap-2">
+ <span className="tw-text-lg">{config.icon}</span>
+ <h4 className="tw-font-medium text-body">
+ {config.displayName}
+ </h4>
+ <span className="tw-text-xs text-body-tertiary bg-body-secondary px-2 py-0.5 tw-rounded-full">
+ {valueEntries.length}
+ </span>
+ </div>
+ {hasMore && (
+ <button
+ onClick={() => toggleExpanded(facetName)}
+ className="text-body-tertiary hover:text-body-secondary tw-transition-colors"
+ >
+ {expanded ? (
+ <ChevronUpIcon className="h-4 w-4" />
+ ) : (
+ <ChevronDownIcon className="h-4 w-4" />
+ )}
+ </button>
+ )}
+ </div>
+ </div>
+
+ {/* Facet Values */}
+ <div className="p-2 tw-space-y-0.5 tw-max-h-64 tw-overflow-y-auto">
+ {visibleEntries.map(([value, count]) =>
+ renderFacetValue(facetName, value, count)
+ )}
+  {hasMore && !expanded && (
+ <button
+ onClick={() => toggleExpanded(facetName)}
+ className="tw-w-full tw-text-sm tw-text-blue-600 hover:tw-text-blue-700 py-2 text-center tw-font-medium"
+ >
+ Show {valueEntries.length - 5} more...
+ </button>
+ )}
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ </div>
+ );
+}

@@ -1,0 +1,468 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { X, Edit, Plus, Building, Home, Map } from 'lucide-react';
+import { LandscapeButton } from '@/components/ui/landscape';
+
+interface ResSpec {
+ res_spec_id: number;
+ subtype_id: number;
+ dua_min?: number;
+ dua_max?: number;
+ lot_w_min_ft?: number;
+ lot_d_min_ft?: number;
+ lot_area_min_sf?: number;
+ sb_front_ft?: number;
+ sb_side_ft?: number;
+ sb_corner_ft?: number;
+ sb_rear_ft?: number;
+ hgt_max_ft?: number;
+ cov_max_pct?: number;
+ os_min_pct?: number;
+ pk_per_unit?: number;
+ notes?: string;
+ eff_date?: string;
+}
+
+interface ComSpec {
+ com_spec_id: number;
+ subtype_id: number;
+ far_min?: number;
+ far_max?: number;
+ cov_max_pct?: number;
+ pk_per_ksf?: number;
+ hgt_max_ft?: number;
+ sb_front_ft?: number;
+ sb_side_ft?: number;
+ sb_corner_ft?: number;
+ sb_rear_ft?: number;
+ os_min_pct?: number;
+ notes?: string;
+ eff_date?: string;
+}
+
+interface LotProduct {
+ product_id: number;
+ code: string;
+ lot_w_ft: number;
+ lot_d_ft: number;
+ lot_area_sf?: number;
+ subtype_id?: number;
+ subtype_name?: string;
+ subtype_code?: string;
+ family_name?: string;
+}
+
+interface LandUse {
+ landuse_id: number;
+ subtype_id: number | null;
+ landuse_code: string;
+ landuse_type: string;
+ name: string;
+ description?: string;
+ active: boolean;
+}
+
+interface Subtype {
+ subtype_id: number;
+ family_id: number;
+ code: string;
+ name: string;
+ ord: number;
+ active: boolean;
+ notes?: string;
+}
+
+interface LandUseDetailsProps {
+ subtype: Subtype;
+ onClose: () => void;
+}
+
+const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => {
+ const [loading, setLoading] = useState(true);
+ const [activeTab, setActiveTab] = useState('specs');
+ const [resSpecs, setResSpecs] = useState<ResSpec[]>([]);
+ const [comSpecs, setComSpecs] = useState<ComSpec[]>([]);
+ const [lotProducts, setLotProducts] = useState<LotProduct[]>([]);
+ const [landuses, setLanduses] = useState<LandUse[]>([]);
+
+ useEffect(() => {
+ loadSubtypeData();
+ }, [subtype.subtype_id]);
+
+ const loadSubtypeData = async () => {
+ try {
+ setLoading(true);
+  const [specsRes, productsRes, landusesRes] = await Promise.all([
+ fetch(`/api/landuse/specs?subtype_id=${subtype.subtype_id}`),
+ fetch(`/api/landuse/products?subtype_id=${subtype.subtype_id}`),
+ fetch('/api/landuse/codes')
+ ]);
+
+ const specsData = await specsRes.json();
+ const productsData = await productsRes.json();
+ const landusesData = await landusesRes.json();
+
+ setResSpecs(specsData.residential || []);
+ setComSpecs(specsData.commercial || []);
+ setLotProducts(Array.isArray(productsData) ? productsData : []);
+  // Show land uses for this subtype AND general/unassigned codes
+ const subtypeLandUses = Array.isArray(landusesData)  ? landusesData.filter((lu: LandUse) =>  (lu.subtype_id === subtype.subtype_id || lu.subtype_id == null || lu.subtype_id === 0)  && lu.active
+ )
+ : [];
+ setLanduses(subtypeLandUses);
+
+ } catch (error) {
+ console.error('Error loading subtype data:', error);
+ } finally {
+ setLoading(false);
+ }
+ };
+
+ const formatNumber = (value?: number | null, suffix = '') => {
+ if (value == null || value === 0) return '—';
+ return `${value.toLocaleString()}${suffix}`;
+ };
+
+ const formatRange = (min?: number | null, max?: number | null, suffix = '') => {
+ if (min != null && max != null) {
+ return `${min.toLocaleString()} - ${max.toLocaleString()}${suffix}`;
+ } else if (min != null) {
+ return `${min.toLocaleString()}+ ${suffix}`;
+ } else if (max != null) {
+ return `≤ ${max.toLocaleString()}${suffix}`;
+ }
+ return '—';
+ };
+
+ return (
+ <div className="tw-fixed tw-inset-0 tw-z-50 tw-overflow-hidden">
+ <div className="tw-absolute tw-inset-0 bg-black tw-bg-opacity-50" onClick={onClose} />
+ <div className="tw-absolute right-0 top-0 tw-h-full w-2/3 bg-body tw-border-l border tw-shadow-xl tw-flex tw-flex-col">
+ {/* Header */}
+ <div className="px-6 py-4 tw-border-b border tw-flex tw-items-center tw-justify-between">
+ <div>
+ <h2 className="tw-text-xl tw-font-semibold text-body">
+ {subtype.code} - {subtype.name}
+ </h2>
+ <p className="tw-text-sm text-body-tertiary">Development Standards & Products</p>
+ </div>
+ <button
+ onClick={onClose}
+ className="btn btn-sm btn-ghost-secondary"
+ aria-label="Close panel"
+ >
+ <X className="w-5 h-5" />
+ </button>
+ </div>
+
+ {/* Tabs */}
+ <div className="tw-flex tw-border-b border">
+ {[
+ { id: 'specs', label: 'Development Standards', icon: Building },
+ { id: 'products', label: 'Lot Products', icon: Home },
+ { id: 'codes', label: 'Land Use Codes', icon: Map }
+ ].map(tab => (
+ <button
+ key={tab.id}
+ onClick={() => setActiveTab(tab.id)}
+ className={`tw-flex tw-items-center gap-2 px-4 py-3 tw-font-medium tw-transition-colors ${ activeTab === tab.id ? tw-'text-blue-400 tw-border-b-2 tw-border-blue-400' : 'text-body-tertiary hover:text-body-tertiary' }`}
+ >
+ <tab.icon className="w-4 h-4" />
+ {tab.label}
+ </button>
+ ))}
+ </div>
+
+ {/* Content */}
+ <div className="tw-flex-1 tw-overflow-y-auto p-6">
+ {loading ? (
+ <div className="tw-flex tw-items-center tw-justify-center tw-h-full">
+ <div className="text-body-tertiary">Loading subtype details...</div>
+ </div>
+ ) : (
+ <div>
+ {activeTab === 'specs' && (
+ <div className="tw-space-y-6">
+ {/* Residential Specifications */}
+ {resSpecs.length > 0 && (
+ <div>
+ <div className="tw-flex tw-items-center tw-justify-between mb-4">
+ <h3 className="tw-text-lg tw-font-semibold text-body tw-flex tw-items-center gap-2">
+ <Home className="w-5 h-5" />
+ Residential Standards
+ </h3>
+ <button className="btn btn-primary btn-sm d-inline-flex tw-align-items-center">
+ <Plus className="w-4 h-4 me-1" />
+ Add Standard
+ </button>
+ </div>
+  {resSpecs.map(spec => (
+ <div key={spec.res_spec_id} className="bg-body tw-rounded-lg p-4 mb-4">
+ <div className="tw-grid tw-grid-cols-3 gap-4">
+ <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Density</h4>
+ <div className="text-body">
+ <div>DUA: {formatRange(spec.dua_min, spec.dua_max, ' units/ac')}</div>
+ <div>Min Lot: {formatNumber(spec.lot_area_min_sf, ' sf')}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Lot Dimensions</h4>
+ <div className="text-body">
+ <div>Min Width: {formatNumber(spec.lot_w_min_ft, ' ft')}</div>
+ <div>Min Depth: {formatNumber(spec.lot_d_min_ft, ' ft')}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Building</h4>
+ <div className="text-body">
+ <div>Max Height: {formatNumber(spec.hgt_max_ft, ' ft')}</div>
+ <div>Max Coverage: {formatNumber(spec.cov_max_pct, '%')}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Setbacks (ft)</h4>
+ <div className="text-body tw-text-sm">
+ <div>Front: {formatNumber(spec.sb_front_ft)}</div>
+ <div>Side: {formatNumber(spec.sb_side_ft)}</div>
+ <div>Rear: {formatNumber(spec.sb_rear_ft)}</div>
+ <div>Corner: {formatNumber(spec.sb_corner_ft)}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Requirements</h4>
+ <div className="text-body tw-text-sm">
+ <div>Min Open Space: {formatNumber(spec.os_min_pct, '%')}</div>
+ <div>Parking: {formatNumber(spec.pk_per_unit, ' /unit')}</div>
+ </div>
+ </div>
+  <div>
+ <div className="tw-flex tw-items-center tw-justify-between">
+ <div>
+ {spec.eff_date && (
+ <div className="tw-text-xs text-body-tertiary">
+ Effective: {new Date(spec.eff_date).toLocaleDateString()}
+ </div>
+ )}
+ </div>
+ <button
+ className="btn btn-sm btn-ghost-primary"
+ aria-label="Edit residential standard"
+ >
+ <Edit className="w-4 h-4" />
+ </button>
+ </div>
+ </div>
+ </div>
+  {spec.notes && (
+ <div className="mt-3 pt-3 tw-border-t border">
+ <p className="tw-text-sm text-body-tertiary">{spec.notes}</p>
+ </div>
+ )}
+ </div>
+ ))}
+ </div>
+ )}
+
+ {/* Commercial Specifications */}
+ {comSpecs.length > 0 && (
+ <div>
+ <div className="tw-flex tw-items-center tw-justify-between mb-4">
+ <h3 className="tw-text-lg tw-font-semibold text-body tw-flex tw-items-center gap-2">
+ <Building className="w-5 h-5" />
+ Commercial Standards
+ </h3>
+ <button className="btn btn-primary btn-sm d-inline-flex tw-align-items-center">
+ <Plus className="w-4 h-4 me-1" />
+ Add Standard
+ </button>
+ </div>
+  {comSpecs.map(spec => (
+ <div key={spec.com_spec_id} className="bg-body tw-rounded-lg p-4 mb-4">
+ <div className="tw-grid tw-grid-cols-3 gap-4">
+ <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Intensity</h4>
+ <div className="text-body">
+ <div>FAR: {formatRange(spec.far_min, spec.far_max)}</div>
+ <div>Max Coverage: {formatNumber(spec.cov_max_pct, '%')}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Building</h4>
+ <div className="text-body">
+ <div>Max Height: {formatNumber(spec.hgt_max_ft, ' ft')}</div>
+ <div>Min Open Space: {formatNumber(spec.os_min_pct, '%')}</div>
+ </div>
+ </div>
+  <div>
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Parking</h4>
+ <div className="text-body">
+ <div>Ratio: {formatNumber(spec.pk_per_ksf, ' /1000sf')}</div>
+ </div>
+ </div>
+  <div className="col-span-2">
+ <h4 className="tw-text-sm tw-font-medium text-body-tertiary mb-2">Setbacks (ft)</h4>
+ <div className="text-body tw-text-sm tw-grid tw-grid-cols-4 gap-2">
+ <div>Front: {formatNumber(spec.sb_front_ft)}</div>
+ <div>Side: {formatNumber(spec.sb_side_ft)}</div>
+ <div>Rear: {formatNumber(spec.sb_rear_ft)}</div>
+ <div>Corner: {formatNumber(spec.sb_corner_ft)}</div>
+ </div>
+ </div>
+  <div className="tw-flex tw-items-center tw-justify-end">
+ <button
+ className="btn btn-sm btn-ghost-primary"
+ aria-label="Edit commercial standard"
+ >
+ <Edit className="w-4 h-4" />
+ </button>
+ </div>
+ </div>
+  {spec.notes && (
+ <div className="mt-3 pt-3 tw-border-t border">
+ <p className="tw-text-sm text-body-tertiary">{spec.notes}</p>
+ </div>
+ )}
+ </div>
+ ))}
+ </div>
+ )}
+
+ {/* No specifications */}
+ {resSpecs.length === 0 && comSpecs.length === 0 && (
+ <div className="text-center py-8 text-body-tertiary">
+ <Building className="w-12 h-12 mx-auto mb-4 tw-opacity-50" />
+ <div className="tw-text-lg mb-2">No Development Standards</div>
+ <div className="tw-text-sm mb-4">Add development standards to define density, setbacks, and building requirements</div>
+ <button className="btn btn-primary">
+ Add Development Standard
+ </button>
+ </div>
+ )}
+ </div>
+ )}
+
+ {activeTab === 'products' && (
+ <div>
+ <div className="tw-flex tw-items-center tw-justify-between mb-4">
+ <h3 className="tw-text-lg tw-font-semibold text-body">Lot Products</h3>
+ <button className="btn btn-primary btn-sm d-inline-flex tw-align-items-center">
+ <Plus className="w-4 h-4 me-1" />
+ Add Product
+ </button>
+ </div>
+  {lotProducts.length > 0 ? (
+ <div className="tw-grid tw-grid-cols-2 gap-4">
+ {lotProducts.map(product => (
+ <div key={product.product_id} className="bg-body tw-rounded-lg p-4">
+ <div className="tw-flex tw-items-center tw-justify-between mb-2">
+ <h4 className="tw-font-medium text-body">{product.code}</h4>
+ <button
+ className="btn btn-sm btn-ghost-primary"
+ aria-label="Edit lot product"
+ >
+ <Edit className="w-4 h-4" />
+ </button>
+ </div>
+  <div className="tw-space-y-1 tw-text-sm">
+ <div className="text-body-tertiary">
+ Lot Size: {product.lot_w_ft}' × {product.lot_d_ft}'
+ </div>
+ <div className="text-body-tertiary">
+ Area: {formatNumber(product.lot_area_sf, ' sf')}
+ </div>
+ <div className="text-body-tertiary">
+ Acres: {product.lot_area_sf ? (product.lot_area_sf / 43560).toFixed(3) : '—'}
+ </div>
+ </div>
+ </div>
+ ))}
+ </div>
+ ) : (
+ <div className="text-center py-8 text-body-tertiary">
+ <Home className="w-12 h-12 mx-auto mb-4 tw-opacity-50" />
+ <div className="tw-text-lg mb-2">No Lot Products</div>
+ <div className="tw-text-sm mb-4">Add lot products to define standard lot sizes and configurations</div>
+ <button className="btn btn-primary">
+ Add Lot Product
+ </button>
+ </div>
+ )}
+ </div>
+ )}
+
+ {activeTab === 'codes' && (
+ <div>
+ <div className="tw-flex tw-items-center tw-justify-between mb-4">
+ <h3 className="tw-text-lg tw-font-semibold text-body">Land Use Codes</h3>
+ <button className="btn btn-primary btn-sm d-inline-flex tw-align-items-center">
+ <Plus className="w-4 h-4 me-1" />
+ Add Code
+ </button>
+ </div>
+  {landuses.length > 0 ? (
+ <div className="tw-space-y-3">
+ {landuses.map(landuse => {
+ const isSpecific = landuse.subtype_id === subtype.subtype_id;
+ const isGeneral = !landuse.subtype_id || landuse.subtype_id === 0;
+  return (
+ <div key={landuse.landuse_id} className="bg-body tw-rounded-lg p-4">
+ <div className="tw-flex tw-items-center tw-justify-between mb-2">
+ <div className="tw-flex tw-items-center gap-2">
+ <h4 className="tw-font-medium text-body">{landuse.landuse_code}</h4>
+ {isSpecific && (
+ <span className="px-2 py-1 tw-bg-blue-600 tw-text-xs text-body rounded">
+ Specific
+ </span>
+ )}
+ {isGeneral && (
+ <span className="px-2 py-1 bg-body tw-text-xs text-body-tertiary rounded">
+ General
+ </span>
+ )}
+ <div className="tw-text-sm text-body-tertiary">({landuse.landuse_type})</div>
+ </div>
+ <button
+ className="btn btn-sm btn-ghost-primary"
+ aria-label="Edit land use code"
+ >
+ <Edit className="w-4 h-4" />
+ </button>
+ </div>
+  <div className="tw-text-sm text-body-tertiary">
+ <div className="tw-font-medium">{landuse.name}</div>
+ {landuse.description && landuse.description !== landuse.name && (
+ <div className="mt-1 text-body-tertiary">{landuse.description}</div>
+ )}
+ {isGeneral && (
+ <div className="mt-1 tw-text-xs text-body-tertiary">
+ Available to all subtypes • Click to assign specifically
+ </div>
+ )}
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ ) : (
+ <div className="text-center py-8 text-body-tertiary">
+ <Map className="w-12 h-12 mx-auto mb-4 tw-opacity-50" />
+ <div className="tw-text-lg mb-2">No Land Use Codes</div>
+ <div className="tw-text-sm mb-4">Add land use codes to define specific uses allowed within this subtype</div>
+ <button className="btn btn-primary">
+ Add Land Use Code
+ </button>
+ </div>
+ )}
+ </div>
+ )}
+ </div>
+ )}
+ </div>
+ </div>
+ </div>
+ );
+};
+
+export default LandUseDetails;

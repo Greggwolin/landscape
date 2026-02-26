@@ -1,0 +1,81 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+
+interface SearchBoxProps {
+ onSearch: (query: string) => void;
+ placeholder?: string;
+ initialValue?: string;
+ debounceMs?: number;
+}
+
+export default function SearchBox({  onSearch,  placeholder ="Search documents...",  initialValue ="",
+ debounceMs = 300 }: SearchBoxProps) {
+ const [query, setQuery] = useState(initialValue);
+ const [debouncedQuery, setDebouncedQuery] = useState(initialValue);
+
+ // Debounce search query
+ useEffect(() => {
+ const timer = setTimeout(() => {
+ setDebouncedQuery(query);
+ }, debounceMs);
+
+ return () => clearTimeout(timer);
+ }, [query, debounceMs]);
+
+ // Trigger search when debounced query changes
+ useEffect(() => {
+ onSearch(debouncedQuery);
+ }, [debouncedQuery, onSearch]);
+
+ const handleClear = () => {
+ setQuery('');
+ setDebouncedQuery('');
+ };
+
+ const handleSubmit = (e: React.FormEvent) => {
+ e.preventDefault();
+ setDebouncedQuery(query);
+ };
+
+ return (
+ <form onSubmit={handleSubmit} className="tw-relative">
+ <div className="tw-relative">
+ {/* Search Icon */}
+ <div className="tw-absolute tw-inset-y-0 left-0 pl-3 tw-flex tw-items-center tw-pointer-events-none">
+ <MagnifyingGlassIcon className="h-5 w-5 text-body-tertiary" />
+ </div>
+
+ {/* Search Input */}
+ <input
+ type="text"
+ value={query}
+ onChange={(e) => setQuery(e.target.value)}
+ placeholder={placeholder}
+ className="tw-block tw-w-full pl-10 pr-10 py-3 border border tw-rounded-lg bg-body text-body focus:ring-2 focus:ring-blue-500 focus:tw-border-blue-500 sm:tw-text-sm tw-transition-colors"
+ />
+
+ {/* Clear Button */}
+ {query && (
+ <div className="tw-absolute tw-inset-y-0 right-0 pr-3 tw-flex tw-items-center">
+ <button
+ type="button"
+ onClick={handleClear}
+ className="text-body-tertiary hover:text-body-secondary tw-transition-colors"
+ >
+ <XMarkIcon className="h-5 w-5" />
+ </button>
+ </div>
+ )}
+ </div>
+
+ {/* Search Tips */}
+ {query.length === 0 && (
+ <div className="mt-2 tw-text-xs text-body-tertiary">
+ Search by document name, content, type, discipline, or tags
+ </div>
+ )}
+ </form>
+ );
+}

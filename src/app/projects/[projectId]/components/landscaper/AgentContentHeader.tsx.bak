@@ -1,0 +1,47 @@
+'use client';
+
+import React from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilChevronLeft } from '@coreui/icons';
+
+interface AgentContentHeaderProps {
+  title: string;
+  subtitle?: string;
+  onToggleCollapse?: () => void;
+  actions?: React.ReactNode;
+}
+
+export function AgentContentHeader({
+  title,
+  subtitle,
+  onToggleCollapse,
+  actions,
+}: AgentContentHeaderProps) {
+  return (
+    <div
+      className="tw-flex tw-items-center tw-justify-between gap-2 px-3 py-2 tw-sticky top-0 tw-z-10"
+      style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+    >
+      <div className="tw-flex tw-items-center gap-3">
+        <span className="tw-text-sm tw-font-semibold text-foreground tw-whitespace-nowrap">
+          {title}
+        </span>
+        {subtitle && (
+          <span className="tw-text-xs text-muted">{subtitle}</span>
+        )}
+      </div>
+      <div className="tw-flex tw-items-center gap-2">
+        {actions}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded hover:bg-hover-overlay text-muted hover:text-foreground tw-transition-colors"
+            aria-label="Collapse content panel"
+          >
+            <CIcon icon={cilChevronLeft} size="sm" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

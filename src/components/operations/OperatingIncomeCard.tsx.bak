@@ -1,0 +1,357 @@
+'use client';
+
+/**
+ * OperatingIncomeCard - P&L style operating income display
+ *
+ * Follows the same visual pattern as the Valuation > Income Approach tab.
+ * Shows Rental Income, Other Income, Vacancy/Deductions in a unified P&L format.
+ * Includes inline editable fields for vacancy rates and other income.
+ */
+
+import React from 'react';
+import { SectionCard } from './SectionCard';
+import { LineItemRow, formatCurrency, formatPercent, formatPerSF } from './types';
+import { InputCell } from './InputCell';
+import { LockClosedIcon } from '@heroicons/react/20/solid';
+
+interface OperatingIncomeCardProps {
+  rentalRows: LineItemRow[];
+  vacancyRows: LineItemRow[];
+  otherIncomeRows: LineItemRow[];
+  grossPotentialRent: number;
+  effectiveGrossIncome: number;
+  totalSF?: number;
+  hasDetailedRentRoll?: boolean;
+  valueAddEnabled?: boolean;
+  onUpdateVacancy?: (lineItemKey: string, field: string, value: number | null) => void;
+  onUpdateOtherIncome?: (lineItemKey: string, field: string, value: number | null) => void;
+}
+
+export function OperatingIncomeCard({
+  rentalRows,
+  vacancyRows,
+  otherIncomeRows,
+  grossPotentialRent,
+  effectiveGrossIncome,
+  totalSF = 0,
+  hasDetailedRentRoll = false,
+  valueAddEnabled = false,
+  onUpdateVacancy,
+  onUpdateOtherIncome,
+}: OperatingIncomeCardProps) {
+  // Calculate rental income totals
+  const rentalTotals = rentalRows.reduce(
+    (acc, row) => {
+      const count = row.as_is.count || 0;
+      const currentTotal = row.as_is.total || 0;
+      const marketTotal = row.as_is.market_total || currentTotal;
+      const lossToLease = marketTotal - currentTotal;
+      const sf = row.as_is.sf || 0;
+      return {
+        count: acc.count + count,
+        annual: acc.annual + currentTotal,
+        lossToLease: acc.lossToLease + lossToLease,
+        totalSF: acc.totalSF + (sf * count),
+      };
+    },
+    { count: 0, annual: 0, lossToLease: 0, totalSF: 0 }
+  );
+
+  // Calculate weighted average rent per unit (based on annual rent / 12 months / unit count)
+  const avgRentPerUnit = rentalTotals.count > 0 ? (rentalTotals.annual / 12) / rentalTotals.count : 0;
+  // Calculate weighted average $/SF
+  const avgPerSF = rentalTotals.totalSF > 0 ? (rentalTotals.annual / 12) / rentalTotals.totalSF : 0;
+
+  // Calculate other income total
+  const otherIncomeTotal = otherIncomeRows.reduce(
+    (acc, row) => acc + (row.as_is.total || 0),
+    0
+  );
+
+  // Calculate vacancy totals
+  const vacancyTotal = vacancyRows.reduce(
+    (acc, row) => acc + (row.as_is.total || 0),
+    0
+  );
+
+  // Source subtitle
+  const sourceLabel = hasDetailedRentRoll ? 'from Rent Roll' : 'from Floor Plan Matrix';
+
+  return (
+    <SectionCard
+      title="Operating Income"
+      subtitle={sourceLabel}
+      className="ops-income-card"
+    >
+      <table className="ops-table tw-ops-grid">
+          <colgroup>
+            <col style={{ width: 'var(--ops-col-label)' }} />
+            <col style={{ width: 'var(--ops-col-units)' }} />
+            <col style={{ width: 'var(--ops-col-current)' }} />
+            <col style={{ width: 'var(--ops-col-annual)' }} />
+            <col style={{ width: 'var(--ops-col-psf)' }} />
+            <col style={{ width: 'var(--ops-col-loss)' }} />
+            {valueAddEnabled && (
+              <>
+                <col style={{ width: 'var(--ops-col-post)' }} />
+                <col style={{ width: 'var(--ops-col-reno)' }} />
+              </>
+            )}
+          </colgroup>
+          <tbody>
+            {/* Rental Income Section Header with Column Labels */}
+            <tr className="ops-parent-row">
+              <td className="tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Rental Income</td>
+              <td className="text-right tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Units</td>
+              <td className="text-right tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Current</td>
+              <td className="text-right tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Annual</td>
+              <td className="text-right tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>$/SF</td>
+              <td className="text-right tw-font-semibold" style={{ whiteSpace: 'nowrap', fontSize: '0.8125rem' }}>Loss to Lease</td>
+              {valueAddEnabled && (
+                <>
+                  <td className="text-right tw-font-semibold post-reno" style={{ whiteSpace: 'nowrap' }}>Post-Reno</td>
+                  <td className="text-right tw-font-semibold post-reno" style={{ whiteSpace: 'nowrap' }}>Reno Total</td>
+                </>
+              )}
+            </tr>
+
+            {rentalRows.map((row) => {
+              const currentRate = row.as_is.rate || 0;
+              const currentTotal = row.as_is.total || 0;
+              const marketTotal = row.as_is.market_total || currentTotal;
+              const lossToLease = marketTotal - currentTotal;
+              const perSF = row.as_is.per_sf;
+
+              const postRenoRate = row.post_reno?.rate || 0;
+              const postRenoTotal = row.post_reno?.total || 0;
+
+              return (
+                <tr key={row.line_item_key} className="ops-child-row" style={{ color: 'var(--cui-body-color)' }}>
+                  <td className="py-1" style={{ whiteSpace: 'nowrap' }}>{row.label}</td>
+                  <td className="text-right py-1">{row.as_is.count ? row.as_is.count : '—'}</td>
+                  <td className="text-right py-1">{currentRate > 0 ? formatCurrency(currentRate) : '—'}</td>
+                  <td className="text-right py-1 tw-font-semibold">{currentTotal > 0 ? formatCurrency(currentTotal) : '—'}</td>
+                  <td className="text-right py-1">{perSF ? formatPerSF(perSF) : '—'}</td>
+                  <td
+                    className="text-right py-1 tw-ops-loss-to-lease"
+                    style={{ color: lossToLease > 0 ? undefined : 'var(--cui-body-color)', fontWeight: 'normal' }}
+                  >
+                    {lossToLease > 0 ? formatCurrency(lossToLease) : '—'}
+                  </td>
+                  {valueAddEnabled && (
+                    <>
+                      <td className="text-right py-1 post-reno">{postRenoRate > 0 ? formatCurrency(postRenoRate) : '—'}</td>
+                      <td className="text-right py-1 tw-font-semibold post-reno">{postRenoTotal > 0 ? formatCurrency(postRenoTotal) : '—'}</td>
+                    </>
+                  )}
+                </tr>
+              );
+            })}
+
+            {/* OTHER INCOME SECTION */}
+            {otherIncomeRows.length > 0 && (
+              <>
+                <tr className="ops-parent-row">
+                  <td className="tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Other Income</td>
+                  <td className="text-right tw-font-semibold">—</td>
+                  <td className="text-right tw-font-semibold">—</td>
+                  <td className="text-right tw-font-bold">{formatCurrency(otherIncomeTotal)}</td>
+                  <td className="text-right tw-font-semibold">—</td>
+                  <td className="text-right tw-font-semibold">—</td>
+                  {valueAddEnabled && (
+                    <>
+                      <td className="text-right tw-font-semibold post-reno">—</td>
+                      <td className="text-right tw-font-bold post-reno">—</td>
+                    </>
+                  )}
+                </tr>
+
+                {otherIncomeRows.map((row) => {
+                  const isParent = row.is_calculated;
+                  const postRenoRate = row.post_reno?.rate || 0;
+                  const postRenoTotal = row.post_reno?.total || 0;
+
+                  return (
+                    <tr key={row.line_item_key} className="ops-child-row" style={{ color: 'var(--cui-body-color)' }}>
+                      <td className="py-1" style={{ whiteSpace: 'nowrap' }}>{row.label}</td>
+                      <td className="text-right py-1">—</td>
+                      <td className="text-right py-1">
+                        {isParent ? (
+                          <span style={{ color: 'var(--cui-secondary-color)' }}>—</span>
+                        ) : onUpdateOtherIncome ? (
+                          <InputCell
+                            value={row.as_is.rate}
+                            variant="as-is"
+                            format="currency"
+                            onChange={(val) => onUpdateOtherIncome(row.line_item_key, 'as_is_rate', val)}
+                          />
+                        ) : (
+                          formatCurrency(row.as_is.rate || 0)
+                        )}
+                      </td>
+                      <td className="text-right py-1 tw-font-semibold">{(row.as_is.total || 0) > 0 ? formatCurrency(row.as_is.total || 0) : '—'}</td>
+                      <td className="text-right py-1">—</td>
+                      <td className="text-right py-1">—</td>
+                      {valueAddEnabled && (
+                        <>
+                          <td className="text-right py-1 post-reno">
+                            {isParent ? '—' : (
+                              onUpdateOtherIncome ? (
+                                <InputCell
+                                  value={postRenoRate}
+                                  variant="post-reno"
+                                  format="currency"
+                                  onChange={(val) => onUpdateOtherIncome(row.line_item_key, 'post_reno_rate', val)}
+                                />
+                              ) : formatCurrency(postRenoRate)
+                            )}
+                          </td>
+                          <td className="text-right py-1 tw-font-semibold post-reno">{postRenoTotal > 0 ? formatCurrency(postRenoTotal) : '—'}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </>
+            )}
+
+            {/* VACANCY & DEDUCTIONS SECTION */}
+            {vacancyRows.length > 0 && (
+              <>
+                <tr className="ops-parent-row">
+                  <td className="tw-font-semibold" style={{ whiteSpace: 'nowrap' }}>Less: Vacancy & Deductions</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  {valueAddEnabled && (
+                    <>
+                      <td className="post-reno"></td>
+                      <td className="post-reno"></td>
+                    </>
+                  )}
+                </tr>
+
+                {vacancyRows.map((row) => {
+                  const rate = row.as_is.rate || 0;
+                  const amount = row.as_is.total || 0;
+                  const isPercentage = row.is_percentage;
+                  // Physical vacancy is read-only if calculated from rent roll
+                  const isReadOnly = row.is_readonly || (row.line_item_key === 'physical_vacancy' && hasDetailedRentRoll);
+                  const postRenoRate = row.post_reno?.rate || 0;
+                  const postRenoTotal = row.post_reno?.total || 0;
+                  // Calculate $/SF for vacancy (monthly basis)
+                  const perSF = totalSF > 0 ? (Math.abs(amount) / 12) / totalSF : 0;
+                  // Loss to Lease for vacancy = difference between as-is and post-reno amounts (savings from lower vacancy)
+                  const vacancyLossToLease = valueAddEnabled ? Math.abs(amount) - Math.abs(postRenoTotal) : 0;
+
+                  return (
+                    <tr key={row.line_item_key} className="ops-child-row" style={{ color: 'var(--cui-body-color)' }}>
+                      <td className="py-1" style={{ whiteSpace: 'nowrap' }}>
+                        <span className="tw-inline-flex tw-items-center gap-1">
+                          {row.label}
+                          {isReadOnly && (
+                            <span className="tw-inline-flex tw-items-center gap-1 tw-text-xs ml-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                              <LockClosedIcon className="w-3 h-3" />
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className={`${isReadOnly ? 'text-right' : 'text-left ops-input-cell'} py-1`}>
+                        {isReadOnly ? (
+                          <span>{formatPercent(rate)}</span>
+                        ) : onUpdateVacancy ? (
+                          <InputCell
+                            value={rate}
+                            variant="as-is"
+                            format={isPercentage ? 'percent' : 'currency'}
+                            onChange={(val) => onUpdateVacancy(row.line_item_key, 'as_is_rate', val)}
+                            className="ops-input-compact"
+                            minWidth={50}
+                          />
+                        ) : (
+                          formatPercent(rate)
+                        )}
+                      </td>
+                      <td className="text-right py-1 ops-vacancy-value">{rate > 0 ? `(${formatCurrency(Math.abs(rate * grossPotentialRent / 12))})` : '—'}</td>
+                      <td className="text-right py-1 ops-vacancy-value tw-font-semibold">{amount !== 0 ? `(${formatCurrency(Math.abs(amount))})` : '—'}</td>
+                      <td className="text-right py-1 ops-vacancy-value">{perSF > 0 ? `(${formatPerSF(perSF)})` : '—'}</td>
+                      <td
+                        className="text-right py-1 tw-ops-loss-to-lease"
+                        style={{ color: vacancyLossToLease > 0 ? undefined : 'var(--cui-body-color)', fontWeight: 'normal' }}
+                      >
+                        {vacancyLossToLease > 0 ? formatCurrency(vacancyLossToLease) : '—'}
+                      </td>
+                      {valueAddEnabled && (
+                        <>
+                          <td className={`${onUpdateVacancy ? 'text-left' : 'text-right'} py-1 post-reno`}>
+                            {onUpdateVacancy ? (
+                              <InputCell
+                                value={postRenoRate}
+                                variant="post-reno"
+                                format={isPercentage ? 'percent' : 'currency'}
+                                onChange={(val) => onUpdateVacancy(row.line_item_key, 'post_reno_rate', val)}
+                                className="ops-input-compact"
+                                minWidth={50}
+                              />
+                            ) : (
+                              formatPercent(postRenoRate)
+                            )}
+                          </td>
+                          <td className="text-right py-1 ops-vacancy-value tw-font-semibold post-reno">{postRenoTotal !== 0 ? `(${formatCurrency(Math.abs(postRenoTotal))})` : '—'}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </>
+            )}
+
+            {/* EFFECTIVE GROSS INCOME - Total Row */}
+            <tr
+              className="tw-border-t-2 tw-border-b-2"
+              style={{
+                borderColor: 'var(--cui-primary)',
+                backgroundColor: 'var(--cui-tertiary-bg)',
+              }}
+            >
+              <td className="py-3 tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>
+                Effective Gross Income
+              </td>
+              <td className="text-right py-3 tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                {rentalTotals.count}
+              </td>
+              <td className="text-right py-3 tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                —
+              </td>
+              <td className="text-right py-3 tw-font-bold" style={{ color: 'var(--cui-success)' }}>
+                {formatCurrency(effectiveGrossIncome)}
+              </td>
+              <td className="text-right py-3 tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                —
+              </td>
+              <td
+                className="text-right py-3 tw-ops-loss-to-lease"
+                style={{ color: rentalTotals.lossToLease > 0 ? undefined : 'var(--cui-body-color)', fontWeight: 'normal' }}
+              >
+                {rentalTotals.lossToLease > 0 ? formatCurrency(rentalTotals.lossToLease) : '—'}
+              </td>
+              {valueAddEnabled && (
+                <>
+                  <td className="text-right py-3 tw-font-semibold post-reno" style={{ color: 'var(--cui-body-color)' }}>
+                    —
+                  </td>
+                  <td className="text-right py-3 tw-font-bold post-reno" style={{ color: 'var(--cui-success)' }}>
+                    —
+                  </td>
+                </>
+              )}
+            </tr>
+          </tbody>
+        </table>
+    </SectionCard>
+  );
+}
+
+export default OperatingIncomeCard;

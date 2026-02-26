@@ -1,0 +1,231 @@
+'use client';
+
+/**
+ * System Preferences - Admin Page
+ * Configure app-level taxonomy, categories, and default settings
+ */
+
+import React, { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import AdminNavBar from '@/app/components/AdminNavBar';
+import { LandscapeButton } from '@/components/ui/landscape';
+import { useUserTier, useUpdateUserTier } from '@/hooks/useUserTier';
+
+// Dynamically import TaxonomyPage to avoid SSR issues
+const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
+  ssr: false,
+});
+
+// Dynamically import UnitCostCategoryManager to avoid SSR issues
+const UnitCostCategoryManager = dynamic(
+  () => import('./components/UnitCostCategoryManager'),
+  { ssr: false }
+);
+
+const UnitOfMeasureManager = dynamic(
+  () => import('./components/UnitOfMeasureManager'),
+  { ssr: false }
+);
+
+const SystemPicklistsAccordion = dynamic(
+  () => import('@/components/admin/SystemPicklistsAccordion').then((mod) => mod.SystemPicklistsAccordion),
+  { ssr: false }
+);
+
+// Preference categories
+interface PreferenceCategory {
+  key: string;
+  label: string;
+  description: string;
+  icon: string;
+}
+
+const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
+  {
+    key: 'pro_features',
+    label: 'Pro Features',
+    description: 'Enable access to capitalization modeling, debt/equity structures, and waterfall distributions',
+    icon: 'Star'
+  },
+  {
+    key: 'unit_cost_categories',
+    label: 'Unit Cost Categories',
+    description: 'Manage global cost categories across all lifecycle stages',
+    icon: 'FolderTree'
+  },
+  {
+    key: 'land_use_taxonomy',
+    label: 'Land Use Taxonomy Manager',
+    description: 'Configure land use types, families, and product categories',
+    icon: 'Map'
+  },
+  {
+    key: 'uom_manager',
+    label: 'Units of Measure Manager',
+    description: 'Configure measurement units used throughout the application',
+    icon: 'Ruler'
+  },
+  {
+    key: 'system_picklists',
+    label: 'System Picklists',
+    description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
+    icon: 'List'
+  }
+];
+
+export default function SystemPreferencesPage() {
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const { data: tierLevel, isLoading: isTierLoading } = useUserTier();
+  const updateTierMutation = useUpdateUserTier();
+
+  const toggleCategory = (key: string) => {
+    setExpandedCategory(expandedCategory === key ? null : key);
+  };
+
+  const handleTierToggle = async (checked: boolean) => {
+    try {
+      const newTier = checked ? 'pro' : 'analyst';
+      await updateTierMutation.mutateAsync(newTier);
+    } catch (error) {
+      console.error('Failed to update tier:', error);
+      alert('Failed to update tier setting. Please try again.');
+    }
+  };
+
+  return (
+    <div className="tw-min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+      <AdminNavBar />
+      <div className="p-4 tw-space-y-4">
+        <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="tw-rounded-lg tw-shadow-sm border">
+          {/* Header */}
+          <div className="p-6" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center gap-3">
+              <Settings size={24} style={{ color: 'var(--cui-primary)', flexShrink: 0 }} />
+              <h1 className="tw-text-2xl tw-font-bold tw-whitespace-nowrap" style={{ color: 'var(--cui-body-color)' }}>System Preferences</h1>
+              <span style={{ color: 'var(--cui-body-color)', fontSize: '1.5rem', fontWeight: 'bold', lineHeight: 1 }}>·</span>
+              <span className="tw-text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                Configure app-level taxonomy, categories, and default settings
+              </span>
+            </div>
+          </div>
+
+          {/* Preference Categories Accordion */}
+          <div className="tw-divide-y" style={{ borderColor: 'var(--cui-border-color)' }}>
+          {PREFERENCE_CATEGORIES.map(category => {
+            const isExpanded = expandedCategory === category.key;
+
+            return (
+              <div key={category.key}>
+                <LandscapeButton
+                  onClick={() => toggleCategory(category.key)}
+                  variant="ghost"
+                  color="secondary"
+                  className="tw-flex tw-w-full tw-items-center tw-justify-between px-6 py-4 tw-transition-colors"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    backgroundColor: isExpanded ? 'var(--cui-tertiary-bg)' : 'transparent',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                    if (!isExpanded) {
+                      e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
+                    }
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                    if (!isExpanded) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  <div className="tw-flex tw-items-center gap-3 tw-flex-1">
+                    <div className="tw-flex tw-items-center" style={{ flexShrink: 0 }}>
+                      {isExpanded ? (
+                        <ChevronDown size={20} style={{ color: 'var(--cui-secondary-color)' }} />
+                      ) : (
+                        <ChevronRight size={20} style={{ color: 'var(--cui-secondary-color)' }} />
+                      )}
+                    </div>
+                    <div className="tw-flex tw-items-center gap-3 tw-flex-1">
+                      <span className="tw-font-medium tw-whitespace-nowrap">{category.label}</span>
+                      <span style={{ color: 'var(--cui-body-color)', fontSize: '1rem', fontWeight: 'bold', lineHeight: 1 }}>·</span>
+                      <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                        {category.description}
+                      </span>
+                    </div>
+                  </div>
+                </LandscapeButton>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                    {category.key === 'pro_features' ? (
+                      <div className="px-6 py-4">
+                        <div className="d-flex tw-justify-content-between tw-align-items-center mb-3">
+                          <div>
+                            <strong style={{ color: 'var(--cui-body-color)' }}>Enable Pro Features</strong>
+                            <p className="text-muted small mb-0">
+                              Access capitalization modeling, debt/equity structures, and waterfall distributions
+                            </p>
+                          </div>
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              role="switch"
+                              id="proTierSwitch"
+                              checked={tierLevel === 'pro'}
+                              onChange={(e) => handleTierToggle(e.target.checked)}
+                              disabled={isTierLoading || updateTierMutation.isPending}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            <label
+                              className="form-check-label ms-2"
+                              htmlFor="proTierSwitch"
+                              style={{
+                                color: 'var(--cui-body-color)',
+                                fontWeight: tierLevel === 'pro' ? '600' : '400'
+                              }}
+                            >
+                              {tierLevel === 'pro' ? 'Pro' : 'Analyst'}
+                            </label>
+                          </div>
+                        </div>
+
+                        {tierLevel === 'pro' && (
+                          <div className="alert alert-info mb-0">
+                            <small>
+                              <strong>Pro Mode Active:</strong> You now have access to the Capitalization tile
+                              in project navigation. You can toggle back to Analyst mode at any time.
+                            </small>
+                          </div>
+                        )}
+                      </div>
+                    ) : category.key === 'land_use_taxonomy' ? (
+                      <div className="px-6 py-4">
+                        <TaxonomyPage />
+                      </div>
+                    ) : category.key === 'unit_cost_categories' ? (
+                      <div style={{ minHeight: '600px' }}>
+                        <UnitCostCategoryManager />
+                      </div>
+                    ) : category.key === 'uom_manager' ? (
+                      <div className="px-6 py-4">
+                        <UnitOfMeasureManager />
+                      </div>
+                    ) : category.key === 'system_picklists' ? (
+                      <div className="px-6 py-4">
+                        <SystemPicklistsAccordion />
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

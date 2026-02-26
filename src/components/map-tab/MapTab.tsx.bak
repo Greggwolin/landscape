@@ -1,0 +1,1881 @@
+/**
+ * MapTab Component
+ *
+ * Full orchestrator for the Map tab — replaces the basic Leaflet view with
+ * the advanced MapLibre GIS system: Google basemaps, plan parcels, project
+ * boundary, tax parcels, draw tools, and feature persistence via Django API.
+ */
+
+'use client';
+
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
+  CButton,
+} from '@coreui/react';
+import type { FeatureCollection, Feature, Geometry } from 'geojson';
+import * as turf from '@turf/turf';
+import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
+
+import type {
+  MapTabProps,
+  BasemapStyle,
+  DrawTool,
+  LayerGroup,
+  LayerGroupId,
+  MapFeature,
+  MapViewState,
+  FeatureCategory,
+} from './types';
+import { MapCanvas } from './MapCanvas';
+import type { MapCanvasRef } from './MapCanvas';
+import { LayerPanel } from './LayerPanel';
+import { DrawToolbar } from './DrawToolbar';
+import { FeatureModal } from './FeatureModal';
+import type { FeatureGeometryType } from './FeatureModal';
+import { useMapDraw } from './hooks/useMapDraw';
+import type { DrawnFeature } from './hooks/useMapDraw';
+import { useMapFeatures } from './hooks/useMapFeatures';
+import { fetchJson } from '@/lib/fetchJson';
+import { getDefaultLayerGroups, BASEMAP_OPTIONS, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from './constants';
+import {
+  useDemographics,
+  DEMOGRAPHIC_FIELDS,
+  formatDemographicValue,
+} from '@/components/location-intelligence';
+import type { RingDemographics } from '@/components/location-intelligence';
+import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
+import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
+import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
+import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
+
+import './map-tab.css';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const parseCoordinate = (value?: number | string | null): number | null => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeCountyValue = (value?: string | null): CountyCode | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(' county', '').trim();
+  return normalized in COUNTY_PARCEL_SERVICES ? (normalized as CountyCode) : null;
+};
+
+const formatCountyLabel = (county: CountyCode): string =>
+  `${county.charAt(0).toUpperCase()}${county.slice(1)} County`;
+
+const getParcelIdFromProps = (props: Record<string, unknown>, featureId?: unknown): string => {
+  const candidate =
+    props.parcel_id ??
+    props.tax_parcel_id ??
+    props.PARCELID ??
+    props.APN ??
+    props.OBJECTID ??
+    props.ObjectID ??
+    props.OBJECTID_1 ??
+    featureId;
+  if (candidate == null) return '';
+  const value = String(candidate).trim();
+  return value;
+};
+
+const getParcelAddressFromProps = (props: Record<string, unknown>): string => {
+  const candidate =
+    props.address ??
+    props.SITUS_ADDRESS ??
+    props.SITEADDRESS ??
+    props.situs_address ??
+    props.siteaddress;
+  return typeof candidate === 'string' ? candidate : '';
+};
+
+const getParcelAcresFromProps = (props: Record<string, unknown>): number | null => {
+  const candidate = props.acres ?? props.ACRES ?? props.GROSSAC ?? props.grossac;
+  const parsed = Number(candidate);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeLatLon = (lat: number | null, lon: number | null): { lat: number | null; lon: number | null } => {
+  if (lat === null || lon === null) return { lat, lon };
+  const latValid = Math.abs(lat) <= 90;
+  const lonValid = Math.abs(lon) <= 180;
+  if (latValid && lonValid) return { lat, lon };
+  const swappedLatValid = Math.abs(lon) <= 90;
+  const swappedLonValid = Math.abs(lat) <= 180;
+  if (swappedLatValid && swappedLonValid) return { lat: lon, lon: lat };
+  return {
+    lat: latValid ? lat : null,
+    lon: lonValid ? lon : null,
+  };
+};
+
+const buildBoundaryFeature = (geojson: Geometry, metadata: Record<string, unknown>): Feature<Geometry> => ({
+  type: 'Feature',
+  geometry: geojson,
+  properties: metadata,
+});
+
+/**
+ * Compute [west, south, east, north] bbox string from a FeatureCollection
+ * using Turf.js (no Leaflet dependency).
+ */
+function computeBboxParam(fc: FeatureCollection | null): string {
+  if (!fc || !fc.features?.length) return '';
+  try {
+    const bbox = turf.bbox(fc);
+    const padding = 0.001;
+    return [bbox[0] - padding, bbox[1] - padding, bbox[2] + padding, bbox[3] + padding].join(',');
+  } catch {
+    return '';
+  }
+}
+
+function normalizeParcelFeatureCollection(collection: FeatureCollection): FeatureCollection {
+  const features = collection.features.map((feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const parcelId = getParcelIdFromProps(props, feature.id);
+    if (parcelId) {
+      props.parcel_id = parcelId;
+    }
+    return {
+      ...feature,
+      id: parcelId || feature.id,
+      properties: props,
+    };
+  });
+  return { ...collection, features };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MapTab Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function MapTab({ project }: MapTabProps) {
+  const projectId = project.project_id;
+  const initialCountyValue = useMemo(() => {
+    const candidate =
+      (project as Record<string, unknown>).county ??
+      (project as Record<string, unknown>).jurisdiction_county ??
+      null;
+    return typeof candidate === 'string' ? candidate : null;
+  }, [project]);
+  const [projectCounty, setProjectCounty] = useState<string | null>(initialCountyValue);
+  const lastProjectIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (lastProjectIdRef.current !== projectId) {
+      lastProjectIdRef.current = projectId;
+      setProjectCounty(initialCountyValue);
+      return;
+    }
+    if (initialCountyValue && initialCountyValue !== projectCounty) {
+      setProjectCounty(initialCountyValue);
+    }
+  }, [initialCountyValue, projectCounty, projectId]);
+  const isDevelopmentProject = useMemo(() => {
+    const perspective = typeof project.analysis_perspective === 'string'
+      ? project.analysis_perspective.toUpperCase()
+      : '';
+    const analysisType = typeof project.analysis_type === 'string'
+      ? project.analysis_type.toUpperCase()
+      : '';
+    const subtype = typeof project.property_subtype === 'string' ? project.property_subtype : '';
+
+    if (perspective === 'DEVELOPMENT') return true;
+    if (analysisType === 'DEVELOPMENT' || analysisType === 'FEASIBILITY') return true;
+    if (subtype && LAND_DEVELOPMENT_SUBTYPES.includes(subtype as (typeof LAND_DEVELOPMENT_SUBTYPES)[number])) {
+      return true;
+    }
+    return false;
+  }, [project.analysis_perspective, project.analysis_type, project.property_subtype]);
+
+  // ───── Coordinates ─────
+  const { lat: projectLat, lon: projectLon } = useMemo(() => {
+    const primary = normalizeLatLon(
+      parseCoordinate(project.location_lat ?? null),
+      parseCoordinate(project.location_lon ?? null)
+    );
+    if (primary.lat !== null && primary.lon !== null) return primary;
+
+    const fallback = normalizeLatLon(
+      parseCoordinate(project.latitude ?? null),
+      parseCoordinate(project.longitude ?? null)
+    );
+    if (fallback.lat !== null && fallback.lon !== null) return fallback;
+
+    return {
+      lat: primary.lat ?? fallback.lat ?? null,
+      lon: primary.lon ?? fallback.lon ?? null,
+    };
+  }, [project.location_lat, project.location_lon, project.latitude, project.longitude]);
+
+  const hasProjectCenter = projectLat !== null && projectLon !== null;
+
+  const projectCenter = useMemo<[number, number]>(() => {
+    if (projectLat !== null && projectLon !== null) return [projectLon, projectLat]; // MapLibre uses [lng, lat]
+    return DEFAULT_MAP_CENTER;
+  }, [projectLat, projectLon]);
+
+  const [resolvedCenter, setResolvedCenter] = useState<[number, number] | null>(
+    hasProjectCenter ? projectCenter : null
+  );
+  const [mapApiCenter, setMapApiCenter] = useState<[number, number] | null>(null);
+  const [mapLocationOverride, setMapLocationOverride] = useState(false);
+
+  useEffect(() => {
+    if (!hasProjectCenter) return;
+    setResolvedCenter((prev) => {
+      if (!prev || prev[0] !== projectCenter[0] || prev[1] !== projectCenter[1]) {
+        return projectCenter;
+      }
+      return prev;
+    });
+  }, [hasProjectCenter, projectCenter]);
+
+  useEffect(() => {
+    if (!mapApiCenter) return;
+    setResolvedCenter((prev) => {
+      if (!prev || prev[0] !== mapApiCenter[0] || prev[1] !== mapApiCenter[1]) {
+        return mapApiCenter;
+      }
+      return prev;
+    });
+  }, [mapApiCenter]);
+
+  // ───── Map UI State ─────
+  const [basemap, setBasemap] = useState<BasemapStyle>('hybrid');
+  const [activeTool, setActiveTool] = useState<DrawTool>(null);
+  const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
+  const [layers, setLayers] = useState<LayerGroup[]>(() => getDefaultLayerGroups());
+  const mapCanvasRef = useRef<MapCanvasRef>(null);
+  const [mapBounds, setMapBounds] = useState<[number, number, number, number] | null>(null);
+
+  // ───── Feature Modal State ─────
+  const [featureModalOpen, setFeatureModalOpen] = useState(false);
+  const [pendingFeature, setPendingFeature] = useState<DrawnFeature | null>(null);
+  const [featureSaving, setFeatureSaving] = useState(false);
+
+  // ───── GIS Data State ─────
+  const [planParcels, setPlanParcels] = useState<FeatureCollection | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  const [projectBoundary, setProjectBoundary] = useState<Feature<Geometry> | null>(null);
+  const [boundaryLoading, setBoundaryLoading] = useState(false);
+  const [boundaryError, setBoundaryError] = useState<string | null>(null);
+
+  const [taxParcels, setTaxParcels] = useState<FeatureCollection | null>(null);
+  const [taxLoading, setTaxLoading] = useState(false);
+  const [taxError, setTaxError] = useState<string | null>(null);
+  const [parcelCountyOverride, setParcelCountyOverride] = useState<CountyCode | null>(null);
+  const [isCountyPromptOpen, setIsCountyPromptOpen] = useState(false);
+  const [parcelSelectionSaving, setParcelSelectionSaving] = useState(false);
+  const [parcelSelectionError, setParcelSelectionError] = useState<string | null>(null);
+  const [selectedTaxParcels, setSelectedTaxParcels] = useState<Record<string, Feature>>({});
+
+  // ───── Toast ─────
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mapZoom, setMapZoom] = useState(DEFAULT_MAP_ZOOM);
+
+  const PARCEL_MIN_ZOOM = 12.5;
+  const COUNTY_PARCEL_MIN_ZOOM = 12.5;
+
+  const autoCounty = useMemo(
+    () => normalizeCountyValue(projectCounty ?? null),
+    [projectCounty]
+  );
+  const resolvedCounty = parcelCountyOverride ?? autoCounty;
+  const selectedTaxParcelIds = useMemo(() => Object.keys(selectedTaxParcels), [selectedTaxParcels]);
+  const taxParcelsLayerVisible = useMemo(() => {
+    const group = layers.find((layerGroup) => layerGroup.id === 'project-boundary');
+    const layer = group?.layers.find((entry) => entry.id === 'tax-parcels');
+    return Boolean(layer?.visible);
+  }, [layers]);
+  const parcelOutlineEnabled = resolvedCounty === 'maricopa' && taxParcelsLayerVisible;
+  const isLosAngelesCounty = useMemo(() => {
+    const value = typeof projectCounty === 'string' ? projectCounty.toLowerCase() : '';
+    return value.includes('los angeles');
+  }, [projectCounty]);
+  const countyOptions = useMemo(
+    () => Object.keys(COUNTY_PARCEL_SERVICES) as CountyCode[],
+    []
+  );
+  const resolvedCountyLabel = useMemo(
+    () => (resolvedCounty ? formatCountyLabel(resolvedCounty) : 'Select county'),
+    [resolvedCounty]
+  );
+  const countyPromptMessage = useMemo(() => {
+    if (autoCounty) {
+      return `Project county detected as ${formatCountyLabel(autoCounty)}. Select a county to override.`;
+    }
+    return 'Select Maricopa or Pinal County to load parcel overlays.';
+  }, [autoCounty]);
+
+  // ───── Demographics (Ring) State ─────
+  const [selectedRingRadius, setSelectedRingRadius] = useState<number | null>(null);
+  const [selectedRingStats, setSelectedRingStats] = useState<RingDemographics | null>(null);
+  const [isRingModalOpen, setIsRingModalOpen] = useState(false);
+
+  const hasResolvedCenter = resolvedCenter !== null;
+  const resolvedLat = resolvedCenter ? resolvedCenter[1] : null;
+  const resolvedLon = resolvedCenter ? resolvedCenter[0] : null;
+
+  const {
+    demographics,
+    isLoading: demographicsLoading,
+    error: demographicsError,
+  } = useDemographics({
+    lat: resolvedLat ?? 0,
+    lon: resolvedLon ?? 0,
+    projectId: String(projectId),
+    enabled: hasResolvedCenter,
+  });
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  useEffect(() => {
+    setParcelCountyOverride(null);
+    setSelectedTaxParcels({});
+    setParcelSelectionError(null);
+  }, [projectId, autoCounty]);
+
+  useEffect(() => {
+    if (projectCounty) return;
+    const controller = new AbortController();
+
+    const loadProjectDetails = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/details`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const nextCounty = payload?.county ?? payload?.jurisdiction_county ?? null;
+        if (typeof nextCounty === 'string' && nextCounty.trim()) {
+          setProjectCounty(nextCounty);
+        }
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load project county:', error);
+      }
+    };
+
+    loadProjectDetails();
+
+    return () => {
+      controller.abort();
+    };
+  }, [projectCounty, projectId]);
+
+
+  const handleSelectCounty = useCallback((county: CountyCode) => {
+    setParcelCountyOverride(county);
+    setIsCountyPromptOpen(false);
+    setParcelSelectionError(null);
+    setLayers((prev) =>
+      prev.map((group) => {
+        if (group.id !== 'project-boundary') return group;
+        return {
+          ...group,
+          layers: group.layers.map((layer) =>
+            layer.id === 'tax-parcels' ? { ...layer, visible: true } : layer
+          ),
+        };
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRingRadius || !demographics?.rings?.length) {
+      setSelectedRingStats(null);
+      return;
+    }
+    const ring = demographics.rings.find((r) => r.radius_miles === selectedRingRadius) ?? null;
+    setSelectedRingStats(ring);
+  }, [demographics, selectedRingRadius]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Project profile (APN)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const [profileApn, setProfileApn] = useState<string>('');
+  const mapCenterRequestRef = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchJson<{ apn?: string | null }>(
+          `/api/projects/${projectId}/profile`,
+          { signal: controller.signal }
+        );
+        if (!active) return;
+        const apnValue = typeof profile?.apn === 'string' ? profile.apn.trim() : '';
+        setProfileApn(apnValue);
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load project profile APN:', error);
+        if (active) setProfileApn('');
+      }
+    };
+
+    loadProfile();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (typeof window !== 'undefined') {
+      try {
+        const tokensStr = localStorage.getItem('auth_tokens');
+        if (tokensStr) {
+          const tokens = JSON.parse(tokensStr);
+          if (typeof tokens?.access === 'string' && tokens.access.trim()) {
+            headers.Authorization = `Bearer ${tokens.access}`;
+          }
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    return headers;
+  }, []);
+
+  const formatShortCurrency = useCallback((value?: number | null) => {
+    if (value == null || !Number.isFinite(value)) return '';
+    if (Math.abs(value) >= 1_000_000) {
+      return `$${(value / 1_000_000).toFixed(2)}M`;
+    }
+    if (Math.abs(value) >= 1_000) {
+      return `$${Math.round(value / 1_000)}K`;
+    }
+    return `$${Math.round(value).toLocaleString()}`;
+  }, []);
+
+  const buildSaleCompPopupHtml = useCallback((props: Record<string, unknown>, fallbackName: string) => {
+    const priceLabel = formatShortCurrency(Number(props.price ?? props.sale_price));
+    const unitLabel = formatShortCurrency(Number(props.price_per_unit ?? props.pricePerUnit));
+    const priceLine = priceLabel
+      ? `${priceLabel}${unitLabel ? `&nbsp;&nbsp;<span style="color:#94a3b8;">${unitLabel} / unit</span>` : ''}`
+      : '';
+    const dateValue = props.date ?? props.sale_date;
+    const nameValue = (props.name as string) || (props.property_name as string) || fallbackName;
+
+    return `
+      <div style="padding: 10px 12px; min-width: 220px; color: #f8fafc; font-family: system-ui, -apple-system, Segoe UI, sans-serif;">
+        <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #ffffff;">
+          <span style="color:#cbd5f5; font-weight:600;">Name:</span> ${nameValue}
+        </div>
+        ${priceLine ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
+          <span style="color:#cbd5f5; font-weight:600;">Price:</span> ${priceLine}
+        </div>` : ''}
+        ${dateValue ? `<div style="font-size: 13px; color: #e2e8f0; margin-bottom: 6px;">
+          <span style="color:#cbd5f5; font-weight:600;">Date:</span> ${new Date(String(dateValue)).toLocaleDateString()}
+        </div>` : ''}
+      </div>
+    `;
+  }, [formatShortCurrency]);
+
+  const [saleComps, setSaleComps] = useState<FeatureCollection | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadSalesComps = async () => {
+      try {
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${djangoUrl}/api/projects/${projectId}/sales-comparables/`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const payload = await response.text();
+          throw new Error(`${response.status}: ${payload}`);
+        }
+
+        const payload = await response.json();
+        const comps = Array.isArray(payload) ? payload : payload?.results ?? payload?.comparables ?? [];
+        const features = comps
+          .map((comp: Record<string, unknown>, index: number) => {
+            const lat = parseCoordinate(comp.latitude as number | string | null | undefined);
+            const lng = parseCoordinate(comp.longitude as number | string | null | undefined);
+            if (lat === null || lng === null) return null;
+
+            const properties = {
+              name: comp.property_name ?? comp.address ?? `Comp ${index + 1}`,
+              price: comp.sale_price != null ? Number(comp.sale_price) : null,
+              price_per_unit: comp.price_per_unit != null ? Number(comp.price_per_unit) : null,
+              date: comp.sale_date ?? null,
+            };
+
+            return {
+              type: 'Feature' as const,
+              id: `comp-${comp.comparable_id ?? index}`,
+              properties,
+              geometry: {
+                type: 'Point' as const,
+                coordinates: [lng, lat],
+              },
+            };
+          })
+          .filter(Boolean);
+
+        if (!features.length) {
+          setSaleComps(null);
+          return;
+        }
+
+        const enriched = features.map((feature, index) => {
+          const props = (feature.properties ?? {}) as Record<string, unknown>;
+          return {
+            ...feature,
+            properties: {
+              ...props,
+              popup_html: buildSaleCompPopupHtml(props, `Comp ${index + 1}`),
+            },
+          };
+        });
+
+        setSaleComps({ type: 'FeatureCollection', features: enriched });
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load sales comps:', error);
+        setSaleComps(null);
+      }
+    };
+
+    loadSalesComps();
+    return () => controller.abort();
+  }, [buildSaleCompPopupHtml, getAuthHeaders, projectId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Rental Comparables (Rent Comps)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const [rentComps, setRentComps] = useState<FeatureCollection | null>(null);
+
+  const getComparableColor = useCallback((propertyName: string): string => {
+    const palette = ['#3b82f6', '#22c55e', '#06b6d4', '#f59e0b', '#ef4444'];
+    let hash = 0;
+    for (let i = 0; i < propertyName.length; i += 1) {
+      hash = (hash * 31 + propertyName.charCodeAt(i)) >>> 0;
+    }
+    return palette[hash % palette.length];
+  }, []);
+
+  const buildRentCompPopupHtml = useCallback((comp: Record<string, unknown>, color: string) => {
+    const rentValue = Number(comp.asking_rent ?? comp.askingRent ?? 0);
+    const sqftValue = Number(comp.avg_sqft ?? comp.avgSqft ?? 0);
+    const bedroomsValue = Number(comp.bedrooms ?? 0);
+    const bathroomsValue = Number(comp.bathrooms ?? 0);
+    const addressValue = comp.address as string | undefined;
+    const addressLines = splitAddressLines(addressValue);
+    const addressHtml = addressLines
+      ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line1)}</div>${
+        addressLines.line2 ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line2)}</div>` : ''
+      }`
+      : '';
+    const nameValue = comp.property_name ?? comp.name ?? 'Rent Comp';
+
+    return `<div class="comparable-popup-content">
+      <div class="comparable-popup-name" style="color: ${color};">${escapeHtml(nameValue)}</div>
+      ${addressHtml}
+      <div class="comparable-popup-details">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
+      <div class="comparable-popup-rent">$${Math.round(rentValue).toLocaleString()}/mo</div>
+      ${comp.distance_miles ? `<div class="comparable-popup-distance">${comp.distance_miles} mi away</div>` : ''}
+    </div>`;
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadRentComps = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/rental-comparables`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const payload = await response.text();
+          throw new Error(`${response.status}: ${payload}`);
+        }
+        const json = await response.json();
+        if (!json?.success || !Array.isArray(json?.data)) {
+          setRentComps(null);
+          return;
+        }
+
+        const grouped = new Map<string, {
+          lat: number;
+          lng: number;
+          name: string;
+          address?: string;
+          distance_miles?: number | null;
+          year_built?: number | null;
+          total_units?: number | null;
+          floorplans: Array<Record<string, unknown>>;
+        }>();
+
+        json.data.forEach((row: Record<string, unknown>) => {
+          const lat = parseCoordinate(row.latitude as number | string | null | undefined);
+          const lng = parseCoordinate(row.longitude as number | string | null | undefined);
+          if (lat === null || lng === null) return;
+
+          const name = (row.property_name as string) || (row.name as string) || 'Rent Comp';
+          const address = row.address as string | undefined;
+          const key = `${name}|${address ?? ''}|${lat}|${lng}`;
+
+          const entry = grouped.get(key) ?? {
+            lat,
+            lng,
+            name,
+            address,
+            distance_miles: row.distance_miles != null ? Number(row.distance_miles) : null,
+            year_built: row.year_built != null ? Number(row.year_built) : null,
+            total_units: row.total_units != null ? Number(row.total_units) : null,
+            floorplans: [],
+          };
+
+          if (row.distance_miles != null) {
+            const next = Number(row.distance_miles);
+            if (Number.isFinite(next)) {
+              entry.distance_miles = entry.distance_miles == null ? next : Math.min(entry.distance_miles, next);
+            }
+          }
+          if (row.year_built != null) {
+            const next = Number(row.year_built);
+            if (Number.isFinite(next)) {
+              entry.year_built = entry.year_built == null ? next : Math.min(entry.year_built, next);
+            }
+          }
+          if (row.total_units != null) {
+            const next = Number(row.total_units);
+            if (Number.isFinite(next)) {
+              entry.total_units = entry.total_units == null ? next : Math.max(entry.total_units, next);
+            }
+          }
+
+          entry.floorplans.push({
+            unit_type: row.unit_type ?? row.unitType ?? '',
+            bedrooms: row.bedrooms ?? null,
+            bathrooms: row.bathrooms ?? null,
+            avg_sqft: row.avg_sqft ?? row.avgSqft ?? null,
+            asking_rent: row.asking_rent ?? row.askingRent ?? null,
+            effective_rent: row.effective_rent ?? row.effectiveRent ?? null,
+          });
+
+          grouped.set(key, entry);
+        });
+
+        const features = Array.from(grouped.values()).map((entry, index) => {
+          const color = getComparableColor(entry.name);
+          return {
+            type: 'Feature' as const,
+            id: `rent-${index}-${entry.lng}-${entry.lat}`,
+            properties: {
+              name: entry.name,
+              address: entry.address ?? null,
+              distance_miles: entry.distance_miles ?? null,
+              year_built: entry.year_built ?? null,
+              total_units: entry.total_units ?? null,
+              floorplans: entry.floorplans,
+              color,
+            },
+            geometry: {
+              type: 'Point' as const,
+              coordinates: [entry.lng, entry.lat],
+            },
+          };
+        });
+
+        setRentComps(
+          features.length
+            ? ({ type: 'FeatureCollection', features } as FeatureCollection)
+            : null
+        );
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to load rental comparables:', error);
+        setRentComps(null);
+      }
+    };
+
+    loadRentComps();
+    return () => controller.abort();
+  }, [projectId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hooks: useMapFeatures (Django CRUD)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const {
+    features: savedFeatures,
+    fetchFeatures,
+    saveFeature,
+  } = useMapFeatures(projectId);
+
+  // Fetch features on mount
+  useEffect(() => {
+    fetchFeatures();
+  }, [fetchFeatures]);
+
+  // Convert saved features to MapFeature[] for MapCanvas
+  const mapFeatures = useMemo<MapFeature[]>(() => {
+    return savedFeatures.map((f) => ({
+      id: f.id,
+      project_id: f.project_id,
+      feature_type: f.feature_type as MapFeature['feature_type'],
+      category: (f.category as FeatureCategory) || null,
+      geometry: f.geometry,
+      label: f.label || null,
+      notes: f.notes || null,
+      style: (f.style as MapFeature['style']) || {},
+      linked_table: f.linked_table || null,
+      linked_id: f.linked_id || null,
+      area_sqft: f.area_sqft || null,
+      area_acres: f.area_acres || null,
+      perimeter_ft: f.perimeter_ft || null,
+      length_ft: f.length_ft || null,
+      created_by: f.created_by || null,
+      created_at: f.created_at,
+      updated_at: f.updated_at,
+    }));
+  }, [savedFeatures]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hooks: useMapDraw (MapboxDraw integration)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const mapInstance = mapCanvasRef.current?.getMap() ?? null;
+
+  const handleFeatureCreated = useCallback((feature: DrawnFeature) => {
+    setPendingFeature(feature);
+    setFeatureModalOpen(true);
+  }, []);
+
+  const {
+    initializeDraw,
+    liveMeasurement,
+    isDrawing,
+    startDrawPoint,
+    startDrawLine,
+    startDrawPolygon,
+    startEdit,
+    deleteSelected,
+    cancelDraw,
+    clearCurrentFeature,
+  } = useMapDraw(mapInstance, {
+    onFeatureCreated: handleFeatureCreated,
+  });
+
+  // Initialize draw control once map is ready
+  const mapIsLoaded = mapCanvasRef.current?.isLoaded() ?? false;
+  const drawInitialized = useRef(false);
+
+  useEffect(() => {
+    if (mapIsLoaded && mapInstance && !drawInitialized.current) {
+      const cleanup = initializeDraw();
+      drawInitialized.current = true;
+      return () => {
+        cleanup?.();
+        drawInitialized.current = false;
+      };
+    }
+  }, [mapIsLoaded, mapInstance, initializeDraw]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GIS Data Fetching
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // 1. Plan Parcels
+  useEffect(() => {
+    if (!isDevelopmentProject) {
+      setPlanParcels(null);
+      setPlanLoading(false);
+      setPlanError(null);
+      return undefined;
+    }
+    const controller = new AbortController();
+
+    const loadPlanParcels = async () => {
+      setPlanLoading(true);
+      setPlanError(null);
+      try {
+        const response = await fetch(
+          `/api/gis/plan-parcels?project_id=${projectId}&include_geometry=true&format=geojson`,
+          { signal: controller.signal }
+        );
+        if (!response.ok) {
+          const payload = await response.text();
+          throw new Error(`${response.status}: ${payload}`);
+        }
+        const data = (await response.json()) as FeatureCollection;
+        setPlanParcels(data);
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        setPlanError(error instanceof Error ? error.message : 'Unable to load plan parcels');
+      } finally {
+        setPlanLoading(false);
+      }
+    };
+
+    loadPlanParcels();
+    return () => controller.abort();
+  }, [projectId, isDevelopmentProject]);
+
+  // 2. Project Boundary
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadBoundary = async () => {
+      setBoundaryLoading(true);
+      setBoundaryError(null);
+      try {
+        const response = await fetch(`/api/gis/ingest-parcels?project_id=${projectId}`, {
+          signal: controller.signal,
+        });
+        if (response.status === 404) {
+          // No boundary data for this project — not an error, just no data yet
+          setProjectBoundary(null);
+          return;
+        }
+        if (!response.ok) {
+          const payload = await response.text();
+          throw new Error(`${response.status}: ${payload}`);
+        }
+        const json = await response.json();
+        if (json?.boundary?.geometry) {
+          setProjectBoundary(
+            buildBoundaryFeature(json.boundary.geometry, {
+              acres: json.boundary.acres,
+              source: json.boundary.source,
+              created_at: json.boundary.created_at,
+            })
+          );
+        } else {
+          setBoundaryError('Boundary geometry missing');
+        }
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        setBoundaryError(error instanceof Error ? error.message : 'Unable to load project boundary');
+      } finally {
+        setBoundaryLoading(false);
+      }
+    };
+
+    loadBoundary();
+    return () => controller.abort();
+  }, [projectId]);
+
+  // 3. Tax Parcels (depends on plan parcels bbox)
+  const bboxParam = useMemo(() => computeBboxParam(planParcels), [planParcels]);
+
+  useEffect(() => {
+    if (resolvedCounty) return;
+    if (!bboxParam) return;
+    const controller = new AbortController();
+
+    const loadTaxParcels = async () => {
+      setTaxLoading(true);
+      setTaxError(null);
+      try {
+        const response = await fetch(`/api/gis/tax-parcels?bbox=${bboxParam}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          const payload = await response.text();
+          throw new Error(`${response.status}: ${payload}`);
+        }
+        const data = (await response.json()) as FeatureCollection;
+        setTaxParcels(data);
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        setTaxError(error instanceof Error ? error.message : 'Unable to load tax parcels');
+      } finally {
+        setTaxLoading(false);
+      }
+    };
+
+    loadTaxParcels();
+    return () => controller.abort();
+  }, [bboxParam, resolvedCounty]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Auto-fit bounds after GIS data loads
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const m = mapCanvasRef.current?.getMap();
+    if (!m) return;
+    if (hasResolvedCenter) return;
+
+    // Collect all loaded GeoJSON features for bounding
+    const allFeatures: Feature[] = [];
+    if (planParcels?.features) allFeatures.push(...planParcels.features);
+    if (projectBoundary) allFeatures.push(projectBoundary);
+    if (taxParcels?.features) allFeatures.push(...taxParcels.features);
+    if (saleComps?.features) allFeatures.push(...saleComps.features);
+    if (rentComps?.features) allFeatures.push(...rentComps.features);
+
+    if (allFeatures.length === 0) return;
+
+    try {
+      const fc: FeatureCollection = { type: 'FeatureCollection', features: allFeatures };
+      const bbox = turf.bbox(fc);
+      m.fitBounds(
+        [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+        { padding: 40, maxZoom: 16, duration: 1200 }
+      );
+    } catch {
+      // ignore bbox calculation errors
+    }
+  }, [planParcels, projectBoundary, taxParcels, saleComps, rentComps, hasResolvedCenter]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Update layer counts from loaded data
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const hasProjectLocation = Boolean(resolvedCenter ?? projectCenter);
+    setLayers((prev) =>
+      prev.map((group) => {
+        if (group.id === 'project-boundary') {
+          return {
+            ...group,
+            layers: group.layers.map((layer) => {
+              if (layer.id === 'plan-parcels') {
+                return {
+                  ...layer,
+                  count: isDevelopmentProject ? planParcels?.features?.length ?? 0 : 0,
+                };
+              }
+              if (layer.id === 'tax-parcels') return { ...layer, count: taxParcels?.features?.length ?? 0 };
+              if (layer.id === 'site-boundary') return { ...layer, count: hasProjectLocation ? 1 : 0 };
+              return layer;
+            }),
+          };
+        }
+        if (group.id === 'comparables') {
+          return {
+            ...group,
+            layers: group.layers.map((layer) => {
+              if (layer.id === 'sale-comps') return { ...layer, count: saleComps?.features?.length ?? 0 };
+              if (layer.id === 'rent-comps') return { ...layer, count: rentComps?.features?.length ?? 0 };
+              if (layer.id === 'land-sales') return { ...layer, count: 0 };
+              return layer;
+            }),
+          };
+        }
+        return group;
+      })
+    );
+  }, [planParcels, taxParcels, projectBoundary, saleComps, rentComps, projectCenter, resolvedCenter, isDevelopmentProject]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Callbacks: Layer Panel
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleToggleLayer = useCallback((groupId: LayerGroupId, layerId: string) => {
+    if (layerId === 'tax-parcels' && !resolvedCounty) {
+      setTaxError('Select a county to load tax parcels.');
+    }
+    setLayers((prev) =>
+      prev.map((group) => {
+        if (group.id !== groupId) return group;
+        return {
+          ...group,
+          layers: group.layers.map((layer) =>
+            layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
+          ),
+        };
+      })
+    );
+  }, [resolvedCounty]);
+
+  const handleToggleGroup = useCallback((groupId: LayerGroupId) => {
+    setLayers((prev) =>
+      prev.map((group) => {
+        if (group.id !== groupId) return group;
+        return { ...group, expanded: !group.expanded };
+      })
+    );
+  }, []);
+
+  const handleZoomToLayer = useCallback((_groupId: LayerGroupId, layerId: string) => {
+    const m = mapCanvasRef.current?.getMap();
+    if (!m) return;
+
+    let data: FeatureCollection | Feature | null = null;
+    if (layerId === 'plan-parcels') data = planParcels;
+    else if (layerId === 'tax-parcels') data = taxParcels;
+    else if (layerId === 'site-boundary') data = projectBoundary;
+
+    if (!data && layerId === 'site-boundary') {
+      const fallbackCenter = resolvedCenter ?? projectCenter;
+      if (fallbackCenter) {
+        m.flyTo({ center: fallbackCenter, zoom: 16, speed: 0.8 });
+      }
+      return;
+    }
+
+    if (!data) return;
+
+    try {
+      const bbox = turf.bbox(data as FeatureCollection);
+      m.fitBounds(
+        [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
+        { padding: 40, maxZoom: 16, duration: 800 }
+      );
+    } catch {
+      // ignore
+    }
+  }, [planParcels, taxParcels, projectBoundary, projectCenter, resolvedCenter]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Callbacks: Draw Toolbar
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleToolChange = useCallback(
+    (tool: DrawTool) => {
+      if (activeTool === tool) {
+        // Deactivate
+        cancelDraw();
+        setActiveTool(null);
+        return;
+      }
+
+      setActiveTool(tool);
+      switch (tool) {
+        case 'point':
+          startDrawPoint();
+          break;
+        case 'line':
+          startDrawLine();
+          break;
+        case 'polygon':
+          startDrawPolygon();
+          break;
+        case 'edit':
+          startEdit();
+          break;
+        case 'delete':
+          deleteSelected();
+          setActiveTool(null);
+          break;
+        default:
+          break;
+      }
+    },
+    [activeTool, cancelDraw, startDrawPoint, startDrawLine, startDrawPolygon, startEdit, deleteSelected]
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Callbacks: Feature Modal (save drawn feature)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleFeatureModalSave = useCallback(
+    async (data: { label: string; category: FeatureCategory; notes: string }) => {
+      if (!pendingFeature) return;
+
+      setFeatureSaving(true);
+      try {
+        const geometry: GeoJSON.Geometry = {
+          type: pendingFeature.type,
+          coordinates: pendingFeature.coordinates,
+        } as GeoJSON.Geometry;
+
+        await saveFeature(geometry, pendingFeature.type.toLowerCase(), {
+          label: data.label,
+          category: data.category,
+          notes: data.notes,
+          area_sqft: pendingFeature.properties.area_sqft,
+          area_acres: pendingFeature.properties.area_acres,
+          perimeter_ft: pendingFeature.properties.perimeter_ft,
+          length_ft: pendingFeature.properties.length_ft,
+        });
+
+        showToast(`Feature "${data.label}" saved`);
+        clearCurrentFeature();
+        setFeatureModalOpen(false);
+        setPendingFeature(null);
+        setActiveTool(null);
+      } catch (err) {
+        showToast(`Error saving feature: ${err instanceof Error ? err.message : 'unknown'}`);
+      } finally {
+        setFeatureSaving(false);
+      }
+    },
+    [pendingFeature, saveFeature, showToast, clearCurrentFeature]
+  );
+
+  const handleFeatureModalClose = useCallback(() => {
+    setFeatureModalOpen(false);
+    setPendingFeature(null);
+    clearCurrentFeature();
+  }, [clearCurrentFeature]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Callbacks: MapCanvas
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleMapClick = useCallback((_coordinates: [number, number]) => {
+    // Future: context menu, inspect, etc.
+  }, []);
+
+  const handleRingClick = useCallback(
+    (radius: number) => {
+      setSelectedRingRadius(radius);
+      const ring = demographics?.rings?.find((r) => r.radius_miles === radius) ?? null;
+      setSelectedRingStats(ring);
+      setIsRingModalOpen(true);
+    },
+    [demographics]
+  );
+
+  const handleFeatureClick = useCallback((feature: MapFeature) => {
+    setSelectedFeatureId(feature.id);
+  }, []);
+
+  const handleTaxParcelToggle = useCallback((feature: Feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const parcelId = getParcelIdFromProps(props, feature.id);
+    if (!parcelId) return;
+
+    setParcelSelectionError(null);
+    setSelectedTaxParcels((prev) => {
+      const next = { ...prev };
+      if (next[parcelId]) {
+        delete next[parcelId];
+      } else {
+        next[parcelId] = feature;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleConfirmBoundary = useCallback(async () => {
+    if (!resolvedCounty) {
+      setIsCountyPromptOpen(true);
+      return;
+    }
+    if (selectedTaxParcelIds.length === 0) {
+      setParcelSelectionError('Select at least one parcel to confirm the boundary.');
+      return;
+    }
+
+    setParcelSelectionSaving(true);
+    setParcelSelectionError(null);
+
+    try {
+      const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://127.0.0.1:8000';
+      const features = selectedTaxParcelIds
+        .map((id) => selectedTaxParcels[id])
+        .filter(Boolean)
+        .map((feature) => {
+          const props = (feature.properties ?? {}) as Record<string, unknown>;
+          const parcelId = getParcelIdFromProps(props, feature.id);
+          return {
+            parcelId,
+            geom: feature.geometry,
+            properties: { ...props, PARCELID: parcelId },
+          };
+        });
+
+      const response = await fetch(`${djangoUrl}/api/gis/parcel-ingest/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          projectId,
+          county: resolvedCounty,
+          parcels: features,
+          source: 'county_parcel_feed',
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.text();
+        throw new Error(payload || `Parcel ingest failed (${response.status})`);
+      }
+
+      const payload = await response.json();
+      if (payload?.boundary?.geometry) {
+        setProjectBoundary(
+          buildBoundaryFeature(payload.boundary.geometry, {
+            acres: payload.boundary.acres,
+            source: payload.boundary.source,
+            created_at: payload.boundary.created_at,
+          })
+        );
+      }
+
+      showToast(`Boundary saved (${selectedTaxParcelIds.length} parcels)`);
+    } catch (error) {
+      console.error('Parcel ingest failed:', error);
+      setParcelSelectionError('Failed to save boundary. Please try again.');
+    } finally {
+      setParcelSelectionSaving(false);
+    }
+  }, [
+    getAuthHeaders,
+    projectId,
+    resolvedCounty,
+    selectedTaxParcelIds,
+    selectedTaxParcels,
+    showToast,
+  ]);
+
+  const handleRemoveSelectedParcel = useCallback((parcelId: string) => {
+    setSelectedTaxParcels((prev) => {
+      if (!prev[parcelId]) return prev;
+      const next = { ...prev };
+      delete next[parcelId];
+      return next;
+    });
+  }, []);
+
+  const handleViewStateChange = useCallback((viewState: MapViewState) => {
+    setMapZoom(viewState.zoom);
+    if (viewState.bounds) {
+      setMapBounds([
+        viewState.bounds[0][0],
+        viewState.bounds[0][1],
+        viewState.bounds[1][0],
+        viewState.bounds[1][1],
+      ]);
+    }
+  }, []);
+
+  const subjectApn = useMemo(() => {
+    const candidate =
+      (project as Record<string, unknown>).apn_primary ??
+      (project as Record<string, unknown>).apn ??
+      (project as Record<string, unknown>).apn_secondary ??
+      (project as Record<string, unknown>).parcel_apn ??
+      (project as Record<string, unknown>).parcel_apn_primary ??
+      (project as Record<string, unknown>).parcel_apn_secondary;
+    const resolved = typeof candidate === 'string' ? candidate.trim() : '';
+    return resolved || profileApn;
+  }, [project, profileApn]);
+
+  useEffect(() => {
+    if (!subjectApn || !isDevelopmentProject || mapLocationOverride) return;
+
+    let active = true;
+
+    const resolveParcelCenter = async () => {
+      try {
+        const collection = await fetchParcelsByAPN([subjectApn]);
+        if (!active) return;
+        if (!collection.features?.length) return;
+
+        const centerFeature = turf.center(collection);
+        const coords = centerFeature.geometry?.coordinates as [number, number] | undefined;
+        if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return;
+
+        setResolvedCenter([coords[0], coords[1]]);
+      } catch (error) {
+        if (!active) return;
+        console.warn('Failed to resolve parcel center from APN:', error);
+      }
+    };
+
+    resolveParcelCenter();
+
+    return () => {
+      active = false;
+    };
+  }, [subjectApn, isDevelopmentProject, mapLocationOverride]);
+
+  useEffect(() => {
+    if (mapCenterRequestRef.current) return;
+
+    let active = true;
+    const controller = new AbortController();
+    mapCenterRequestRef.current = true;
+
+    const resolveMapCenter = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/map`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Map center lookup failed (${response.status})`);
+        }
+        const payload = await response.json();
+        const center = payload?.center as [number, number] | undefined;
+        if (!active || !center) return;
+        if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) return;
+        setMapApiCenter(center);
+        setMapLocationOverride(Boolean(payload?.location_override));
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') return;
+        console.warn('Failed to resolve project map center:', error);
+      }
+    };
+
+    resolveMapCenter();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
+
+  const compApns = useMemo(() => {
+    const apns: string[] = [];
+    const features = saleComps?.features ?? [];
+    features.forEach((feature) => {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const candidate =
+        props.APN ??
+        props.apn ??
+        props.parcel_apn ??
+        props.apn_primary ??
+        props.apn_secondary ??
+        props.AIN ??
+        props.ain;
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) apns.push(trimmed);
+      }
+    });
+    return apns;
+  }, [saleComps]);
+
+  const parcelBoundsKey = useMemo(() => {
+    if (!mapBounds) return '';
+    return mapBounds.map((value) => value.toFixed(5)).join('|');
+  }, [mapBounds]);
+
+  const countyParcelBoundsKey = useMemo(() => {
+    if (!mapBounds || !resolvedCounty) return '';
+    return `${resolvedCounty}:${mapBounds.map((value) => value.toFixed(5)).join('|')}`;
+  }, [mapBounds, resolvedCounty]);
+
+  const [parcelCollection, setParcelCollection] = useState<FeatureCollection | null>(null);
+  const lastParcelKeyRef = useRef<string>('');
+  const lastCountyParcelKeyRef = useRef<string>('');
+  const countyParcelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    lastCountyParcelKeyRef.current = '';
+    setTaxParcels(null);
+    setSelectedTaxParcels({});
+    setTaxError(null);
+  }, [resolvedCounty]);
+
+  useEffect(() => {
+    if (!isLosAngelesCounty) return;
+    if (mapZoom < PARCEL_MIN_ZOOM || !mapBounds) return;
+    if (!parcelBoundsKey) return;
+    if (lastParcelKeyRef.current === parcelBoundsKey) return;
+
+    let active = true;
+
+    const loadParcels = async () => {
+      try {
+        const result = await fetchParcelsByBbox(mapBounds);
+        if (!active) return;
+        setParcelCollection(result);
+        lastParcelKeyRef.current = parcelBoundsKey;
+      } catch (error) {
+        if (!active) return;
+        console.warn('Failed to fetch LA County parcels for map tab:', error);
+        setParcelCollection(null);
+      }
+    };
+
+    loadParcels();
+
+    return () => {
+      active = false;
+    };
+  }, [mapZoom, mapBounds, parcelBoundsKey, isLosAngelesCounty]);
+
+  useEffect(() => {
+    if (!resolvedCounty) return;
+    if (!taxParcelsLayerVisible) return;
+    if (mapZoom < COUNTY_PARCEL_MIN_ZOOM || !mapBounds) {
+      setTaxParcels(null);
+      return;
+    }
+    if (!countyParcelBoundsKey) return;
+    if (lastCountyParcelKeyRef.current === countyParcelBoundsKey) return;
+
+    if (countyParcelTimerRef.current) {
+      clearTimeout(countyParcelTimerRef.current);
+    }
+
+    let active = true;
+    countyParcelTimerRef.current = setTimeout(() => {
+      const loadCountyParcels = async () => {
+        setTaxLoading(true);
+        setTaxError(null);
+        try {
+          const result = await queryParcelsByBounds(
+            resolvedCounty,
+            mapBounds,
+            getAuthHeaders()
+          );
+          if (!active) return;
+          const normalized = normalizeParcelFeatureCollection(result);
+          setTaxParcels(normalized);
+          lastCountyParcelKeyRef.current = countyParcelBoundsKey;
+        } catch (error) {
+          if (!active) return;
+          console.warn('Failed to fetch county parcels:', error);
+          setTaxParcels(null);
+          setTaxError('Unable to load county parcels');
+        } finally {
+          if (active) setTaxLoading(false);
+        }
+      };
+
+      void loadCountyParcels();
+    }, 300);
+
+    return () => {
+      active = false;
+      if (countyParcelTimerRef.current) {
+        clearTimeout(countyParcelTimerRef.current);
+      }
+    };
+  }, [
+    resolvedCounty,
+    taxParcelsLayerVisible,
+    mapZoom,
+    mapBounds,
+    countyParcelBoundsKey,
+    getAuthHeaders,
+    COUNTY_PARCEL_MIN_ZOOM,
+  ]);
+
+  const selectedParcelList = useMemo(
+    () => selectedTaxParcelIds.map((id) => selectedTaxParcels[id]).filter(Boolean),
+    [selectedTaxParcelIds, selectedTaxParcels]
+  );
+
+  const totalSelectedAcres = useMemo(() => {
+    return selectedParcelList.reduce((sum, feature) => {
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const acres = getParcelAcresFromProps(props);
+      return sum + (acres ?? 0);
+    }, 0);
+  }, [selectedParcelList]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Loading indicator
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const isAnyLoading = planLoading || boundaryLoading || taxLoading;
+  const loadingErrors = [planError, boundaryError, taxError].filter(Boolean);
+
+  // Layer state wrapper for MapCanvas
+  const layerState = useMemo(() => ({ groups: layers }), [layers]);
+  const panelLayerState = useMemo(() => {
+    const filteredGroups = layers
+      .map((group) => {
+        let filteredLayers = group.layers.map((layer) => ({ ...layer, disabled: false }));
+        if (!isDevelopmentProject) {
+          filteredLayers = filteredLayers.filter((layer) => layer.id !== 'plan-parcels');
+        }
+        filteredLayers = filteredLayers.filter((layer) => {
+          if (layer.id === 'tax-parcels') return true;
+          return layer.count === undefined || layer.count > 0;
+        });
+        return {
+          ...group,
+          layers: filteredLayers,
+        };
+      })
+      .filter((group) => group.layers.length > 0);
+    return { groups: filteredGroups };
+  }, [layers, isDevelopmentProject, resolvedCounty]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="map-tab">
+      {/* ─── Sidebar: Layers + Draw Tools ─── */}
+      <div className="map-tab-sidebar">
+        <LayerPanel
+          layers={panelLayerState}
+          onToggleLayer={handleToggleLayer}
+          onToggleGroup={handleToggleGroup}
+          onZoomToLayer={handleZoomToLayer}
+        />
+        <div className="map-tab-parcel-panel">
+          <div className="map-tab-panel-header">
+            <div>
+              <div className="map-tab-panel-title">County Parcels</div>
+              <div className="map-tab-panel-subtitle">
+                {resolvedCountyLabel}
+              </div>
+            </div>
+            {!resolvedCounty && (
+              <button
+                type="button"
+                className="map-tab-panel-action"
+                onClick={() => setIsCountyPromptOpen(true)}
+              >
+                Select
+              </button>
+            )}
+          </div>
+          <div className="map-tab-panel-body">
+            {!resolvedCounty && (
+              <div className="map-tab-panel-message">
+                Select Maricopa or Pinal County to enable parcel overlays.
+              </div>
+            )}
+            {resolvedCounty && (
+              <>
+                {!taxParcelsLayerVisible && (
+                  <div className="map-tab-panel-message">
+                    Enable the Tax Parcels layer to view parcels and select boundaries.
+                  </div>
+                )}
+                {taxLoading && (
+                  <div className="map-tab-panel-message">Loading parcels…</div>
+                )}
+                {taxError && (
+                  <div className="map-tab-panel-error">{taxError}</div>
+                )}
+                <div className="map-tab-parcel-summary">
+                  <div className="map-tab-parcel-metric">
+                    <span>Selected</span>
+                    <strong>{selectedTaxParcelIds.length}</strong>
+                  </div>
+                  <div className="map-tab-parcel-metric">
+                    <span>Total Acres</span>
+                    <strong>{totalSelectedAcres.toFixed(2)}</strong>
+                  </div>
+                </div>
+                {selectedParcelList.length === 0 ? (
+                  <div className="map-tab-panel-message">
+                    Click parcels on the map to add them to the boundary.
+                  </div>
+                ) : (
+                  <div className="map-tab-parcel-list">
+                    {selectedParcelList.map((feature, index) => {
+                      const props = (feature.properties ?? {}) as Record<string, unknown>;
+                      const parcelId = getParcelIdFromProps(props, feature.id);
+                      const address = getParcelAddressFromProps(props);
+                      const addressLines = splitAddressLines(address);
+                      const acres = getParcelAcresFromProps(props);
+                      return (
+                        <div
+                          key={parcelId || feature.id?.toString() || `parcel-${index}`}
+                          className="map-tab-parcel-item"
+                        >
+                          <div className="map-tab-parcel-meta">
+                            <div className="map-tab-parcel-id">{parcelId || 'Parcel'}</div>
+                            {addressLines ? (
+                              <div className="map-tab-parcel-address">
+                                <div>{addressLines.line1}</div>
+                                {addressLines.line2 && <div>{addressLines.line2}</div>}
+                              </div>
+                            ) : address ? (
+                              <div className="map-tab-parcel-address">{address}</div>
+                            ) : null}
+                          </div>
+                          <div className="map-tab-parcel-actions">
+                            <div className="map-tab-parcel-acres">
+                              {acres != null ? `${acres.toFixed(2)} ac` : '—'}
+                            </div>
+                            {parcelId && (
+                              <button
+                                type="button"
+                                className="map-tab-parcel-remove"
+                                onClick={() => handleRemoveSelectedParcel(parcelId)}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {parcelSelectionError && (
+                  <div className="map-tab-panel-error">{parcelSelectionError}</div>
+                )}
+                <div className="map-tab-panel-actions">
+                  <CButton
+                    color="primary"
+                    size="sm"
+                    disabled={selectedTaxParcelIds.length === 0 || parcelSelectionSaving}
+                    onClick={handleConfirmBoundary}
+                  >
+                    {parcelSelectionSaving ? 'Saving...' : 'Confirm Boundary'}
+                  </CButton>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="map-tab-tools">
+          <div className="map-tab-tools-header">Draw / Measure</div>
+          <DrawToolbar
+            activeTool={activeTool}
+            onToolChange={handleToolChange}
+          />
+        </div>
+      </div>
+
+      {/* ─── Map Content Area ─── */}
+      <div className="map-tab-content">
+        <MapCanvas
+          ref={mapCanvasRef}
+          center={resolvedCenter ?? projectCenter}
+          zoom={DEFAULT_MAP_ZOOM}
+          basemap={basemap}
+          layers={layerState}
+          features={mapFeatures}
+          activeTool={activeTool}
+          selectedFeatureId={selectedFeatureId}
+          planParcels={planParcels}
+          projectBoundary={projectBoundary}
+          taxParcels={taxParcels}
+          selectedTaxParcelIds={selectedTaxParcelIds}
+          parcelOutlineEnabled={parcelOutlineEnabled}
+          saleComps={saleComps}
+          rentComps={rentComps}
+          parcelCollection={parcelCollection}
+          parcelSubjectApn={subjectApn || null}
+          parcelCompApns={compApns}
+          selectedRingRadius={selectedRingRadius}
+          onMapClick={handleMapClick}
+          onRingClick={handleRingClick}
+          onFeatureClick={handleFeatureClick}
+          onTaxParcelToggle={handleTaxParcelToggle}
+          onViewStateChange={handleViewStateChange}
+        />
+
+        {/* Live measurement overlay during drawing */}
+        {isDrawing && liveMeasurement && (
+          <div className="map-tab-measurement-overlay">
+            {liveMeasurement}
+          </div>
+        )}
+
+        {/* Loading/Error indicators */}
+        {isAnyLoading && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: 12,
+              padding: '6px 12px',
+              background: 'rgba(0,0,0,0.7)',
+              borderRadius: 6,
+              fontSize: 12,
+              color: '#e5e5e5',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+          >
+            Loading GIS data...
+          </div>
+        )}
+        {loadingErrors.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: isAnyLoading ? 48 : 12,
+              left: 12,
+              padding: '6px 12px',
+              background: 'rgba(220,38,38,0.8)',
+              borderRadius: 6,
+              fontSize: 12,
+              color: '#fff',
+              zIndex: 10,
+              maxWidth: 300,
+            }}
+          >
+            {loadingErrors.join('; ')}
+          </div>
+        )}
+
+        {/* ─── Bottom Toolbar: Basemap + Search + Export ─── */}
+        <div className="map-tab-bottom-toolbar">
+          <div className="map-tab-basemap-selector">
+            <label htmlFor="basemap-select">Basemap</label>
+            <select
+              id="basemap-select"
+              value={basemap}
+              onChange={(e) => setBasemap(e.target.value as BasemapStyle)}
+            >
+              {BASEMAP_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="map-tab-search">
+            <input
+              type="text"
+              className="map-tab-search-input"
+              placeholder="Search parcels..."
+              disabled
+            />
+          </div>
+
+          <button type="button" className="map-tab-export-btn" disabled>
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Ring Demographics Modal ─── */}
+      <CModal
+        visible={isRingModalOpen}
+        onClose={() => setIsRingModalOpen(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>
+            {selectedRingRadius ? `${selectedRingRadius}-Mile Ring Demographics` : 'Ring Demographics'}
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          {demographicsLoading && (
+            <div style={{ color: 'var(--cui-secondary-color)' }}>
+              Loading demographics...
+            </div>
+          )}
+          {!demographicsLoading && (demographicsError || !selectedRingStats) && (
+            <div style={{ color: demographicsError ? 'var(--cui-danger)' : 'var(--cui-secondary-color)' }}>
+              {demographicsError || 'No demographics data available for this ring.'}
+            </div>
+          )}
+          {selectedRingStats && (
+            <div className="d-flex flex-column gap-2">
+              {DEMOGRAPHIC_FIELDS.map((field) => {
+                const value = selectedRingStats[field.key as keyof RingDemographics];
+                const numericValue = typeof value === 'number' ? value : null;
+                return (
+                  <div
+                    key={field.key}
+                    className="d-flex tw-justify-content-between tw-align-items-center"
+                    style={{ borderBottom: '1px solid var(--cui-border-color)', paddingBottom: '0.35rem' }}
+                  >
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>{field.label}</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {formatDemographicValue(numericValue, field.format)}
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="d-flex tw-justify-content-between tw-align-items-center">
+                <span style={{ color: 'var(--cui-secondary-color)' }}>Block Groups</span>
+                <span style={{ fontWeight: 600 }}>{selectedRingStats.block_groups_included ?? '—'}</span>
+              </div>
+              <div className="d-flex tw-justify-content-between tw-align-items-center">
+                <span style={{ color: 'var(--cui-secondary-color)' }}>Land Area</span>
+                <span style={{ fontWeight: 600 }}>
+                  {selectedRingStats.total_land_area_sqmi !== null && selectedRingStats.total_land_area_sqmi !== undefined
+                    ? `${selectedRingStats.total_land_area_sqmi.toFixed(1)} sq mi`
+                    : '—'}
+                </span>
+              </div>
+              <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.85rem' }}>
+                {demographicsLoading
+                  ? 'Refreshing demographics…'
+                  : demographicsError || 'Click inside 1, 3, or 5-mile ring areas to switch.'}
+              </div>
+            </div>
+          )}
+        </CModalBody>
+        <CModalFooter>
+          <CButton color="secondary" variant="outline" onClick={() => setIsRingModalOpen(false)}>
+            Close
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* ─── County Parcel Modal ─── */}
+      <CModal
+        visible={isCountyPromptOpen}
+        onClose={() => setIsCountyPromptOpen(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>Select County</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div style={{ color: 'var(--cui-secondary-color)' }}>
+            {countyPromptMessage}
+          </div>
+        </CModalBody>
+        <CModalFooter className="d-flex tw-flex-wrap gap-2">
+          {countyOptions.map((county) => (
+            <CButton
+              key={county}
+              color="primary"
+              variant={resolvedCounty === county ? undefined : 'outline'}
+              onClick={() => handleSelectCounty(county)}
+            >
+              {formatCountyLabel(county)}
+            </CButton>
+          ))}
+          <CButton color="secondary" variant="outline" onClick={() => setIsCountyPromptOpen(false)}>
+            Cancel
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* ─── Feature Modal ─── */}
+      {pendingFeature && (
+        <FeatureModal
+          isOpen={featureModalOpen}
+          featureType={pendingFeature.type as FeatureGeometryType}
+          coordinates={pendingFeature.coordinates}
+          measurements={pendingFeature.properties}
+          onClose={handleFeatureModalClose}
+          onSave={handleFeatureModalSave}
+          isSaving={featureSaving}
+        />
+      )}
+
+      {/* ─── Toast ─── */}
+      {toast && (
+        <div className="map-tab-toast">{toast}</div>
+      )}
+    </div>
+  );
+}
+
+export default MapTab;

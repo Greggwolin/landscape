@@ -1,0 +1,138 @@
+'use client';
+
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CSpinner,
+} from '@coreui/react';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+interface ChangelogEntry {
+  changelog_id: number;
+  version: string;
+  deployed_at: string;
+  published_notes: string | null;
+}
+
+interface ChangelogModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
+  const [entries, setEntries] = useState<ChangelogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEntries = useCallback(async () => {
+    if (!isOpen) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      let accessToken: string | null = null;
+      try {
+        const tokens = localStorage.getItem('auth_tokens');
+        accessToken = tokens ? JSON.parse(tokens).access : null;
+      } catch {
+        accessToken = null;
+      }
+
+      const headers: HeadersInit = {};
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      let response = await fetch(`${DJANGO_API_URL}/api/changelog/`, { headers });
+      if ((response.status === 401 || response.status === 403) && accessToken) {
+        response = await fetch(`${DJANGO_API_URL}/api/changelog/`);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const detail =
+          errorData &&
+          typeof errorData === 'object' &&
+          'detail' in errorData &&
+          typeof errorData.detail === 'string'
+            ? ` ${errorData.detail}`
+            : '';
+        throw new Error(`Failed to fetch changelog (${response.status}).${detail}`);
+      }
+
+      const data = await response.json();
+      // Filter to only published entries for non-admin users
+      const entriesData = Array.isArray(data) ? data : data.results || [];
+      setEntries(entriesData.filter((e: ChangelogEntry) => e.published_notes));
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to load changelog');
+    } finally {
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    void fetchEntries();
+  }, [fetchEntries]);
+
+  return (
+    <CModal visible={isOpen} onClose={onClose} size="lg">
+      <CModalHeader>
+        <CModalTitle>Changelog</CModalTitle>
+      </CModalHeader>
+      <CModalBody style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        {loading ? (
+          <div className="text-center py-4">
+            <CSpinner size="sm" />
+            <p className="mt-2 text-muted">Loading changelog...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-4 text-danger">{error}</div>
+        ) : entries.length === 0 ? (
+          <div className="text-center py-4 text-muted">
+            No changelog entries available yet.
+          </div>
+        ) : (
+          <div className="changelog-entries">
+            {entries.map((entry, index) => (
+              <div
+                key={entry.changelog_id}
+                className={`changelog-entry ${index < entries.length - 1 ? 'mb-4 pb-4 border-bottom' : ''}`}
+              >
+                <div className="d-flex tw-align-items-center gap-3 mb-2">
+                  <h5 className="mb-0 fw-bold" style={{ color: 'var(--cui-primary)' }}>
+                    {entry.version}
+                  </h5>
+                  <span className="text-muted small">
+                    {new Date(entry.deployed_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+                <div
+                  className="changelog-notes"
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    lineHeight: 1.6,
+                    color: 'var(--cui-body-color)',
+                  }}
+                >
+                  {entry.published_notes}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CModalBody>
+    </CModal>
+  );
+}
+
+export default ChangelogModal;

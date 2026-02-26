@@ -1,0 +1,389 @@
+'use client';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { CFormInput, CSpinner } from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
+import CIcon from '@coreui/icons-react';
+import { cilSend, cilCheckCircle } from '@coreui/icons';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+import { captureBrowserContext } from '@/lib/utils/browserContext';
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface HelpFeedbackAgentProps {
+  projectId: number;
+  pageContext: string;
+  onFeedbackSubmitted?: () => void;
+}
+
+// Detect if message starts with "Feedback" keyword
+function isFeedbackTrigger(message: string): boolean {
+  return /^feedback[:\s]/i.test(message.trim());
+}
+
+// Detect organic feedback patterns in conversation
+function detectOrganicFeedback(message: string): boolean {
+  const feedbackPatterns = [
+    /\b(bug|broken|error|crash|not working|doesn't work|won't|issue|problem)\b/i,
+    /\b(feature|request|would be nice|suggestion|should|could you add)\b/i,
+    /\b(confusing|confused|unclear|hard to|difficult|don't understand)\b/i,
+  ];
+  return feedbackPatterns.some((pattern) => pattern.test(message));
+}
+
+export function HelpFeedbackAgent({
+  projectId,
+  pageContext,
+  onFeedbackSubmitted,
+}: HelpFeedbackAgentProps) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content:
+        "Hi! I'm here to help you with this page and collect any feedback. What questions do you have?",
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [feedbackMode, setFeedbackMode] = useState(false);
+  const [pendingFeedback, setPendingFeedback] = useState<string | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const submitFeedback = useCallback(
+    async (feedbackMessage: string) => {
+      try {
+        let accessToken: string | null = null;
+        try {
+          const tokens = localStorage.getItem('auth_tokens');
+          accessToken = tokens ? JSON.parse(tokens).access : null;
+        } catch {
+          accessToken = null;
+        }
+
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+
+        const browserContext = captureBrowserContext();
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_DJANGO_API_URL}/api/feedback/submit/`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              message: feedbackMessage,
+              chat_history: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+              })),
+              page_url: window.location.href,
+              page_path: window.location.pathname,
+              project_id: projectId,
+              browser_context: browserContext,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setFeedbackSubmitted(true);
+          setTimeout(() => setFeedbackSubmitted(false), 3000);
+
+          if (data.status === 'duplicate') {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: data.message,
+              },
+            ]);
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: data.message,
+              },
+            ]);
+          }
+
+          onFeedbackSubmitted?.();
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content:
+                'Sorry, there was an error submitting your feedback. Please try again.',
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error('Failed to submit feedback:', error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'Sorry, there was an error submitting your feedback. Please try again.',
+          },
+        ]);
+      }
+    },
+    [messages, projectId, onFeedbackSubmitted]
+  );
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+
+    const userMessage = input.trim();
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    setLoading(true);
+
+    try {
+      // Check for feedback trigger
+      if (isFeedbackTrigger(userMessage)) {
+        // Extract feedback content after "Feedback:" or "Feedback "
+        const feedbackContent = userMessage.replace(/^feedback[:\s]*/i, '').trim();
+
+        if (feedbackContent) {
+          // Direct feedback submission
+          setFeedbackMode(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content:
+                "Got it—I'll make sure this gets logged. Processing your feedback now...",
+            },
+          ]);
+          await submitFeedback(feedbackContent);
+          setFeedbackMode(false);
+        } else {
+          // Ask for feedback details
+          setFeedbackMode(true);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content:
+                "Got it—I'll make sure this gets logged. Tell me more about what you're experiencing or suggesting.",
+            },
+          ]);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // If in feedback mode, submit the follow-up as feedback
+      if (feedbackMode) {
+        await submitFeedback(userMessage);
+        setFeedbackMode(false);
+        setLoading(false);
+        return;
+      }
+
+      // Check for pending feedback confirmation
+      if (pendingFeedback) {
+        const lowerMessage = userMessage.toLowerCase();
+        if (
+          lowerMessage.includes('yes') ||
+          lowerMessage.includes('sure') ||
+          lowerMessage.includes('ok') ||
+          lowerMessage.includes('please')
+        ) {
+          await submitFeedback(pendingFeedback);
+          setPendingFeedback(null);
+          setLoading(false);
+          return;
+        } else if (
+          lowerMessage.includes('no') ||
+          lowerMessage.includes("don't") ||
+          lowerMessage.includes('cancel')
+        ) {
+          setPendingFeedback(null);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content:
+                "No problem! Let me know if there's anything else I can help with.",
+            },
+          ]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Regular chat - send to Landscaper
+      let accessToken: string | null = null;
+      try {
+        const tokens = localStorage.getItem('auth_tokens');
+        accessToken = tokens ? JSON.parse(tokens).access : null;
+      } catch {
+        accessToken = null;
+      }
+
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          message: userMessage,
+          page_context: 'alpha_assistant',
+          source_page: pageContext,
+        }),
+      });
+
+      const data = await response.json();
+      const assistantText =
+        data?.content || data?.message || data?.response || data?.text || 'I saved that for you.';
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: assistantText }]);
+
+      // Check if organic feedback detected
+      if (detectOrganicFeedback(userMessage)) {
+        setPendingFeedback(userMessage);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              "It sounds like you've hit an issue. Would you like me to log this as feedback so it can be tracked and addressed?",
+          },
+        ]);
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="help-feedback-agent d-flex flex-column h-100">
+      {/* Instruction text */}
+      <p
+        className="small mb-3"
+        style={{
+          color: 'var(--cui-secondary-color)',
+          lineHeight: 1.5,
+        }}
+      >
+        This chat space allows you to ask for guidance on the use of the application
+        and for providing any feedback or feature-requests you may have. While the
+        landscaper agent may ask if you&apos;d like to submit feedback based on the
+        contents of one of your chats, if you simply start a prompt with the word
+        &quot;Feedback&quot;, landscaper will know your intent and make sure your
+        comments are logged with the proper context.
+      </p>
+
+      {/* Feedback submitted indicator */}
+      {feedbackSubmitted && (
+        <div
+          className="d-flex tw-align-items-center gap-2 mb-2 p-2 rounded"
+          style={{
+            backgroundColor: 'var(--cui-success-bg-subtle)',
+            border: '1px solid var(--cui-success-border-subtle)',
+          }}
+        >
+          <CIcon icon={cilCheckCircle} className="text-success" />
+          <span className="small text-success">Feedback logged!</span>
+        </div>
+      )}
+
+      {/* Chat messages */}
+      <div
+        className="chat-messages tw-flex-grow-1 tw-overflow-auto mb-2"
+        style={{
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: 'var(--cui-border-radius)',
+          padding: '0.5rem',
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          minHeight: '200px',
+        }}
+      >
+        {messages.map((msg, index) => (
+          <div
+            key={`${msg.role}-${index}`}
+            className={`chat-message mb-2 p-2 rounded ${ msg.role === 'user' ? 'bg-primary text-white ms-4' : 'bg-light' }`}
+            style={{
+              whiteSpace: 'pre-wrap',
+              fontSize: '0.875rem',
+              color: msg.role === 'user' ? undefined : 'var(--cui-body-color)',
+            }}
+          >
+            {msg.role === 'user' ? msg.content : processLandscaperResponse(msg.content)}
+          </div>
+        ))}
+        {loading && (
+          <div
+            className="chat-message mb-2 p-2 rounded bg-light"
+            style={{ fontSize: '0.875rem' }}
+          >
+            <CSpinner size="sm" className="me-2" /> Thinking...
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Chat input */}
+      <div className="chat-input d-flex gap-2">
+        <CFormInput
+          placeholder={
+            feedbackMode
+              ? 'Describe your feedback...'
+              : pendingFeedback
+                ? 'Yes to log feedback, or continue chatting...'
+                : 'Ask about this page...'
+          }
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={loading}
+          style={{ fontSize: '0.875rem' }}
+        />
+        <SemanticButton
+          intent="primary-action"
+          onClick={sendMessage}
+          disabled={!input.trim() || loading}
+        >
+          <CIcon icon={cilSend} />
+        </SemanticButton>
+      </div>
+    </div>
+  );
+}
+
+export default HelpFeedbackAgent;

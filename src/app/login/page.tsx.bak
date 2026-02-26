@@ -1,0 +1,21 @@
+'use client';
+
+import { Suspense } from 'react';
+import LoginForm from './LoginForm';
+
+// Loading fallback for Suspense
+function LoginLoading() {
+  return (
+    <div className="tw-fixed tw-inset-0 tw-bg-gray-900 tw-flex tw-items-center tw-justify-center">
+      <div className="tw-animate-spin tw-rounded-full h-12 w-12 tw-border-t-2 tw-border-b-2 tw-border-blue-500"></div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
+  );
+}

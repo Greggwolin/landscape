@@ -1,0 +1,105 @@
+'use client'
+
+import React from 'react'
+import { Project, Area, Phase } from './PlanningWizard'
+
+interface NavigationTilesProps {
+  project: Project
+  currentArea?: Area
+  currentPhase?: Phase
+  onNavigateToProject: () => void
+  onNavigateToArea?: (areaId: string) => void
+  onNavigateToPhase?: (areaId: string, phaseId: string) => void
+  onAddPhase?: (areaId: string) => void
+  onAddParcel?: () => void
+  showProjectTile?: boolean
+}
+
+const NavigationTiles: React.FC<NavigationTilesProps> = ({
+  project,
+  currentArea,
+  currentPhase,
+  onNavigateToProject,
+  onNavigateToArea,
+  onNavigateToPhase,
+  onAddPhase,
+  onAddParcel,
+  showProjectTile = true
+}) => {
+  return (
+    <div className="tw-flex gap-3 mb-4 h-16">
+      {/* Project Tile */}
+      {showProjectTile && (
+        <button
+          onClick={onNavigateToProject}
+          className="tw-flex tw-items-center tw-justify-center tw-h-full tw-aspect-square tw-bg-gray-700 border tw-border-gray-600 tw-rounded-lg hover:tw-bg-gray-600 tw-transition-colors tw-duration-200"
+        >
+          <div className="text-center">
+            <div className="w-4 h-4 tw-bg-blue-500 rounded mx-auto mb-1"></div>
+            <div className="tw-text-xs tw-font-medium text-white">{project.name}</div>
+          </div>
+        </button>
+      )}
+
+      {/* Area Tile */}
+      {currentArea && (
+        <button
+          onClick={() => onNavigateToArea && onNavigateToArea(currentArea.id)}
+          className="tw-flex tw-items-center tw-justify-center tw-h-full tw-aspect-square tw-bg-slate-700 border tw-border-slate-600 tw-rounded-lg hover:tw-bg-slate-600 tw-transition-colors tw-duration-200"
+        >
+          <div className="text-center">
+            <div className="w-4 h-4 tw-bg-slate-400 rounded mx-auto mb-1"></div>
+            <div className="tw-text-xs tw-font-medium text-white">{currentArea.name}</div>
+            <div className="tw-text-xs tw-text-gray-400">
+              {currentArea.phases.length} phase{currentArea.phases.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        </button>
+      )}
+
+      {/* Phase Tile */}
+      {currentPhase && currentArea && (
+        <button
+          onClick={() => onNavigateToPhase && onNavigateToPhase(currentArea.id, currentPhase.id)}
+          className="tw-flex tw-items-center tw-justify-center tw-h-full tw-aspect-square tw-bg-purple-700 border tw-border-purple-600 tw-rounded-lg hover:tw-bg-purple-600 tw-transition-colors tw-duration-200"
+        >
+          <div className="text-center">
+            <div className="w-4 h-4 tw-bg-purple-400 rounded mx-auto mb-1"></div>
+            <div className="tw-text-xs tw-font-medium text-white">{currentPhase.name}</div>
+            <div className="tw-text-xs tw-text-gray-400">
+              {currentPhase.parcels.length} parcel{currentPhase.parcels.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        </button>
+      )}
+
+      {/* Add Phase Tile */}
+      {currentArea && onAddPhase && (
+        <button
+          onClick={() => onAddPhase(currentArea.id)}
+          className="tw-flex tw-items-center tw-justify-center tw-h-full tw-aspect-square tw-bg-blue-600 border tw-border-blue-500 tw-rounded-lg hover:tw-bg-blue-700 tw-transition-colors tw-duration-200"
+        >
+          <div className="text-center">
+            <div className="tw-text-2xl tw-font-bold text-white mb-1">+</div>
+            <div className="tw-text-xs tw-font-medium text-white">Add Phase</div>
+          </div>
+        </button>
+      )}
+
+      {/* Add Parcel Tile */}
+      {currentPhase && onAddParcel && (
+        <button
+          onClick={onAddParcel}
+          className="tw-flex tw-items-center tw-justify-center tw-h-full tw-aspect-square tw-bg-green-600 border tw-border-green-500 tw-rounded-lg hover:tw-bg-green-700 tw-transition-colors tw-duration-200"
+        >
+          <div className="text-center">
+            <div className="tw-text-2xl tw-font-bold text-white mb-1">+</div>
+            <div className="tw-text-xs tw-font-medium text-white">Add Parcel</div>
+          </div>
+        </button>
+      )}
+    </div>
+  )
+}
+
+export default NavigationTiles

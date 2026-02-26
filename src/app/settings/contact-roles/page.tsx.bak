@@ -1,0 +1,493 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  CContainer,
+  CCard,
+  CCardHeader,
+  CCardBody,
+  CTable,
+  CTableHead,
+  CTableBody,
+  CTableRow,
+  CTableHeaderCell,
+  CTableDataCell,
+  CSpinner,
+  CBadge,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel,
+  CFormInput,
+  CFormSelect,
+  CFormCheck,
+  CRow,
+  CCol,
+  CInputGroup,
+  CInputGroupText,
+} from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
+import CIcon from '@coreui/icons-react';
+import {
+  cilPlus,
+  cilPencil,
+  cilTrash,
+  cilSearch,
+  cilCheckCircle,
+  cilBan,
+  cilLockLocked,
+} from '@coreui/icons';
+import {
+  getContactRoles,
+  createContactRole,
+  updateContactRole,
+  deleteContactRole,
+  toggleContactRoleVisibility,
+} from '@/lib/api/contacts';
+import type { ContactRole, ContactRoleFormData, RoleCategory } from '@/types/contacts';
+
+const ROLE_CATEGORIES: { value: RoleCategory; label: string }[] = [
+  { value: 'Client', label: 'Client' },
+  { value: 'Transaction Party', label: 'Transaction Party' },
+  { value: 'Internal Team', label: 'Internal Team' },
+  { value: 'Vendor', label: 'Vendor' },
+  { value: 'Other', label: 'Other' },
+];
+
+const ROLE_CATEGORY_COLORS: Record<RoleCategory, string> = {
+  Client: 'primary',
+  'Transaction Party': 'success',
+  'Internal Team': 'info',
+  Vendor: 'warning',
+  Other: 'secondary',
+};
+
+const initialFormData: ContactRoleFormData = {
+  role_code: '',
+  role_label: '',
+  role_category: 'Other',
+  description: '',
+  display_order: 100,
+};
+
+export default function ContactRolesPage() {
+  const [roles, setRoles] = useState<ContactRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<RoleCategory | 'all'>('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingRole, setEditingRole] = useState<ContactRole | null>(null);
+  const [formData, setFormData] = useState<ContactRoleFormData>(initialFormData);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getContactRoles(
+        filterCategory !== 'all' ? { category: filterCategory } : undefined
+      );
+      setRoles(response.results);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterCategory]);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
+  // Filter roles by search query
+  const filteredRoles = roles.filter((role) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      role.role_code.toLowerCase().includes(query) ||
+      role.role_label.toLowerCase().includes(query) ||
+      role.description?.toLowerCase().includes(query)
+    );
+  });
+
+  const handleOpenModal = (role?: ContactRole) => {
+    if (role) {
+      setEditingRole(role);
+      setFormData({
+        role_code: role.role_code,
+        role_label: role.role_label,
+        role_category: role.role_category,
+        description: role.description || '',
+        display_order: role.display_order,
+      });
+    } else {
+      setEditingRole(null);
+      setFormData(initialFormData);
+    }
+    setErrors({});
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingRole(null);
+    setFormData(initialFormData);
+    setErrors({});
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'display_order' ? Number(value) : value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.role_code.trim()) {
+      newErrors.role_code = 'Role code is required';
+    } else if (!/^[a-z_]+$/.test(formData.role_code)) {
+      newErrors.role_code = 'Role code must be lowercase with underscores only';
+    }
+
+    if (!formData.role_label.trim()) {
+      newErrors.role_label = 'Role label is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+
+    setSaving(true);
+    try {
+      if (editingRole) {
+        await updateContactRole(editingRole.role_id, formData);
+      } else {
+        await createContactRole(formData);
+      }
+      handleCloseModal();
+      fetchRoles();
+    } catch (error) {
+      console.error('Error saving role:', error);
+      setErrors({ submit: 'Failed to save role. The code may already exist.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (role: ContactRole) => {
+    if (role.is_system) {
+      alert('System roles cannot be deleted.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete role "${role.role_label}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteContactRole(role.role_id);
+      fetchRoles();
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      alert('Failed to delete role. It may be in use.');
+    }
+  };
+
+  const handleToggleVisibility = async (role: ContactRole) => {
+    try {
+      await toggleContactRoleVisibility(role.role_id, !role.is_active);
+      fetchRoles();
+    } catch (error) {
+      console.error('Error toggling visibility:', error);
+    }
+  };
+
+  return (
+    <CContainer fluid className="py-4">
+      <CCard className="tw-border-0 tw-shadow-sm">
+        <CCardHeader className="bg-transparent border-bottom d-flex tw-justify-content-between tw-align-items-center py-3">
+          <div>
+            <h4 className="mb-0">Contact Roles</h4>
+            <small className="text-muted">
+              Manage the roles contacts can have on projects
+            </small>
+          </div>
+          <SemanticButton intent="primary-action" onClick={() => handleOpenModal()}>
+            <CIcon icon={cilPlus} className="me-2" />
+            Add Role
+          </SemanticButton>
+        </CCardHeader>
+
+        <CCardBody>
+          {/* Filters */}
+          <CRow className="mb-4 g-3">
+            <CCol md={4}>
+              <CInputGroup>
+                <CInputGroupText>
+                  <CIcon icon={cilSearch} />
+                </CInputGroupText>
+                <CFormInput
+                  placeholder="Search roles..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </CInputGroup>
+            </CCol>
+            <CCol md={4}>
+              <CFormSelect
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value as RoleCategory | 'all')}
+              >
+                <option value="all">All Categories</option>
+                {ROLE_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+          </CRow>
+
+          {/* Roles Table */}
+          {loading ? (
+            <div className="text-center py-5">
+              <CSpinner color="primary" />
+              <p className="text-muted mt-2">Loading roles...</p>
+            </div>
+          ) : filteredRoles.length === 0 ? (
+            <div className="text-center py-5">
+              <p className="text-muted">
+                {searchQuery || filterCategory !== 'all'
+                  ? 'No roles match your filters'
+                  : 'No roles defined yet'}
+              </p>
+            </div>
+          ) : (
+            <CTable hover responsive className="align-middle">
+              <CTableHead>
+                <CTableRow>
+                  <CTableHeaderCell style={{ width: '100px' }}>Order</CTableHeaderCell>
+                  <CTableHeaderCell>Role Code</CTableHeaderCell>
+                  <CTableHeaderCell>Label</CTableHeaderCell>
+                  <CTableHeaderCell>Category</CTableHeaderCell>
+                  <CTableHeaderCell>Status</CTableHeaderCell>
+                  <CTableHeaderCell style={{ width: '120px' }}>Actions</CTableHeaderCell>
+                </CTableRow>
+              </CTableHead>
+              <CTableBody>
+                {filteredRoles.map((role) => (
+                  <CTableRow
+                    key={role.role_id}
+                    className={`!role.is_active ? 'table-secondary' : undefined`}
+                  >
+                    <CTableDataCell>
+                      <CBadge color="light" textColor="dark">
+                        {role.display_order}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <code>{role.role_code}</code>
+                      {role.is_system && (
+                        <CIcon
+                          icon={cilLockLocked}
+                          size="sm"
+                          className="ms-2 text-muted"
+                          title="System role"
+                        />
+                      )}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="fw-semibold">{role.role_label}</div>
+                      {role.description && (
+                        <small className="text-muted">{role.description}</small>
+                      )}
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge color={ROLE_CATEGORY_COLORS[role.role_category]}>
+                        {role.role_category}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <CBadge
+                        color={role.is_active ? 'success' : 'secondary'}
+                        className="d-flex tw-align-items-center gap-1"
+                        style={{ width: 'fit-content' }}
+                      >
+                        <CIcon
+                          icon={role.is_active ? cilCheckCircle : cilBan}
+                          size="sm"
+                        />
+                        {role.is_active ? 'Active' : 'Hidden'}
+                      </CBadge>
+                    </CTableDataCell>
+                    <CTableDataCell>
+                      <div className="d-flex gap-1">
+                        <SemanticButton
+                          intent="tertiary-action"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleOpenModal(role)}
+                          title="Edit role"
+                          disabled={role.is_system}
+                        >
+                          <CIcon icon={cilPencil} />
+                        </SemanticButton>
+                        <SemanticButton
+                          intent={role.is_active ? 'neutral-action' : 'confirm-action'}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleToggleVisibility(role)}
+                          title={role.is_active ? 'Hide role' : 'Show role'}
+                        >
+                          <CIcon icon={role.is_active ? cilBan : cilCheckCircle} />
+                        </SemanticButton>
+                        <SemanticButton
+                          intent="destructive-action"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(role)}
+                          title="Delete role"
+                          disabled={role.is_system}
+                        >
+                          <CIcon icon={cilTrash} />
+                        </SemanticButton>
+                      </div>
+                    </CTableDataCell>
+                  </CTableRow>
+                ))}
+              </CTableBody>
+            </CTable>
+          )}
+        </CCardBody>
+      </CCard>
+
+      {/* Add/Edit Role Modal */}
+      <CModal visible={showModal} onClose={handleCloseModal}>
+        <CModalHeader closeButton>
+          <CModalTitle>{editingRole ? 'Edit Role' : 'Add New Role'}</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <CForm>
+            <CRow className="g-3">
+              <CCol md={6}>
+                <CFormLabel htmlFor="role_code">
+                  Role Code <span className="text-danger">*</span>
+                </CFormLabel>
+                <CFormInput
+                  id="role_code"
+                  name="role_code"
+                  value={formData.role_code}
+                  onChange={handleChange}
+                  invalid={!!errors.role_code}
+                  placeholder="e.g., site_manager"
+                  disabled={!!editingRole}
+                />
+                {errors.role_code && (
+                  <div className="text-danger small mt-1">{errors.role_code}</div>
+                )}
+                <small className="text-muted">
+                  Lowercase with underscores, e.g., property_manager
+                </small>
+              </CCol>
+
+              <CCol md={6}>
+                <CFormLabel htmlFor="role_label">
+                  Display Label <span className="text-danger">*</span>
+                </CFormLabel>
+                <CFormInput
+                  id="role_label"
+                  name="role_label"
+                  value={formData.role_label}
+                  onChange={handleChange}
+                  invalid={!!errors.role_label}
+                  placeholder="e.g., Site Manager"
+                />
+                {errors.role_label && (
+                  <div className="text-danger small mt-1">{errors.role_label}</div>
+                )}
+              </CCol>
+
+              <CCol md={6}>
+                <CFormLabel htmlFor="role_category">Category</CFormLabel>
+                <CFormSelect
+                  id="role_category"
+                  name="role_category"
+                  value={formData.role_category}
+                  onChange={handleChange}
+                >
+                  {ROLE_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </CFormSelect>
+              </CCol>
+
+              <CCol md={6}>
+                <CFormLabel htmlFor="display_order">Display Order</CFormLabel>
+                <CFormInput
+                  id="display_order"
+                  name="display_order"
+                  type="number"
+                  value={formData.display_order}
+                  onChange={handleChange}
+                  min={1}
+                />
+                <small className="text-muted">
+                  Lower numbers appear first
+                </small>
+              </CCol>
+
+              <CCol md={12}>
+                <CFormLabel htmlFor="description">Description</CFormLabel>
+                <CFormInput
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Brief description of this role"
+                />
+              </CCol>
+            </CRow>
+
+            {errors.submit && (
+              <div className="alert alert-danger mt-3 mb-0">{errors.submit}</div>
+            )}
+          </CForm>
+        </CModalBody>
+        <CModalFooter>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={handleCloseModal}>
+            Cancel
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Saving...
+              </>
+            ) : editingRole ? (
+              'Update Role'
+            ) : (
+              'Create Role'
+            )}
+          </SemanticButton>
+        </CModalFooter>
+      </CModal>
+    </CContainer>
+  );
+}

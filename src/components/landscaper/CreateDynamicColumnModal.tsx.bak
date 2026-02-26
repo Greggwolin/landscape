@@ -1,0 +1,190 @@
+/**
+ * CreateDynamicColumnModal - Create new dynamic column during mapping
+ *
+ * Allows users to create a new column for data that doesn't map to standard fields.
+ */
+
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CButton,
+  CFormInput,
+  CFormSelect,
+  CFormLabel,
+  CAlert,
+} from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilPlus } from '@coreui/icons';
+
+interface CreateDynamicColumnModalProps {
+  visible: boolean;
+  sourceColumn: string;
+  suggestedName: string;
+  suggestedType: string;
+  sampleValues: string[];
+  onClose: () => void;
+  onCreate: (name: string, dataType: string) => void;
+}
+
+const DATA_TYPES = [
+  { value: 'text', label: 'Text', description: 'Free-form text values' },
+  { value: 'number', label: 'Number', description: 'Numeric values (1, 2, 3.5)' },
+  { value: 'currency', label: 'Currency ($)', description: 'Dollar amounts ($1,234.56)' },
+  { value: 'percent', label: 'Percentage (%)', description: 'Percentage values (85%)' },
+  { value: 'date', label: 'Date', description: 'Date values (01/15/2024)' },
+  { value: 'boolean', label: 'Yes/No', description: 'True/false, yes/no values' },
+];
+
+const CreateDynamicColumnModal: React.FC<CreateDynamicColumnModalProps> = ({
+  visible,
+  sourceColumn,
+  suggestedName,
+  suggestedType,
+  sampleValues,
+  onClose,
+  onCreate,
+}) => {
+  const [name, setName] = useState(suggestedName);
+  const [dataType, setDataType] = useState(suggestedType || 'text');
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (visible) {
+      setName(suggestedName);
+      setDataType(suggestedType || 'text');
+      setError(null);
+    }
+  }, [visible, suggestedName, suggestedType]);
+
+  const handleCreate = () => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setError('Column name is required');
+      return;
+    }
+
+    if (trimmedName.length < 2) {
+      setError('Column name must be at least 2 characters');
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setError('Column name must be less than 50 characters');
+      return;
+    }
+
+    // Check for invalid characters (allow letters, numbers, spaces, hyphens, underscores)
+    if (!/^[\w\s-]+$/.test(trimmedName)) {
+      setError('Column name can only contain letters, numbers, spaces, hyphens, and underscores');
+      return;
+    }
+
+    onCreate(trimmedName, dataType);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleCreate();
+    }
+  };
+
+  return (
+    <CModal visible={visible} onClose={onClose} backdrop="static">
+      <CModalHeader>
+        <CModalTitle className="d-flex tw-align-items-center gap-2">
+          <CIcon icon={cilPlus} />
+          Create New Column
+        </CModalTitle>
+      </CModalHeader>
+
+      <CModalBody>
+        <CAlert color="info" className="mb-4">
+          Creating a new column for data from <strong>&ldquo;{sourceColumn}&rdquo;</strong>
+        </CAlert>
+
+        {error && (
+          <CAlert color="danger" className="mb-3">
+            {error}
+          </CAlert>
+        )}
+
+        <div className="mb-3">
+          <CFormLabel htmlFor="columnName">
+            Column Name <span className="text-danger">*</span>
+          </CFormLabel>
+          <CFormInput
+            id="columnName"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="e.g., Delinquent Balance"
+            autoFocus
+          />
+          <div className="form-text">
+            This name will appear as the column header in your rent roll.
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <CFormLabel htmlFor="dataType">Data Type</CFormLabel>
+          <CFormSelect
+            id="dataType"
+            value={dataType}
+            onChange={(e) => setDataType(e.target.value)}
+          >
+            {DATA_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </CFormSelect>
+          <div className="form-text">
+            {DATA_TYPES.find((t) => t.value === dataType)?.description}
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <CFormLabel>Sample Values from File</CFormLabel>
+          <div
+            className="p-3 rounded border"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', maxHeight: 150, overflow: 'auto' }}
+          >
+            {sampleValues.length > 0 ? (
+              sampleValues.slice(0, 8).map((v, i) => (
+                <div key={i} className="small mb-1">
+                  {v || <span className="text-body-secondary fst-italic">(empty)</span>}
+                </div>
+              ))
+            ) : (
+              <div className="small text-body-secondary fst-italic">No sample values available</div>
+            )}
+          </div>
+        </div>
+      </CModalBody>
+
+      <CModalFooter>
+        <CButton color="secondary" variant="ghost" onClick={onClose}>
+          Cancel
+        </CButton>
+        <CButton color="primary" onClick={handleCreate}>
+          <CIcon icon={cilPlus} className="me-1" />
+          Create Column
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+};
+
+export default CreateDynamicColumnModal;

@@ -1,0 +1,162 @@
+'use client';
+
+import React from 'react';
+
+export interface BudgetColumnConfig {
+  id: string;
+  label: string;
+  visible: boolean;
+  locked?: boolean; // Core columns that can't be hidden
+  description?: string;
+}
+
+interface ColumnChooserProps {
+  isOpen: boolean;
+  onClose: () => void;
+  columns: BudgetColumnConfig[];
+  onToggleColumn: (columnId: string) => void;
+}
+
+export function ColumnChooser({
+  isOpen,
+  onClose,
+  columns,
+  onToggleColumn,
+}: ColumnChooserProps) {
+  if (!isOpen) return null;
+
+  const coreColumns = columns.filter(col => col.locked);
+  const optionalColumns = columns.filter(col => !col.locked);
+
+  return (
+    <div
+      className="tw-fixed tw-inset-0 bg-black/50 tw-flex tw-items-center tw-justify-center tw-z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:tw-bg-gray-800 border tw-border-gray-300 dark:tw-border-gray-700 tw-rounded-lg p-6 tw-max-w-2xl tw-w-full mx-4 tw-shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="tw-flex tw-items-center tw-justify-between mb-4">
+          <h3 className="tw-text-xl tw-font-semibold tw-text-gray-900 dark:text-white">
+            Configure Columns
+          </h3>
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-ghost-secondary"
+            aria-label="Close"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="tw-text-sm tw-text-gray-600 dark:tw-text-gray-300 mb-6">
+          Select which columns to display in the budget grid. Core columns are always visible.
+        </p>
+
+        <div className="tw-max-h-[500px] tw-overflow-y-auto">
+          {/* Core Columns (Always Visible) */}
+          {coreColumns.length > 0 && (
+            <div className="mb-6">
+              <h4 className="tw-text-sm tw-font-medium tw-text-gray-700 dark:tw-text-gray-300 mb-3">
+                Core Columns (always visible)
+              </h4>
+              <div className="tw-space-y-2">
+                {coreColumns.map(col => (
+                  <div
+                    key={col.id}
+                    className="tw-flex tw-items-start gap-3 p-3 tw-bg-gray-50 dark:tw-bg-gray-900/50 rounded border tw-border-gray-200 dark:tw-border-gray-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      disabled
+                      className="mt-1 w-4 h-4 tw-text-blue-600 tw-bg-gray-100 tw-border-gray-300 rounded tw-cursor-not-allowed"
+                    />
+                    <div className="tw-flex-1">
+                      <div className="tw-flex tw-items-center gap-2">
+                        <span className="tw-text-gray-700 dark:tw-text-gray-300 tw-font-medium">
+                          {col.label}
+                        </span>
+                        <span className="tw-text-xs px-2 py-0.5 tw-bg-blue-100 dark:tw-bg-blue-900 tw-text-blue-700 dark:tw-text-blue-300 rounded">
+                          Required
+                        </span>
+                      </div>
+                      {col.description && (
+                        <p className="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400 mt-1">
+                          {col.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Optional Columns */}
+          {optionalColumns.length > 0 && (
+            <div>
+              <h4 className="tw-text-sm tw-font-medium tw-text-gray-700 dark:tw-text-gray-300 mb-3">
+                Optional Columns
+              </h4>
+              <div className="tw-space-y-2">
+                {optionalColumns.map(col => (
+                  <label
+                    key={col.id}
+                    className="tw-flex tw-items-start gap-3 p-3 tw-bg-gray-50 dark:tw-bg-gray-900 rounded border tw-border-gray-200 dark:tw-border-gray-700 hover:tw-bg-gray-100 dark:hover:tw-bg-gray-850 tw-cursor-pointer tw-transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={col.visible}
+                      onChange={() => onToggleColumn(col.id)}
+                      className="mt-1 w-4 h-4 tw-text-blue-600 bg-white dark:tw-bg-gray-700 tw-border-gray-300 dark:tw-border-gray-600 rounded focus:ring-blue-500"
+                    />
+                    <div className="tw-flex-1">
+                      <div className="tw-flex tw-items-center gap-2">
+                        <span className="tw-text-gray-900 dark:text-white tw-font-medium">
+                          {col.label}
+                        </span>
+                      </div>
+                      {col.description && (
+                        <p className="tw-text-xs tw-text-gray-500 dark:tw-text-gray-400 mt-1">
+                          {col.description}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="tw-flex tw-justify-between tw-items-center gap-2 pt-4 mt-6 tw-border-t tw-border-gray-200 dark:tw-border-gray-700">
+          <button
+            onClick={() => {
+              // Reset to default (show all optional columns)
+              optionalColumns.forEach(col => {
+                if (!col.visible) {
+                  onToggleColumn(col.id);
+                }
+              });
+            }}
+            className="btn btn-secondary"
+          >
+            Show All
+          </button>
+          <button
+            onClick={onClose}
+            className="btn btn-primary"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

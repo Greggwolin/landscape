@@ -1,0 +1,22 @@
+'use client';
+
+import { useState } from 'react';
+import GrowthRateDetail from '@/app/components/GrowthRateDetail';
+import { SemanticButton } from '@/components/ui/landscape';
+
+export default function GrowthRateDetailSandboxPage() {
+  const [visible, setVisible] = useState(true);
+
+  return (
+    <div className="tw-min-h-screen tw-bg-slate-950 tw-flex tw-flex-col tw-items-center tw-justify-center gap-4 py-10">
+      <h1 className="tw-text-2xl tw-font-semibold text-white">Growth Rate Detail Sandbox</h1>
+      <p className="tw-text-sm tw-text-slate-300">
+        Use this sandbox to experiment with the GrowthRateDetail component.
+      </p>
+      <SemanticButton intent="primary-action" onClick={() => setVisible(true)}>
+        Open Detail Modal
+      </SemanticButton>
+      {visible && <GrowthRateDetail onClose={() => setVisible(false)} />}
+    </div>
+  );
+}

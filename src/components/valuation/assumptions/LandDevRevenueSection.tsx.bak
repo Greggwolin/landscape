@@ -1,0 +1,90 @@
+'use client';
+
+/**
+ * Land Dev Revenue Section
+ *
+ * Revenue assumptions for Land Development projects:
+ * - Price Growth Set (dropdown linked to core_fin_growth_rate_sets)
+ *
+ * Session: QK-28
+ */
+
+import React, { useState } from 'react';
+import type { DcfAnalysis } from '@/types/dcf-analysis';
+import { GrowthRateSelect } from './GrowthRateSelect';
+
+// ============================================================================
+// CHEVRON ICON
+// ============================================================================
+
+function ChevronIcon({ isOpen }: { isOpen: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 tw-transition-transform tw-duration-200 ${isOpen ? tw-'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+interface LandDevRevenueSectionProps {
+  data?: DcfAnalysis;
+  onChange: (field: keyof DcfAnalysis, value: number | null) => void;
+  projectId: number;
+  defaultOpen?: boolean;
+}
+
+export function LandDevRevenueSection({
+  data,
+  onChange,
+  projectId,
+  defaultOpen = true,
+}: LandDevRevenueSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      {/* Section Header */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="tw-w-full d-flex tw-justify-content-between tw-align-items-center text-left"
+        style={{
+          background: 'var(--cui-tertiary-bg)',
+          padding: '0.5rem 0.75rem',
+          borderRadius: 0,
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+          Revenue
+        </span>
+        <ChevronIcon isOpen={isOpen} />
+      </button>
+
+      {/* Content */}
+      {isOpen && (
+        <div className="pt-2 px-3 pb-2 tw-space-y-2">
+          {/* Price Growth Rate Set */}
+          <GrowthRateSelect
+            label="Price Growth"
+            value={data?.price_growth_set_id}
+            onChange={(v) => onChange('price_growth_set_id', v)}
+            cardType="revenue"
+            projectId={projectId}
+            tooltip="Land price appreciation rate"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default LandDevRevenueSection;

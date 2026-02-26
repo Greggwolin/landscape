@@ -1,0 +1,322 @@
+'use client';
+
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  createLandscaperProfile,
+  fetchLandscaperProfile,
+} from '@/services/landscaperProfile';
+
+export default function LoginForm() {
+  const { login, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
+  const [tosAcceptedAt, setTosAcceptedAt] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [tosMap, setTosMap] = useState<Record<string, string>>({});
+  const normalizedUsername = useMemo(() => username.trim().toLowerCase(), [username]);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && !redirecting) {
+      router.push('/dashboard');
+    }
+  }, [isLoading, isAuthenticated, redirecting, router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('tosAcceptedByUser');
+    if (stored) {
+      try {
+        setTosMap(JSON.parse(stored));
+      } catch {
+        setTosMap({});
+      }
+    }
+  }, []);
+
+  const currentTosTimestamp = useMemo(() => {
+    return normalizedUsername ? tosMap[normalizedUsername] || null : null;
+  }, [normalizedUsername, tosMap]);
+
+  useEffect(() => {
+    setTosAcceptedAt(currentTosTimestamp);
+    if (currentTosTimestamp) {
+      setTosAccepted(true);
+      return;
+    }
+    setTosAccepted(false);
+  }, [currentTosTimestamp, normalizedUsername]);
+
+  const formattedAcceptedDate = useMemo(() => {
+    if (!tosAcceptedAt) return null;
+    const date = new Date(tosAcceptedAt);
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [tosAcceptedAt]);
+
+  const requiresTos = Boolean(normalizedUsername) && !currentTosTimestamp;
+
+  const persistAcceptedTos = (usernameKey: string, acceptedAt: string) => {
+    setTosMap((prev) => {
+      const newMap = {
+        ...prev,
+        [usernameKey]: acceptedAt,
+      };
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('tosAcceptedByUser', JSON.stringify(newMap));
+      }
+      return newMap;
+    });
+    setTosAcceptedAt(acceptedAt);
+    setTosAccepted(true);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (requiresTos && !tosAccepted) {
+      setError('Please accept the Terms of Service before logging in.');
+      return;
+    }
+
+    setError('');
+    setIsSubmitting(true);
+
+    try {
+      const loginUsername = username.trim();
+      const loginUsernameKey = loginUsername.toLowerCase();
+      const result = await login({ username: loginUsername, password });
+      let acceptedAt: string | null = null;
+
+      if (requiresTos) {
+        acceptedAt = new Date().toISOString();
+        await createLandscaperProfile({ tos_accepted_at: acceptedAt });
+        persistAcceptedTos(loginUsernameKey, acceptedAt);
+      }
+
+      const isAdmin = result.user?.role === 'admin';
+      if (isAdmin) {
+        setRedirecting(true);
+        router.push('/dashboard');
+        return;
+      }
+      const profile = await fetchLandscaperProfile();
+      const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
+      setRedirecting(true);
+      router.push(target);
+
+      const resolvedAcceptedAt = profile.tos_accepted_at ?? acceptedAt;
+      if (resolvedAcceptedAt) {
+        const profileUsername = result.user?.username?.toLowerCase?.() || loginUsernameKey;
+        persistAcceptedTos(profileUsername, resolvedAcceptedAt);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="tw-min-h-screen tw-flex tw-items-center tw-justify-center px-6 py-10"
+      style={{
+        backgroundColor: 'var(--cui-body-bg)',
+        color: 'var(--cui-body-color)',
+      }}
+    >
+      <div
+        className="tw-w-full tw-max-w-xl"
+      >
+        <div className="tw-flex tw-justify-center mb-6">
+          <Image
+            src="/logo-invert.png"
+            alt="Landscape"
+            width={260}
+            height={70}
+            priority
+          />
+        </div>
+        <div
+          className="tw-rounded-3xl border border-line-soft tw-shadow-2xl p-8"
+          style={{ backgroundColor: 'var(--surface-card-header)' }}
+        >
+          <h2 className="tw-text-3xl tw-font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Sign in to Alpha
+          </h2>
+          {error && (
+            <div
+              className="mb-4 tw-rounded-lg px-4 py-3 tw-text-sm"
+              style={{ backgroundColor: 'var(--chip-soft-costs-bg)', color: 'var(--track-change-deletion)' }}
+            >
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="tw-space-y-5">
+            <div>
+              <label
+                htmlFor="username"
+                className="tw-text-sm tw-font-medium"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="mt-1 tw-w-full tw-rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: 'var(--surface-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--text-primary)',
+                }}
+                placeholder="Enter your username"
+                required
+                autoFocus
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="password"
+                className="tw-text-sm tw-font-medium"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 tw-w-full tw-rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: 'var(--surface-bg)',
+                  borderColor: 'var(--cui-border-color)',
+                  color: 'var(--text-primary)',
+                }}
+                placeholder="Enter your password"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="tw-flex tw-items-center tw-justify-between tw-text-sm">
+              <div />
+              <Link
+                href="/forgot-password"
+                className="tw-text-xs tw-font-medium"
+                style={{ color: 'var(--cui-primary)' }}
+              >
+                Forgot password?
+              </Link>
+            </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || (requiresTos && !tosAccepted)}
+              className="tw-w-full tw-rounded-xl px-4 py-3 tw-font-semibold tw-transition"
+              style={{
+                backgroundColor:
+                  isSubmitting || (requiresTos && !tosAccepted) ? 'var(--line-soft)' : 'var(--cui-primary)',
+                color: 'var(--text-inverse)',
+              }}
+            >
+              {isSubmitting ? (
+                <span className="tw-flex tw-items-center tw-justify-center gap-3">
+                  <svg
+                    className="h-4 w-4 text-current tw-animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="tw-opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="tw-opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+          {requiresTos && (
+            <div className="mt-6 tw-rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+              <label className="tw-flex tw-items-center tw-text-sm gap-3" style={{ color: 'var(--text-primary)' }}>
+                <input
+                  type="checkbox"
+                  checked={tosAccepted}
+                  onChange={(e) => setTosAccepted(e.target.checked)}
+                  className="h-4 w-4 rounded border"
+                  style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-bg)' }}
+                />
+                <span>
+                  I accept the{' '}
+                  <Link href="/terms" className="tw-font-medium" style={{ color: 'var(--cui-primary)' }}>
+                    Alpha Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" className="tw-font-medium" style={{ color: 'var(--cui-primary)' }}>
+                    Privacy Policy
+                  </Link>
+                  .
+                </span>
+              </label>
+            </div>
+          )}
+          {!requiresTos && formattedAcceptedDate && (
+            <div className="mt-6 tw-rounded-2xl border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--surface-card)' }}>
+              <p className="tw-text-sm" style={{ color: 'var(--text-primary)', margin: 0 }}>
+                Terms accepted on {formattedAcceptedDate}
+              </p>
+            </div>
+          )}
+          <p className="mt-6 tw-text-xs text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+            Need an account?{' '}
+            <Link href="/register" className="tw-font-medium" style={{ color: 'var(--cui-primary)' }}>
+              Create one
+            </Link>
+          </p>
+        </div>
+        <div
+          className="mt-6 tw-rounded-3xl border border-line-soft p-6"
+          style={{ backgroundColor: 'var(--surface-card)', borderColor: 'var(--cui-border-color)' }}
+        >
+          <p className="tw-text-sm tw-uppercase tw-tracking-[0.2em] mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
+            Guidance
+          </p>
+          <h1 className="tw-text-2xl tw-font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+            A better Landscaper onboarding
+          </h1>
+          <p className="tw-text-base tw-leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
+            We pair you with a calibrated Landscaper assistant, tailored to your role, tone, and tooling.
+            Your onboarding answers map directly to how the chat introduces itself, suggests documents, and
+            keeps confidential insights locked to your private workspace.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

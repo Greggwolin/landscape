@@ -1,0 +1,75 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+
+import { getPrototypeById } from '@/lib/prototypes/registry';
+import type { PrototypeMetadata } from '@/lib/prototypes/types';
+import PrototypeViewer from './prototype-viewer';
+import PrototypeNotesClient from './PrototypeNotesClient';
+
+interface PrototypePageProps {
+  params: {
+    prototypeId: string;
+  };
+}
+
+const PrototypeMeta = ({ prototype }: { prototype: PrototypeMetadata }) => {
+  return (
+    <div className="mb-6 tw-flex tw-flex-wrap tw-items-center gap-3 tw-text-xs tw-text-neutral-400">
+      <span className="tw-rounded-full border tw-border-neutral-700 px-3 py-1 tw-uppercase tw-tracking-wide">
+        {prototype.status}
+      </span>
+      {prototype.branch ? (
+        <Link
+          href={`https://github.com/Greggwolin/landscape/tree/${prototype.branch}`}
+          className="tw-rounded-full border tw-border-neutral-700 px-3 py-1 tw-transition hover:tw-border-neutral-400"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Branch: {prototype.branch}
+        </Link>
+      ) : null}
+      {prototype.tags?.map((tag) => (
+        <span key={tag} className="tw-rounded-full border tw-border-neutral-800 tw-bg-neutral-900 px-3 py-1 tw-uppercase">
+          {tag}
+        </span>
+      ))}
+      {prototype.owners ? (
+        <span className="tw-rounded-full border tw-border-neutral-800 tw-bg-neutral-900 px-3 py-1">
+          Owners: {prototype.owners.join(', ')}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
+export default function PrototypePage({ params }: PrototypePageProps) {
+  const prototype = getPrototypeById(params.prototypeId);
+
+  if (!prototype) {
+    notFound();
+  }
+
+  const prototypeData = prototype;
+
+  return (
+    <div className="tw-space-y-4">
+      <div>
+        <Link
+          href="/prototypes"
+          className="tw-text-sm tw-text-neutral-400 tw-transition hover:text-white"
+        >
+          ← Back to prototype list
+        </Link>
+        <h2 className="mt-2 tw-text-3xl tw-font-semibold text-white">{prototypeData.name}</h2>
+        <p className="mt-2 tw-max-w-2xl tw-text-sm tw-text-neutral-400">{prototypeData.description}</p>
+        <PrototypeMeta prototype={prototypeData} />
+      </div>
+
+      <PrototypeNotesClient prototypeId={prototypeData.id} />
+
+      <div className="tw-rounded-xl border tw-border-neutral-800 tw-bg-neutral-900/60 p-4">
+        <PrototypeViewer prototype={prototypeData} />
+      </div>
+    </div>
+  );
+}

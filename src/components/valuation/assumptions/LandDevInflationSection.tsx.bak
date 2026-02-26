@@ -1,0 +1,103 @@
+'use client';
+
+/**
+ * Land Dev Inflation Section
+ *
+ * Combined section for Land Development inflation assumptions:
+ * - Price Growth (revenue escalation)
+ * - Cost Inflation (development cost escalation)
+ *
+ * Replaces separate LandDevRevenueSection and LandDevCostsSection.
+ *
+ * Session: QK-28
+ */
+
+import React, { useState } from 'react';
+import type { DcfAnalysis } from '@/types/dcf-analysis';
+import { GrowthRateSelect } from './GrowthRateSelect';
+
+// ============================================================================
+// CHEVRON ICON
+// ============================================================================
+
+function ChevronIcon({ isOpen }: { isOpen: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 tw-transition-transform tw-duration-200 ${isOpen ? tw-'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+interface LandDevInflationSectionProps {
+  data?: DcfAnalysis;
+  onChange: (field: keyof DcfAnalysis, value: number | null) => void;
+  projectId: number;
+  defaultOpen?: boolean;
+}
+
+export function LandDevInflationSection({
+  data,
+  onChange,
+  projectId,
+  defaultOpen = true,
+}: LandDevInflationSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      {/* Section Header */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="tw-w-full d-flex tw-justify-content-between tw-align-items-center text-left"
+        style={{
+          background: 'var(--cui-tertiary-bg)',
+          padding: '0.5rem 0.75rem',
+          borderRadius: 0,
+          border: 'none',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+          Inflation
+        </span>
+        <ChevronIcon isOpen={isOpen} />
+      </button>
+
+      {/* Content */}
+      {isOpen && (
+        <div className="pt-2 px-3 pb-2 tw-space-y-2">
+          {/* Price Growth Rate Set */}
+          <GrowthRateSelect
+            label="Price Growth"
+            value={data?.price_growth_set_id}
+            onChange={(v) => onChange('price_growth_set_id', v)}
+            cardType="revenue"
+            projectId={projectId}
+            tooltip="Land price appreciation rate"
+          />
+
+          {/* Cost Inflation Rate Set */}
+          <GrowthRateSelect
+            label="Cost Inflation"
+            value={data?.cost_inflation_set_id}
+            onChange={(v) => onChange('cost_inflation_set_id', v)}
+            cardType="cost"
+            projectId={projectId}
+            tooltip="Development cost inflation rate"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default LandDevInflationSection;

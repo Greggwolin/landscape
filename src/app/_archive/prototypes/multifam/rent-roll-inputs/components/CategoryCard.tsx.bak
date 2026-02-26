@@ -1,0 +1,52 @@
+'use client';
+
+import React from 'react';
+
+interface CategoryCardProps {
+  category: string;
+  label: string;
+  amount: number;
+  percentOfTotal: number;
+  isOutlier: boolean;
+  varianceFromMarket: number;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+export function CategoryCard({
+  category,
+  label,
+  amount,
+  percentOfTotal,
+  isOutlier,
+  varianceFromMarket,
+  isSelected,
+  onClick
+}: CategoryCardProps) {
+  return (
+    <div
+      onClick={onClick}
+      className={`p-4 tw-rounded-lg border tw-cursor-pointer tw-transition-all tw-duration-200 ${isSelected ? tw-'bg-gray-700 tw-border-blue-500 ring-2 ring-blue-500/50' : tw-'bg-gray-800 tw-border-gray-700 hover:tw-border-gray-600 hover:tw-bg-gray-750' }`}
+    >
+      <div className="tw-flex tw-items-start tw-justify-between mb-2">
+        <h3 className="tw-text-sm tw-font-medium tw-text-gray-200">{label}</h3>
+        {isOutlier && (
+          <span className="tw-text-orange-400" title="Above market median">⚠️</span>
+        )}
+      </div>
+
+      <div className="tw-text-2xl tw-font-bold text-white mb-1">
+        ${amount.toLocaleString()}
+      </div>
+
+      <div className="tw-flex tw-items-center tw-justify-between tw-text-xs">
+        <span className="tw-text-gray-400">{percentOfTotal}% of total</span>
+        {varianceFromMarket !== 0 && (
+          <span className={`varianceFromMarket > 0 ? tw-'text-orange-400' : tw-'text-green-400'`}>
+            {varianceFromMarket > 0 ? '+' : ''}{varianceFromMarket}% vs market
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,105 @@
+'use client';
+
+import type { ContainerNode } from '@/types/containers';
+import type { ContainerCostMetadata } from '@/types/valuation';
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+});
+
+interface ImprovementsSectionProps {
+  containers: ContainerNode[];
+  metadata: Record<number, ContainerCostMetadata | null>;
+  loading: boolean;
+}
+
+export function ImprovementsSection({ containers, metadata, loading }: ImprovementsSectionProps) {
+  const hasBuildings = containers.length > 0;
+  const totalBaseCost = Object.values(metadata).reduce((sum, meta) => sum + (meta?.base_cost_per_sf ?? 0), 0);
+
+  return (
+    <section className="tw-rounded-lg border p-5" style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}>
+      <div className="tw-flex tw-items-center tw-justify-between mb-4">
+        <div>
+          <h3 className="tw-text-lg tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+            Improvements (Structures)
+          </h3>
+          <p className="tw-text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+            Track each building (container) and the associated cost metadata.
+          </p>
+        </div>
+      </div>
+
+      {loading && !hasBuildings && (
+        <div className="text-center py-10" style={{ color: 'var(--cui-secondary-color)' }}>
+          Loading buildings...
+        </div>
+      )}
+
+      {!loading && !hasBuildings && (
+        <div className="text-center py-6" style={{ color: 'var(--cui-secondary-color)' }}>
+          No building containers detected for this project.
+        </div>
+      )}
+
+      {hasBuildings && (
+        <div className="tw-space-y-3">
+          {containers.map((container) => {
+            const meta = metadata[container.division_id];
+            return (
+              <div key={container.division_id} className="rounded border p-4" style={{ borderColor: 'var(--cui-border-color)' }}>
+                <div className="tw-flex tw-items-center tw-justify-between">
+                  <div>
+                    <div className="tw-text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                      {(container as { container_code?: string }).container_code ?? container.division_code}
+                    </div>
+                    <div className="tw-text-lg tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                      {container.display_name}
+                    </div>
+                  </div>
+                  <div className="text-right tw-text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
+                    Attributes:
+                    <div style={{ color: 'var(--cui-body-color)' }}>
+                      {(container.attributes as Record<string, unknown> | null)?.units_total ?? '—'} units
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 tw-grid tw-grid-cols-2 gap-4 tw-text-sm">
+                  <div>
+                    <div className="tw-text-xs tw-uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+                      Base $/SF
+                    </div>
+                    <div className="tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                      {meta?.base_cost_per_sf ? currencyFormatter.format(meta.base_cost_per_sf) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="tw-text-xs tw-uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+                      Multiplier
+                    </div>
+                    <div className="tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+                      {meta ? `${(meta.height_per_story_factor ?? 1).toFixed(3)} × ${(meta.perimeter_factor ?? 1).toFixed(3)}` : '—'}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  Indirect: {(meta?.indirect_cost_pct ?? 0).toFixed(2)}% · Profit: {(meta?.entrepreneurial_profit_pct ?? 0).toFixed(2)}%
+                </div>
+              </div>
+            );
+          })}
+          <div className="rounded border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}>
+            <div className="tw-text-xs tw-uppercase" style={{ color: 'var(--cui-secondary-color)' }}>
+              Total Base Cost (per SF)
+            </div>
+            <div className="tw-text-xl tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+              {currencyFormatter.format(totalBaseCost)}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

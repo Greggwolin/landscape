@@ -1,0 +1,363 @@
+'use client';
+
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { FileText, Upload, Loader2, CheckCircle, AlertCircle, Clipboard } from 'lucide-react';
+
+interface NewProjectDropZoneProps {
+  onFileDrop: (file: File) => void;
+  onFilesDrop?: (files: File[]) => void; // For multi-file drops (OM packages)
+  isDark?: boolean;
+  isProcessing?: boolean;
+  compact?: boolean;
+  multiple?: boolean; // Allow multiple file selection
+}
+
+type DropPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
+
+// Allowed MIME types for validation
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'image/jpeg',
+  'image/png'
+];
+
+export default function NewProjectDropZone({
+  onFileDrop,
+  onFilesDrop,
+  isDark = false,
+  isProcessing = false,
+  compact = false,
+  multiple = false,
+}: NewProjectDropZoneProps) {
+  const [phase, setPhase] = useState<DropPhase>('idle');
+  const [fileName, setFileName] = useState<string>('');
+  const [fileCount, setFileCount] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Process multiple files
+  const processFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+
+    setFileCount(files.length);
+    setFileName(files.length === 1 ? files[0].name : `${files.length} files`);
+    setPhase('uploading');
+    setErrorMessage('');
+
+    try {
+      // Simulate brief upload delay for UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setPhase('analyzing');
+
+      // Call appropriate parent handler
+      if (files.length > 1 && onFilesDrop) {
+        onFilesDrop(files);
+      } else {
+        // Process files one at a time if no multi-file handler
+        for (const file of files) {
+          onFileDrop(file);
+        }
+      }
+
+      // Parent will handle the actual processing
+      // We just show a brief success state
+      setTimeout(() => {
+        setPhase('complete');
+        setTimeout(() => {
+          setPhase('idle');
+          setFileName('');
+          setFileCount(0);
+        }, 2000);
+      }, 500);
+    } catch (error) {
+      setPhase('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Upload failed');
+      setTimeout(() => {
+        setPhase('idle');
+        setErrorMessage('');
+        setFileCount(0);
+      }, 3000);
+    }
+  }, [onFileDrop, onFilesDrop]);
+
+  // Single file processing (backwards compatible)
+  const processFile = useCallback(async (file: File) => {
+    processFiles([file]);
+  }, [processFiles]);
+
+  // Handle pasted files from clipboard
+  const handlePaste = useCallback((event: ClipboardEvent) => {
+    if (isProcessing || phase !== 'idle') return;
+
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file && ALLOWED_MIME_TYPES.includes(file.type)) {
+          event.preventDefault();
+          // Process the pasted file
+          processFile(file);
+          return;
+        }
+      }
+    }
+  }, [isProcessing, phase, processFile]);
+
+  // Add paste event listener
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Listen on document for paste events when container is focused or hovered
+    const handleDocumentPaste = (event: ClipboardEvent) => {
+      // Check if the dropzone or its children are focused/active
+      if (container.contains(document.activeElement) || container.matches(':hover')) {
+        handlePaste(event);
+      }
+    };
+
+    document.addEventListener('paste', handleDocumentPaste);
+    return () => {
+      document.removeEventListener('paste', handleDocumentPaste);
+    };
+  }, [handlePaste]);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+    // Use processFiles for all drops (handles single and multi-file)
+    processFiles(acceptedFiles);
+  }, [processFiles]);
+
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    isDragAccept,
+    isDragReject,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 32 * 1024 * 1024, // 32MB
+    maxFiles: multiple ? 20 : 1, // Allow up to 20 files for OM packages
+    multiple,
+    disabled: isProcessing || phase !== 'idle',
+  });
+
+  const isActive = phase !== 'idle';
+
+  // Determine border and background colors
+  const getBorderClass = () => {
+    if (isDragAccept) return 'border-green-400 bg-green-50 dark:bg-green-900/20';
+    if (isDragReject) return 'border-red-400 bg-red-50 dark:bg-red-900/20';
+    if (isDragActive) return 'border-blue-400 bg-blue-50 dark:bg-blue-900/20';
+    if (phase === 'complete') return 'border-green-400 bg-green-50 dark:bg-green-900/20';
+    if (phase === 'error') return 'border-red-400 bg-red-50 dark:bg-red-900/20';
+    return isDark
+      ? 'border-slate-600 hover:border-slate-500'
+      : 'border-slate-300 hover:border-slate-400';
+  };
+
+  if (compact) {
+    return (
+      <div
+        ref={containerRef}
+        {...getRootProps()}
+        tabIndex={0}
+        className={`tw-relative tw-border-2 tw-border-dashed tw-rounded-lg p-4 text-center tw-cursor-pointer tw-transition-colors tw-duration-200 outline-none focus:ring-2 focus:ring-blue-400 ${getBorderClass()} ${isActive ? tw-'cursor-default' : ''}`}
+      >
+        <input {...getInputProps()} />
+
+        <div className="tw-flex tw-items-center tw-justify-center gap-3">
+          {phase === 'idle' && (
+            <>
+              <Upload className={`h-5 w-5 ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`} />
+              <span className={`tw-text-sm ${isDark ? tw-'text-slate-300' : tw-'text-slate-600'}`}>
+                {isDragActive
+                  ? (multiple ? 'Drop documents here' : 'Drop document here')
+                  : (multiple ? 'Drag, paste, or click to browse files' : 'Drag, paste, or click to browse')
+                }
+              </span>
+            </>
+          )}
+
+          {phase === 'uploading' && (
+            <>
+              <Loader2 className="h-5 w-5 tw-animate-spin tw-text-blue-500" />
+              <span className="tw-text-sm tw-text-blue-600">Uploading {fileName}...</span>
+            </>
+          )}
+
+          {phase === 'analyzing' && (
+            <>
+              <Loader2 className="h-5 w-5 tw-animate-spin tw-text-amber-500" />
+              <span className="tw-text-sm tw-text-amber-600">
+                {fileCount > 1 ? `Analyzing ${fileCount} documents...` : 'Analyzing document...'}
+              </span>
+            </>
+          )}
+
+          {phase === 'complete' && (
+            <>
+              <CheckCircle className="h-5 w-5 tw-text-green-500" />
+              <span className="tw-text-sm tw-text-green-600">
+                {fileCount > 1 ? `${fileCount} documents received!` : 'Document received!'}
+              </span>
+            </>
+          )}
+
+          {phase === 'error' && (
+            <>
+              <AlertCircle className="h-5 w-5 tw-text-red-500" />
+              <span className="tw-text-sm tw-text-red-600">{errorMessage || 'Upload failed'}</span>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      {...getRootProps()}
+      tabIndex={0}
+      className={`tw-relative tw-border-2 tw-border-dashed p-8 text-center tw-cursor-pointer tw-transition-colors tw-duration-200 outline-none focus:ring-2 focus:ring-blue-400 ${getBorderClass()} ${isActive ? tw-'cursor-default' : ''}`}
+      style={{ borderRadius: 'var(--cui-card-border-radius)' }}
+    >
+      <input {...getInputProps()} />
+
+      {phase === 'idle' && (
+        <div className="tw-space-y-3">
+          <div className={`mx-auto h-12 w-12 tw-rounded-full tw-flex tw-items-center tw-justify-center ${ isDark ? tw-'bg-slate-800' : tw-'bg-slate-100' }`}>
+            <FileText className={`h-6 w-6 ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`} />
+          </div>
+
+          {isDragActive ? (
+            isDragAccept ? (
+              <div>
+                <p className="tw-text-base tw-font-medium tw-text-green-600">Drop to upload</p>
+                <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+                  Release to start analysis
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="tw-text-base tw-font-medium tw-text-red-600">File not supported</p>
+                <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+                  Use PDF, Word, or Excel files
+                </p>
+              </div>
+            )
+          ) : (
+            <div>
+              <p className={`tw-text-base tw-font-medium ${isDark ? tw-'text-slate-200' : tw-'text-slate-700'}`}>
+                {multiple ? 'Drop or paste documents here' : 'Drop or paste a document here'}
+              </p>
+              <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+                {multiple
+                  ? 'OM package, rent roll, T-12, appraisal (multi-file supported)'
+                  : 'Offering memorandum, rent roll, T-12, or appraisal'
+                }
+              </p>
+            </div>
+          )}
+
+          <div className="tw-flex tw-items-center tw-justify-center gap-2">
+            <button
+              type="button"
+              className="tw-inline-flex tw-items-center gap-2 tw-rounded-lg tw-bg-blue-600 px-4 py-2 tw-text-sm tw-font-medium text-white hover:tw-bg-blue-500 tw-transition"
+            >
+              <Upload className="h-4 w-4" />
+              {multiple ? 'Select Files' : 'Select File'}
+            </button>
+            <span className={`tw-text-xs ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>or</span>
+            <span className={`tw-inline-flex tw-items-center gap-1 tw-text-xs ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              <Clipboard className="h-3 w-3" />
+              Ctrl+V to paste
+            </span>
+          </div>
+
+          <p className={`tw-text-xs ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>
+            PDF, Word, Excel up to 32MB
+          </p>
+        </div>
+      )}
+
+      {phase === 'uploading' && (
+        <div className="tw-space-y-3">
+          <Loader2 className="h-12 w-12 mx-auto tw-animate-spin tw-text-blue-500" />
+          <div>
+            <p className="tw-text-base tw-font-medium tw-text-blue-600">Uploading...</p>
+            <p className={`tw-text-sm tw-truncate tw-max-w-xs mx-auto ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              {fileName}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {phase === 'analyzing' && (
+        <div className="tw-space-y-3">
+          <div className="tw-relative mx-auto h-12 w-12">
+            <div className="tw-absolute tw-inset-0 tw-rounded-full tw-bg-amber-500/20 tw-animate-ping" />
+            <div className="tw-relative h-12 w-12 tw-rounded-full tw-bg-amber-500/10 tw-flex tw-items-center tw-justify-center">
+              <Loader2 className="h-6 w-6 tw-animate-spin tw-text-amber-500" />
+            </div>
+          </div>
+          <div>
+            <p className="tw-text-base tw-font-medium tw-text-amber-600">
+              {fileCount > 1 ? `Analyzing ${fileCount} documents...` : 'Analyzing document...'}
+            </p>
+            <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              Extracting fields for Landscaper
+            </p>
+          </div>
+        </div>
+      )}
+
+      {phase === 'complete' && (
+        <div className="tw-space-y-3">
+          <div className="mx-auto h-12 w-12 tw-rounded-full tw-bg-green-500 tw-flex tw-items-center tw-justify-center">
+            <CheckCircle className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <p className="tw-text-base tw-font-medium tw-text-green-600">
+              {fileCount > 1 ? `${fileCount} documents received!` : 'Document received!'}
+            </p>
+            <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              Landscaper is reviewing the content
+            </p>
+          </div>
+        </div>
+      )}
+
+      {phase === 'error' && (
+        <div className="tw-space-y-3">
+          <div className="mx-auto h-12 w-12 tw-rounded-full tw-bg-red-500/10 tw-flex tw-items-center tw-justify-center">
+            <AlertCircle className="h-6 w-6 tw-text-red-500" />
+          </div>
+          <div>
+            <p className="tw-text-base tw-font-medium tw-text-red-600">Upload failed</p>
+            <p className={`tw-text-sm ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              {errorMessage || 'Please try again'}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

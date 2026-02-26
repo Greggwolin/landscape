@@ -1,0 +1,58 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
+const iframeSrc = '/prototypes/lease-input-page.html';
+
+const LeaseInputPrototype = () => {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) {
+      return;
+    }
+
+    const handleLoad = () => setLoaded(true);
+    iframe.addEventListener('load', handleLoad);
+    return () => iframe.removeEventListener('load', handleLoad);
+  }, []);
+
+  return (
+    <div className="tw-flex tw-flex-col gap-4">
+      <div className="tw-flex tw-items-center tw-justify-between tw-rounded-lg border tw-border-neutral-800 tw-bg-neutral-900/70 px-4 py-3 tw-text-sm tw-text-neutral-300">
+        <div>
+          <span className="tw-font-semibold text-white">Lease Input Prototype</span>
+          <span className="ml-2 tw-text-neutral-500">
+            Embedded static HTML generated in CoreUI. Useful for quick layout checks.
+          </span>
+        </div>
+        <a
+          href={iframeSrc}
+          target="_blank"
+          rel="noreferrer"
+          className="tw-rounded-md border tw-border-neutral-600 px-3 py-1 tw-text-xs tw-font-medium tw-text-neutral-200 tw-transition hover:tw-border-neutral-400 hover:text-white"
+        >
+          Open in new tab
+        </a>
+      </div>
+
+      <div className="tw-relative tw-min-h-[720px] tw-overflow-hidden tw-rounded-xl border tw-border-neutral-800 bg-black/40">
+        {!loaded ? (
+          <div className="tw-absolute tw-inset-0 tw-z-10 tw-flex tw-items-center tw-justify-center tw-text-sm tw-text-neutral-500">
+            Loading CoreUI document…
+          </div>
+        ) : null}
+        <iframe
+          ref={iframeRef}
+          src={iframeSrc}
+          title="Lease Input Prototype"
+          className="tw-h-[1200px] tw-w-full bg-white"
+        />
+      </div>
+    </div>
+  );
+};
+
+export default LeaseInputPrototype;

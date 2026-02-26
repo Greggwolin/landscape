@@ -1,0 +1,103 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
+import { ChatMessageBubble } from '@/components/landscaper/ChatMessageBubble';
+
+interface AgentChatProps {
+  projectId: string;
+  agentId: string;
+  agentName: string;
+  placeholder?: string;
+  activeTab?: string;  // Page context for tool filtering (e.g., 'mf_valuation', 'mf_operations')
+}
+
+export function AgentChat({
+  projectId,
+  agentId,
+  agentName,
+  placeholder,
+  activeTab = 'home',
+}: AgentChatProps) {
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { messages, sendMessage, isLoading } = useLandscaperThreads({
+    projectId,
+    pageContext: activeTab || 'home',  // Pass page context for tool filtering
+  });
+
+  // Track if user has sent a message - only auto-scroll after user interaction
+  const userHasSentMessage = useRef(false);
+  const prevMessageCount = useRef(0);
+
+  useEffect(() => {
+    // Only scroll if user has sent a message AND there are new messages
+    if (userHasSentMessage.current && messages.length > prevMessageCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    prevMessageCount.current = messages.length;
+  }, [messages]);
+
+  const handleSend = () => {
+    if (!input.trim() || isLoading) return;
+
+    // Mark that user has interacted - now auto-scroll is allowed
+    userHasSentMessage.current = true;
+
+    // Optimistically add user message immediately
+    const currentMessage = input.trim();
+    setInput('');
+
+    sendMessage(currentMessage).catch(() => {
+      setInput(currentMessage);
+    });
+  };
+
+  return (
+    <div className="tw-flex tw-h-full tw-flex-col">
+      <div className="tw-flex-1 tw-space-y-3 tw-overflow-y-auto p-3">
+        {messages.length === 0 ? (
+          <div className="py-8 text-center text-muted">
+            <p className="tw-text-sm">
+              Ask {agentName} anything about this analysis.
+            </p>
+          </div>
+        ) : (
+          messages.map((msg: ThreadMessage) => (
+            <ChatMessageBubble key={msg.messageId} message={msg} />
+          ))
+        )}
+
+        {isLoading && (
+          <div className="tw-flex tw-items-center gap-2 tw-text-sm text-muted">
+            <div className="h-4 w-4 tw-animate-spin tw-rounded-full tw-border-b-2 border-primary"></div>
+            <span>Thinking...</span>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="tw-border-t border-border p-3">
+        <div className="tw-flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            placeholder={placeholder || 'Ask a question...'}
+            className="tw-flex-1 tw-rounded-lg border border-border bg-background px-3 py-2 tw-text-sm"
+            disabled={isLoading}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            className="tw-rounded-lg bg-primary px-3 py-2 tw-text-sm text-primary-foreground tw-transition-colors hover:bg-primary/90 disabled:tw-opacity-50"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

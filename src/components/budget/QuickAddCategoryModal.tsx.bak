@@ -1,0 +1,312 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, AlertTriangle, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import type {
+  BudgetCategory,
+  CategoryLevel,
+  QuickAddCategoryRequest,
+  QuickAddCategoryResponse,
+} from '@/types/budget-categories';
+
+interface QuickAddCategoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (category: QuickAddCategoryResponse) => void;
+  projectId: number;
+  availableCategories?: BudgetCategory[];
+  defaultLevel?: CategoryLevel;
+  defaultParentId?: number | null;
+}
+
+/**
+ * Quick-Add Category Modal
+ *
+ * Minimal category creation for budget grid workflow.
+ * Only requires name and level - other fields auto-generated or optional.
+ *
+ * Features:
+ * - Auto-generates code from name
+ * - Cascading parent selector
+ * - Incomplete category flagging
+ * - Validation hints
+ */
+export function QuickAddCategoryModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  projectId,
+  availableCategories = [],
+  defaultLevel,
+  defaultParentId,
+}: QuickAddCategoryModalProps) {
+  const { showToast } = useToast();
+
+  // Form state
+  const [name, setName] = useState('');
+  const [level, setLevel] = useState<CategoryLevel | null>(defaultLevel || 1);
+  const [parentId, setParentId] = useState<number | null>(defaultParentId || null);
+
+  // UI state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // Filter available parent categories based on selected level
+  const availableParents = availableCategories.filter(
+    (cat) => cat.level === (level ? level - 1 : 0) && cat.is_active
+  );
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+      setLevel(defaultLevel || 1);
+      setParentId(defaultParentId || null);
+      setValidationErrors([]);
+    }
+  }, [isOpen, defaultLevel, defaultParentId]);
+
+  // Update parent when level changes
+  useEffect(() => {
+    if (level === 1) {
+      setParentId(null); // Level 1 cannot have parent
+    } else if (level && parentId) {
+      // Verify current parent is valid for new level
+      const parentCategory = availableCategories.find((c) => c.category_id === parentId);
+      if (parentCategory && parentCategory.level !== level - 1) {
+        setParentId(null); // Clear invalid parent
+      }
+    }
+  }, [level, parentId, availableCategories]);
+
+  // Client-side validation
+  const validate = (): boolean => {
+    const errors: string[] = [];
+
+    if (!name || name.trim().length === 0) {
+      errors.push('Category name is required');
+    }
+
+    if (!level) {
+      errors.push('Level is required');
+    }
+
+    if (level && level > 1 && !parentId) {
+      // Warning, not error - can still submit without parent
+      errors.push(`Warning: Level ${level} categories should have a parent (recommended but optional)`);
+    }
+
+    setValidationErrors(errors);
+
+    // Allow submission even with warnings (only block on hard errors)
+    const hardErrors = errors.filter((e) => !e.startsWith('Warning:'));
+    return hardErrors.length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const requestData: QuickAddCategoryRequest = {
+        name: name.trim(),
+        level: level!,
+        project_id: projectId,
+      };
+
+      // Only include parent_id if set
+      if (parentId) {
+        requestData.parent_id = parentId;
+      }
+
+      const response = await fetch('/api/financial/budget-categories/quick-add/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create category');
+      }
+
+      const newCategory: QuickAddCategoryResponse = await response.json();
+
+      showToast(
+        `"${newCategory.name}" has been added. You can complete additional details in Admin → Preferences later.`,
+        'success'
+      );
+
+      onSuccess(newCategory);
+      onClose();
+    } catch (error) {
+      console.error('Failed to create category:', error);
+
+      showToast(
+        error instanceof Error ? error.message : 'Failed to create category',
+        'error'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (isSubmitting) return;
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
+      <DialogContent className="sm:tw-max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Quick-Add Category</DialogTitle>
+          <DialogDescription>
+            Create a budget category with minimal info. You can complete additional details
+            (description, icon, color) in Admin → Preferences later.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="tw-grid gap-4 py-4">
+          {/* Incomplete Category Info */}
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This category will be flagged as <strong>incomplete</strong> until you add a
+              description, icon, and color in the admin panel.
+            </AlertDescription>
+          </Alert>
+
+          {/* Category Name */}
+          <div className="tw-grid gap-2">
+            <Label htmlFor="category-name">
+              Category Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="category-name"
+              placeholder="e.g., Environmental Studies, Geotechnical, etc."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isSubmitting}
+              autoFocus
+            />
+            <p className="tw-text-xs text-muted-foreground">
+              Code will be auto-generated from the name
+            </p>
+          </div>
+
+          {/* Level Selector */}
+          <div className="tw-grid gap-2">
+            <Label htmlFor="category-level">
+              Level <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={level?.toString() || ''}
+              onValueChange={(value) => setLevel(parseInt(value) as CategoryLevel)}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="category-level">
+                <SelectValue placeholder="Select level..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Level 1 (Top)</SelectItem>
+                <SelectItem value="2">Level 2</SelectItem>
+                <SelectItem value="3">Level 3</SelectItem>
+                <SelectItem value="4">Level 4 (Detail)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Parent Selector (for L2-4) */}
+          {level && level > 1 && (
+            <div className="tw-grid gap-2">
+              <Label htmlFor="category-parent">
+                Parent Category {level > 1 && '(Recommended)'}
+              </Label>
+              <Select
+                value={parentId?.toString() || ''}
+                onValueChange={(value) => setParentId(value ? parseInt(value) : null)}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger id="category-parent">
+                  <SelectValue placeholder="Select parent (optional)..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableParents.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No Level {level - 1} categories available
+                    </SelectItem>
+                  ) : (
+                    availableParents.map((cat) => (
+                      <SelectItem key={cat.category_id} value={cat.category_id.toString()}>
+                        {cat.name} ({cat.code})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="tw-text-xs text-muted-foreground">
+                {parentId
+                  ? 'Parent will be used to generate category code'
+                  : 'You can assign a parent later in admin panel'}
+              </p>
+            </div>
+          )}
+
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
+            <Alert variant={validationErrors.some((e) => !e.startsWith('Warning:')) ? 'destructive' : 'default'}>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <ul className="tw-list-disc tw-list-inside tw-space-y-1">
+                  {validationErrors.map((error, idx) => (
+                    <li key={idx} className="tw-text-sm">
+                      {error}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 tw-animate-spin" />}
+            Create Category
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default QuickAddCategoryModal;

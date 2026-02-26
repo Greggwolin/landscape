@@ -1,0 +1,72 @@
+'use client';
+
+import React from 'react';
+
+interface CardProps {
+  children: React.ReactNode;
+  title?: string;
+  subtitle?: string;
+  className?: string;
+  headerAction?: React.ReactNode;
+  noPadding?: boolean;
+}
+
+/**
+ * Card component for agent canvas sections.
+ * Provides consistent styling with shadow, rounded corners, and optional header.
+ */
+export function Card({
+  children,
+  title,
+  subtitle,
+  className = '',
+  headerAction,
+  noPadding = false,
+}: CardProps) {
+  return (
+    <div
+      className={`bg-surface-card tw-rounded-lg tw-shadow-sm ${className}`}
+      style={{
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+      }}
+    >
+      {(title || headerAction) && (
+        <div
+          className="tw-flex tw-items-center tw-justify-between px-3 py-2 tw-border-b border-border tw-sticky top-0 tw-z-10"
+          style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+        >
+          <div>
+            {title && <h3 className="tw-font-semibold tw-text-sm text-foreground">{title}</h3>}
+            {subtitle && <p className="tw-text-xs text-muted mt-0.5">{subtitle}</p>}
+          </div>
+          {headerAction && <div>{headerAction}</div>}
+        </div>
+      )}
+      <div className={`noPadding ? '' : 'p-3'`}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * CardGrid component for organizing multiple cards in a responsive grid.
+ */
+interface CardGridProps {
+  children: React.ReactNode;
+  columns?: 1 | 2 | 3 | 4;
+  className?: string;
+}
+
+export function CardGrid({ children, columns = 2, className = '' }: CardGridProps) {
+  const colClasses = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-1 md:grid-cols-2',
+    3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+  };
+
+  return (
+    <div className={`tw-grid gap-3 ${colClasses[columns]} ${className}`}>
+      {children}
+    </div>
+  );
+}

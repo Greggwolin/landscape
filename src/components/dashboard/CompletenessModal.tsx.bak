@@ -1,0 +1,163 @@
+'use client';
+
+import React from 'react';
+import { CompletenessBar } from './CompletenessBar';
+
+export interface CompletenessCategory {
+  name: string;
+  percentage: number;
+  status: 'complete' | 'partial' | 'missing';
+  details: string;
+}
+
+export interface CompletenessModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectName: string;
+  overallPercentage: number;
+  categories: CompletenessCategory[];
+}
+
+/**
+ * Modal showing detailed completeness breakdown across 6 categories.
+ */
+export function CompletenessModal({
+  isOpen,
+  onClose,
+  projectName,
+  overallPercentage,
+  categories,
+}: CompletenessModalProps) {
+  if (!isOpen) return null;
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'complete':
+        return (
+          <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-green-100 px-2 py-0.5 tw-text-xs tw-font-medium tw-text-green-700">
+            Complete
+          </span>
+        );
+      case 'partial':
+        return (
+          <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-yellow-100 px-2 py-0.5 tw-text-xs tw-font-medium tw-text-yellow-700">
+            Partial
+          </span>
+        );
+      case 'missing':
+        return (
+          <span className="tw-inline-flex tw-items-center tw-rounded-full tw-bg-red-100 px-2 py-0.5 tw-text-xs tw-font-medium tw-text-red-700">
+            Missing
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getCategoryIcon = (name: string) => {
+    switch (name) {
+      case 'Property Data':
+        return '📍';
+      case 'Sources':
+        return '💰';
+      case 'Uses':
+        return '📊';
+      case 'Structure':
+        return '🏗️';
+      case 'Valuation':
+        return '💎';
+      case 'Documents':
+        return '📄';
+      default:
+        return '📋';
+    }
+  };
+
+  return (
+    <div className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center">
+      {/* Backdrop */}
+      <div
+        className="tw-absolute tw-inset-0 bg-black/50 tw-backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="tw-relative tw-z-10 tw-w-full tw-max-w-lg bg-white tw-shadow-2xl" style={{ borderRadius: 'var(--cui-card-border-radius)' }}>
+        {/* Header */}
+        <div className="tw-flex tw-items-center tw-justify-between tw-border-b border-border px-6 py-4">
+          <div>
+            <h2 className="tw-text-lg tw-font-semibold text-foreground">{projectName}</h2>
+            <p className="tw-text-sm text-muted">Analysis Readiness</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="tw-rounded-lg p-2 text-muted hover:bg-surface-hover hover:text-foreground tw-transition-colors"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Overall Progress */}
+        <div className="tw-border-b border-border px-6 py-4">
+          <div className="tw-flex tw-items-center tw-justify-between mb-2">
+            <span className="tw-text-sm tw-font-medium text-foreground">Overall Completeness</span>
+            <span
+              className={`tw-text-2xl tw-font-bold ${ overallPercentage < 30 ? tw-'text-red-600' : overallPercentage < 70 ? tw-'text-yellow-600' : tw-'text-green-600' }`}
+            >
+              {overallPercentage}%
+            </span>
+          </div>
+          <CompletenessBar percentage={overallPercentage} showLabel={false} size="md" />
+        </div>
+
+        {/* Categories List */}
+        <div className="px-6 py-4 tw-max-h-[400px] tw-overflow-y-auto">
+          <h3 className="tw-text-sm tw-font-medium text-muted mb-4">Category Breakdown</h3>
+          <div className="tw-space-y-4">
+            {categories.map((category) => (
+              <div
+                key={category.name}
+                className="tw-rounded-lg border border-border p-4 hover:border-primary/30 tw-transition-colors"
+              >
+                <div className="tw-flex tw-items-center tw-justify-between mb-2">
+                  <div className="tw-flex tw-items-center gap-2">
+                    <span className="tw-text-lg">{getCategoryIcon(category.name)}</span>
+                    <span className="tw-font-medium text-foreground">{category.name}</span>
+                  </div>
+                  {getStatusBadge(category.status)}
+                </div>
+                <CompletenessBar percentage={category.percentage} size="sm" />
+                <p className="mt-2 tw-text-xs text-muted">{category.details}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="tw-border-t border-border px-6 py-4">
+          <button
+            onClick={onClose}
+            className="tw-w-full tw-rounded-lg bg-primary px-4 py-2 tw-text-sm tw-font-medium text-white hover:bg-primary-hover tw-transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default CompletenessModal;

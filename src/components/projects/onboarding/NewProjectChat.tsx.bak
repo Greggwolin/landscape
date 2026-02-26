@@ -1,0 +1,212 @@
+'use client';
+
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Send, FileText, Loader2 } from 'lucide-react';
+import type { ChatMessage } from './types';
+import NewProjectDropZone from './NewProjectDropZone';
+import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+
+interface NewProjectChatProps {
+  messages: ChatMessage[];
+  isProcessing: boolean;
+  onSendMessage: (message: string) => void;
+  onDocumentDrop: (file: File) => void;
+  isDark?: boolean;
+  projectId: number | null;
+}
+
+const STARTER_PROMPTS = [
+  "I'm evaluating a 100-unit apartment building in Phoenix",
+  "I have an offering memorandum to analyze",
+  "Help me set up a new multifamily acquisition",
+  "I'm looking at a retail property in Scottsdale",
+];
+
+export default function NewProjectChat({
+  messages,
+  isProcessing,
+  onSendMessage,
+  onDocumentDrop,
+  isDark = false,
+  projectId: _projectId,
+}: NewProjectChatProps) {
+  const [input, setInput] = useState('');
+  const [showDropZone, setShowDropZone] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Hide drop zone after first message or document
+  useEffect(() => {
+    if (messages.length > 1) {
+      setShowDropZone(false);
+    }
+  }, [messages]);
+
+  const handleSend = useCallback(() => {
+    if (!input.trim() || isProcessing) return;
+    onSendMessage(input.trim());
+    setInput('');
+  }, [input, isProcessing, onSendMessage]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleStarterClick = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+
+  const handleFileDrop = useCallback((file: File) => {
+    setShowDropZone(false);
+    onDocumentDrop(file);
+  }, [onDocumentDrop]);
+
+  return (
+    <div className="tw-flex tw-h-full tw-flex-col">
+      {/* Messages Area */}
+      <div className="tw-flex-1 tw-overflow-y-auto p-4 tw-space-y-4">
+        {messages.length === 0 ? (
+          // Initial empty state
+          <div className="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full text-center">
+            <div className={`tw-text-5xl mb-4 ${isDark ? tw-'opacity-80' : ''}`}>
+              🌿
+            </div>
+            <h3 className={`tw-text-lg tw-font-medium mb-2 ${isDark ? tw-'text-slate-200' : tw-'text-slate-800'}`}>
+              Welcome to Landscaper
+            </h3>
+            <p className={`tw-text-sm mb-6 tw-max-w-md ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+              Tell me about your new project, or drag a document into this window for me to review.
+            </p>
+
+            {/* Document Drop Zone */}
+            {showDropZone && (
+              <div className="tw-w-full tw-max-w-md mb-6">
+                <NewProjectDropZone
+                  onFileDrop={handleFileDrop}
+                  isDark={isDark}
+                  isProcessing={isProcessing}
+                />
+              </div>
+            )}
+
+            {/* Starter Prompts */}
+            <div className="tw-w-full tw-max-w-md tw-space-y-2">
+              <p className={`tw-text-xs tw-font-medium mb-2 ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>
+                Or start with:
+              </p>
+              {STARTER_PROMPTS.map((prompt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleStarterClick(prompt)}
+                  className={`tw-w-full text-left px-3 py-2 tw-rounded-lg tw-text-sm tw-transition ${ isDark ? tw-'bg-slate-800 tw-text-slate-300 hover:tw-bg-slate-700 border tw-border-slate-700' : tw-'bg-slate-100 tw-text-slate-600 hover:tw-bg-slate-200 border tw-border-slate-200' }`}
+                >
+                  💡 {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Message history
+          <>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`tw-flex ${message.role === 'user' ? tw-'justify-end' : tw-'justify-start'}`}
+              >
+                <div
+                  className={`tw-max-w-[85%] tw-rounded-lg px-4 py-3 tw-text-sm ${ message.role === 'user' ? tw-'bg-blue-600 text-white' : isDark ? tw-'bg-slate-800 border tw-border-slate-700 tw-text-slate-200' : 'bg-white border tw-border-slate-200 tw-text-slate-700 tw-shadow-sm' }`}
+                >
+                  {/* Message content - sanitized for assistant messages */}
+                  <div className="tw-whitespace-pre-wrap">
+                    {message.role === 'user'
+                      ? message.content
+                      : processLandscaperResponse(message.content)
+                    }
+                  </div>
+
+                  {/* Metadata badges */}
+                  {message.metadata?.fieldsExtracted && message.metadata.fieldsExtracted.length > 0 && (
+                    <div className="mt-2 pt-2 tw-border-t tw-border-slate-200/20">
+                      <span className={`tw-text-xs ${message.role === 'user' ? tw-'text-blue-200' : isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+                        Extracted {message.metadata.fieldsExtracted.length} fields
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Processing indicator */}
+            {isProcessing && (
+              <div className="tw-flex tw-justify-start">
+                <div className={`tw-flex tw-items-center gap-2 px-4 py-3 tw-rounded-lg tw-text-sm ${ isDark ? tw-'bg-slate-800 tw-text-slate-300' : tw-'bg-slate-100 tw-text-slate-600' }`}>
+                  <Loader2 className="h-4 w-4 tw-animate-spin" />
+                  <span>Landscaper is thinking...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className={`tw-border-t p-4 ${isDark ? tw-'border-slate-700' : tw-'border-slate-200'}`}>
+        <div className="tw-flex gap-2">
+          <div className="tw-flex-1 tw-relative">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Landscaper..."
+              disabled={isProcessing}
+              rows={1}
+              className={`tw-w-full tw-resize-none tw-rounded-lg border px-4 py-3 pr-12 tw-text-sm tw-transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${ isDark ? tw-'border-slate-700 tw-bg-slate-800 tw-text-slate-100 placeholder-slate-500' : tw-'border-slate-300 bg-white tw-text-slate-900 placeholder-slate-400' } ${isProcessing ? tw-'opacity-50 tw-cursor-not-allowed' : ''}`}
+              style={{ minHeight: '44px', maxHeight: '120px' }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isProcessing}
+              className={`tw-absolute right-2 top-1/2 tw--translate-y-1/2 tw-rounded-md p-2 tw-transition ${ input.trim() && !isProcessing ? tw-'bg-blue-600 text-white hover:tw-bg-blue-500' : isDark ? tw-'bg-slate-700 tw-text-slate-500' : tw-'bg-slate-100 tw-text-slate-400' }`}
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className={`mt-2 tw-flex tw-items-center tw-justify-between tw-text-xs ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>
+          <span>Press Enter to send</span>
+          <button
+            onClick={() => setShowDropZone(!showDropZone)}
+            className={`tw-flex tw-items-center gap-1 tw-transition hover:tw-text-blue-500 ${ showDropZone ? tw-'text-blue-500' : '' }`}
+          >
+            <FileText className="h-3 w-3" />
+            Upload document
+          </button>
+        </div>
+
+        {/* Inline drop zone toggle */}
+        {showDropZone && messages.length > 0 && (
+          <div className="mt-3">
+            <NewProjectDropZone
+              onFileDrop={handleFileDrop}
+              isDark={isDark}
+              isProcessing={isProcessing}
+              compact
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

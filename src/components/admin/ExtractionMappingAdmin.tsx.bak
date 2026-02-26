@@ -1,0 +1,839 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import {
+  CButton,
+  CFormSelect,
+  CFormInput,
+  CSpinner,
+  CTable,
+  CTableHead,
+  CTableBody,
+  CTableRow,
+  CTableHeaderCell,
+  CTableDataCell,
+  CBadge,
+  CFormSwitch,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CFormLabel,
+  CFormTextarea,
+  CTooltip,
+} from '@coreui/react';
+import { SemanticButton } from '@/components/ui/landscape';
+import CIcon from '@coreui/icons-react';
+import { cilPlus, cilPencil, cilChartLine, cilTrash } from '@coreui/icons';
+import { CircleHelp } from 'lucide-react';
+import useSWR from 'swr';
+
+type ExtractionMapping = {
+  mapping_id: number;
+  document_type: string;
+  source_pattern: string;
+  source_aliases: string[];
+  target_table: string;
+  target_field: string;
+  data_type: string;
+  transform_rule: string | null;
+  confidence: string;
+  auto_write: boolean;
+  overwrite_existing: boolean;
+  is_active: boolean;
+  is_system: boolean;
+  applicable_tags: string[];
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  times_extracted?: number;
+  projects_used?: number;
+  documents_processed?: number;
+  avg_confidence_score?: number;
+  write_rate?: number;
+  acceptance_rate?: number;
+  last_used_at?: string;
+};
+
+type DocumentTypeCount = {
+  document_type: string;
+  count: number;
+  active_count: number;
+};
+
+type TargetTableCount = {
+  target_table: string;
+  count: number;
+  active_count: number;
+};
+
+// Badge color mapping for template-derived doc types
+const DOC_TYPE_BADGE_COLORS: Record<string, string> = {
+  'Offering': 'primary',
+  'Property Data': 'success',
+  'Operations': 'info',
+  'Market Data': 'warning',
+  'Diligence': 'dark',
+  'Agreements': 'primary',
+  'Leases': 'info',
+  'Title & Survey': 'secondary',
+  'Correspondence': 'secondary',
+  'Accounting': 'warning',
+  'Misc': 'secondary',
+};
+
+// Generate a consistent color for unknown doc types
+function getDocTypeBadgeColor(docType: string): string {
+  if (DOC_TYPE_BADGE_COLORS[docType]) return DOC_TYPE_BADGE_COLORS[docType];
+  // Hash-based fallback
+  const colors = ['primary', 'success', 'info', 'warning', 'dark'];
+  let hash = 0;
+  for (let i = 0; i < docType.length; i++) {
+    hash = docType.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  High: 'success',
+  Medium: 'warning',
+  Low: 'danger',
+};
+
+const DATA_TYPE_OPTIONS = [
+  { value: 'text', label: 'Text' },
+  { value: 'integer', label: 'Integer' },
+  { value: 'decimal', label: 'Decimal' },
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'date', label: 'Date' },
+  { value: 'json', label: 'JSON' },
+];
+
+const TRANSFORM_RULE_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'strip_currency', label: 'Strip Currency' },
+  { value: 'percent_to_decimal', label: 'Percent to Decimal' },
+  { value: 'parse_date', label: 'Parse Date' },
+  { value: 'extract_number', label: 'Extract Number' },
+];
+
+const CONFIDENCE_OPTIONS = [
+  { value: 'High', label: 'High' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'Low', label: 'Low' },
+];
+
+// Column header tooltips
+const COLUMN_TOOLTIPS: Record<string, string> = {
+  Active: 'Toggle extraction on/off. Does not affect existing data.',
+  'Doc Type': 'Document category this mapping applies to. Set in DMS Admin > Templates.',
+  Pattern: 'The label Landscaper searches for. Aliases shown below.',
+  Target: 'Database destination: table.field',
+  Type: 'Expected data type for validation and conversion.',
+  Confidence: 'High = auto-write, Medium = write + flag, Low = report only.',
+  Actions: 'Edit mapping details. System mappings can\'t be deleted.',
+};
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export function ExtractionMappingAdmin() {
+  const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [documentTypeFilter, setDocumentTypeFilter] = useState('');
+  const [confidenceFilter, setConfidenceFilter] = useState('');
+  const [tableFilter, setTableFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'' | 'true' | 'false'>('');
+  const [showStats, setShowStats] = useState(false);
+
+  // Modal states
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [editingMapping, setEditingMapping] = useState<ExtractionMapping | null>(null);
+  const [formData, setFormData] = useState({
+    document_type: '',
+    source_pattern: '',
+    source_aliases: '',
+    target_table: '',
+    target_field: '',
+    data_type: 'text',
+    transform_rule: '',
+    confidence: 'Medium',
+    auto_write: true,
+    overwrite_existing: false,
+    is_active: true,
+    applicable_tags: '',
+    notes: '',
+  });
+
+  // Build query params
+  const queryParams = new URLSearchParams();
+  if (documentTypeFilter) queryParams.set('document_type', documentTypeFilter);
+  if (confidenceFilter) queryParams.set('confidence', confidenceFilter);
+  if (tableFilter) queryParams.set('target_table', tableFilter);
+  if (activeFilter) queryParams.set('is_active', activeFilter);
+  if (searchTerm) queryParams.set('search', searchTerm);
+
+  // Fetch mappings
+  const mappingsUrl = showStats
+    ? `${DJANGO_API}/api/landscaper/mappings/stats/`
+    : `${DJANGO_API}/api/landscaper/mappings/?${queryParams.toString()}`;
+
+  const { data: mappingsData, isLoading, mutate } = useSWR(mappingsUrl, fetcher);
+
+  // Fetch document types and tables for filters (from unified endpoint)
+  const { data: docTypesData } = useSWR<{ document_types: DocumentTypeCount[] }>(
+    `${DJANGO_API}/api/landscaper/mappings/document-types/`,
+    fetcher
+  );
+  const { data: tablesData } = useSWR<{ target_tables: TargetTableCount[] }>(
+    `${DJANGO_API}/api/landscaper/mappings/target-tables/`,
+    fetcher
+  );
+
+  // Doc type options for the form dropdown (derived from the unified endpoint)
+  const docTypeOptions = useMemo(() => {
+    if (!docTypesData?.document_types) return [];
+    return docTypesData.document_types.map((dt) => dt.document_type).sort();
+  }, [docTypesData]);
+
+  // Memoize filtered mappings (client-side filtering when showStats is on)
+  const filteredMappings = useMemo(() => {
+    if (!mappingsData?.mappings) return [];
+    let result = mappingsData.mappings as ExtractionMapping[];
+
+    if (showStats) {
+      if (documentTypeFilter) {
+        result = result.filter((m) => m.document_type === documentTypeFilter);
+      }
+      if (confidenceFilter) {
+        result = result.filter((m) => m.confidence === confidenceFilter);
+      }
+      if (tableFilter) {
+        result = result.filter((m) => m.target_table === tableFilter);
+      }
+      if (activeFilter) {
+        result = result.filter((m) => m.is_active === (activeFilter === 'true'));
+      }
+      if (searchTerm) {
+        const lowerSearch = searchTerm.toLowerCase();
+        result = result.filter(
+          (m) =>
+            m.source_pattern.toLowerCase().includes(lowerSearch) ||
+            m.target_table.toLowerCase().includes(lowerSearch) ||
+            m.target_field.toLowerCase().includes(lowerSearch)
+        );
+      }
+    }
+
+    return result;
+  }, [mappingsData, showStats, documentTypeFilter, confidenceFilter, tableFilter, activeFilter, searchTerm]);
+
+  const handleAdd = () => {
+    setEditingMapping(null);
+    setFormData({
+      document_type: docTypeOptions[0] || '',
+      source_pattern: '',
+      source_aliases: '',
+      target_table: '',
+      target_field: '',
+      data_type: 'text',
+      transform_rule: '',
+      confidence: 'Medium',
+      auto_write: true,
+      overwrite_existing: false,
+      is_active: true,
+      applicable_tags: '',
+      notes: '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEdit = (mapping: ExtractionMapping) => {
+    setEditingMapping(mapping);
+    setFormData({
+      document_type: mapping.document_type,
+      source_pattern: mapping.source_pattern,
+      source_aliases: (mapping.source_aliases || []).join(', '),
+      target_table: mapping.target_table,
+      target_field: mapping.target_field,
+      data_type: mapping.data_type,
+      transform_rule: mapping.transform_rule || '',
+      confidence: mapping.confidence,
+      auto_write: mapping.auto_write,
+      overwrite_existing: mapping.overwrite_existing,
+      is_active: mapping.is_active,
+      applicable_tags: (mapping.applicable_tags || []).join(', '),
+      notes: mapping.notes || '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    const payload = {
+      ...formData,
+      source_aliases: formData.source_aliases
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s),
+      applicable_tags: formData.applicable_tags
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s),
+      transform_rule: formData.transform_rule || null,
+      notes: formData.notes || null,
+    };
+
+    const url = editingMapping
+      ? `${DJANGO_API}/api/landscaper/mappings/${editingMapping.mapping_id}/`
+      : `${DJANGO_API}/api/landscaper/mappings/`;
+
+    const method = editingMapping ? 'PUT' : 'POST';
+
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    await mutate();
+    setIsEditModalOpen(false);
+  };
+
+  const handleDelete = async (mapping: ExtractionMapping) => {
+    if (mapping.is_system) {
+      alert('System mappings cannot be deleted. You can deactivate them instead.');
+      return;
+    }
+
+    if (!confirm(`Delete mapping "${mapping.source_pattern}"?`)) return;
+
+    await fetch(`${DJANGO_API}/api/landscaper/mappings/${mapping.mapping_id}/`, {
+      method: 'DELETE',
+    });
+
+    await mutate();
+  };
+
+  const handleToggleActive = async (mapping: ExtractionMapping) => {
+    await fetch(`${DJANGO_API}/api/landscaper/mappings/${mapping.mapping_id}/`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !mapping.is_active }),
+    });
+
+    await mutate();
+  };
+
+  const formatPercent = (value?: number) => {
+    if (value === null || value === undefined) return '-';
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  // Render a column header with tooltip
+  const HeaderWithTooltip = ({ label, width }: { label: string; width?: string }) => (
+    <CTableHeaderCell style={width ? { width } : undefined}>
+      <CTooltip content={COLUMN_TOOLTIPS[label] || ''} placement="top">
+        <span className="d-inline-flex tw-align-items-center gap-1" style={{ cursor: 'help' }}>
+          {label}
+          <CircleHelp size={12} style={{ opacity: 0.5 }} />
+        </span>
+      </CTooltip>
+    </CTableHeaderCell>
+  );
+
+  return (
+    <div className="p-0">
+      {/* Filters Row */}
+      <div className="d-flex tw-flex-wrap tw-align-items-center gap-2 mb-3">
+        <CFormInput
+          type="text"
+          placeholder="Search patterns, tables, fields..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '200px' }}
+          size="sm"
+        />
+
+        <CFormSelect
+          value={documentTypeFilter}
+          onChange={(e) => setDocumentTypeFilter(e.target.value)}
+          style={{ width: '180px' }}
+          size="sm"
+        >
+          <option value="">All Doc Types</option>
+          {docTypesData?.document_types?.map((dt) => (
+            <option key={dt.document_type} value={dt.document_type}>
+              {dt.document_type} ({dt.count})
+            </option>
+          ))}
+        </CFormSelect>
+
+        <CFormSelect
+          value={tableFilter}
+          onChange={(e) => setTableFilter(e.target.value)}
+          style={{ width: '150px' }}
+          size="sm"
+        >
+          <option value="">All Tables</option>
+          {tablesData?.target_tables?.map((t) => (
+            <option key={t.target_table} value={t.target_table}>
+              {t.target_table} ({t.count})
+            </option>
+          ))}
+        </CFormSelect>
+
+        <CFormSelect
+          value={confidenceFilter}
+          onChange={(e) => setConfidenceFilter(e.target.value)}
+          style={{ width: '120px' }}
+          size="sm"
+        >
+          <option value="">All Confidence</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </CFormSelect>
+
+        <CFormSelect
+          value={activeFilter}
+          onChange={(e) => setActiveFilter(e.target.value as '' | 'true' | 'false')}
+          style={{ width: '100px' }}
+          size="sm"
+        >
+          <option value="">All Status</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </CFormSelect>
+
+        <div className="ms-auto d-flex gap-2">
+          <CButton
+            color="secondary"
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsHelpModalOpen(true)}
+            title="Help"
+          >
+            <CircleHelp size={16} />
+          </CButton>
+
+          <CButton
+            color={showStats ? 'primary' : 'secondary'}
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowStats(!showStats)}
+            title="Toggle Stats View"
+          >
+            <CIcon icon={cilChartLine} />
+            <span className="ms-1">Stats</span>
+          </CButton>
+
+          <SemanticButton intent="primary-action" size="sm" onClick={handleAdd}>
+            <CIcon icon={cilPlus} className="me-1" />
+            Add Mapping
+          </SemanticButton>
+        </div>
+      </div>
+
+      {/* Results Count */}
+      <div className="text-muted small mb-2">
+        {filteredMappings.length} mapping{filteredMappings.length !== 1 ? 's' : ''}
+        {documentTypeFilter && ` in ${documentTypeFilter}`}
+      </div>
+
+      {/* Mappings Table */}
+      {isLoading ? (
+        <div className="text-center py-4">
+          <CSpinner size="sm" />
+        </div>
+      ) : (
+        <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+          <CTable small striped hover>
+            <CTableHead className="tw-sticky-top bg-body">
+              <CTableRow>
+                <HeaderWithTooltip label="Active" width="50px" />
+                <HeaderWithTooltip label="Doc Type" width="120px" />
+                <HeaderWithTooltip label="Pattern" />
+                <HeaderWithTooltip label="Target" />
+                <HeaderWithTooltip label="Type" width="80px" />
+                <HeaderWithTooltip label="Confidence" width="80px" />
+                {showStats && (
+                  <>
+                    <CTableHeaderCell style={{ width: '60px' }}>Used</CTableHeaderCell>
+                    <CTableHeaderCell style={{ width: '80px' }}>Write Rate</CTableHeaderCell>
+                  </>
+                )}
+                <HeaderWithTooltip label="Actions" width="80px" />
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {filteredMappings.map((mapping) => (
+                <CTableRow key={mapping.mapping_id}>
+                  <CTableDataCell>
+                    <CFormSwitch
+                      checked={mapping.is_active}
+                      onChange={() => handleToggleActive(mapping)}
+                      size="sm"
+                    />
+                  </CTableDataCell>
+                  <CTableDataCell>
+                    <CBadge
+                      color={getDocTypeBadgeColor(mapping.document_type)}
+                      className="tw-text-truncate"
+                      style={{ maxWidth: '110px' }}
+                    >
+                      {mapping.document_type}
+                    </CBadge>
+                  </CTableDataCell>
+                  <CTableDataCell>
+                    <div className="fw-medium">{mapping.source_pattern}</div>
+                    {mapping.source_aliases?.length > 0 && (
+                      <div className="text-muted small">
+                        Also: {mapping.source_aliases.slice(0, 2).join(', ')}
+                        {mapping.source_aliases.length > 2 && ` +${mapping.source_aliases.length - 2}`}
+                      </div>
+                    )}
+                  </CTableDataCell>
+                  <CTableDataCell>
+                    <code className="small">
+                      {mapping.target_table}.{mapping.target_field}
+                    </code>
+                    {mapping.transform_rule && (
+                      <div className="text-muted small">Transform: {mapping.transform_rule}</div>
+                    )}
+                  </CTableDataCell>
+                  <CTableDataCell>
+                    <span className="text-muted small">{mapping.data_type}</span>
+                  </CTableDataCell>
+                  <CTableDataCell>
+                    <CBadge color={CONFIDENCE_COLORS[mapping.confidence] || 'secondary'}>
+                      {mapping.confidence}
+                    </CBadge>
+                  </CTableDataCell>
+                  {showStats && (
+                    <>
+                      <CTableDataCell className="text-center">
+                        {mapping.times_extracted || 0}
+                      </CTableDataCell>
+                      <CTableDataCell className="text-center">
+                        {formatPercent(mapping.write_rate)}
+                      </CTableDataCell>
+                    </>
+                  )}
+                  <CTableDataCell>
+                    <div className="d-flex gap-1">
+                      <SemanticButton
+                        intent="tertiary-action"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(mapping)}
+                        title="Edit"
+                      >
+                        <CIcon icon={cilPencil} size="sm" />
+                      </SemanticButton>
+                      {!mapping.is_system && (
+                        <SemanticButton
+                          intent="destructive-action"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(mapping)}
+                          title="Delete"
+                        >
+                          <CIcon icon={cilTrash} size="sm" />
+                        </SemanticButton>
+                      )}
+                    </div>
+                  </CTableDataCell>
+                </CTableRow>
+              ))}
+            </CTableBody>
+          </CTable>
+        </div>
+      )}
+
+      {/* Edit/Create Modal */}
+      <CModal visible={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} size="lg">
+        <CModalHeader>
+          <CModalTitle>{editingMapping ? 'Edit Mapping' : 'Add Mapping'}</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div className="row g-3">
+            <div className="col-md-6">
+              <CFormLabel>Document Type</CFormLabel>
+              <CFormSelect
+                value={formData.document_type}
+                onChange={(e) => setFormData({ ...formData, document_type: e.target.value })}
+              >
+                <option value="">Select doc type</option>
+                {docTypeOptions.map((dt) => (
+                  <option key={dt} value={dt}>
+                    {dt}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Confidence</CFormLabel>
+              <CFormSelect
+                value={formData.confidence}
+                onChange={(e) => setFormData({ ...formData, confidence: e.target.value })}
+              >
+                {CONFIDENCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Source Pattern *</CFormLabel>
+              <CFormInput
+                value={formData.source_pattern}
+                onChange={(e) => setFormData({ ...formData, source_pattern: e.target.value })}
+                placeholder="e.g., Year Built"
+              />
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Source Aliases (comma-separated)</CFormLabel>
+              <CFormInput
+                value={formData.source_aliases}
+                onChange={(e) => setFormData({ ...formData, source_aliases: e.target.value })}
+                placeholder="e.g., Built, Construction Year"
+              />
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Target Table *</CFormLabel>
+              <CFormInput
+                value={formData.target_table}
+                onChange={(e) => setFormData({ ...formData, target_table: e.target.value })}
+                placeholder="e.g., tbl_project"
+              />
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Target Field *</CFormLabel>
+              <CFormInput
+                value={formData.target_field}
+                onChange={(e) => setFormData({ ...formData, target_field: e.target.value })}
+                placeholder="e.g., year_built"
+              />
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Data Type</CFormLabel>
+              <CFormSelect
+                value={formData.data_type}
+                onChange={(e) => setFormData({ ...formData, data_type: e.target.value })}
+              >
+                {DATA_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+
+            <div className="col-md-6">
+              <CFormLabel>Transform Rule</CFormLabel>
+              <CFormSelect
+                value={formData.transform_rule}
+                onChange={(e) => setFormData({ ...formData, transform_rule: e.target.value })}
+              >
+                {TRANSFORM_RULE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </CFormSelect>
+            </div>
+
+            <div className="col-12">
+              <CFormLabel>Applicable Tags (comma-separated, optional)</CFormLabel>
+              <CFormInput
+                value={formData.applicable_tags}
+                onChange={(e) => setFormData({ ...formData, applicable_tags: e.target.value })}
+                placeholder="e.g., Appraisal, LIHTC (empty = applies to all docs of this type)"
+              />
+              <div className="text-muted small mt-1">
+                When set, this mapping only fires for documents with matching tags.
+              </div>
+            </div>
+
+            <div className="col-12">
+              <CFormLabel>Notes</CFormLabel>
+              <CFormTextarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={2}
+                placeholder="Optional notes about this mapping"
+              />
+            </div>
+
+            <div className="col-md-4">
+              <CFormSwitch
+                label="Auto Write"
+                checked={formData.auto_write}
+                onChange={(e) => setFormData({ ...formData, auto_write: e.target.checked })}
+              />
+              <div className="text-muted small">Automatically write extracted values</div>
+            </div>
+
+            <div className="col-md-4">
+              <CFormSwitch
+                label="Overwrite Existing"
+                checked={formData.overwrite_existing}
+                onChange={(e) => setFormData({ ...formData, overwrite_existing: e.target.checked })}
+              />
+              <div className="text-muted small">Replace existing values</div>
+            </div>
+
+            <div className="col-md-4">
+              <CFormSwitch
+                label="Active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              />
+              <div className="text-muted small">Enable this mapping</div>
+            </div>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <SemanticButton intent="secondary-action" variant="ghost" onClick={() => setIsEditModalOpen(false)}>
+            Cancel
+          </SemanticButton>
+          <SemanticButton intent="primary-action" onClick={handleSave}>
+            {editingMapping ? 'Update' : 'Create'}
+          </SemanticButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* Help Modal */}
+      <CModal visible={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} size="lg" scrollable>
+        <CModalHeader>
+          <CModalTitle>Understanding AI Extraction Mappings</CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          <div className="d-flex flex-column gap-4">
+            {/* Section 1 */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>What This Panel Does</h6>
+              <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                Extraction mappings tell Landscaper how to read your documents. When you upload a document
+                &mdash; an offering memo, appraisal, rent roll, or operating statement &mdash; Landscaper
+                scans it for specific patterns (like &ldquo;Cap Rate&rdquo; or &ldquo;Annual Premium&rdquo;)
+                and writes the extracted values to the correct fields in your project.
+              </p>
+              <p className="small mb-0 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                This panel shows all active mappings and lets you customize how Landscaper interprets
+                documents. Changes here affect ALL future document extractions across your workspace.
+              </p>
+            </div>
+
+            {/* Section 2: Column Definitions */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Column Definitions</h6>
+              <table className="table table-sm small" style={{ color: 'var(--cui-body-color)' }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '120px' }}>Column</th>
+                    <th>What It Means</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="fw-medium">Active</td>
+                    <td>Toggle on/off. Inactive mappings are skipped during extraction. Turning off a mapping does NOT delete previously extracted data.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Doc Type</td>
+                    <td>Which type of document this mapping applies to (e.g., Property Data, Offering, Accounting). Doc Types come from your DMS template configuration.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Pattern</td>
+                    <td>The label or phrase Landscaper looks for in documents. &ldquo;Also:&rdquo; shows aliases &mdash; alternative phrasings that match the same concept.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Target</td>
+                    <td>The database table and field where the extracted value is written. Format: table_name.field_name.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Type</td>
+                    <td>The data type for validation: decimal, text, integer, date, boolean. Landscaper converts extracted text to this type before writing.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Confidence</td>
+                    <td>How aggressively Landscaper writes this value. High = auto-writes without review. Medium = writes but flags for review. Low = reports but doesn&apos;t write.</td>
+                  </tr>
+                  <tr>
+                    <td className="fw-medium">Actions</td>
+                    <td>Edit opens the mapping editor. System mappings can be edited but not deleted. Custom mappings you create can be deleted.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Section 3: Impact */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Impact of Changes</h6>
+              <dl className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                <dt>Adding a mapping</dt>
+                <dd className="mb-2">Creates a new extraction rule. Next time Landscaper processes a document of that Doc Type, it will look for your pattern. Existing documents are NOT re-processed automatically.</dd>
+
+                <dt>Editing a mapping</dt>
+                <dd className="mb-2">Changes take effect on the next document extraction. Previously extracted data is not retroactively updated.</dd>
+
+                <dt>Deleting a mapping</dt>
+                <dd className="mb-2">Removes the extraction rule. Previously extracted data remains in your project. System mappings cannot be deleted, only deactivated.</dd>
+
+                <dt>Changing Confidence</dt>
+                <dd className="mb-2">Raising confidence from Medium to High means Landscaper will auto-write without flagging for review. Lowering gives you more control.</dd>
+
+                <dt>Deactivating a mapping</dt>
+                <dd className="mb-0">Equivalent to a soft delete. The mapping is preserved but ignored during extraction. Reactivate anytime.</dd>
+              </dl>
+            </div>
+
+            {/* Section 4: Tags */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Tags &amp; Filtering</h6>
+              <p className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                Tags on your documents help Landscaper apply the right mappings. When a mapping has
+                associated tags (like &ldquo;Appraisal&rdquo; or &ldquo;LIHTC&rdquo;), it only fires for documents
+                with matching tags. Mappings without tags apply to all documents of that Doc Type.
+              </p>
+              <p className="small mb-0 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                You can add tags to documents in the Document Profile editor. Landscaper will suggest
+                tags automatically during document upload based on content analysis.
+              </p>
+            </div>
+
+            {/* Section 5: Tips */}
+            <div>
+              <h6 className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>Tips</h6>
+              <ul className="small mb-0" style={{ color: 'var(--cui-secondary-color)' }}>
+                <li>Use the search bar and filters to find specific mappings quickly.</li>
+                <li>Check the Stats button for extraction success rates and common failures.</li>
+                <li>If Landscaper consistently misreads a field, edit the Pattern&apos;s aliases to include the phrasing your documents use.</li>
+                <li>Start with Medium confidence for new mappings until you&apos;ve verified accuracy, then promote to High.</li>
+              </ul>
+            </div>
+          </div>
+        </CModalBody>
+        <CModalFooter>
+          <p className="small mb-0 me-auto" style={{ color: 'var(--cui-secondary-color)' }}>
+            Need help? Ask Landscaper &mdash; it can explain any mapping in detail and suggest new ones based on your documents.
+          </p>
+          <CButton color="primary" onClick={() => setIsHelpModalOpen(false)}>
+            Got it
+          </CButton>
+        </CModalFooter>
+      </CModal>
+    </div>
+  );
+}

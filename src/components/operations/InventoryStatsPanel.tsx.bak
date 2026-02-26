@@ -1,0 +1,86 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+interface InventoryStats {
+  unsold_parcels: number;
+  total_parcels: number;
+  unsold_acres: number;
+  total_acres: number;
+  pct_unsold: number;
+}
+
+interface InventoryStatsPanelProps {
+  projectId: number;
+}
+
+export function InventoryStatsPanel({ projectId }: InventoryStatsPanelProps) {
+  const [stats, setStats] = useState<InventoryStats | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadStats = async () => {
+      try {
+        setError(null);
+        const response = await fetch(`/api/projects/${projectId}/operating-expenses/inventory-stats`);
+        if (!response.ok) {
+          throw new Error('Failed to load inventory stats');
+        }
+        const payload = await response.json();
+        if (isMounted) {
+          setStats(payload);
+        }
+      } catch (err) {
+        console.error('Error loading inventory stats:', err);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load inventory stats');
+        }
+      }
+    };
+
+    loadStats();
+    return () => {
+      isMounted = false;
+    };
+  }, [projectId]);
+
+  if (error) {
+    return (
+      <div className="rounded border tw-border-red-500 tw-bg-red-900/40 p-3 tw-text-sm tw-text-red-100">
+        {error}
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="tw-flex tw-items-center tw-justify-center rounded border tw-border-gray-800 tw-bg-gray-900/40 p-3 tw-text-sm tw-text-gray-300">
+        Loading inventory stats...
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded border tw-border-gray-800 tw-bg-gray-900/40 p-4 tw-text-gray-100">
+      <h3 className="tw-text-sm tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Unsold Inventory</h3>
+      <div className="mt-3 tw-grid tw-grid-cols-3 gap-4 text-center">
+        <div>
+          <div className="tw-text-2xl tw-font-bold">{stats.unsold_parcels}</div>
+          <div className="tw-text-xs tw-text-gray-400">of {stats.total_parcels} parcels</div>
+        </div>
+        <div>
+          <div className="tw-text-2xl tw-font-bold">{stats.unsold_acres.toFixed(1)} ac</div>
+          <div className="tw-text-xs tw-text-gray-400">of {stats.total_acres.toFixed(1)} acres</div>
+        </div>
+        <div>
+          <div className="tw-text-2xl tw-font-bold">{stats.pct_unsold}%</div>
+          <div className="tw-text-xs tw-text-gray-400">unsold</div>
+        </div>
+      </div>
+      <div className="mt-2 tw-text-xs tw-text-gray-500">
+        Operating expenses auto-adjust based on unsold inventory levels.
+      </div>
+    </div>
+  );
+}

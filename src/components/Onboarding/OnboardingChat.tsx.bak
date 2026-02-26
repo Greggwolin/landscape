@@ -1,0 +1,359 @@
+'use client';
+
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  analyzeDocument,
+  cancelDocument,
+  compileLandscaperInstructions,
+  confirmDocument,
+  DocumentAnalysis,
+  LandscaperProfile,
+  updateLandscaperProfile,
+} from '@/services/landscaperProfile';
+import DocumentUploadModal from './DocumentUploadModal';
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'landscaper';
+  text: string;
+  created_at: string;
+}
+
+interface OnboardingChatProps {
+  profile: LandscaperProfile;
+  onProfileRefresh: () => Promise<void>;
+}
+
+const DOCUMENT_INVITATIONS: Record<string, string> = {
+  appraiser: 'Bring sample appraisals or comp files.',
+  land_developer: 'Upload your pro formas, feasibility models, or site plans.',
+  cre_investor_multifamily: 'Share investment memos, rent rolls, or T12s.',
+};
+
+const ROLE_NATURAL: Record<string, string> = {
+  appraiser: 'appraiser',
+  land_developer: 'land developer',
+  cre_investor_multifamily: 'multifamily investor',
+};
+
+const PROPERTY_FOCUS_LABELS: Record<string, string> = {
+  multifamily: 'multifamily properties',
+  land_subdivision: 'land and subdivision work',
+  entitled_land: 'entitled land',
+  raw_land: 'raw land',
+  both: 'both entitled and raw land',
+  value_add: 'value-add assets',
+  core: 'core / core+ deals',
+  opportunistic: 'opportunistic investments',
+};
+
+const TOOL_LABELS: Record<string, string> = {
+  argus: 'ARGUS',
+  excel: 'Excel',
+  both: 'ARGUS and Excel',
+  other: 'other tools',
+  none: 'new tools',
+};
+
+const getInitialMessage = (profile: LandscaperProfile) => {
+  const role = profile.role_primary ? ROLE_NATURAL[profile.role_primary] : null;
+  const focus = profile.role_property_type ? PROPERTY_FOCUS_LABELS[profile.role_property_type] : null;
+  const market = profile.markets_text ? profile.markets_text : null;
+  const tool = profile.primary_tool ? TOOL_LABELS[profile.primary_tool] : null;
+
+  const sentenceFragments: string[] = [];
+  if (role) {
+    sentenceFragments.push(`I see you're a ${role}`);
+  } else {
+    sentenceFragments.push("I see you're here");
+  }
+
+  if (focus) {
+    sentenceFragments.push(`who focuses on ${focus}`);
+  }
+
+  if (market) {
+    sentenceFragments.push(`in the ${market} market`);
+  }
+
+  if (tool && tool !== 'new tools') {
+    sentenceFragments.push(`and use ${tool} during underwriting`);
+  }
+
+  const firstSentence = sentenceFragments.join(' ').replace(/\s+/g, ' ').trim() + '.';
+  const followUp = tool && tool !== 'new tools'
+    ? `Can you tell me more about how you typically use ${tool} in your workflow?`
+    : 'Can you share how you like to work with me today?';
+  return `${firstSentence} ${followUp}`;
+};
+
+const buildMessagesFromProfile = (profile: LandscaperProfile): ChatMessage[] => {
+  if (profile.onboarding_chat_history && profile.onboarding_chat_history.length > 0) {
+    return profile.onboarding_chat_history as ChatMessage[];
+  }
+  const initial = {
+    id: 'initial',
+    sender: 'landscaper' as const,
+    text: getInitialMessage(profile),
+    created_at: new Date().toISOString(),
+  };
+  return [initial];
+};
+
+export default function OnboardingChat({ profile, onProfileRefresh }: OnboardingChatProps) {
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatMessage[]>(() => buildMessagesFromProfile(profile));
+  const [inputValue, setInputValue] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [uploadState, setUploadState] = useState<'idle' | 'analyzing'>('idle');
+  const [chatError, setChatError] = useState('');
+  const [entering, setEntering] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [initialSeeded, setInitialSeeded] = useState(false);
+
+  useEffect(() => {
+    if (profile.onboarding_chat_history && profile.onboarding_chat_history.length > 0) {
+      setMessages(profile.onboarding_chat_history as ChatMessage[]);
+    }
+  }, [profile.onboarding_chat_history]);
+
+  useEffect(() => {
+    if (initialSeeded) {
+      return;
+    }
+    if (!profile.onboarding_chat_history || profile.onboarding_chat_history.length === 0) {
+      const initialMessage = buildMessagesFromProfile(profile)[0];
+      updateLandscaperProfile({ onboarding_chat_history: [initialMessage] })
+        .catch(() => {})
+        .finally(() => setInitialSeeded(true));
+    } else {
+      setInitialSeeded(true);
+    }
+  }, [initialSeeded, profile.onboarding_chat_history, profile]);
+
+  const documentInvitation = useMemo(() => {
+    const invitation = DOCUMENT_INVITATIONS[profile.role_primary] || 'Add any documents you want the Landscaper to read.';
+    return invitation;
+  }, [profile.role_primary]);
+
+  const handleSendMessage = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!inputValue.trim()) return;
+    const newMessage: ChatMessage = {
+      id: `${Date.now()}-${Math.random()}`,
+      sender: 'user',
+      text: inputValue.trim(),
+      created_at: new Date().toISOString(),
+    };
+    const updatedMessages = [...messages, newMessage];
+    setMessages(updatedMessages);
+    setInputValue('');
+    setIsSending(true);
+    setChatError('');
+    try {
+      await updateLandscaperProfile({ onboarding_chat_history: updatedMessages });
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Unable to save chat message yet.');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handlePasteDocument = async (file: File) => {
+    setUploadState('analyzing');
+    setChatError('');
+    try {
+      const result = await analyzeDocument(file);
+      setAnalysis(result);
+      setModalOpen(true);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Document analysis failed.');
+    } finally {
+      setUploadState('idle');
+    }
+  };
+
+  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handlePasteDocument(file);
+    }
+    event.target.value = '';
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      handlePasteDocument(file);
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!analysis) return;
+    setModalOpen(false);
+    setUploadState('analyzing');
+    try {
+      await confirmDocument(analysis.document_id);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-doc`,
+          sender: 'landscaper',
+          text: 'Got it. I saved that document to your Document Library and will use it to inform future answers.',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      await onProfileRefresh();
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Unable to confirm document.');
+    } finally {
+      setUploadState('idle');
+      setAnalysis(null);
+    }
+  };
+
+  const handleCancelUpload = async () => {
+    if (!analysis) return;
+    setModalOpen(false);
+    try {
+      await cancelDocument(analysis.document_id);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-doc-cancel`,
+          sender: 'landscaper',
+          text: 'No problem—document discarded. Let me know if you want to try another upload.',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Unable to cancel document.');
+    } finally {
+      setAnalysis(null);
+    }
+  };
+
+  const handleEnterLandscape = async () => {
+    if (entering) return;
+    setEntering(true);
+    try {
+      await compileLandscaperInstructions();
+      router.push('/dashboard');
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : 'Unable to enter Landscape yet.');
+    } finally {
+      setEntering(false);
+    }
+  };
+
+  return (
+    <div className="tw-flex tw-flex-col tw-h-full" style={{ backgroundColor: 'var(--surface-card)', color: 'var(--text-primary)' }}>
+      <div className="tw-flex-1 tw-overflow-y-auto px-4 py-6 tw-space-y-6">
+        <div className="tw-space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`tw-flex ${message.sender === 'user' ? tw-'justify-end' : tw-'justify-start'}`}
+            >
+              <div
+                className="tw-rounded-2xl p-4 tw-shadow-sm tw-max-w-[80%]"
+                style={{
+                  backgroundColor:
+                    message.sender === 'user'
+                      ? 'var(--cui-primary-bg-subtle)'
+                      : 'var(--surface-card-header)',
+                }}
+              >
+                <p className="tw-text-base tw-leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                  {message.text}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {chatError && (
+        <div className="mx-4 mb-2 tw-rounded-lg border px-4 py-2 tw-text-sm" style={{ borderColor: 'var(--track-change-deletion)', color: 'var(--track-change-deletion)' }}>
+          {chatError}
+        </div>
+      )}
+      <div className="mx-4 mb-6 tw-space-y-4">
+        <div
+          className="tw-rounded-2xl border tw-border-dashed p-4 text-center tw-transition"
+          style={{
+            borderColor: 'var(--cui-border-color)',
+            backgroundColor: 'var(--surface-card)',
+            color: 'var(--text-primary)',
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <p className="tw-font-semibold mb-2">Upload a document</p>
+          <p className="tw-text-sm mb-3" style={{ color: 'var(--cui-secondary-color)' }}>
+            {documentInvitation}
+          </p>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="tw-rounded-full border px-4 py-2 tw-text-sm tw-font-semibold"
+            style={{ borderColor: 'var(--cui-primary)', color: 'var(--cui-primary)' }}
+          >
+            Choose a file{uploadState === 'analyzing' ? ' (analyzing...)' : ''}
+          </button>
+          <input ref={fileInputRef} type="file" className="tw-hidden" onChange={handleFileSelect} />
+        </div>
+        <form onSubmit={handleSendMessage} className="tw-flex gap-3">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Send a message to your Landscaper"
+            className="tw-flex-1 tw-rounded-3xl border px-4 py-3"
+            style={{
+              backgroundColor: 'var(--surface-card)',
+              borderColor: 'var(--cui-border-color)',
+              color: 'var(--text-primary)',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={isSending || !inputValue.trim()}
+            className="tw-rounded-full px-4 py-3 tw-text-sm tw-font-semibold tw-transition"
+            style={{
+              backgroundColor: isSending ? 'var(--line-soft)' : 'var(--cui-primary)',
+              color: 'var(--text-inverse)',
+            }}
+          >
+            Send
+          </button>
+        </form>
+        <div className="tw-flex tw-justify-end">
+          <button
+            type="button"
+            onClick={handleEnterLandscape}
+            disabled={entering}
+            className="tw-rounded-full px-5 py-3 tw-text-sm tw-font-semibold"
+            style={{
+              color: 'var(--text-inverse)',
+              background: entering
+                ? 'var(--line-soft)'
+                : 'linear-gradient(90deg, var(--cui-primary), var(--cui-secondary))',
+            }}
+          >
+            {entering ? 'Preparing Landscape…' : 'Enter Landscape'}
+          </button>
+        </div>
+      </div>
+      <DocumentUploadModal
+        open={modalOpen}
+        analysis={analysis}
+        onConfirm={handleConfirmUpload}
+        onCancel={handleCancelUpload}
+      />
+    </div>
+  );
+}

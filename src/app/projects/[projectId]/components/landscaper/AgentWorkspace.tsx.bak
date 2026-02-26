@@ -1,0 +1,53 @@
+'use client';
+
+import React, { ReactNode } from 'react';
+import { AgentChat } from './AgentChat';
+
+interface AgentWorkspaceProps {
+  projectId: string;
+  agentId: string;
+  agentName: string;
+  agentIcon: string;
+  children: ReactNode;  // The agent-specific canvas (map, grid, etc.)
+  activeTab?: string;  // Page context for tool filtering (e.g., 'mf_valuation', 'mf_operations')
+}
+
+export function AgentWorkspace({
+  projectId,
+  agentId,
+  agentName,
+  agentIcon,
+  children,
+  activeTab = 'home',
+}: AgentWorkspaceProps) {
+  return (
+    <div className="tw-flex tw-flex-col tw-h-full">
+      {/* Agent Header */}
+      <header className="p-4 tw-border-b border-border tw-flex tw-items-center gap-3">
+        <span className="tw-text-2xl">{agentIcon}</span>
+        <div>
+          <h1 className="tw-text-xl tw-font-bold">{agentName}</h1>
+          <p className="tw-text-sm text-muted">Specialized analysis workspace</p>
+        </div>
+      </header>
+
+      <div className="tw-flex-1 tw-flex tw-overflow-hidden">
+        {/* Agent Canvas - unique per agent */}
+        <main className="tw-flex-1 tw-overflow-y-auto">
+          {children}
+        </main>
+
+        {/* Agent Chat - consistent across agents */}
+        <aside className="w-96 tw-border-l border-border bg-surface-elevated">
+          <AgentChat
+            projectId={projectId}
+            agentId={agentId}
+            agentName={agentName}
+            placeholder={`Ask ${agentName} anything...`}
+            activeTab={activeTab}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}

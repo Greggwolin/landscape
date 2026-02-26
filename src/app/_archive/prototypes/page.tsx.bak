@@ -1,0 +1,150 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { prototypeRegistry } from '@/lib/prototypes/registry';
+
+const statusMap: Record<string, string> = {
+  wip: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  stable: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  archived: 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+};
+
+interface PrototypeNoteEntry {
+  id: string;
+  prototypeId: string;
+  note: string;
+  timestamp: string;
+}
+
+type NotesByPrototype = Record<string, PrototypeNoteEntry[]>;
+
+const formatTimestamp = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleString();
+};
+
+function PrototypesIndexContent() {
+  const [notes, setNotes] = useState<NotesByPrototype>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const orderedNotes = useMemo(() => {
+    const normalized: NotesByPrototype = {};
+    Object.entries(notes).forEach(([prototypeId, entries]) => {
+      normalized[prototypeId] = [...entries].sort((a, b) =>
+        new Date(a.timestamp) > new Date(b.timestamp) ? -1 : 1
+      );
+    });
+    return normalized;
+  }, [notes]);
+
+  useEffect(() => {
+    const loadNotes = async () => {
+      try {
+        const response = await fetch('/api/prototypes/notes?type=regular', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Failed to load notes');
+        }
+        const payload = (await response.json()) as PrototypeNoteEntry[];
+        const grouped: NotesByPrototype = {};
+        for (const entry of payload) {
+          if (!grouped[entry.prototypeId]) {
+            grouped[entry.prototypeId] = [];
+          }
+          grouped[entry.prototypeId].push(entry);
+        }
+        setNotes(grouped);
+      } catch (err) {
+        console.error(err);
+        setError('Unable to load prototype notes.');
+      }
+    };
+
+    loadNotes();
+  }, []);
+
+  return (
+    <div className="p-4 tw-space-y-4 tw-min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+      {error ? (
+        <div className="rounded border p-4" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
+          <p className="tw-text-sm" style={{ color: 'var(--cui-warning)' }}>{error}</p>
+        </div>
+      ) : null}
+
+      {/* Prototypes Grid */}
+      <div className="tw-grid gap-4 md:tw-grid-cols-2">
+        {prototypeRegistry.map((prototype) => {
+          const prototypeNotes = orderedNotes[prototype.id] ?? [];
+          const latestNote = prototypeNotes[0];
+
+          return (
+            <Link
+              key={prototype.id}
+              href={`/prototypes/${prototype.id}`}
+              className="group tw-flex tw-h-full tw-flex-col tw-justify-between tw-rounded-lg border p-5 tw-transition tw-cursor-pointer"
+              style={{
+                borderColor: 'var(--cui-border-color)',
+                backgroundColor: 'var(--cui-body-bg)'
+              }}
+            >
+              <div className="tw-space-y-4">
+                <div className="tw-flex tw-items-center tw-justify-between gap-3">
+                  <div className="tw-flex tw-items-center gap-2">
+                    <h3 className="tw-text-xl tw-font-semibold text-white">{prototype.name}</h3>
+                    <span className="tw-rounded-full tw-bg-blue-600/20 tw-text-blue-300 border tw-border-blue-500/40 px-2 py-0.5 tw-text-xs tw-font-medium">
+                      Open →
+                    </span>
+                  </div>
+                  <span
+                    className={`tw-rounded-full border px-3 py-1 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide ${ statusMap[prototype.status] }`}
+                  >
+                    {prototype.status}
+                  </span>
+                </div>
+                <p className="tw-text-sm tw-text-gray-400">{prototype.description}</p>
+                {prototype.notes ? (
+                  <p className="tw-rounded-lg border tw-border-dashed tw-border-gray-700 tw-bg-gray-900/80 px-3 py-2 tw-text-xs tw-text-gray-400">
+                    {prototype.notes}
+                  </p>
+                ) : null}
+                {prototype.tags && prototype.tags.length > 0 ? (
+                  <div className="tw-flex tw-flex-wrap gap-2 tw-text-xs tw-text-gray-400">
+                    {prototype.tags.map((tag) => (
+                      <span key={tag} className="tw-rounded-full border tw-border-gray-700 px-3 py-1 tw-uppercase">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {prototype.branch ? (
+                  <div className="tw-text-xs tw-text-gray-500">
+                    Branch: <code>{prototype.branch}</code>
+                  </div>
+                ) : null}
+
+                <div className="tw-space-y-2 tw-rounded-lg border tw-border-gray-700 tw-bg-gray-900/60 p-3">
+                  <div className="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Latest note</div>
+                  {latestNote ? (
+                    <div className="tw-text-xs tw-text-gray-300">
+                      <div className="tw-font-medium tw-text-gray-200">{formatTimestamp(latestNote.timestamp)}</div>
+                      <div className="mt-1 tw-text-gray-400">{latestNote.note}</div>
+                    </div>
+                  ) : (
+                    <div className="tw-text-xs tw-text-gray-500">No notes yet.</div>
+                  )}
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export default function PrototypesIndexPage() {
+  return <PrototypesIndexContent />;
+}

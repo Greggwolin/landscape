@@ -1,0 +1,173 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+
+interface PhaseFormProps {
+  areaName: string
+  onSubmit: (phaseData: { name: string; description: string }) => void
+  onCancel: () => void
+  suggestedName?: string
+}
+
+const PhaseForm: React.FC<PhaseFormProps> = ({
+  areaName,
+  onSubmit,
+  onCancel,
+  suggestedName
+}) => {
+  const [formData, setFormData] = useState({
+    name: suggestedName || '',
+    description: ''
+  })
+
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [hasChanges, setHasChanges] = useState(false)
+  const [showExitDialog, setShowExitDialog] = useState(false)
+
+  // Track if form has any values
+  useEffect(() => {
+    const hasValues = formData.name || formData.description
+    setHasChanges(Boolean(hasValues))
+  }, [formData])
+
+  // ESC key handling
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      console.log('PhaseForm - Key pressed:', e.key, 'hasChanges:', hasChanges)
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        if (hasChanges) {
+          setShowExitDialog(true)
+        } else {
+          onCancel()
+        }
+      }
+    }
+
+    console.log('PhaseForm - Adding ESC key listener')
+    document.addEventListener('keydown', handleEscKey, true)
+    return () => {
+      console.log('PhaseForm - Removing ESC key listener')
+      document.removeEventListener('keydown', handleEscKey, true)
+    }
+  }, [hasChanges, onCancel])
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {}
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Phase name is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validate()) return
+
+    onSubmit({
+      name: formData.name.trim(),
+      description: formData.description.trim()
+    })
+  }
+
+  return (
+    <div className="tw-fixed tw-inset-0 bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-50">
+      <div className="tw-bg-gray-800 border tw-border-gray-700 tw-rounded-lg tw-shadow-xl tw-w-[500px] tw-max-h-[90vh] tw-overflow-y-auto">
+        <div className="tw-border-b tw-border-gray-700 px-6 py-4">
+          <h2 className="tw-text-lg tw-font-semibold text-white">{areaName}: {suggestedName || 'Phase'}</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="tw-space-y-4">
+            {/* Phase Name */}
+            <div>
+              <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-300 mb-1">
+                Phase Name
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`tw-w-full tw-bg-gray-700 border tw-rounded-md px-3 py-2 tw-text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:tw-border-blue-500 ${ errors.name ? tw-'border-red-500' : tw-'border-gray-600' }`}
+                placeholder="<Required>"
+                autoFocus
+              />
+              {errors.name && (
+                <p className="tw-text-red-400 tw-text-xs mt-1">{errors.name}</p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-300 mb-1">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={4}
+                className="tw-w-full tw-bg-gray-700 border tw-border-gray-600 tw-rounded-md px-3 py-2 tw-text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:tw-border-blue-500"
+                placeholder="<Add>"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="tw-flex tw-justify-end gap-3 mt-6">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 tw-text-sm tw-font-medium tw-text-gray-300 tw-bg-gray-700 border tw-border-gray-600 tw-rounded-md hover:tw-bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 tw-text-sm tw-font-medium text-white tw-bg-blue-600 tw-rounded-md hover:tw-bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Add Phase
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Exit Confirmation Dialog */}
+      {showExitDialog && (
+        <div className="tw-fixed tw-inset-0 bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-60">
+          <div className="tw-bg-gray-800 border tw-border-gray-700 tw-rounded-lg tw-shadow-xl w-96">
+            <div className="tw-border-b tw-border-gray-700 px-6 py-4">
+              <h2 className="tw-text-lg tw-font-semibold text-white">Unsaved Changes</h2>
+            </div>
+            <div className="p-6">
+              <p className="tw-text-gray-300 mb-4">You have unsaved data. What would you like to do?</p>
+              <div className="tw-flex tw-justify-end gap-3">
+                <button
+                  onClick={() => setShowExitDialog(false)}
+                  className="px-4 py-2 tw-text-sm tw-font-medium tw-text-gray-300 tw-bg-gray-700 border tw-border-gray-600 tw-rounded-md hover:tw-bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Continue Editing
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExitDialog(false)
+                    onCancel()
+                  }}
+                  className="px-4 py-2 tw-text-sm tw-font-medium text-white tw-bg-red-600 tw-rounded-md hover:tw-bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Exit Without Saving
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default PhaseForm

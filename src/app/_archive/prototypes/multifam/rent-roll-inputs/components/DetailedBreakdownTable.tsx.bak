@@ -1,0 +1,236 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ComplexityTier } from '@/contexts/ComplexityModeContext';
+
+interface ExpenseRow {
+  expense_type: string;
+  expense_category: string;
+  label: string;
+  annual_amount: number;
+  per_unit: number;
+  per_sf: number;
+  escalation_rate: number;
+  is_recoverable?: boolean;
+  recovery_rate?: number;
+}
+
+interface DetailedBreakdownTableProps {
+  mode: ComplexityTier;
+  expenses: ExpenseRow[];
+  selectedCategory: string | null;
+  onUpdateExpense: (expenseType: string, field: string, value: number | boolean) => void;
+}
+
+export function DetailedBreakdownTable({
+  mode,
+  expenses,
+  selectedCategory,
+  onUpdateExpense
+}: DetailedBreakdownTableProps) {
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+
+  // Filter expenses based on selected category and mode
+  const visibleExpenses = expenses.filter(exp => {
+    if (selectedCategory && exp.expense_category !== selectedCategory) {
+      return false;
+    }
+    return true;
+  });
+
+  const handleEditStart = (expenseType: string, currentValue: number) => {
+    setEditingRow(expenseType);
+    setEditValue(currentValue.toString());
+  };
+
+  const handleEditSave = (expenseType: string) => {
+    const numValue = parseFloat(editValue.replace(/,/g, ''));
+    if (!isNaN(numValue)) {
+      onUpdateExpense(expenseType, 'annual_amount', numValue);
+    }
+    setEditingRow(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditingRow(null);
+    setEditValue('');
+  };
+
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  };
+
+  // Calculate totals
+  const totals = visibleExpenses.reduce(
+    (acc, exp) => ({
+      annual: acc.annual + exp.annual_amount,
+      perUnit: acc.perUnit + exp.per_unit,
+      perSF: acc.perSF + exp.per_sf
+    }),
+    { annual: 0, perUnit: 0, perSF: 0 }
+  );
+
+  return (
+    <div className="tw-bg-gray-800/50 tw-rounded-lg border tw-border-gray-700">
+      <div className="px-6 py-4 tw-border-b tw-border-gray-700 tw-flex tw-items-center tw-justify-between">
+        <div>
+          <h3 className="tw-text-lg tw-font-semibold text-white">Detailed Breakdown</h3>
+          <p className="tw-text-xs tw-text-gray-400 mt-1">
+            {selectedCategory
+              ? `Showing expenses for selected category`
+              : `Showing all ${visibleExpenses.length} line items`}
+          </p>
+        </div>
+        <div className="tw-flex tw-items-center gap-2">
+          <button className="px-3 py-1.5 tw-text-xs tw-bg-gray-700 tw-text-gray-300 rounded hover:tw-bg-gray-600 tw-transition-colors">
+            ⚙️ Configure
+          </button>
+          <button className="px-3 py-1.5 tw-text-xs tw-bg-blue-700 text-white rounded hover:tw-bg-blue-600 tw-transition-colors">
+            📄 Import T-12
+          </button>
+        </div>
+      </div>
+
+      <div className="tw-overflow-x-auto">
+        <table className="tw-w-full">
+          <thead>
+            <tr className="tw-border-b tw-border-gray-700 tw-bg-gray-900">
+              <th className="text-left p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Category</th>
+              <th className="text-left p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Line Item</th>
+              <th className="text-right p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Annual</th>
+              <th className="text-right p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Per Unit</th>
+              {(mode === 'standard' || mode === 'advanced') && (
+                <>
+                  <th className="text-right p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Per SF</th>
+                  <th className="text-right p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Escalation</th>
+                </>
+              )}
+              {mode === 'advanced' && (
+                <>
+                  <th className="text-center p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Recoverable</th>
+                  <th className="text-right p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Recovery %</th>
+                </>
+              )}
+              <th className="text-center p-3 tw-text-xs tw-font-medium tw-text-gray-400 tw-uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleExpenses.map((expense, idx) => {
+              const isEditing = editingRow === expense.expense_type;
+
+              return (
+                <tr
+                  key={expense.expense_type}
+                  className={`tw-border-b tw-border-gray-700/50 hover:tw-bg-gray-700/30 tw-transition-colors ${idx % 2 === 0 ? tw-'bg-gray-800/30' : tw-'bg-gray-800/50'}`}
+                >
+                  <td className="p-3 tw-text-sm tw-text-gray-400">{expense.expense_category}</td>
+                  <td className="p-3 tw-text-sm text-white">{expense.label}</td>
+                  <td className="p-3 text-right">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleEditSave(expense.expense_type);
+                          if (e.key === 'Escape') handleEditCancel();
+                        }}
+                        className="w-28 px-2 py-1 tw-bg-gray-900 border tw-border-gray-600 rounded text-right text-white tw-text-sm tw-font-mono focus:outline-none focus:tw-border-blue-500"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="tw-text-sm text-white tw-font-mono">
+                        ${formatCurrency(expense.annual_amount)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-right tw-text-sm tw-text-gray-300 tw-font-mono">
+                    ${formatCurrency(expense.per_unit)}
+                  </td>
+                  {(mode === 'standard' || mode === 'advanced') && (
+                    <>
+                      <td className="p-3 text-right tw-text-sm tw-text-gray-300 tw-font-mono">
+                        ${expense.per_sf.toFixed(2)}
+                      </td>
+                      <td className="p-3 text-right tw-text-sm tw-text-gray-300">
+                        {(expense.escalation_rate * 100).toFixed(1)}%
+                      </td>
+                    </>
+                  )}
+                  {mode === 'advanced' && (
+                    <>
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={expense.is_recoverable || false}
+                          onChange={(e) =>
+                            onUpdateExpense(expense.expense_type, 'is_recoverable', e.target.checked)
+                          }
+                          className="w-4 h-4 rounded tw-border-gray-600 tw-bg-gray-700 tw-text-blue-600"
+                        />
+                      </td>
+                      <td className="p-3 text-right tw-text-sm tw-text-gray-300">
+                        {expense.is_recoverable && expense.recovery_rate
+                          ? `${(expense.recovery_rate * 100).toFixed(0)}%`
+                          : '—'}
+                      </td>
+                    </>
+                  )}
+                  <td className="p-3 text-center">
+                    {isEditing ? (
+                      <div className="tw-flex tw-items-center gap-2 tw-justify-center">
+                        <button
+                          onClick={() => handleEditSave(expense.expense_type)}
+                          className="tw-text-blue-400 hover:tw-text-blue-300 tw-text-sm"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleEditCancel}
+                          className="tw-text-gray-400 hover:tw-text-gray-300 tw-text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleEditStart(expense.expense_type, expense.annual_amount)}
+                        className="tw-text-blue-400 hover:tw-text-blue-300 tw-text-sm"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="tw-border-t-2 tw-border-gray-600 tw-bg-gray-800">
+              <td colSpan={2} className="p-3 tw-text-sm tw-font-semibold text-white">
+                TOTAL
+              </td>
+              <td className="p-3 text-right tw-text-lg tw-font-bold text-white">
+                ${formatCurrency(totals.annual)}
+              </td>
+              <td className="p-3 text-right tw-text-sm tw-font-semibold text-white">
+                ${formatCurrency(totals.perUnit)}
+              </td>
+              {(mode === 'standard' || mode === 'advanced') && (
+                <>
+                  <td className="p-3 text-right tw-text-sm tw-font-semibold text-white">
+                    ${totals.perSF.toFixed(2)}
+                  </td>
+                  <td colSpan={mode === 'advanced' ? 3 : 1}></td>
+                </>
+              )}
+              {mode === 'advanced' && <td></td>}
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}

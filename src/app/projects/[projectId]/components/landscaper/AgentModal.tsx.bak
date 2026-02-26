@@ -1,0 +1,112 @@
+'use client';
+
+import React, { useEffect, useCallback } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilX, cilCloudDownload, cilSpreadsheet, cilFile } from '@coreui/icons';
+
+interface AgentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}
+
+export function AgentModal({ isOpen, onClose, title, subtitle, children }: AgentModalProps) {
+  // Handle escape key
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, handleKeyDown]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="tw-fixed tw-inset-0 tw-z-50 tw-flex"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+    >
+      {/* Modal Container - Full screen with padding */}
+      <div className="tw-flex-1 tw-flex tw-flex-col m-4 tw-overflow-hidden bg-background" style={{ borderRadius: 'var(--cui-card-border-radius)' }}>
+        {/* Header */}
+        <div className="tw-flex tw-items-center tw-justify-between px-6 py-4 tw-border-b border-border">
+          <div>
+            <h2 className="tw-text-xl tw-font-semibold text-foreground">{title}</h2>
+            {subtitle && (
+              <p className="tw-text-sm text-muted mt-1">{subtitle}</p>
+            )}
+          </div>
+          <div className="tw-flex tw-items-center gap-2">
+            {/* Export Buttons (placeholder) */}
+            <ExportButton icon={cilSpreadsheet} label="Excel" />
+            <ExportButton icon={cilFile} label="PDF" />
+            <ExportButton icon={cilCloudDownload} label="Export" />
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="p-2 tw-rounded-lg hover:bg-hover-overlay text-muted hover:text-foreground tw-transition-colors ml-2"
+              aria-label="Close modal"
+            >
+              <CIcon icon={cilX} size="lg" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content Area - Two columns: Canvas + Chat */}
+        <div className="tw-flex-1 tw-flex tw-overflow-hidden">
+          {/* Main Canvas */}
+          <div className="tw-flex-1 tw-overflow-auto p-6">
+            {children}
+          </div>
+
+          {/* Embedded Chat Panel */}
+          <div className="w-80 tw-border-l border-border tw-flex tw-flex-col bg-surface-card">
+            <div className="px-4 py-3 tw-border-b border-border">
+              <span className="tw-text-sm tw-font-medium text-foreground">Chat</span>
+            </div>
+            <div className="tw-flex-1 tw-overflow-y-auto p-4">
+              <div className="text-center text-muted tw-text-sm py-8">
+                <p>Ask questions about this view</p>
+                <p className="tw-text-xs mt-2 tw-opacity-60">Chat coming soon</p>
+              </div>
+            </div>
+            <div className="p-3 tw-border-t border-border">
+              <input
+                type="text"
+                placeholder="Ask a question..."
+                className="tw-w-full px-3 py-2 tw-rounded-lg border border-border bg-background text-foreground tw-text-sm"
+                disabled
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExportButton({ icon, label }: { icon: string[]; label: string }) {
+  return (
+    <button
+      className="tw-flex tw-items-center gap-1.5 px-3 py-1.5 tw-rounded-lg tw-text-sm text-muted hover:text-foreground hover:bg-hover-overlay tw-transition-colors"
+      title={`Export as ${label}`}
+      disabled
+    >
+      <CIcon icon={icon} size="sm" />
+      <span>{label}</span>
+    </button>
+  );
+}

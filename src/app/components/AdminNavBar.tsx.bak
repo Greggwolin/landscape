@@ -1,0 +1,97 @@
+'use client';
+
+import React, { useMemo } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+
+/**
+ * AdminNavBar Component
+ * Horizontal navigation bar for admin pages (similar to project tabs)
+ */
+
+interface AdminNavItem {
+  id: string;
+  label: string;
+  href: string;
+  requiresAdmin?: boolean;
+}
+
+const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  { id: 'preferences', label: 'Preferences', href: '/admin/preferences' },
+  { id: 'benchmarks', label: 'Benchmarks', href: '/admin/benchmarks' },
+  { id: 'cost-library', label: 'Cost Library', href: '/admin/benchmarks/cost-library' },
+  { id: 'dms', label: 'DMS Admin', href: '/admin/dms/templates' },
+  { id: 'feedback', label: 'Feedback', href: '/admin/feedback', requiresAdmin: true },
+];
+
+export default function AdminNavBar() {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const isAdmin = Boolean(
+    (user as { is_admin?: boolean } | null)?.is_admin || user?.role === 'admin'
+  );
+
+  const navItems = useMemo(
+    () => ADMIN_NAV_ITEMS.filter((item) => !item.requiresAdmin || isAdmin),
+    [isAdmin]
+  );
+
+  const isActive = (href: string) => {
+    if (href === '/admin/benchmarks/cost-library') {
+      return pathname === href;
+    }
+    if (href === '/admin/benchmarks') {
+      return pathname === href;
+    }
+    return pathname?.startsWith(href);
+  };
+
+  return (
+    <div
+      className="tw-sticky tw-flex tw-items-center gap-0 px-6 h-14 tw-border-b"
+      style={{
+        backgroundColor: 'var(--cui-body-bg)',
+        borderColor: 'var(--cui-border-color)',
+        top: '58px',
+        zIndex: 40
+      }}
+    >
+      <div className="tw-flex tw-items-center gap-2 mr-8">
+        <span className="tw-text-sm tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+          Admin
+        </span>
+      </div>
+      <div className="tw-flex tw-flex-1 gap-0">
+        {navItems.map((item) => {
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className="px-5 py-4 tw-text-sm tw-transition-colors tw-relative"
+              style={{
+                color: active ? 'var(--cui-primary)' : 'var(--cui-secondary-color)',
+                fontWeight: active ? 600 : 400,
+                borderBottom: active ? '2px solid var(--cui-primary)' : '2px solid transparent',
+                backgroundColor: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                if (!active) {
+                  e.currentTarget.style.color = 'var(--cui-body-color)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!active) {
+                  e.currentTarget.style.color = 'var(--cui-secondary-color)';
+                }
+              }}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,117 @@
+'use client'
+
+import React, { useState } from 'react'
+
+type Column = { name: string; type: string; nullable: boolean; position: number }
+type FK = { column: string; references: { table: string; column: string } }
+type TableInfo = { columns: Column[]; foreignKeys: FK[] }
+
+type Props = {
+  tableNames: string[]
+  tables: Record<string, TableInfo>
+}
+
+const SchemaAccordion: React.FC<Props> = ({ tableNames, tables }) => {
+  const [open, setOpen] = useState<string | null>(tableNames[0] ?? null)
+
+  const onToggle = (name: string) => {
+    setOpen(prev => (prev === name ? null : name))
+  }
+
+  return (
+    <div className="tw-space-y-4">
+      <div className="tw-bg-gray-800 rounded border tw-border-gray-700">
+        <div className="px-4 py-3 tw-border-b tw-border-gray-700">
+          <div className="tw-text-sm tw-text-gray-300 mb-2">Tables</div>
+          <div className="tw-flex tw-flex-wrap gap-2">
+            {tableNames.map(name => (
+              <button
+                key={name}
+                onClick={() => setOpen(name)}
+                className={`px-2 py-1 rounded border tw-text-xs tw-transition-colors ${ open === name ? tw-'bg-blue-700 tw-border-blue-500 text-white' : tw-'bg-gray-700 tw-border-gray-600 tw-text-gray-200 hover:tw-bg-gray-600' }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {tableNames.map(name => {
+        const t = tables[name]
+        const isOpen = open === name
+        return (
+          <div key={name} className="rounded border tw-border-gray-800 tw-overflow-hidden">
+            <button
+              onClick={() => onToggle(name)}
+              className={`tw-w-full px-4 py-2 tw-flex tw-items-center tw-justify-between tw-border-b tw-transition-colors ${ isOpen ? tw-'bg-gray-800 tw-border-gray-700' : tw-'bg-gray-900 tw-border-gray-800 hover:tw-bg-gray-800' }`}
+            >
+              <span className="tw-text-sm tw-font-semibold text-white">{name}</span>
+              <span className="tw-text-gray-400 tw-text-xs">{isOpen ? 'Hide' : 'Show'}</span>
+            </button>
+            {isOpen && (
+              <div className="p-3 tw-space-y-4 tw-bg-gray-900">
+                <div>
+                  <div className="tw-text-xs tw-text-gray-300 mb-2">Columns</div>
+                  <div className="tw-overflow-x-auto">
+                    <table className="tw-min-w-full tw-text-xs border-collapse">
+                      <thead>
+                        <tr className="tw-bg-gray-800 tw-text-gray-200">
+                          <th className="px-2 py-1 text-left border tw-border-gray-700">#</th>
+                          <th className="px-2 py-1 text-left border tw-border-gray-700">Name</th>
+                          <th className="px-2 py-1 text-left border tw-border-gray-700">Type</th>
+                          <th className="px-2 py-1 text-left border tw-border-gray-700">Nullable</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {t.columns
+                          .slice()
+                          .sort((a, b) => a.position - b.position)
+                          .map(col => (
+                            <tr key={col.name} className="odd:tw-bg-gray-850">
+                              <td className="px-2 py-1 border tw-border-gray-800 tw-text-gray-300">{col.position}</td>
+                              <td className="px-2 py-1 border tw-border-gray-800 text-white">{col.name}</td>
+                              <td className="px-2 py-1 border tw-border-gray-800 tw-text-gray-300">{col.type}</td>
+                              <td className="px-2 py-1 border tw-border-gray-800 tw-text-gray-300">{col.nullable ? 'YES' : 'NO'}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="tw-text-xs tw-text-gray-300 mb-2">Foreign Keys</div>
+                  {t.foreignKeys.length ? (
+                    <div className="tw-overflow-x-auto">
+                      <table className="tw-min-w-full tw-text-xs border-collapse">
+                        <thead>
+                          <tr className="tw-bg-gray-800 tw-text-gray-200">
+                            <th className="px-2 py-1 text-left border tw-border-gray-700">Column</th>
+                            <th className="px-2 py-1 text-left border tw-border-gray-700">References</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {t.foreignKeys.map((fk, idx) => (
+                            <tr key={idx} className="odd:tw-bg-gray-850">
+                              <td className="px-2 py-1 border tw-border-gray-800 text-white">{fk.column}</td>
+                              <td className="px-2 py-1 border tw-border-gray-800 tw-text-blue-300">{fk.references.table}.{fk.references.column}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="tw-text-xs tw-text-gray-500">No foreign keys</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default SchemaAccordion

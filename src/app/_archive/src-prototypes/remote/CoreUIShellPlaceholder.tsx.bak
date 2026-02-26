@@ -1,0 +1,37 @@
+'use client';
+
+import Link from 'next/link';
+
+interface MissingCoreUIProps {
+  branch?: string;
+}
+
+const CoreUIShellPlaceholder: React.FC<MissingCoreUIProps> = ({ branch = 'feature/coreui-prototype' }) => {
+  return (
+    <div className="tw-flex tw-min-h-[60vh] tw-flex-col tw-items-center tw-justify-center gap-6 tw-rounded-lg border tw-border-dashed tw-border-gray-700 p-10 text-center">
+      <div className="tw-text-6xl">🧪</div>
+      <div className="tw-space-y-2">
+        <h2 className="tw-text-2xl tw-font-semibold">CoreUI prototype lives on another branch</h2>
+        <p className="text-muted-foreground">
+          Checkout the <code>{branch}</code> branch locally to try the full CoreUI shell.
+          Once that branch is present, this entry will automatically render the real experience.
+        </p>
+      </div>
+      <div className="tw-space-x-4">
+        <Link
+          href="https://github.com/Greggwolin/landscape/tree/feature/coreui-prototype"
+          className="tw-rounded-md bg-primary px-4 py-2 tw-text-sm tw-font-medium text-primary-foreground tw-shadow"
+          target="_blank"
+          rel="noreferrer"
+        >
+          View branch on GitHub
+        </Link>
+        <span className="tw-text-sm text-muted-foreground">
+          git fetch origin {branch} && git checkout {branch}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+export default CoreUIShellPlaceholder;

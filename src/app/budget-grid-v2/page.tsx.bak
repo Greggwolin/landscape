@@ -1,0 +1,50 @@
+'use client';
+
+import { useState } from 'react';
+import BudgetGridDark from '../components/Budget/BudgetGridDark';
+
+export default function BudgetGridV2Page() {
+  const [projectId, setProjectId] = useState<number>(7);
+
+  return (
+    <div className="tw-min-h-screen tw-bg-gray-900">
+      {/* Header */}
+      <div className="tw-bg-gray-800 tw-border-b tw-border-gray-700 p-6">
+        <div className="tw-flex tw-items-center tw-justify-between">
+          <div>
+            <h1 className="tw-text-2xl tw-font-bold text-white">Budget Grid - Dark Theme</h1>
+            <p className="tw-text-gray-400 mt-2">
+              Spreadsheet interface for budget management
+            </p>
+          </div>
+          <div className="tw-flex tw-items-center gap-4">
+            <div>
+              <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-300 mb-1">
+                Project
+              </label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(Number(e.target.value))}
+                className="tw-bg-gray-700 border tw-border-gray-600 text-white tw-rounded-md px-3 py-2 tw-text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={7}>Peoria Lakes</option>
+                <option value={8}>Red Valley MPC</option>
+              </select>
+            </div>
+            <a
+              href="/budget-grid"
+              className="tw-text-sm tw-text-blue-400 hover:tw-text-blue-300 underline"
+            >
+              ← Light Theme Version
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Budget Grid Component */}
+      <div className="p-6">
+        <BudgetGridDark projectId={projectId} />
+      </div>
+    </div>
+  );
+}

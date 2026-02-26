@@ -1,0 +1,2625 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import { unitTypesAPI, unitsAPI, leasesAPI } from '@/lib/api/multifamily';
+import { PhysicalDescription } from '../property';
+import { formatNumber, formatCurrency, formatDecimal } from '@/utils/formatNumber';
+import { ChevronDown, ChevronRight, MapPin, Building2, Calendar } from 'lucide-react';
+import { CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@coreui/react';
+import { CompetitiveMarketCharts, PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
+import { useCallback, useRef } from 'react';
+import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
+import { type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
+import { usePendingRentRollChanges } from '@/hooks/usePendingRentRollChanges';
+import LocationIntelligenceCard from './LocationIntelligenceCard';
+
+interface Project {
+  project_id: number;
+  project_name: string;
+  project_type_code?: string;
+  project_type?: string;
+  property_subtype?: string;
+  location_lat?: number | string | null;
+  location_lon?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+}
+
+interface PropertyTabProps {
+  project: Project;
+  activeTab?: string;
+}
+
+// Mock data types
+interface FloorPlan {
+  id: string;
+  name: string;
+  bedrooms: number;
+  bathrooms: number;
+  sqft: number;
+  unitCount: number;
+  currentRent: number;
+  marketRent: number;
+  aiEstimate: number; // AI-estimated market rent from comparables
+}
+
+
+interface Unit {
+  id: string;
+  unitNumber: string;
+  floorPlan: string;
+  sqft: number;
+  bedrooms: number;
+  bathrooms: number;
+  currentRent: number;
+  marketRent: number;
+  proformaRent: number;
+  leaseStart: string;
+  leaseEnd: string;
+  tenantName: string;
+  status: 'Occupied' | 'Vacant' | 'Notice' | 'Renewal' | 'Unknown';
+  deposit: number;
+  monthlyIncome: number;
+  rentPerSF: number;
+  proformaRentPerSF: number;
+  notes: string;
+}
+
+interface ColumnConfig {
+  id: string;
+  label: string;
+  category: 'unit' | 'tenant' | 'lease' | 'financial' | 'floorplan' | 'dynamic';
+  visible: boolean;
+  type: 'input' | 'calculated' | 'dynamic';
+  description?: string;
+  /** For dynamic columns: the underlying data type for formatting */
+  dataType?: DynamicColumnDataType;
+  /** For dynamic columns: the definition ID from tbl_dynamic_column_definition */
+  dynamicColumnId?: number;
+}
+
+const isEmptyColumnValue = (value: unknown) => {
+  if (value === null || value === undefined) return true;
+  if (typeof value === 'number') return !Number.isFinite(value) || value === 0;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return true;
+    return trimmed.toLowerCase() === 'unknown';
+  }
+  return false;
+};
+
+const getUnitValueForColumn = (
+  unit: Unit,
+  columnId: string,
+  dynamicValues?: Record<string, Record<string, unknown>>
+) => {
+  switch (columnId) {
+    case 'unitNumber':
+      return unit.unitNumber;
+    case 'floorPlan':
+      return unit.floorPlan;
+    case 'bedrooms':
+      return unit.bedrooms;
+    case 'bathrooms':
+      return unit.bathrooms;
+    case 'sqft':
+      return unit.sqft;
+    case 'tenantName':
+      return unit.tenantName;
+    case 'status':
+      return unit.status;
+    case 'leaseStart':
+      return unit.leaseStart;
+    case 'leaseEnd':
+      return unit.leaseEnd;
+    case 'deposit':
+      return unit.deposit;
+    case 'currentRent':
+      return unit.currentRent;
+    case 'marketRent':
+      return unit.marketRent;
+    case 'proformaRent':
+      return unit.proformaRent;
+    case 'monthlyIncome':
+      return unit.monthlyIncome;
+    case 'rentPerSF':
+      return unit.rentPerSF;
+    case 'proformaRentPerSF':
+      return unit.proformaRentPerSF;
+    case 'notes':
+      return unit.notes;
+    default:
+      // Dynamic column lookup: columnId is the column_key, unit.id is the row_id
+      if (dynamicValues) {
+        return dynamicValues[unit.id]?.[columnId] ?? null;
+      }
+      return null;
+  }
+};
+
+// Mock data with AI estimates
+const mockFloorPlans: FloorPlan[] = [
+  { id: '1', name: 'A1', bedrooms: 1, bathrooms: 1, sqft: 650, unitCount: 24, currentRent: 1200, marketRent: 1350, aiEstimate: 1375 },
+  { id: '2', name: 'A2', bedrooms: 1, bathrooms: 1, sqft: 725, unitCount: 18, currentRent: 1300, marketRent: 1425, aiEstimate: 1420 },
+  { id: '3', name: 'B1', bedrooms: 2, bathrooms: 2, sqft: 950, unitCount: 36, currentRent: 1650, marketRent: 1800, aiEstimate: 1825 },
+  { id: '4', name: 'B2', bedrooms: 2, bathrooms: 2, sqft: 1050, unitCount: 28, currentRent: 1750, marketRent: 1900, aiEstimate: 1950 },
+  { id: '5', name: 'C1', bedrooms: 3, bathrooms: 2, sqft: 1250, unitCount: 16, currentRent: 2100, marketRent: 2250, aiEstimate: 2300 },
+];
+
+// RentalComparable type matching database schema
+interface RentalComparable {
+  comparable_id: number;
+  property_name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  distance_miles?: number;
+  year_built?: number;
+  total_units?: number;
+  unit_type?: string;
+  bedrooms: number;
+  bathrooms: number;
+  avg_sqft: number;
+  asking_rent: number;
+  effective_rent?: number;
+  concessions?: string;
+  amenities?: string;
+  notes?: string;
+  data_source?: string;
+  as_of_date?: string;
+  is_active?: boolean;
+}
+
+// Landscaper Insights Component - dynamically generates insights from comparables
+interface LandscaperInsightsProps {
+  floorPlans: FloorPlan[];
+  comparables: RentalComparable[];
+  comparablesByProperty: Array<{
+    propertyName: string;
+    distance?: number;
+    yearBuilt?: number;
+    totalUnits?: number;
+    unitTypes: RentalComparable[];
+    rentRange: { min: number; max: number };
+  }>;
+}
+
+function LandscaperInsights({ floorPlans, comparables, comparablesByProperty }: LandscaperInsightsProps) {
+  // Filter to only comparables with valid asking_rent (catches NaN, null, undefined, 0, Infinity)
+  // Note: DB may return numbers as strings, so convert first
+  const validComparables = comparables.filter(c => {
+    const rent = Number(c.asking_rent);
+    return Number.isFinite(rent) && rent > 0;
+  });
+
+  // If no comparable data, show a helpful message
+  if (validComparables.length === 0) {
+    return (
+      <p style={{ color: 'var(--cui-secondary-color)', fontSize: '0.875rem' }}>
+        No rental comparables available. Use Landscaper to extract comp data from your OM or add comparables manually.
+      </p>
+    );
+  }
+
+  // Calculate market stats directly from comparables (works even without floor plans)
+  // Use Number() to handle string values from DB
+  const avgCompRent = Math.round(validComparables.reduce((sum, c) => sum + Number(c.asking_rent), 0) / validComparables.length);
+  const minRent = Math.min(...validComparables.map(c => Number(c.asking_rent)));
+  const maxRent = Math.max(...validComparables.map(c => Number(c.asking_rent)));
+
+  // Group by bedroom count for insights (using validComparables)
+  const byBedroom = new Map<number, { count: number; avgRent: number; minRent: number; maxRent: number }>();
+  validComparables.forEach(c => {
+    const rent = Number(c.asking_rent);
+    const existing = byBedroom.get(c.bedrooms);
+    if (!existing) {
+      byBedroom.set(c.bedrooms, { count: 1, avgRent: rent, minRent: rent, maxRent: rent });
+    } else {
+      existing.count += 1;
+      existing.avgRent = ((existing.avgRent * (existing.count - 1)) + rent) / existing.count;
+      existing.minRent = Math.min(existing.minRent, rent);
+      existing.maxRent = Math.max(existing.maxRent, rent);
+    }
+  });
+
+  // Calculate avg $/SF if we have sqft data
+  const compsWithSqft = validComparables.filter(c => Number(c.avg_sqft) > 0);
+  const avgRentPerSqft = compsWithSqft.length > 0
+    ? compsWithSqft.reduce((sum, c) => sum + (Number(c.asking_rent) / Number(c.avg_sqft)), 0) / compsWithSqft.length
+    : 0;
+
+  // Get nearest comp
+  const nearestComp = comparablesByProperty.find(p => p.distance && p.distance > 0);
+
+  // Check if we have floor plan data to compare against
+  const plansWithComps = floorPlans.filter((p: FloorPlan & { matchType?: string; compCount?: number }) =>
+    (p.matchType && p.matchType !== 'none') || (p.aiEstimate !== p.marketRent)
+  );
+  const hasFloorPlanComparison = plansWithComps.length > 0;
+
+  // If we have floor plan comparison data, calculate gap metrics
+  let marketGapText = '';
+  if (hasFloorPlanComparison) {
+    const totalCurrentRent = plansWithComps.reduce((sum, p) => sum + (p.currentRent * p.unitCount), 0);
+    const totalAIRent = plansWithComps.reduce((sum, p) => sum + (p.aiEstimate * p.unitCount), 0);
+    const totalUnits = plansWithComps.reduce((sum, p) => sum + p.unitCount, 0);
+    const avgCurrentRent = totalUnits > 0 ? Math.round(totalCurrentRent / totalUnits) : 0;
+    const avgAIRent = totalUnits > 0 ? Math.round(totalAIRent / totalUnits) : 0;
+    const marketGap = avgCurrentRent > 0 ? ((avgAIRent - avgCurrentRent) / avgCurrentRent * 100) : 0;
+
+    if (Math.abs(marketGap) > 1) {
+      marketGapText = marketGap > 0
+        ? `Your current rents appear to be ${marketGap.toFixed(0)}% below market.`
+        : `Your current rents are ${Math.abs(marketGap).toFixed(0)}% above market.`;
+    }
+  }
+
+  return (
+    <div
+      style={{
+        color: 'var(--cui-body-color)',
+        fontSize: '0.875rem',
+        display: 'grid',
+        gap: '0.5rem',
+      }}
+    >
+      <p>
+        <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Market Summary:</span>{' '}
+        Analyzed {validComparables.length} unit types across {comparablesByProperty.length} properties.
+        Average asking rent is <span style={{ fontWeight: 600 }}>{formatCurrency(avgCompRent)}/mo</span> (range: {formatCurrency(minRent)}-{formatCurrency(maxRent)}).
+        {avgRentPerSqft > 0 && <> Average rent per SF: <span style={{ fontWeight: 600 }}>${avgRentPerSqft.toFixed(2)}/SF</span>.</>}
+      </p>
+
+      <p>
+        <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>By Unit Type:</span>{' '}
+        {Array.from(byBedroom.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([beds, data]) => (
+            <span key={beds}>
+              {beds === 0 ? 'Studio' : `${beds}BR`}: {formatCurrency(Math.round(data.avgRent))} avg ({data.count} units){beds < Math.max(...Array.from(byBedroom.keys())) ? ' · ' : ''}
+            </span>
+          ))
+        }
+      </p>
+
+      {nearestComp && (
+        <p>
+          <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Nearest Comp:</span>{' '}
+          {nearestComp.propertyName} ({nearestComp.distance} mi) — {formatCurrency(nearestComp.rentRange.min)}-{formatCurrency(nearestComp.rentRange.max)}/mo
+          {nearestComp.yearBuilt && `, built ${nearestComp.yearBuilt}`}
+          {nearestComp.totalUnits && `, ${nearestComp.totalUnits} units`}.
+        </p>
+      )}
+
+      {marketGapText && (
+        <p>
+          <span style={{ color: 'var(--cui-primary)', fontWeight: 600 }}>Position:</span>{' '}
+          {marketGapText}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * PropertyNarrative - Generates a narrative description of the subject property
+ * for the Details tab. Pulls from project DB fields (physical description),
+ * rent roll stats, and any OM document narrative stored in the knowledge system.
+ */
+function PropertyNarrative({ projectId, units, floorPlans }: {
+  projectId: number;
+  units: Unit[];
+  floorPlans: FloorPlan[];
+}) {
+  const [propertyData, setPropertyData] = useState<Record<string, unknown> | null>(null);
+  const [omNarrative, setOmNarrative] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+
+        // Fetch project data (same source as PhysicalDescription)
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+        const [projectRes, docsRes] = await Promise.all([
+          fetch(`${djangoUrl}/api/projects/${projectId}/`),
+          fetch(`${djangoUrl}/api/documents/?project_id=${projectId}`),
+        ]);
+
+        if (projectRes.ok) {
+          const data = await projectRes.json();
+          setPropertyData(data);
+        }
+
+        // Look for OM document with extracted text
+        if (docsRes.ok) {
+          const docsData = await docsRes.json();
+          const docs = docsData.results || docsData;
+          const omDoc = docs.find((d: Record<string, unknown>) =>
+            d.doc_type === 'om' || d.doc_type === 'offering_memorandum' ||
+            (typeof d.doc_name === 'string' && /\b(om|offering.memo)/i.test(d.doc_name))
+          );
+          if (omDoc?.extracted_text) {
+            // Extract property description section from OM text
+            const text = omDoc.extracted_text as string;
+            const descMatch = text.match(/(?:property\s+description|subject\s+property|physical\s+description|the\s+property\s+is)[:\s]*([^]*?)(?=\n\n[A-Z]|\n#{1,3}\s|$)/i);
+            if (descMatch) {
+              setOmNarrative(descMatch[1].trim().slice(0, 1500));
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[PropertyNarrative] Error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [projectId]);
+
+  // Build narrative from available data
+  const narrative = useMemo(() => {
+    if (!propertyData && units.length === 0) return null;
+
+    const d = propertyData || {};
+    const sentences: string[] = [];
+
+    // Property identity + location
+    const name = d.project_name as string;
+    const address = d.street_address || d.project_address;
+    const city = d.city || d.jurisdiction_city;
+    const state = d.state || d.jurisdiction_state;
+    const county = d.county || d.jurisdiction_county;
+    const location = [address, city, state].filter(Boolean).join(', ');
+
+    if (name && location) {
+      sentences.push(`${name} is located at ${location}${county ? ` in ${county} County` : ''}.`);
+    } else if (name) {
+      sentences.push(`${name} is the subject property.`);
+    }
+
+    // Building characteristics
+    const yearBuilt = d.year_built as number | null;
+    const totalUnits = d.total_units as number | null || units.length;
+    const stories = d.stories as number | null;
+    const buildingCount = d.building_count as number | null;
+    const constructionType = d.construction_type as string | null;
+    const grossSF = d.gross_sf as number | null;
+    const nra = d.net_rentable_area as number | null;
+    const propertyClass = d.property_class as string | null;
+
+    const buildingParts: string[] = [];
+    if (totalUnits) buildingParts.push(`${formatNumber(totalUnits)}-unit`);
+    if (propertyClass) buildingParts.push(`Class ${propertyClass}`);
+    buildingParts.push('multifamily property');
+
+    let buildingSentence = `The subject is a ${buildingParts.join(' ')}`;
+    const buildingDetails: string[] = [];
+    if (buildingCount && buildingCount > 1) buildingDetails.push(`${buildingCount} buildings`);
+    if (stories) buildingDetails.push(`${stories} ${stories === 1 ? 'story' : 'stories'}`);
+    if (constructionType) buildingDetails.push(`${constructionType} construction`);
+    if (buildingDetails.length > 0) buildingSentence += ` comprising ${buildingDetails.join(', ')}`;
+    if (yearBuilt) buildingSentence += `, originally constructed in ${yearBuilt}`;
+    buildingSentence += '.';
+    sentences.push(buildingSentence);
+
+    // Square footage
+    if (grossSF || nra) {
+      const sfParts: string[] = [];
+      if (grossSF) sfParts.push(`${formatNumber(grossSF)} gross SF`);
+      if (nra) sfParts.push(`${formatNumber(nra)} net rentable SF`);
+      sentences.push(`The property contains ${sfParts.join(' and ')}.`);
+    }
+
+    // Unit mix from floor plans
+    if (floorPlans.length > 0) {
+      const bedroomCounts = new Map<number, { count: number; avgSF: number; avgRent: number }>();
+      floorPlans.forEach(fp => {
+        const existing = bedroomCounts.get(fp.bedrooms);
+        if (existing) {
+          const totalCount = existing.count + fp.unitCount;
+          existing.avgSF = Math.round((existing.avgSF * existing.count + fp.sqft * fp.unitCount) / totalCount);
+          existing.avgRent = Math.round((existing.avgRent * existing.count + fp.currentRent * fp.unitCount) / totalCount);
+          existing.count = totalCount;
+        } else {
+          bedroomCounts.set(fp.bedrooms, { count: fp.unitCount, avgSF: fp.sqft, avgRent: fp.currentRent });
+        }
+      });
+
+      const mixParts = Array.from(bedroomCounts.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([beds, data]) => {
+          const label = beds === 0 ? 'studio' : `${beds}-bedroom`;
+          return `${data.count} ${label} (avg ${formatNumber(data.avgSF)} SF)`;
+        });
+
+      if (mixParts.length > 0) {
+        sentences.push(`The unit mix includes ${mixParts.join(', ')}.`);
+      }
+    }
+
+    // Site characteristics
+    const lotAcres = d.lot_size_acres || d.acres_gross;
+    const zoning = d.current_zoning as string | null;
+    const topography = d.topography as string | null;
+    const siteParts: string[] = [];
+    if (lotAcres) siteParts.push(`${Number(lotAcres).toFixed(2)} acres`);
+    if (zoning) siteParts.push(`zoned ${zoning}`);
+    if (topography) siteParts.push(`${(topography as string).toLowerCase()} topography`);
+    if (siteParts.length > 0) {
+      sentences.push(`The site encompasses ${siteParts.join(', ')}.`);
+    }
+
+    // Parking
+    const parkingSpaces = d.parking_spaces as number | null;
+    const parkingType = d.parking_type as string | null;
+    const parkingRatio = d.parking_ratio as number | null;
+    if (parkingSpaces) {
+      let parkingSentence = `Parking consists of ${formatNumber(parkingSpaces)} spaces`;
+      if (parkingType) parkingSentence += ` (${parkingType.toLowerCase()})`;
+      if (parkingRatio) parkingSentence += `, a ratio of ${parkingRatio.toFixed(1)} spaces per unit`;
+      parkingSentence += '.';
+      sentences.push(parkingSentence);
+    }
+
+    // Occupancy from units
+    if (units.length > 0) {
+      const occupied = units.filter(u => u.status === 'Occupied' || u.status === 'Renewal').length;
+      const occupancy = Math.round((occupied / units.length) * 100);
+      const avgRent = units.filter(u => u.currentRent > 0).reduce((sum, u) => sum + u.currentRent, 0) /
+        (units.filter(u => u.currentRent > 0).length || 1);
+      sentences.push(`As of the current rent roll, the property reports ${occupancy}% occupancy with an average in-place rent of ${formatCurrency(Math.round(avgRent))} per unit.`);
+    }
+
+    // Condition and quality
+    const conditionRating = d.condition_rating as number | null;
+    const qualityRating = d.quality_rating as number | null;
+    const effectiveAge = d.effective_age as number | null;
+    if (conditionRating || qualityRating || effectiveAge) {
+      const condParts: string[] = [];
+      if (conditionRating) condParts.push(`condition rated ${conditionRating}/5`);
+      if (qualityRating) condParts.push(`quality rated ${qualityRating}/5`);
+      if (effectiveAge) condParts.push(`an effective age of ${effectiveAge} years`);
+      sentences.push(`The improvements reflect ${condParts.join(', ')}.`);
+    }
+
+    return sentences.join(' ');
+  }, [propertyData, units, floorPlans]);
+
+  if (loading) {
+    return (
+      <div
+        className="tw-rounded-lg p-4"
+        style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+      >
+        <div className="tw-flex tw-items-center gap-2">
+          <div className="w-4 h-4 tw-border-2 tw-border-t-transparent tw-rounded-full tw-animate-spin" style={{ borderColor: 'var(--cui-primary)', borderTopColor: 'transparent' }} />
+          <span className="tw-text-sm" style={{ color: 'var(--cui-secondary-color)' }}>Loading property narrative...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!narrative && !omNarrative) return null;
+
+  return (
+    <div
+      className="tw-rounded-lg p-4"
+      style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}
+    >
+      <div className="tw-flex tw-items-start gap-3">
+        <div className="tw-flex-shrink-0">
+          <svg className="w-5 h-5" style={{ color: 'var(--cui-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <div className="tw-flex-1">
+          <div className="tw-flex tw-items-center gap-2 mb-2">
+            <h4 className="tw-text-sm tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>Property Description</h4>
+            <span className="studio-badge-info">Narrative</span>
+          </div>
+          <div className="tw-text-sm tw-space-y-3" style={{ color: 'var(--cui-body-color)', lineHeight: '1.6' }}>
+            {omNarrative && (
+              <p>{omNarrative}</p>
+            )}
+            {narrative && (
+              <p>{narrative}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const mockUnits: Unit[] = [
+  { id: '1', unitNumber: '101', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1200, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-01-15', leaseEnd: '2025-01-14', tenantName: 'John Smith', status: 'Occupied', deposit: 1200, monthlyIncome: 1200, rentPerSF: 1.85, proformaRentPerSF: 2.12, notes: '' },
+  { id: '2', unitNumber: '102', floorPlan: 'A1', sqft: 650, bedrooms: 1, bathrooms: 1, currentRent: 1225, marketRent: 1350, proformaRent: 1375, leaseStart: '2024-03-01', leaseEnd: '2025-02-28', tenantName: 'Sarah Johnson', status: 'Occupied', deposit: 1225, monthlyIncome: 1225, rentPerSF: 1.88, proformaRentPerSF: 2.12, notes: '' },
+  { id: '3', unitNumber: '103', floorPlan: 'B1', sqft: 950, bedrooms: 2, bathrooms: 2, currentRent: 0, marketRent: 1800, proformaRent: 1825, leaseStart: '', leaseEnd: '', tenantName: '', status: 'Vacant', deposit: 0, monthlyIncome: 0, rentPerSF: 0, proformaRentPerSF: 1.92, notes: 'Available for lease' },
+  { id: '4', unitNumber: '104', floorPlan: 'B1', sqft: 950, bedrooms: 2, bathrooms: 2, currentRent: 1650, marketRent: 1800, proformaRent: 1825, leaseStart: '2023-11-01', leaseEnd: '2024-10-31', tenantName: 'Michael Brown', status: 'Notice', deposit: 1650, monthlyIncome: 1650, rentPerSF: 1.74, proformaRentPerSF: 1.92, notes: '60-day notice given' },
+  { id: '5', unitNumber: '105', floorPlan: 'B2', sqft: 1050, bedrooms: 2, bathrooms: 2, currentRent: 1750, marketRent: 1900, proformaRent: 1950, leaseStart: '2024-06-15', leaseEnd: '2025-06-14', tenantName: 'Emily Davis', status: 'Occupied', deposit: 1750, monthlyIncome: 1750, rentPerSF: 1.67, proformaRentPerSF: 1.86, notes: '' },
+  { id: '6', unitNumber: '201', floorPlan: 'A2', sqft: 725, bedrooms: 1, bathrooms: 1, currentRent: 1300, marketRent: 1425, proformaRent: 1420, leaseStart: '2024-02-01', leaseEnd: '2025-01-31', tenantName: 'David Wilson', status: 'Renewal', deposit: 1300, monthlyIncome: 1300, rentPerSF: 1.79, proformaRentPerSF: 1.96, notes: 'Renewal pending' },
+  { id: '7', unitNumber: '202', floorPlan: 'A2', sqft: 725, bedrooms: 1, bathrooms: 1, currentRent: 1275, marketRent: 1425, proformaRent: 1420, leaseStart: '2024-04-15', leaseEnd: '2025-04-14', tenantName: 'Lisa Martinez', status: 'Occupied', deposit: 1275, monthlyIncome: 1275, rentPerSF: 1.76, proformaRentPerSF: 1.96, notes: '' },
+  { id: '8', unitNumber: '203', floorPlan: 'C1', sqft: 1250, bedrooms: 3, bathrooms: 2, currentRent: 2100, marketRent: 2250, proformaRent: 2300, leaseStart: '2024-01-01', leaseEnd: '2025-12-31', tenantName: 'Robert Garcia', status: 'Occupied', deposit: 2100, monthlyIncome: 2100, rentPerSF: 1.68, proformaRentPerSF: 1.84, notes: '' },
+];
+
+// PropertyTab uses camelCase column IDs; the delta system uses backend snake_case field names.
+const COLUMN_TO_BACKEND_FIELD: Record<string, string> = {
+  currentRent: 'current_rent',
+  tenantName: 'tenant_name',
+  leaseStart: 'lease_start',
+  leaseEnd: 'lease_end',
+  status: 'occupancy_status',
+  marketRent: 'market_rent',
+  sqft: 'square_feet',
+  bedrooms: 'bedrooms',
+  bathrooms: 'bathrooms',
+  deposit: 'security_deposit',
+  unitNumber: 'unit_number',
+  floorPlan: 'unit_type',
+};
+
+// Column configuration - defines all available columns
+const defaultColumns: ColumnConfig[] = [
+  // Unit Info
+  { id: 'unitNumber', label: 'Unit', category: 'unit', visible: true, type: 'input', description: 'Unit number or identifier' },
+  { id: 'floorPlan', label: 'Plan', category: 'floorplan', visible: true, type: 'input', description: 'Floor plan / unit type code (e.g. A1, B2)' },
+  { id: 'bedrooms', label: 'Bed', category: 'unit', visible: true, type: 'input', description: 'Number of bedrooms' },
+  { id: 'bathrooms', label: 'Bath', category: 'unit', visible: true, type: 'input', description: 'Number of bathrooms' },
+  { id: 'sqft', label: 'SF', category: 'unit', visible: true, type: 'input', description: 'Square footage of the unit' },
+  // Tenant Info
+  { id: 'tenantName', label: 'Tenant', category: 'tenant', visible: true, type: 'input', description: 'Current tenant name (rarely used in underwriting)' },
+  { id: 'status', label: 'Status', category: 'tenant', visible: true, type: 'input', description: 'Occupancy status: Occupied, Vacant, Notice, or Renewal' },
+  // Lease Terms
+  { id: 'leaseStart', label: 'Lease Start', category: 'lease', visible: true, type: 'input', description: 'Lease commencement date' },
+  { id: 'leaseEnd', label: 'Lease End', category: 'lease', visible: true, type: 'input', description: 'Lease expiration date' },
+  { id: 'deposit', label: 'Deposit', category: 'lease', visible: false, type: 'input', description: 'Security deposit amount' },
+  // Financial
+  { id: 'currentRent', label: 'Current Rent', category: 'financial', visible: true, type: 'input', description: 'Actual rent being collected today' },
+  { id: 'marketRent', label: 'Market Rent', category: 'financial', visible: true, type: 'input', description: 'Current market rent estimate' },
+  { id: 'proformaRent', label: 'Proforma Rent', category: 'financial', visible: false, type: 'input', description: 'Projected future rent for underwriting' },
+  { id: 'monthlyIncome', label: 'Monthly Income', category: 'financial', visible: false, type: 'calculated', description: 'Total monthly income (includes current rent + other fees)' },
+  { id: 'rentPerSF', label: 'Rent/SF', category: 'financial', visible: false, type: 'calculated', description: 'Current rent divided by square footage' },
+  { id: 'proformaRentPerSF', label: 'Proforma $/SF', category: 'financial', visible: false, type: 'calculated', description: 'Proforma rent divided by square footage' },
+  // Other
+  { id: 'notes', label: 'Notes', category: 'unit', visible: false, type: 'input', description: 'Free-form notes for this unit' },
+];
+
+export default function PropertyTab({ project, activeTab = 'details' }: PropertyTabProps) {
+  const projectId = project.project_id;
+  // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
+  // property_subtype (e.g. 'RETAIL_NNN') is a lookup code, not recognized by getProjectCategory().
+  const effectiveProjectType = project.project_type_code
+    || project.project_type
+    || project.property_subtype;
+  const projectType = project.project_type_code; // Keep for display purposes
+
+  // Check if this is an income property (multifamily, office, retail, etc.)
+  // Uses the same logic as folderTabConfig for consistency
+  const isMultifamily = isIncomeProperty(effectiveProjectType);
+
+  const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
+  const [comparables, setComparables] = useState<RentalComparable[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Unit | null>(null);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [planEditDraft, setPlanEditDraft] = useState<FloorPlan | null>(null);
+  const [columns, setColumns] = useState<ColumnConfig[]>(defaultColumns);
+  const [showFieldChooser, setShowFieldChooser] = useState(false);
+  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
+  const [hasCustomizedColumns, setHasCustomizedColumns] = useState(false);
+  const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
+  const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
+  const propertyListRef = useRef<HTMLDivElement>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null);
+
+  // Rent Roll sorting state
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Dynamic EAV columns disabled for alpha — base columns cover all active fields.
+  // Re-enable when EAV value population is implemented.
+  const [dynamicColumnDefs, setDynamicColumnDefs] = useState<any[]>([]);
+  const dynamicValues: Record<string, Record<string, unknown>> = {};
+  const refreshDynamicColumns = () => {};
+
+  // Pending rent roll extraction changes (delta highlighting)
+  const {
+    hasPending,
+    changes: pendingChanges,
+    pendingByCell,
+    summary: pendingSummary,
+    documentName: pendingDocName,
+    getFieldState,
+    toggleFieldAcceptance,
+    acceptAll,
+    rejectAll,
+    refresh: refreshPending,
+  } = usePendingRentRollChanges(isMultifamily ? Number(projectId) : undefined);
+
+  // Fetch dynamic columns for multifamily projects (Tags, Additional Tags, etc.)
+  // These are DynamicColumnDefinition rows created during extraction via confirm_column_mapping
+  const [activeDynCols, setActiveDynCols] = useState<ColumnConfig[]>([]);
+  const [activeDynValues, setActiveDynValues] = useState<Record<string, Record<string, unknown>>>({});
+  useEffect(() => {
+    if (!isMultifamily) {
+      setActiveDynCols([]);
+      setActiveDynValues({});
+      return;
+    }
+    const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    // Fetch column definitions
+    fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`)
+      .then(res => res.ok ? res.json() : [])
+      .then(data => {
+        const allCols = Array.isArray(data) ? data : data.results || [];
+        // Only include active, non-proposed columns that DON'T overlap with base column labels
+        const baseLabels = new Set(defaultColumns.map(c => c.label.toLowerCase()));
+        const seen = new Set<string>();
+        const filtered = allCols.filter((d: any) => {
+          if (!d.is_active || d.is_proposed) return false;
+          const norm = d.display_label.toLowerCase();
+          if (baseLabels.has(norm)) return false;
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        });
+        setDynamicColumnDefs(filtered);
+        setActiveDynCols(filtered.map((d: any) => ({
+          id: `dyn_${d.column_key}`,
+          label: d.display_label,
+          category: 'dynamic' as const,
+          visible: true,
+          type: 'dynamic' as const,
+          description: `Custom field from extraction`,
+          dataType: d.data_type,
+          dynamicColumnId: d.id,
+        })));
+        // Fetch values for these columns
+        if (filtered.length > 0) {
+          fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/with_values/?table_name=multifamily_unit`)
+            .then(r => r.ok ? r.json() : { values: {} })
+            .then(vData => setActiveDynValues(vData.values || {}))
+            .catch(() => setActiveDynValues({}));
+        }
+      })
+      .catch(() => { setActiveDynCols([]); setActiveDynValues({}); });
+  }, [isMultifamily, projectId]);
+
+  // Derive additional columns from pending changes that aren't in base columns
+  const pendingExtraColumns = useMemo(() => {
+    if (!hasPending || pendingChanges.length === 0) return [];
+
+    // Collect all backend field names that have pending changes
+    const backendFieldsInBase = new Set(Object.values(COLUMN_TO_BACKEND_FIELD));
+    const extraFields = new Map<string, string>(); // field -> fieldLabel
+
+    for (const change of pendingChanges) {
+      if (!backendFieldsInBase.has(change.field) && !extraFields.has(change.field)) {
+        extraFields.set(change.field, change.fieldLabel);
+      }
+    }
+
+    // Convert to ColumnConfig entries
+    return Array.from(extraFields.entries()).map(([field, label]) => ({
+      id: `pending_${field}`,
+      label: label,
+      category: 'dynamic' as ColumnConfig['category'],
+      visible: true,
+      type: 'dynamic' as ColumnConfig['type'],
+      description: `Pending field from extraction`,
+    }));
+  }, [hasPending, pendingChanges]);
+
+  // NOTE: Dynamic column merge disabled — see stub above. Left intact for re-enablement.
+  const staticLabels = useMemo(
+    () => new Set(defaultColumns.map(c => c.label.toLowerCase())),
+    []
+  );
+  const dynColFingerprint = useMemo(() => {
+    const seen = new Set<string>();
+    return dynamicColumnDefs
+      .filter(d => d.is_active && !d.is_proposed)
+      .filter(d => {
+        const norm = d.display_label.toLowerCase();
+        if (staticLabels.has(norm)) return false;
+        if (seen.has(norm)) return false;
+        seen.add(norm);
+        return true;
+      })
+      .map(d => d.id)
+      .join(',');
+  }, [dynamicColumnDefs, staticLabels]);
+  const lastDynFingerprint = useRef('');
+  useEffect(() => {
+    if (!dynColFingerprint || dynColFingerprint === lastDynFingerprint.current) return;
+    lastDynFingerprint.current = dynColFingerprint;
+    setColumns(prev => {
+      // Remove any previously-merged dynamic columns
+      const staticCols = prev.filter(c => c.category !== 'dynamic');
+      // Build ColumnConfig entries from active dynamic definitions,
+      // excluding any whose display_label matches a base column (case-insensitive)
+      // and deduplicating dynamic columns against each other.
+      const seenDynLabels = new Set<string>();
+      const dynCols: ColumnConfig[] = dynamicColumnDefs
+        .filter(d => d.is_active && !d.is_proposed)
+        .filter(d => {
+          const normLabel = d.display_label.toLowerCase();
+          if (staticLabels.has(normLabel)) return false;
+          if (seenDynLabels.has(normLabel)) return false;
+          seenDynLabels.add(normLabel);
+          return true;
+        })
+        .map(d => ({
+          id: `dyn_${d.column_key}`,
+          label: d.display_label,
+          category: 'dynamic' as const,
+          visible: true,
+          type: 'dynamic' as const,
+          description: `Custom field (${d.data_type}) from ${d.source}`,
+          dataType: d.data_type,
+          dynamicColumnId: d.id,
+        }));
+      if (dynCols.length === 0) return prev; // No dynamic cols to add
+      return [...staticCols, ...dynCols];
+    });
+  }, [dynColFingerprint, dynamicColumnDefs, staticLabels]);
+
+  // Calculate AI market rent estimates from comparable data
+  // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
+  const aiEstimatesByBedBath = useMemo(() => {
+    const estimates = new Map<string, { totalRent: number; totalSqft: number; count: number; avgRent: number; avgRentPerSqft: number }>();
+    // Also track by bedroom only for fuzzy matching when exact bed/bath doesn't match
+    const byBedroomOnly = new Map<number, { totalRent: number; totalSqft: number; count: number; avgRent: number; avgRentPerSqft: number }>();
+
+    // Only include comparables with valid rent values (handle string/number)
+    comparables.filter(c => {
+      const rent = Number(c.asking_rent);
+      return Number.isFinite(rent) && rent > 0;
+    }).forEach(comp => {
+      const rent = Number(comp.asking_rent);
+      const sqft = Number(comp.avg_sqft) || 0;
+
+      // Exact bed/bath key
+      const key = `${comp.bedrooms}/${comp.bathrooms}`;
+      if (!estimates.has(key)) {
+        estimates.set(key, { totalRent: 0, totalSqft: 0, count: 0, avgRent: 0, avgRentPerSqft: 0 });
+      }
+      const entry = estimates.get(key)!;
+      entry.totalRent += rent;
+      entry.totalSqft += sqft;
+      entry.count += 1;
+
+      // Also group by bedroom only
+      if (!byBedroomOnly.has(comp.bedrooms)) {
+        byBedroomOnly.set(comp.bedrooms, { totalRent: 0, totalSqft: 0, count: 0, avgRent: 0, avgRentPerSqft: 0 });
+      }
+      const bedEntry = byBedroomOnly.get(comp.bedrooms)!;
+      bedEntry.totalRent += rent;
+      bedEntry.totalSqft += sqft;
+      bedEntry.count += 1;
+    });
+
+    // Calculate averages for exact matches
+    estimates.forEach((entry) => {
+      entry.avgRent = Math.round(entry.totalRent / entry.count);
+      entry.avgRentPerSqft = entry.totalSqft > 0 ? entry.totalRent / entry.totalSqft : 0;
+    });
+
+    // Calculate averages for bedroom-only matches
+    byBedroomOnly.forEach((entry) => {
+      entry.avgRent = Math.round(entry.totalRent / entry.count);
+      entry.avgRentPerSqft = entry.totalSqft > 0 ? entry.totalRent / entry.totalSqft : 0;
+    });
+
+    // Store bedroom-only estimates with special key format "Xbd"
+    byBedroomOnly.forEach((entry, bedrooms) => {
+      estimates.set(`${bedrooms}bd`, entry);
+    });
+
+    return estimates;
+  }, [comparables]);
+
+  // Floor plans with AI estimates populated from comparable data
+  // Uses fuzzy matching: exact bed/bath -> rounded bath -> bedroom only
+  const floorPlansWithAI = useMemo(() => {
+    return floorPlans.map(plan => {
+      // Try exact bed/bath match first
+      const exactKey = `${plan.bedrooms}/${plan.bathrooms}`;
+      let estimate = aiEstimatesByBedBath.get(exactKey);
+      let matchType: 'exact' | 'rounded' | 'bedroom' | 'none' = 'none';
+
+      if (estimate && estimate.count > 0) {
+        matchType = 'exact';
+      } else {
+        // Try rounded bathroom (1.75 -> 2, 1.5 -> 2, 1.25 -> 1)
+        const roundedBath = Math.round(plan.bathrooms);
+        const roundedKey = `${plan.bedrooms}/${roundedBath}`;
+        estimate = aiEstimatesByBedBath.get(roundedKey);
+
+        if (estimate && estimate.count > 0) {
+          matchType = 'rounded';
+        } else {
+          // Fall back to bedroom-only matching
+          const bedroomKey = `${plan.bedrooms}bd`;
+          estimate = aiEstimatesByBedBath.get(bedroomKey);
+          if (estimate && estimate.count > 0) {
+            matchType = 'bedroom';
+          }
+        }
+      }
+
+      if (estimate && estimate.count > 0) {
+        // Use comparable average rent, or fall back to $/SF calculation if sqft differs significantly
+        let aiEstimate = estimate.avgRent;
+
+        // If the floor plan sqft differs from comparable average by >15%, adjust using $/SF
+        if (estimate.avgRentPerSqft > 0 && plan.sqft > 0) {
+          const avgCompSqft = estimate.totalSqft / estimate.count;
+          const sqftDiff = Math.abs(plan.sqft - avgCompSqft) / avgCompSqft;
+          if (sqftDiff > 0.15) {
+            // Adjust rent based on floor plan's actual sqft
+            aiEstimate = Math.round(estimate.avgRentPerSqft * plan.sqft);
+          }
+        }
+
+        return { ...plan, aiEstimate, matchType, compCount: estimate.count };
+      }
+
+      // No matching comparables - fall back to current market rent
+      return { ...plan, aiEstimate: plan.marketRent, matchType: 'none' as const, compCount: 0 };
+    });
+  }, [floorPlans, aiEstimatesByBedBath]);
+
+  // Group comparables by property name for collapsible display
+  const comparablesByProperty = useMemo(() => {
+    const grouped = new Map<string, RentalComparable[]>();
+    comparables.forEach(comp => {
+      const key = comp.property_name;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(comp);
+    });
+    // Sort each group by bedrooms
+    grouped.forEach(comps => {
+      comps.sort((a, b) => a.bedrooms - b.bedrooms);
+    });
+    // Convert to array sorted by distance
+    return Array.from(grouped.entries())
+      .map(([name, comps]) => {
+        // Filter for valid rents when calculating stats (handle string/number)
+        const validRentComps = comps.filter(c => {
+          const rent = Number(c.asking_rent);
+          return Number.isFinite(rent) && rent > 0;
+        });
+        const avgRent = validRentComps.length > 0
+          ? Math.round(validRentComps.reduce((sum, c) => sum + Number(c.asking_rent), 0) / validRentComps.length)
+          : 0;
+        const rentRange = validRentComps.length > 0
+          ? {
+              min: Math.min(...validRentComps.map(c => Number(c.asking_rent))),
+              max: Math.max(...validRentComps.map(c => Number(c.asking_rent)))
+            }
+          : { min: 0, max: 0 };
+
+        return {
+          propertyName: name,
+          address: comps[0]?.address,
+          distance: comps[0]?.distance_miles,
+          yearBuilt: comps[0]?.year_built,
+          totalUnits: comps[0]?.total_units,
+          latitude: comps[0]?.latitude,
+          longitude: comps[0]?.longitude,
+          unitTypes: comps,
+          avgRent,
+          rentRange
+        };
+      })
+      .sort((a, b) => (a.distance || 999) - (b.distance || 999));
+  }, [comparables]);
+
+  // Toggle property expansion
+  const toggleProperty = (propertyName: string) => {
+    setExpandedProperties(prev => {
+      const next = new Set(prev);
+      if (next.has(propertyName)) {
+        next.delete(propertyName);
+      } else {
+        next.add(propertyName);
+      }
+      return next;
+    });
+  };
+
+  // Expand all properties
+  const expandAll = () => {
+    setExpandedProperties(new Set(comparablesByProperty.map(p => p.propertyName)));
+  };
+
+  // Collapse all properties
+  const collapseAll = () => {
+    setExpandedProperties(new Set());
+  };
+
+  // Handle click from chart - scroll to property in listing
+  const handlePropertyClick = useCallback((propertyName: string) => {
+    // First expand the property
+    setExpandedProperties(prev => new Set(prev).add(propertyName));
+
+    // Set highlight effect
+    setHighlightedProperty(propertyName);
+    setTimeout(() => setHighlightedProperty(null), 2000);
+
+    // Scroll to property after a brief delay for DOM update
+    setTimeout(() => {
+      const element = document.getElementById(`property-${propertyName.replace(/\s+/g, '-')}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  }, []);
+
+  // Handle color assignments from chart
+  const handleColorsAssigned = useCallback((colors: PropertyColorMap) => {
+    setPropertyColors(colors);
+  }, []);
+
+  // Handle column resize drag
+  const handleResizeStart = useCallback((colId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).parentElement;
+    const startWidth = th?.offsetWidth ?? 120;
+    resizingRef.current = { colId, startX: e.clientX, startWidth };
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const ref = resizingRef.current;
+      const delta = moveEvent.clientX - ref.startX;
+      const newWidth = Math.max(60, ref.startWidth + delta);
+      setColumnWidths(prev => ({ ...prev, [ref.colId]: newWidth }));
+    };
+
+    const onMouseUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  // Load real data from database (extracted as callback so useLandscaperRefresh can trigger it)
+  const loadData = useCallback(async () => {
+    // Skip data loading for non-multifamily projects
+    if (!isMultifamily) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Fetch unit types (floor plans), units, and leases in parallel
+      const [unitTypesData, unitsData, leasesData] = await Promise.all([
+        unitTypesAPI.list(projectId),
+        unitsAPI.list(projectId),
+        leasesAPI.list(projectId),
+      ]);
+
+      const leasesByUnit = new Map(leasesData.map(l => [l.unit_id, l]));
+
+      // Build avg current rent per unit type from occupied leases (ACTIVE + MONTH_TO_MONTH)
+      const occupiedStatuses = ['ACTIVE', 'MONTH_TO_MONTH'];
+      const rentsByUnitType = new Map<string, number[]>();
+      unitsData.forEach(u => {
+        const lease = leasesByUnit.get(u.unit_id);
+        if (lease && occupiedStatuses.includes(lease.lease_status) && lease.base_rent_monthly) {
+          const rents = rentsByUnitType.get(u.unit_type) || [];
+          rents.push(Number(lease.base_rent_monthly));
+          rentsByUnitType.set(u.unit_type, rents);
+        }
+      });
+
+      // Only include unit types that have actual units assigned in the units table
+      const actualUnitCountByType = new Map<string, number>();
+      unitsData.forEach(u => {
+        actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
+      });
+
+      const transformedFloorPlans: FloorPlan[] = unitTypesData
+        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0)
+        .map(ut => {
+          const leaseRents = rentsByUnitType.get(ut.unit_type_code);
+          const avgLeaseRent = leaseRents && leaseRents.length > 0
+            ? Math.round(leaseRents.reduce((a, b) => a + b, 0) / leaseRents.length)
+            : 0;
+          // Use actual lease rent if available, otherwise fall back to market rent
+          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_market_rent || 0);
+          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.total_units;
+
+          return {
+            id: ut.unit_type_id.toString(),
+            name: ut.unit_type_code,
+            bedrooms: Number(ut.bedrooms),
+            bathrooms: Number(ut.bathrooms),
+            sqft: ut.avg_square_feet,
+            unitCount: actualCount,
+            currentRent,
+            marketRent: Math.round(ut.current_market_rent || 0),
+            aiEstimate: 0 // Will be populated from comparables
+          };
+        });
+
+      const normalizeStatus = (status?: string | null): Unit['status'] => {
+        if (!status) return 'Unknown';
+        const normalized = status.toLowerCase();
+        if (normalized === 'occupied') return 'Occupied';
+        if (normalized === 'vacant') return 'Vacant';
+        if (normalized === 'notice') return 'Notice';
+        if (normalized === 'renewal') return 'Renewal';
+        return 'Unknown';
+      };
+
+      const transformedUnits: Unit[] = unitsData.map(u => {
+        const lease = leasesByUnit.get(u.unit_id);
+        const unitRent = Math.round(u.current_rent ?? 0);
+        const baseRent = unitRent > 0 ? unitRent : Math.round(lease?.base_rent_monthly || 0);
+        const marketRent = Math.round(u.market_rent || 0);
+        const unitStatus = normalizeStatus(u.occupancy_status);
+        const leaseStatus = lease && occupiedStatuses.includes(lease.lease_status) ? 'Occupied' : lease ? 'Vacant' : 'Unknown';
+        return {
+          id: u.unit_id.toString(),
+          unitNumber: u.unit_number,
+          floorPlan: u.unit_type,
+          sqft: u.square_feet,
+          bedrooms: Number(u.bedrooms || 0),
+          bathrooms: Number(u.bathrooms || 0),
+          currentRent: baseRent,
+          marketRent: marketRent,
+          proformaRent: Math.round(marketRent * 1.05),
+          leaseStart: lease?.lease_start_date || u.current_lease?.lease_start_date || u.lease_start_date || '',
+          leaseEnd: lease?.lease_end_date || u.current_lease?.lease_end_date || u.lease_end_date || '',
+          tenantName: lease?.resident_name || '',
+          status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
+          deposit: Math.round(lease?.security_deposit || 0),
+          monthlyIncome: baseRent,
+          rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
+          proformaRentPerSF: u.square_feet > 0 && marketRent ? marketRent / u.square_feet : 0,
+          notes: u.other_features || ''
+        };
+      });
+
+      // Fetch rental comparables
+      const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`);
+      if (compsResponse.ok) {
+        const compsData = await compsResponse.json();
+        if (compsData.success && compsData.data) {
+          setComparables(compsData.data);
+        }
+      }
+
+      // Always use real data (even if empty)
+      setFloorPlans(transformedFloorPlans);
+      setUnits(transformedUnits);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      // On error, set empty arrays instead of mock data
+      setFloorPlans([]);
+      setUnits([]);
+      setComparables([]);
+      setLoading(false);
+    }
+  }, [projectId, isMultifamily]);
+
+  // Initial data load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Auto-refresh when Landscaper mutates units, leases, or unit types
+  const refreshAll = useCallback(() => {
+    loadData();
+    refreshDynamicColumns();
+    refreshPending();
+  }, [loadData, refreshDynamicColumns, refreshPending]);
+  useLandscaperRefresh(
+    projectId,
+    ['units', 'leases', 'unit_types', 'project', 'dynamic_columns'],
+    refreshAll
+  );
+
+  // Auto-hide columns that have no data — runs once when units load, not on every render.
+  // Uses a ref to track whether we've already auto-hidden for the current unit set.
+  const autoHideRanForRef = useRef<string>('');
+  useEffect(() => {
+    if (!units.length || hasCustomizedColumns) return;
+    // Build a stable fingerprint so we only auto-hide once per unit set
+    const fingerprint = units.map(u => u.id).join(',');
+    if (autoHideRanForRef.current === fingerprint) return;
+    autoHideRanForRef.current = fingerprint;
+
+    setColumns((prev) => {
+      let changed = false;
+      const next = prev.map((col) => {
+        if (!col.visible) return col;
+        // Skip dynamic columns entirely — they default to visible and are
+        // managed by the merge effect. Don't auto-hide them here.
+        if (col.category === 'dynamic') return col;
+        // Static columns: hide if no unit has data
+        const hasAnyValue = units.some((unit) => !isEmptyColumnValue(getUnitValueForColumn(unit, col.id)));
+        if (hasAnyValue) return col;
+        changed = true;
+        return { ...col, visible: false };
+      });
+      return changed ? next : prev; // Only update state if something actually changed
+    });
+  }, [units, hasCustomizedColumns]);
+
+  // Get visible columns (base + any extra columns from pending changes)
+  const visibleColumns = useMemo(() => {
+    const baseCols = columns.filter(col => col.visible);
+    return [...baseCols, ...pendingExtraColumns];
+  }, [columns, pendingExtraColumns]);
+
+  // Sorted units for rent roll table
+  const sortedUnits = useMemo(() => {
+    if (!sortColumn) return units;
+    return [...units].sort((a, b) => {
+      const aVal = getUnitValueForColumn(a, sortColumn, dynamicValues);
+      const bVal = getUnitValueForColumn(b, sortColumn, dynamicValues);
+      // Nulls/empty last
+      const aEmpty = aVal === null || aVal === undefined || aVal === '';
+      const bEmpty = bVal === null || bVal === undefined || bVal === '';
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      // Numeric comparison
+      const aNum = Number(aVal);
+      const bNum = Number(bVal);
+      if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
+        return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+      // String comparison
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      const cmp = aStr.localeCompare(bStr);
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+  }, [units, sortColumn, sortDirection, dynamicValues]);
+
+  const handleSortClick = useCallback((columnId: string) => {
+    setSortColumn(prev => {
+      if (prev === columnId) {
+        // Toggle direction, or clear on third click
+        if (sortDirection === 'asc') {
+          setSortDirection('desc');
+          return columnId;
+        } else {
+          setSortDirection('asc');
+          return null; // Reset sort
+        }
+      }
+      setSortDirection('asc');
+      return columnId;
+    });
+  }, [sortDirection]);
+
+  // Render table cell content based on column
+  const renderCellContent = (unit: Unit, columnId: string) => {
+    const isEdit = isEditing(unit.id);
+
+    // If this cell has a pending change, show current → proposed
+    if (!isEdit) {
+      const backendField = COLUMN_TO_BACKEND_FIELD[columnId];
+      if (backendField) {
+        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+        if (change) {
+          const state = getFieldState(change.unitId, change.field);
+          const currentDisplay = change.currentValue != null ? String(change.currentValue) : '—';
+          const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+
+          // Format values for display (currency, numeric, or plain)
+          const isCurrency = ['currentRent', 'marketRent', 'proformaRent', 'deposit', 'monthlyIncome'].includes(columnId);
+          const isNumeric = !isNaN(Number(change.currentValue)) || !isNaN(Number(change.newValue));
+          const fmtCurrent = isCurrency && change.currentValue != null
+            ? `$${Number(change.currentValue).toLocaleString()}`
+            : isNumeric && change.currentValue != null && !isNaN(Number(change.currentValue))
+            ? Number(change.currentValue).toLocaleString()
+            : currentDisplay;
+          const fmtNew = isCurrency && change.newValue != null
+            ? `$${Number(change.newValue).toLocaleString()}`
+            : isNumeric && change.newValue != null && !isNaN(Number(change.newValue))
+            ? Number(change.newValue).toLocaleString()
+            : newDisplay;
+
+          if (state === 'accepted') {
+            // Accepted: show new value in green
+            return (
+              <span style={{ color: 'var(--cui-success)' }} title={`Was: ${fmtCurrent}`}>
+                {fmtNew}
+              </span>
+            );
+          } else {
+            // Pending: show current → new
+            return (
+              <span title={`Current: ${fmtCurrent} → Proposed: ${fmtNew}`}>
+                <span style={{ color: 'var(--cui-tertiary-color)', textDecoration: 'line-through', fontSize: '0.75rem' }}>
+                  {fmtCurrent}
+                </span>
+                <span style={{ color: 'var(--cui-warning)', marginLeft: '4px', fontWeight: 500 }}>
+                  {fmtNew}
+                </span>
+              </span>
+            );
+          }
+        }
+      }
+    }
+
+    // Normal rendering (no pending change or in edit mode)
+    switch (columnId) {
+      case 'unitNumber':
+        return <span className="tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>{unit.unitNumber}</span>;
+      case 'floorPlan':
+        return isEdit ? (
+          <input
+            type="text"
+            className="w-20 rounded px-2 py-1 tw-text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.floorPlan || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, floorPlan: e.target.value } : null)}
+          />
+        ) : (
+          <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.floorPlan || '—'}</span>
+        );
+      case 'bedrooms':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</span>;
+      case 'bathrooms':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</span>;
+      case 'sqft':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.sqft)}</span>;
+      case 'currentRent':
+        return isEdit ? (
+          <input
+            type="number"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.currentRent || 0}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, currentRent: Number(e.target.value) } : null)}
+          />
+        ) : (
+          unit.status === 'Vacant' ? '—' : formatCurrency(unit.currentRent)
+        );
+      case 'marketRent':
+        return isEdit ? (
+          <input
+            type="number"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.marketRent || 0}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, marketRent: Number(e.target.value) } : null)}
+          />
+        ) : (
+          <span className="tw-font-medium" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(unit.marketRent)}</span>
+        );
+      case 'proformaRent':
+        return isEdit ? (
+          <input
+            type="number"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.proformaRent || 0}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, proformaRent: Number(e.target.value) } : null)}
+          />
+        ) : (
+          <span style={{ color: 'var(--cui-secondary-color)' }}>{formatCurrency(unit.proformaRent)}</span>
+        );
+      case 'status':
+        return isEdit ? (
+          <select
+            className="rounded px-2 py-1 tw-text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.status || 'Unknown'}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, status: e.target.value as Unit['status'] } : null)}
+          >
+            <option value="Occupied">Occupied</option>
+            <option value="Vacant">Vacant</option>
+            <option value="Notice">Notice</option>
+            <option value="Renewal">Renewal</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        ) : (
+          <span className="px-2 py-0.5 rounded tw-text-xs tw-font-medium border" style={getStatusBadge(unit.status)}>{unit.status}</span>
+        );
+      case 'tenantName':
+        return isEdit ? (
+          <input
+            type="text"
+            className="tw-w-full rounded px-2 py-1"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.tenantName || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, tenantName: e.target.value } : null)}
+          />
+        ) : (
+          unit.tenantName || '—'
+        );
+      case 'leaseStart':
+        return isEdit ? (
+          <input
+            type="date"
+            className="rounded px-2 py-1 tw-text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.leaseStart || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseStart: e.target.value } : null)}
+          />
+        ) : (
+          unit.leaseStart ? formatLeaseDate(unit.leaseStart) : '—'
+        );
+      case 'leaseEnd':
+        return isEdit ? (
+          <input
+            type="date"
+            className="rounded px-2 py-1 tw-text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.leaseEnd || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, leaseEnd: e.target.value } : null)}
+          />
+        ) : (
+          unit.leaseEnd ? formatLeaseDate(unit.leaseEnd) : '—'
+        );
+      case 'deposit':
+        return isEdit ? (
+          <input
+            type="number"
+            className="w-24 rounded px-2 py-1 text-center"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.deposit || 0}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, deposit: Number(e.target.value) } : null)}
+          />
+        ) : (
+          formatCurrency(unit.deposit)
+        );
+      case 'monthlyIncome':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{formatCurrency(unit.monthlyIncome)}</span>;
+      case 'rentPerSF':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.rentPerSF ? `$${formatDecimal(unit.rentPerSF)}` : '—'}</span>;
+      case 'proformaRentPerSF':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.proformaRentPerSF ? `$${formatDecimal(unit.proformaRentPerSF)}` : '—'}</span>;
+      case 'notes':
+        return isEdit ? (
+          <input
+            type="text"
+            className="tw-w-full rounded px-2 py-1 tw-text-xs"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+            value={editDraft?.notes || ''}
+            onChange={(e) => setEditDraft(prev => prev ? { ...prev, notes: e.target.value } : null)}
+          />
+        ) : (
+          <span className="tw-text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
+        );
+      default: {
+        // Pending extra column: show new value from pending changes
+        if (columnId.startsWith('pending_')) {
+          const backendField = columnId.replace('pending_', '');
+          const change = pendingByCell.get(`${unit.id}:${backendField}`);
+          if (change) {
+            const state = getFieldState(change.unitId, change.field);
+            const newDisplay = change.newValue != null ? String(change.newValue) : '—';
+            return (
+              <span style={{ color: state === 'accepted' ? 'var(--cui-success)' : 'var(--cui-warning)', fontWeight: 500 }}>
+                {newDisplay}
+              </span>
+            );
+          }
+          return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+        }
+        // Dynamic column: look up value from activeDynValues (extraction-created columns)
+        if (columnId.startsWith('dyn_')) {
+          const colKey = columnId.replace(/^dyn_/, '');
+          const rawValue = activeDynValues[unit.id]?.[colKey];
+          if (rawValue === null || rawValue === undefined) return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+          return <span style={{ color: 'var(--cui-secondary-color)' }}>{String(rawValue)}</span>;
+        }
+        return null;
+      }
+    }
+  };
+
+  // Get column alignment class
+  const getColumnAlign = (columnId: string): string => {
+    const centerAlign = ['bedrooms', 'bathrooms', 'sqft', 'currentRent', 'marketRent', 'proformaRent',
+                         'status', 'leaseEnd', 'deposit', 'monthlyIncome', 'rentPerSF', 'proformaRentPerSF'];
+    if (centerAlign.includes(columnId)) return 'text-center';
+    // Dynamic columns: center-align numeric types
+    const colConfig = columns.find(c => c.id === columnId);
+    if (colConfig?.category === 'dynamic' && colConfig.dataType && ['number', 'currency', 'percent', 'boolean'].includes(colConfig.dataType)) {
+      return 'text-center';
+    }
+    return 'text-left';
+  };
+
+  // Calculate total statistics
+  const totalUnits = useMemo(() => {
+    return floorPlans.reduce((sum, fp) => sum + fp.unitCount, 0);
+  }, [floorPlans]);
+
+  const occupiedUnits = useMemo(() => {
+    return units.filter(u => u.status === 'Occupied').length;
+  }, [units]);
+
+  const occupancyRate = useMemo(() => {
+    return units.length > 0 ? ((occupiedUnits / units.length) * 100).toFixed(1) : '0.0';
+  }, [occupiedUnits, units.length]);
+
+  const avgCurrentRent = useMemo(() => {
+    const occupied = units.filter(u => u.status === 'Occupied');
+    if (occupied.length === 0) return 0;
+    return Math.round(occupied.reduce((sum, u) => sum + u.currentRent, 0) / occupied.length);
+  }, [units]);
+
+  const avgMarketRent = useMemo(() => {
+    if (units.length === 0) return 0;
+    return Math.round(units.reduce((sum, u) => sum + u.marketRent, 0) / units.length);
+  }, [units]);
+
+  const totalMonthlyIncome = useMemo(() => {
+    return units.filter(u => u.status === 'Occupied').reduce((sum, u) => sum + u.currentRent, 0);
+  }, [units]);
+
+  const rentGrowthPotential = useMemo(() => {
+    if (avgCurrentRent === 0) return 0;
+    return (((avgMarketRent - avgCurrentRent) / avgCurrentRent) * 100).toFixed(1);
+  }, [avgCurrentRent, avgMarketRent]);
+
+  const avgRentPerSF = useMemo(() => {
+    const occupied = units.filter(u => u.status === 'Occupied');
+    if (occupied.length === 0) return 0;
+    const totalRent = occupied.reduce((sum, u) => sum + u.currentRent, 0);
+    const totalSF = occupied.reduce((sum, u) => sum + u.sqft, 0);
+    return (totalRent / totalSF).toFixed(2);
+  }, [units]);
+
+  // Status badge styles - using semantic CoreUI colors
+  const getStatusBadge = (status: Unit['status']) => {
+    const styles: Record<Unit['status'], React.CSSProperties> = {
+      'Occupied': { backgroundColor: 'var(--cui-success-bg)', color: 'var(--cui-success)', borderColor: 'var(--cui-success)' },
+      'Vacant': { backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)', borderColor: 'var(--cui-danger)' },
+      'Notice': { backgroundColor: 'var(--cui-warning-bg)', color: 'var(--cui-warning)', borderColor: 'var(--cui-warning)' },
+      'Renewal': { backgroundColor: 'var(--cui-info-bg)', color: 'var(--cui-info)', borderColor: 'var(--cui-info)' },
+      'Unknown': { backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-secondary-color)', borderColor: 'var(--cui-border-color)' }
+    };
+    return styles[status];
+  };
+
+  // AI estimate indicator - shows if market rent differs from AI estimate based on comparables
+  const getAIIndicator = (marketRent: number, aiEstimate: number, compCount: number, matchType: string) => {
+    // If no comparable data or no difference, don't show any indicator
+    if (compCount === 0 || matchType === 'none' || aiEstimate === 0 || aiEstimate === marketRent) {
+      return null;
+    }
+
+    const diff = marketRent - aiEstimate;
+    const percentDiff = Math.abs((diff / aiEstimate) * 100);
+
+    if (percentDiff < 2) return null; // Within 2% - no indicator
+
+    const matchLabel = matchType === 'exact' ? '' : matchType === 'rounded' ? ' (rounded bath)' : ' (by bedroom)';
+    const tooltip = `Landscaper suggests ${formatCurrency(aiEstimate)} based on ${compCount} comparable unit${compCount > 1 ? 's' : ''}${matchLabel} (${percentDiff.toFixed(1)}% ${diff > 0 ? 'above' : 'below'} market)`;
+
+    if (diff > 0) {
+      return (
+        <span className="ml-1 tw-text-xs tw-text-green-400 cursor-help" title={tooltip}>
+          ↑
+        </span>
+      );
+    } else {
+      return (
+        <span className="ml-1 tw-text-xs tw-text-amber-400 cursor-help" title={tooltip}>
+          ↓
+        </span>
+      );
+    }
+  };
+
+  // Floor plan edit handlers
+  const handlePlanEditStart = (plan: FloorPlan) => {
+    setEditingPlanId(plan.id);
+    setPlanEditDraft({ ...plan });
+  };
+
+  const handlePlanEditCancel = () => {
+    setEditingPlanId(null);
+    setPlanEditDraft(null);
+  };
+
+  const handlePlanEditSave = () => {
+    if (planEditDraft) {
+      setFloorPlans(prev => prev.map(p => p.id === planEditDraft.id ? planEditDraft : p));
+      setEditingPlanId(null);
+      setPlanEditDraft(null);
+    }
+  };
+
+  const isPlanEditing = (planId: string) => editingPlanId === planId;
+
+  // Unit edit handlers
+  const handleEditStart = (unit: Unit) => {
+    setEditingUnitId(unit.id);
+    setEditDraft({ ...unit });
+  };
+
+  const handleEditCancel = () => {
+    setEditingUnitId(null);
+    setEditDraft(null);
+  };
+
+  const handleEditSave = () => {
+    if (editDraft) {
+      setUnits(prev => prev.map(u => u.id === editDraft.id ? editDraft : u));
+      setEditingUnitId(null);
+      setEditDraft(null);
+    }
+  };
+
+  const isEditing = (unitId: string) => editingUnitId === unitId;
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="tw-flex tw-items-center tw-justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="text-center">
+          <div className="tw-inline-block tw-animate-spin tw-rounded-full h-12 w-12 tw-border-b-2 mb-4" style={{ borderColor: 'var(--cui-primary)' }}></div>
+          <p style={{ color: 'var(--cui-secondary-color)' }}>Loading rent roll data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "Coming Soon" for non-multifamily projects
+  if (!isMultifamily) {
+    const projectTypeLabels: Record<string, string> = {
+      'OFF': 'Office',
+      'RET': 'Retail',
+      'IND': 'Industrial',
+      'MXD': 'Mixed-Use',
+      'LAND': 'Land Development',
+      'HOT': 'Hospitality'
+    };
+
+    return (
+      <div className="tw-flex tw-items-center tw-justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="tw-shadow-lg p-12 text-center tw-max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h2 className="tw-text-2xl tw-font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
+            {projectTypeLabels[projectType || ''] || 'Commercial'} Property Tab Coming Soon
+          </h2>
+          <p className="mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
+            This project is a <strong style={{ color: 'var(--cui-body-color)' }}>{projectTypeLabels[projectType || ''] || projectType}</strong> asset type.
+          </p>
+          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
+            The Property tab is currently designed for multifamily projects only.
+            A dedicated template for {projectTypeLabels[projectType || '']?.toLowerCase() || 'this asset type'} properties is under development.
+          </p>
+          <div className="tw-rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
+            <p className="tw-text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
+              <strong>For now, use these alternatives:</strong>
+            </p>
+            <ul className="tw-text-sm tw-space-y-1 ml-4 tw-list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
+              <li>Financial Analysis tab for cash flow modeling</li>
+              <li>Assumptions & Factors for market rent inputs</li>
+              <li>Reports tab for PDF rent roll generation</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Determine if this is a unit-based property type (MF, office with suites, etc.)
+  // vs. single-asset types (retail, industrial, hotel) that don't use unit/floorPlan data
+  const isUnitBased = projectType === 'MF' || projectType === 'OFF';
+
+  // Show empty state only for unit-based property types with no data yet.
+  // Single-asset types (retail, industrial, hotel) always render PhysicalDescription.
+  if (isUnitBased && units.length === 0 && floorPlans.length === 0) {
+    return (
+      <div className="tw-flex tw-items-center tw-justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
+        <div className="tw-shadow-lg p-12 text-center tw-max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
+          <div className="mb-6">
+            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h2 className="tw-text-2xl tw-font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
+            No Property Data Yet
+          </h2>
+          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
+            This project doesn&apos;t have any unit or floorplan data yet. Upload a rent roll or manually add unit information to get started.
+          </p>
+          <div className="tw-rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
+            <p className="tw-text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
+              <strong>To add data:</strong>
+            </p>
+            <ul className="tw-text-sm tw-space-y-1 ml-4 tw-list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
+              <li>Navigate to the Rent Roll page to upload a rent roll spreadsheet</li>
+              <li>Use the Django admin panel to manually add unit types and units</li>
+              <li>Import data via the API endpoints</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Does this project have unit-level data (floor plans, rent roll)?
+  const hasUnitData = floorPlans.length > 0 || units.length > 0;
+
+  // Render content based on activeTab (controlled by folder tabs)
+  const renderDetailsContent = () => (
+    <div>
+      {/* Two-column layout: Physical Description + Floor Plan Matrix (when unit data exists) */}
+      <div className="tw-flex tw-flex-col lg:flex-row gap-4 tw-items-start">
+        {/* Left Column - Physical Description */}
+        <div className={`tw-w-full ${hasUnitData ? tw-'lg:w-[32%]' : tw-'lg:w-full'} tw-flex-shrink-0`}>
+          <div
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: 'var(--cui-border-radius, 0.375rem)',
+            }}
+          >
+            <div
+              className="tw-border-b px-3 py-2"
+              style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}
+            >
+              <h3 className="tw-font-semibold tw-text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                Physical Description
+              </h3>
+            </div>
+            <div>
+              <PhysicalDescription projectId={projectId} compact />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Floor Plan Matrix + Landscaper Analysis (only when unit data exists) */}
+        {hasUnitData && <div className="tw-w-full lg:w-3/5 tw-space-y-4">
+          {/* Floor Plan Matrix */}
+          <div
+            className="tw-overflow-hidden"
+            style={{
+              backgroundColor: 'var(--cui-card-bg)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: 'var(--cui-border-radius, 0.375rem)',
+            }}
+          >
+            <div
+              className="tw-border-b px-3 py-2"
+              style={{ backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}
+            >
+              <div className="tw-flex tw-items-center tw-justify-between">
+                <div className="tw-flex tw-items-center gap-3">
+                  <h3 className="tw-font-semibold tw-text-sm m-0" style={{ color: 'var(--cui-body-color)' }}>
+                    Floor Plan Matrix
+                  </h3>
+                  <span className="studio-badge-info">
+                    Aggregates from Units
+                  </span>
+                </div>
+                <div className="tw-flex tw-items-center gap-4 tw-text-xs">
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>
+                    Total: <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>{formatNumber(totalUnits)}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="p-3">
+              <table className="tw-w-full tw-text-sm">
+                <thead style={{ backgroundColor: 'var(--surface-card-header)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                    <th className="text-left px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Plan</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bed</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Bath</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>SF</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Units</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Current</th>
+                    <th className="text-center px-2 py-2 tw-font-medium tw-whitespace-nowrap" style={{ color: 'var(--cui-secondary-color)' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {floorPlansWithAI.map((plan, index) => {
+                    const editing = isPlanEditing(plan.id);
+                    const draft = editing ? planEditDraft! : plan;
+
+                    return (
+                      <tr key={plan.id} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                        <td className="px-2 py-2">
+                          {editing ? (
+                            <input
+                              type="text"
+                              className="w-16 rounded px-2 py-1 tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.name}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, name: e.target.value} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-body-color)', fontWeight: 600 }}>{plan.name}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="w-12 rounded px-1 py-1 text-center tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.bedrooms}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, bedrooms: Number(e.target.value)} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.bedrooms)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <input
+                              type="number"
+                              step="0.5"
+                              className="w-12 rounded px-1 py-1 text-center tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.bathrooms}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, bathrooms: Number(e.target.value)} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.bathrooms)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="w-16 rounded px-1 py-1 text-center tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.sqft}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, sqft: Number(e.target.value)} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.sqft)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="w-14 rounded px-1 py-1 text-center tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.unitCount}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, unitCount: Number(e.target.value)} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-secondary-color)' }}>{formatNumber(plan.unitCount)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="w-20 rounded px-1 py-1 text-center tw-text-sm"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)', color: 'var(--cui-body-color)' }}
+                              value={draft.currentRent}
+                              onChange={(e) => setPlanEditDraft(d => d ? {...d, currentRent: Number(e.target.value)} : null)}
+                            />
+                          ) : (
+                            <span style={{ color: 'var(--cui-body-color)', fontWeight: 500 }}>{formatCurrency(plan.currentRent)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          {editing ? (
+                            <div className="tw-flex tw-items-center gap-1 tw-justify-center">
+                              <button
+                                className="px-2 py-1 tw-text-xs rounded"
+                                style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+                                onClick={handlePlanEditSave}
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="px-2 py-1 tw-text-xs rounded"
+                                style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
+                                onClick={handlePlanEditCancel}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className="px-2 py-1 tw-text-xs rounded"
+                              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
+                              onClick={() => handlePlanEditStart(plan)}
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Property Narrative - Below Floor Plan Matrix in right column */}
+          <PropertyNarrative projectId={projectId} units={units} floorPlans={floorPlans} />
+        </div>}
+      </div>
+    </div>
+  );
+
+  const renderMarketContent = () => (
+    <div style={{ display: 'grid', gap: '1rem' }}>
+      <LocationIntelligenceCard
+        projectId={project.project_id}
+        projectName={project.project_name}
+        latitude={project.location_lat ?? project.latitude}
+        longitude={project.location_lon ?? project.longitude}
+        rentalComparables={comparables}
+        comparableColors={propertyColors}
+      />
+
+      {/* Comparable Rentals with Map */}
+      <div
+        style={{
+          overflow: 'hidden',
+          backgroundColor: 'var(--cui-card-bg)',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: 'var(--cui-border-radius, 0.375rem)',
+        }}
+      >
+        <div
+          className="d-flex tw-align-items-center tw-justify-content-between"
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: 'var(--surface-card-header)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
+            <div className="d-flex tw-align-items-center" style={{ gap: '0.75rem' }}>
+              <h3 style={{ color: 'var(--cui-body-color)', fontSize: '1rem', margin: 0, fontWeight: 600 }}>Comparable Rentals</h3>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.125rem 0.5rem',
+                  borderRadius: '999px',
+                  backgroundColor: 'var(--cui-info-bg)',
+                  color: 'var(--cui-info)',
+                  border: '1px solid var(--cui-info)',
+                }}
+              >
+                {comparablesByProperty.length} properties • {comparables.length} unit types
+              </span>
+            </div>
+            <div className="d-flex tw-align-items-center" style={{ gap: '0.5rem' }}>
+              <button
+                onClick={expandAll}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  color: 'var(--cui-secondary-color)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--cui-border-color)',
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                Expand All
+              </button>
+              <button
+                onClick={collapseAll}
+                style={{
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: '0.375rem',
+                  color: 'var(--cui-secondary-color)',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--cui-border-color)',
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+          <div className="d-flex" style={{ backgroundColor: 'var(--cui-card-bg)', gap: '1rem', padding: '1rem', alignItems: 'stretch' }}>
+            {/* Left: Collapsible Property Groups */}
+            <div
+              style={{
+                display: 'grid',
+                gap: '0.125rem',
+                paddingRight: '0.25rem',
+                flex: '0 0 50%',
+                alignContent: 'start',
+              }}
+            >
+              {comparablesByProperty.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem 0', fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
+                  <p>No rental comparables available.</p>
+                  <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>Ask Landscaper to extract comps from your OM.</p>
+                </div>
+              ) : (
+                comparablesByProperty.map((property, propIdx) => {
+                  const isExpanded = expandedProperties.has(property.propertyName);
+                  const isHighlighted = highlightedProperty === property.propertyName;
+                  const propertyColor = propertyColors[property.propertyName];
+                  const unitTypeRows = Array.isArray(property.unitTypes)
+                    ? property.unitTypes.filter((unit): unit is RentalComparable => Boolean(unit))
+                    : [];
+                  return (
+                    <div
+                      key={property.propertyName}
+                      id={`property-${property.propertyName.replace(/\s+/g, '-')}`}
+                      style={{
+                        border: `1px solid ${isHighlighted ? (propertyColor || 'var(--cui-primary)') : 'var(--cui-border-color)'}`,
+                        borderRadius: '0.5rem',
+                        overflow: 'hidden',
+                        transition: 'all 0.3s ease',
+                        boxShadow: isHighlighted ? '0 0 0 2px rgba(var(--cui-primary-rgb), 0.25)' : 'none',
+                      }}
+                    >
+                      {/* Property Header - Clickable */}
+                      <button
+                        onClick={() => toggleProperty(property.propertyName)}
+                        className="d-flex tw-align-items-center tw-justify-content-between"
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          transition: 'background-color 0.15s ease',
+                          textAlign: 'left',
+                          backgroundColor: 'var(--cui-tertiary-bg)',
+                          border: 'none',
+                        }}
+                      >
+                        <div className="d-flex tw-align-items-center" style={{ gap: '0.5rem', minWidth: 0, flex: 1 }}>
+                          {isExpanded ? (
+                            <ChevronDown size={16} style={{ color: 'var(--cui-secondary-color)', flexShrink: 0 }} />
+                          ) : (
+                            <ChevronRight size={16} style={{ color: 'var(--cui-secondary-color)', flexShrink: 0 }} />
+                          )}
+                          {/* Color dot */}
+                          {propertyColor && (
+                            <span
+                              style={{ width: '0.75rem', height: '0.75rem', borderRadius: '999px', flexShrink: 0, backgroundColor: propertyColor }}
+                            />
+                          )}
+                          <div style={{ minWidth: 0 }}>
+                            <div className="d-flex tw-align-items-center" style={{ gap: '0.5rem' }}>
+                              <span
+                                style={{
+                                  color: 'var(--cui-body-color)',
+                                  fontSize: '0.875rem',
+                                  fontWeight: 500,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {property.propertyName}
+                              </span>
+                              <span style={{ color: 'var(--cui-tertiary-color)', fontSize: '0.75rem' }}>({unitTypeRows.length} types)</span>
+                            </div>
+                            {property.address && (
+                              <div className="d-flex tw-align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                                <MapPin size={12} style={{ flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{property.address}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="d-flex tw-align-items-center" style={{ gap: '0.75rem', flexShrink: 0, fontSize: '0.75rem' }}>
+                          {property.distance && (
+                            <span style={{ color: 'var(--cui-info)', fontWeight: 500 }}>{property.distance} mi</span>
+                          )}
+                          {property.yearBuilt && (
+                            <span className="d-flex tw-align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)' }}>
+                              <Calendar size={12} />
+                              {property.yearBuilt}
+                            </span>
+                          )}
+                          {property.totalUnits && (
+                            <span className="d-flex tw-align-items-center" style={{ gap: '0.25rem', color: 'var(--cui-secondary-color)' }}>
+                              <Building2 size={12} />
+                              {property.totalUnits}
+                            </span>
+                          )}
+                          <span style={{ color: 'var(--cui-success)', fontWeight: 500 }}>
+                            {property.rentRange.min === property.rentRange.max
+                              ? formatCurrency(property.rentRange.min)
+                              : `${formatCurrency(property.rentRange.min)} - ${formatCurrency(property.rentRange.max)}`
+                            }
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Expanded Unit Types */}
+                      {isExpanded && (
+                        <div style={{ backgroundColor: 'var(--cui-tertiary-bg)', borderTop: '1px solid var(--cui-border-color)' }}>
+                          <table style={{ width: '100%', fontSize: '0.75rem' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                                <th style={{ textAlign: 'left', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)', minWidth: '140px' }}>Unit Type</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Bed</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Bath</th>
+                                <th style={{ textAlign: 'center', padding: '0.375rem 0.5rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>SF</th>
+                                <th style={{ textAlign: 'right', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>Rent</th>
+                                <th style={{ textAlign: 'right', padding: '0.375rem 0.75rem', fontWeight: 500, color: 'var(--cui-secondary-color)' }}>$/SF</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {unitTypeRows.length === 0 ? (
+                                <tr>
+                                  <td
+                                    colSpan={6}
+                                    style={{
+                                      padding: '0.5rem 0.75rem',
+                                      textAlign: 'center',
+                                      color: 'var(--cui-secondary-color)',
+                                      fontStyle: 'italic',
+                                    }}
+                                  >
+                                    No comparable floorplan rows available.
+                                  </td>
+                                </tr>
+                              ) : (
+                                unitTypeRows.map((unit, idx) => {
+                                  const isLastRow = idx === unitTypeRows.length - 1;
+                                  const askingRent = Number(unit.asking_rent);
+                                  const avgSqft = Number(unit.avg_sqft);
+                                  const rentPerSf = avgSqft > 0 && Number.isFinite(askingRent)
+                                    ? `$${(askingRent / avgSqft).toFixed(2)}`
+                                    : '—';
+
+                                  return (
+                                    <tr
+                                      key={`${property.propertyName}-${unit.comparable_id}-${idx}`}
+                                      style={{
+                                        borderBottom: isLastRow ? 'none' : '1px solid var(--cui-border-color-translucent)',
+                                        backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--cui-secondary-bg)',
+                                      }}
+                                    >
+                                      <td style={{ padding: '0.375rem 0.75rem', color: 'var(--cui-body-color)' }}>
+                                        {unit.unit_type || `${formatNumber(unit.bedrooms)}BR/${formatNumber(unit.bathrooms)}BA`}
+                                      </td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bedrooms)}</td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.bathrooms)}</td>
+                                      <td style={{ padding: '0.375rem 0.5rem', textAlign: 'center', color: 'var(--cui-secondary-color)' }}>{formatNumber(unit.avg_sqft)}</td>
+                                      <td style={{ padding: '0.375rem 0.75rem', textAlign: 'right', color: 'var(--cui-success)', fontWeight: 500 }}>{formatCurrency(unit.asking_rent)}</td>
+                                      <td style={{ padding: '0.375rem 0.75rem', textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
+                                        {rentPerSf}
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right: Competitive Market Graph (old map panel archived at tabs/archive/ComparableRentalsMapTemplate.tsx) */}
+            <div
+              style={{
+                flex: '1 1 50%',
+                minHeight: '500px',
+                minWidth: 0,
+                backgroundColor: 'var(--cui-tertiary-bg)',
+                border: '1px solid var(--cui-border-color)',
+                borderRadius: '0.5rem',
+                overflow: 'hidden',
+                display: 'flex',
+              }}
+            >
+              {comparables.length > 0 ? (
+                <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+                  <CompetitiveMarketCharts
+                    comparables={comparables}
+                    floorPlans={floorPlans}
+                    subjectPropertyName={project.project_name}
+                    onPropertyClick={handlePropertyClick}
+                    onColorsAssigned={handleColorsAssigned}
+                    selectedProperty={highlightedProperty}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="h-100 d-flex tw-align-items-center tw-justify-content-center"
+                  style={{ color: 'var(--cui-secondary-color)', width: '100%' }}
+                >
+                  No chart data available.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+      {/* Landscaper Analysis - Comp-based market insights */}
+      <div
+        style={{
+          backgroundColor: 'var(--cui-card-bg)',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: '0.5rem',
+          padding: '1rem',
+        }}
+      >
+        <div className="d-flex tw-align-items-start" style={{ gap: '0.75rem' }}>
+          <div style={{ flexShrink: 0 }}>
+            <svg style={{ color: 'var(--cui-primary)', width: '1.25rem', height: '1.25rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="d-flex tw-align-items-center" style={{ gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <h4 style={{ color: 'var(--cui-body-color)', fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>Landscaper Analysis</h4>
+              <span style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}>
+                {comparables.length > 0 ? `Based on ${comparables.length} comp units` : ''}
+              </span>
+            </div>
+            <LandscaperInsights
+              floorPlans={floorPlansWithAI}
+              comparables={comparables}
+              comparablesByProperty={comparablesByProperty}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Format lease date as MMM-YY (e.g., "Sep-25")
+  const formatLeaseDate = (dateStr: string): string => {
+    if (!dateStr) return '—';
+    try {
+      const date = new Date(dateStr);
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const year = date.toLocaleDateString('en-US', { year: '2-digit' });
+      return `${month}-${year}`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const renderRentRollContent = () => (
+    <div className="tw-space-y-4">
+      {/* Detailed Rent Roll Table */}
+      <div className="tw-overflow-hidden" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)', borderRadius: 'var(--cui-border-radius, 0.375rem)' }}>
+
+        {/* KPI Tiles */}
+        <div className="px-4 py-3 tw-grid tw-grid-cols-6 gap-3 tw-border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
+          {/* Occupancy Rate */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Occupancy</span>
+              <svg className="w-4 h-4 tw-text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>{occupiedUnits} / {units.length} units</div>
+          </div>
+
+          {/* Avg Current Rent */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg Current Rent</span>
+              <svg className="w-4 h-4 tw-text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(avgCurrentRent)}</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Per unit/month</div>
+          </div>
+
+          {/* Avg Market Rent */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Avg Market Rent</span>
+              <svg className="w-4 h-4 tw-text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>{formatCurrency(avgMarketRent)}</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Per unit/month</div>
+          </div>
+
+          {/* Rent Growth Potential */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Growth Potential</span>
+              <svg className="w-4 h-4 tw-text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold tw-text-green-400">{rentGrowthPotential !== '0.0' && rentGrowthPotential !== 0 ? `+${rentGrowthPotential}%` : '—'}</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>To market rate</div>
+          </div>
+
+          {/* Total Monthly Income */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Monthly Income</span>
+              <svg className="w-4 h-4 tw-text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>{totalMonthlyIncome === 0 ? '—' : `$${(totalMonthlyIncome / 1000).toFixed(1)}k`}</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Current total</div>
+          </div>
+
+          {/* Avg Rent per SF */}
+          <div className="tw-rounded-lg p-3" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>
+            <div className="tw-flex tw-items-center tw-justify-between mb-1">
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>Rent/SF</span>
+              <svg className="w-4 h-4 tw-text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+              </svg>
+            </div>
+            <div className="tw-text-2xl tw-font-bold" style={{ color: 'var(--cui-body-color)' }}>{avgRentPerSF === '0.00' || Number(avgRentPerSF) === 0 ? '—' : `$${avgRentPerSF}`}</div>
+            <div className="tw-text-xs mt-1" style={{ color: 'var(--cui-tertiary-color)' }}>Average rate</div>
+          </div>
+        </div>
+
+        {/* Pending extraction changes banner */}
+        {hasPending && (
+          <div className="px-4 py-2 tw-flex tw-items-center tw-justify-between" style={{ backgroundColor: 'rgba(var(--cui-warning-rgb), 0.25)', borderBottom: '1px solid var(--cui-warning)' }}>
+            <div className="tw-flex tw-items-center gap-2">
+              <span className="tw-text-sm tw-font-medium" style={{ color: 'var(--cui-warning)' }}>
+                {pendingSummary?.total_field_changes ?? pendingChanges.length} pending changes
+              </span>
+              {pendingDocName && (
+                <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+                  from {pendingDocName}
+                </span>
+              )}
+              <span className="tw-text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>
+                Click yellow cells to accept
+              </span>
+            </div>
+            <div className="tw-flex tw-items-center gap-2">
+              <button
+                onClick={acceptAll}
+                className="px-3 py-1 tw-text-xs rounded tw-font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-success-rgb), 0.20)', color: 'var(--cui-success)', border: '1px solid var(--cui-success)' }}
+              >
+                Accept All ({pendingChanges.length})
+              </button>
+              <button
+                onClick={rejectAll}
+                className="px-3 py-1 tw-text-xs rounded tw-font-medium"
+                style={{ backgroundColor: 'rgba(var(--cui-danger-rgb), 0.20)', color: 'var(--cui-danger)', border: '1px solid var(--cui-danger)' }}
+              >
+                Reject All
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="tw-border-b tw-flex tw-items-center tw-justify-between" style={{ padding: '0.5rem 1rem', backgroundColor: 'var(--surface-card-header)', borderColor: 'var(--cui-border-color)' }}>
+          <div className="tw-flex tw-items-center gap-4">
+            <div className="tw-flex tw-items-center gap-3">
+              <h3 className="tw-font-semibold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>Detailed Rent Roll</h3>
+              <div className="tw-flex tw-items-center gap-2 px-2 py-1 tw-bg-green-900/20 border tw-border-green-700/40 rounded tw-text-xs">
+                <svg className="w-3 h-3 tw-text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                </svg>
+                <span className="tw-font-medium" style={{ color: 'var(--cui-success)' }}>Populates Floor Plans</span>
+              </div>
+            </div>
+            <div className="tw-flex tw-items-center gap-4 tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
+              <span>Occupancy: <span className="tw-font-medium" style={{ color: 'var(--cui-body-color)' }}>{occupancyRate}%</span></span>
+              <span>Units: <span className="tw-font-medium" style={{ color: 'var(--cui-body-color)' }}>{units.length} / {totalUnits}</span></span>
+            </div>
+          </div>
+          <div className="tw-flex tw-items-center gap-2">
+            <button
+              onClick={() => setShowFieldChooser(true)}
+              className="px-3 py-1.5 tw-text-sm rounded tw-transition-colors tw-flex tw-items-center gap-1.5"
+              style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-body-color)' }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Configure Columns
+            </button>
+            <button
+              className="px-3 py-1.5 tw-text-sm rounded tw-transition-colors"
+              style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+            >
+              + Add Unit
+            </button>
+          </div>
+        </div>
+
+        <div className="tw-overflow-x-auto">
+          <table className="tw-w-full tw-text-sm" style={{ tableLayout: 'fixed' }}>
+            <thead style={{ backgroundColor: 'var(--cui-dark-bg)' }}>
+              <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                {visibleColumns.map(col => (
+                  <th
+                    key={col.id}
+                    className={`px-3 py-2 tw-font-medium ${getColumnAlign(col.id)}`}
+                    style={{
+                      color: 'var(--cui-secondary-color)',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      ...(columnWidths[col.id] ? { width: columnWidths[col.id] } : {}),
+                    }}
+                    onClick={() => handleSortClick(col.id)}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      {col.label}
+                      {sortColumn === col.id && (
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8, lineHeight: 1 }}>
+                          {sortDirection === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
+                    </span>
+                    <div
+                      onMouseDown={(e) => handleResizeStart(col.id, e)}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '20%',
+                        bottom: '20%',
+                        width: 5,
+                        cursor: 'col-resize',
+                        userSelect: 'none',
+                        borderRight: '1px solid var(--cui-border-color)',
+                      }}
+                    />
+                  </th>
+                ))}
+                <th className="text-center px-3 py-2 tw-font-medium" style={{ color: 'var(--cui-secondary-color)', width: 80 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedUnits.map((unit, index) => (
+                <tr key={unit.id} style={{ borderBottom: '1px solid var(--cui-border-color)', backgroundColor: index % 2 === 0 ? 'var(--cui-card-bg)' : 'var(--cui-tertiary-bg)' }}>
+                  {visibleColumns.map(col => (
+                    <td key={col.id} className={`px-3 py-2 ${getColumnAlign(col.id)}`}
+                      style={(() => {
+                        // Check base columns via COLUMN_TO_BACKEND_FIELD mapping
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        // Also handle pending extra columns (pending_ prefix)
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return {};
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return {};
+                        const state = getFieldState(change.unitId, change.field);
+                        return state === 'accepted'
+                          ? { backgroundColor: 'rgba(var(--cui-success-rgb), 0.35)', borderBottom: '2px solid var(--cui-success)', cursor: 'pointer' }
+                          : { backgroundColor: 'rgba(var(--cui-warning-rgb), 0.35)', borderBottom: '2px solid var(--cui-warning)', cursor: 'pointer' };
+                      })()}
+                      onClick={() => {
+                        let backendField = COLUMN_TO_BACKEND_FIELD[col.id];
+                        if (!backendField && col.id.startsWith('pending_')) {
+                          backendField = col.id.replace('pending_', '');
+                        }
+                        if (!backendField) return;
+                        const change = pendingByCell.get(`${unit.id}:${backendField}`);
+                        if (!change) return;
+                        toggleFieldAcceptance(change.unitId, change.field);
+                      }}
+                    >
+                      {renderCellContent(unit, col.id)}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center">
+                    {isEditing(unit.id) ? (
+                      <div className="tw-flex tw-items-center gap-2 tw-justify-center">
+                        <button
+                          className="px-2 py-1 tw-text-xs rounded"
+                          style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+                          onClick={handleEditSave}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="px-2 py-1 tw-text-xs rounded"
+                          style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
+                          onClick={handleEditCancel}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="px-2 py-1 tw-text-xs rounded"
+                        style={{ backgroundColor: 'var(--cui-tertiary-bg)', color: 'var(--cui-secondary-color)' }}
+                        onClick={() => handleEditStart(unit)}
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Field Chooser Modal */}
+      {showFieldChooser && (
+        <div className="tw-fixed tw-inset-0 tw-flex tw-items-center tw-justify-center tw-z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+          <div
+            className="tw-rounded-lg tw-w-full tw-max-w-2xl tw-max-h-[80vh] tw-overflow-hidden tw-flex tw-flex-col"
+            style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}
+          >
+            {/* Modal Header */}
+            <div
+              className="px-6 py-4 tw-flex tw-items-center tw-justify-between"
+              style={{ borderBottom: '1px solid var(--cui-border-color)' }}
+            >
+              <h3 className="tw-text-lg tw-font-semibold" style={{ color: 'var(--cui-body-color)' }}>Configure Columns</h3>
+              <button
+                onClick={() => setShowFieldChooser(false)}
+                className="tw-transition-colors"
+                style={{ color: 'var(--cui-secondary-color)' }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-2 tw-overflow-y-auto tw-flex-1">
+              <div className="mb-2 pb-1.5" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+                <div className="tw-flex tw-items-center gap-4 tw-text-xs">
+                  <div className="tw-flex tw-items-center gap-1.5">
+                    <span
+                      className="px-1.5 py-0.5 rounded tw-font-medium text-[10px]"
+                      style={{ backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }}
+                    >
+                      Input
+                    </span>
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>User-editable</span>
+                  </div>
+                  <div className="tw-flex tw-items-center gap-1.5">
+                    <span
+                      className="px-1.5 py-0.5 rounded tw-font-medium text-[10px]"
+                      style={{ backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }}
+                    >
+                      Calc
+                    </span>
+                    <span style={{ color: 'var(--cui-secondary-color)' }}>Auto-calculated</span>
+                  </div>
+                  {columns.some(c => c.category === 'dynamic') && (
+                    <div className="tw-flex tw-items-center gap-1.5">
+                      <span
+                        className="px-1.5 py-0.5 rounded tw-font-medium text-[10px]"
+                        style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981' }}
+                      >
+                        Extra
+                      </span>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>From extraction</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Column categories — include 'dynamic' only when dynamic columns exist */}
+              {(['unit', 'floorplan', 'tenant', 'lease', 'financial'] as const)
+                .concat(columns.some(c => c.category === 'dynamic') ? ['dynamic' as const] : [])
+                .map(category => {
+                  const categoryCols = columns.filter(col => col.category === category);
+                  if (categoryCols.length === 0) return null;
+                  const categoryLabel = category === 'dynamic' ? 'Additional Fields' : `${category} Info`;
+                  return (
+                <div key={category} className="mb-3">
+                  <h4 className="tw-text-xs tw-font-semibold mb-1 tw-capitalize" style={{ color: category === 'dynamic' ? '#10b981' : 'var(--cui-info, #3b82f6)' }}>{categoryLabel}</h4>
+                  <div className="tw-space-y-0.5 ml-5">
+                    {categoryCols.map(col => (
+                      <label
+                        key={col.id}
+                        htmlFor={`field-${col.id}`}
+                        className="tw-flex tw-items-center gap-2.5 tw-cursor-pointer px-2 py-1 rounded tw-text-xs group"
+                        style={{ backgroundColor: col.visible ? 'var(--cui-tertiary-bg)' : 'transparent' }}
+                      >
+                        <input
+                          type="checkbox"
+                          id={`field-${col.id}`}
+                          checked={col.visible}
+                          onChange={(e) => {
+                            setHasCustomizedColumns(true);
+                            setColumns(prev => prev.map(c =>
+                              c.id === col.id ? { ...c, visible: e.target.checked } : c
+                            ));
+                          }}
+                          className="rounded tw-flex-shrink-0"
+                          style={{ accentColor: 'var(--cui-primary)' }}
+                        />
+                        <span
+                          className="px-1.5 py-0.5 text-[10px] rounded tw-font-medium tw-flex-shrink-0"
+                          style={col.type === 'dynamic'
+                            ? { backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#10b981' }
+                            : col.type === 'input'
+                              ? { backgroundColor: 'var(--cui-info-bg-subtle, rgba(59, 130, 246, 0.15))', border: '1px solid var(--cui-info, #3b82f6)', color: 'var(--cui-info, #3b82f6)' }
+                              : { backgroundColor: 'rgba(147, 51, 234, 0.15)', border: '1px solid #9333ea', color: '#9333ea' }
+                          }
+                        >
+                          {col.type === 'dynamic' ? 'Extra' : col.type === 'input' ? 'Input' : 'Calc'}
+                        </span>
+                        <span className="tw-font-medium w-28 tw-flex-shrink-0" style={{ color: 'var(--cui-body-color)' }}>{col.label}</span>
+                        <span className="tw-flex-1" style={{ color: 'var(--cui-secondary-color)' }}>{col.description}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                  );
+              })}
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              className="px-6 py-3 tw-flex tw-items-center tw-justify-between"
+              style={{ borderTop: '1px solid var(--cui-border-color)' }}
+            >
+              <button
+                onClick={() => {
+                  setHasCustomizedColumns(false);
+                  // Reset static columns to defaults, keep dynamic columns with data visible
+                  setColumns(prev => {
+                    const dynCols = prev.filter(c => c.category === 'dynamic').map(c => ({ ...c, visible: true }));
+                    return [...defaultColumns, ...dynCols];
+                  });
+                }}
+                className="px-3 py-1.5 tw-text-xs rounded tw-transition-colors"
+                style={{ backgroundColor: 'var(--cui-secondary-bg)', color: 'var(--cui-body-color)' }}
+              >
+                Reset to Defaults
+              </button>
+              <button
+                onClick={() => setShowFieldChooser(false)}
+                className="px-4 py-1.5 tw-text-xs rounded tw-transition-colors"
+                style={{ backgroundColor: 'var(--cui-primary)', color: 'var(--cui-white)' }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Main return - render content based on activeTab
+  return (
+    <>
+      {activeTab === 'details' && renderDetailsContent()}
+      {activeTab === 'market' && renderMarketContent()}
+      {activeTab === 'rent-roll' && renderRentRollContent()}
+    </>
+  );
+}

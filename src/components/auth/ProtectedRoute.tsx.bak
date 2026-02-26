@@ -1,0 +1,86 @@
+'use client';
+
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter, usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requireAdmin?: boolean;
+}
+
+/**
+ * ProtectedRoute component that guards routes requiring authentication.
+ *
+ * Usage:
+ * ```tsx
+ * <ProtectedRoute>
+ *   <YourProtectedComponent />
+ * </ProtectedRoute>
+ *
+ * // For admin-only routes:
+ * <ProtectedRoute requireAdmin>
+ *   <AdminComponent />
+ * </ProtectedRoute>
+ * ```
+ */
+export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        // Store the attempted URL for redirect after login
+        sessionStorage.setItem('redirectAfterLogin', pathname);
+        router.push('/login');
+      } else if (requireAdmin && user && !user.is_staff) {
+        // User is authenticated but not admin, redirect to dashboard
+        router.push('/dashboard');
+      }
+    }
+  }, [isLoading, isAuthenticated, requireAdmin, user, router, pathname]);
+
+  // Show loading spinner while checking auth
+  if (isLoading) {
+    return (
+      <div className="tw-min-h-screen bg-[#1a1d21] tw-flex tw-items-center tw-justify-center">
+        <div className="tw-flex tw-flex-col tw-items-center gap-4">
+          <div className="tw-animate-spin tw-rounded-full h-12 w-12 tw-border-t-2 tw-border-b-2 tw-border-blue-500"></div>
+          <p className="tw-text-gray-400 tw-text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything while redirecting
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // Don't render admin content for non-admin users
+  if (requireAdmin && user && !user.is_staff) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+/**
+ * Higher-order component version of ProtectedRoute
+ */
+export function withAuth<P extends object>(
+  WrappedComponent: React.ComponentType<P>,
+  options: { requireAdmin?: boolean } = {}
+) {
+  return function AuthenticatedComponent(props: P) {
+    return (
+      <ProtectedRoute requireAdmin={options.requireAdmin}>
+        <WrappedComponent {...props} />
+      </ProtectedRoute>
+    );
+  };
+}
+
+export default ProtectedRoute;

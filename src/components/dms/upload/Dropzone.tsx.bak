@@ -1,0 +1,144 @@
+'use client';
+
+/**
+ * Dropzone — Drag-and-drop file upload area for DMS.
+ *
+ * This is now a thin shell that captures files and routes them to the
+ * UploadStagingContext. The staging tray handles classification, collision
+ * detection, and upload execution.
+ */
+
+import React, { useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { useUploadStaging } from '@/contexts/UploadStagingContext';
+
+interface DropzoneProps {
+  projectId: number;
+  workspaceId: number;
+  docType?: string;
+  discipline?: string;
+  phaseId?: number;
+  parcelId?: number;
+  onUploadComplete?: (results: unknown[]) => void;
+  onUploadError?: (error: Error) => void;
+}
+
+export default function Dropzone({
+  docType = 'general',
+}: DropzoneProps) {
+  const { stageFiles, isTrayOpen } = useUploadStaging();
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
+      stageFiles(acceptedFiles, docType !== 'general' ? { suggestedDocType: docType } : undefined);
+    },
+    [stageFiles, docType]
+  );
+
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    isDragReject,
+    isDragAccept,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/gif': ['.gif'],
+      'text/plain': ['.txt'],
+      'text/csv': ['.csv'],
+    },
+    maxSize: 32 * 1024 * 1024,
+    maxFiles: 10,
+  });
+
+  const borderColor = isDragAccept
+    ? 'border-green-400 bg-green-50 '
+    : isDragReject
+      ? 'border-red-400 bg-red-50 '
+      : isDragActive
+        ? 'border-blue-400 bg-blue-50 '
+        : 'border ';
+
+  return (
+    <div className="tw-w-full">
+      <div
+        {...getRootProps()}
+        className={`tw-relative tw-border-2 tw-border-dashed tw-rounded-lg p-8 text-center tw-cursor-pointer tw-transition-colors tw-duration-200 tw-ease-in-out ${borderColor} hover:tw-border-blue-400 hover:tw-bg-blue-50`}
+      >
+        <input {...getInputProps()} />
+
+        {isTrayOpen ? (
+          <div className="tw-space-y-2">
+            <p className="tw-text-lg tw-font-medium text-body">
+              Files staged for review
+            </p>
+            <p className="tw-text-sm text-body-secondary">
+              See the staging tray below to review and confirm uploads
+            </p>
+          </div>
+        ) : isDragActive ? (
+          isDragAccept ? (
+            <div>
+              <p className="tw-text-lg tw-font-medium tw-text-green-600">
+                Drop files here to stage
+              </p>
+              <p className="tw-text-sm text-body-secondary">
+                Release to add files to the staging tray
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="tw-text-lg tw-font-medium tw-text-red-600">
+                Some files are not supported
+              </p>
+              <p className="tw-text-sm text-body-secondary">
+                Only PDF, Office docs, images, and text files are allowed
+              </p>
+            </div>
+          )
+        ) : (
+          <div className="tw-space-y-4">
+            <div className="mx-auto h-12 w-12 text-body-tertiary">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 48 48" aria-hidden="true">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="tw-text-lg tw-font-medium text-body">
+                Drag and drop files here, or click to browse
+              </p>
+              <p className="tw-text-sm text-body-secondary mt-2">
+                Supports PDF, Word, Excel, images, and text files up to 32MB
+              </p>
+              <p className="tw-text-xs text-body-tertiary mt-1">
+                Maximum 10 files per upload
+              </p>
+            </div>
+            <div className="tw-flex tw-items-center tw-justify-center">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm d-inline-flex tw-align-items-center"
+              >
+                Select Files
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

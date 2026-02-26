@@ -1,0 +1,290 @@
+'use client';
+
+/**
+ * ProjectProfileTile Component — v2.0 (Two-Column Grid)
+ *
+ * Displays project profile metadata in a two-column CSS grid layout.
+ * Field order matches approved mockup:
+ *   Line 1: Project Name | Address (2-line)
+ *   Line 2: Total Units | Gross Acres
+ *   Line 3: County | Market
+ *   Line 4: APN | Ownership
+ *   Line 5: Property Type | Subtype
+ *   Line 6: Perspective | Purpose
+ *   Line 7: Asking Price | Analysis Start Date
+ *   Line 8: Photos | (empty)
+ */
+
+import React, { useState, useCallback } from 'react';
+import { CCard, CCardHeader, CCardBody } from '@coreui/react';
+import useSWR from 'swr';
+import ProfileField from './ProfileField';
+import ProjectProfileEditModal from './ProjectProfileEditModal';
+import { fetchJson } from '@/lib/fetchJson';
+import type { ProjectProfile } from '@/types/project-profile';
+import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
+import ProjectPhotosModal from './ProjectPhotosModal';
+import { useQuery } from '@tanstack/react-query';
+import { PERSPECTIVE_LABELS, PURPOSE_LABELS } from '@/types/project-taxonomy';
+
+// Acquisition price summary types
+interface AcquisitionPriceSummary {
+  project_id: number;
+  asking_price: number | null;
+  has_closing_date: boolean;
+  closing_date: string | null;
+  total_acquisition_cost: number | null;
+  land_cost: number;
+  total_fees: number;
+  total_deposits: number;
+  total_credits: number;
+  effective_acquisition_price: number | null;
+  price_source: 'calculated' | 'asking' | null;
+}
+
+interface ProjectProfileTileProps {
+  projectId: number;
+}
+
+const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
+
+/** Format a two-line address: street on line 1, city/state/zip on line 2 */
+function formatAddress(profile: ProjectProfile): React.ReactNode | undefined {
+  const street = profile.address;
+  const parts = [profile.city, profile.state, profile.zip_code].filter(Boolean);
+  const cityLine = parts.length > 0
+    ? `${profile.city || ''}${profile.city && profile.state ? ', ' : ''}${profile.state || ''} ${profile.zip_code || ''}`.trim()
+    : '';
+
+  if (!street && !cityLine) return undefined;
+
+  return (
+    <>
+      {street && <>{street}</>}
+      {street && cityLine && <br />}
+      {cityLine && <>{cityLine}</>}
+    </>
+  );
+}
+
+export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectId }) => {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showPhotosModal, setShowPhotosModal] = useState(false);
+  const { refreshProjects } = useProjectContext();
+
+  // Check if project has any linked photos (for pill label)
+  const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+  const { data: mediaData } = useQuery<{ links: Array<{ link_id: number }> }>({
+    queryKey: ['entity-media', 'project', projectId],
+    queryFn: async () => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
+      );
+      if (!res.ok) throw new Error('Failed to fetch project media');
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+  const photoCount = mediaData?.links?.length ?? 0;
+
+  const { data: profile, error, isLoading, mutate } = useSWR<ProjectProfile>(
+    `/api/projects/${projectId}/profile`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // Fetch acquisition price summary
+  const { data: priceSummary, mutate: mutatePriceSummary } = useSWR<AcquisitionPriceSummary>(
+    `${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`,
+    (url: string) => fetch(url).then(res => res.ok ? res.json() : null),
+    { revalidateOnFocus: false }
+  );
+
+  // Listen for Landscaper field updates and auto-refresh
+  const handleFieldUpdate = useCallback(() => {
+    mutate();
+    refreshProjects();
+  }, [mutate, refreshProjects]);
+
+  useFieldRefreshListener(projectId, handleFieldUpdate);
+
+  const handleEditClick = () => setIsEditModalOpen(true);
+  const handleModalClose = () => setIsEditModalOpen(false);
+
+  const handleSaveSuccess = () => {
+    mutate();
+    mutatePriceSummary();
+    refreshProjects();
+    setIsEditModalOpen(false);
+  };
+
+  // Format currency
+  const formatCurrency = (value: number | null | undefined): string => {
+    if (value === null || value === undefined) return '';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Determine acquisition price label & value
+  const getAcquisitionDisplay = (): { label: string; value: string | undefined } => {
+    if (!priceSummary) return { label: 'Asking Price', value: undefined };
+    const { has_closing_date, total_acquisition_cost, asking_price } = priceSummary;
+    if (has_closing_date && total_acquisition_cost !== null) {
+      return { label: 'Acquisition Cost', value: formatCurrency(total_acquisition_cost) };
+    }
+    return { label: 'Asking Price', value: asking_price ? formatCurrency(asking_price) : undefined };
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <CCard className="project-profile-tile">
+        <CCardHeader className="d-flex tw-align-items-center tw-justify-content-between">
+          <span className="fw-semibold">Project Profile</span>
+        </CCardHeader>
+        <CCardBody>
+          <div className="text-center text-muted py-4">Loading...</div>
+        </CCardBody>
+      </CCard>
+    );
+  }
+
+  // Error state
+  if (error || !profile) {
+    return (
+      <CCard className="project-profile-tile">
+        <CCardHeader className="d-flex tw-align-items-center tw-justify-content-between">
+          <span className="fw-semibold">Project Profile</span>
+        </CCardHeader>
+        <CCardBody>
+          <div className="text-center text-danger py-4">Failed to load project profile</div>
+        </CCardBody>
+      </CCard>
+    );
+  }
+
+  const acq = getAcquisitionDisplay();
+
+  return (
+    <>
+      <CCard
+        className="h-100"
+        style={{
+          overflow: 'hidden',
+        }}
+      >
+        <CCardHeader className="d-flex tw-align-items-center tw-justify-content-between">
+          <span className="fw-semibold">Project Profile</span>
+          <button
+            type="button"
+            style={{
+              fontSize: '0.7rem',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '999px',
+              lineHeight: 1,
+              fontWeight: 600,
+              backgroundColor: 'var(--cui-primary)',
+              color: '#FFFFFF',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+            onClick={handleEditClick}
+          >
+            Edit
+          </button>
+        </CCardHeader>
+        <CCardBody style={{ padding: 0 }}>
+          <div className="tw-profile-grid">
+            {/* Line 1: Property Type | Subtype */}
+            <ProfileField
+              label="Property Type"
+              value={profile.project_type || profile.project_type_code}
+            />
+            <ProfileField label="Subtype" value={profile.property_subtype} />
+
+            {/* Line 2: Project Name | Address */}
+            <ProfileField label="Project Name" value={profile.project_name} />
+            <ProfileField label="Address" value={formatAddress(profile)} />
+
+            {/* Line 3: Units | Gross Acres */}
+            <ProfileField
+              label={getUnitsLabel(profile)}
+              value={getUnitCount(profile) ? formatUnits(getUnitCount(profile)) : undefined}
+            />
+            <ProfileField
+              label="Gross Acres"
+              value={profile.gross_acres ? formatGrossAcres(profile.gross_acres) : undefined}
+            />
+
+            {/* Line 4: County | Market */}
+            <ProfileField label="County" value={profile.county} />
+            <ProfileField
+              label="Market"
+              value={formatMSADisplay(profile.msa_name, profile.state_abbreviation, profile.market)}
+            />
+
+            {/* Line 5: APN | Ownership */}
+            <ProfileField label="APN" value={profile.apn} />
+            <ProfileField label="Ownership" value={profile.ownership_type} />
+
+            {/* Line 6: Perspective | Purpose */}
+            <ProfileField
+              label="Perspective"
+              value={profile.analysis_perspective ? PERSPECTIVE_LABELS[profile.analysis_perspective] : undefined}
+            />
+            <ProfileField
+              label="Purpose"
+              value={profile.analysis_purpose ? PURPOSE_LABELS[profile.analysis_purpose] : undefined}
+            />
+
+            {/* Line 7: Asking Price | Analysis Start Date */}
+            <ProfileField label={acq.label} value={acq.value} />
+            <ProfileField
+              label="Analysis Start"
+              value={profile.analysis_start_date
+                ? new Date(profile.analysis_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : undefined}
+            />
+
+            {/* Line 8: Photos */}
+            <ProfileField label="Photos">
+              <button
+                type="button"
+                className="studio-badge-info"
+                onClick={() => setShowPhotosModal(true)}
+              >
+                {photoCount > 0 ? `Photos (${photoCount})` : 'Add Photo'}
+              </button>
+            </ProfileField>
+          </div>
+        </CCardBody>
+      </CCard>
+
+      {isEditModalOpen && (
+        <ProjectProfileEditModal
+          projectId={projectId}
+          profile={profile}
+          isOpen={isEditModalOpen}
+          onClose={handleModalClose}
+          onSaveSuccess={handleSaveSuccess}
+        />
+      )}
+
+      {showPhotosModal && (
+        <ProjectPhotosModal
+          isOpen={showPhotosModal}
+          onClose={() => setShowPhotosModal(false)}
+          projectId={projectId}
+        />
+      )}
+    </>
+  );
+};
+
+export default ProjectProfileTile;

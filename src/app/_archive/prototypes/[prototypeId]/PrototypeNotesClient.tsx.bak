@@ -1,0 +1,128 @@
+'use client';
+
+import { useEffect, useState, useTransition } from 'react';
+
+interface PrototypeNoteEntry {
+  id: string;
+  prototypeId: string;
+  note: string;
+  timestamp: string;
+}
+
+interface PrototypeNotesClientProps {
+  prototypeId: string;
+}
+
+const formatTimestamp = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleString();
+};
+
+const PrototypeNotesClient: React.FC<PrototypeNotesClientProps> = ({ prototypeId }) => {
+  const [notes, setNotes] = useState<PrototypeNoteEntry[]>([]);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/prototypes/notes?prototypeId=${encodeURIComponent(prototypeId)}`, {
+          cache: 'no-store'
+        });
+        if (!response.ok) {
+          throw new Error('Failed to load notes');
+        }
+        const payload = (await response.json()) as PrototypeNoteEntry[];
+        const ordered = [...payload].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setNotes(ordered);
+      } catch (err) {
+        console.error(err);
+        setError('Unable to load notes for this prototype.');
+      }
+    };
+
+    load();
+  }, [prototypeId]);
+
+  const handleSubmit = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setError(null);
+    startTransition(async () => {
+      try {
+        const response = await fetch('/api/prototypes/notes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ prototypeId, note: trimmed })
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const message = (payload as { error?: string }).error ?? 'Unable to save note';
+          throw new Error(message);
+        }
+
+        const { entry } = (await response.json()) as { entry: PrototypeNoteEntry };
+        setNotes((prev) => [entry, ...prev]);
+        setDraft('');
+      } catch (err) {
+        console.error(err);
+        const message = err instanceof Error ? err.message : 'Unexpected error while saving note.';
+        setError(message);
+      }
+    });
+  };
+
+  return (
+    <div className="tw-space-y-4 tw-rounded-xl border tw-border-neutral-800 tw-bg-neutral-900/60 p-4">
+      <div className="tw-space-y-2">
+        <h3 className="tw-text-sm tw-font-semibold tw-text-neutral-200">Add note</h3>
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          rows={3}
+          placeholder="Capture quick reactions, TODOs, or follow-ups while reviewing this prototype."
+          className="tw-w-full tw-rounded-md border tw-border-neutral-800 tw-bg-neutral-950 px-3 py-2 tw-text-sm tw-text-neutral-200 focus:border-white/40 focus:outline-none"
+        />
+        <div className="tw-flex tw-items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isPending || !draft.trim()}
+            className="tw-inline-flex tw-items-center tw-justify-center tw-rounded-md bg-white/10 px-3 py-1.5 tw-text-xs tw-font-semibold text-white tw-transition hover:bg-white/20 disabled:tw-opacity-50"
+          >
+            {isPending ? 'Saving…' : 'Log note'}
+          </button>
+          {error ? <span className="tw-text-xs tw-text-amber-400">{error}</span> : null}
+        </div>
+      </div>
+
+      <div className="tw-space-y-2">
+        <div className="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-neutral-500">History</div>
+        {notes.length === 0 ? (
+          <div className="tw-text-xs tw-text-neutral-500">No notes yet. Add your first impression above.</div>
+        ) : (
+          <ul className="tw-space-y-2 tw-text-xs tw-text-neutral-400">
+            {notes.map((entry) => (
+              <li key={entry.id} className="tw-rounded-md border tw-border-neutral-800 tw-bg-neutral-950/80 p-3">
+                <div className="tw-font-medium tw-text-neutral-200">{formatTimestamp(entry.timestamp)}</div>
+                <div className="mt-1 tw-text-neutral-400">{entry.note}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default PrototypeNotesClient;

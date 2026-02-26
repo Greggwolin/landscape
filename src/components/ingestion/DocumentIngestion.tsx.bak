@@ -1,0 +1,515 @@
+'use client';
+
+import React, { useState, useCallback } from 'react';
+import { CopilotKit } from '@copilotkit/react-core';
+import { useDropzone } from 'react-dropzone';
+import { CSpinner } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilCloudUpload } from '@coreui/icons';
+import { DocumentCard } from './DocumentCard';
+import { PropertyOverview } from './PropertyOverview';
+import { IngestionChat } from './IngestionChat';
+import { MilestoneBar } from './MilestoneBar';
+import { emitMutationComplete } from '@/lib/events/landscaper-events';
+import type {
+  IngestionDocument,
+  PropertySummary,
+  MilestoneItem,
+  StagingData,
+  DocumentStatus,
+} from './types';
+
+interface DocumentIngestionProps {
+  projectId: number;
+  projectName: string;
+  initialDocuments?: IngestionDocument[];
+  initialSummary?: PropertySummary;
+  initialMilestones?: MilestoneItem[];
+  onAnalysisReady?: () => void;
+}
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+// Default empty summary
+const emptySummary: PropertySummary = {
+  totalUnits: null,
+  averageRent: null,
+  occupancy: null,
+  noi: null,
+  capRate: null,
+  pricePerUnit: null,
+  unitMix: [],
+};
+
+export function DocumentIngestion({
+  projectId,
+  projectName,
+  initialDocuments = [],
+  initialSummary,
+  initialMilestones,
+  onAnalysisReady,
+}: DocumentIngestionProps) {
+  const [documents, setDocuments] = useState<IngestionDocument[]>(initialDocuments);
+  const [summary, setSummary] = useState<PropertySummary>(initialSummary || emptySummary);
+  const [stagingData, setStagingData] = useState<StagingData | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Calculate milestones based on document status or use initial milestones
+  const milestones: MilestoneItem[] = initialMilestones || [
+    {
+      id: 'rent_roll',
+      label: 'Rent Roll',
+      status: documents.some(d => d.doc_type === 'rent_roll' && d.status === 'confirmed')
+        ? 'complete'
+        : documents.some(d => d.doc_type === 'rent_roll')
+        ? 'partial'
+        : summary.totalUnits && summary.totalUnits > 0
+        ? 'complete'
+        : 'missing',
+    },
+    {
+      id: 't12',
+      label: 'T12',
+      status: documents.some(d => d.doc_type === 't12' && d.status === 'confirmed')
+        ? 'complete'
+        : documents.some(d => d.doc_type === 't12')
+        ? 'partial'
+        : 'missing',
+    },
+    {
+      id: 'market_data',
+      label: 'Market Data',
+      status: summary.capRate && !summary.pricePerUnit ? 'partial' : summary.capRate ? 'complete' : 'missing',
+    },
+    {
+      id: 'cap_rate',
+      label: 'Cap Rate',
+      status: summary.pricePerUnit ? 'complete' : summary.capRate ? 'partial' : 'missing',
+    },
+  ];
+
+  const isReady = milestones.filter(m => m.status === 'complete').length >= 3;
+
+  // Infer document type from filename
+  const inferDocType = (filename: string): string => {
+    const lower = filename.toLowerCase();
+    if (lower.includes('rent') || lower.includes('roll')) return 'rent_roll';
+    if (lower.includes('t12') || lower.includes('t-12') || lower.includes('income')) return 't12';
+    if (lower.includes('om') || lower.includes('offering') || lower.includes('memo')) return 'om';
+    if (lower.includes('survey')) return 'survey';
+    return 'misc';
+  };
+
+  // Format extraction summary for display
+  const formatExtractionSummary = (staging: StagingData): string => {
+    const parts: string[] = [];
+    if (staging.summary.total_units) {
+      parts.push(`<strong>${staging.summary.total_units} units</strong>`);
+    }
+    if (staging.summary.occupied_units) {
+      const occupancy = Math.round(
+        (staging.summary.occupied_units / staging.summary.total_units) * 100
+      );
+      parts.push(`<strong>${occupancy}%</strong> occupancy`);
+    }
+    if (staging.summary.monthly_income) {
+      parts.push(`<strong>$${staging.summary.monthly_income.toLocaleString()}</strong>/mo income`);
+    }
+    return parts.join(' · ');
+  };
+
+  // Calculate overall confidence from staging data
+  const calculateOverallConfidence = (staging: StagingData): number => {
+    const allItems = [...staging.unit_types, ...staging.units, ...staging.leases];
+    if (allItems.length === 0) return 0;
+    const totalConfidence = allItems.reduce((sum, item) => sum + (item.confidence || 0), 0);
+    return totalConfidence / allItems.length;
+  };
+
+  // Update property summary from staging data
+  const updateSummaryFromStaging = useCallback((staging: StagingData) => {
+    const unitMix = staging.unit_types.map((ut, idx) => {
+      const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+      const data = ut.data as {
+        bedroom_count?: number;
+        bathroom_count?: number;
+        unit_count?: number;
+        market_rent_monthly?: number;
+      };
+      return {
+        type: `${data.bedroom_count || 0}BR`,
+        count: data.unit_count || 0,
+        avgRent: data.market_rent_monthly || 0,
+        color: colors[idx % colors.length],
+        percentage: staging.summary.total_units
+          ? ((data.unit_count || 0) / staging.summary.total_units) * 100
+          : 0,
+      };
+    });
+
+    setSummary(prev => ({
+      ...prev,
+      totalUnits: staging.summary.total_units,
+      occupancy: Math.round(
+        ((staging.summary.total_units - staging.summary.vacant_units) /
+          staging.summary.total_units) *
+          100
+      ),
+      averageRent: staging.units.length > 0
+        ? Math.round(
+            staging.units.reduce((sum, u) => {
+              const data = u.data as { monthly_rent?: number };
+              return sum + (data.monthly_rent || 0);
+            }, 0) / staging.units.length
+          )
+        : null,
+      unitMix,
+    }));
+  }, []);
+
+  // Poll for extraction status (defined before onDrop to avoid initialization error)
+  const pollExtractionStatus = useCallback(async (docId: number) => {
+    const maxAttempts = 30;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setDocuments(prev =>
+          prev.map(d =>
+            d.doc_id === docId ? { ...d, status: 'error' as DocumentStatus } : d
+          )
+        );
+        return;
+      }
+
+      attempts++;
+
+      try {
+        const response = await fetch(`${DJANGO_API_URL}/api/dms/staging/${docId}/`);
+
+        if (response.ok) {
+          const staging = await response.json();
+
+          setDocuments(prev =>
+            prev.map(d =>
+              d.doc_id === docId
+                ? {
+                    ...d,
+                    status: 'pending' as DocumentStatus,
+                    extraction: {
+                      summary: formatExtractionSummary(staging),
+                      fields: [],
+                      confidence: calculateOverallConfidence(staging),
+                      warnings: staging.needs_review?.map((r: { message: string }) => r.message) ?? [],
+                      needs_review: staging.needs_review?.length > 0,
+                    },
+                  }
+                : d
+            )
+          );
+
+          setStagingData(staging);
+          updateSummaryFromStaging(staging);
+          return;
+        }
+
+        setTimeout(poll, 2000);
+      } catch (error) {
+        console.error('Poll error:', error);
+        setTimeout(poll, 2000);
+      }
+    };
+
+    poll();
+  }, [updateSummaryFromStaging]);
+
+  // Handle file upload
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+
+    setIsUploading(true);
+
+    for (const file of acceptedFiles) {
+      const tempId = Date.now();
+      const tempDoc: IngestionDocument = {
+        doc_id: tempId,
+        doc_name: file.name,
+        doc_type: inferDocType(file.name),
+        status: 'uploading',
+        created_at: new Date().toISOString(),
+      };
+
+      setDocuments(prev => [...prev, tempDoc]);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('project_id', projectId.toString());
+        formData.append('doc_type', tempDoc.doc_type);
+        formData.append('run_full_extraction', 'true');
+
+        const response = await fetch('/api/dms/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        setDocuments(prev =>
+          prev.map(d =>
+            d.doc_id === tempId
+              ? {
+                  ...d,
+                  doc_id: result.doc_id,
+                  status: 'processing' as DocumentStatus,
+                  storage_uri: result.storage_uri,
+                }
+              : d
+          )
+        );
+
+        // Start polling for extraction completion
+        pollExtractionStatus(result.doc_id);
+      } catch (error) {
+        console.error('Upload error:', error);
+        setDocuments(prev =>
+          prev.map(d =>
+            d.doc_id === tempId
+              ? { ...d, status: 'error' as DocumentStatus }
+              : d
+          )
+        );
+      }
+    }
+
+    setIsUploading(false);
+  }, [projectId, pollExtractionStatus]);
+
+  // Handle confirm extraction
+  const handleConfirmExtraction = async (docId: number) => {
+    const doc = documents.find(d => d.doc_id === docId);
+    if (!doc || !stagingData) return;
+
+    try {
+      // Get all assertion IDs
+      const approvedIds = [
+        ...stagingData.unit_types.map(ut => ut.assertion_id),
+        ...stagingData.units.map(u => u.assertion_id),
+        ...stagingData.leases.map(l => l.assertion_id),
+      ];
+
+      const response = await fetch(`${DJANGO_API_URL}/api/dms/staging/${docId}/commit/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          approved_assertions: approvedIds,
+          corrections: [],
+        }),
+      });
+
+      if (response.ok) {
+        // Update document status
+        setDocuments(prev =>
+          prev.map(d =>
+            d.doc_id === docId ? { ...d, status: 'confirmed' as DocumentStatus } : d
+          )
+        );
+
+        // Emit mutation event for other components
+        emitMutationComplete({
+          projectId,
+          mutationType: 'staging_commit',
+          tables: ['units', 'leases', 'unit_types'],
+          counts: {
+            created: approvedIds.length,
+            total: approvedIds.length,
+          },
+        });
+      } else {
+        console.error('Commit failed:', await response.text());
+      }
+    } catch (error) {
+      console.error('Commit error:', error);
+    }
+  };
+
+  // Handle edit request
+  const handleRequestEdit = (docId: number, field: string) => {
+    console.log(`Edit requested for doc ${docId}, field ${field}`);
+    // TODO: Open edit modal
+  };
+
+  // Handle adding asking price
+  const handleAddAskingPrice = (price: number) => {
+    setSummary(prev => ({
+      ...prev,
+      pricePerUnit: prev.totalUnits ? Math.round(price / prev.totalUnits) : null,
+      capRate: prev.noi ? (prev.noi / price) * 100 : prev.capRate,
+    }));
+  };
+
+  // Setup dropzone
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+    },
+    maxSize: 32 * 1024 * 1024,
+    disabled: isUploading,
+  });
+
+  return (
+    <CopilotKit runtimeUrl="/api/copilotkit">
+      <div
+        className="d-flex flex-column vh-100"
+        style={{ background: 'var(--cui-dark-bg-subtle)' }}
+      >
+        {/* Header */}
+        <header
+          className="d-flex tw-align-items-center px-4 gap-4"
+          style={{
+            height: '60px',
+            background: 'var(--cui-body-bg)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
+          <div className="text-primary fw-bold" style={{ fontSize: '20px' }}>
+            🌿 Landscaper
+          </div>
+          <div
+            className="px-3 py-1 rounded"
+            style={{
+              background: 'var(--cui-tertiary-bg)',
+              fontSize: '14px',
+            }}
+          >
+            {projectName}
+          </div>
+          <div className="ms-auto">
+            <span
+              className="badge rounded-pill"
+              style={{
+                background: 'var(--cui-primary)',
+                fontSize: '12px',
+                padding: '6px 16px',
+              }}
+            >
+              Diligence Phase
+            </span>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <div
+          className="tw-flex-grow-1 d-grid"
+          style={{
+            gridTemplateColumns: '320px 1fr 360px',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Left Panel - Documents */}
+          <aside
+            className="tw-overflow-auto p-3"
+            style={{
+              background: 'var(--cui-body-bg)',
+              borderRight: '1px solid var(--cui-border-color)',
+            }}
+          >
+            <div
+              className="tw-text-uppercase text-body-secondary mb-3 pb-2"
+              style={{
+                fontSize: '11px',
+                letterSpacing: '1px',
+                borderBottom: '1px solid var(--cui-border-color)',
+              }}
+            >
+              Documents & Extractions
+            </div>
+
+            {/* Upload Zone */}
+            <div
+              {...getRootProps()}
+              className={`rounded-3 p-4 text-center mb-4 ${ isDragActive ? 'border-primary bg-primary tw-bg-opacity-10' : '' }`}
+              style={{
+                border: '2px dashed var(--cui-border-color)',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              <input {...getInputProps()} />
+              {isUploading ? (
+                <CSpinner size="sm" className="mb-2" />
+              ) : (
+                <CIcon icon={cilCloudUpload} size="xl" className="text-body-secondary mb-2" />
+              )}
+              <div className="text-body-secondary" style={{ fontSize: '13px' }}>
+                {isDragActive
+                  ? 'Drop files here'
+                  : 'Drop files or click to upload'}
+                <br />
+                <small>OM, T12, Rent Roll, Surveys</small>
+              </div>
+            </div>
+
+            {/* Document Cards */}
+            {documents.map(doc => (
+              <DocumentCard
+                key={doc.doc_id}
+                document={doc}
+                onConfirm={handleConfirmExtraction}
+                onEdit={() => handleRequestEdit(doc.doc_id, '')}
+              />
+            ))}
+
+            {documents.length === 0 && (
+              <div className="text-center text-body-secondary py-4" style={{ fontSize: '13px' }}>
+                No documents yet. Upload files to begin.
+              </div>
+            )}
+          </aside>
+
+          {/* Center Panel - Visualization */}
+          <main className="tw-overflow-auto p-4">
+            <PropertyOverview summary={summary} />
+          </main>
+
+          {/* Right Panel - Chat */}
+          <aside
+            className="d-flex flex-column"
+            style={{
+              background: 'var(--cui-body-bg)',
+              borderLeft: '1px solid var(--cui-border-color)',
+            }}
+          >
+            <IngestionChat
+              projectId={projectId}
+              projectName={projectName}
+              documents={documents}
+              summary={summary}
+              stagingData={stagingData}
+              onConfirmExtraction={handleConfirmExtraction}
+              onRequestEdit={handleRequestEdit}
+              onAddAskingPrice={handleAddAskingPrice}
+            />
+          </aside>
+        </div>
+
+        {/* Milestone Bar */}
+        <MilestoneBar
+          milestones={milestones}
+          isReady={isReady}
+          onReadyClick={onAnalysisReady}
+        />
+      </div>
+    </CopilotKit>
+  );
+}
+
+export default DocumentIngestion;

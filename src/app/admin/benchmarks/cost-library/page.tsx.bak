@@ -1,0 +1,42 @@
+'use client';
+
+/**
+ * Cost Line Item Library - Benchmarks Page
+ * Development cost templates and benchmarks database
+ *
+ * This page displays the comprehensive cost line item library with:
+ * - Stage-based cost categories (Entitlements, Engineering, Development)
+ * - Cost type tabs (Hard, Soft, Deposits, Other)
+ * - Inline editing and full CRUD operations
+ * - Category filtering and search
+ */
+
+import React from 'react';
+import { Database } from 'lucide-react';
+import UnitCostsPanel from '@/components/benchmarks/unit-costs/UnitCostsPanel';
+
+export default function CostLibraryPage() {
+  return (
+    <div className="tw-min-h-screen bg-surface-card text-text-primary">
+      <div className="p-4 tw-space-y-4">
+        <div className="tw-rounded-lg border border-line-soft bg-surface-card tw-shadow-sm">
+          {/* Header */}
+          <div className="tw-border-b border-line-soft p-6">
+            <div className="tw-flex tw-flex-col gap-2">
+              <div className="tw-flex tw-items-center gap-3">
+                <Database size={24} className="text-brand-primary" />
+                <h1 className="tw-text-2xl tw-font-bold tw-whitespace-nowrap">Unit Cost Library</h1>
+              </div>
+              <p className="tw-text-sm text-text-secondary">
+                Development cost templates and benchmark database
+              </p>
+            </div>
+          </div>
+
+          {/* Main Content - UnitCostsPanel with no filter (show all) */}
+          <UnitCostsPanel projectTypeFilter="" />
+        </div>
+      </div>
+    </div>
+  );
+}

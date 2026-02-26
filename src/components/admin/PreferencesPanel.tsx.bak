@@ -1,0 +1,142 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ChevronDown, ChevronRight, Settings } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { LandscapeButton } from '@/components/ui/landscape';
+import StyleCatalogContent from '@/app/components/StyleCatalog/StyleCatalogContent';
+
+// Dynamically import components to avoid SSR issues
+const TaxonomyPage = dynamic(() => import('@/app/settings/taxonomy/page'), {
+  ssr: false,
+});
+
+const UnitCostCategoryManager = dynamic(
+  () => import('@/app/admin/preferences/components/UnitCostCategoryManager'),
+  { ssr: false }
+);
+
+const UnitOfMeasureManager = dynamic(
+  () => import('@/app/admin/preferences/components/UnitOfMeasureManager'),
+  { ssr: false }
+);
+
+const SystemPicklistsAccordion = dynamic(
+  () => import('@/components/admin/SystemPicklistsAccordion').then((mod) => mod.SystemPicklistsAccordion),
+  { ssr: false }
+);
+
+interface PreferenceCategory {
+  key: string;
+  label: string;
+  description: string;
+  icon: string;
+}
+
+const PREFERENCE_CATEGORIES: PreferenceCategory[] = [
+  {
+    key: 'unit_cost_categories',
+    label: 'Unit Cost Categories',
+    description: 'Manage global cost categories across all lifecycle stages',
+    icon: 'FolderTree'
+  },
+  {
+    key: 'land_use_taxonomy',
+    label: 'Land Use Taxonomy Manager',
+    description: 'Configure land use types, families, and product categories',
+    icon: 'Map'
+  },
+  {
+    key: 'uom_manager',
+    label: 'Units of Measure Manager',
+    description: 'Configure measurement units used throughout the application',
+    icon: 'Ruler'
+  },
+  {
+    key: 'system_picklists',
+    label: 'System Picklists',
+    description: 'Manage common dropdown values (phase status, ownership, property taxonomy, leases)',
+    icon: 'List'
+  },
+  {
+    key: 'style_catalog',
+    label: 'Canonical Styles',
+    description: 'Read-only style catalog for governance and review',
+    icon: 'Palette'
+  }
+];
+
+export default function PreferencesPanel() {
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+  const toggleCategory = (key: string) => {
+    setExpandedCategory(expandedCategory === key ? null : key);
+  };
+
+  return (
+    <div className="tw-space-y-4">
+      <div style={{ backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }} className="tw-rounded-lg tw-shadow-sm border">
+        {/* Header */}
+        <div className="p-4" style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+          <div className="d-flex tw-align-items-center gap-3">
+            <Settings size={20} style={{ color: 'var(--cui-primary)' }} />
+            <h2 className="h5 mb-0" style={{ color: 'var(--cui-body-color)' }}>System Preferences</h2>
+          </div>
+          <p className="tw-text-sm mb-0 mt-2" style={{ color: 'var(--cui-secondary-color)' }}>
+            Configure app-level taxonomy, categories, and default settings
+          </p>
+        </div>
+
+        {/* Preference Categories Accordion */}
+        <div className="tw-divide-y" style={{ borderColor: 'var(--cui-border-color)' }}>
+          {PREFERENCE_CATEGORIES.map(category => {
+            const isExpanded = expandedCategory === category.key;
+
+            return (
+              <div key={category.key}>
+                <LandscapeButton
+                  onClick={() => toggleCategory(category.key)}
+                  variant="ghost"
+                  color="secondary"
+                  className="d-flex w-100 tw-align-items-center tw-justify-content-between px-4 py-3"
+                  style={{
+                    color: 'var(--cui-body-color)',
+                    backgroundColor: isExpanded ? 'var(--cui-tertiary-bg)' : 'transparent',
+                    cursor: 'pointer',
+                    borderRadius: 0
+                  }}
+                >
+                  <div className="d-flex tw-align-items-center gap-3 tw-flex-grow-1">
+                    <div className="d-flex flex-column tw-align-items-start">
+                      <span className="fw-semibold">
+                        {category.label}
+                        <span className="tw-text-sm ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
+                          — {category.description}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown size={20} style={{ color: 'var(--cui-body-color)' }} />
+                  ) : (
+                    <ChevronRight size={20} style={{ color: 'var(--cui-body-color)' }} />
+                  )}
+                </LandscapeButton>
+
+                {isExpanded && (
+                  <div className="p-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
+                    {category.key === 'unit_cost_categories' && <UnitCostCategoryManager />}
+                    {category.key === 'land_use_taxonomy' && <TaxonomyPage />}
+                    {category.key === 'uom_manager' && <UnitOfMeasureManager />}
+                    {category.key === 'system_picklists' && <SystemPicklistsAccordion />}
+                    {category.key === 'style_catalog' && <StyleCatalogContent title="Canonical Styles" />}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}

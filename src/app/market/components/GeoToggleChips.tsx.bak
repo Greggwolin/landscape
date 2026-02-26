@@ -1,0 +1,63 @@
+import React from 'react';
+import clsx from 'clsx';
+
+export interface GeoTarget {
+  geo_id: string;
+  geo_level: string;
+  geo_name: string;
+}
+
+const LABELS: Record<string, string> = {
+  CITY: 'City',
+  COUNTY: 'County',
+  MSA: 'MSA',
+  STATE: 'State',
+  TRACT: 'Tract',
+  US: 'US',
+};
+
+interface GeoToggleChipsProps {
+  targets: GeoTarget[];
+  selectedGeoIds: string[];
+  onToggle: (geoId: string) => void;
+  baseGeoId?: string | null;
+  availableGeoIds?: Set<string>;
+}
+
+export const GeoToggleChips: React.FC<GeoToggleChipsProps> = ({
+  targets,
+  selectedGeoIds,
+  onToggle,
+  baseGeoId,
+  availableGeoIds,
+}) => {
+  if (!targets.length) return null;
+
+  return (
+    <div className="tw-flex tw-flex-wrap tw-items-center gap-2">
+      {targets.map((target) => {
+        const label = LABELS[target.geo_level] ?? target.geo_level;
+        const isBase = baseGeoId === target.geo_id;
+        const hasData = isBase || !availableGeoIds || availableGeoIds.has(target.geo_id);
+        const isActive = hasData && (isBase || selectedGeoIds.includes(target.geo_id));
+        return (
+          <button
+            key={target.geo_id}
+            type="button"
+            onClick={() => {
+              if (!isBase && hasData) {
+                onToggle(target.geo_id);
+              }
+            }}
+            disabled={isBase || !hasData}
+            className={`clsx( 'px-3 py-1 tw-rounded-full border tw-text-sm tw-transition-colors', isActive ? tw-'bg-blue-500/20 tw-border-blue-400 tw-text-blue-200' : hasData ? tw-'border-gray-600 tw-text-gray-300 hover:tw-border-blue-400 hover:tw-text-blue-200' : tw-'border-gray-700 tw-text-gray-600 tw-cursor-not-allowed', isBase && tw-'cursor-default tw-opacity-80' )`}
+          >
+            <span className="tw-font-medium">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+export default GeoToggleChips;

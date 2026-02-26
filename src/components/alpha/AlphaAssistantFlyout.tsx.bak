@@ -1,0 +1,93 @@
+'use client';
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { CCloseButton, CAccordion, CAccordionItem, CAccordionHeader, CAccordionBody } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilLifeRing } from '@coreui/icons';
+import { HelpFeedbackAgent } from './HelpFeedbackAgent';
+import { FeedbackLog } from './FeedbackLog';
+import './alpha-flyout.css';
+
+interface AlphaAssistantFlyoutProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pageContext: string;
+  projectId: number;
+}
+
+export function AlphaAssistantFlyout({
+  isOpen,
+  onClose,
+  pageContext,
+  projectId,
+}: AlphaAssistantFlyoutProps) {
+  const [activeAccordion, setActiveAccordion] = useState<number | null>(1);
+  const [feedbackLogKey, setFeedbackLogKey] = useState(0);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
+  // Refresh feedback log when feedback is submitted
+  const handleFeedbackSubmitted = useCallback(() => {
+    setFeedbackLogKey((prev) => prev + 1);
+  }, []);
+
+  const handleAccordionChange = (itemKey: number | null) => {
+    setActiveAccordion(itemKey);
+  };
+
+  return (
+    <div className={`alpha-flyout ${isOpen ? 'open' : ''}`}>
+      {/* Header */}
+      <div className="alpha-flyout-header">
+        <div className="d-flex tw-align-items-center gap-2">
+          <CIcon icon={cilLifeRing} />
+          <span className="fw-semibold">Alpha Assistant</span>
+        </div>
+        <CCloseButton onClick={onClose} />
+      </div>
+
+      {/* Accordion Content */}
+      <div className="alpha-flyout-accordion-wrapper">
+        <CAccordion
+          activeItemKey={activeAccordion}
+          className="alpha-assistant-accordion"
+        >
+          {/* Accordion 1: Help / Feedback Agent */}
+          <CAccordionItem itemKey={1}>
+            <CAccordionHeader onClick={() => handleAccordionChange(activeAccordion === 1 ? null : 1)}>
+              Help / Feedback Agent
+            </CAccordionHeader>
+            <CAccordionBody>
+              <HelpFeedbackAgent
+                projectId={projectId}
+                pageContext={pageContext}
+                onFeedbackSubmitted={handleFeedbackSubmitted}
+              />
+            </CAccordionBody>
+          </CAccordionItem>
+
+          {/* Accordion 2: Feedback Log */}
+          <CAccordionItem itemKey={2}>
+            <CAccordionHeader onClick={() => handleAccordionChange(activeAccordion === 2 ? null : 2)}>
+              Feedback Log
+            </CAccordionHeader>
+            <CAccordionBody>
+              <FeedbackLog key={feedbackLogKey} />
+            </CAccordionBody>
+          </CAccordionItem>
+        </CAccordion>
+      </div>
+    </div>
+  );
+}
+
+export default AlphaAssistantFlyout;

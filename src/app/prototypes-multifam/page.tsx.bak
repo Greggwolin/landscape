@@ -1,0 +1,239 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Header from '../components/Header';
+import Navigation from '../components/Navigation';
+import { ProjectProvider } from '../components/ProjectProvider';
+import { multiFamPrototypeRegistry } from '@/lib/prototypes-multifam/registry';
+
+const statusMap: Record<string, string> = {
+  wip: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  stable: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  archived: 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+};
+
+interface PrototypeNoteEntry {
+  id: string;
+  prototypeId: string;
+  note: string;
+  timestamp: string;
+}
+
+type NotesByPrototype = Record<string, PrototypeNoteEntry[]>;
+
+const formatTimestamp = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleString();
+};
+
+function PrototypesMultiFamContent() {
+  const [notes, setNotes] = useState<NotesByPrototype>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const orderedNotes = useMemo(() => {
+    const normalized: NotesByPrototype = {};
+    Object.entries(notes).forEach(([prototypeId, entries]) => {
+      normalized[prototypeId] = [...entries].sort((a, b) =>
+        new Date(a.timestamp) > new Date(b.timestamp) ? -1 : 1
+      );
+    });
+    return normalized;
+  }, [notes]);
+
+  useEffect(() => {
+    const loadNotes = async () => {
+      try {
+        const response = await fetch('/api/prototypes/notes?type=multifam', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Failed to load notes');
+        }
+        const payload = (await response.json()) as PrototypeNoteEntry[];
+        const grouped: NotesByPrototype = {};
+        for (const entry of payload) {
+          if (!grouped[entry.prototypeId]) {
+            grouped[entry.prototypeId] = [];
+          }
+          grouped[entry.prototypeId].push(entry);
+        }
+        setNotes(grouped);
+      } catch (err) {
+        console.error(err);
+        setError('Unable to load prototype notes.');
+      }
+    };
+
+    loadNotes();
+  }, []);
+
+  return (
+    <div className="p-4 tw-space-y-4 tw-bg-gray-950 tw-min-h-screen">
+      {/* Page Title */}
+      <div className="tw-bg-gray-800 rounded border tw-border-gray-700 p-3">
+        <h2 className="tw-text-lg tw-font-semibold text-white">Prototypes - MultiFam</h2>
+      </div>
+
+      {/* Description */}
+      <div className="tw-bg-gray-800 rounded border tw-border-gray-700 p-4">
+        <p className="tw-text-sm tw-text-gray-400">
+          Each row contains two cards: one for the frontend UI prototype and one for the corresponding Django admin interface.
+          Click any tile to open it in a new window.
+        </p>
+        {error ? (
+          <p className="mt-3 tw-text-sm tw-text-amber-400">{error}</p>
+        ) : null}
+      </div>
+
+      {/* Prototypes Grid */}
+      {multiFamPrototypeRegistry.length === 0 ? (
+        <div className="tw-bg-gray-800 rounded border tw-border-gray-700 p-8 text-center">
+          <p className="tw-text-gray-400">No multifamily prototypes registered yet.</p>
+          <p className="mt-2 tw-text-sm tw-text-gray-500">
+            Add entries to <code className="mx-1 rounded tw-bg-gray-700 px-2 py-0.5 tw-text-xs">src/lib/prototypes-multifam/registry.ts</code> to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="tw-space-y-4">
+          {multiFamPrototypeRegistry.map((prototype) => {
+            const frontendNotes = orderedNotes[prototype.id] ?? [];
+            const backendNotes = orderedNotes[`${prototype.id}-admin`] ?? [];
+            const latestFrontendNote = frontendNotes[0];
+            const latestBackendNote = backendNotes[0];
+
+            return (
+              <div key={prototype.id} className="tw-grid gap-4 md:tw-grid-cols-2">
+                {/* Frontend Tile */}
+                <Link
+                  href={prototype.frontendUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group tw-flex tw-h-full tw-flex-col tw-justify-between tw-rounded-lg border tw-border-gray-700 tw-bg-gray-800 p-5 tw-transition hover:tw-border-gray-600 hover:tw-bg-gray-750 tw-cursor-pointer"
+                >
+                  <div className="tw-space-y-4">
+                    <div className="tw-flex tw-items-center tw-justify-between gap-3">
+                      <div className="tw-flex tw-items-center gap-2">
+                        <h3 className="tw-text-xl tw-font-semibold text-white">{prototype.name}</h3>
+                        <span className="tw-rounded-full tw-bg-blue-600/20 tw-text-blue-300 border tw-border-blue-500/40 px-2 py-0.5 tw-text-xs tw-font-medium">
+                          Open →
+                        </span>
+                      </div>
+                      <span
+                        className={`tw-rounded-full border px-3 py-1 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide ${ statusMap[prototype.status] }`}
+                      >
+                        {prototype.status}
+                      </span>
+                    </div>
+                    <p className="tw-text-sm tw-text-gray-400">{prototype.description}</p>
+                    {prototype.notes ? (
+                      <p className="tw-rounded-lg border tw-border-dashed tw-border-gray-700 tw-bg-gray-900/80 px-3 py-2 tw-text-xs tw-text-gray-400">
+                        {prototype.notes}
+                      </p>
+                    ) : null}
+                    {prototype.tags && prototype.tags.length > 0 ? (
+                      <div className="tw-flex tw-flex-wrap gap-2 tw-text-xs tw-text-gray-400">
+                        {prototype.tags.map((tag) => (
+                          <span key={tag} className="tw-rounded-full border tw-border-gray-700 px-3 py-1 tw-uppercase">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {prototype.branch ? (
+                      <div className="tw-text-xs tw-text-gray-500">
+                        Branch: <code>{prototype.branch}</code>
+                      </div>
+                    ) : null}
+
+                    <div className="tw-space-y-2 tw-rounded-lg border tw-border-gray-700 tw-bg-gray-900/60 p-3">
+                      <div className="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Latest note</div>
+                      {latestFrontendNote ? (
+                        <div className="tw-text-xs tw-text-gray-300">
+                          <div className="tw-font-medium tw-text-gray-200">{formatTimestamp(latestFrontendNote.timestamp)}</div>
+                          <div className="mt-1 tw-text-gray-400">{latestFrontendNote.note}</div>
+                        </div>
+                      ) : (
+                        <div className="tw-text-xs tw-text-gray-500">No notes yet.</div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+
+                {/* Backend Admin Tile */}
+                <Link
+                  href={prototype.backendUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group tw-flex tw-h-full tw-flex-col tw-justify-between tw-rounded-lg border tw-border-gray-700 tw-bg-gray-800 p-5 tw-transition hover:tw-border-gray-600 hover:tw-bg-gray-750 tw-cursor-pointer"
+                >
+                  <div className="tw-space-y-4">
+                    <div className="tw-flex tw-items-center tw-justify-between gap-3">
+                      <div className="tw-flex tw-items-center gap-2">
+                        <h3 className="tw-text-xl tw-font-semibold text-white">{prototype.name} - Admin</h3>
+                        <span className="tw-rounded-full tw-bg-purple-600/20 tw-text-purple-300 border tw-border-purple-500/40 px-2 py-0.5 tw-text-xs tw-font-medium">
+                          Admin →
+                        </span>
+                      </div>
+                      <span
+                        className={`tw-rounded-full border px-3 py-1 tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide ${ statusMap[prototype.status] }`}
+                      >
+                        {prototype.status}
+                      </span>
+                    </div>
+                    <p className="tw-text-sm tw-text-gray-400">Django admin interface for {prototype.name.toLowerCase()}</p>
+                    {prototype.tags && prototype.tags.length > 0 ? (
+                      <div className="tw-flex tw-flex-wrap gap-2 tw-text-xs tw-text-gray-400">
+                        {prototype.tags.map((tag) => (
+                          <span key={tag} className="tw-rounded-full border tw-border-gray-700 px-3 py-1 tw-uppercase">
+                            {tag}
+                          </span>
+                        ))}
+                        <span className="tw-rounded-full border tw-border-gray-700 px-3 py-1 tw-uppercase">admin</span>
+                      </div>
+                    ) : (
+                      <div className="tw-flex tw-flex-wrap gap-2 tw-text-xs tw-text-gray-400">
+                        <span className="tw-rounded-full border tw-border-gray-700 px-3 py-1 tw-uppercase">admin</span>
+                      </div>
+                    )}
+
+                    <div className="tw-space-y-2 tw-rounded-lg border tw-border-gray-700 tw-bg-gray-900/60 p-3">
+                      <div className="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Latest note</div>
+                      {latestBackendNote ? (
+                        <div className="tw-text-xs tw-text-gray-300">
+                          <div className="tw-font-medium tw-text-gray-200">{formatTimestamp(latestBackendNote.timestamp)}</div>
+                          <div className="mt-1 tw-text-gray-400">{latestBackendNote.note}</div>
+                        </div>
+                      ) : (
+                        <div className="tw-text-xs tw-text-gray-500">No notes yet.</div>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function PrototypesMultiFamPage() {
+  const [activeView] = useState('prototype-lab-multifam');
+
+  return (
+    <ProjectProvider>
+      <div className="tw-min-h-screen tw-bg-gray-950 tw-flex tw-flex-col">
+        <Header />
+        <div className="tw-flex tw-flex-1">
+          <Navigation activeView={activeView} setActiveView={() => {}} />
+          <main className="tw-flex-1 tw-overflow-visible tw-bg-gray-950">
+            <PrototypesMultiFamContent />
+          </main>
+        </div>
+      </div>
+    </ProjectProvider>
+  );
+}

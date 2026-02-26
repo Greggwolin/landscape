@@ -1,0 +1,271 @@
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilLayers } from '@coreui/icons';
+
+export interface DocTypeFilter {
+  doc_type: string;
+  count: number;
+  is_expanded?: boolean;
+}
+
+export interface SmartFilter {
+  filter_id: number;
+  filter_name: string;
+  doc_type: string;
+  tags: string[];
+  count: number;
+}
+
+interface DocTypeFiltersProps {
+  projectId: number | null;
+  selectedDocType: string | null;
+  onFilterChange: (docType: string | null) => void;
+  className?: string;
+  workspaceId?: number;
+}
+
+async function parseJsonSafely<T>(response: Response, context: string): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  const raw = await response.text();
+  if (!raw) return {} as T;
+
+  if (!contentType.toLowerCase().includes('application/json')) {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: expected JSON, received ${contentType || 'unknown'} (${response.status}). ${preview}`);
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const preview = raw.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`${context}: invalid JSON response (${response.status}). ${preview}`);
+  }
+}
+
+export default function DocTypeFilters({
+  projectId,
+  selectedDocType,
+  onFilterChange,
+  className = '',
+  workspaceId = 1
+}: DocTypeFiltersProps) {
+  const [docTypes, setDocTypes] = useState<DocTypeFilter[]>([]);
+  const [smartFilters, setSmartFilters] = useState<SmartFilter[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    void fetchCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  const applyPlatformKnowledge = (entries: DocTypeFilter[], platformCount = 0) => {
+    const normalized = entries.filter(
+      (item) => item.doc_type.toLowerCase() !== 'platform knowledge'
+    );
+    const existing = entries.find(
+      (item) => item.doc_type.toLowerCase() === 'platform knowledge'
+    );
+    return [
+      ...normalized,
+      {
+        doc_type: 'Platform Knowledge',
+        count: existing?.count ?? platformCount
+      }
+    ];
+  };
+
+  const fetchCounts = async () => {
+    setIsLoading(true);
+    try {
+      if (!projectId) {
+        const [response, platformResponse] = await Promise.all([
+          fetch('/api/dms/search?limit=0&offset=0'),
+          fetch('/api/platform-knowledge?limit=0&offset=0')
+        ]);
+        if (!response.ok) throw new Error('Failed to fetch global filters');
+        const data = await parseJsonSafely<{ facets?: { doc_type?: Record<string, number | string> } }>(
+          response,
+          'dms/search global filters'
+        );
+        const platformData = platformResponse.ok
+          ? await parseJsonSafely<{ totalHits?: number }>(platformResponse, 'platform-knowledge global filters')
+          : { totalHits: 0 };
+        const facetDocTypes = data?.facets?.doc_type || {};
+        const docTypeEntries = Object.entries(facetDocTypes)
+          .filter(([docType]) => docType && docType !== 'null')
+          .map(([docType, count]) => ({
+            doc_type: docType,
+            count: Number(count) || 0
+          }))
+          .sort((a, b) => a.doc_type.localeCompare(b.doc_type));
+        setDocTypes(applyPlatformKnowledge(docTypeEntries, platformData.totalHits || 0));
+        setSmartFilters([]);
+        return;
+      }
+
+      const [docTypesResponse, countsResponse] = await Promise.all([
+        fetch(`/api/dms/templates/doc-types?project_id=${projectId}&workspace_id=${workspaceId}`),
+        fetch(`/api/dms/filters/counts?project_id=${projectId}`)
+      ]);
+      const platformResponse = await fetch('/api/platform-knowledge?limit=0&offset=0');
+
+      let docTypeOptions: string[] = [];
+      if (docTypesResponse.ok) {
+        const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
+          docTypesResponse,
+          'dms/templates/doc-types filters'
+        );
+        docTypeOptions = Array.isArray(data.doc_type_options) ? data.doc_type_options : [];
+      }
+
+      if (!countsResponse.ok) throw new Error('Failed to fetch filter counts');
+      const countsData = await parseJsonSafely<{ doc_type_counts?: Array<{ doc_type: string; count: number }>; smart_filters?: any[] }>(
+        countsResponse,
+        'dms/filters/counts filters'
+      );
+      const countEntries: Array<{ doc_type: string; count: number }> = Array.isArray(countsData.doc_type_counts)
+        ? countsData.doc_type_counts
+        : [];
+      const countMap = new Map<string, number>();
+      countEntries.forEach(({ doc_type, count }) => {
+        if (!doc_type) return;
+        countMap.set(doc_type, count ?? 0);
+        countMap.set(doc_type.toLowerCase(), count ?? 0);
+      });
+
+      const templateFilters = docTypeOptions.map((type) => ({
+        doc_type: type,
+        count: countMap.get(type) ?? countMap.get(type.toLowerCase()) ?? 0
+      }));
+
+      const templateSet = new Set(docTypeOptions.map((type) => type.toLowerCase()));
+      const extraFilters = countEntries
+        .filter(({ doc_type }) => doc_type && !templateSet.has(doc_type.toLowerCase()))
+        .map(({ doc_type, count }) => ({
+          doc_type,
+          count: count ?? 0
+        }));
+
+      const platformData = platformResponse.ok
+        ? await parseJsonSafely<{ totalHits?: number }>(platformResponse, 'platform-knowledge filters')
+        : { totalHits: 0 };
+      setDocTypes(applyPlatformKnowledge([...templateFilters, ...extraFilters], platformData.totalHits || 0));
+      setSmartFilters(
+        Array.isArray(countsData.smart_filters)
+          ? countsData.smart_filters.map((item: any) => ({
+              filter_id: item.filter_id,
+              filter_name: item.filter_name,
+              doc_type: item.query?.doc_type || '',
+              tags: item.query?.tags || [],
+              count: 0
+            }))
+          : []
+      );
+    } catch (error) {
+      console.error('DocTypeFilters load error:', error);
+      setDocTypes([]);
+      setSmartFilters([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggle = (docType: string) => {
+    const next = new Set(expanded);
+    if (next.has(docType)) {
+      next.delete(docType);
+    } else {
+      next.add(docType);
+    }
+    setExpanded(next);
+  };
+
+  const smartFiltersByType = useMemo(() => {
+    const map = new Map<string, SmartFilter[]>();
+    smartFilters.forEach((sf) => {
+      const list = map.get(sf.doc_type) ?? [];
+      list.push(sf);
+      map.set(sf.doc_type, list);
+    });
+    return map;
+  }, [smartFilters]);
+
+  if (isLoading) {
+    return (
+      <div className={`tw-text-sm p-4 ${className}`} style={{ color: 'var(--cui-secondary-color)' }}>
+        Loading filters...
+      </div>
+    );
+  }
+
+  if (docTypes.length === 0) {
+    return (
+      <div className={`tw-text-sm p-4 ${className}`} style={{ color: 'var(--cui-secondary-color)' }}>
+        No document types found
+      </div>
+    );
+  }
+
+  return (
+    <div className={`className`}>
+      {docTypes.map((item) => {
+        const isActive = selectedDocType === item.doc_type;
+        const isExpanded = expanded.has(item.doc_type);
+        const smartList = smartFiltersByType.get(item.doc_type) ?? [];
+
+        return (
+          <div key={item.doc_type} style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
+            <button
+              onClick={() => {
+                handleToggle(item.doc_type);
+                onFilterChange(item.doc_type);
+              }}
+              className="tw-w-full tw-flex tw-items-center tw-justify-between px-4 py-3 tw-text-sm tw-transition-colors"
+              style={{
+                backgroundColor: isActive ? 'var(--cui-primary-bg)' : 'transparent',
+                color: isActive ? 'var(--cui-primary)' : 'var(--cui-body-color)'
+              }}
+            >
+              <div className="tw-flex tw-items-center gap-2">
+                <span style={{ color: 'var(--cui-secondary-color)' }}>
+                  {isExpanded ? '▾' : '▸'}
+                </span>
+                <CIcon icon={cilLayers} className="w-4 h-4" style={{ color: 'var(--cui-secondary-color)' }} />
+                <span className="tw-font-medium">{item.doc_type}</span>
+              </div>
+              <span className="tw-text-xs" style={{ color: 'var(--cui-secondary-color)' }}>{item.count ?? 0}</span>
+            </button>
+
+            {isExpanded && smartList.length > 0 && (
+              <div className="pl-6 pr-3 pb-2 tw-space-y-1">
+                {smartList.map((sf) => {
+                  const sfActive = selectedDocType === sf.doc_type && sf.filter_name === sf.filter_name;
+                  return (
+                    <button
+                      key={sf.filter_id}
+                      onClick={() => onFilterChange(sf.doc_type)}
+                      className="tw-w-full tw-flex tw-items-center tw-justify-between tw-text-xs px-2 py-1 rounded"
+                      style={{
+                        backgroundColor: sfActive ? 'var(--cui-primary-bg)' : 'transparent',
+                        color: sfActive ? 'var(--cui-primary)' : 'var(--cui-body-color)'
+                      }}
+                    >
+                      <span className="tw-flex tw-items-center gap-2">
+                        <span style={{ color: 'var(--cui-secondary-color)' }}>•</span>
+                        {sf.filter_name}
+                      </span>
+                      <span style={{ color: 'var(--cui-secondary-color)' }}>{sf.count ?? 0}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

@@ -1,0 +1,124 @@
+'use client';
+
+/**
+ * StagingTray — Slide-up panel for reviewing and confirming staged uploads.
+ * Appears at bottom of the DMS view when files are dropped or selected.
+ */
+
+import React from 'react';
+import { useUploadStaging } from '@/contexts/UploadStagingContext';
+import StagingRow from './StagingRow';
+
+export default function StagingTray() {
+  const {
+    stagedFiles,
+    isTrayOpen,
+    closeTray,
+    removeFile,
+    confirmFile,
+    confirmAll,
+    setFileDocType,
+    setFileRoute,
+    docTypes,
+  } = useUploadStaging();
+
+  const readyCount = stagedFiles.filter(f => f.status === 'ready').length;
+  const pendingCount = stagedFiles.filter(
+    f => f.status !== 'complete' && f.status !== 'error'
+  ).length;
+  const isUploading = stagedFiles.some(f => f.status === 'uploading');
+
+  if (!isTrayOpen || stagedFiles.length === 0) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={closeTray}
+        role="presentation"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.25)',
+          zIndex: 1039,
+        }}
+      />
+
+      {/* Tray */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxHeight: '45vh',
+          zIndex: 1040,
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--cui-body-bg)',
+          borderTop: '2px solid var(--cui-primary)',
+          boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.12)',
+          borderRadius: '12px 12px 0 0',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="d-flex tw-align-items-center tw-justify-content-between px-4 py-2"
+          style={{
+            borderBottom: '1px solid var(--cui-border-color)',
+            flexShrink: 0,
+          }}
+        >
+          <div className="d-flex tw-align-items-center gap-2">
+            <span style={{ fontSize: '1rem' }}>&#128229;</span>
+            <strong style={{ fontSize: '0.85rem', color: 'var(--cui-body-color)' }}>
+              Staging
+            </strong>
+            <span
+              className="tw-text-xs"
+              style={{ color: 'var(--cui-secondary-color)' }}
+            >
+              &mdash; {pendingCount} file{pendingCount !== 1 ? 's' : ''} pending
+            </span>
+          </div>
+
+          <div className="d-flex gap-2">
+            <button
+              type="button"
+              onClick={() => void confirmAll()}
+              disabled={readyCount === 0 || isUploading}
+              className="btn btn-primary btn-sm"
+              style={{ fontSize: '0.75rem' }}
+            >
+              {isUploading ? 'Uploading...' : `Confirm All (${readyCount})`}
+            </button>
+            <button
+              type="button"
+              onClick={closeTray}
+              disabled={isUploading}
+              className="btn btn-outline-secondary btn-sm"
+              style={{ fontSize: '0.75rem' }}
+            >
+              &#10005;
+            </button>
+          </div>
+        </div>
+
+        {/* File list */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {stagedFiles.map(sf => (
+            <StagingRow
+              key={sf.id}
+              file={sf}
+              docTypes={docTypes}
+              onRemove={removeFile}
+              onConfirm={(id) => void confirmFile(id)}
+              onSetDocType={setFileDocType}
+              onSetRoute={setFileRoute}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}

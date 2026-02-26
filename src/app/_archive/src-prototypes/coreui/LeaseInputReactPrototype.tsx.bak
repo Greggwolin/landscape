@@ -1,0 +1,50 @@
+'use client';
+
+import { useState } from 'react';
+
+const LeaseInputReactPrototype = () => {
+  const [iframeKey, setIframeKey] = useState(0);
+
+  return (
+    <div className="tw-flex tw-flex-col gap-4">
+      <div className="tw-flex tw-flex-col gap-2 tw-rounded-lg border tw-border-neutral-800 tw-bg-neutral-900/80 px-4 py-3 tw-text-sm tw-text-neutral-300 md:flex-row md:tw-items-center md:tw-justify-between">
+        <div>
+          <h3 className="tw-text-base tw-font-semibold text-white">Lease Workspace Prototype</h3>
+          <p className="tw-text-neutral-400">
+            React/Next.js conversion of the ARGUS-style lease input experience. Launches the dynamic route at
+            <code className="ml-2 rounded tw-bg-neutral-800 px-2 py-0.5 tw-text-xs">/lease/101</code> backed by the mock
+            API.
+          </p>
+        </div>
+        <div className="tw-flex gap-3">
+          <a
+            href="/lease/101"
+            target="_blank"
+            rel="noreferrer"
+            className="tw-rounded-md tw-bg-indigo-500 px-4 py-2 tw-text-sm tw-font-semibold text-white tw-shadow tw-transition hover:tw-bg-indigo-400"
+          >
+            Open full page
+          </a>
+          <button
+            type="button"
+            onClick={() => setIframeKey((prev) => prev + 1)}
+            className="tw-rounded-md border tw-border-neutral-700 px-4 py-2 tw-text-sm tw-font-semibold tw-text-neutral-200 tw-transition hover:tw-border-neutral-500 hover:text-white"
+          >
+            Reload preview
+          </button>
+        </div>
+      </div>
+
+      <div className="tw-relative tw-min-h-[720px] tw-overflow-hidden tw-rounded-xl border tw-border-neutral-800 bg-black/40">
+        <iframe
+          key={iframeKey}
+          src="/lease/101"
+          title="Lease Input React Prototype"
+          className="tw-h-[1100px] tw-w-full bg-transparent"
+        />
+      </div>
+    </div>
+  );
+};
+
+export default LeaseInputReactPrototype;

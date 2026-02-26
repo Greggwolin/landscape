@@ -1,0 +1,650 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+
+interface DocumentReviewSuggestion {
+  field_name: string
+  field_label: string
+  suggested_value: string | number
+  confidence: number
+  reasoning: string
+  current_value?: string | number | null
+  source_documents: string[]
+}
+
+interface DocumentReviewResponse {
+  project_id: number
+  review_summary: string
+  suggestions: DocumentReviewSuggestion[]
+  documents_analyzed: string[]
+}
+
+interface DocumentReviewProps {
+  projectId: number
+  onComplete?: () => void
+  onClose?: () => void
+}
+
+type SuggestionStatus = 'pending' | 'confirmed' | 'edited' | 'passed'
+
+interface SuggestionState extends DocumentReviewSuggestion {
+  status: SuggestionStatus
+  edited_value?: string | number
+  user_notes?: string
+}
+
+const DocumentReview: React.FC<DocumentReviewProps> = ({
+  projectId,
+  onComplete,
+  onClose
+}) => {
+  const [isLoading, setIsLoading] = useState(true)
+  const [reviewData, setReviewData] = useState<DocumentReviewResponse | null>(null)
+  const [suggestions, setSuggestions] = useState<SuggestionState[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [expandedSuggestion, setExpandedSuggestion] = useState<string | null>(null)
+
+  useEffect(() => {
+    performDocumentReview()
+  }, [projectId])
+
+  const performDocumentReview = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      console.log('🤖 Starting AI document review...')
+
+      const response = await fetch('/api/ai/document-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to perform document review')
+      }
+
+      const data: DocumentReviewResponse = await response.json()
+      setReviewData(data)
+
+      // Initialize suggestion states
+      const initialSuggestions: SuggestionState[] = data.suggestions.map(suggestion => ({
+        ...suggestion,
+        status: 'pending'
+      }))
+      setSuggestions(initialSuggestions)
+
+    } catch (err) {
+      console.error('Document review error:', err)
+      setError(err instanceof Error ? err.message : 'Unknown error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSuggestionAction = (fieldName: string, action: SuggestionStatus, value?: string | number, notes?: string) => {
+    setSuggestions(prev => prev.map(suggestion =>
+      suggestion.field_name === fieldName
+        ? {
+            ...suggestion,
+            status: action,
+            edited_value: value,
+            user_notes: notes
+          }
+        : suggestion
+    ))
+  }
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.9) return 'text-green-600'
+    if (confidence >= 0.7) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const getConfidenceText = (confidence: number) => {
+    if (confidence >= 0.9) return 'High'
+    if (confidence >= 0.7) return 'Medium'
+    return 'Low'
+  }
+
+  const handleConfirmAll = async () => {
+    const confirmedSuggestions = suggestions.filter(s => s.status === 'confirmed' || s.status === 'edited')
+
+    if (confirmedSuggestions.length === 0) {
+      alert('Please confirm at least one suggestion before proceeding.')
+      return
+    }
+
+    try {
+      setIsUpdating(true)
+
+      const fieldUpdates = confirmedSuggestions.map(suggestion => ({
+        field_name: suggestion.field_name,
+        value: suggestion.status === 'edited' ? suggestion.edited_value : suggestion.suggested_value
+      }))
+
+      const userFeedback = suggestions
+        .filter(s => s.user_notes)
+        .map(s => `${s.field_label}: ${s.user_notes}`)
+        .join('; ')
+
+      const response = await fetch('/api/ai/document-review', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          field_updates: fieldUpdates,
+          user_feedback: userFeedback || null
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update project fields')
+      }
+
+      console.log('✅ Project fields updated successfully')
+
+      if (onComplete) {
+        onComplete()
+      }
+
+    } catch (err) {
+      console.error('Update error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update project fields')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const getSummaryStats = () => {
+    const confirmed = suggestions.filter(s => s.status === 'confirmed').length
+    const edited = suggestions.filter(s => s.status === 'edited').length
+    const passed = suggestions.filter(s => s.status === 'passed').length
+    const pending = suggestions.filter(s => s.status === 'pending').length
+
+    return { confirmed, edited, passed, pending }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="tw-fixed tw-inset-0 bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-50">
+        <div className="bg-white tw-rounded-lg p-8 tw-max-w-md tw-w-full mx-4">
+          <div className="tw-flex tw-items-center gap-3">
+            <div className="tw-animate-spin w-6 h-6 tw-border-2 tw-border-blue-500 tw-border-t-transparent tw-rounded-full"></div>
+            <span className="tw-text-gray-700">Analyzing project documents...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="tw-fixed tw-inset-0 bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-50">
+        <div className="bg-white tw-rounded-lg p-8 tw-max-w-md tw-w-full mx-4">
+          <div className="tw-text-red-600 mb-4">
+            <h3 className="tw-text-lg tw-font-semibold">Document Review Error</h3>
+            <p className="tw-text-sm mt-2">{error}</p>
+          </div>
+          <div className="tw-flex gap-2">
+            <button
+              onClick={performDocumentReview}
+              className="btn btn-primary"
+            >
+              Retry
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="btn btn-secondary"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!reviewData) {
+    return null
+  }
+
+  const stats = getSummaryStats()
+
+  return (
+    <div className="tw-fixed tw-inset-0 bg-black tw-bg-opacity-50 tw-flex tw-items-center tw-justify-center tw-z-50 tw-overflow-y-auto">
+      <div className="bg-white tw-rounded-lg tw-shadow-xl tw-max-w-4xl tw-w-full mx-4 my-8 tw-max-h-[90vh] tw-flex tw-flex-col">
+        {/* Header */}
+        <div className="p-6 tw-border-b tw-border-gray-200">
+          <div className="tw-flex tw-items-center tw-justify-between">
+            <div>
+              <h2 className="tw-text-xl tw-font-semibold tw-text-gray-900">AI Document Review</h2>
+              <p className="tw-text-sm tw-text-gray-600 mt-1">
+                Project {projectId} • {reviewData.documents_analyzed.length} document(s) analyzed
+              </p>
+            </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="btn btn-sm btn-ghost-secondary"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="p-6 tw-bg-blue-50 tw-border-b tw-border-gray-200">
+          <h3 className="tw-font-medium tw-text-gray-900 mb-2">Review Summary</h3>
+          <p className="tw-text-gray-700 tw-text-sm tw-leading-relaxed">{reviewData.review_summary}</p>
+
+          {/* Progress Stats */}
+          <div className="mt-4 tw-flex gap-4 tw-text-sm">
+            <span className="tw-text-green-600">✓ {stats.confirmed} confirmed</span>
+            <span className="tw-text-blue-600">✏ {stats.edited} edited</span>
+            <span className="tw-text-yellow-600">⏸ {stats.passed} passed</span>
+            <span className="tw-text-gray-600">⏳ {stats.pending} pending</span>
+          </div>
+        </div>
+
+        {/* Suggestions List */}
+        <div className="tw-flex-1 tw-overflow-y-auto p-6">
+          <h3 className="tw-font-medium tw-text-gray-900 mb-4">Suggested Field Values</h3>
+
+          {suggestions.length === 0 ? (
+            <div className="text-center py-8 tw-text-gray-500">
+              No field suggestions found in the analyzed documents.
+            </div>
+          ) : (
+            <div className="tw-space-y-4">
+              {suggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={suggestion.field_name}
+                  suggestion={suggestion}
+                  onAction={handleSuggestionAction}
+                  isExpanded={expandedSuggestion === suggestion.field_name}
+                  onToggleExpand={() => setExpandedSuggestion(
+                    expandedSuggestion === suggestion.field_name ? null : suggestion.field_name
+                  )}
+                  getConfidenceColor={getConfidenceColor}
+                  getConfidenceText={getConfidenceText}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 tw-border-t tw-border-gray-200 tw-bg-gray-50">
+          <div className="tw-flex tw-items-center tw-justify-between">
+            <div className="tw-text-sm tw-text-gray-600">
+              {stats.confirmed + stats.edited} of {suggestions.length} suggestions ready to apply
+            </div>
+            <div className="tw-flex gap-3">
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="btn btn-outline-secondary"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                onClick={handleConfirmAll}
+                disabled={isUpdating || (stats.confirmed + stats.edited) === 0}
+                className="btn btn-primary d-flex tw-align-items-center gap-2"
+              >
+                {isUpdating && <div className="w-4 h-4 tw-border-2 border-white tw-border-t-transparent tw-rounded-full tw-animate-spin"></div>}
+                Apply Changes ({stats.confirmed + stats.edited})
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface SuggestionCardProps {
+  suggestion: SuggestionState
+  onAction: (fieldName: string, action: SuggestionStatus, value?: string | number, notes?: string) => void
+  isExpanded: boolean
+  onToggleExpand: () => void
+  getConfidenceColor: (confidence: number) => string
+  getConfidenceText: (confidence: number) => string
+}
+
+const SuggestionCard: React.FC<SuggestionCardProps> = ({
+  suggestion,
+  onAction,
+  isExpanded,
+  onToggleExpand,
+  getConfidenceColor,
+  getConfidenceText
+}) => {
+  const [editValue, setEditValue] = useState<string | number>(suggestion.suggested_value)
+  const [editNotes, setEditNotes] = useState('')
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [isReanalyzing, setIsReanalyzing] = useState(false)
+  const [reanalysisMessage, setReanalysisMessage] = useState('')
+  const [aiRevisedSuggestion, setAiRevisedSuggestion] = useState<any>(null)
+  const [showAiRevision, setShowAiRevision] = useState(false)
+
+  const handleEdit = () => {
+    if (editNotes.trim()) {
+      onAction(suggestion.field_name, 'edited', editValue, editNotes)
+      setShowEditForm(false)
+    } else {
+      alert('Please provide reasoning for your edit.')
+    }
+  }
+
+  const handleAIReanalysis = async () => {
+    if (!editNotes.trim()) {
+      alert('Please provide feedback for the AI to consider during re-analysis.')
+      return
+    }
+
+    setIsReanalyzing(true)
+    setReanalysisMessage('')
+
+    try {
+      const response = await fetch('/api/ai/document-review', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: 8, // For demo, hardcode Red Valley project
+          field_name: suggestion.field_name,
+          user_feedback: editNotes,
+          current_suggestion: suggestion,
+          user_proposed_value: editValue // Include the user's proposed value
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        // Store the AI's revised suggestion for user review
+        setAiRevisedSuggestion(result.revised_suggestion)
+        setShowAiRevision(true)
+
+        let message = `🤖 ${result.message}`
+        if (result.additional_fields && result.additional_fields.length > 0) {
+          message += `\n\n📊 Analysis Details:\n• Document: ${result.analysis_details?.document_analyzed}\n• Tables Found: ${result.analysis_details?.tables_found}\n• Rows Analyzed: ${result.analysis_details?.total_rows_analyzed}\n\n✨ Discovered ${result.additional_fields.length} new fields: ${result.additional_fields.map(f => f.field_label).join(', ')}`
+        }
+
+        setReanalysisMessage(message)
+
+        // Log discovered fields for potential addition to suggestions list
+        if (result.additional_fields) {
+          console.log('🔍 AI discovered additional fields:', result.additional_fields)
+          // In a real implementation, these would be added to the main suggestions list
+        }
+      } else if (result.requires_user_clarification) {
+        setReanalysisMessage(`❓ ${result.message}\n\n${result.ai_question}`)
+      } else {
+        setReanalysisMessage('❌ AI re-analysis failed: ' + (result.message || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Re-analysis error:', error)
+      setReanalysisMessage('❌ Failed to contact AI for re-analysis')
+    } finally {
+      setIsReanalyzing(false)
+    }
+  }
+
+  const handleAcceptAiRevision = () => {
+    if (aiRevisedSuggestion) {
+      setEditValue(aiRevisedSuggestion.suggested_value)
+      setEditNotes(editNotes + (editNotes ? '\n\n' : '') + `Accepted AI revised suggestion: ${aiRevisedSuggestion.reasoning}`)
+      setShowAiRevision(false)
+    }
+  }
+
+  const handleRejectAiRevision = () => {
+    setShowAiRevision(false)
+    setAiRevisedSuggestion(null)
+  }
+
+  const getStatusIcon = () => {
+    switch (suggestion.status) {
+      case 'confirmed': return <span className="tw-text-green-600">✓</span>
+      case 'edited': return <span className="tw-text-blue-600">✏</span>
+      case 'passed': return <span className="tw-text-yellow-600">⏸</span>
+      default: return <span className="tw-text-gray-400">⏳</span>
+    }
+  }
+
+  const getDisplayValue = () => {
+    if (suggestion.status === 'edited' && suggestion.edited_value !== undefined) {
+      return suggestion.edited_value
+    }
+    return suggestion.suggested_value
+  }
+
+  return (
+    <div className="border tw-border-gray-200 tw-rounded-lg p-4 bg-white">
+      <div className="tw-flex tw-items-center tw-justify-between">
+        <div className="tw-flex-1">
+          <div className="tw-flex tw-items-center gap-2 mb-2">
+            {getStatusIcon()}
+            <h4 className="tw-font-medium tw-text-gray-900">{suggestion.field_label}</h4>
+            <span className={`tw-text-xs tw-font-medium ${getConfidenceColor(suggestion.confidence)}`}>
+              {getConfidenceText(suggestion.confidence)} ({Math.round(suggestion.confidence * 100)}%)
+            </span>
+          </div>
+
+          {/* Document Sources */}
+          <div className="mb-3">
+            <div className="tw-text-xs tw-text-gray-500 mb-1">Based on documents:</div>
+            <div className="tw-flex tw-flex-wrap gap-1">
+              {suggestion.source_documents.map((doc, index) => (
+                <span
+                  key={index}
+                  className="tw-inline-flex tw-items-center px-2 py-1 tw-rounded-full tw-text-xs tw-bg-blue-100 tw-text-blue-700"
+                >
+                  📄 {doc}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="tw-grid tw-grid-cols-2 gap-4 tw-text-sm">
+            <div>
+              <span className="tw-text-gray-500">Current:</span>
+              <div className="tw-font-mono tw-bg-gray-50 p-1 rounded mt-1">
+                {suggestion.current_value || <em className="tw-text-gray-400">None</em>}
+              </div>
+            </div>
+            <div>
+              <span className="tw-text-gray-500">Suggested:</span>
+              <div className="tw-font-mono tw-bg-blue-50 p-1 rounded mt-1">
+                {getDisplayValue()}
+              </div>
+            </div>
+          </div>
+
+          {isExpanded && (
+            <div className="mt-3 tw-text-sm tw-text-gray-600 tw-bg-gray-50 p-3 rounded">
+              <strong>AI Reasoning:</strong> {suggestion.reasoning}
+            </div>
+          )}
+
+          {suggestion.status === 'edited' && suggestion.user_notes && (
+            <div className="mt-2 tw-text-sm tw-text-blue-700 tw-bg-blue-50 p-2 rounded">
+              <strong>Your notes:</strong> {suggestion.user_notes}
+            </div>
+          )}
+        </div>
+
+        <div className="tw-flex tw-items-center gap-2 ml-4">
+          <button
+            onClick={onToggleExpand}
+            className="tw-text-gray-400 hover:tw-text-gray-600 tw-text-xs"
+          >
+            {isExpanded ? 'Less' : 'More'}
+          </button>
+        </div>
+      </div>
+
+      {suggestion.status === 'pending' && (
+        <div className="tw-flex tw-items-center gap-2 mt-4 pt-3 tw-border-t tw-border-gray-100">
+          <button
+            onClick={() => onAction(suggestion.field_name, 'confirmed')}
+            className="btn btn-sm btn-success"
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => setShowEditForm(true)}
+            className="btn btn-sm btn-primary"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onAction(suggestion.field_name, 'passed')}
+            className="btn btn-sm btn-warning"
+          >
+            Pass
+          </button>
+        </div>
+      )}
+
+      {suggestion.status !== 'pending' && (
+        <div className="tw-flex tw-items-center gap-2 mt-4 pt-3 tw-border-t tw-border-gray-100">
+          <button
+            onClick={() => onAction(suggestion.field_name, 'pending')}
+            className="btn btn-sm btn-secondary"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+
+      {showEditForm && (
+        <div className="mt-4 p-3 tw-bg-blue-50 rounded border">
+          <div className="mb-3">
+            <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-700 mb-1">
+              Your Value:
+            </label>
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              className="tw-w-full p-2 border tw-border-gray-300 rounded tw-text-sm"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="tw-block tw-text-sm tw-font-medium tw-text-gray-700 mb-1">
+              Why is the AI suggestion incorrect?
+            </label>
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              placeholder="Explain why you're changing this value..."
+              className="tw-w-full p-2 border tw-border-gray-300 rounded tw-text-sm h-20"
+            />
+          </div>
+
+          {reanalysisMessage && (
+            <div className="mb-3 p-2 tw-bg-yellow-50 border tw-border-yellow-200 rounded tw-text-sm">
+              {reanalysisMessage}
+            </div>
+          )}
+
+          {/* AI Revised Suggestion for Confirmation */}
+          {showAiRevision && aiRevisedSuggestion && (
+            <div className="mb-3 p-4 tw-bg-green-50 tw-border-2 tw-border-green-300 tw-rounded-lg">
+              <div className="tw-flex tw-items-center gap-2 mb-2">
+                <span className="tw-text-green-700 tw-font-semibold">🤖 AI Found New Information!</span>
+                <span className="tw-text-xs tw-bg-green-200 tw-text-green-800 px-2 py-1 rounded">
+                  {Math.round(aiRevisedSuggestion.confidence * 100)}% confidence
+                </span>
+              </div>
+
+              <div className="tw-grid tw-grid-cols-2 gap-4 mb-3">
+                <div>
+                  <div className="tw-text-xs tw-text-gray-600 mb-1">Original Suggestion:</div>
+                  <div className="tw-font-mono tw-bg-gray-100 p-2 rounded tw-text-sm">
+                    {suggestion.suggested_value}
+                  </div>
+                </div>
+                <div>
+                  <div className="tw-text-xs tw-text-gray-600 mb-1">AI Revised Suggestion:</div>
+                  <div className="tw-font-mono tw-bg-green-100 p-2 rounded tw-text-sm tw-font-semibold">
+                    {aiRevisedSuggestion.suggested_value}
+                  </div>
+                </div>
+              </div>
+
+              <div className="tw-text-xs tw-text-green-700 mb-3 tw-bg-green-100 p-2 rounded">
+                <strong>AI Reasoning:</strong> {aiRevisedSuggestion.reasoning}
+              </div>
+
+              <div className="tw-flex gap-2">
+                <button
+                  onClick={handleAcceptAiRevision}
+                  className="btn btn-sm btn-success"
+                >
+                  ✅ Accept AI Revision
+                </button>
+                <button
+                  onClick={handleRejectAiRevision}
+                  className="btn btn-sm btn-secondary"
+                >
+                  ❌ Keep My Value
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="tw-flex gap-2 tw-flex-wrap">
+            <button
+              onClick={handleAIReanalysis}
+              disabled={isReanalyzing || !editNotes.trim()}
+              className="btn btn-sm btn-info d-flex tw-align-items-center gap-1"
+            >
+              {isReanalyzing && <div className="w-3 h-3 border border-white tw-border-t-transparent tw-rounded-full tw-animate-spin"></div>}
+              🤖 Ask AI to Re-analyze
+            </button>
+            <button
+              onClick={handleEdit}
+              className="btn btn-sm btn-primary"
+            >
+              Save Edit
+            </button>
+            <button
+              onClick={() => {
+                setShowEditForm(false)
+                setEditValue(suggestion.suggested_value)
+                setEditNotes('')
+                setReanalysisMessage('')
+                setShowAiRevision(false)
+                setAiRevisedSuggestion(null)
+              }}
+              className="btn btn-sm btn-secondary"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default DocumentReview

@@ -1,0 +1,569 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import {
+  useCompetitorsWithZondaSync,
+  useDeleteCompetitor,
+  MarketCompetitiveProject,
+  MarketCompetitiveProjectProduct,
+} from '@/hooks/useMarketData';
+import { useToast } from '@/components/ui/toast';
+import { SemanticBadge } from '@/components/ui/landscape';
+import { AddCompetitorModal } from './AddCompetitorModal';
+
+interface CompetitiveProjectsPanelProps {
+  projectId: number;
+  radiusMiles: number;
+}
+
+// Grouped structure for master plan display
+interface MasterPlanGroup {
+  masterPlanName: string | null;
+  competitors: MarketCompetitiveProject[];
+  // Aggregated metrics
+  totalUnits: number;
+  priceMin: number | null;
+  priceMax: number | null;
+  avgAbsorption: number | null;
+}
+
+export function CompetitiveProjectsPanel({ projectId, radiusMiles }: CompetitiveProjectsPanelProps) {
+  const { showToast } = useToast();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [expandedMasterPlans, setExpandedMasterPlans] = useState<Set<string>>(new Set(['__all__']));
+  const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+
+  // Use the auto-sync hook
+  const {
+    competitors,
+    isLoading,
+    isSyncing,
+    lastSyncResult,
+    manualSync,
+  } = useCompetitorsWithZondaSync(projectId, radiusMiles);
+
+  const deleteCompetitor = useDeleteCompetitor();
+
+  // Group competitors by master plan
+  const groupedCompetitors = useMemo(() => {
+    const groups: Map<string, MasterPlanGroup> = new Map();
+
+    for (const comp of competitors) {
+      const key = comp.master_plan_name || '__standalone__';
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          masterPlanName: comp.master_plan_name || null,
+          competitors: [],
+          totalUnits: 0,
+          priceMin: null,
+          priceMax: null,
+          avgAbsorption: null,
+        });
+      }
+
+      const group = groups.get(key)!;
+      group.competitors.push(comp);
+
+      // Aggregate metrics - prefer units_remaining from products, fallback to total_units
+      let remainingUnits = 0;
+      if (comp.products && comp.products.length > 0) {
+        remainingUnits = comp.products.reduce((sum, p) => sum + (p.units_remaining || 0), 0);
+      }
+      // Fall back to total_units if no remaining found in products
+      if (remainingUnits === 0 && comp.total_units) {
+        remainingUnits = comp.total_units;
+      }
+      group.totalUnits += remainingUnits;
+
+      if (comp.price_min !== undefined && comp.price_min !== null) {
+        group.priceMin = group.priceMin === null
+          ? comp.price_min
+          : Math.min(group.priceMin, comp.price_min);
+      }
+      if (comp.price_max !== undefined && comp.price_max !== null) {
+        group.priceMax = group.priceMax === null
+          ? comp.price_max
+          : Math.max(group.priceMax, comp.price_max);
+      }
+    }
+
+    // Calculate average absorption for each group
+    for (const group of groups.values()) {
+      const absorptions = group.competitors
+        .filter(c => c.absorption_rate_monthly !== undefined && c.absorption_rate_monthly !== null)
+        .map(c => Number(c.absorption_rate_monthly));
+      if (absorptions.length > 0) {
+        const validAbsorptions = absorptions.filter(a => !isNaN(a));
+        if (validAbsorptions.length > 0) {
+          group.avgAbsorption = validAbsorptions.reduce((a, b) => a + b, 0) / validAbsorptions.length;
+        }
+      }
+    }
+
+    // Sort: master plans first (alphabetically), then standalone
+    const sorted = Array.from(groups.values()).sort((a, b) => {
+      if (a.masterPlanName === null && b.masterPlanName !== null) return 1;
+      if (a.masterPlanName !== null && b.masterPlanName === null) return -1;
+      if (a.masterPlanName && b.masterPlanName) {
+        return a.masterPlanName.localeCompare(b.masterPlanName);
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [competitors]);
+
+  // Handle deletion
+  const handleDelete = async (comp: MarketCompetitiveProject) => {
+    if (!comp.id) return;
+    if (!confirm(`Delete "${comp.display_name || comp.comp_name}"?`)) return;
+
+    try {
+      await deleteCompetitor.mutateAsync({ projectId, id: comp.id });
+      showToast('Competitor removed', 'success');
+    } catch {
+      showToast('Failed to remove competitor', 'error');
+    }
+  };
+
+  // Toggle master plan expansion
+  const toggleMasterPlan = (key: string) => {
+    setExpandedMasterPlans(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Toggle product expansion
+  const toggleProducts = (id: number) => {
+    setExpandedProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Format currency
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value === undefined || value === null) return '-';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  // Handle sync completion message
+  React.useEffect(() => {
+    if (lastSyncResult && lastSyncResult.imported_count > 0) {
+      showToast(`Imported ${lastSyncResult.imported_count} competitor(s) from Zonda`, 'success');
+    }
+  }, [lastSyncResult, showToast]);
+
+  // Extract subdivision name from comp_name (removes master plan prefix if present)
+  const getSubdivisionName = (comp: MarketCompetitiveProject) => {
+    if (!comp.master_plan_name || !comp.comp_name.includes('/')) {
+      return comp.comp_name;
+    }
+    // Handle formats like "Aloravita/Ascent III" -> "Ascent III"
+    const parts = comp.comp_name.split('/');
+    return parts[parts.length - 1];
+  };
+
+  return (
+    <div className="card h-100">
+      <div className="card-header d-flex tw-justify-content-between tw-align-items-center">
+        <div>
+          <h5 className="mb-0">Competitive Projects</h5>
+          {isSyncing && (
+            <small className="text-muted">
+              <i className="bi bi-arrow-repeat spin me-1"></i>
+              Syncing Zonda data...
+            </small>
+          )}
+        </div>
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => setShowAddModal(true)}
+          >
+            <i className="bi bi-plus-lg me-1"></i>
+            Add
+          </button>
+          <button
+            className="btn btn-sm btn-outline-secondary"
+            onClick={() => manualSync()}
+            disabled={isSyncing}
+            title="Refresh Zonda data"
+          >
+            <i className={`bi bi-arrow-clockwise ${isSyncing ? 'spin' : ''}`}></i>
+          </button>
+        </div>
+      </div>
+
+      <div className="card-body p-0">
+        {/* Loading state */}
+        {isLoading && (
+          <div className="text-center py-4">
+            <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+            Loading competitors...
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && competitors.length === 0 && (
+          <div className="text-center text-muted py-4">
+            <i className="bi bi-building fs-1 mb-2 d-block tw-opacity-50"></i>
+            <p className="mb-2">No competitive projects yet</p>
+            <small>
+              Click &quot;Add&quot; to add competitors manually or from Zonda,
+              <br />or competitors will auto-populate based on the search radius.
+            </small>
+          </div>
+        )}
+
+        {/* Grouped competitors list */}
+        {!isLoading && groupedCompetitors.length > 0 && (
+          <div className="list-group list-group-flush">
+            {groupedCompetitors.map((group) => {
+              const groupKey = group.masterPlanName || '__standalone__';
+              const isExpanded = expandedMasterPlans.has(groupKey) || expandedMasterPlans.has('__all__');
+              const isMasterPlan = group.masterPlanName !== null;
+              const hasMultiple = group.competitors.length > 1;
+
+              // For standalone (no master plan), render directly
+              if (!isMasterPlan) {
+                return group.competitors.map((comp) => (
+                    <CompetitorRow
+                      key={comp.id}
+                      comp={comp}
+                      isIndented={false}
+                      expandedProducts={expandedProducts}
+                      toggleProducts={toggleProducts}
+                      handleDelete={handleDelete}
+                      deleteCompetitor={deleteCompetitor}
+                      formatCurrency={formatCurrency}
+                      getSubdivisionName={getSubdivisionName}
+                    />
+                ));
+              }
+
+              // For master plan groups, render collapsible parent
+              return (
+                <div key={groupKey}>
+                  {/* Master Plan Header */}
+                  <div
+                    className="list-group-item p-2 d-flex tw-flex-nowrap tw-justify-content-between tw-align-items-center"
+                    style={{
+                      cursor: hasMultiple ? 'pointer' : 'default',
+                      backgroundColor: 'var(--bs-tertiary-bg)',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onClick={() => hasMultiple && toggleMasterPlan(groupKey)}
+                  >
+                    <div className="d-flex tw-align-items-center gap-2 tw-overflow-hidden" style={{ minWidth: 0 }}>
+                      {hasMultiple && (
+                        <i className={`bi bi-chevron-${isExpanded ? 'down' : 'right'} text-muted`}></i>
+                      )}
+                      <i className="bi bi-buildings text-primary"></i>
+                      <span className="fw-semibold tw-text-truncate" style={{ maxWidth: '260px' }}>
+                        {group.masterPlanName}
+                      </span>
+                      <SemanticBadge
+                        intent="navigation-meta"
+                        value="subdivisions"
+                        className="ms-2"
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        {group.competitors.length} subdivisions
+                      </SemanticBadge>
+                    </div>
+                    <div className="d-flex gap-3 small text-muted text-nowrap tw-flex-shrink-0">
+                      <span><strong>{group.totalUnits}</strong> units</span>
+                      <span>
+                        {formatCurrency(group.priceMin)} - {formatCurrency(group.priceMax)}
+                      </span>
+                      {group.avgAbsorption !== null && (
+                        <span><strong>{group.avgAbsorption.toFixed(1)}</strong> /mo avg</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subdivisions (child rows) */}
+                  {isExpanded && group.competitors.map((comp) => (
+                    <CompetitorRow
+                      key={comp.id}
+                      comp={comp}
+                      isIndented={true}
+                      expandedProducts={expandedProducts}
+                      toggleProducts={toggleProducts}
+                      handleDelete={handleDelete}
+                      deleteCompetitor={deleteCompetitor}
+                      formatCurrency={formatCurrency}
+                      getSubdivisionName={getSubdivisionName}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Add competitor modal */}
+      <AddCompetitorModal
+        projectId={projectId}
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+      />
+
+      <style jsx>{`
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Individual competitor row component
+interface CompetitorRowProps {
+  comp: MarketCompetitiveProject;
+  isIndented: boolean;
+  expandedProducts: Set<number>;
+  toggleProducts: (id: number) => void;
+  handleDelete: (comp: MarketCompetitiveProject) => void;
+  deleteCompetitor: ReturnType<typeof useDeleteCompetitor>;
+  formatCurrency: (value: number | undefined | null) => string;
+  getSubdivisionName: (comp: MarketCompetitiveProject) => string;
+}
+
+// Normalize lot dimension/width keys regardless of snake_case vs camelCase
+const getLotDimensionsValue = (product: MarketCompetitiveProjectProduct | undefined | null) =>
+  product?.lot_dimensions ?? product?.lotDimensions ?? null;
+
+const getLotWidthValue = (product: MarketCompetitiveProjectProduct | undefined | null) =>
+  product?.lot_width_ft ?? product?.lotWidthFt ?? null;
+
+function CompetitorRow({
+  comp,
+  isIndented,
+  expandedProducts,
+  toggleProducts,
+  handleDelete,
+  deleteCompetitor,
+  formatCurrency,
+  getSubdivisionName,
+}: CompetitorRowProps) {
+  const hasProducts = comp.products && comp.products.length > 0;
+  const isProductsExpanded = comp.id ? expandedProducts.has(comp.id) : false;
+  const statusValue = comp.status ?? 'unknown';
+  const statusLabel =
+    statusValue === 'selling'
+      ? 'Active'
+      : statusValue.replace(/_/g, ' ');
+
+  // Calculate remaining units from products if available
+  const unitsRemaining = useMemo(() => {
+    if (comp.products && comp.products.length > 0) {
+      const remaining = comp.products.reduce((sum, p) => sum + (p.units_remaining || 0), 0);
+      if (remaining > 0) return remaining;
+    }
+    return comp.total_units;
+  }, [comp.products, comp.total_units]);
+
+  // Get lot dimensions from products (prefer first with lot_dimensions, then any with lot_width_ft)
+  const lotDimensions = useMemo(() => {
+    if (!comp.products || comp.products.length === 0) return null;
+    // Find one with lot_dimensions string first
+    const withDims = comp.products.find(p => getLotDimensionsValue(p));
+    if (withDims) return getLotDimensionsValue(withDims);
+    // Fall back to lot width
+    const withWidth = comp.products.find(p => getLotWidthValue(p));
+    if (withWidth) return `${getLotWidthValue(withWidth)}'`;
+    return null;
+  }, [comp.products]);
+
+  return (
+    <div className="list-group-item p-0">
+      {/* Main row - single line format for subdivisions */}
+      <div
+        className="d-flex tw-flex-nowrap tw-justify-content-between tw-align-items-center px-2 py-1"
+        style={{
+          cursor: hasProducts ? 'pointer' : 'default',
+          paddingLeft: isIndented ? '2.5rem' : undefined,
+          backgroundColor: isIndented ? 'transparent' : undefined,
+          minHeight: '2.5rem',
+          whiteSpace: 'nowrap',
+        }}
+        onClick={() => comp.id && hasProducts && toggleProducts(comp.id)}
+      >
+        <div className="d-flex tw-align-items-center gap-2 tw-flex-grow-1 tw-overflow-hidden" style={{ minWidth: 0 }}>
+          {hasProducts && (
+            <i className={`bi bi-chevron-${isProductsExpanded ? 'down' : 'right'} text-muted small tw-flex-shrink-0`}></i>
+          )}
+          {isIndented && <i className="bi bi-house text-muted small tw-flex-shrink-0"></i>}
+
+          {/* Project name */}
+          <span className={`${isIndented ? 'fw-medium' : 'fw-semibold'} tw-text-truncate`} style={{ maxWidth: '180px' }}>
+            {isIndented ? getSubdivisionName(comp) : (comp.display_name || comp.comp_name)}
+          </span>
+
+          {/* Builder name (inline) */}
+          {comp.builder_name && (
+            <span className="text-muted small tw-text-truncate" style={{ maxWidth: '120px' }}>
+              {comp.builder_name}
+            </span>
+          )}
+
+          {/* Metrics inline */}
+          <div className="d-flex tw-align-items-center gap-2 ms-auto text-nowrap small tw-flex-shrink-0">
+            {/* Lot dimensions - show prominently */}
+            {lotDimensions && (
+              <SemanticBadge
+                intent="category"
+                value="lot-dimensions"
+                className="me-1"
+                style={{ fontSize: '0.7rem' }}
+              >
+                {lotDimensions}
+              </SemanticBadge>
+            )}
+            {unitsRemaining && (
+              <span className="text-muted">
+                <strong className="text-body">{unitsRemaining}</strong> units
+              </span>
+            )}
+            {(comp.price_min || comp.price_max) && (
+              <span className="text-muted">
+                {formatCurrency(comp.price_min)} - {formatCurrency(comp.price_max)}
+              </span>
+            )}
+            {comp.absorption_rate_monthly && (
+              <span className="text-muted">
+                <strong className="text-body">{Number(comp.absorption_rate_monthly).toFixed(1)}</strong>/mo
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Badges and delete at far right */}
+        <div className="d-flex tw-align-items-center gap-1 ms-2 tw-flex-shrink-0">
+          <SemanticBadge
+            intent="status"
+            value={statusValue}
+            style={{ fontSize: '0.65rem' }}
+          >
+            {statusLabel}
+          </SemanticBadge>
+          {comp.data_source === 'Zonda' && (
+            <SemanticBadge
+              intent="category"
+              value={comp.data_source}
+              className="ms-1"
+              style={{ fontSize: '0.6rem' }}
+              title="Zonda data source"
+            >
+              Z
+            </SemanticBadge>
+          )}
+          <button
+            className="btn btn-sm btn-link p-0 text-danger ms-1"
+            onClick={(e) => { e.stopPropagation(); handleDelete(comp); }}
+            title="Remove"
+            disabled={deleteCompetitor.isPending}
+          >
+            <i className="bi bi-trash small"></i>
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded products section */}
+      {comp.id && isProductsExpanded && comp.products && comp.products.length > 0 && (
+        <div className="border-top bg-light" style={{ marginLeft: isIndented ? '2rem' : 0 }}>
+          <ProductsTable products={comp.products} formatCurrency={formatCurrency} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-component for products table
+function ProductsTable({
+  products,
+  formatCurrency
+}: {
+  products: MarketCompetitiveProjectProduct[];
+  formatCurrency: (value: number | undefined | null) => string;
+}) {
+  // DEBUG: Log products to console
+  console.log('[ProductsTable] products:', products);
+  console.log('[ProductsTable] first product lot_dimensions:', products[0]?.lot_dimensions);
+  console.log('[ProductsTable] first product lot_width_ft:', products[0]?.lot_width_ft);
+
+  return (
+    <div className="table-responsive">
+      <table className="table table-sm table-borderless mb-0 small text-nowrap">
+        <thead>
+          <tr className="text-muted">
+            <th>Lot</th>
+            <th className="text-end">Price Range</th>
+            <th className="text-end">$/SF</th>
+            <th className="text-end">Remaining</th>
+            <th className="text-end">Sales/Mo</th>
+            <th className="text-end">MOS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products.map((prod, idx) => (
+            <tr key={prod.id || idx}>
+              <td>
+                <SemanticBadge
+                  intent="category"
+                  value="lot-dimensions"
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  {JSON.stringify({
+                    lot_dimensions: prod.lot_dimensions,
+                    lotDimensions: prod.lotDimensions,
+                    lot_width_ft: prod.lot_width_ft,
+                    lotWidthFt: prod.lotWidthFt
+                  })}
+                </SemanticBadge>
+              </td>
+              <td className="text-end">
+                {formatCurrency(prod.price_min)} - {formatCurrency(prod.price_max)}
+              </td>
+              <td className="text-end">
+                {prod.price_per_sf_avg ? formatCurrency(prod.price_per_sf_avg) : '-'}
+              </td>
+              <td className="text-end">
+                {prod.units_remaining ?? '-'}
+              </td>
+              <td className="text-end">
+                {prod.sales_rate_monthly != null ? Number(prod.sales_rate_monthly).toFixed(1) : '-'}
+              </td>
+              <td className="text-end">
+                {prod.mos_inventory != null ? Number(prod.mos_inventory).toFixed(1) : '-'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

@@ -1,0 +1,209 @@
+'use client';
+
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilSend, cilLightbulb, cilBook, cilCog, cilList } from '@coreui/icons';
+
+interface ChatMessage {
+ role: 'user' | 'assistant';
+ content: string;
+ timestamp: Date;
+}
+
+interface PlatformKnowledgeAccordionProps {
+ documentKey: string;
+ documentTitle: string;
+ pageCount?: number | null;
+ chatHistory: ChatMessage[];
+ onSendMessage: (message: string) => Promise<void>;
+ onQuickAction: (action: 'summarize' | 'topics' | 'key_concepts' | 'methodologies') => void;
+ isLoading?: boolean;
+}
+
+export default function PlatformKnowledgeAccordion({
+ documentKey,
+ documentTitle,
+ pageCount,
+ chatHistory,
+ onSendMessage,
+ onQuickAction,
+ isLoading = false
+}: PlatformKnowledgeAccordionProps) {
+ const canSummarize = useMemo(() => {
+ const threshold = 50;
+ const safeCount = pageCount ?? 0;
+ return safeCount > 0 && safeCount <= threshold;
+ }, [pageCount]);
+ const [inputValue, setInputValue] = useState('');
+ const [isSending, setIsSending] = useState(false);
+ const messagesEndRef = useRef<HTMLDivElement>(null);
+ const inputRef = useRef<HTMLInputElement>(null);
+
+ // Auto-scroll to bottom when new messages arrive
+ useEffect(() => {
+ messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+ }, [chatHistory]);
+
+ // Focus input when accordion opens
+ useEffect(() => {
+ inputRef.current?.focus();
+ }, []);
+
+ const handleSubmit = async (e: React.FormEvent) => {
+ e.preventDefault();
+ if (!inputValue.trim() || isSending) return;
+
+ const message = inputValue.trim();
+ setInputValue('');
+ setIsSending(true);
+
+ try {
+ await onSendMessage(message);
+ } finally {
+ setIsSending(false);
+ }
+ };
+
+ const handleQuickAction = (action: 'summarize' | 'topics' | 'key_concepts' | 'methodologies') => {
+ if (isSending) return;
+ onQuickAction(action);
+ };
+
+ return (
+ <tr>
+ <td colSpan={8} className="p-0">
+ <div className="bg-body-tertiary tw-border-t tw-border-b border">
+ {/* Accordion content - fixed height */}
+ <div className="tw-flex tw-h-[380px]">
+ {/* Left panel - Quick actions */}
+ <div className="tw-w-[180px] tw-flex-shrink-0 tw-border-r border p-3 tw-flex tw-flex-col gap-2">
+ <div className="tw-text-xs tw-font-medium text-body-tertiary mb-1">
+ Quick Actions
+ </div>
+
+ {canSummarize ? (
+ <button
+ type="button"
+ onClick={() => handleQuickAction('summarize')}
+ disabled={isSending}
+ className="tw-flex tw-items-center gap-2 px-3 py-2 tw-text-sm text-left text-body-secondary bg-body border border tw-rounded-md hover:tw-bg-blue-50 hover:tw-border-blue-300 tw-transition-colors disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
+ >
+ <CIcon icon={cilLightbulb} className="w-4 h-4 tw-text-amber-500" />
+ <span>Summarize</span>
+ </button>
+ ) : (
+ <button
+ type="button"
+ onClick={() => handleQuickAction('topics')}
+ disabled={isSending}
+ className="tw-flex tw-items-center gap-2 px-3 py-2 tw-text-sm text-left text-body-secondary bg-body border border tw-rounded-md hover:tw-bg-blue-50 hover:tw-border-blue-300 tw-transition-colors disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
+ >
+ <CIcon icon={cilList} className="w-4 h-4 tw-text-emerald-500" />
+ <span>What topics?</span>
+ </button>
+ )}
+
+ <button
+ type="button"
+ onClick={() => handleQuickAction('key_concepts')}
+ disabled={isSending}
+ className="tw-flex tw-items-center gap-2 px-3 py-2 tw-text-sm text-left text-body-secondary bg-body border border tw-rounded-md hover:tw-bg-blue-50 hover:tw-border-blue-300 tw-transition-colors disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
+ >
+ <CIcon icon={cilBook} className="w-4 h-4 tw-text-blue-500" />
+ <span>Key concepts</span>
+ </button>
+
+ <button
+ type="button"
+ onClick={() => handleQuickAction('methodologies')}
+ disabled={isSending}
+ className="tw-flex tw-items-center gap-2 px-3 py-2 tw-text-sm text-left text-body-secondary bg-body border border tw-rounded-md hover:tw-bg-blue-50 hover:tw-border-blue-300 tw-transition-colors disabled:tw-opacity-50 disabled:tw-cursor-not-allowed"
+ >
+ <CIcon icon={cilCog} className="w-4 h-4 tw-text-purple-500" />
+ <span>Methodologies</span>
+ </button>
+
+ <div className="mt-auto pt-3 tw-border-t border">
+ <div className="tw-text-xs text-body-tertiary">
+ Chatting with:
+ </div>
+ <div className="tw-text-xs tw-font-medium text-body-secondary tw-truncate" title={documentTitle}>
+ {documentTitle}
+ </div>
+ </div>
+ </div>
+
+ {/* Right panel - Chat area */}
+ <div className="tw-flex-1 tw-flex tw-flex-col tw-min-w-0">
+ {/* Messages area */}
+ <div className="tw-flex-1 tw-overflow-y-auto p-4 tw-space-y-3">
+ {chatHistory.length === 0 ? (
+ <div className="tw-flex tw-flex-col tw-items-center tw-justify-center tw-h-full text-body-tertiary">
+ <span className="tw-text-3xl mb-2">💬</span>
+ <p className="tw-text-sm">Ask a question about this document</p>
+ <p className="tw-text-xs mt-1">or use a quick action to get started</p>
+ </div>
+ ) : (
+ chatHistory.map((msg, idx) => (
+ <div
+ key={idx}
+ className={`tw-flex ${msg.role === 'user' ? tw-'justify-end' : tw-'justify-start'}`}
+ >
+ <div
+ className={`tw-max-w-[80%] tw-rounded-lg px-3 py-2 tw-text-sm ${ msg.role === 'user' ? tw-'bg-blue-600 text-white' : 'bg-body text-body border border ' }`}
+ >
+ <div className="tw-whitespace-pre-wrap">{msg.content}</div>
+ <div
+ className={`tw-text-xs mt-1 ${ msg.role === 'user' ? tw-'text-blue-200' : 'text-body-tertiary ' }`}
+ >
+ {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+ </div>
+ </div>
+ </div>
+ ))
+ )}
+
+ {/* Loading indicator */}
+ {(isSending || isLoading) && (
+ <div className="tw-flex tw-justify-start">
+ <div className="bg-body border border tw-rounded-lg px-3 py-2">
+ <div className="tw-flex tw-items-center gap-2 tw-text-sm text-body-tertiary">
+ <div className="tw-animate-spin tw-rounded-full h-4 w-4 tw-border-b-2 tw-border-blue-600"></div>
+ <span>Thinking...</span>
+ </div>
+ </div>
+ </div>
+ )}
+
+ <div ref={messagesEndRef} />
+ </div>
+
+ {/* Input area */}
+ <div className="tw-border-t border p-3">
+ <form onSubmit={handleSubmit} className="tw-flex gap-2">
+ <input
+ ref={inputRef}
+ type="text"
+ value={inputValue}
+ onChange={(e) => setInputValue(e.target.value)}
+ placeholder="Ask about this document..."
+ disabled={isSending}
+ className="tw-flex-1 px-3 py-2 tw-text-sm border border tw-rounded-md bg-body text-body focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:tw-opacity-50"
+ />
+ <button
+ type="submit"
+ disabled={!inputValue.trim() || isSending}
+ className="px-4 py-2 tw-bg-blue-600 text-white tw-rounded-md hover:tw-bg-blue-700 disabled:tw-opacity-50 disabled:tw-cursor-not-allowed tw-transition-colors tw-flex tw-items-center gap-2"
+ >
+ <CIcon icon={cilSend} className="w-4 h-4" />
+ <span className="tw-text-sm">Send</span>
+ </button>
+ </form>
+ </div>
+ </div>
+ </div>
+ </div>
+ </td>
+ </tr>
+ );
+}

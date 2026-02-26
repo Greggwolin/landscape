@@ -1,0 +1,326 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
+import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
+import { ChatMessageBubble } from './ChatMessageBubble';
+import { LandscaperProgress } from './LandscaperProgress';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+interface LandscaperChatProps {
+  projectId: number;
+  activeTab?: string;
+  isIngesting?: boolean;
+  ingestionProgress?: number; // 0-100
+  ingestionMessage?: string;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
+  onReviewMedia?: (docId: number, docName: string) => void;
+}
+
+/**
+ * Get context-aware hint for the current tab.
+ */
+function getTabContextHint(tab: string): string {
+  const hints: Record<string, string> = {
+    'home': 'Project Overview',
+    'property': 'Property Details & Site',
+    'operations': 'Rent Roll & Operating Expenses',
+    'feasibility': 'Returns & Feasibility Analysis',
+    'capitalization': 'Capital Structure & Financing',
+    'reports': 'Reports & Analytics',
+    'documents': 'Document Management',
+  };
+  return hints[tab] || 'General';
+}
+
+export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand, onReviewMedia }: LandscaperChatProps) {
+  const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const userHasSentMessage = useRef(false);
+  const prevMessageCount = useRef(0);
+  const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
+  const tabContextHint = getTabContextHint(activeTab);
+
+  const { messages, sendMessage, isLoading, loadThreadMessages, error } = useLandscaperThreads({
+    projectId: projectId.toString(),
+    pageContext: activeTab,
+  });
+
+  // Mutation handlers for Level 2 autonomy
+  const handleConfirmMutation = useCallback(async (mutationId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Refresh chat history to reflect updated state
+        loadThreadMessages?.();
+      } else {
+        console.error('Failed to confirm mutation:', data.error);
+      }
+    } catch (error) {
+      console.error('Error confirming mutation:', error);
+    }
+  }, [loadThreadMessages]);
+
+  const handleRejectMutation = useCallback(async (mutationId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/reject/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadThreadMessages?.();
+      }
+    } catch (error) {
+      console.error('Error rejecting mutation:', error);
+    }
+  }, [loadThreadMessages]);
+
+  const handleConfirmBatch = useCallback(async (batchId: string) => {
+    try {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/batch/${batchId}/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (data.success) {
+        loadThreadMessages?.();
+      } else {
+        console.error('Failed to confirm batch:', data.error);
+      }
+    } catch (error) {
+      console.error('Error confirming batch:', error);
+    }
+  }, [loadThreadMessages]);
+
+  // Auto-scroll only after user interaction
+  useEffect(() => {
+    if (userHasSentMessage.current && messages.length > prevMessageCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    prevMessageCount.current = messages.length;
+  }, [messages]);
+
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const lineHeight = parseInt(getComputedStyle(textarea).lineHeight || '20', 10);
+    const maxHeight = lineHeight * 8;
+    const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [input, resizeTextarea]);
+
+  const handleSend = () => {
+    if (!input.trim() || isLoading) return;
+
+    userHasSentMessage.current = true;
+
+    const currentMessage = input.trim();
+    setInput('');
+
+    sendMessage(currentMessage).catch(() => {
+      setInput(currentMessage);
+    });
+  };
+
+  const hoverNeutralBackground = {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.currentTarget.style.backgroundColor = 'transparent';
+    },
+  };
+
+  return (
+    <div className="d-flex h-100 flex-column">
+      {/* Header - matches CoreUI card header padding (0.5rem 1rem) */}
+      <div
+        className="d-flex tw-align-items-center gap-2 border-bottom"
+        style={{
+          padding: '0.5rem 1rem',
+          borderColor: 'var(--cui-border-color)',
+          backgroundColor: 'var(--surface-card-header)',
+        }}
+      >
+        <LandscaperIcon className="landscaper-panel-icon" aria-hidden="true" />
+        <span className="fw-bold" style={{ color: 'var(--cui-body-color)', fontSize: '1rem' }}>
+          Landscaper
+        </span>
+
+        {/* Context indicator - shows which tab Landscaper is focused on */}
+        {!isIngesting && (
+          <span
+            className="ms-auto badge rounded-pill"
+            style={{
+              color: 'var(--cui-secondary-color)',
+              backgroundColor: 'var(--cui-tertiary-bg)',
+              fontSize: '0.75rem',
+            }}
+          >
+            {tabContextHint}
+          </span>
+        )}
+
+        {/* Ingestion Progress Gauge */}
+        {isIngesting && (
+          <div className="d-flex tw-align-items-center gap-2 ms-auto">
+            <div
+              className="tw-position-relative"
+              style={{ width: '32px', height: '32px' }}
+              title={ingestionMessage || 'Processing...'}
+            >
+              {/* Background circle */}
+              <svg style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 36 36">
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="var(--cui-border-color)"
+                  strokeWidth="3"
+                />
+                {/* Progress arc */}
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="14"
+                  fill="none"
+                  stroke="var(--cui-primary)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(ingestionProgress / 100) * 87.96} 87.96`}
+                  style={{ transition: 'stroke-dasharray 0.3s ease' }}
+                />
+              </svg>
+              {/* Percentage text in center */}
+              <div
+                className="tw-position-absolute top-0 start-0 d-flex tw-align-items-center tw-justify-content-center fw-medium"
+                style={{ color: 'var(--cui-body-color)', width: '100%', height: '100%', fontSize: '0.75rem' }}
+              >
+                {Math.round(ingestionProgress)}
+              </div>
+            </div>
+            <span
+              className="small tw-text-truncate d-inline-block"
+              style={{ color: 'var(--cui-secondary-color)', maxWidth: '120px' }}
+            >
+              {ingestionMessage || 'Ingesting...'}
+            </span>
+          </div>
+        )}
+
+        {/* Collapse/Expand toggle */}
+        {onToggleExpand && (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="btn btn-sm d-flex tw-align-items-center tw-justify-content-center p-1"
+            style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
+            title={isExpanded ? 'Collapse chat' : 'Expand chat'}
+            {...hoverNeutralBackground}
+          >
+            <CIcon
+              icon={isExpanded ? cilChevronTop : cilChevronBottom}
+              size="sm"
+              style={{ color: 'var(--cui-secondary-color)' }}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div
+        className="tw-flex-grow-1 tw-overflow-auto p-3 d-flex flex-column gap-3"
+        style={{ backgroundColor: 'var(--cui-body-bg)' }}
+      >
+        {messages.length === 0 ? (
+          <div className="py-4 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+            <p className="small mb-1">{promptCopy}</p>
+            <p style={{ fontSize: '0.75rem', marginBottom: 0 }}>Budget, market analysis, assumptions, documents...</p>
+          </div>
+        ) : (
+          messages.map((msg: ThreadMessage) => (
+            <ChatMessageBubble
+              key={msg.messageId}
+              message={msg}
+              onConfirmMutation={handleConfirmMutation}
+              onRejectMutation={handleRejectMutation}
+              onConfirmBatch={handleConfirmBatch}
+              onReviewMedia={onReviewMedia}
+            />
+          ))
+        )}
+
+        {error && !isLoading && (
+          <div className="rounded border px-3 py-2 small" style={{
+            borderColor: 'var(--cui-danger-border-subtle)',
+            color: 'var(--cui-danger)',
+            backgroundColor: 'var(--cui-danger-bg-subtle)',
+          }}>
+            {error}
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Progress indicator - shows during processing */}
+      <LandscaperProgress isProcessing={isLoading} />
+
+      {/* Input */}
+      <div
+        className="border-top p-3"
+        style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
+      >
+        <div className="d-flex gap-2 tw-align-items-end">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={promptCopy}
+            rows={1}
+            className="form-control tw-flex-grow-1"
+            style={{
+              backgroundColor: 'var(--cui-body-bg)',
+              color: 'var(--cui-body-color)',
+              maxHeight: '200px',
+              resize: 'none',
+            }}
+            disabled={isLoading}
+          />
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            className="btn btn-primary"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

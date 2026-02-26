@@ -1,0 +1,165 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import type { ReadinessResult } from './types';
+
+interface ModelReadinessDisplayProps {
+  readiness: ReadinessResult;
+  isDark?: boolean;
+}
+
+function getConfidenceColor(level: string): string {
+  switch (level) {
+    case 'high':
+      return 'text-green-600 bg-green-100';
+    case 'medium':
+      return 'text-amber-600 bg-amber-100';
+    case 'low':
+      return 'text-orange-600 bg-orange-100';
+    default:
+      return 'text-red-600 bg-red-100';
+  }
+}
+
+function getProgressColor(score: number): string {
+  if (score >= 90) return 'bg-green-500';
+  if (score >= 70) return 'bg-amber-500';
+  if (score >= 50) return 'bg-orange-500';
+  return 'bg-red-500';
+}
+
+export default function ModelReadinessDisplay({
+  readiness,
+  isDark = false,
+}: ModelReadinessDisplayProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const confidenceColors = getConfidenceColor(readiness.confidence_level);
+  const progressColor = getProgressColor(readiness.readiness_score);
+
+  return (
+    <div className={`p-3 ${isDark ? tw-'bg-slate-800/50' : tw-'bg-slate-50'}`}>
+      {/* Compact view */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="tw-w-full tw-flex tw-items-center tw-justify-between"
+      >
+        <div className="tw-flex tw-items-center gap-3 tw-flex-1 tw-min-w-0">
+          {/* Score */}
+          <div className="tw-flex tw-items-center gap-2">
+            <span className={`tw-text-sm tw-font-semibold ${isDark ? tw-'text-slate-200' : tw-'text-slate-700'}`}>
+              {Math.round(readiness.readiness_score)}%
+            </span>
+            <div className={`w-20 h-2 tw-rounded-full ${isDark ? tw-'bg-slate-700' : tw-'bg-slate-200'}`}>
+              <div
+                className={`tw-h-full tw-rounded-full tw-transition-all ${progressColor}`}
+                style={{ width: `${Math.min(readiness.readiness_score, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Confidence badge */}
+          <span className={`tw-text-xs tw-font-medium px-2 py-0.5 tw-rounded-full tw-capitalize ${confidenceColors}`}>
+            {readiness.confidence_level}
+          </span>
+
+          {/* Can run indicator */}
+          {readiness.can_run_model ? (
+            <CheckCircle className="h-4 w-4 tw-text-green-500 tw-flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 tw-text-amber-500 tw-flex-shrink-0" />
+          )}
+        </div>
+
+        {/* Expand/collapse icon */}
+        {isExpanded ? (
+          <ChevronUp className={`h-4 w-4 tw-flex-shrink-0 ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`} />
+        ) : (
+          <ChevronDown className={`h-4 w-4 tw-flex-shrink-0 ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`} />
+        )}
+      </button>
+
+      {/* Expanded details */}
+      {isExpanded && (
+        <div className={`mt-3 pt-3 tw-border-t tw-space-y-3 ${isDark ? tw-'border-slate-700' : tw-'border-slate-200'}`}>
+          {/* Stats row */}
+          <div className={`tw-flex tw-items-center gap-4 tw-text-xs ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+            <span>
+              <strong className={`isDark ? tw-'text-slate-200' : tw-'text-slate-700'`}>
+                {readiness.populated_count}
+              </strong>{' '}
+              of {readiness.total_input_fields} fields
+            </span>
+            {!readiness.can_run_model && (
+              <span className="tw-text-amber-600">
+                Model requires all critical fields
+              </span>
+            )}
+          </div>
+
+          {/* Missing critical fields */}
+          {readiness.missing_critical.length > 0 && (
+            <div>
+              <div className="tw-flex tw-items-center gap-1.5 mb-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 tw-text-red-500" />
+                <span className={`tw-text-xs tw-font-medium ${isDark ? tw-'text-slate-300' : tw-'text-slate-600'}`}>
+                  Missing Critical ({readiness.missing_critical.length})
+                </span>
+              </div>
+              <div className="tw-flex tw-flex-wrap gap-1">
+                {readiness.missing_critical.slice(0, 5).map((field) => (
+                  <span
+                    key={field.field_key}
+                    className={`tw-text-xs px-2 py-0.5 rounded ${ isDark ? tw-'bg-red-900/30 tw-text-red-400' : tw-'bg-red-100 tw-text-red-700' }`}
+                  >
+                    {field.label}
+                  </span>
+                ))}
+                {readiness.missing_critical.length > 5 && (
+                  <span className={`tw-text-xs px-2 py-0.5 ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>
+                    +{readiness.missing_critical.length - 5} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Missing important fields */}
+          {readiness.missing_important.length > 0 && (
+            <div>
+              <div className="tw-flex tw-items-center gap-1.5 mb-1.5">
+                <span className={`tw-text-xs tw-font-medium ${isDark ? tw-'text-slate-400' : tw-'text-slate-500'}`}>
+                  Missing Important ({readiness.missing_important.length})
+                </span>
+              </div>
+              <div className="tw-flex tw-flex-wrap gap-1">
+                {readiness.missing_important.slice(0, 5).map((field) => (
+                  <span
+                    key={field.field_key}
+                    className={`tw-text-xs px-2 py-0.5 rounded ${ isDark ? tw-'bg-amber-900/30 tw-text-amber-400' : tw-'bg-amber-100 tw-text-amber-700' }`}
+                  >
+                    {field.label}
+                  </span>
+                ))}
+                {readiness.missing_important.length > 5 && (
+                  <span className={`tw-text-xs px-2 py-0.5 ${isDark ? tw-'text-slate-500' : tw-'text-slate-400'}`}>
+                    +{readiness.missing_important.length - 5} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* All good state */}
+          {readiness.missing_critical.length === 0 && readiness.missing_important.length === 0 && (
+            <div className="tw-flex tw-items-center gap-2 tw-text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span className="tw-text-xs tw-font-medium">All critical and important fields populated</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

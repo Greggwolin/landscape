@@ -1,0 +1,213 @@
+'use client';
+
+import React, { useRef, useMemo, useEffect } from 'react';
+import { MapOblique, MapObliqueRef } from '@/components/map/MapOblique';
+import type { ProjectSummary } from '@/app/components/ProjectProvider';
+import { getPropertyTypeLabel, getPropertyTypeTokenRef } from '@/config/propertyTypeTokens';
+
+interface DashboardMapProps {
+  projects: ProjectSummary[];
+  selectedProjectId?: number | null;
+  onProjectSelect?: (projectId: number) => void;
+}
+
+const getNumber = (value?: number | string | null) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const isValidLatLon = (lat: number | null, lon: number | null) =>
+  lat !== null &&
+  lon !== null &&
+  Math.abs(lat) <= 90 &&
+  Math.abs(lon) <= 180;
+
+const filterOutliers = (coords: Array<{ lat: number; lon: number }>) => {
+  if (coords.length <= 3) return coords;
+
+  const toRadians = (deg: number) => (deg * Math.PI) / 180;
+  const approxDistanceKm = (a: { lat: number; lon: number }, b: { lat: number; lon: number }) => {
+    const R = 6371;
+    const dLat = toRadians(b.lat - a.lat);
+    const dLon = toRadians(b.lon - a.lon);
+    const lat1 = toRadians(a.lat);
+    const lat2 = toRadians(b.lat);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLon = Math.sin(dLon / 2);
+    const c = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon;
+    return 2 * R * Math.atan2(Math.sqrt(c), Math.sqrt(1 - c));
+  };
+
+  const centroid = coords.reduce(
+    (acc, c) => ({ lat: acc.lat + c.lat / coords.length, lon: acc.lon + c.lon / coords.length }),
+    { lat: 0, lon: 0 }
+  );
+
+  const distances = coords.map((c) => ({
+    ...c,
+    dist: approxDistanceKm(c, centroid)
+  }));
+
+  const sorted = [...distances].sort((a, b) => a.dist - b.dist);
+  const mid = Math.floor(sorted.length / 2);
+  const median =
+    sorted.length % 2 === 0 ? (sorted[mid - 1].dist + sorted[mid].dist) / 2 : sorted[mid].dist;
+
+  const threshold = Math.max(median * 4, 1200); // allow regional spread (SoCal + AZ) but drop cross-country outliers
+  const filtered = distances.filter((d) => d.dist <= threshold);
+
+  const keep = filtered.length >= 2 ? filtered : distances;
+  return keep.map(({ lat, lon }) => ({ lat, lon }));
+};
+
+const toTypeCode = (project: ProjectSummary) =>
+  project.project_type_code?.toUpperCase() ||
+  project.project_type?.toUpperCase() ||
+  project.property_subtype?.toUpperCase() ||
+  null;
+
+const getTypeLabel = (project: ProjectSummary) => {
+  const code = toTypeCode(project);
+  return getPropertyTypeLabel(code || project.project_type || project.project_type_code || 'Type N/A');
+};
+
+const getTypeColor = (project: ProjectSummary) => {
+  const tokenRef = getPropertyTypeTokenRef(toTypeCode(project));
+  return tokenRef?.bgVar || 'var(--cui-primary)';
+};
+
+export default function DashboardMap({ projects, selectedProjectId, onProjectSelect }: DashboardMapProps) {
+  const mapRef = useRef<MapObliqueRef>(null);
+
+  // Calculate center point and bounds from all projects with coordinates
+  const { center, markers, bounds } = useMemo(() => {
+    const projectsWithCoords = projects
+      .map((project) => {
+        const lat = getNumber(project.latitude ?? project.location_lat);
+        const lon = getNumber(project.longitude ?? project.location_lon);
+        return isValidLatLon(lat, lon)
+          ? { ...project, lat, lon }
+          : null;
+      })
+      .filter(Boolean) as Array<ProjectSummary & { lat: number; lon: number }>;
+
+    if (projectsWithCoords.length === 0) {
+      // Default to LA area if no projects have coordinates
+      return {
+        center: [-118.2437, 34.0522] as [number, number],
+        markers: [],
+        bounds: null
+      };
+    }
+
+    // Calculate bounds to fit all projects
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLon = Infinity, maxLon = -Infinity;
+
+    projectsWithCoords.forEach((p) => {
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon;
+      if (p.lon > maxLon) maxLon = p.lon;
+    });
+
+    // Identify main cluster to avoid outlier zoom blowouts
+    const filtered = filterOutliers(projectsWithCoords.map(({ lat, lon }) => ({ lat, lon })));
+    const fitCoords = filtered.length >= 2 ? filtered : projectsWithCoords;
+
+    let fitMinLat = Infinity, fitMaxLat = -Infinity;
+    let fitMinLon = Infinity, fitMaxLon = -Infinity;
+    fitCoords.forEach((c) => {
+      if (c.lat < fitMinLat) fitMinLat = c.lat;
+      if (c.lat > fitMaxLat) fitMaxLat = c.lat;
+      if (c.lon < fitMinLon) fitMinLon = c.lon;
+      if (c.lon > fitMaxLon) fitMaxLon = c.lon;
+    });
+
+    // Expand bounds by 10% for padding
+    const latPadding = Math.max((fitMaxLat - fitMinLat) * 0.1, 0.01);
+    const lonPadding = Math.max((fitMaxLon - fitMinLon) * 0.1, 0.01);
+    const paddedBounds: [[number, number], [number, number]] = [
+      [fitMinLon - lonPadding, fitMinLat - latPadding],
+      [fitMaxLon + lonPadding, fitMaxLat + latPadding]
+    ];
+
+    // Calculate average center
+    const avgLat = fitCoords.reduce((sum, c) => sum + c.lat, 0) / fitCoords.length;
+    const avgLon = fitCoords.reduce((sum, c) => sum + c.lon, 0) / fitCoords.length;
+
+    // Create markers for each project
+    const projectMarkers = projectsWithCoords.map((project) => ({
+      id: `${project.project_id}`,
+      coordinates: [project.lon, project.lat] as [number, number],
+      color: getTypeColor(project),
+      variant: 'dot' as const,
+      isActive: project.project_id === selectedProjectId,
+      popup: `
+        <div style="font-size: 13px; line-height: 1.3;">
+          <div style="font-weight: 600;">${project.project_name}</div>
+          <div style="color: var(--cui-secondary-color);">${getTypeLabel(project)}</div>
+        </div>
+      `
+    }));
+
+    return {
+      center: [avgLon, avgLat] as [number, number],
+      markers: projectMarkers,
+      bounds: paddedBounds
+    };
+  }, [projects, selectedProjectId]);
+
+  // Fit map to bounds when it loads or filters change
+  useEffect(() => {
+    if (!mapRef.current || markers.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (markers.length === 1) {
+        mapRef.current?.flyToSubject(markers[0].coordinates, 11);
+      } else if (bounds) {
+        mapRef.current?.fitBounds(bounds, { padding: 60, pitch: 0, bearing: 0 });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [bounds, markers]);
+
+  return (
+    <div className="h-100 w-100 tw-position-relative">
+      {markers.length === 0 ? (
+        <div
+          className="d-flex tw-align-items-center tw-justify-content-center h-100 rounded border text-center"
+          style={{
+            backgroundColor: 'var(--cui-tertiary-bg)',
+            borderColor: 'var(--cui-border-color)',
+            color: 'var(--cui-secondary-color)'
+          }}
+        >
+          <p className="small mb-0">Add project coordinates to display on map</p>
+        </div>
+      ) : (
+        <MapOblique
+          ref={mapRef}
+          center={center}
+          zoom={10}
+          pitch={0}
+          bearing={0}
+          markers={markers}
+          showExtrusions={false}
+          onFeatureClick={(id) => {
+            const projectId = Number(id);
+            if (!Number.isNaN(projectId)) {
+              onProjectSelect?.(projectId);
+            }
+          }}
+          styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+        />
+      )}
+    </div>
+  );
+}

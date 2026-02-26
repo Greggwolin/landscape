@@ -1,0 +1,215 @@
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import useSWR from 'swr';
+import CIcon from '@coreui/icons-react';
+import { cilChevronLeft } from '@coreui/icons';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+import ProjectProfileEditModal from '@/components/project/ProjectProfileEditModal';
+import ProjectTabMap from '@/components/map/ProjectTabMap';
+import { fetchJson } from '@/lib/fetchJson';
+import type { ProjectProfile } from '@/types/project-profile';
+import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
+import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
+import { PERSPECTIVE_LABELS, PURPOSE_LABELS } from '@/types/project-taxonomy';
+
+interface ProjectSelectorCardProps {
+  projectId: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
+
+export function ProjectSelectorCard({ projectId, onToggleCollapse }: ProjectSelectorCardProps) {
+  const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const { data: profile, mutate } = useSWR<ProjectProfile>(
+    `/api/projects/${projectId}/profile`,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  const project = useMemo(() => {
+    return projects.find((p) => p.project_id === projectId) || activeProject;
+  }, [projects, projectId, activeProject]);
+
+  const handleProjectChange = (newProjectId: number) => {
+    const targetProject = projects.find((p) => p.project_id === newProjectId);
+    const targetUrl = getProjectSwitchUrl(
+      newProjectId,
+      pathname,
+      targetProject?.project_type_code,
+      searchParams
+    );
+    selectProject(newProjectId);
+    router.push(targetUrl);
+  };
+
+  const handleEditClick = () => {
+    setIsEditModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsEditModalOpen(false);
+  };
+
+  const handleSaveSuccess = () => {
+    mutate();
+    refreshProjects();
+    setIsEditModalOpen(false);
+  };
+
+  // Profile field display helper
+  const displayValue = (value: string | number | null | undefined, defaultText = '—') => {
+    if (value === null || value === undefined || value === '') return defaultText;
+    return String(value);
+  };
+
+  return (
+    <>
+      <div className="tw-flex tw-flex-col gap-3">
+        {/* Active Project Card */}
+        <div
+          className="tw-rounded-lg tw-shadow-sm tw-overflow-hidden"
+          style={{
+            backgroundColor: 'var(--surface-card)',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          {/* Header with Project Selector, Edit Button, and Collapse Toggle - sticky */}
+          <div
+            className="tw-flex tw-items-center tw-justify-between gap-2 px-3 py-2 tw-sticky top-0 tw-z-10"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+          >
+            <div className="tw-flex tw-items-center gap-3">
+              <label className="tw-text-sm tw-font-semibold text-foreground tw-whitespace-nowrap">
+                Active Project:
+              </label>
+              <select
+                value={project?.project_id ?? projectId}
+                onChange={(e) => handleProjectChange(Number(e.target.value))}
+                className="px-2 py-1 rounded border border-border bg-background text-foreground tw-text-sm tw-cursor-pointer"
+                style={{ maxWidth: '200px' }}
+                disabled={!project}
+              >
+                {projects.length > 0 ? (
+                  projects.map((proj) => (
+                    <option key={proj.project_id} value={proj.project_id}>
+                      {proj.project_name} - {proj.project_type_code || 'LAND'}
+                    </option>
+                  ))
+                ) : (
+                  <option value={projectId}>Loading...</option>
+                )}
+              </select>
+            </div>
+            <div className="tw-flex tw-items-center gap-2">
+              <button
+                onClick={handleEditClick}
+                className="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wider tw-text-blue-600 hover:tw-text-blue-800 tw-transition-colors"
+                style={{ letterSpacing: '0.08em' }}
+              >
+                Edit
+              </button>
+              {onToggleCollapse && (
+                <button
+                  onClick={onToggleCollapse}
+                  className="p-1 rounded hover:bg-hover-overlay text-muted hover:text-foreground tw-transition-colors"
+                  aria-label="Collapse content panel"
+                >
+                  <CIcon icon={cilChevronLeft} size="sm" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Profile Fields - 2 columns, 6 items each */}
+          <div className="p-3">
+            <div className="tw-grid tw-grid-cols-2 tw-gap-x-8 tw-gap-y-2">
+              {/* Column 1 */}
+              <div className="tw-flex tw-flex-col gap-2">
+                <ProfileFieldRow
+                  label="Perspective"
+                  value={displayValue(profile?.analysis_perspective ? PERSPECTIVE_LABELS[profile.analysis_perspective] : null)}
+                />
+                <ProfileFieldRow
+                  label="Purpose"
+                  value={displayValue(profile?.analysis_purpose ? PURPOSE_LABELS[profile.analysis_purpose] : null)}
+                />
+                {profile?.value_add_enabled && (
+                  <ProfileFieldRow label="Value-Add" value="Enabled" />
+                )}
+                <ProfileFieldRow label="Project Type" value={displayValue(profile?.property_subtype)} />
+                <ProfileFieldRow label="Target Units" value={profile?.target_units ? formatTargetUnits(profile.target_units) : '—'} />
+                <ProfileFieldRow label="Gross Acres" value={profile?.gross_acres ? formatGrossAcres(profile.gross_acres) : '—'} />
+                <ProfileFieldRow label="Address" value={displayValue(profile?.address)} />
+                <ProfileFieldRow label="City" value={displayValue(profile?.city)} />
+              </div>
+              {/* Column 2 */}
+              <div className="tw-flex tw-flex-col gap-2">
+                <ProfileFieldRow label="County" value={displayValue(profile?.county)} />
+                <ProfileFieldRow label="State" value={displayValue(profile?.state)} />
+                <ProfileFieldRow label="Zip Code" value={displayValue(profile?.zip_code)} />
+                <ProfileFieldRow label="Market" value={formatMSADisplay(profile?.msa_name, profile?.state_abbreviation) || '—'} />
+                <ProfileFieldRow label="APN" value={displayValue(profile?.apn)} />
+                <ProfileFieldRow label="Ownership Type" value={displayValue(profile?.ownership_type)} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Map Card - separate card */}
+        <div
+          className="tw-rounded-lg tw-shadow-sm tw-overflow-hidden"
+          style={{
+            backgroundColor: 'var(--surface-card)',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}
+        >
+          <div
+            className="px-3 py-2 tw-sticky top-0 tw-z-10"
+            style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}
+          >
+            <span className="tw-text-sm tw-font-medium text-foreground">Map - 3D Oblique View</span>
+          </div>
+          <div className="p-3">
+            <ProjectTabMap
+              projectId={String(projectId)}
+              styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}
+              tabId="landscaper"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && profile && (
+        <ProjectProfileEditModal
+          projectId={projectId}
+          profile={profile}
+          isOpen={isEditModalOpen}
+          onClose={handleModalClose}
+          onSaveSuccess={handleSaveSuccess}
+        />
+      )}
+    </>
+  );
+}
+
+// Inline component for profile field rows
+function ProfileFieldRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="tw-flex tw-items-baseline gap-2 tw-text-sm">
+      <span className="tw-font-medium text-muted tw-whitespace-nowrap" style={{ minWidth: '110px' }}>
+        {label}:
+      </span>
+      <span className="text-foreground tw-truncate">{value}</span>
+    </div>
+  );
+}
