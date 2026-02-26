@@ -646,6 +646,50 @@
   color: var(--cui-secondary-color);
 }
 
+/* Provenance icons — data origin indicator */
+.ops-provenance {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.ops-provenance svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ops-provenance-lock {
+  color: var(--cui-warning, #f9b115);
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.ops-provenance-lock:hover {
+  opacity: 1;
+}
+
+.ops-provenance-input {
+  color: var(--cui-secondary-color, #9da5b1);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ops-provenance-revertable {
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.15s;
+}
+
+.ops-provenance-revertable:hover {
+  opacity: 1;
+  color: var(--cui-warning, #f9b115);
+}
+
 /* Column visibility — hide cells when columns are toggled off */
 .ops-hide-ltl .ops-col-ltl {
   display: none;

@@ -1918,6 +1918,15 @@ LANDSCAPER_TOOLS = [
                 "scenario_id": {"type": "integer"},
                 "probability_weight": {"type": "number"},
                 "notes": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["observed", "inferred", "assumed"],
+                    "description": "Data confidence: observed=from market data, inferred=derived from comps, assumed=user estimate",
+                },
+                "data_source": {
+                    "type": "string",
+                    "description": "Source of absorption data (e.g., 'Metrostudy Q4 2025', 'Builder interview', 'Zonda report')",
+                },
                 "reason": {"type": "string"},
             },
         },
@@ -3008,6 +3017,147 @@ LANDSCAPER_TOOLS = [
                 "selected_case": {"type": "string", "enum": ["conservative", "base", "optimistic"]},
             },
             "required": ["gross_acres"],
+        },
+    },
+    # ── Land Development Ingestion Tools ──────────────────────────────────────
+    {
+        "name": "configure_project_hierarchy",
+        "description": "Set the hierarchy level labels for a land development project (e.g., Area/Phase/Parcel). Updates tbl_project_config tier labels. Only for LAND projects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tier_1_label": {
+                    "type": "string",
+                    "description": "Level 1 label (default: 'Area'). Examples: Area, District, Village",
+                },
+                "tier_2_label": {
+                    "type": "string",
+                    "description": "Level 2 label (default: 'Phase'). Examples: Phase, Pod, Section",
+                },
+                "tier_3_label": {
+                    "type": "string",
+                    "description": "Level 3 label (default: 'Parcel'). Examples: Parcel, Lot, Tract",
+                },
+                "reason": {"type": "string"},
+            },
+        },
+    },
+    {
+        "name": "create_land_dev_containers",
+        "description": "Bulk create the Area → Phase → Parcel hierarchy for a land development project. Writes to legacy tables (tbl_area, tbl_phase, tbl_parcel). Only for LAND projects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "areas": {
+                    "type": "array",
+                    "description": "Array of areas, each containing phases with parcels.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "area_alias": {"type": "string", "description": "Area name (e.g., 'Area 1', 'North Village')"},
+                            "area_no": {"type": "integer", "description": "Area number for ordering"},
+                            "phases": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "phase_name": {"type": "string", "description": "Phase name (e.g., 'Phase 1.1')"},
+                                        "phase_no": {"type": "integer", "description": "Phase number for ordering"},
+                                        "label": {"type": "string"},
+                                        "phase_status": {"type": "string", "enum": ["planned", "entitled", "under_construction", "delivering", "complete"]},
+                                        "parcels": {
+                                            "type": "array",
+                                            "description": "One row per lot type within this phase",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "parcel_name": {"type": "string", "description": "Descriptive name (e.g., '50x120 SFD Lots')"},
+                                                    "parcel_code": {"type": "string", "description": "Short code (e.g., 'P1.1-SFD50')"},
+                                                    "lot_product": {"type": "string", "description": "Lot product type (e.g., '50x120', 'Townhome', 'APTS')"},
+                                                    "product_code": {"type": "string"},
+                                                    "lot_width": {"type": "number"},
+                                                    "lot_depth": {"type": "number"},
+                                                    "lot_area": {"type": "number", "description": "Lot area in SF"},
+                                                    "units_total": {"type": "integer", "description": "Number of lots/units of this type"},
+                                                    "acres_gross": {"type": "number"},
+                                                    "landuse_code": {"type": "string"},
+                                                    "landuse_type": {"type": "string"},
+                                                },
+                                                "required": ["parcel_name", "units_total"],
+                                            },
+                                        },
+                                    },
+                                    "required": ["phase_name"],
+                                },
+                            },
+                        },
+                        "required": ["area_alias"],
+                    },
+                },
+                "reason": {"type": "string"},
+            },
+            "required": ["areas"],
+        },
+    },
+    {
+        "name": "update_lot_mix",
+        "description": "Set or update lot type inventory for a phase. Each entry becomes one tbl_parcel row (one row per lot type). Only for LAND projects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phase_id": {"type": "integer", "description": "Target phase ID"},
+                "lot_types": {
+                    "type": "array",
+                    "description": "Array of lot type definitions. Each becomes one parcel row.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer", "description": "Existing parcel_id to update (omit for new)"},
+                            "parcel_name": {"type": "string", "description": "Descriptive name (e.g., '50x120 SFD')"},
+                            "parcel_code": {"type": "string"},
+                            "lot_product": {"type": "string", "description": "Product type code"},
+                            "product_code": {"type": "string"},
+                            "lot_width": {"type": "number"},
+                            "lot_depth": {"type": "number"},
+                            "lot_area": {"type": "number"},
+                            "units_total": {"type": "integer", "description": "Count of lots of this type"},
+                            "acres_gross": {"type": "number"},
+                            "saleprice": {"type": "number", "description": "Base sale price per lot"},
+                            "landuse_code": {"type": "string"},
+                            "landuse_type": {"type": "string"},
+                        },
+                        "required": ["parcel_name", "units_total"],
+                    },
+                },
+                "reason": {"type": "string"},
+            },
+            "required": ["phase_id", "lot_types"],
+        },
+    },
+    {
+        "name": "update_land_use_budget",
+        "description": "Set land use allocations for a land dev project (gross-to-net acreage by use type). Writes to tbl_acreage_allocation. Only for LAND projects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phase_id": {"type": "integer", "description": "Optional phase ID to scope allocations to a specific phase"},
+                "allocations": {
+                    "type": "array",
+                    "description": "Land use allocation entries",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "land_use": {"type": "string", "description": "Land use category (e.g., 'Gross', 'Net Developable', 'Open Space', 'Roads/ROW', 'Single Family', 'Commercial', 'Drainage')"},
+                            "acres": {"type": "number", "description": "Acres allocated to this use"},
+                            "notes": {"type": "string", "description": "Source or context note"},
+                            "data_source": {"type": "string", "description": "Where the data came from (e.g., 'Metrostudy Q4 2025')"},
+                        },
+                        "required": ["land_use", "acres"],
+                    },
+                },
+                "reason": {"type": "string"},
+            },
+            "required": ["allocations"],
         },
     },
 ]

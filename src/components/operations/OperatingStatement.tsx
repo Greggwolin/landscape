@@ -8,6 +8,58 @@ import { InputCell } from './InputCell';
 import { ItemNameEditor } from './ItemNameEditor';
 import { LineItemRow, formatCurrency, formatPercent, formatPerSF } from './types';
 import { LockClosedIcon, PlusIcon, MinusIcon } from '@heroicons/react/20/solid';
+import CIcon from '@coreui/icons-react';
+import { cilLockLocked, cilInput } from '@coreui/icons';
+
+// =============================================================================
+// PROVENANCE ICON — indicates data origin for each row
+// =============================================================================
+type ProvenanceSource = 'ingestion' | 'user' | 'user_modified';
+
+interface ProvenanceIconProps {
+  source?: ProvenanceSource;
+  isCalculated?: boolean;
+  onClick?: () => void;
+}
+
+/**
+ * Shows provenance state for a row:
+ *   ingestion      → amber lock   (click to override / make editable)
+ *   user           → muted input  (no action)
+ *   user_modified  → muted input  (click to revert to extracted value)
+ *   calculated     → nothing
+ */
+function ProvenanceIcon({ source, isCalculated, onClick }: ProvenanceIconProps) {
+  if (isCalculated || !source) return null;
+
+  if (source === 'ingestion') {
+    return (
+      <span
+        className="ops-provenance ops-provenance-lock"
+        title="Extracted from document — click to override"
+        onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+        role="button"
+        tabIndex={0}
+      >
+        <CIcon icon={cilLockLocked} size="sm" />
+      </span>
+    );
+  }
+
+  // user or user_modified
+  const isRevertable = source === 'user_modified';
+  return (
+    <span
+      className={`ops-provenance ops-provenance-input${isRevertable ? ' ops-provenance-revertable' : ''}`}
+      title={isRevertable ? 'User override — click to revert to extracted value' : 'User-entered value'}
+      onClick={isRevertable ? (e) => { e.stopPropagation(); onClick?.(); } : undefined}
+      role={isRevertable ? 'button' : undefined}
+      tabIndex={isRevertable ? 0 : undefined}
+    >
+      <CIcon icon={cilInput} size="sm" />
+    </span>
+  );
+}
 
 const DRAG_TYPE = 'opex_item';
 
@@ -67,6 +119,8 @@ interface OperatingStatementProps {
   onDeleteExpenses?: (opexIds: number[]) => Promise<void>;
   /** Callback for inline item name changes (double-click edit) */
   onItemNameChange?: (opexId: number, categoryId: number, categoryName: string) => Promise<void>;
+  /** Callback when provenance icon is clicked (lock→unlock or revert) */
+  onProvenanceToggle?: (lineItemKey: string, currentSource: ProvenanceSource) => void;
   hideLossToLease?: boolean;
   hidePostReno?: boolean;
 }
@@ -83,6 +137,7 @@ interface SelectableExpenseRowProps {
   onStartEditName: (opexId: number) => void;
   onSaveItemName: (opexId: number, categoryId: number, categoryName: string) => void;
   onCancelEditName: () => void;
+  onProvenanceToggle?: (lineItemKey: string, currentSource: ProvenanceSource) => void;
 }
 
 function SelectableExpenseRow({
@@ -96,7 +151,8 @@ function SelectableExpenseRow({
   onUpdateRow,
   onStartEditName,
   onSaveItemName,
-  onCancelEditName
+  onCancelEditName,
+  onProvenanceToggle
 }: SelectableExpenseRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isDraggable = row.is_draggable;
@@ -196,6 +252,11 @@ function SelectableExpenseRow({
             >
               {row.label}
             </span>
+            <ProvenanceIcon
+              source={row.source}
+              isCalculated={row.is_calculated}
+              onClick={() => row.source && onProvenanceToggle?.(row.line_item_key, row.source)}
+            />
           </span>
         )}
       </div>
@@ -535,6 +596,7 @@ export function OperatingStatement({
   onAddExpense,
   onDeleteExpenses,
   onItemNameChange,
+  onProvenanceToggle,
   hideLossToLease = false,
   hidePostReno: hidePostRenoProp
 }: OperatingStatementProps) {
@@ -987,7 +1049,8 @@ export function OperatingStatement({
             const rate = row.as_is.rate || 0;
             const amount = row.as_is.total || 0;
             const isPercentage = row.is_percentage;
-            const isReadOnly = row.is_readonly || (row.line_item_key === 'physical_vacancy' && hasDetailedRentRoll);
+            // Physical vacancy: use is_readonly from backend (accounts for override)
+            const isReadOnly = row.is_readonly ?? false;
             const postRenoRate = row.post_reno?.rate || 0;
             const postRenoTotal = row.post_reno?.total || 0;
             const perSF = totalSF > 0 ? (Math.abs(amount) / 12) / totalSF : 0;
@@ -998,11 +1061,16 @@ export function OperatingStatement({
                 <div className="ops-cell">
                   <span className="ops-label-inline">
                     {row.label}
-                    {isReadOnly && (
+                    {row.line_item_key === 'physical_vacancy' && hasDetailedRentRoll ? (
+                      <ProvenanceIcon
+                        source={row.source as ProvenanceSource | undefined}
+                        onClick={() => row.source && onProvenanceToggle?.(row.line_item_key, row.source)}
+                      />
+                    ) : isReadOnly ? (
                       <span className="ops-lock">
                         <LockClosedIcon className="w-3 h-3" />
                       </span>
-                    )}
+                    ) : null}
                   </span>
                 </div>
                 <div className={`ops-cell ${isReadOnly ? 'num' : 'ops-input-cell'}`}>
@@ -1124,6 +1192,7 @@ export function OperatingStatement({
                 onStartEditName={handleStartEditItemName}
                 onSaveItemName={handleSaveItemName}
                 onCancelEditName={handleCancelEditItemName}
+                onProvenanceToggle={onProvenanceToggle}
               />
             );
           })}

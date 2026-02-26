@@ -18,14 +18,29 @@ import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-// Map DB table names from pending_mutations to the event table names components watch
+// Map DB table names from pending_mutations to the event table names components watch.
+// Keys must match the table_name values used in tool_executor.py mutations.
 const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
+  // Operations tab watches: operating_expenses, units, unit_types, leases
   tbl_operating_expenses: ['operating_expenses'],
-  tbl_unit: ['units'],
+  tbl_multifamily_unit: ['units'],
+  tbl_multifamily_unit_type: ['unit_types'],
   tbl_lease: ['leases'],
-  tbl_unit_type: ['unit_types'],
+  tbl_vacancy_assumption: ['operating_expenses'], // vacancy changes trigger ops refresh
+  tbl_project_assumption: ['operating_expenses'], // assumption changes (vacancy override) trigger ops refresh
+
+  // Capitalization tab watches: loans, equity_structure, waterfall_tiers
+  tbl_loan: ['loans'],
+  tbl_equity_structure: ['equity_structure'],
+  tbl_waterfall_tier: ['waterfall_tiers'],
+
+  // Comps
   tbl_rental_comp: ['rental_comps'],
+  tbl_rent_comparable: ['rental_comps'],
   tbl_sales_comp: ['sales_comps'],
+  tbl_sales_comparables: ['sales_comps'],
+
+  // Project-level
   tbl_project: ['project'],
   tbl_dcf_assumption: ['dcf_analysis', 'cashflow'],
 };

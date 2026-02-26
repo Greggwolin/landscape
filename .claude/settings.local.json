@@ -588,7 +588,11 @@
       "Bash(git push -u origin feature/alpha-prep)",
       "Bash(./venv/bin/python manage.py shell -c \":*)",
       "Bash(./venv/bin/python manage.py check --database default)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(__NEW_LINE_3ebba35207161cf4__ echo \"1. Planning tab target tables identified and documented in code comment:\")",
+      "Bash(__NEW_LINE_3ebba35207161cf4__ echo \"\")",
+      "Bash(__NEW_LINE_a2c8739d12434159__ echo \"\")",
+      "Bash(__NEW_LINE_e74d67d3437a24a0__ echo \"\")"
     ],
     "deny": [],
     "ask": [],

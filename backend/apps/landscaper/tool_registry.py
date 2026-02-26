@@ -210,6 +210,9 @@ PAGE_TOOLS = {
         "query_platform_knowledge",
         "get_knowledge_entities",
         "get_knowledge_facts",
+        # Land dev ingestion
+        "configure_project_hierarchy",
+        "create_land_dev_containers",
     ],
 
     "land_planning": [
@@ -234,6 +237,11 @@ PAGE_TOOLS = {
         "get_milestones",
         "update_milestone",
         "delete_milestone",
+        # Land dev ingestion tools (2026-02-26)
+        "configure_project_hierarchy",
+        "create_land_dev_containers",
+        "update_lot_mix",
+        "update_land_use_budget",
     ],
 
     "land_budget": [

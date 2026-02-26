@@ -137,8 +137,9 @@ ALLOWED_UPDATES = {
     'tbl_parcel': {
         'fields': [
             'parcel_name', 'parcel_type', 'lot_count', 'net_acres', 'gross_acres',
-            'avg_lot_size_sf', 'avg_lot_price', 'total_revenue', 'absorption_rate',
+            'absorption_rate',
             'status', 'notes', 'is_active'
+            # REMOVED: avg_lot_size_sf, avg_lot_price, total_revenue (calculated fields)
         ],
         'pk_field': 'parcel_id',
         'fk_field': 'project_id',
@@ -157,7 +158,9 @@ ALLOWED_UPDATES = {
         'fields': [
             'expense_category', 'expense_type', 'annual_amount', 'amount_per_sf',
             'is_recoverable', 'recovery_rate', 'escalation_type', 'escalation_rate',
-            'start_period', 'payment_frequency', 'notes', 'account_id'
+            'start_period', 'payment_frequency', 'notes', 'account_id',
+            'source', 'unit_amount', 'category_id', 'parent_category',
+            'calculation_basis', 'statement_discriminator'
         ],
         'pk_field': 'opex_id',
         'fk_field': 'project_id',
@@ -304,6 +307,8 @@ FIELD_TYPES = {
     'escalation_rate': 'decimal',
     'start_period': 'integer',
     'account_id': 'integer',
+    'unit_amount': 'decimal',
+    'category_id': 'integer',
     # Boolean fields
     'is_active': 'boolean',
     'is_recoverable': 'boolean',
@@ -1280,6 +1285,19 @@ def bulk_upsert_operating_expenses(
             'summary': 'No operating expenses provided'
         }
 
+    # Fetch auto-calculated expense categories so we can skip them
+    auto_calc_categories: set = set()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT LOWER(expense_category)
+                FROM landscape.tbl_operating_expenses
+                WHERE project_id = %s AND is_auto_calculated = true
+            """, [project_id])
+            auto_calc_categories = {r[0] for r in cursor.fetchall() if r[0]}
+    except Exception as e:
+        logger.warning(f"[bulk_upsert_operating_expenses] auto-calc lookup failed: {e}")
+
     results = []
     created_count = 0
     updated_count = 0
@@ -1293,6 +1311,17 @@ def bulk_upsert_operating_expenses(
     )
 
     for expense in expenses:
+        # Guard: reject writes to auto-calculated expense categories
+        cat = (expense.get('label', '') or expense.get('expense_category', '')).lower()
+        if cat and cat in auto_calc_categories:
+            results.append({
+                'success': False,
+                'error': f"Expense '{cat}' is auto-calculated (derived from project metrics). Update the calculation basis instead.",
+                'expense': expense,
+                'is_auto_calculated': True,
+            })
+            error_count += 1
+            continue
         label = expense.get('label', expense.get('expense_label', ''))
         amount = expense.get('annual_amount', expense.get('amount', 0))
         unit_amount = expense.get('unit_amount', expense.get('per_unit'))
@@ -2009,14 +2038,27 @@ VACANCY_COLUMNS = [
     'submarket_vacancy_rate_pct', 'competitive_set_vacancy_pct'
 ]
 
+# Vacancy fields derived from rent roll / financial engine — read-only
+CALCULATED_VACANCY_FIELDS = frozenset([
+    'physical_vacancy_pct',
+    'economic_vacancy_pct',
+])
+
 
 def _get_assumption_record(
     table_name: str,
     pk_column: str,
     project_id: int,
-    columns: List[str]
+    columns: List[str],
+    calculated_fields: frozenset = frozenset(),
 ) -> Dict[str, Any]:
-    """Generic getter for assumption tables."""
+    """Generic getter for assumption tables.
+
+    Args:
+        calculated_fields: Optional set of column names that are engine-computed
+            outputs.  When provided, the response ``data`` dict tags each value
+            with ``is_calculated`` so the AI never attempts to write them back.
+    """
     try:
         col_list = ', '.join(columns)
         with connection.cursor() as cursor:
@@ -2043,7 +2085,13 @@ def _get_assumption_record(
                     val = val.isoformat()
                 data[col] = val
 
-            return {'success': True, 'exists': True, 'data': data}
+            result = {'success': True, 'exists': True, 'data': data}
+
+            # Annotate calculated fields so the AI knows they are read-only
+            if calculated_fields:
+                result['calculated_fields'] = sorted(calculated_fields & set(columns))
+
+            return result
 
     except Exception as e:
         logger.error(f"Error getting {table_name}: {e}")
@@ -2440,7 +2488,12 @@ def handle_get_cashflow_results(
     target_project = tool_input.get('project_id') or project_id
     try:
         payload = _assemble_cashflow_results_payload(target_project)
-        return {'success': True, 'data': payload}
+        return {
+            'success': True,
+            'data': payload,
+            'all_fields_calculated': True,
+            '_note': 'All values are engine outputs. Do not write these back — update assumptions instead.',
+        }
     except Exception as err:
         logger.error(f"Failed to fetch cashflow results for project {target_project}: {err}")
         return {'success': False, 'error': str(err)}
@@ -2790,7 +2843,8 @@ def handle_get_vacancy_assumptions(
         table_name='tbl_vacancy_assumption',
         pk_column='vacancy_id',
         project_id=project_id,
-        columns=VACANCY_COLUMNS
+        columns=VACANCY_COLUMNS,
+        calculated_fields=CALCULATED_VACANCY_FIELDS,
     )
 
 
@@ -2803,6 +2857,18 @@ def handle_update_vacancy_assumptions(
     **kwargs
 ) -> Dict[str, Any]:
     """Update vacancy and loss assumptions."""
+    # Block writes to engine-calculated fields
+    blocked = [k for k in tool_input if k in CALCULATED_VACANCY_FIELDS and tool_input[k] is not None]
+    if blocked:
+        return {
+            'success': False,
+            'error': (
+                f"Cannot write to calculated fields: {blocked}. "
+                "These are derived from the rent roll / financial engine. "
+                "Update the source data instead."
+            ),
+        }
+
     if propose_only:
         from .services.mutation_service import MutationService
 
@@ -7956,7 +8022,8 @@ ABSORPTION_SCHEDULE_COLUMNS = [
     'revenue_category', 'lu_family_name', 'lu_type_code', 'product_code',
     'start_period', 'periods_to_complete', 'timing_method', 'units_per_period',
     'total_units', 'base_price_per_unit', 'price_escalation_pct', 'scenario_name',
-    'probability_weight', 'notes', 'scenario_id'
+    'probability_weight', 'notes', 'scenario_id',
+    'confidence', 'data_source',  # Added 2026-02-26 for land dev ingestion
 ]
 
 PARCEL_SALE_EVENT_COLUMNS = [
@@ -9339,6 +9406,544 @@ def delete_absorption_schedule(
     except Exception as e:
         logger.error(f"Error deleting absorption schedule: {e}")
         return {'success': False, 'error': str(e)}
+
+
+# ============ LAND DEV INGESTION TOOLS ============
+# Added 2026-02-26: Tools for populating land development projects from documents.
+# These tools are gated to LAND project types only.
+
+def _require_land_project(project_id: int) -> Optional[Dict[str, Any]]:
+    """Verify project is a land development type. Returns error dict if not."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT project_type FROM landscape.tbl_project WHERE project_id = %s
+            """, [project_id])
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Project {project_id} not found'}
+            ptype = (row[0] or '').upper()
+            if ptype not in ('LAND', 'MXU'):
+                return {'success': False, 'error': f'Tool only available for Land Development projects (current type: {ptype})'}
+    except Exception as e:
+        return {'success': False, 'error': f'Error checking project type: {e}'}
+    return None  # No error — project is land dev
+
+
+@register_tool('configure_project_hierarchy', is_mutation=True)
+def handle_configure_project_hierarchy(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Set hierarchy level labels for a land development project."""
+    gate = _require_land_project(project_id)
+    if gate:
+        return gate
+
+    tier_1 = tool_input.get('tier_1_label')
+    tier_2 = tool_input.get('tier_2_label')
+    tier_3 = tool_input.get('tier_3_label')
+    reason = tool_input.get('reason', 'Configure project hierarchy labels')
+
+    if not any([tier_1, tier_2, tier_3]):
+        return {'success': False, 'error': 'At least one tier label required'}
+
+    changes = {}
+    if tier_1:
+        changes['tier_1_label'] = tier_1
+    if tier_2:
+        changes['tier_2_label'] = tier_2
+    if tier_3:
+        changes['tier_3_label'] = tier_3
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='config_update',
+            table_name='tbl_project_config',
+            field_name=None,
+            record_id=str(project_id),
+            proposed_value=changes,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            set_parts = [f"{k} = %s" for k in changes.keys()]
+            values = list(changes.values()) + [project_id]
+
+            cursor.execute(f"""
+                UPDATE landscape.tbl_project_config
+                SET {', '.join(set_parts)}
+                WHERE project_id = %s
+                RETURNING project_id
+            """, values)
+            row = cursor.fetchone()
+
+            if not row:
+                # Insert if no config exists
+                cols = ['project_id'] + list(changes.keys())
+                placeholders = ['%s'] * len(cols)
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_project_config ({', '.join(cols)})
+                    VALUES ({', '.join(placeholders)})
+                    ON CONFLICT (project_id) DO UPDATE SET {', '.join(set_parts[:len(changes)])}
+                    RETURNING project_id
+                """, [project_id] + list(changes.values()) + list(changes.values()))
+
+            _log_planning_activity(project_id, 'tbl_project_config', 'update', len(changes), reason)
+
+            return {
+                'success': True,
+                'action': 'updated',
+                'labels': changes,
+                'message': f"Hierarchy labels updated: {', '.join(f'{k}={v}' for k, v in changes.items())}"
+            }
+    except Exception as e:
+        logger.error(f"Error configuring hierarchy: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('create_land_dev_containers', is_mutation=True)
+def handle_create_land_dev_containers(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Bulk create Area → Phase → Parcel hierarchy for a land development project."""
+    gate = _require_land_project(project_id)
+    if gate:
+        return gate
+
+    areas_input = tool_input.get('areas', [])
+    reason = tool_input.get('reason', 'Create land development hierarchy')
+
+    if not areas_input:
+        return {'success': False, 'error': 'areas array required'}
+
+    if propose_only:
+        # Summarize for proposal
+        total_areas = len(areas_input)
+        total_phases = sum(len(a.get('phases', [])) for a in areas_input)
+        total_parcels = sum(
+            len(p.get('parcels', []))
+            for a in areas_input
+            for p in a.get('phases', [])
+        )
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_bulk_create',
+            table_name='tbl_area,tbl_phase,tbl_parcel',
+            field_name=None,
+            record_id=None,
+            proposed_value={
+                'areas': total_areas,
+                'phases': total_phases,
+                'parcels': total_parcels,
+                'hierarchy': [
+                    {
+                        'area': a.get('area_alias'),
+                        'phases': [
+                            {
+                                'phase': p.get('phase_name'),
+                                'parcels': len(p.get('parcels', []))
+                            }
+                            for p in a.get('phases', [])
+                        ]
+                    }
+                    for a in areas_input
+                ]
+            },
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        created = {'areas': [], 'phases': [], 'parcels': []}
+
+        with connection.cursor() as cursor:
+            for area_input in areas_input:
+                # Get next area_no
+                cursor.execute("""
+                    SELECT COALESCE(MAX(area_no), 0) + 1
+                    FROM landscape.tbl_area WHERE project_id = %s
+                """, [project_id])
+                next_area_no = cursor.fetchone()[0]
+                area_no = area_input.get('area_no', next_area_no)
+
+                cursor.execute("""
+                    INSERT INTO landscape.tbl_area (project_id, area_alias, area_no)
+                    VALUES (%s, %s, %s)
+                    RETURNING area_id, area_alias
+                """, [project_id, area_input['area_alias'], area_no])
+                area_row = cursor.fetchone()
+                area_id = area_row[0]
+                created['areas'].append({'area_id': area_id, 'area_alias': area_row[1]})
+
+                for phase_input in area_input.get('phases', []):
+                    # Get next phase_no
+                    cursor.execute("""
+                        SELECT COALESCE(MAX(phase_no), 0) + 1
+                        FROM landscape.tbl_phase WHERE area_id = %s
+                    """, [area_id])
+                    next_phase_no = cursor.fetchone()[0]
+                    phase_no = phase_input.get('phase_no', next_phase_no)
+
+                    phase_cols = ['project_id', 'area_id', 'phase_name', 'phase_no']
+                    phase_vals = [project_id, area_id, phase_input['phase_name'], phase_no]
+
+                    for opt_field in ['label', 'description', 'phase_status', 'phase_start_date',
+                                      'phase_completion_date', 'absorption_start_date']:
+                        if opt_field in phase_input:
+                            phase_cols.append(opt_field)
+                            phase_vals.append(phase_input[opt_field])
+
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_phase ({', '.join(phase_cols)})
+                        VALUES ({', '.join(['%s'] * len(phase_cols))})
+                        RETURNING phase_id, phase_name
+                    """, phase_vals)
+                    phase_row = cursor.fetchone()
+                    phase_id = phase_row[0]
+                    created['phases'].append({'phase_id': phase_id, 'phase_name': phase_row[1], 'area_id': area_id})
+
+                    for parcel_input in phase_input.get('parcels', []):
+                        parcel_cols = ['project_id', 'phase_id']
+                        parcel_vals = [project_id, phase_id]
+
+                        # Map input fields to PARCEL_COLUMNS
+                        for field in PARCEL_COLUMNS:
+                            if field in parcel_input and field not in ('project_id', 'phase_id'):
+                                parcel_cols.append(field)
+                                parcel_vals.append(parcel_input[field])
+
+                        cursor.execute(f"""
+                            INSERT INTO landscape.tbl_parcel ({', '.join(parcel_cols)})
+                            VALUES ({', '.join(['%s'] * len(parcel_cols))})
+                            RETURNING parcel_id, parcel_name
+                        """, parcel_vals)
+                        parcel_row = cursor.fetchone()
+                        created['parcels'].append({
+                            'parcel_id': parcel_row[0],
+                            'parcel_name': parcel_row[1],
+                            'phase_id': phase_id
+                        })
+
+        _log_planning_activity(
+            project_id, 'tbl_area,tbl_phase,tbl_parcel', 'bulk_create',
+            len(created['areas']) + len(created['phases']) + len(created['parcels']),
+            reason
+        )
+
+        return {
+            'success': True,
+            'action': 'bulk_created',
+            'created': {
+                'areas': len(created['areas']),
+                'phases': len(created['phases']),
+                'parcels': len(created['parcels']),
+            },
+            'details': created,
+            'message': (
+                f"Created {len(created['areas'])} areas, "
+                f"{len(created['phases'])} phases, "
+                f"{len(created['parcels'])} parcels"
+            )
+        }
+    except Exception as e:
+        logger.error(f"Error creating land dev containers: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_lot_mix', is_mutation=True)
+def handle_update_lot_mix(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Set or update lot type inventory for a phase (one tbl_parcel row per lot type)."""
+    gate = _require_land_project(project_id)
+    if gate:
+        return gate
+
+    phase_id = tool_input.get('phase_id')
+    lot_types = tool_input.get('lot_types', [])
+    reason = tool_input.get('reason', 'Update lot mix')
+
+    if not phase_id:
+        return {'success': False, 'error': 'phase_id required'}
+    if not lot_types:
+        return {'success': False, 'error': 'lot_types array required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_upsert',
+            table_name='tbl_parcel',
+            field_name=None,
+            record_id=str(phase_id),
+            proposed_value={
+                'phase_id': phase_id,
+                'lot_types': lot_types,
+                'count': len(lot_types),
+            },
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        results = []
+        with connection.cursor() as cursor:
+            for lot in lot_types:
+                parcel_id = lot.get('id') or lot.get('parcel_id')
+
+                # Build column/value pairs from PARCEL_COLUMNS whitelist
+                data = {'project_id': project_id, 'phase_id': phase_id}
+                for field in PARCEL_COLUMNS:
+                    if field in lot and field not in ('project_id', 'phase_id'):
+                        data[field] = lot[field]
+
+                if parcel_id:
+                    # Update existing parcel row
+                    updates = {k: v for k, v in data.items() if k not in ('project_id', 'phase_id')}
+                    if updates:
+                        set_parts = [f"{k} = %s" for k in updates.keys()]
+                        values = list(updates.values()) + [parcel_id, project_id]
+                        cursor.execute(f"""
+                            UPDATE landscape.tbl_parcel
+                            SET {', '.join(set_parts)}
+                            WHERE parcel_id = %s AND project_id = %s
+                            RETURNING parcel_id, parcel_name
+                        """, values)
+                        row = cursor.fetchone()
+                        if row:
+                            results.append({'action': 'updated', 'parcel_id': row[0], 'parcel_name': row[1]})
+                else:
+                    # Insert new parcel row
+                    cols = list(data.keys())
+                    placeholders = ['%s'] * len(cols)
+                    values = list(data.values())
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_parcel ({', '.join(cols)})
+                        VALUES ({', '.join(placeholders)})
+                        RETURNING parcel_id, parcel_name
+                    """, values)
+                    row = cursor.fetchone()
+                    results.append({'action': 'created', 'parcel_id': row[0], 'parcel_name': row[1]})
+
+        _log_planning_activity(project_id, 'tbl_parcel', 'lot_mix_update', len(results), reason)
+
+        return {
+            'success': True,
+            'action': 'lot_mix_updated',
+            'phase_id': phase_id,
+            'count': len(results),
+            'results': results,
+        }
+    except Exception as e:
+        logger.error(f"Error updating lot mix: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_land_use_budget', is_mutation=True)
+def handle_update_land_use_budget(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Set land use allocations for a land development project.
+
+    Target table: landscape.tbl_acreage_allocation
+    Lookup table: landscape.lu_acreage_allocation_type (11 categories)
+    View: landscape.vw_acreage_allocation (enriched read with project/doc joins)
+
+    Planning tab reads parcels/phases directly; acreage allocations are a
+    parallel data layer showing gross-to-net land budget by use category.
+    Django endpoint: GET/POST /api/landdev/projects/{id}/allocations/
+    """
+    gate = _require_land_project(project_id)
+    if gate:
+        return gate
+
+    phase_id = tool_input.get('phase_id')
+    allocations = tool_input.get('allocations', [])
+    reason = tool_input.get('reason', 'Update land use budget')
+
+    if not allocations:
+        return {'success': False, 'error': 'allocations array required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_upsert',
+            table_name='tbl_acreage_allocation',
+            field_name=None,
+            record_id=str(phase_id) if phase_id else None,
+            proposed_value={
+                'phase_id': phase_id,
+                'allocations': allocations,
+                'count': len(allocations),
+            },
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        results = []
+        with connection.cursor() as cursor:
+            for alloc in allocations:
+                land_use = alloc.get('land_use', '')
+                acres = alloc.get('acres', 0)
+                notes = alloc.get('notes')
+                data_source = alloc.get('data_source')
+
+                # Resolve allocation_type_code from land_use string
+                # Try exact match first, then fuzzy match to lookup table
+                alloc_type_code = _resolve_allocation_type_code(cursor, land_use)
+
+                # Resolve allocation_type_id from code
+                allocation_type_id = None
+                if alloc_type_code:
+                    cursor.execute("""
+                        SELECT allocation_type_id FROM landscape.lu_acreage_allocation_type
+                        WHERE allocation_type_code = %s LIMIT 1
+                    """, [alloc_type_code])
+                    row = cursor.fetchone()
+                    if row:
+                        allocation_type_id = row[0]
+
+                # Upsert: match on project_id + allocation_type_code + phase_id
+                cursor.execute("""
+                    SELECT allocation_id FROM landscape.tbl_acreage_allocation
+                    WHERE project_id = %s
+                    AND allocation_type_code = %s
+                    AND COALESCE(phase_id, 0) = COALESCE(%s, 0)
+                """, [project_id, alloc_type_code or 'other', phase_id])
+                existing = cursor.fetchone()
+
+                if existing:
+                    cursor.execute("""
+                        UPDATE landscape.tbl_acreage_allocation
+                        SET acres = %s, allocation_type_id = %s, notes = %s,
+                            updated_at = NOW()
+                        WHERE allocation_id = %s
+                        RETURNING allocation_id
+                    """, [acres, allocation_type_id, notes, existing[0]])
+                    results.append({'action': 'updated', 'allocation_id': existing[0],
+                                    'type_code': alloc_type_code, 'acres': acres})
+                else:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_acreage_allocation
+                        (project_id, phase_id, allocation_type_id, allocation_type_code,
+                         acres, notes, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        RETURNING allocation_id
+                    """, [project_id, phase_id, allocation_type_id,
+                          alloc_type_code or 'other', acres, notes])
+                    row = cursor.fetchone()
+                    results.append({'action': 'created', 'allocation_id': row[0],
+                                    'type_code': alloc_type_code, 'acres': acres})
+
+        _log_planning_activity(project_id, 'tbl_acreage_allocation', 'land_use_budget',
+                               len(results), reason)
+
+        return {
+            'success': True,
+            'action': 'land_use_budget_updated',
+            'allocation_count': len(results),
+            'results': results,
+        }
+    except Exception as e:
+        logger.error(f"Error updating land use budget: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+def _resolve_allocation_type_code(cursor, land_use: str) -> Optional[str]:
+    """
+    Map a free-text land use label to an allocation_type_code from
+    lu_acreage_allocation_type. Falls back to 'other' if no match.
+    """
+    if not land_use:
+        return 'other'
+
+    land_use_lower = land_use.lower().strip()
+
+    # Direct keyword mapping to allocation_type_codes
+    keyword_map = {
+        'gross': 'gross',
+        'total': 'gross',
+        'net developable': 'net_developable',
+        'net': 'net_developable',
+        'developable': 'net_developable',
+        'open space': 'open_space',
+        'park': 'open_space',
+        'trail': 'open_space',
+        'natural': 'open_space',
+        'drainage': 'drainage',
+        'detention': 'drainage',
+        'retention': 'drainage',
+        'stormwater': 'drainage',
+        'road': 'roads_row',
+        'row': 'roads_row',
+        'right': 'roads_row',
+        'street': 'roads_row',
+        'amenity': 'amenity',
+        'clubhouse': 'amenity',
+        'pool': 'amenity',
+        'recreation': 'amenity',
+        'commercial': 'commercial',
+        'retail': 'commercial',
+        'office': 'commercial',
+        'multifamily': 'multifamily',
+        'apartment': 'multifamily',
+        'attached': 'multifamily',
+        'mf': 'multifamily',
+        'apt': 'multifamily',
+        'single family': 'single_family',
+        'single-family': 'single_family',
+        'detached': 'single_family',
+        'sfd': 'single_family',
+        'sf ': 'single_family',
+        'residential sfd': 'single_family',
+        'residential sf': 'single_family',
+        'school': 'school',
+    }
+
+    for keyword, code in keyword_map.items():
+        if keyword in land_use_lower:
+            return code
+
+    # Try exact match in DB
+    cursor.execute("""
+        SELECT allocation_type_code FROM landscape.lu_acreage_allocation_type
+        WHERE LOWER(allocation_type_code) = %s
+        OR LOWER(allocation_type_name) = %s
+        LIMIT 1
+    """, [land_use_lower, land_use_lower])
+    row = cursor.fetchone()
+    if row:
+        return row[0]
+
+    return 'other'
 
 
 @register_tool("get_parcel_sale_events")
@@ -10779,23 +11384,30 @@ def handle_get_portfolio_summary(
     if not user_id:
         return {'success': False, 'error': 'User authentication required for portfolio tools.'}
 
+    logger.info(f"[PORTFOLIO] get_portfolio_summary called with user_id={user_id}")
+
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Debug: check what created_by_id values exist
+                cur.execute("SELECT project_id, project_name, created_by_id FROM landscape.tbl_project WHERE is_active = true LIMIT 10")
+                debug_rows = cur.fetchall()
+                logger.info(f"[PORTFOLIO] DB projects (first 10): {[(r['project_id'], r['project_name'], r['created_by_id']) for r in debug_rows]}")
+
                 cur.execute("""
                     SELECT
-                        p.id,
-                        p.name,
+                        p.project_id,
+                        p.project_name,
                         p.project_type_code,
-                        p.status,
+                        p.analysis_mode,
                         p.city,
-                        p.state_province,
-                        p.total_acres,
+                        p.state,
+                        p.acres_gross,
                         p.total_units,
                         p.created_at,
                         p.updated_at
                     FROM landscape.tbl_project p
-                    WHERE p.created_by_user_id = %s
+                    WHERE (p.created_by_id = %s OR p.created_by_id IS NULL)
                       AND p.is_active = true
                     ORDER BY p.updated_at DESC
                 """, [user_id])
@@ -10806,12 +11418,12 @@ def handle_get_portfolio_summary(
             'project_count': len(projects),
             'projects': [
                 {
-                    'id': p['id'],
-                    'name': p['name'],
+                    'id': p['project_id'],
+                    'name': p['project_name'],
                     'type': p['project_type_code'],
-                    'status': p['status'],
-                    'location': f"{p['city'] or ''}, {p['state_province'] or ''}".strip(', '),
-                    'acres': float(p['total_acres']) if p['total_acres'] else None,
+                    'mode': p['analysis_mode'],
+                    'location': f"{p['city'] or ''}, {p['state'] or ''}".strip(', '),
+                    'acres': float(p['acres_gross']) if p['acres_gross'] else None,
                     'units': p['total_units'],
                     'updated': p['updated_at'].isoformat() if p['updated_at'] else None,
                 }
@@ -10843,9 +11455,9 @@ def handle_get_portfolio_assumptions(
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id, name, project_type_code
+                    SELECT project_id, project_name, project_type_code
                     FROM landscape.tbl_project
-                    WHERE id = %s AND created_by_user_id = %s AND is_active = true
+                    WHERE project_id = %s AND (created_by_id = %s OR created_by_id IS NULL) AND is_active = true
                 """, [target_project_id, user_id])
                 target = cur.fetchone()
 
@@ -10855,27 +11467,27 @@ def handle_get_portfolio_assumptions(
                         'error': 'Project not found or you do not have access.',
                     }
 
-                # Fetch key assumptions
+                # Fetch key assumptions from actual tbl_project columns
                 cur.execute("""
                     SELECT
-                        p.discount_rate,
-                        p.exit_cap_rate,
-                        p.going_in_cap_rate,
-                        p.holding_period_years,
-                        p.vacancy_rate_pct,
-                        p.expense_growth_rate,
-                        p.revenue_growth_rate,
-                        p.total_acres,
+                        p.discount_rate_pct,
+                        p.cap_rate_current AS going_in_cap_rate,
+                        p.cap_rate_proforma AS exit_cap_rate,
+                        p.current_vacancy_rate,
+                        p.proforma_vacancy_rate,
+                        p.acres_gross,
                         p.total_units,
-                        p.total_budget
+                        p.current_noi,
+                        p.proforma_noi,
+                        p.acquisition_price
                     FROM landscape.tbl_project p
-                    WHERE p.id = %s
+                    WHERE p.project_id = %s
                 """, [target_project_id])
                 assumptions = cur.fetchone()
 
         return {
             'success': True,
-            'project_name': target['name'],
+            'project_name': target['project_name'],
             'project_type': target['project_type_code'],
             'assumptions': {k: (float(v) if isinstance(v, Decimal) else v)
                            for k, v in (assumptions or {}).items() if v is not None},
@@ -10906,33 +11518,81 @@ def handle_get_project_assumptions_detail(
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # Verify ownership
                 cur.execute("""
-                    SELECT id FROM landscape.tbl_project
-                    WHERE id = %s AND created_by_user_id = %s AND is_active = true
+                    SELECT project_id FROM landscape.tbl_project
+                    WHERE project_id = %s AND (created_by_id = %s OR created_by_id IS NULL) AND is_active = true
                 """, [target_project_id, user_id])
                 if not cur.fetchone():
                     return {'success': False, 'error': 'Project not found or access denied.'}
 
-                # Market assumptions
+                # Fetch financial assumptions from tbl_project directly
                 cur.execute("""
-                    SELECT assumption_key, assumption_value, period_label
-                    FROM landscape.tbl_market_assumption
-                    WHERE project_id = %s
-                    ORDER BY assumption_key, period_label
+                    SELECT
+                        p.discount_rate_pct,
+                        p.cost_of_capital_pct,
+                        p.cap_rate_current,
+                        p.cap_rate_proforma,
+                        p.current_vacancy_rate,
+                        p.proforma_vacancy_rate,
+                        p.current_gpr,
+                        p.current_noi,
+                        p.proforma_gpr,
+                        p.proforma_noi,
+                        p.current_opex,
+                        p.proforma_opex,
+                        p.planning_efficiency,
+                        p.market_velocity_annual,
+                        p.acquisition_price,
+                        p.asking_price
+                    FROM landscape.tbl_project p
+                    WHERE p.project_id = %s
                 """, [target_project_id])
-                market_rows = cur.fetchall()
+                detail_row = cur.fetchone()
 
-                # Growth rates
+                # Check if tbl_market_assumption exists before querying
                 cur.execute("""
-                    SELECT rate_type, rate_value, year_number
-                    FROM landscape.tbl_growth_rate
-                    WHERE project_id = %s
-                    ORDER BY rate_type, year_number
-                """, [target_project_id])
-                growth_rows = cur.fetchall()
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'landscape'
+                          AND table_name = 'tbl_market_assumption'
+                    )
+                """)
+                market_table_exists = cur.fetchone()['exists']
+
+                market_rows = []
+                if market_table_exists:
+                    cur.execute("""
+                        SELECT assumption_key, assumption_value, period_label
+                        FROM landscape.tbl_market_assumption
+                        WHERE project_id = %s
+                        ORDER BY assumption_key, period_label
+                    """, [target_project_id])
+                    market_rows = cur.fetchall()
+
+                # Check if tbl_growth_rate exists before querying
+                cur.execute("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'landscape'
+                          AND table_name = 'tbl_growth_rate'
+                    )
+                """)
+                growth_table_exists = cur.fetchone()['exists']
+
+                growth_rows = []
+                if growth_table_exists:
+                    cur.execute("""
+                        SELECT rate_type, rate_value, year_number
+                        FROM landscape.tbl_growth_rate
+                        WHERE project_id = %s
+                        ORDER BY rate_type, year_number
+                    """, [target_project_id])
+                    growth_rows = cur.fetchall()
 
         return {
             'success': True,
             'target_project_id': target_project_id,
+            'financial_detail': {k: (float(v) if isinstance(v, Decimal) else v)
+                                for k, v in (detail_row or {}).items() if v is not None},
             'market_assumptions': [
                 {k: (float(v) if isinstance(v, Decimal) else v) for k, v in row.items()}
                 for row in market_rows
@@ -10962,6 +11622,8 @@ AUTO_EXECUTE_TOOLS = {
     'confirm_column_mapping',  # Column mapping - user confirmed in chat
     'compute_rent_roll_delta',  # Delta computation - deterministic diff, no mutation
     'delete_units',       # Unit deletion - user explicitly requested in chat (2-phase: confirm → execute)
+    'create_land_dev_containers',  # Land dev hierarchy bulk create from document intake
+    'update_lot_mix',     # Lot mix batch from document intake
 }
 
 

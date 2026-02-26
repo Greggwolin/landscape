@@ -3,6 +3,52 @@
 from rest_framework import serializers
 
 
+# ── Acreage Allocation ────────────────────────────────────────────────────
+
+
+class AcreageAllocationSerializer(serializers.Serializer):
+    """Read/write serializer for tbl_acreage_allocation rows."""
+
+    allocation_id = serializers.IntegerField(read_only=True)
+    project_id = serializers.IntegerField(read_only=True)
+    phase_id = serializers.IntegerField(required=False, allow_null=True)
+    parcel_id = serializers.IntegerField(required=False, allow_null=True)
+    allocation_type_id = serializers.IntegerField(required=False, allow_null=True)
+    allocation_type_code = serializers.CharField(max_length=50)
+    allocation_type_name = serializers.CharField(read_only=True, required=False)
+    acres = serializers.DecimalField(max_digits=12, decimal_places=4)
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    confidence_score = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False, allow_null=True
+    )
+    value_source = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    source_doc_id = serializers.IntegerField(required=False, allow_null=True)
+    source_page = serializers.IntegerField(required=False, allow_null=True)
+    source_snippet = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+
+class AcreageAllocationWriteSerializer(serializers.Serializer):
+    """Validation for creating/updating a single allocation."""
+
+    allocation_type_code = serializers.CharField(max_length=50)
+    acres = serializers.DecimalField(max_digits=12, decimal_places=4)
+    phase_id = serializers.IntegerField(required=False, allow_null=True)
+    parcel_id = serializers.IntegerField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    confidence_score = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False, allow_null=True
+    )
+    value_source = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    source_doc_id = serializers.IntegerField(required=False, allow_null=True)
+    source_page = serializers.IntegerField(required=False, allow_null=True)
+    source_snippet = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+
+# ── Land Planning ─────────────────────────────────────────────────────────
+
+
 class LandPlanningInputSerializer(serializers.Serializer):
     """Input validation for land planning computation."""
 

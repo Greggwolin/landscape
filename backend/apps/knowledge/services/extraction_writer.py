@@ -382,6 +382,16 @@ class ExtractionWriter:
                 return self._write_income_upsert(mapping, value)
             return False, f"Unknown upsert target table: {target_table}"
 
+        # ── Land Development write types ─────────────────────────────────────
+        elif mapping.db_write_type == 'row_lot_inventory':
+            return self._write_lot_inventory(mapping, value, scope_id)
+
+        elif mapping.db_write_type == 'row_absorption':
+            return self._write_absorption(mapping, value, scope_id)
+
+        elif mapping.db_write_type == 'row_land_use_budget':
+            return self._write_land_use_budget(mapping, value, scope_id)
+
         return False, f"Unknown row-based write type: {mapping.db_write_type}"
 
     def _write_assumption(
@@ -594,6 +604,208 @@ class ExtractionWriter:
             cursor.execute(sql, [self.project_id, name, target_date])
 
         return True, f"Wrote milestone: {name}"
+
+    # ── Land Development Writers ────────────────────────────────────────────
+
+    def _write_lot_inventory(
+        self,
+        mapping: FieldMapping,
+        value: Any,
+        scope_id: Optional[int] = None
+    ) -> Tuple[bool, str]:
+        """Write lot inventory to tbl_parcel (one row per lot type)."""
+        if not isinstance(value, list):
+            value = [value]
+
+        count = 0
+        for lot in value:
+            if not isinstance(lot, dict):
+                continue
+
+            phase_id = lot.get('phase_id', scope_id)
+            parcel_name = lot.get('parcel_name', lot.get('name', 'Unknown'))
+            units_total = lot.get('units_total', lot.get('count', 0))
+
+            cols = ['project_id', 'phase_id', 'parcel_name', 'units_total']
+            vals = [self.project_id, phase_id, parcel_name, units_total]
+
+            for field in ['parcel_code', 'lot_product', 'product_code', 'lot_width',
+                          'lot_depth', 'lot_area', 'acres_gross', 'landuse_code',
+                          'landuse_type', 'saleprice']:
+                if field in lot:
+                    cols.append(field)
+                    vals.append(lot[field])
+
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_parcel ({', '.join(cols)})
+                    VALUES ({', '.join(['%s'] * len(cols))})
+                    RETURNING parcel_id
+                """, vals)
+                count += 1
+
+        return True, f"Wrote {count} lot inventory rows"
+
+    def _write_absorption(
+        self,
+        mapping: FieldMapping,
+        value: Any,
+        scope_id: Optional[int] = None
+    ) -> Tuple[bool, str]:
+        """Write absorption schedule entries to tbl_absorption_schedule."""
+        if not isinstance(value, list):
+            value = [value]
+
+        count = 0
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+
+            cols = ['project_id']
+            vals = [self.project_id]
+
+            allowed = [
+                'area_id', 'phase_id', 'parcel_id', 'revenue_stream_name',
+                'revenue_category', 'lu_family_name', 'lu_type_code', 'product_code',
+                'start_period', 'periods_to_complete', 'timing_method', 'units_per_period',
+                'total_units', 'base_price_per_unit', 'price_escalation_pct',
+                'scenario_name', 'probability_weight', 'notes',
+                'confidence', 'data_source',
+            ]
+
+            for field in allowed:
+                if field in entry:
+                    cols.append(field)
+                    vals.append(entry[field])
+
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_absorption_schedule
+                    ({', '.join(cols)}, created_at, updated_at)
+                    VALUES ({', '.join(['%s'] * len(cols))}, NOW(), NOW())
+                    RETURNING absorption_id
+                """, vals)
+                count += 1
+
+        return True, f"Wrote {count} absorption schedule entries"
+
+    def _write_land_use_budget(
+        self,
+        mapping: FieldMapping,
+        value: Any,
+        scope_id: Optional[int] = None
+    ) -> Tuple[bool, str]:
+        """
+        Write land use allocations to tbl_acreage_allocation.
+
+        Target table: landscape.tbl_acreage_allocation
+        Lookup table: landscape.lu_acreage_allocation_type (11 categories)
+        View:         landscape.vw_acreage_allocation (enriched read)
+
+        Each item in the value array should have:
+          - land_use / allocation_type_code: category label or code
+          - acres: acreage value
+          - notes: optional description
+        scope_id is used as phase_id (optional).
+        """
+        if not isinstance(value, list):
+            value = [value]
+
+        phase_id = scope_id  # scope_id maps to phase_id for land dev
+        wrote = 0
+
+        with connection.cursor() as cursor:
+            for item in value:
+                # Accept either dict-style items or plain values
+                if isinstance(item, dict):
+                    land_use = item.get('land_use', item.get('allocation_type_code', 'other'))
+                    try:
+                        acres = Decimal(str(item.get('acres', 0)).replace(',', ''))
+                    except (InvalidOperation, ValueError):
+                        logger.warning(f"Invalid acres value in land use budget: {item.get('acres')}")
+                        continue
+                    notes = item.get('notes')
+                else:
+                    # Plain value — skip, need structured data
+                    logger.warning(f"Skipping non-dict land use budget item: {item}")
+                    continue
+
+                # Resolve allocation_type_code via keyword matching
+                alloc_type_code = self._resolve_alloc_type_code(cursor, land_use)
+
+                # Resolve allocation_type_id from code
+                allocation_type_id = None
+                cursor.execute("""
+                    SELECT allocation_type_id FROM landscape.lu_acreage_allocation_type
+                    WHERE allocation_type_code = %s LIMIT 1
+                """, [alloc_type_code])
+                row = cursor.fetchone()
+                if row:
+                    allocation_type_id = row[0]
+
+                # Upsert: match on project_id + allocation_type_code + phase_id
+                cursor.execute("""
+                    SELECT allocation_id FROM landscape.tbl_acreage_allocation
+                    WHERE project_id = %s
+                    AND allocation_type_code = %s
+                    AND COALESCE(phase_id, 0) = COALESCE(%s, 0)
+                """, [self.project_id, alloc_type_code, phase_id])
+                existing = cursor.fetchone()
+
+                if existing:
+                    cursor.execute("""
+                        UPDATE landscape.tbl_acreage_allocation
+                        SET acres = %s, allocation_type_id = %s, notes = %s,
+                            updated_at = NOW()
+                        WHERE allocation_id = %s
+                    """, [acres, allocation_type_id, notes, existing[0]])
+                else:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_acreage_allocation
+                        (project_id, phase_id, allocation_type_id, allocation_type_code,
+                         acres, notes, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    """, [self.project_id, phase_id, allocation_type_id,
+                          alloc_type_code, acres, notes])
+                wrote += 1
+
+        return True, f"Wrote {wrote} land use allocation entries to tbl_acreage_allocation"
+
+    @staticmethod
+    def _resolve_alloc_type_code(cursor, land_use: str) -> str:
+        """Map a free-text land use label to an allocation_type_code."""
+        if not land_use:
+            return 'other'
+        label = land_use.lower().strip()
+
+        # Direct keyword map
+        keyword_map = {
+            'gross': 'gross', 'total': 'gross', 'gross acres': 'gross',
+            'net developable': 'net_developable', 'net': 'net_developable', 'developable': 'net_developable',
+            'open space': 'open_space', 'park': 'open_space', 'greenbelt': 'open_space',
+            'drainage': 'drainage', 'detention': 'drainage', 'floodplain': 'drainage',
+            'road': 'roads_row', 'row': 'roads_row', 'right of way': 'roads_row', 'street': 'roads_row',
+            'amenity': 'amenity', 'clubhouse': 'amenity', 'recreation': 'amenity', 'pool': 'amenity',
+            'commercial': 'commercial', 'retail': 'commercial', 'office': 'commercial',
+            'multifamily': 'multifamily', 'apartment': 'multifamily', 'mf': 'multifamily',
+            'single family': 'single_family', 'sfd': 'single_family', 'sfr': 'single_family', 'sf': 'single_family',
+            'school': 'school', 'education': 'school',
+        }
+        for keyword, code in keyword_map.items():
+            if keyword in label:
+                return code
+
+        # DB fallback: exact match on code or label
+        cursor.execute("""
+            SELECT allocation_type_code FROM landscape.lu_acreage_allocation_type
+            WHERE allocation_type_code = %s OR LOWER(allocation_type_name) = %s
+            LIMIT 1
+        """, [label, label])
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+
+        return 'other'
 
     def _write_assumption_upsert(
         self,

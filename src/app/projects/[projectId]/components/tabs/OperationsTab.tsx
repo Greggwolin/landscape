@@ -264,6 +264,69 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     }
   };
 
+  // Handle provenance toggle (lock/unlock or revert)
+  const handleProvenanceToggle = useCallback((lineItemKey: string, currentSource: string) => {
+    // Special handling for physical vacancy
+    if (lineItemKey === 'physical_vacancy') {
+      if (currentSource === 'ingestion') {
+        // Lock clicked → set vacancy override to current calculated value (makes it editable)
+        const currentRate = vacancyRows.find(r => r.line_item_key === 'physical_vacancy')?.as_is?.rate;
+        fetch(`/api/projects/${project.project_id}/operations/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vacancy_override_pct: currentRate ?? 0.05 })
+        }).then(() => reload());
+      } else if (currentSource === 'user_modified') {
+        // Revert to rent-roll-calculated value
+        if (window.confirm('Revert physical vacancy to the rent-roll-calculated value?')) {
+          fetch(`/api/projects/${project.project_id}/operations/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vacancy_override_pct: null })
+          }).then(() => reload());
+        }
+      }
+      return;
+    }
+
+    // OpEx row provenance toggle
+    const findOpexId = (rows: LineItemRow[]): number | undefined => {
+      for (const row of rows) {
+        if (row.line_item_key === lineItemKey) return row.opex_id;
+        if (row.children) {
+          const found = findOpexId(row.children);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+
+    if (currentSource === 'ingestion') {
+      // Lock clicked → make editable (source → user_modified)
+      const opexId = findOpexId(opexRows);
+      if (!opexId) return;
+
+      fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: 'user_modified' })
+      }).then(() => reload());
+    } else if (currentSource === 'user_modified') {
+      // Input icon on user_modified → revert to extracted value
+      const opexId = findOpexId(opexRows);
+      if (!opexId) return;
+
+      if (window.confirm('Revert this value to the original extracted amount?')) {
+        fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'ingestion', revert: true })
+        }).then(() => reload());
+      }
+    }
+    // source === 'user' → no action (user-entered, nothing to revert to)
+  }, [opexRows, vacancyRows, project.project_id, reload]);
+
   // Handle inline item name change (double-click edit)
   const handleItemNameChange = async (opexId: number, categoryId: number, categoryName: string) => {
     try {
@@ -505,6 +568,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         onAddExpense={handleAddExpense}
         onDeleteExpenses={handleDeleteExpenses}
         onItemNameChange={handleItemNameChange}
+        onProvenanceToggle={handleProvenanceToggle}
         hideLossToLease={hideLossToLease}
         hidePostReno={hidePostReno}
       />
