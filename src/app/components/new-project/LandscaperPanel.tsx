@@ -190,12 +190,14 @@ const LandscaperPanel = ({
     setUserMessages(prev => [...prev, receiptMessage])
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-
+      // Send file as raw body to avoid FormData body size limit (~1MB) in Next.js route handlers
       const response = await fetch('/api/landscaper/extract-for-project', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': file.type,
+          'X-Filename': encodeURIComponent(file.name),
+        },
+        body: file
       })
 
       const result = await response.json()

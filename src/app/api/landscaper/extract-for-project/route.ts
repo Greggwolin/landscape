@@ -74,11 +74,12 @@ Only include fields where you found actual data. Do not make up values.`
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    // Read file as raw body (avoids FormData body size limit ~1MB in Next.js route handlers)
+    const mimeType = request.headers.get('content-type') || ''
+    const filename = decodeURIComponent(request.headers.get('x-filename') || 'unknown')
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!mimeType || mimeType === 'application/octet-stream') {
+      return NextResponse.json({ error: 'No content type provided' }, { status: 400 })
     }
 
     // Validate file type
@@ -92,20 +93,25 @@ export async function POST(request: NextRequest) {
       'image/png'
     ]
 
-    if (!allowedTypes.includes(file.type)) {
+    if (!allowedTypes.includes(mimeType)) {
       return NextResponse.json(
         { error: 'Unsupported file type. Please upload PDF, Word, Excel, or image files.' },
         { status: 400 }
       )
     }
 
-    // Convert file to base64
-    const buffer = await file.arrayBuffer()
+    // Read raw body as ArrayBuffer and convert to base64
+    const buffer = await request.arrayBuffer()
+
+    if (buffer.byteLength === 0) {
+      return NextResponse.json({ error: 'No file data received' }, { status: 400 })
+    }
+
     const base64 = Buffer.from(buffer).toString('base64')
 
     // Check file size (PDFs over ~25MB may hit API limits)
     const fileSizeMB = buffer.byteLength / (1024 * 1024)
-    console.log(`Processing file: ${file.name}, size: ${fileSizeMB.toFixed(2)}MB, type: ${file.type}`)
+    console.log(`Processing file: ${filename}, size: ${fileSizeMB.toFixed(2)}MB, type: ${mimeType}`)
 
     if (fileSizeMB > 25) {
       return NextResponse.json(
@@ -125,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use Claude to extract document content
-    const result = await extractWithClaude(base64, file.type, file.name, anthropicKey)
+    const result = await extractWithClaude(base64, mimeType, filename, anthropicKey)
     return NextResponse.json(result)
 
   } catch (error) {
