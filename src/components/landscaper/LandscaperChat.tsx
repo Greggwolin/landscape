@@ -7,8 +7,21 @@ import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
+import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+// Map DB table names from pending_mutations to the event table names components watch
+const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
+  tbl_operating_expenses: ['operating_expenses'],
+  tbl_unit: ['units'],
+  tbl_lease: ['leases'],
+  tbl_unit_type: ['unit_types'],
+  tbl_rental_comp: ['rental_comps'],
+  tbl_sales_comp: ['sales_comps'],
+  tbl_project: ['project'],
+  tbl_dcf_assumption: ['dcf_analysis', 'cashflow'],
+};
 
 interface LandscaperChatProps {
   projectId: number;
@@ -62,13 +75,24 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       if (data.success) {
         // Refresh chat history to reflect updated state
         loadThreadMessages?.();
+
+        // Emit mutation event so page components refresh without reload
+        const pid = data.project_id || projectId;
+        const tableName = data.table_name || '';
+        const eventTables = DB_TABLE_TO_EVENT_TABLES[tableName] || [tableName.replace('tbl_', '')];
+        emitMutationComplete({
+          projectId: typeof pid === 'string' ? parseInt(pid) : pid,
+          mutationType: data.mutation_type || 'confirm',
+          tables: eventTables,
+          counts: { updated: 1, total: 1 },
+        });
       } else {
         console.error('Failed to confirm mutation:', data.error);
       }
     } catch (error) {
       console.error('Error confirming mutation:', error);
     }
-  }, [loadThreadMessages]);
+  }, [loadThreadMessages, projectId]);
 
   const handleRejectMutation = useCallback(async (mutationId: string) => {
     try {
@@ -94,13 +118,32 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       const data = await response.json();
       if (data.success) {
         loadThreadMessages?.();
+
+        // Collect all affected tables from batch results and emit single event
+        const affectedTables = new Set<string>();
+        let totalConfirmed = 0;
+        for (const result of (data.results || [])) {
+          if (result.success && result.table_name) {
+            const eventTables = DB_TABLE_TO_EVENT_TABLES[result.table_name] || [result.table_name.replace('tbl_', '')];
+            eventTables.forEach((t: string) => affectedTables.add(t));
+            totalConfirmed++;
+          }
+        }
+        if (affectedTables.size > 0) {
+          emitMutationComplete({
+            projectId,
+            mutationType: 'batch_confirm',
+            tables: Array.from(affectedTables),
+            counts: { updated: totalConfirmed, total: totalConfirmed },
+          });
+        }
       } else {
         console.error('Failed to confirm batch:', data.error);
       }
     } catch (error) {
       console.error('Error confirming batch:', error);
     }
-  }, [loadThreadMessages]);
+  }, [loadThreadMessages, projectId]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {

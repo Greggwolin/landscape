@@ -10765,6 +10765,190 @@ def check_income_analysis_availability(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Portfolio Intelligence Tools (read-only, cross-project)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_portfolio_summary')
+def handle_get_portfolio_summary(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    user_id: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Return summary of all projects owned by the current user."""
+    if not user_id:
+        return {'success': False, 'error': 'User authentication required for portfolio tools.'}
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT
+                        p.id,
+                        p.name,
+                        p.project_type_code,
+                        p.status,
+                        p.city,
+                        p.state_province,
+                        p.total_acres,
+                        p.total_units,
+                        p.created_at,
+                        p.updated_at
+                    FROM landscape.tbl_project p
+                    WHERE p.created_by_user_id = %s
+                      AND p.is_active = true
+                    ORDER BY p.updated_at DESC
+                """, [user_id])
+                projects = cur.fetchall()
+
+        return {
+            'success': True,
+            'project_count': len(projects),
+            'projects': [
+                {
+                    'id': p['id'],
+                    'name': p['name'],
+                    'type': p['project_type_code'],
+                    'status': p['status'],
+                    'location': f"{p['city'] or ''}, {p['state_province'] or ''}".strip(', '),
+                    'acres': float(p['total_acres']) if p['total_acres'] else None,
+                    'units': p['total_units'],
+                    'updated': p['updated_at'].isoformat() if p['updated_at'] else None,
+                }
+                for p in projects
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Error in get_portfolio_summary: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_portfolio_assumptions')
+def handle_get_portfolio_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    user_id: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Read key assumptions from other user projects for comparison (read-only)."""
+    if not user_id:
+        return {'success': False, 'error': 'User authentication required for portfolio tools.'}
+
+    target_project_id = tool_input.get('target_project_id')
+    if not target_project_id:
+        return {'success': False, 'error': 'target_project_id is required.'}
+
+    # Verify user owns the target project
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT id, name, project_type_code
+                    FROM landscape.tbl_project
+                    WHERE id = %s AND created_by_user_id = %s AND is_active = true
+                """, [target_project_id, user_id])
+                target = cur.fetchone()
+
+                if not target:
+                    return {
+                        'success': False,
+                        'error': 'Project not found or you do not have access.',
+                    }
+
+                # Fetch key assumptions
+                cur.execute("""
+                    SELECT
+                        p.discount_rate,
+                        p.exit_cap_rate,
+                        p.going_in_cap_rate,
+                        p.holding_period_years,
+                        p.vacancy_rate_pct,
+                        p.expense_growth_rate,
+                        p.revenue_growth_rate,
+                        p.total_acres,
+                        p.total_units,
+                        p.total_budget
+                    FROM landscape.tbl_project p
+                    WHERE p.id = %s
+                """, [target_project_id])
+                assumptions = cur.fetchone()
+
+        return {
+            'success': True,
+            'project_name': target['name'],
+            'project_type': target['project_type_code'],
+            'assumptions': {k: (float(v) if isinstance(v, Decimal) else v)
+                           for k, v in (assumptions or {}).items() if v is not None},
+            'note': 'Read-only. Use update tools on the current project to make changes.',
+        }
+    except Exception as e:
+        logger.error(f"Error in get_portfolio_assumptions: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_project_assumptions_detail')
+def handle_get_project_assumptions_detail(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    user_id: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get detailed assumptions (market, growth, cap rates) for another user project."""
+    if not user_id:
+        return {'success': False, 'error': 'User authentication required for portfolio tools.'}
+
+    target_project_id = tool_input.get('target_project_id')
+    if not target_project_id:
+        return {'success': False, 'error': 'target_project_id is required.'}
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Verify ownership
+                cur.execute("""
+                    SELECT id FROM landscape.tbl_project
+                    WHERE id = %s AND created_by_user_id = %s AND is_active = true
+                """, [target_project_id, user_id])
+                if not cur.fetchone():
+                    return {'success': False, 'error': 'Project not found or access denied.'}
+
+                # Market assumptions
+                cur.execute("""
+                    SELECT assumption_key, assumption_value, period_label
+                    FROM landscape.tbl_market_assumption
+                    WHERE project_id = %s
+                    ORDER BY assumption_key, period_label
+                """, [target_project_id])
+                market_rows = cur.fetchall()
+
+                # Growth rates
+                cur.execute("""
+                    SELECT rate_type, rate_value, year_number
+                    FROM landscape.tbl_growth_rate
+                    WHERE project_id = %s
+                    ORDER BY rate_type, year_number
+                """, [target_project_id])
+                growth_rows = cur.fetchall()
+
+        return {
+            'success': True,
+            'target_project_id': target_project_id,
+            'market_assumptions': [
+                {k: (float(v) if isinstance(v, Decimal) else v) for k, v in row.items()}
+                for row in market_rows
+            ],
+            'growth_rates': [
+                {k: (float(v) if isinstance(v, Decimal) else v) for k, v in row.items()}
+                for row in growth_rows
+            ],
+            'note': 'Read-only cross-project data. Cannot modify other projects.',
+        }
+    except Exception as e:
+        logger.error(f"Error in get_project_assumptions_detail: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main Dispatcher (Registry-based)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -14037,3 +14221,4 @@ from .tools import whatif_commit_tools  # noqa: E402, F401
 from .tools import scenario_ops_tools  # noqa: E402, F401
 from .tools import kpi_tools  # noqa: E402, F401
 from .tools import ic_tools  # noqa: E402, F401
+from .tools import landdev_tools  # noqa: E402, F401

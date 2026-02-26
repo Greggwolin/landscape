@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import SalesContent from '@/components/sales/SalesContent';
+import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 
 interface Project {
   project_id: number;
@@ -15,6 +16,12 @@ interface SalesTabProps {
 
 export default function SalesTab({ project }: SalesTabProps) {
   const isLandDevelopment = project.project_type_code === 'LAND';
+
+  // Force child remount on Landscaper mutations via key increment
+  const [refreshKey, setRefreshKey] = useState(0);
+  const watchedTables = useMemo(() => ['absorption_schedule', 'parcel_sale_events', 'competitive_projects'], []);
+  const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  useLandscaperRefresh(project.project_id, watchedTables, handleRefresh);
 
   // Show message for non-land development projects
   if (!isLandDevelopment) {
@@ -72,7 +79,7 @@ export default function SalesTab({ project }: SalesTabProps) {
 
   return (
     <div className="sales-tab-content">
-      <SalesContent projectId={project.project_id} />
+      <SalesContent key={refreshKey} projectId={project.project_id} />
     </div>
   );
 }

@@ -572,7 +572,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           COALESCE(parent_category, 'unclassified') as parent_category
         FROM tbl_operating_expenses
         WHERE project_id = ${projectIdNum}
-          AND LOWER(COALESCE(expense_type, '')) NOT IN ('management', 'management fee', 'property management')
           AND LOWER(COALESCE(parent_category, '')) != 'management'
         ORDER BY parent_category, expense_category, updated_at DESC
       `;

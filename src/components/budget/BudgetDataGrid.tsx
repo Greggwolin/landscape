@@ -3,12 +3,12 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import { LandscapeButton } from '@/components/ui/landscape';
+
 import { getColumnsByMode, type BudgetItem, type BudgetColumnDef } from './ColumnDefinitions';
 import type { BudgetMode } from '@/types/budget';
 import CategoryEditorRow from './custom/CategoryEditorRow';
 import GroupRow from './custom/GroupRow';
-import ExpandableDetailsRow from './custom/ExpandableDetailsRow';
+
 import { useBudgetGrouping } from '@/hooks/useBudgetGrouping';
 import { useBudgetVariance, getCategoryVariance, type CategoryVariance } from '@/hooks/useBudgetVariance';
 import { useGridKeyboard, type GridCell } from './hooks/useGridKeyboard';
@@ -36,6 +36,8 @@ interface Props {
   }) => void;
   hasFrontFeet?: boolean;
   costInflationRate?: number; // Project-level cost inflation rate (decimal, e.g., 0.03 for 3%)
+  columnVisibility?: Record<string, boolean>;
+  onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
 }
 
 export default function BudgetDataGrid({
@@ -52,9 +54,10 @@ export default function BudgetDataGrid({
   onRequestGroupAdd,
   hasFrontFeet,
   costInflationRate,
+  columnVisibility,
+  onColumnVisibilityChange,
 }: Props) {
   const [expandedFactId, setExpandedFactId] = useState<number | null>(null); // For category editor
-  const [expandedDetailsFactId, setExpandedDetailsFactId] = useState<number | null>(null); // For details row
   const [editingCell, setEditingCell] = useState<GridCell | null>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +148,17 @@ export default function BudgetDataGrid({
     }),
     getCoreRowModel: getCoreRowModel(),
     columnResizeMode: 'onChange',
+    state: {
+      ...(columnVisibility ? { columnVisibility } : {}),
+    },
+    onColumnVisibilityChange: onColumnVisibilityChange
+      ? (updater) => {
+          const next = typeof updater === 'function'
+            ? updater(columnVisibility ?? {})
+            : updater;
+          onColumnVisibilityChange(next);
+        }
+      : undefined,
   });
 
   // Keyboard navigation
@@ -323,8 +337,6 @@ export default function BudgetDataGrid({
 
                 if (!tableRow) return null;
 
-                const isDetailsExpanded = expandedDetailsFactId === item.fact_id;
-
                 return (
                   <React.Fragment key={`item-${item.fact_id}`}>
                     <tr
@@ -332,36 +344,14 @@ export default function BudgetDataGrid({
                       className={isSelected ? 'table-active' : undefined}
                       style={{ cursor: 'pointer' }}
                     >
-                      {tableRow.getVisibleCells().map((cell, cellIndex) => {
-                        const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
+                      {tableRow.getVisibleCells().map((cell) => {
                         const columnMeta = cell.column.columnDef.meta as any;
                         const columnDef = cell.column.columnDef as BudgetColumnDef<BudgetItem>;
                         const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
 
                         return (
                           <td key={cell.id} className={columnDef.cellClassName} style={{ maxWidth: cell.column.columnDef.maxSize, textAlign }}>
-                            {hasExpandButton ? (
-                              <div className="d-flex align-items-center gap-2">
-                                <LandscapeButton
-                                  color="secondary"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDetailsFactId(isDetailsExpanded ? null : item.fact_id);
-                                  }}
-                                  title="Toggle details"
-                                  className="p-0"
-                                >
-                                  {isDetailsExpanded ? '▼' : '▶'}
-                                </LandscapeButton>
-                                <div className="flex-grow-1">
-                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                </div>
-                              </div>
-                            ) : (
-                              flexRender(cell.column.columnDef.cell, cell.getContext())
-                            )}
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
                         );
                       })}
@@ -379,16 +369,6 @@ export default function BudgetDataGrid({
                         </td>
                       </tr>
                     )}
-                    {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
-                      <ExpandableDetailsRow
-                        item={item}
-                        mode={mode}
-                        columnCount={tableRow.getVisibleCells().length}
-                        projectId={projectId}
-                        projectTypeCode={projectTypeCode}
-                        onInlineCommit={onInlineCommit}
-                      />
-                    )}
                   </React.Fragment>
                 );
               }
@@ -398,7 +378,6 @@ export default function BudgetDataGrid({
             table.getRowModel().rows.map((row, rowIndex) => {
               const isSelected = selectedItem?.fact_id === row.original.fact_id;
               const isExpanded = expandedFactId === row.original.fact_id;
-              const isDetailsExpanded = expandedDetailsFactId === row.original.fact_id;
               const isRowFocused = isKeyboardMode && focusedCell.row === rowIndex;
 
               return (
@@ -412,7 +391,6 @@ export default function BudgetDataGrid({
                     aria-selected={isSelected}
                   >
                     {row.getVisibleCells().map((cell, cellIndex) => {
-                      const hasExpandButton = cellIndex === 0 && (mode === 'standard' || mode === 'detail');
                       const columnMeta = cell.column.columnDef.meta as any;
                       const columnDef = cell.column.columnDef as BudgetColumnDef<BudgetItem>;
                       const textAlign = columnMeta?.align === 'center' ? 'center' : columnMeta?.align === 'right' ? 'right' : undefined;
@@ -442,28 +420,7 @@ export default function BudgetDataGrid({
                           onClick={() => handleCellClick(rowIndex, cellIndex)}
                           aria-readonly={!isEditable}
                         >
-                          {hasExpandButton ? (
-                            <div className="d-flex align-items-center gap-2">
-                              <LandscapeButton
-                                color="secondary"
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedDetailsFactId(isDetailsExpanded ? null : row.original.fact_id);
-                                }}
-                                title="Toggle details"
-                                className="p-0"
-                              >
-                                {isDetailsExpanded ? '▼' : '▶'}
-                              </LandscapeButton>
-                              <div className="flex-grow-1">
-                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                              </div>
-                            </div>
-                          ) : (
-                            flexRender(cell.column.columnDef.cell, cell.getContext())
-                          )}
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       );
                     })}
@@ -480,16 +437,6 @@ export default function BudgetDataGrid({
                         />
                       </td>
                     </tr>
-                  )}
-                  {isDetailsExpanded && (mode === 'standard' || mode === 'detail') && (
-                    <ExpandableDetailsRow
-                      item={row.original}
-                      mode={mode}
-                      columnCount={row.getVisibleCells().length}
-                      projectId={projectId}
-                      projectTypeCode={projectTypeCode}
-                      onInlineCommit={onInlineCommit}
-                    />
                   )}
                 </React.Fragment>
               );

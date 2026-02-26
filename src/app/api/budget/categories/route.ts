@@ -17,7 +17,7 @@ import { sql } from '@/lib/db';
  * - parent_id: Filter by parent category
  * - is_template: Filter templates (true) or project categories (false)
  * - include_inactive: Include inactive categories (default: false)
- * - activity: Filter by activity (Acquisition, Planning & Engineering, Development, Operations, Disposition, Financing)
+ * - activity: Filter by activity (Acquisition, Planning & Engineering, Improvements, Operations, Disposition, Financing)
  */
 export async function GET(request: NextRequest) {
   try {

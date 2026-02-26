@@ -741,6 +741,9 @@ class MutationService:
                         "success": True,
                         "mutation_id": mutation_id,
                         "action": "confirmed",
+                        "project_id": project_id,
+                        "table_name": table_name,
+                        "mutation_type": mutation_type,
                         "result": execution_result,
                     }
                 else:

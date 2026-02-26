@@ -165,9 +165,10 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
   }, [getValueAddErrors, updateValueAddField, valueAddState]);
 
   // Auto-refresh when Landscaper updates operating expenses
+  const watchedTables = useMemo(() => ['operating_expenses', 'units', 'unit_types', 'leases'], []);
   useLandscaperRefresh(
     project.project_id,
-    ['operating_expenses', 'units', 'unit_types', 'leases'],
+    watchedTables,
     reload
   );
 

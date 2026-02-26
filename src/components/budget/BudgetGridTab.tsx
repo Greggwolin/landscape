@@ -11,21 +11,21 @@ import {
   CModalHeader,
   CModalTitle,
 } from '@coreui/react';
-import { type BudgetMode } from './ModeSelector';
+import type { BudgetMode } from '@/types/budget';
 import BudgetDataGrid from './BudgetDataGrid';
 import FiltersAccordion from './FiltersAccordion';
 import { useBudgetData } from './hooks/useBudgetData';
 import type { BudgetItem } from './ColumnDefinitions';
 import BudgetItemModalV2, { type BudgetItemFormValues } from './BudgetItemModalV2';
-// Removed: TimelineTab and SalesContent imports - tabs removed
 import QuickAddCategoryModal from './QuickAddCategoryModal';
 import IncompleteCategoriesReminder from './IncompleteCategoriesReminder';
 import { useContainers } from '@/hooks/useContainers';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import type { BudgetCategory, QuickAddCategoryResponse } from '@/types/budget-categories';
-import { usePreference } from '@/hooks/useUserPreferences';
 import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 import { SemanticButton } from '@/components/ui/landscape';
+import { ColumnChooser, type BudgetColumnConfig } from './custom/ColumnChooser';
+import { getColumnsByMode } from './ColumnDefinitions';
 
 interface Props {
   projectId: number;
@@ -33,6 +33,25 @@ interface Props {
 }
 
 // Removed: SubTab type and tab navigation - now showing grid directly
+
+// Human-readable labels for columns whose headers are JSX functions
+const COLUMN_LABELS: Record<string, string> = {
+  division_id: 'Phase',
+  notes: 'Description',
+  phase_units: 'Units',
+  phase_acres: 'Acres',
+  phase_front_feet: 'Front Feet',
+  uom_code: 'UOM',
+  rate: 'Rate',
+  amount: 'Amount',
+  escalated_amount: 'Escalated Amount',
+  start_period: 'Start Period',
+  periods_to_complete: 'Duration',
+  activity: 'Stage',
+  category_l1_id: 'Category',
+  variance_amount: 'Variance',
+  actions: 'Actions',
+};
 
 // Helper to check if project is Land Development type
 function isLandDevelopmentProject(projectTypeCode?: string): boolean {
@@ -44,19 +63,64 @@ function isLandDevelopmentProject(projectTypeCode?: string): boolean {
 }
 
 export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
-  // Removed: activeSubTab state - now showing grid directly
-
-  // Mode state with database persistence via usePreference hook
-  const [mode, setMode] = usePreference<BudgetMode>({
-    key: 'budget.mode',
-    defaultValue: 'napkin',
-    scopeType: 'project',
-    scopeId: projectId,
-    migrateFrom: `budget_mode_${projectId}`, // Auto-migrate from old localStorage key
-  });
+  // Mode deprecated — always use 'detail' (full column superset).
+  // Column chooser now controls individual column visibility.
+  const mode: BudgetMode = 'detail';
 
   const [selected, setSelected] = useState<BudgetItem | undefined>();
   const [projectTypeCode, setProjectTypeCode] = useState<string | undefined>(undefined);
+
+  // Column chooser state
+  const [showColumnChooser, setShowColumnChooser] = useState(false);
+  const colVisStorageKey = `budget_col_vis_${projectId}`;
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(colVisStorageKey);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Persist column visibility to localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(colVisStorageKey, JSON.stringify(columnVisibility));
+    } catch (err) {
+      console.warn('Unable to persist column visibility', err);
+    }
+  }, [columnVisibility, colVisStorageKey]);
+
+  // Columns that cannot be hidden (defined outside render to avoid dep issues)
+  const LOCKED_COLUMN_IDS = useMemo(
+    () => new Set(['division_id', 'notes', 'rate', 'amount', 'actions']),
+    []
+  );
+
+  // Build ColumnChooser config from detail mode's full column set
+  const columnChooserConfig: BudgetColumnConfig[] = useMemo(() => {
+    const cols = getColumnsByMode(mode);
+    return cols.map(col => {
+      const colId = ('accessorKey' in col ? String(col.accessorKey) : col.id) ?? '';
+      const label =
+        COLUMN_LABELS[colId] ??
+        (typeof col.header === 'string'
+          ? col.header
+          : colId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+      const locked = LOCKED_COLUMN_IDS.has(colId);
+      const visible = locked || (columnVisibility[colId] !== false);
+      return { id: colId, label, visible, locked };
+    });
+  }, [mode, columnVisibility, LOCKED_COLUMN_IDS]);
+
+  const handleToggleColumn = (columnId: string) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [columnId]: prev[columnId] === false ? true : false,
+    }));
+  };
 
   const filterStorageKey = `budget_filters_${projectId}`;
   const getStoredFilters = () => {
@@ -491,6 +555,14 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
           <SemanticButton
             intent="secondary-action"
             size="sm"
+            variant="outline"
+            onClick={() => setShowColumnChooser(true)}
+          >
+            ⚙️ Columns
+          </SemanticButton>
+          <SemanticButton
+            intent="secondary-action"
+            size="sm"
             onClick={() => setQuickAddCategoryOpen(true)}
           >
             + Quick Add Category
@@ -508,13 +580,15 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
           selectedItem={selected}
           onRowSelect={setSelected}
           onInlineCommit={handleInlineCommit}
-          onOpenModal={mode === 'napkin' ? undefined : openEditModal}
+          onOpenModal={openEditModal}
           projectTypeCode={projectTypeCode}
           onRequestRowAdd={handleAddFromRow}
           onRequestRowDelete={handleRequestDelete}
           onRequestGroupAdd={handleGroupAdd}
           hasFrontFeet={hasFrontFeet}
           costInflationRate={costInflationRate}
+          columnVisibility={columnVisibility}
+          onColumnVisibilityChange={setColumnVisibility}
         />
 
         <div className="small text-secondary mt-2">
@@ -541,6 +615,14 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
         onSuccess={handleQuickAddSuccess}
         projectId={projectId}
         availableCategories={availableCategories}
+      />
+
+      {/* Column Chooser Modal */}
+      <ColumnChooser
+        isOpen={showColumnChooser}
+        onClose={() => setShowColumnChooser(false)}
+        columns={columnChooserConfig}
+        onToggleColumn={handleToggleColumn}
       />
 
       <CModal visible={Boolean(pendingDelete)} onClose={handleCancelDelete}>
