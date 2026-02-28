@@ -1133,7 +1133,7 @@ thead th,
 .profile-field__label {
   font-size: 0.65rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* text-transform removed — labels are already proper-case in JSX */
   color: var(--cui-tertiary-color, #94a3b8);
   letter-spacing: 0.04em;
   margin-bottom: 0.1rem;

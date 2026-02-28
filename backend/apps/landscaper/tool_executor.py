@@ -116,6 +116,14 @@ ALLOWED_UPDATES = {
             'legal_owner', 'developer_owner',
             # Status
             'is_active',
+            # Property classification (added 2026-02-27, verified against live DB)
+            'project_type_code', 'property_subtype', 'property_class', 'ownership_type',
+            # Identification
+            'apn_primary', 'msa_id',
+            # Valuation
+            'asking_price',
+            # Analysis configuration
+            'analysis_perspective', 'analysis_purpose', 'value_source',
         ],
         # Map friendly names to actual column names (for convenience)
         'field_aliases': {
@@ -136,20 +144,40 @@ ALLOWED_UPDATES = {
     },
     'tbl_parcel': {
         'fields': [
-            'parcel_name', 'parcel_type', 'lot_count', 'net_acres', 'gross_acres',
-            'absorption_rate',
-            'status', 'notes', 'is_active'
-            # REMOVED: avg_lot_size_sf, avg_lot_price, total_revenue (calculated fields)
+            # Verified against live DB information_schema 2026-02-27
+            'parcel_name', 'parcel_code', 'landuse_code', 'landuse_type',
+            'acres_gross', 'units_total',
+            'lot_width', 'lot_depth', 'lot_area', 'lot_product',
+            'family_name', 'type_code', 'product_code',
+            'building_name', 'building_class', 'year_built', 'rentable_sf',
+            'description',
         ],
+        'field_aliases': {
+            # Backward compat: old wrong names → correct columns
+            'parcel_type': 'landuse_code',
+            'lot_count': 'units_total',
+            'gross_acres': 'acres_gross',
+            'notes': 'description',
+        },
         'pk_field': 'parcel_id',
         'fk_field': 'project_id',
         'schema': 'landscape'
     },
     'tbl_phase': {
         'fields': [
-            'phase_name', 'phase_number', 'lot_count', 'start_date', 'end_date',
-            'budget_amount', 'status', 'notes', 'is_active'
+            # Verified against live DB information_schema 2026-02-27
+            'phase_name', 'phase_no', 'label',
+            'phase_start_date', 'phase_completion_date', 'absorption_start_date',
+            'phase_status', 'description',
         ],
+        'field_aliases': {
+            # Backward compat: old wrong names → correct columns
+            'phase_number': 'phase_no',
+            'start_date': 'phase_start_date',
+            'end_date': 'phase_completion_date',
+            'status': 'phase_status',
+            'notes': 'description',
+        },
         'pk_field': 'phase_id',
         'fk_field': 'project_id',
         'schema': 'landscape'
@@ -289,17 +317,18 @@ FIELD_TYPES = {
     'discount_rate_pct': 'decimal',
     'cost_of_capital_pct': 'decimal',
     'assessed_value': 'decimal',
-    # tbl_parcel numeric fields
-    'lot_count': 'integer',
-    'net_acres': 'decimal',
-    'gross_acres': 'decimal',
-    'avg_lot_size_sf': 'decimal',
-    'avg_lot_price': 'decimal',
-    'total_revenue': 'decimal',
-    'absorption_rate': 'decimal',
-    # tbl_phase numeric fields
-    'phase_number': 'integer',
-    'budget_amount': 'decimal',
+    # tbl_parcel numeric fields (corrected to real column names 2026-02-27)
+    'units_total': 'integer',
+    # acres_gross already defined above (tbl_project)
+    'lot_width': 'decimal',
+    'lot_depth': 'decimal',
+    'lot_area': 'decimal',
+    'rentable_sf': 'decimal',
+    'year_built': 'integer',
+    # tbl_phase numeric fields (corrected to real column names 2026-02-27)
+    'phase_no': 'integer',
+    # tbl_project expansion fields
+    'asking_price': 'decimal',
     # tbl_operating_expenses numeric fields
     'annual_amount': 'decimal',
     'amount_per_sf': 'decimal',
@@ -2044,6 +2073,120 @@ CALCULATED_VACANCY_FIELDS = frozenset([
     'economic_vacancy_pct',
 ])
 
+# P2 column lists — verified against live DB information_schema 2026-02-27
+LEASE_ASSUMPTION_COLUMNS = [
+    'space_type', 'market_rent_psf_annual', 'market_rent_growth_rate',
+    'renewal_probability', 'downtime_months', 'ti_psf_renewal',
+    'ti_psf_new_tenant', 'lc_psf_renewal', 'lc_psf_new_tenant',
+    'free_rent_months_renewal', 'free_rent_months_new_tenant',
+    'effective_date', 'notes'
+]
+
+VALUE_ADD_ASSUMPTION_COLUMNS = [
+    'is_enabled', 'reno_cost_per_sf', 'relocation_incentive',
+    'renovate_all', 'units_to_renovate', 'reno_starts_per_month',
+    'reno_start_month', 'rent_premium_pct', 'relet_lag_months',
+    'reno_cost_basis', 'months_to_complete'
+]
+
+MULTIFAMILY_TURN_COLUMNS = [
+    'unit_id', 'move_out_date', 'make_ready_complete_date', 'next_move_in_date',
+    'total_vacant_days', 'cleaning_cost', 'painting_cost',
+    'carpet_flooring_cost', 'appliance_cost', 'other_cost',
+    'total_make_ready_cost', 'turn_status', 'notes'
+]
+
+COST_APPROACH_COLUMNS = [
+    'land_valuation_method', 'land_area_sf', 'land_value_per_sf',
+    'total_land_value', 'cost_method', 'building_area_sf', 'cost_per_sf',
+    'base_replacement_cost', 'entrepreneurial_incentive_pct',
+    'total_replacement_cost', 'physical_curable',
+    'physical_incurable_short', 'physical_incurable_long',
+    'functional_curable', 'functional_incurable', 'external_obsolescence',
+    'total_depreciation', 'depreciated_improvements',
+    'site_improvements_cost', 'site_improvements_description',
+    'indicated_value'
+]
+
+LOT_COLUMNS = [
+    'parcel_id', 'phase_id', 'lot_number', 'unit_number', 'suite_number',
+    'unit_type', 'lot_sf', 'unit_sf', 'bedrooms', 'bathrooms',
+    'floor_number', 'base_price', 'price_psf', 'options_price',
+    'total_price', 'lot_status', 'sale_date', 'close_date', 'lease_id'
+]
+
+LOT_TYPE_COLUMNS = [
+    'producttype_name', 'typical_lot_width', 'typical_lot_depth'
+]
+
+SALE_PHASE_COLUMNS = [
+    'phase_code', 'phase_name', 'default_sale_date', 'default_commission_pct',
+    'default_closing_cost_per_unit', 'default_onsite_cost_pct'
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1 Column Lists — verified against live DB information_schema 2026-02-27
+# ─────────────────────────────────────────────────────────────────────────────
+
+MULTIFAMILY_PROPERTY_COLUMNS = [
+    'property_name', 'property_class', 'property_subtype',
+    'year_built', 'year_renovated', 'number_of_buildings', 'number_of_floors',
+    'total_units', 'rentable_units', 'total_building_sf', 'avg_unit_sf',
+    'parking_spaces_total', 'parking_ratio', 'parking_type',
+    'garage_spaces', 'covered_spaces', 'tandem_spaces', 'surface_spaces',
+    'has_manager_unit', 'manager_unit_count', 'manager_rent_credit_monthly',
+    'leasing_office_count', 'leasing_office_sf',
+    'has_commercial_space', 'commercial_sf', 'commercial_unit_count', 'commercial_type',
+    'assessed_value', 'assessment_year', 'property_tax_rate',
+    'direct_assessments_annual', 'tax_jurisdiction',
+    'utility_recovery_method', 'rubs_recovery_pct',
+    'gas_metered_individually', 'electric_metered_individually', 'water_metered_individually',
+    'has_solar_panels', 'solar_capacity_kw', 'has_tankless_water_heaters',
+    'has_ev_charging', 'ev_charging_spaces', 'energy_star_certified',
+    'rent_control_exempt', 'rent_control_ordinance', 'exemption_reason',
+    'has_section8_units', 'section8_unit_count', 'affordable_housing_program',
+    'property_status', 'stabilization_date', 'stabilized_occupancy_pct',
+    'acquisition_date', 'acquisition_price',
+]
+
+INCOME_APPROACH_COLUMNS = [
+    'market_cap_rate_method', 'selected_cap_rate', 'cap_rate_justification',
+    'direct_cap_value', 'forecast_period_years', 'terminal_cap_rate',
+    'discount_rate', 'dcf_value',
+    'noi_capitalization_basis', 'stabilized_vacancy_rate',
+    'cap_rate_interval', 'discount_rate_interval',
+]
+
+INCOME_PROPERTY_COLUMNS = [
+    'property_name', 'property_type', 'property_subtype', 'property_type_code',
+    'total_building_sf', 'rentable_sf', 'usable_sf', 'common_area_sf', 'load_factor',
+    'year_built', 'year_renovated', 'number_of_floors', 'number_of_units',
+    'parking_spaces', 'parking_ratio',
+    'property_status', 'stabilization_date', 'stabilized_occupancy_pct',
+    'acquisition_date', 'acquisition_price', 'current_assessed_value',
+]
+
+INCOME_PROPERTY_MF_EXT_COLUMNS = [
+    'total_units', 'total_bedrooms', 'avg_unit_sf',
+    'studio_count', 'one_bed_count', 'two_bed_count', 'three_bed_count', 'four_plus_bed_count',
+    'has_pool', 'has_fitness_center', 'has_clubhouse', 'has_business_center',
+    'has_pet_park', 'has_ev_charging', 'has_package_lockers', 'has_controlled_access',
+    'surface_parking_spaces', 'covered_parking_spaces', 'garage_parking_spaces',
+    'parking_revenue_monthly',
+    'utility_billing_type', 'water_metering', 'electric_metering', 'gas_metering',
+    'class_rating', 'repositioning_potential', 'value_add_score',
+    'is_rent_controlled', 'rent_control_jurisdiction', 'allowable_annual_increase_pct',
+    'has_affordable_units', 'affordable_unit_count',
+    'lihtc_expiration_date', 'section_8_contract_date',
+]
+
+VALUATION_RECONCILIATION_COLUMNS = [
+    'sales_comparison_value', 'sales_comparison_weight',
+    'cost_approach_value', 'cost_approach_weight',
+    'income_approach_value', 'income_approach_weight',
+    'final_reconciled_value', 'reconciliation_narrative', 'valuation_date',
+]
+
 
 def _get_assumption_record(
     table_name: str,
@@ -2196,7 +2339,10 @@ def _log_assumption_activity(
             'tbl_property_acquisition': 'acquisition assumptions',
             'tbl_revenue_rent': 'rent revenue assumptions',
             'tbl_revenue_other': 'other income assumptions',
-            'tbl_vacancy_assumption': 'vacancy assumptions'
+            'tbl_vacancy_assumption': 'vacancy assumptions',
+            'tbl_lease_assumptions': 'lease assumptions',
+            'tbl_value_add_assumptions': 'value-add assumptions',
+            'tbl_cost_approach': 'cost approach',
         }
         label = table_labels.get(table_name, table_name)
 
@@ -2299,6 +2445,31 @@ def _filter_numeric_assumptions(values: Dict[str, Any]) -> Dict[str, Any]:
         elif isinstance(value, Decimal):
             filtered[key] = float(value)
     return filtered
+
+
+def _serialize_db_value(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return float(value)
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return value
+
+
+def _serialize_db_record(columns: List[str], row: Any) -> Dict[str, Any]:
+    return {col: _serialize_db_value(row[idx]) for idx, col in enumerate(columns)}
+
+
+def _serialize_db_records(columns: List[str], rows: List[Any]) -> List[Dict[str, Any]]:
+    return [_serialize_db_record(columns, row) for row in rows]
+
+
+def _project_exists(project_id: int) -> bool:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT 1 FROM landscape.tbl_project WHERE project_id = %s",
+            [project_id]
+        )
+        return cursor.fetchone() is not None
 
 
 def _build_cashflow_assumptions(project_id: int) -> Dict[str, Any]:
@@ -2895,6 +3066,683 @@ def handle_update_vacancy_assumptions(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# P2: New Tools (Session 4A)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_lease_assumptions')
+def handle_get_lease_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve lease assumption defaults for a project."""
+    space_type = tool_input.get('space_type')
+
+    try:
+        with connection.cursor() as cursor:
+            query = """
+                SELECT assumption_id, project_id, space_type, market_rent_psf_annual,
+                       market_rent_growth_rate, renewal_probability, downtime_months,
+                       ti_psf_renewal, ti_psf_new_tenant, lc_psf_renewal,
+                       lc_psf_new_tenant, free_rent_months_renewal,
+                       free_rent_months_new_tenant, effective_date, notes,
+                       created_at, updated_at
+                FROM landscape.tbl_lease_assumptions
+                WHERE project_id = %s
+            """
+            params: List[Any] = [project_id]
+
+            if space_type:
+                query += " AND space_type = %s"
+                params.append(space_type)
+
+            query += " ORDER BY space_type, effective_date DESC"
+            cursor.execute(query, params)
+            columns = [col[0] for col in cursor.description]
+            records = _serialize_db_records(columns, cursor.fetchall())
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting lease assumptions: {e}")
+        return {'success': False, 'error': str(e), 'count': 0, 'records': []}
+
+
+@register_tool('update_lease_assumptions', is_mutation=True)
+def handle_update_lease_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update lease assumption defaults."""
+    reason = tool_input.get('reason', 'Update lease assumptions')
+    space_type = tool_input.get('space_type')
+    effective_date = tool_input.get('effective_date')
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in LEASE_ASSUMPTION_COLUMNS and value is not None
+    }
+
+    if not space_type or not effective_date:
+        return {'success': False, 'error': 'space_type and effective_date are required'}
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_lease_assumptions',
+            field_name=None,
+            record_id=f"{space_type}:{effective_date}",
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT assumption_id
+                FROM landscape.tbl_lease_assumptions
+                WHERE project_id = %s
+                  AND space_type = %s
+                  AND effective_date = %s
+            """, [project_id, space_type, effective_date])
+            existing = cursor.fetchone()
+
+            if existing:
+                write_fields = {
+                    key: value for key, value in updates.items()
+                    if key not in {'space_type', 'effective_date'}
+                }
+                if not write_fields:
+                    return {'success': False, 'error': 'No writable fields provided beyond the key'}
+
+                set_clauses = ', '.join([f"{col} = %s" for col in write_fields.keys()])
+                values = list(write_fields.values()) + [existing[0]]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_lease_assumptions
+                    SET {set_clauses}, updated_at = NOW()
+                    WHERE assumption_id = %s
+                """, values)
+                action = 'updated'
+                assumption_id = existing[0]
+                fields_logged = list(write_fields.keys())
+            else:
+                columns = ['project_id'] + list(updates.keys())
+                placeholders = ', '.join(['%s'] * len(columns))
+                values = [project_id] + list(updates.values())
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_lease_assumptions ({', '.join(columns)})
+                    VALUES ({placeholders})
+                    RETURNING assumption_id
+                """, values)
+                assumption_id = cursor.fetchone()[0]
+                action = 'created'
+                fields_logged = list(updates.keys())
+
+        _log_assumption_activity(project_id, 'tbl_lease_assumptions', action, fields_logged, reason)
+        return {
+            'success': True,
+            'action': action,
+            'assumption_id': assumption_id,
+            'fields_updated': fields_logged,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating lease assumptions: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_value_add_assumptions')
+def handle_get_value_add_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve value-add renovation assumptions."""
+    return _get_assumption_record(
+        table_name='tbl_value_add_assumptions',
+        pk_column='value_add_id',
+        project_id=project_id,
+        columns=VALUE_ADD_ASSUMPTION_COLUMNS,
+    )
+
+
+@register_tool('update_value_add_assumptions', is_mutation=True)
+def handle_update_value_add_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update value-add renovation assumptions."""
+    reason = tool_input.get('reason', 'Update value-add assumptions')
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in VALUE_ADD_ASSUMPTION_COLUMNS and value is not None
+    }
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_value_add_assumptions',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    return _upsert_assumption_record(
+        table_name='tbl_value_add_assumptions',
+        pk_column='value_add_id',
+        project_id=project_id,
+        columns=VALUE_ADD_ASSUMPTION_COLUMNS,
+        input_data=tool_input,
+    )
+
+
+@register_tool('get_cost_approach')
+def handle_get_cost_approach(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve the latest cost approach record for a project."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT cost_approach_id, project_id, land_valuation_method, land_area_sf,
+                       land_value_per_sf, total_land_value, cost_method,
+                       building_area_sf, cost_per_sf, base_replacement_cost,
+                       entrepreneurial_incentive_pct, total_replacement_cost,
+                       physical_curable, physical_incurable_short,
+                       physical_incurable_long, functional_curable,
+                       functional_incurable, external_obsolescence,
+                       total_depreciation, depreciated_improvements,
+                       site_improvements_cost, site_improvements_description,
+                       indicated_value, created_at, updated_at
+                FROM landscape.tbl_cost_approach
+                WHERE project_id = %s
+                ORDER BY updated_at DESC NULLS LAST, cost_approach_id DESC
+                LIMIT 1
+            """, [project_id])
+            row = cursor.fetchone()
+
+            if not row:
+                return {'success': True, 'exists': False, 'data': None}
+
+            columns = [col[0] for col in cursor.description]
+            return {
+                'success': True,
+                'exists': True,
+                'data': _serialize_db_record(columns, row),
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting cost approach: {e}")
+        return {'success': False, 'error': str(e), 'exists': False}
+
+
+@register_tool('update_cost_approach', is_mutation=True)
+def handle_update_cost_approach(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update cost approach valuation inputs."""
+    reason = tool_input.get('reason', 'Update cost approach')
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in COST_APPROACH_COLUMNS and value is not None
+    }
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_cost_approach',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT cost_approach_id
+                FROM landscape.tbl_cost_approach
+                WHERE project_id = %s
+                ORDER BY updated_at DESC NULLS LAST, cost_approach_id DESC
+                LIMIT 1
+            """, [project_id])
+            existing = cursor.fetchone()
+
+            if existing:
+                set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
+                values = list(updates.values()) + [existing[0]]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_cost_approach
+                    SET {set_clauses}, updated_at = NOW()
+                    WHERE cost_approach_id = %s
+                """, values)
+                action = 'updated'
+                cost_approach_id = existing[0]
+            else:
+                columns = ['project_id'] + list(updates.keys())
+                placeholders = ', '.join(['%s'] * len(columns))
+                values = [project_id] + list(updates.values())
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_cost_approach ({', '.join(columns)})
+                    VALUES ({placeholders})
+                    RETURNING cost_approach_id
+                """, values)
+                cost_approach_id = cursor.fetchone()[0]
+                action = 'created'
+
+        _log_assumption_activity(project_id, 'tbl_cost_approach', action, list(updates.keys()), reason)
+        return {
+            'success': True,
+            'action': action,
+            'cost_approach_id': cost_approach_id,
+            'fields_updated': list(updates.keys()),
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating cost approach: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-1: Multifamily Property Tools (tbl_multifamily_property)
+# Added 2026-02-27 — UNIQUE(project_id) constraint exists, UPSERT safe
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_multifamily_property')
+def handle_get_multifamily_property(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve multifamily property attributes."""
+    return _get_assumption_record(
+        table_name='tbl_multifamily_property',
+        pk_column='multifamily_property_id',
+        project_id=project_id,
+        columns=MULTIFAMILY_PROPERTY_COLUMNS,
+    )
+
+
+@register_tool('update_multifamily_property', is_mutation=True)
+def handle_update_multifamily_property(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update multifamily property attributes. One record per project."""
+    if propose_only:
+        from .services.mutation_service import MutationService
+
+        updates = {k: v for k, v in tool_input.items()
+                   if k in MULTIFAMILY_PROPERTY_COLUMNS and v is not None}
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_multifamily_property',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', 'Update multifamily property attributes'),
+            source_message_id=source_message_id,
+        )
+    else:
+        return _upsert_assumption_record(
+            table_name='tbl_multifamily_property',
+            pk_column='multifamily_property_id',
+            project_id=project_id,
+            columns=MULTIFAMILY_PROPERTY_COLUMNS,
+            input_data=tool_input,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-2: Income Approach Tools (tbl_income_approach)
+# Added 2026-02-27 — no UNIQUE on project_id; _upsert_assumption_record
+# handles check-then-insert/update pattern safely
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_income_approach')
+def handle_get_income_approach(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve income approach valuation parameters."""
+    return _get_assumption_record(
+        table_name='tbl_income_approach',
+        pk_column='income_approach_id',
+        project_id=project_id,
+        columns=INCOME_APPROACH_COLUMNS,
+    )
+
+
+@register_tool('update_income_approach', is_mutation=True)
+def handle_update_income_approach(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Save or update income approach parameters."""
+    if propose_only:
+        from .services.mutation_service import MutationService
+
+        updates = {k: v for k, v in tool_input.items()
+                   if k in INCOME_APPROACH_COLUMNS and v is not None}
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_income_approach',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', 'Update income approach parameters'),
+            source_message_id=source_message_id,
+        )
+    else:
+        return _upsert_assumption_record(
+            table_name='tbl_income_approach',
+            pk_column='income_approach_id',
+            project_id=project_id,
+            columns=INCOME_APPROACH_COLUMNS,
+            input_data=tool_input,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-4: Income Property Tools (tbl_income_property + tbl_income_property_mf_ext)
+# Added 2026-02-27 — tbl_income_property_mf_ext has no project_id; linked
+# via income_property_id FK to tbl_income_property
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_income_property')
+def handle_get_income_property(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve the income property master record."""
+    return _get_assumption_record(
+        table_name='tbl_income_property',
+        pk_column='income_property_id',
+        project_id=project_id,
+        columns=INCOME_PROPERTY_COLUMNS,
+    )
+
+
+@register_tool('update_income_property', is_mutation=True)
+def handle_update_income_property(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Save or update the income property master record."""
+    if propose_only:
+        from .services.mutation_service import MutationService
+
+        updates = {k: v for k, v in tool_input.items()
+                   if k in INCOME_PROPERTY_COLUMNS and v is not None}
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_income_property',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', 'Update income property record'),
+            source_message_id=source_message_id,
+        )
+    else:
+        return _upsert_assumption_record(
+            table_name='tbl_income_property',
+            pk_column='income_property_id',
+            project_id=project_id,
+            columns=INCOME_PROPERTY_COLUMNS,
+            input_data=tool_input,
+        )
+
+
+@register_tool('get_income_property_mf_ext')
+def handle_get_income_property_mf_ext(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve multifamily-specific income property extensions.
+
+    Joins through tbl_income_property since mf_ext has no direct project_id.
+    """
+    try:
+        col_list = ', '.join([f"ext.{c}" for c in INCOME_PROPERTY_MF_EXT_COLUMNS])
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT ip.income_property_id, {col_list}
+                FROM landscape.tbl_income_property ip
+                JOIN landscape.tbl_income_property_mf_ext ext
+                  ON ext.income_property_id = ip.income_property_id
+                WHERE ip.project_id = %s
+                LIMIT 1
+            """, [project_id])
+            row = cursor.fetchone()
+
+            if not row:
+                return {'success': True, 'exists': False, 'data': None}
+
+            data = {'income_property_id': row[0]}
+            for i, col in enumerate(INCOME_PROPERTY_MF_EXT_COLUMNS):
+                val = row[i + 1]
+                if isinstance(val, Decimal):
+                    val = float(val)
+                if hasattr(val, 'isoformat'):
+                    val = val.isoformat()
+                data[col] = val
+
+            return {'success': True, 'exists': True, 'data': data}
+
+    except Exception as e:
+        logger.error(f"Error getting income_property_mf_ext: {e}")
+        return {'success': False, 'error': str(e), 'exists': False}
+
+
+@register_tool('update_income_property_mf_ext', is_mutation=True)
+def handle_update_income_property_mf_ext(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Save or update multifamily income extensions.
+
+    Requires an income property record to exist (use update_income_property first).
+    Links via income_property_id FK.
+    """
+    if propose_only:
+        from .services.mutation_service import MutationService
+
+        updates = {k: v for k, v in tool_input.items()
+                   if k in INCOME_PROPERTY_MF_EXT_COLUMNS and v is not None}
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_income_property_mf_ext',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', 'Update MF income property extensions'),
+            source_message_id=source_message_id,
+        )
+    else:
+        updates = {k: v for k, v in tool_input.items()
+                   if k in INCOME_PROPERTY_MF_EXT_COLUMNS and v is not None}
+        reason = tool_input.get('reason', 'Updated via Landscaper')
+
+        if not updates:
+            return {'success': False, 'error': 'No valid fields provided'}
+
+        try:
+            with connection.cursor() as cursor:
+                # Find the income_property_id for this project
+                cursor.execute("""
+                    SELECT income_property_id
+                    FROM landscape.tbl_income_property
+                    WHERE project_id = %s
+                    LIMIT 1
+                """, [project_id])
+                ip_row = cursor.fetchone()
+
+                if not ip_row:
+                    return {
+                        'success': False,
+                        'error': 'No income property record found for this project. '
+                                 'Use update_income_property first to create one.'
+                    }
+
+                income_property_id = ip_row[0]
+
+                # Check if mf_ext row exists
+                cursor.execute("""
+                    SELECT income_property_id
+                    FROM landscape.tbl_income_property_mf_ext
+                    WHERE income_property_id = %s
+                """, [income_property_id])
+                existing = cursor.fetchone()
+
+                if existing:
+                    set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
+                    values = list(updates.values()) + [income_property_id]
+                    cursor.execute(f"""
+                        UPDATE landscape.tbl_income_property_mf_ext
+                        SET {set_clauses}, updated_at = NOW()
+                        WHERE income_property_id = %s
+                    """, values)
+                    action = 'updated'
+                else:
+                    col_names = ['income_property_id'] + list(updates.keys())
+                    placeholders = ', '.join(['%s'] * len(col_names))
+                    values = [income_property_id] + list(updates.values())
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_income_property_mf_ext
+                            ({', '.join(col_names)})
+                        VALUES ({placeholders})
+                    """, values)
+                    action = 'created'
+
+            _log_assumption_activity(
+                project_id=project_id,
+                table_name='tbl_income_property_mf_ext',
+                action=action,
+                fields=list(updates.keys()),
+                reason=reason,
+            )
+
+            return {
+                'success': True,
+                'action': action,
+                'income_property_id': income_property_id,
+                'fields_updated': list(updates.keys()),
+            }
+
+        except Exception as e:
+            logger.error(f"Error upserting income_property_mf_ext: {e}")
+            return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-5: Valuation Reconciliation Tools (tbl_valuation_reconciliation)
+# Added 2026-02-27
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_valuation_reconciliation')
+def handle_get_valuation_reconciliation(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve the valuation reconciliation record."""
+    return _get_assumption_record(
+        table_name='tbl_valuation_reconciliation',
+        pk_column='reconciliation_id',
+        project_id=project_id,
+        columns=VALUATION_RECONCILIATION_COLUMNS,
+    )
+
+
+@register_tool('update_valuation_reconciliation', is_mutation=True)
+def handle_update_valuation_reconciliation(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Save or update the valuation reconciliation."""
+    if propose_only:
+        from .services.mutation_service import MutationService
+
+        updates = {k: v for k, v in tool_input.items()
+                   if k in VALUATION_RECONCILIATION_COLUMNS and v is not None}
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='assumption_upsert',
+            table_name='tbl_valuation_reconciliation',
+            field_name=None,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', 'Update valuation reconciliation'),
+            source_message_id=source_message_id,
+        )
+    else:
+        return _upsert_assumption_record(
+            table_name='tbl_valuation_reconciliation',
+            pk_column='reconciliation_id',
+            project_id=project_id,
+            columns=VALUATION_RECONCILIATION_COLUMNS,
+            input_data=tool_input,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Rent Roll Tool Handlers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -2944,7 +3792,8 @@ def _log_rent_roll_activity(
         table_labels = {
             'tbl_multifamily_unit_type': 'unit types',
             'tbl_multifamily_unit': 'units',
-            'tbl_lease': 'leases'
+            'tbl_lease': 'leases',
+            'tbl_multifamily_turn': 'unit turns',
         }
         label = table_labels.get(table_name, table_name)
 
@@ -3357,6 +4206,125 @@ def handle_delete_units(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Multifamily Turn Tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_unit_turns')
+def handle_get_unit_turns(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve unit turn records for a project or specific unit."""
+    unit_id = tool_input.get('unit_id')
+
+    try:
+        with connection.cursor() as cursor:
+            query = """
+                SELECT t.turn_id, t.unit_id, u.unit_number, u.building_name, u.unit_type,
+                       t.move_out_date, t.make_ready_complete_date, t.next_move_in_date,
+                       t.total_vacant_days, t.cleaning_cost, t.painting_cost,
+                       t.carpet_flooring_cost, t.appliance_cost, t.other_cost,
+                       t.total_make_ready_cost, t.turn_status, t.notes,
+                       t.created_at, t.updated_at
+                FROM landscape.tbl_multifamily_turn t
+                JOIN landscape.tbl_multifamily_unit u ON u.unit_id = t.unit_id
+                WHERE u.project_id = %s
+            """
+            params: List[Any] = [project_id]
+
+            if unit_id:
+                query += " AND t.unit_id = %s"
+                params.append(unit_id)
+
+            query += " ORDER BY t.move_out_date DESC NULLS LAST, t.turn_id DESC"
+            cursor.execute(query, params)
+            columns = [col[0] for col in cursor.description]
+            records = _serialize_db_records(columns, cursor.fetchall())
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting unit turns: {e}")
+        return {'success': False, 'error': str(e), 'count': 0, 'records': []}
+
+
+@register_tool('create_unit_turn', is_mutation=True)
+def handle_create_unit_turn(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create a multifamily unit turn record."""
+    reason = tool_input.get('reason', 'Create unit turn')
+    unit_id = tool_input.get('unit_id')
+    insert_data = {
+        key: value for key, value in tool_input.items()
+        if key in MULTIFAMILY_TURN_COLUMNS and value is not None
+    }
+
+    if not unit_id:
+        return {'success': False, 'error': 'unit_id required'}
+
+    if len(insert_data) <= 1:
+        return {'success': False, 'error': 'At least one turn field is required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='rent_roll_create',
+            table_name='tbl_multifamily_turn',
+            field_name=None,
+            record_id=str(unit_id),
+            proposed_value=insert_data,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT unit_id, unit_number
+                FROM landscape.tbl_multifamily_unit
+                WHERE unit_id = %s AND project_id = %s
+            """, [unit_id, project_id])
+            unit_row = cursor.fetchone()
+            if not unit_row:
+                return {'success': False, 'error': f'Unit {unit_id} not found for this project'}
+
+            columns = list(insert_data.keys())
+            placeholders = ', '.join(['%s'] * len(columns))
+            values = list(insert_data.values())
+            cursor.execute(f"""
+                INSERT INTO landscape.tbl_multifamily_turn ({', '.join(columns)}, created_at, updated_at)
+                VALUES ({placeholders}, NOW(), NOW())
+                RETURNING turn_id
+            """, values)
+            turn_id = cursor.fetchone()[0]
+
+        _log_rent_roll_activity(project_id, 'tbl_multifamily_turn', 'create', 1, 0, reason)
+        return {
+            'success': True,
+            'action': 'created',
+            'turn_id': turn_id,
+            'unit_id': unit_row[0],
+            'unit_number': unit_row[1],
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating unit turn: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Leases Tools
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -3543,12 +4511,47 @@ SALES_COMP_COLUMNS = [
     'comp_number', 'property_name', 'address', 'city', 'state', 'zip',
     'sale_date', 'sale_price', 'price_per_unit', 'price_per_sf',
     'year_built', 'units', 'building_sf', 'cap_rate', 'grm',
-    'distance_from_subject', 'unit_mix', 'notes', 'latitude', 'longitude', 'unit_count'
+    'distance_from_subject', 'unit_mix', 'notes', 'latitude', 'longitude', 'unit_count',
+    # Added Session 3: property classification fields
+    'property_type', 'property_subtype', 'building_class', 'property_rights',
+    'land_area_sf', 'land_area_acres',
 ]
 
 SALES_ADJ_COLUMNS = [
     'adjustment_type', 'adjustment_pct', 'adjustment_amount',
     'justification', 'user_adjustment_pct', 'ai_accepted', 'user_notes', 'last_modified_by'
+]
+
+# Verified against live DB information_schema 2026-02-27
+# tbl_sales_comp_land: 36 columns, UNIQUE(comparable_id), FK → tbl_sales_comparables
+SALES_COMP_LAND_COLUMNS = [
+    'current_zoning', 'proposed_zoning', 'zoning_description',
+    'entitled', 'entitlement_status', 'approved_uses', 'approved_density',
+    'approved_units', 'approved_sf', 'max_far', 'max_height_ft',
+    'topography', 'shape', 'frontage_ft', 'depth_ft', 'corner_lot',
+    'flood_zone', 'wetlands_pct',
+    'water_available', 'sewer_available', 'gas_available', 'electric_available', 'utility_notes',
+    'existing_improvements', 'demolition_required', 'demolition_cost_estimate',
+    'phase1_complete', 'phase2_complete', 'remediation_required', 'remediation_cost_estimate',
+    'impact_fees_estimate', 'offsite_costs_estimate',
+]
+
+# Verified against live DB information_schema 2026-02-27
+# tbl_parcel_sale_assumptions: 31 columns, UNIQUE(parcel_id), FK → tbl_parcel
+# NOTE: No project_id column — must JOIN through tbl_parcel to verify project ownership
+PARCEL_SALE_ASSUMPTION_COLUMNS = [
+    'sale_date',
+    'base_price_per_unit', 'price_uom', 'inflation_rate',
+    'inflated_price_per_unit', 'gross_parcel_price',
+    'improvement_offset_per_uom', 'improvement_offset_total',
+    'improvement_offset_source', 'improvement_offset_override',
+    'gross_sale_proceeds',
+    'legal_pct', 'legal_amount', 'legal_override',
+    'commission_pct', 'commission_amount', 'commission_override',
+    'closing_cost_pct', 'closing_cost_amount', 'closing_cost_override',
+    'title_insurance_pct', 'title_insurance_amount', 'title_insurance_override',
+    'custom_transaction_costs',
+    'total_transaction_costs', 'net_sale_proceeds', 'net_proceeds_per_uom',
 ]
 
 
@@ -3585,19 +4588,28 @@ def handle_get_sales_comparables(
 ) -> Dict[str, Any]:
     """Get sales comparables for a project."""
     limit = tool_input.get('limit', 100)
+    property_type = tool_input.get('property_type')  # Optional filter: 'LAND', 'MULTIFAMILY', etc.
 
     try:
         with connection.cursor() as cursor:
-            cursor.execute("""
+            where_clause = "WHERE project_id = %s"
+            params = [project_id]
+            if property_type:
+                where_clause += " AND property_type = %s"
+                params.append(property_type)
+            params.append(limit)
+
+            cursor.execute(f"""
                 SELECT comparable_id, comp_number, property_name, address, city, state, zip,
                        sale_date, sale_price, price_per_unit, price_per_sf,
                        year_built, units, building_sf, cap_rate, grm,
-                       distance_from_subject, unit_mix, notes, latitude, longitude, unit_count
+                       distance_from_subject, unit_mix, notes, latitude, longitude, unit_count,
+                       property_type, property_subtype, land_area_sf, land_area_acres
                 FROM landscape.tbl_sales_comparables
-                WHERE project_id = %s
+                {where_clause}
                 ORDER BY comp_number, sale_date DESC
                 LIMIT %s
-            """, [project_id, limit])
+            """, params)
 
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
@@ -3606,7 +4618,8 @@ def handle_get_sales_comparables(
             for row in rows:
                 record = dict(zip(columns, row))
                 # Convert Decimal to float for JSON
-                for key in ['sale_price', 'price_per_unit', 'price_per_sf', 'units', 'grm', 'latitude', 'longitude']:
+                for key in ['sale_price', 'price_per_unit', 'price_per_sf', 'units', 'grm',
+                           'latitude', 'longitude', 'land_area_sf', 'land_area_acres']:
                     if record.get(key) is not None:
                         record[key] = float(record[key])
                 # Handle date
@@ -3955,6 +4968,444 @@ def handle_update_sales_comp_adjustment(
 
     except Exception as e:
         logger.error(f"Error updating sales comp adjustment: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sales Comp Land Extension Tools (tbl_sales_comp_land)
+# Session 3: Land-specific fields for sales comparables
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_land_comp_detail')
+def handle_get_land_comp_detail(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get land-specific detail for a sales comparable."""
+    comparable_id = tool_input.get('comparable_id')
+
+    if not comparable_id:
+        return {'success': False, 'error': 'comparable_id required'}
+
+    try:
+        with connection.cursor() as cursor:
+            # Verify comparable belongs to this project
+            cursor.execute("""
+                SELECT property_name FROM landscape.tbl_sales_comparables
+                WHERE comparable_id = %s AND project_id = %s
+            """, [comparable_id, project_id])
+            comp_row = cursor.fetchone()
+            if not comp_row:
+                return {'success': False, 'error': f'Comparable {comparable_id} not found for this project'}
+
+            # Get land extension record
+            cursor.execute("""
+                SELECT *
+                FROM landscape.tbl_sales_comp_land
+                WHERE comparable_id = %s
+            """, [comparable_id])
+
+            if cursor.rowcount == 0:
+                return {
+                    'success': True,
+                    'exists': False,
+                    'comparable_id': comparable_id,
+                    'property_name': comp_row[0],
+                    'message': 'No land-specific detail record exists for this comparable'
+                }
+
+            columns = [col[0] for col in cursor.description]
+            row = cursor.fetchone()
+            record = dict(zip(columns, row))
+
+            # Convert Decimal to float for JSON serialization
+            for key, val in record.items():
+                if isinstance(val, Decimal):
+                    record[key] = float(val)
+                elif hasattr(val, 'isoformat'):
+                    record[key] = str(val)
+
+            record['property_name'] = comp_row[0]
+            return {
+                'success': True,
+                'exists': True,
+                'record': record
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting land comp detail: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_land_comp_detail', is_mutation=True)
+def handle_update_land_comp_detail(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update land-specific detail for a sales comparable."""
+    comparable_id = tool_input.get('comparable_id')
+    reason = tool_input.get('reason', 'Update land comp detail')
+
+    if not comparable_id:
+        return {'success': False, 'error': 'comparable_id required'}
+
+    # Build update dict from allowed columns only
+    updates = {k: v for k, v in tool_input.items()
+               if k in SALES_COMP_LAND_COLUMNS and v is not None}
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='comparable_upsert',
+            table_name='tbl_sales_comp_land',
+            field_name=None,
+            record_id=str(comparable_id),
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            # Verify comparable belongs to this project
+            cursor.execute("""
+                SELECT comparable_id FROM landscape.tbl_sales_comparables
+                WHERE comparable_id = %s AND project_id = %s
+            """, [comparable_id, project_id])
+            if not cursor.fetchone():
+                return {'success': False, 'error': f'Comparable {comparable_id} not found for this project'}
+
+            # Check if land detail exists (UNIQUE on comparable_id)
+            cursor.execute("""
+                SELECT land_id FROM landscape.tbl_sales_comp_land
+                WHERE comparable_id = %s
+            """, [comparable_id])
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update
+                set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
+                values = list(updates.values()) + [comparable_id]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_sales_comp_land
+                    SET {set_clauses}, updated_at = NOW()
+                    WHERE comparable_id = %s
+                """, values)
+
+                _log_comparables_activity(project_id, 'tbl_sales_comp_land', 'update', 1, reason)
+                return {
+                    'success': True,
+                    'action': 'updated',
+                    'land_id': existing[0],
+                    'comparable_id': comparable_id
+                }
+            else:
+                # Insert
+                col_names = ['comparable_id'] + list(updates.keys())
+                placeholders = ', '.join(['%s'] * len(col_names))
+                values = [comparable_id] + list(updates.values())
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_sales_comp_land ({', '.join(col_names)})
+                    VALUES ({placeholders})
+                    RETURNING land_id
+                """, values)
+                new_id = cursor.fetchone()[0]
+
+                _log_comparables_activity(project_id, 'tbl_sales_comp_land', 'create', 1, reason)
+                return {
+                    'success': True,
+                    'action': 'created',
+                    'land_id': new_id,
+                    'comparable_id': comparable_id
+                }
+
+    except Exception as e:
+        logger.error(f"Error updating land comp detail: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Parcel Sale Assumptions Tools (tbl_parcel_sale_assumptions)
+# Session 3: Per-parcel lot pricing, escalation, and transaction cost assumptions
+# NOTE: tbl_parcel_sale_assumptions has no project_id column.
+#       Ownership verified via JOIN to tbl_parcel(parcel_id → project_id).
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_parcel_sale_assumptions')
+def handle_get_parcel_sale_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get sale assumptions for one or all parcels in a project."""
+    parcel_id = tool_input.get('parcel_id')
+
+    try:
+        with connection.cursor() as cursor:
+            if parcel_id:
+                # Single parcel — verify it belongs to this project
+                cursor.execute("""
+                    SELECT a.*
+                    FROM landscape.tbl_parcel_sale_assumptions a
+                    JOIN landscape.tbl_parcel p ON p.parcel_id = a.parcel_id
+                    WHERE p.project_id = %s AND a.parcel_id = %s
+                """, [project_id, parcel_id])
+            else:
+                # All parcels for this project
+                cursor.execute("""
+                    SELECT a.*
+                    FROM landscape.tbl_parcel_sale_assumptions a
+                    JOIN landscape.tbl_parcel p ON p.parcel_id = a.parcel_id
+                    WHERE p.project_id = %s
+                    ORDER BY a.parcel_id
+                """, [project_id])
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+            records = []
+            for row in rows:
+                record = dict(zip(columns, row))
+                for key, val in record.items():
+                    if isinstance(val, Decimal):
+                        record[key] = float(val)
+                    elif hasattr(val, 'isoformat'):
+                        record[key] = str(val)
+                records.append(record)
+
+            if parcel_id and len(records) == 0:
+                return {
+                    'success': True,
+                    'exists': False,
+                    'parcel_id': parcel_id,
+                    'message': 'No sale assumptions found for this parcel'
+                }
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting parcel sale assumptions: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_parcel_sale_assumptions', is_mutation=True)
+def handle_update_parcel_sale_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update sale assumptions for a single parcel."""
+    parcel_id = tool_input.get('parcel_id')
+    reason = tool_input.get('reason', 'Update parcel sale assumptions')
+
+    if not parcel_id:
+        return {'success': False, 'error': 'parcel_id required'}
+
+    # Build update dict from allowed columns only
+    updates = {k: v for k, v in tool_input.items()
+               if k in PARCEL_SALE_ASSUMPTION_COLUMNS and v is not None}
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='parcel_assumption_upsert',
+            table_name='tbl_parcel_sale_assumptions',
+            field_name=None,
+            record_id=str(parcel_id),
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            # Verify parcel belongs to this project
+            cursor.execute("""
+                SELECT parcel_id FROM landscape.tbl_parcel
+                WHERE parcel_id = %s AND project_id = %s
+            """, [parcel_id, project_id])
+            if not cursor.fetchone():
+                return {'success': False, 'error': f'Parcel {parcel_id} not found for this project'}
+
+            # Check if assumptions exist (UNIQUE on parcel_id)
+            cursor.execute("""
+                SELECT assumption_id FROM landscape.tbl_parcel_sale_assumptions
+                WHERE parcel_id = %s
+            """, [parcel_id])
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update
+                set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
+                values = list(updates.values()) + [parcel_id]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_parcel_sale_assumptions
+                    SET {set_clauses}, updated_at = NOW()
+                    WHERE parcel_id = %s
+                """, values)
+
+                _log_comparables_activity(project_id, 'tbl_parcel_sale_assumptions', 'update', 1, reason)
+                return {
+                    'success': True,
+                    'action': 'updated',
+                    'assumption_id': existing[0],
+                    'parcel_id': parcel_id
+                }
+            else:
+                # Insert
+                col_names = ['parcel_id'] + list(updates.keys())
+                placeholders = ', '.join(['%s'] * len(col_names))
+                values = [parcel_id] + list(updates.values())
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_parcel_sale_assumptions ({', '.join(col_names)})
+                    VALUES ({placeholders})
+                    RETURNING assumption_id
+                """, values)
+                new_id = cursor.fetchone()[0]
+
+                _log_comparables_activity(project_id, 'tbl_parcel_sale_assumptions', 'create', 1, reason)
+                return {
+                    'success': True,
+                    'action': 'created',
+                    'assumption_id': new_id,
+                    'parcel_id': parcel_id
+                }
+
+    except Exception as e:
+        logger.error(f"Error updating parcel sale assumptions: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('bulk_update_parcel_sale_assumptions', is_mutation=True)
+def handle_bulk_update_parcel_sale_assumptions(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Update sale assumptions for multiple parcels in one operation."""
+    assumptions = tool_input.get('assumptions', [])
+    reason = tool_input.get('reason', 'Bulk update parcel sale assumptions')
+
+    if not assumptions:
+        return {'success': False, 'error': 'assumptions array required'}
+
+    # Enforce 100-item cap — return error, do not silently truncate
+    if len(assumptions) > 100:
+        return {
+            'success': False,
+            'error': f'Maximum 100 items per request. Received {len(assumptions)}. Split into smaller batches.'
+        }
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='parcel_assumption_bulk_upsert',
+            table_name='tbl_parcel_sale_assumptions',
+            field_name=None,
+            record_id=None,
+            proposed_value={'count': len(assumptions), 'assumptions': assumptions},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    succeeded = 0
+    failed = []
+
+    try:
+        with connection.cursor() as cursor:
+            # Pre-fetch all parcel_ids for this project for ownership validation
+            cursor.execute("""
+                SELECT parcel_id FROM landscape.tbl_parcel
+                WHERE project_id = %s
+            """, [project_id])
+            valid_parcel_ids = {row[0] for row in cursor.fetchall()}
+
+            for item in assumptions:
+                parcel_id = item.get('parcel_id')
+                if not parcel_id:
+                    failed.append({'parcel_id': None, 'error': 'parcel_id required'})
+                    continue
+
+                if parcel_id not in valid_parcel_ids:
+                    failed.append({'parcel_id': parcel_id, 'error': f'Parcel {parcel_id} not found for this project'})
+                    continue
+
+                updates = {k: v for k, v in item.items()
+                           if k in PARCEL_SALE_ASSUMPTION_COLUMNS and v is not None}
+                if not updates:
+                    failed.append({'parcel_id': parcel_id, 'error': 'No valid fields to update'})
+                    continue
+
+                try:
+                    # Check if exists (UNIQUE on parcel_id)
+                    cursor.execute("""
+                        SELECT assumption_id FROM landscape.tbl_parcel_sale_assumptions
+                        WHERE parcel_id = %s
+                    """, [parcel_id])
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
+                        values = list(updates.values()) + [parcel_id]
+                        cursor.execute(f"""
+                            UPDATE landscape.tbl_parcel_sale_assumptions
+                            SET {set_clauses}, updated_at = NOW()
+                            WHERE parcel_id = %s
+                        """, values)
+                    else:
+                        col_names = ['parcel_id'] + list(updates.keys())
+                        placeholders = ', '.join(['%s'] * len(col_names))
+                        values = [parcel_id] + list(updates.values())
+                        cursor.execute(f"""
+                            INSERT INTO landscape.tbl_parcel_sale_assumptions ({', '.join(col_names)})
+                            VALUES ({placeholders})
+                        """, values)
+
+                    succeeded += 1
+
+                except Exception as item_error:
+                    failed.append({'parcel_id': parcel_id, 'error': str(item_error)})
+
+        if succeeded > 0:
+            _log_comparables_activity(
+                project_id, 'tbl_parcel_sale_assumptions', 'bulk_update', succeeded, reason
+            )
+
+        return {
+            'success': True,
+            'succeeded': succeeded,
+            'failed': failed,
+            'total': len(assumptions)
+        }
+
+    except Exception as e:
+        logger.error(f"Error in bulk update parcel sale assumptions: {e}")
         return {'success': False, 'error': str(e)}
 
 
@@ -6070,6 +7521,538 @@ def handle_delete_parcel(
 
     except Exception as e:
         logger.error(f"Error deleting parcel: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lot, Lot Type, and Sale Phase Tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_lots')
+def handle_get_lots(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve lot records for a project."""
+    parcel_id = tool_input.get('parcel_id')
+    lot_type_id = tool_input.get('lot_type_id')
+    status = tool_input.get('status') or tool_input.get('lot_status')
+
+    try:
+        with connection.cursor() as cursor:
+            query = """
+                SELECT l.lot_id, l.parcel_id, l.phase_id, l.project_id, l.lot_number,
+                       l.unit_number, l.suite_number, l.unit_type, l.lot_sf,
+                       l.unit_sf, l.bedrooms, l.bathrooms, l.floor_number,
+                       l.base_price, l.price_psf, l.options_price, l.total_price,
+                       l.lot_status, l.sale_date, l.close_date, l.lease_id,
+                       l.created_at, l.updated_at, p.parcel_name, p.lot_type_id,
+                       lt.producttype_name, ph.phase_name
+                FROM landscape.tbl_lot l
+                LEFT JOIN landscape.tbl_parcel p ON p.parcel_id = l.parcel_id
+                LEFT JOIN landscape.tbl_lot_type lt ON lt.producttype_id = p.lot_type_id
+                LEFT JOIN landscape.tbl_phase ph ON ph.phase_id = l.phase_id
+                WHERE l.project_id = %s
+            """
+            params: List[Any] = [project_id]
+
+            if parcel_id is not None:
+                query += " AND l.parcel_id = %s"
+                params.append(parcel_id)
+            if lot_type_id is not None:
+                query += " AND p.lot_type_id = %s"
+                params.append(lot_type_id)
+            if status:
+                query += " AND l.lot_status = %s"
+                params.append(status)
+
+            query += " ORDER BY l.parcel_id, l.lot_number NULLS LAST, l.unit_number NULLS LAST, l.lot_id"
+            cursor.execute(query, params)
+            columns = [col[0] for col in cursor.description]
+            records = _serialize_db_records(columns, cursor.fetchall())
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting lots: {e}")
+        return {'success': False, 'error': str(e), 'count': 0, 'records': []}
+
+
+@register_tool('create_lot', is_mutation=True)
+def handle_create_lot(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create a lot record for a project."""
+    reason = tool_input.get('reason', 'Create lot')
+    parcel_id = tool_input.get('parcel_id')
+    requested_phase_id = tool_input.get('phase_id')
+    requested_lot_type_id = tool_input.get('lot_type_id')
+
+    insert_data = {
+        key: value for key, value in tool_input.items()
+        if key in LOT_COLUMNS and value is not None and key not in {'parcel_id', 'phase_id'}
+    }
+    if tool_input.get('status') is not None and 'lot_status' not in insert_data:
+        insert_data['lot_status'] = tool_input.get('status')
+    if tool_input.get('list_price') is not None and 'base_price' not in insert_data:
+        insert_data['base_price'] = tool_input.get('list_price')
+    if tool_input.get('sale_price') is not None and 'total_price' not in insert_data:
+        insert_data['total_price'] = tool_input.get('sale_price')
+
+    if not parcel_id:
+        return {'success': False, 'error': 'parcel_id required'}
+
+    if not any(tool_input.get(field) for field in ('lot_number', 'unit_number', 'suite_number')):
+        return {'success': False, 'error': 'lot_number, unit_number, or suite_number is required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        proposed_value = {'parcel_id': parcel_id, **insert_data}
+        if requested_phase_id is not None:
+            proposed_value['phase_id'] = requested_phase_id
+        if requested_lot_type_id is not None:
+            proposed_value['lot_type_id'] = requested_lot_type_id
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_create',
+            table_name='tbl_lot',
+            field_name=None,
+            proposed_value=proposed_value,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT parcel_id, phase_id, lot_type_id, parcel_name
+                FROM landscape.tbl_parcel
+                WHERE parcel_id = %s AND project_id = %s
+            """, [parcel_id, project_id])
+            parcel_row = cursor.fetchone()
+            if not parcel_row:
+                return {'success': False, 'error': f'Parcel {parcel_id} not found for this project'}
+
+            parcel_phase_id = parcel_row[1]
+            parcel_lot_type_id = parcel_row[2]
+            if requested_phase_id is not None and parcel_phase_id is not None and requested_phase_id != parcel_phase_id:
+                return {'success': False, 'error': 'phase_id must match the parcel phase for new lots'}
+            if requested_phase_id is not None and parcel_phase_id is None:
+                cursor.execute("""
+                    SELECT phase_id
+                    FROM landscape.tbl_phase
+                    WHERE phase_id = %s AND project_id = %s
+                """, [requested_phase_id, project_id])
+                if not cursor.fetchone():
+                    return {'success': False, 'error': f'Phase {requested_phase_id} not found for this project'}
+            if requested_lot_type_id is not None and parcel_lot_type_id != requested_lot_type_id:
+                return {
+                    'success': False,
+                    'error': 'lot_type_id is controlled by the parcel and does not match this parcel',
+                }
+
+            fields = {
+                'project_id': project_id,
+                'parcel_id': parcel_id,
+            }
+            if requested_phase_id is not None:
+                fields['phase_id'] = requested_phase_id
+            elif parcel_phase_id is not None:
+                fields['phase_id'] = parcel_phase_id
+            fields.update(insert_data)
+
+            columns = list(fields.keys())
+            placeholders = ', '.join(['%s'] * len(columns))
+            values = list(fields.values())
+            cursor.execute(f"""
+                INSERT INTO landscape.tbl_lot ({', '.join(columns)}, created_at, updated_at)
+                VALUES ({placeholders}, NOW(), NOW())
+                RETURNING lot_id, lot_number
+            """, values)
+            row = cursor.fetchone()
+
+        _log_planning_activity(project_id, 'tbl_lot', 'create', 1, reason)
+        return {
+            'success': True,
+            'action': 'created',
+            'lot_id': row[0],
+            'lot_number': row[1],
+            'parcel_id': parcel_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating lot: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_lot', is_mutation=True)
+def handle_update_lot(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Update a lot record."""
+    lot_id = tool_input.get('lot_id')
+    reason = tool_input.get('reason', 'Update lot')
+
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in LOT_COLUMNS and value is not None and key != 'project_id'
+    }
+    if tool_input.get('status') is not None and 'lot_status' not in updates:
+        updates['lot_status'] = tool_input.get('status')
+    if tool_input.get('list_price') is not None and 'base_price' not in updates:
+        updates['base_price'] = tool_input.get('list_price')
+    if tool_input.get('sale_price') is not None and 'total_price' not in updates:
+        updates['total_price'] = tool_input.get('sale_price')
+
+    if not lot_id:
+        return {'success': False, 'error': 'lot_id required'}
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_upsert',
+            table_name='tbl_lot',
+            field_name=None,
+            record_id=str(lot_id),
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT lot_id, parcel_id, phase_id, lot_number
+                FROM landscape.tbl_lot
+                WHERE lot_id = %s AND project_id = %s
+            """, [lot_id, project_id])
+            current_row = cursor.fetchone()
+            if not current_row:
+                return {'success': False, 'error': f'Lot {lot_id} not found for this project'}
+
+            if 'parcel_id' in updates:
+                cursor.execute("""
+                    SELECT parcel_id, phase_id
+                    FROM landscape.tbl_parcel
+                    WHERE parcel_id = %s AND project_id = %s
+                """, [updates['parcel_id'], project_id])
+                parcel_row = cursor.fetchone()
+                if not parcel_row:
+                    return {'success': False, 'error': f"Parcel {updates['parcel_id']} not found for this project"}
+                if 'phase_id' in updates and parcel_row[1] is not None and updates['phase_id'] != parcel_row[1]:
+                    return {'success': False, 'error': 'phase_id must match the parcel phase'}
+                if 'phase_id' in updates and parcel_row[1] is None:
+                    cursor.execute("""
+                        SELECT phase_id
+                        FROM landscape.tbl_phase
+                        WHERE phase_id = %s AND project_id = %s
+                    """, [updates['phase_id'], project_id])
+                    if not cursor.fetchone():
+                        return {'success': False, 'error': f"Phase {updates['phase_id']} not found for this project"}
+                if parcel_row[1] is not None and 'phase_id' not in updates:
+                    updates['phase_id'] = parcel_row[1]
+            elif 'phase_id' in updates:
+                cursor.execute("""
+                    SELECT phase_id
+                    FROM landscape.tbl_phase
+                    WHERE phase_id = %s AND project_id = %s
+                """, [updates['phase_id'], project_id])
+                if not cursor.fetchone():
+                    return {'success': False, 'error': f"Phase {updates['phase_id']} not found for this project"}
+
+            set_parts = [f"{key} = %s" for key in updates.keys()]
+            values = list(updates.values()) + [lot_id, project_id]
+            cursor.execute(f"""
+                UPDATE landscape.tbl_lot
+                SET {', '.join(set_parts)}, updated_at = NOW()
+                WHERE lot_id = %s AND project_id = %s
+                RETURNING lot_id, lot_number
+            """, values)
+            row = cursor.fetchone()
+
+        _log_planning_activity(project_id, 'tbl_lot', 'update', 1, reason)
+        return {
+            'success': True,
+            'action': 'updated',
+            'lot_id': row[0],
+            'lot_number': row[1],
+            'fields_updated': list(updates.keys()),
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating lot: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_lot_types')
+def handle_get_lot_types(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve global lot type definitions annotated with project parcel usage."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT lt.producttype_id, lt.producttype_name, lt.typical_lot_width,
+                       lt.typical_lot_depth, COUNT(DISTINCT p.parcel_id) AS parcel_count
+                FROM landscape.tbl_lot_type lt
+                LEFT JOIN landscape.tbl_parcel p
+                    ON p.lot_type_id = lt.producttype_id
+                   AND p.project_id = %s
+                GROUP BY lt.producttype_id, lt.producttype_name,
+                         lt.typical_lot_width, lt.typical_lot_depth
+                ORDER BY lt.producttype_name
+            """, [project_id])
+            columns = [col[0] for col in cursor.description]
+            records = _serialize_db_records(columns, cursor.fetchall())
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting lot types: {e}")
+        return {'success': False, 'error': str(e), 'count': 0, 'records': []}
+
+
+@register_tool('update_lot_type', is_mutation=True)
+def handle_update_lot_type(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update a lot type definition."""
+    producttype_id = tool_input.get('producttype_id') or tool_input.get('lot_type_id')
+    reason = tool_input.get('reason', 'Update lot type')
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in LOT_TYPE_COLUMNS and value is not None
+    }
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_upsert',
+            table_name='tbl_lot_type',
+            field_name=None,
+            record_id=str(producttype_id) if producttype_id else None,
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            if producttype_id:
+                if not _project_exists(project_id):
+                    return {'success': False, 'error': f'Project {project_id} not found'}
+
+                cursor.execute("""
+                    SELECT lt.producttype_id, lt.producttype_name
+                    FROM landscape.tbl_lot_type lt
+                    WHERE lt.producttype_id = %s
+                """, [producttype_id])
+                row = cursor.fetchone()
+                if not row:
+                    return {'success': False, 'error': f'Lot type {producttype_id} not found'}
+
+                set_parts = [f"{key} = %s" for key in updates.keys()]
+                values = list(updates.values()) + [producttype_id]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_lot_type
+                    SET {', '.join(set_parts)}
+                    WHERE producttype_id = %s
+                    RETURNING producttype_id, producttype_name
+                """, values)
+                updated_row = cursor.fetchone()
+                action = 'updated'
+            else:
+                if not _project_exists(project_id):
+                    return {'success': False, 'error': f'Project {project_id} not found'}
+                if 'producttype_name' not in updates:
+                    return {'success': False, 'error': 'producttype_name required for new lot types'}
+
+                columns = list(updates.keys())
+                placeholders = ', '.join(['%s'] * len(columns))
+                values = list(updates.values())
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_lot_type ({', '.join(columns)})
+                    VALUES ({placeholders})
+                    RETURNING producttype_id, producttype_name
+                """, values)
+                updated_row = cursor.fetchone()
+                action = 'created'
+
+        _log_planning_activity(project_id, 'tbl_lot_type', action, 1, reason)
+        return {
+            'success': True,
+            'action': action,
+            'lot_type_id': updated_row[0],
+            'producttype_name': updated_row[1],
+            'fields_updated': list(updates.keys()),
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating lot type: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('get_sale_phases')
+def handle_get_sale_phases(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve sale phase records for a project."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT phase_code, project_id, phase_name, default_sale_date,
+                       default_commission_pct, default_closing_cost_per_unit,
+                       default_onsite_cost_pct, created_at, updated_at
+                FROM landscape.tbl_sale_phases
+                WHERE project_id = %s
+                ORDER BY default_sale_date NULLS LAST, phase_code
+            """, [project_id])
+            columns = [col[0] for col in cursor.description]
+            records = _serialize_db_records(columns, cursor.fetchall())
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting sale phases: {e}")
+        return {'success': False, 'error': str(e), 'count': 0, 'records': []}
+
+
+@register_tool('update_sale_phase', is_mutation=True)
+def handle_update_sale_phase(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update a sale phase record."""
+    phase_code = (
+        tool_input.get('phase_code')
+        or tool_input.get('sale_phase_id')
+        or tool_input.get('sale_phase_code')
+    )
+    reason = tool_input.get('reason', 'Update sale phase')
+    updates = {
+        key: value for key, value in tool_input.items()
+        if key in SALE_PHASE_COLUMNS and value is not None and key != 'phase_code'
+    }
+    if phase_code:
+        updates['phase_code'] = phase_code
+
+    if not phase_code:
+        return {'success': False, 'error': 'phase_code required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='planning_upsert',
+            table_name='tbl_sale_phases',
+            field_name=None,
+            record_id=str(phase_code),
+            proposed_value=updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT phase_code, project_id, phase_name
+                FROM landscape.tbl_sale_phases
+                WHERE phase_code = %s
+            """, [phase_code])
+            existing = cursor.fetchone()
+
+            if existing and existing[1] != project_id:
+                return {'success': False, 'error': f'Sale phase {phase_code} belongs to a different project'}
+
+            if existing:
+                write_fields = {
+                    key: value for key, value in updates.items()
+                    if key != 'phase_code'
+                }
+                if not write_fields:
+                    return {'success': False, 'error': 'No valid fields to update'}
+
+                set_parts = [f"{key} = %s" for key in write_fields.keys()]
+                values = list(write_fields.values()) + [phase_code, project_id]
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_sale_phases
+                    SET {', '.join(set_parts)}, updated_at = NOW()
+                    WHERE phase_code = %s AND project_id = %s
+                    RETURNING phase_code, phase_name
+                """, values)
+                row = cursor.fetchone()
+                action = 'updated'
+                fields_logged = list(write_fields.keys())
+            else:
+                if 'default_sale_date' not in updates:
+                    return {'success': False, 'error': 'default_sale_date required for new sale phases'}
+
+                fields = {'project_id': project_id, **updates}
+                columns = list(fields.keys())
+                placeholders = ', '.join(['%s'] * len(columns))
+                values = list(fields.values())
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_sale_phases ({', '.join(columns)}, created_at, updated_at)
+                    VALUES ({placeholders}, NOW(), NOW())
+                    RETURNING phase_code, phase_name
+                """, values)
+                row = cursor.fetchone()
+                action = 'created'
+                fields_logged = list(updates.keys())
+
+        _log_planning_activity(project_id, 'tbl_sale_phases', action, 1, reason)
+        return {
+            'success': True,
+            'action': action,
+            'phase_code': row[0],
+            'phase_name': row[1],
+            'fields_updated': fields_logged,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating sale phase: {e}")
         return {'success': False, 'error': str(e)}
 
 
@@ -10561,9 +12544,27 @@ def handle_confirm_column_mapping(
         except Document.DoesNotExist:
             return {'success': False, 'error': f'Document {document_id} not found in this project'}
 
-        # Section 8 source column — when provided, a boolean 'is_section_8'
-        # dynamic column is created and populated from this source column's values.
+        # Section 8 source column — when provided, maps to the native
+        # tbl_multifamily_unit.is_section8 field (not a dynamic column).
         section8_source = tool_input.get('section8_source_column')
+
+        # Defensive: if LLM included a native mapping in the mappings array,
+        # extract the section8 source column from it.
+        for m in mappings:
+            if isinstance(m, dict) and m.get('native_field') == 'is_section8':
+                section8_source = section8_source or m.get('source_column')
+            if isinstance(m, dict) and m.get('suggestion') == 'map_native' and m.get('key') == 'is_section8':
+                section8_source = section8_source or m.get('source_column')
+
+        # Remove any native mappings from the regular mappings array
+        # (they're handled via section8_source_column, not as dynamic columns)
+        mappings = [
+            m for m in mappings
+            if not (isinstance(m, dict) and (
+                m.get('native_field') == 'is_section8' or
+                (m.get('suggestion') == 'map_native' and m.get('key') == 'is_section8')
+            ))
+        ]
 
         result = apply_column_mapping(
             project_id=project_id,

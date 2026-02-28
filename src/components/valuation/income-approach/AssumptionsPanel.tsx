@@ -39,9 +39,43 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 const INPUT_STYLE: React.CSSProperties = { width: '6rem', flexShrink: 0 };
 const SELECT_STYLE: React.CSSProperties = { width: '7.5rem', flexShrink: 0 };
 
+type ValuationMethodView = 'direct_cap' | 'dcf' | 'both';
+
 interface ExtendedAssumptionsPanelProps extends AssumptionsPanelProps {
   activeMethod?: 'direct_cap' | 'dcf';
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
+}
+
+/**
+ * Calculate mortgage constant (Rm) from rate and amortization.
+ * Rm = monthly payment factor × 12
+ * Monthly payment factor = (r * (1+r)^n) / ((1+r)^n - 1) where r = monthly rate, n = total months
+ */
+function calcMortgageConstant(annualRate: number, amortYears: number): number | null {
+  if (!annualRate || annualRate <= 0 || !amortYears || amortYears <= 0) return null;
+  const r = annualRate / 12; // monthly rate
+  const n = amortYears * 12; // total months
+  const factor = (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  return factor * 12; // annualize
+}
+
+/**
+ * Calculate indicated cap rate from band of investment inputs.
+ * Cap Rate = (LTV × Rm) + ((1 - LTV) × equity_dividend_rate)
+ */
+function calcBandCapRate(
+  ltv: number | null,
+  mortgageRate: number | null,
+  amortYears: number | null,
+  equityDividendRate: number | null,
+): { mortgageConstant: number | null; indicatedCapRate: number | null } {
+  if (ltv == null || mortgageRate == null || amortYears == null || equityDividendRate == null) {
+    return { mortgageConstant: null, indicatedCapRate: null };
+  }
+  const rm = calcMortgageConstant(mortgageRate, amortYears);
+  if (rm == null) return { mortgageConstant: null, indicatedCapRate: null };
+  const capRate = (ltv * rm) + ((1 - ltv) * equityDividendRate);
+  return { mortgageConstant: rm, indicatedCapRate: capRate };
 }
 
 export function AssumptionsPanel({
@@ -53,11 +87,18 @@ export function AssumptionsPanel({
   activeMethod = 'direct_cap',
   onMethodChange,
 }: ExtendedAssumptionsPanelProps) {
+  // Track the view mode (which assumption sections to show)
+  // 'both' shows all sections; 'direct_cap' / 'dcf' show relevant ones only
+  const [viewMode, setViewMode] = useState<ValuationMethodView>(
+    activeMethod === 'dcf' ? 'dcf' : 'direct_cap'
+  );
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     income: true,
     expenses: true,
     capitalization: true,
     dcf: true,
+    band: true,
   });
 
   // Define hooks before any conditional returns
@@ -109,40 +150,38 @@ export function AssumptionsPanel({
 
         {/* Method toggle + saving indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <button
-            type="button"
-            onClick={() => onMethodChange?.('direct_cap')}
-            style={{
-              padding: '0.2rem 0.5rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              borderRadius: '0.25rem',
-              border: '1px solid',
-              cursor: 'pointer',
-              borderColor: activeMethod === 'direct_cap' ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-              backgroundColor: activeMethod === 'direct_cap' ? 'var(--cui-primary)' : 'transparent',
-              color: activeMethod === 'direct_cap' ? 'white' : 'var(--cui-secondary-color)',
-            }}
-          >
-            Direct Cap
-          </button>
-          <button
-            type="button"
-            onClick={() => onMethodChange?.('dcf')}
-            style={{
-              padding: '0.2rem 0.5rem',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              borderRadius: '0.25rem',
-              border: '1px solid',
-              cursor: 'pointer',
-              borderColor: activeMethod === 'dcf' ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-              backgroundColor: activeMethod === 'dcf' ? 'var(--cui-primary)' : 'transparent',
-              color: activeMethod === 'dcf' ? 'white' : 'var(--cui-secondary-color)',
-            }}
-          >
-            Cash Flow
-          </button>
+          {(['direct_cap', 'dcf', 'both'] as ValuationMethodView[]).map((mode) => {
+            const isActive = viewMode === mode;
+            const label = mode === 'direct_cap' ? 'Direct Cap'
+              : mode === 'dcf' ? 'Cash Flow'
+              : 'Both';
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setViewMode(mode);
+                  // Switch the right panel to the appropriate method
+                  if (mode === 'direct_cap') onMethodChange?.('direct_cap');
+                  else if (mode === 'dcf') onMethodChange?.('dcf');
+                  // 'both' keeps the current right panel method
+                }}
+                style={{
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  borderRadius: '0.25rem',
+                  border: '1px solid',
+                  cursor: 'pointer',
+                  borderColor: isActive ? 'var(--cui-primary)' : 'var(--cui-border-color)',
+                  backgroundColor: isActive ? 'var(--cui-primary)' : 'transparent',
+                  color: isActive ? 'white' : 'var(--cui-secondary-color)',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
 
           {isSaving && (
             <div
@@ -280,112 +319,234 @@ export function AssumptionsPanel({
           </div>
         </AccordionSection>
 
-        {/* Capitalization Section */}
-        <AccordionSection
-          title="Capitalization"
-          isOpen={openSections.capitalization}
-          onToggle={() => toggleSection('capitalization')}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <AssumptionRow>
-              <PercentInput
-                label="Going-In Cap Rate"
-                value={assumptions.selected_cap_rate}
-                onChange={(v) => onAssumptionChange('selected_cap_rate', v)}
-                min={0.01}
-                max={0.15}
-              />
-            </AssumptionRow>
+        {/* Capitalization Section — hidden when DCF-only */}
+        {viewMode !== 'dcf' && (
+          <AccordionSection
+            title="Capitalization"
+            isOpen={openSections.capitalization}
+            onToggle={() => toggleSection('capitalization')}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <AssumptionRow>
+                <PercentInput
+                  label="Going-In Cap Rate"
+                  value={assumptions.selected_cap_rate}
+                  onChange={(v) => onAssumptionChange('selected_cap_rate', v)}
+                  min={0.01}
+                  max={0.15}
+                />
+              </AssumptionRow>
 
-            <AssumptionRow>
-              <SelectInput
-                label="Method"
-                value={assumptions.market_cap_rate_method}
-                onChange={(v) => onAssumptionChange('market_cap_rate_method', v)}
-                options={[
-                  { value: 'comp_sales', label: 'Comp Sales' },
-                  { value: 'band_investment', label: 'Band' },
-                  { value: 'investor_survey', label: 'Survey' },
-                ]}
-              />
-            </AssumptionRow>
+              <AssumptionRow>
+                <SelectInput
+                  label="Method"
+                  value={assumptions.market_cap_rate_method}
+                  onChange={(v) => onAssumptionChange('market_cap_rate_method', v)}
+                  options={[
+                    { value: 'comp_sales', label: 'Comp Sales' },
+                    { value: 'band_investment', label: 'Band' },
+                    { value: 'investor_survey', label: 'Survey' },
+                  ]}
+                />
+              </AssumptionRow>
 
-            <AssumptionRow>
-              <PercentInput
-                label="Sensitivity Interval"
-                value={assumptions.cap_rate_interval}
-                onChange={(v) => onAssumptionChange('cap_rate_interval', v)}
-                min={0.0025}
-                max={0.01}
-                tooltip="Interval for sensitivity matrix"
-              />
-            </AssumptionRow>
-          </div>
-        </AccordionSection>
+              <AssumptionRow>
+                <PercentInput
+                  label="Sensitivity Interval"
+                  value={assumptions.cap_rate_interval}
+                  onChange={(v) => onAssumptionChange('cap_rate_interval', v)}
+                  min={0.0025}
+                  max={0.01}
+                  tooltip="Interval for sensitivity matrix"
+                />
+              </AssumptionRow>
+            </div>
+          </AccordionSection>
+        )}
 
-        {/* DCF Parameters Section */}
-        <AccordionSection
-          title="DCF Parameters"
-          isOpen={openSections.dcf}
-          onToggle={() => toggleSection('dcf')}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <AssumptionRow>
-              <NumberInput
-                label="Hold Period"
-                value={assumptions.hold_period_years}
-                onChange={(v) => onAssumptionChange('hold_period_years', v)}
-                min={1}
-                max={30}
-                suffix="yrs"
-              />
-            </AssumptionRow>
+        {/* Band of Investment — shown only when method = band_investment and not DCF-only */}
+        {viewMode !== 'dcf' && assumptions.market_cap_rate_method === 'band_investment' && (
+          <BandOfInvestmentPanel
+            assumptions={assumptions}
+            onAssumptionChange={onAssumptionChange}
+            isOpen={openSections.band}
+            onToggle={() => toggleSection('band')}
+          />
+        )}
 
-            <AssumptionRow>
-              <PercentInput
-                label="Discount Rate"
-                value={assumptions.discount_rate}
-                onChange={(v) => onAssumptionChange('discount_rate', v)}
-                min={0.05}
-                max={0.20}
-              />
-            </AssumptionRow>
+        {/* DCF Parameters Section — hidden when Direct Cap only */}
+        {viewMode !== 'direct_cap' && (
+          <AccordionSection
+            title="DCF Parameters"
+            isOpen={openSections.dcf}
+            onToggle={() => toggleSection('dcf')}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <AssumptionRow>
+                <NumberInput
+                  label="Hold Period"
+                  value={assumptions.hold_period_years}
+                  onChange={(v) => onAssumptionChange('hold_period_years', v)}
+                  min={1}
+                  max={30}
+                  suffix="yrs"
+                />
+              </AssumptionRow>
 
-            <AssumptionRow>
-              <PercentInput
-                label="Exit Cap Rate"
-                value={assumptions.terminal_cap_rate}
-                onChange={(v) => onAssumptionChange('terminal_cap_rate', v)}
-                min={0.01}
-                max={0.15}
-              />
-            </AssumptionRow>
+              <AssumptionRow>
+                <PercentInput
+                  label="Discount Rate"
+                  value={assumptions.discount_rate}
+                  onChange={(v) => onAssumptionChange('discount_rate', v)}
+                  min={0.05}
+                  max={0.20}
+                />
+              </AssumptionRow>
 
-            <AssumptionRow>
-              <PercentInput
-                label="Discount Interval"
-                value={assumptions.discount_rate_interval}
-                onChange={(v) => onAssumptionChange('discount_rate_interval', v)}
-                min={0.0025}
-                max={0.01}
-                tooltip="For sensitivity matrix"
-              />
-            </AssumptionRow>
+              <AssumptionRow>
+                <PercentInput
+                  label="Exit Cap Rate"
+                  value={assumptions.terminal_cap_rate}
+                  onChange={(v) => onAssumptionChange('terminal_cap_rate', v)}
+                  min={0.01}
+                  max={0.15}
+                />
+              </AssumptionRow>
 
-            <AssumptionRow>
-              <PercentInput
-                label="Selling Costs"
-                value={assumptions.selling_costs_pct}
-                onChange={(v) => onAssumptionChange('selling_costs_pct', v)}
-                min={0}
-                max={0.10}
-                tooltip="Broker fees, closing costs at exit"
-              />
-            </AssumptionRow>
-          </div>
-        </AccordionSection>
+              <AssumptionRow>
+                <PercentInput
+                  label="Discount Interval"
+                  value={assumptions.discount_rate_interval}
+                  onChange={(v) => onAssumptionChange('discount_rate_interval', v)}
+                  min={0.0025}
+                  max={0.01}
+                  tooltip="For sensitivity matrix"
+                />
+              </AssumptionRow>
+
+              <AssumptionRow>
+                <PercentInput
+                  label="Selling Costs"
+                  value={assumptions.selling_costs_pct}
+                  onChange={(v) => onAssumptionChange('selling_costs_pct', v)}
+                  min={0}
+                  max={0.10}
+                  tooltip="Broker fees, closing costs at exit"
+                />
+              </AssumptionRow>
+            </div>
+          </AccordionSection>
+        )}
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// BAND OF INVESTMENT PANEL
+// ============================================================================
+
+interface BandOfInvestmentPanelProps {
+  assumptions: AssumptionsPanelProps['assumptions'];
+  onAssumptionChange: AssumptionsPanelProps['onAssumptionChange'];
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+function BandOfInvestmentPanel({
+  assumptions,
+  onAssumptionChange,
+  isOpen,
+  onToggle,
+}: BandOfInvestmentPanelProps) {
+  const { mortgageConstant, indicatedCapRate } = calcBandCapRate(
+    assumptions.band_mortgage_ltv,
+    assumptions.band_mortgage_rate,
+    assumptions.band_amortization_years,
+    assumptions.band_equity_dividend_rate,
+  );
+
+  return (
+    <AccordionSection
+      title="Band of Investment"
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <AssumptionRow>
+          <PercentInput
+            label="Market LTV"
+            value={assumptions.band_mortgage_ltv ?? 0}
+            onChange={(v) => onAssumptionChange('band_mortgage_ltv', v)}
+            min={0}
+            max={0.95}
+            tooltip="Typical market loan-to-value ratio"
+          />
+        </AssumptionRow>
+
+        <AssumptionRow>
+          <PercentInput
+            label="Market Int. Rate"
+            value={assumptions.band_mortgage_rate ?? 0}
+            onChange={(v) => onAssumptionChange('band_mortgage_rate', v)}
+            min={0.01}
+            max={0.15}
+            tooltip="Typical market mortgage interest rate"
+          />
+        </AssumptionRow>
+
+        <AssumptionRow>
+          <NumberInput
+            label="Amortization"
+            value={assumptions.band_amortization_years ?? 0}
+            onChange={(v) => onAssumptionChange('band_amortization_years', v)}
+            min={5}
+            max={40}
+            suffix="yrs"
+          />
+        </AssumptionRow>
+
+        <AssumptionRow>
+          <PercentInput
+            label="Equity Div. Rate"
+            value={assumptions.band_equity_dividend_rate ?? 0}
+            onChange={(v) => onAssumptionChange('band_equity_dividend_rate', v)}
+            min={0.01}
+            max={0.25}
+            tooltip="Required equity dividend rate (cash-on-cash)"
+          />
+        </AssumptionRow>
+
+        {/* Calculated outputs */}
+        <div
+          style={{
+            marginTop: '0.5rem',
+            paddingTop: '0.5rem',
+            borderTop: '1px solid var(--cui-border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+              Mortgage Constant (Rm)
+            </span>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--cui-body-color)' }}>
+              {mortgageConstant != null ? `${(mortgageConstant * 100).toFixed(3)}%` : '\u2014'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--cui-body-color)' }}>
+              Indicated Cap Rate
+            </span>
+            <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--cui-success)' }}>
+              {indicatedCapRate != null ? `${(indicatedCapRate * 100).toFixed(2)}%` : '\u2014'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </AccordionSection>
   );
 }
 

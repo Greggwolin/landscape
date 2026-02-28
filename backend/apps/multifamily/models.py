@@ -171,6 +171,9 @@ class MultifamilyUnit(models.Model):
     unit_category = models.CharField(max_length=50, null=True, blank=True)
     unit_designation = models.CharField(max_length=100, null=True, blank=True)
     other_features = models.TextField(null=True, blank=True)
+    is_section8 = models.BooleanField(default=False)
+    section8_contract_date = models.DateField(null=True, blank=True)
+    section8_contract_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     extra_data = models.JSONField(
         null=True,
         blank=True,

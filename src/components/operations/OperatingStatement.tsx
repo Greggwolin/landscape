@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { DetailSummaryToggle, ViewMode } from './DetailSummaryToggle';
@@ -604,17 +604,73 @@ export function OperatingStatement({
   const [viewMode, setViewMode] = useState<ViewMode>('detail');
   const [savingItem, setSavingItem] = useState<number | null>(null);
 
-  // Compute grid-template-columns based on visible columns
-  const gridTemplateCols = [
-    '200px',                    // label
-    'minmax(60px, 70px)',       // units
-    'minmax(90px, 100px)',      // current
-    'minmax(100px, 120px)',     // annual
-    'minmax(70px, 80px)',       // $/SF
-    ...(hideLossToLease ? [] : ['minmax(100px, 110px)']),  // loss to lease
-    ...(hidePR ? [] : ['minmax(110px, 130px)']),      // post renovation rent/mo
-    ...(hidePR ? [] : ['minmax(90px, 110px)']),       // annual (reno)
-  ].join(' ');
+  // Column widths state for user-resizable columns
+  const defaultWidths = [200, 65, 95, 110, 75, 105, 120, 100];
+  const [colWidths, setColWidths] = useState<number[]>(defaultWidths);
+
+  const handleResizeStart = useCallback((colIdx: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    // Capture start values in closure — no ref needed
+    const startX = e.clientX;
+    const startW = colWidths[colIdx];
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - startX;
+      const newWidth = Math.max(50, startW + delta);
+      setColWidths(prev => {
+        const next = [...prev];
+        next[colIdx] = newWidth;
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [colWidths]);
+
+  // Build visible column indices
+  const visibleColIndices: number[] = [0, 1, 2, 3, 4];
+  if (!hideLossToLease) visibleColIndices.push(5);
+  if (!hidePR) visibleColIndices.push(6, 7);
+
+  // ResizeObserver: measure container and distribute extra width proportionally
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Compute column template: pixel widths expanded to fill container
+  const gridTemplateCols = useMemo(() => {
+    const baseWidths = visibleColIndices.map(i => colWidths[i]);
+    const totalBase = baseWidths.reduce((s, w) => s + w, 0);
+
+    if (containerWidth > totalBase + 10) {
+      // Distribute extra space proportionally across all columns
+      const extra = containerWidth - totalBase;
+      return baseWidths.map(w => `${Math.round(w + (w / totalBase) * extra)}px`).join(' ');
+    }
+    return baseWidths.map(w => `${w}px`).join(' ');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hideLossToLease, hidePR, colWidths, containerWidth]);
 
   // Selection state
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
@@ -893,6 +949,7 @@ export function OperatingStatement({
     <DndProvider backend={HTML5Backend}>
       <div className="ops-statement-scroll">
         <div
+          ref={gridRef}
           className={`ops-statement-grid${hideLossToLease ? ' ops-hide-ltl' : ''}${hidePR ? ' ops-hide-post' : ''}`}
           style={{ gridTemplateColumns: gridTemplateCols }}
         >
@@ -910,16 +967,28 @@ export function OperatingStatement({
               </div>
             </div>
           )}
-          {/* Column header row */}
+          {/* Column header row — each cell has a resize handle on the right edge */}
           <div className="ops-row ops-header-row">
-            <div className="ops-cell ops-header-cell">Revenue</div>
-            <div className="ops-cell ops-header-cell num">Units</div>
-            <div className="ops-cell ops-header-cell num">Rent/Mo</div>
-            <div className="ops-cell ops-header-cell num">Annual</div>
-            <div className="ops-cell ops-header-cell num">$/SF</div>
-            <div className="ops-cell ops-header-cell num ops-col-ltl">Loss to Lease</div>
-            <div className="ops-cell ops-header-cell num ops-col-post">Rent / Mo</div>
-            <div className="ops-cell ops-header-cell num ops-col-reno">Annual</div>
+            {[
+              { label: 'Revenue', idx: 0, cls: '' },
+              { label: 'Units', idx: 1, cls: 'num' },
+              { label: 'Rent/Mo', idx: 2, cls: 'num' },
+              { label: 'Annual', idx: 3, cls: 'num' },
+              { label: '$/SF', idx: 4, cls: 'num' },
+              ...(!hideLossToLease ? [{ label: 'Loss to Lease', idx: 5, cls: 'num ops-col-ltl' }] : []),
+              ...(!hidePR ? [
+                { label: 'Rent / Mo', idx: 6, cls: 'num ops-col-post' },
+                { label: 'Annual', idx: 7, cls: 'num ops-col-reno' },
+              ] : []),
+            ].map(({ label, idx, cls }) => (
+              <div key={idx} className={`ops-cell ops-header-cell ${cls}`} style={{ position: 'relative' }}>
+                {label}
+                <div
+                  className="ops-col-resize-handle"
+                  onMouseDown={(e) => handleResizeStart(idx, e)}
+                />
+              </div>
+            ))}
           </div>
 
           {rentalRows.map((row) => {

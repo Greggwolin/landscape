@@ -368,6 +368,7 @@ export function createFolderConfig(
       subTabs: filterSubtabsByType(
         [
           { id: 'summary', label: 'Summary' },
+          { id: 'rent_schedule', label: 'Rent Schedule', projectTypes: ['multifamily'] },
           { id: 'export', label: 'Export' },
           { id: 'investment_committee', label: 'IC Review', hideForPurpose: ['VALUATION'] as AnalysisPurposeCode[] },
         ],

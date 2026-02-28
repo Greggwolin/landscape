@@ -344,7 +344,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               }}
             >
               <DropZoneWrapper className="project-folder-content-wrapper">
-                <div className="project-folder-content" data-subtab={currentTab}>
+                <div className="project-folder-content" data-subtab={currentTab} style={{ paddingTop: 0 }}>
                   {children}
                 </div>
               </DropZoneWrapper>

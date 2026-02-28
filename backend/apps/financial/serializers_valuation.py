@@ -750,6 +750,11 @@ class IncomeApproachSerializer(serializers.ModelSerializer):
             'stabilized_vacancy_rate',
             'cap_rate_interval',
             'discount_rate_interval',
+            # Band of Investment (Migration 20260227)
+            'band_mortgage_ltv',
+            'band_mortgage_rate',
+            'band_amortization_years',
+            'band_equity_dividend_rate',
             # Related
             'cap_rate_comps',
             'created_at',

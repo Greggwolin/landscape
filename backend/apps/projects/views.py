@@ -12,7 +12,10 @@ from django.db.models import Sum, F, DecimalField
 from django.db.models.functions import Coalesce
 from django.db import connection
 from decimal import Decimal
+import logging
 import math
+
+logger = logging.getLogger(__name__)
 
 from .models import Project, AnalysisTypeConfig, AnalysisDraft
 from .serializers import (
@@ -78,6 +81,79 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return ProjectListSerializer
         return ProjectSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/projects/:id/
+
+        Hard-deletes a project. Accepts optional JSON body:
+        {
+            "transfer_documents_to_platform": true
+        }
+
+        If transfer_documents_to_platform is true, all eligible project
+        documents are ingested into platform knowledge before deletion.
+        CASCADE handles cleanup of project-scoped data (docs, assertions,
+        extractions, snapshots). Knowledge entities/facts survive since
+        they have no project FK.
+        """
+        project = self.get_object()
+        project_name = project.project_name
+        project_id = project.project_id
+
+        # Parse optional body — DRF doesn't parse body on DELETE by default
+        transfer_docs = False
+        try:
+            import json
+            body = json.loads(request.body) if request.body else {}
+            transfer_docs = body.get('transfer_documents_to_platform', False)
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        transfer_summary = None
+        if transfer_docs:
+            try:
+                from apps.knowledge.services.document_transfer_service import (
+                    transfer_project_documents_to_platform,
+                )
+                transfer_summary = transfer_project_documents_to_platform(project_id)
+                logger.info(
+                    'Document transfer complete for project %s (%s): %s transferred, %s failed, %s skipped',
+                    project_name,
+                    project_id,
+                    transfer_summary['transferred'],
+                    transfer_summary['failed'],
+                    transfer_summary['skipped'],
+                )
+            except Exception as exc:
+                logger.exception(
+                    'Document transfer failed for project %s (%s)',
+                    project_name,
+                    project_id,
+                )
+                return Response(
+                    {
+                        'error': f'Document transfer failed: {str(exc)}. Project was NOT deleted.',
+                        'project_id': project_id,
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # Hard-delete — CASCADE handles all project-scoped data
+        project.delete()
+
+        logger.info('Project "%s" (id=%s) permanently deleted.', project_name, project_id)
+
+        # Return 200 with summary instead of 204 so caller gets transfer details
+        return Response(
+            {
+                'deleted': True,
+                'project_id': project_id,
+                'project_name': project_name,
+                'transfer_summary': transfer_summary,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=['get'])
     def containers(self, request, pk=None):

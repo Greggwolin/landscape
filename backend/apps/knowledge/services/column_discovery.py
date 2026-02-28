@@ -908,29 +908,15 @@ def apply_column_mapping(
             'created': created,
         })
 
-    # Create Section 8 boolean flag column if requested
+    # Section 8 native field mapping — writes directly to tbl_multifamily_unit.is_section8
+    # instead of creating a dynamic column definition.
+    section8_native_mapping = None
     if section8_source_column:
-        sec8_key = 'is_section_8'
-        sec8_def, sec8_created = DynamicColumnDefinition.objects.get_or_create(
-            project_id=project_id,
-            table_name='multifamily_unit',
-            column_key=sec8_key,
-            defaults={
-                'display_label': 'Section 8',
-                'data_type': 'boolean',
-                'source': 'user',
-                'is_proposed': False,
-                'proposed_from_document_id': document_id,
-            }
-        )
-        created_columns.append({
-            'id': sec8_def.id,
-            'column_key': sec8_key,
-            'display_label': 'Section 8',
+        section8_native_mapping = {
             'source_column': section8_source_column,
-            'created': sec8_created,
-            'is_section_8_flag': True,
-        })
+            'native_field': 'is_section8',
+            'companion_fields': ['section8_contract_date', 'section8_contract_rent'],
+        }
 
     # Check for existing active job for this document
     existing_job = ExtractionJob.objects.filter(
@@ -958,6 +944,7 @@ def apply_column_mapping(
             'dynamic_columns': [c for c in created_columns],
             'skipped_columns': skipped_columns,
             **(({'section8_source_column': section8_source_column} if section8_source_column else {})),
+            **(({'section8_native_mapping': section8_native_mapping} if section8_native_mapping else {})),
         }
     )
 
@@ -1025,6 +1012,16 @@ def apply_column_mapping(
                         job.result_summary['auto_committed'] = True
                         job.result_summary['units_committed'] = commit_result.get('units_affected', 0)
                         job.result_summary['snapshot_id'] = commit_result.get('snapshot_id')
+
+                        # Check for Section 8 units after commit
+                        from apps.multifamily.models import MultifamilyUnit as MU
+                        sec8_count = MU.objects.filter(
+                            project_id=proj_id, is_section8=True
+                        ).count()
+                        if sec8_count > 0:
+                            job.result_summary['section8_units_detected'] = True
+                            job.result_summary['section8_count'] = sec8_count
+
                         job.save()
                         logger.info(
                             f"[async_extraction] Auto-committed {commit_result.get('units_affected', 0)} units "
@@ -1070,6 +1067,8 @@ def apply_column_mapping(
             if is_initial_load
             else 'Extraction started. Changes will be staged for review.'
         ),
+        **(({'section8_native_mapping': True, 'section8_source_column': section8_source_column}
+            if section8_native_mapping else {})),
     }
 
 
@@ -1406,10 +1405,20 @@ def analyze_unmapped_columns_for_dynamic(
 
                 if detected_flags.get('section_8', 0) > 0:
                     column_offer['proposed_columns'].append({
-                        'key': 'is_section_8',
+                        'key': 'is_section8',
                         'label': 'Section 8',
                         'data_type': 'boolean',
-                        'description': f"Yes/No flag ({detected_flags['section_8']} units have Section 8)",
+                        'suggestion': 'map_native',
+                        'native_field': 'is_section8',
+                        'companion_fields': [
+                            'section8_contract_date',
+                            'section8_contract_rent',
+                        ],
+                        'description': (
+                            f"Yes/No flag ({detected_flags['section_8']} units have Section 8). "
+                            f"Maps to built-in Section 8 fields — also unlocks contract date "
+                            f"and contract rent columns in the rent roll."
+                        ),
                     })
                 if detected_flags.get('payment_plan', 0) > 0:
                     column_offer['proposed_columns'].append({
@@ -1734,10 +1743,11 @@ def format_discovery_for_chat(discovery_result: dict) -> str:
         if has_sec8:
             parts.append(
                 f"❓ {name} → Contains mixed values including 'Sec. 8' indicators.\n"
+                f"   Section 8 maps to a built-in field (not a dynamic column).\n"
                 f"   I can:\n"
-                f"   (1) Create a 'Section 8' boolean flag (Y/N) extracted from this column\n"
-                f"   (2) Create a raw '{name}' text column with the full value\n"
-                f"   (3) Both — Section 8 flag + {name} column\n"
+                f"   (1) Map Section 8 to the native is_section8 field — also unlocks S8 Contract Date and S8 Contract Rent in the rent roll grid\n"
+                f"   (2) Additionally create a raw '{name}' text column for the full value\n"
+                f"   (3) Skip — do not extract Section 8 status\n"
                 f"   What would you like?"
             )
 

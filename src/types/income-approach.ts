@@ -110,6 +110,12 @@ export interface IncomeApproachAssumptions {
   market_cap_rate_method: CapRateMethod;
   cap_rate_justification: string;
 
+  // Band of Investment (editable, shown when method = band_investment)
+  band_mortgage_ltv: number | null;
+  band_mortgage_rate: number | null;
+  band_amortization_years: number | null;
+  band_equity_dividend_rate: number | null;
+
   // DCF Parameters (all editable)
   hold_period_years: number;
   terminal_cap_rate: number;

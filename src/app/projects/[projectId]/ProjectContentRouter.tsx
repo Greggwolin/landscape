@@ -39,6 +39,7 @@ import { MapTab } from '@/components/map-tab';
 import { ICPage } from '@/components/ic/ICPage';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import IntelligenceTab from '@/components/intelligence/IntelligenceTab';
+import { RentScheduleReport } from '@/components/reports/RentScheduleReport';
 
 interface Project {
   project_id: number;
@@ -258,6 +259,8 @@ function ProjectContentRouter({
         switch (currentTab) {
           case 'summary':
             return <ReportsTab project={project} />;
+          case 'rent_schedule':
+            return <RentScheduleReport projectId={project.project_id} />;
           case 'export':
             return <ComingSoon folder="reports" tab="export" icon="📤" />;
           case 'investment_committee':

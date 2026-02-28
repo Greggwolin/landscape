@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { CAlert, CButton, CSpinner } from '@coreui/react';
 import type {
   UnitCostCategoryReference,
   UnitCostCategoryHierarchy,
@@ -448,36 +449,35 @@ export default function UnitCostCategoryManager() {
 
   if (isLoading) {
     return (
-      <div className="category-manager-loading">
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <p className="mt-3 text-muted">Loading category taxonomy...</p>
+      <div className="d-flex flex-column align-items-center justify-content-center py-5">
+        <CSpinner />
+        <p className="mt-3 text-medium-emphasis mb-0">Loading category taxonomy...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="category-manager-error">
-        <div className="alert alert-danger" role="alert">
-          <h5 className="alert-heading">Error Loading Categories</h5>
-          <p>{error}</p>
-          <button className="btn btn-sm btn-outline-danger mt-2" onClick={loadData}>
+      <div className="py-2">
+        <CAlert color="danger" className="mb-0">
+          <h6 className="alert-heading mb-2">Error Loading Categories</h6>
+          <p className="mb-2">{error}</p>
+          <CButton color="danger" variant="outline" size="sm" onClick={loadData}>
             Retry
-          </button>
-        </div>
+          </CButton>
+        </CAlert>
       </div>
     );
   }
 
-  const rightPanelWidth = 100 - leftPanelWidth - middlePanelWidth;
-
   return (
-    <div className="unit-cost-category-manager">
-      <div className="manager-content">
+    <div
+      className="d-flex flex-column border rounded overflow-hidden"
+      style={{ minHeight: 560, backgroundColor: 'var(--cui-card-bg)', borderColor: 'var(--cui-border-color)' }}
+    >
+      <div className="d-flex flex-grow-1 overflow-hidden">
         {/* Column 1: Lifecycle Stage Filter */}
-        <div style={{ width: `${leftPanelWidth}%`, flexShrink: 0 }}>
+        <div className="h-100" style={{ width: `${leftPanelWidth}%`, flexShrink: 0 }}>
           <ActivityFilter
             stages={LIFECYCLE_STAGES}
             selectedStages={selectedStages}
@@ -490,7 +490,6 @@ export default function UnitCostCategoryManager() {
 
         {/* Left Resizer */}
         <div
-          className="column-resizer"
           style={{
             width: '4px',
             flexShrink: 0,
@@ -519,7 +518,7 @@ export default function UnitCostCategoryManager() {
         </div>
 
         {/* Column 2: Category Tree */}
-        <div style={{ width: `${middlePanelWidth}%`, flexShrink: 0 }}>
+        <div className="h-100" style={{ width: `${middlePanelWidth}%`, flexShrink: 0 }}>
           <CategoryTree
             categories={categoryHierarchy}
             selectedCategory={selectedCategory}
@@ -533,7 +532,6 @@ export default function UnitCostCategoryManager() {
 
         {/* Right Resizer */}
         <div
-          className="column-resizer"
           style={{
             width: '4px',
             flexShrink: 0,
@@ -562,7 +560,7 @@ export default function UnitCostCategoryManager() {
         </div>
 
         {/* Column 3: Category Detail Panel */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="h-100" style={{ flex: 1, minWidth: 0 }}>
           <CategoryDetailPanel
             category={selectedCategory}
             allCategories={categories}

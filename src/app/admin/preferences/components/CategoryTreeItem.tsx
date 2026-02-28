@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ChevronRight, ChevronDown, Plus } from 'lucide-react';
+import { CBadge, CButton } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import type { UnitCostCategoryHierarchy, UnitCostCategoryReference } from '@/types/benchmarks';
 import { LIFECYCLE_STAGE_ICONS } from './lifecycle-icons';
@@ -18,6 +19,18 @@ interface CategoryTreeItemProps {
   parentName?: string;
 }
 
+const STAGE_COLORS: Record<string, 'success' | 'info' | 'primary' | 'warning' | 'danger' | 'secondary'> = {
+  Acquisition: 'success',
+  'Planning & Engineering': 'info',
+  Improvements: 'primary',
+  Development: 'primary',
+  Operations: 'info',
+  Disposition: 'warning',
+  Financing: 'danger',
+};
+
+const stageColor = (stage: string) => STAGE_COLORS[stage] || 'secondary';
+
 export default function CategoryTreeItem({
   category,
   selectedCategory,
@@ -32,6 +45,8 @@ export default function CategoryTreeItem({
   const hasChildren = category.children.length > 0;
   const isExpanded = expandedCategories.has(category.category_id);
   const isSelected = selectedCategory?.category_id === category.category_id;
+  const primaryStage = category.activitys[0];
+  const primaryTone = primaryStage ? `var(--cui-${stageColor(primaryStage)})` : 'var(--cui-primary)';
 
   const handleClick = () => {
     onSelectCategory({
@@ -70,13 +85,30 @@ export default function CategoryTreeItem({
   };
 
   return (
-    <div className="category-tree-item">
+    <div>
       <div
-        className={`tree-item-row ${isSelected ? 'selected' : ''}`}
-        style={{ paddingLeft: `${depth * 20 + 12}px` }}
+        className="d-flex align-items-center gap-2 border rounded px-2 py-2"
+        style={{
+          marginLeft: `${depth * 16}px`,
+          backgroundColor: isSelected
+            ? `color-mix(in srgb, ${primaryTone} 16%, var(--cui-body-bg))`
+            : 'var(--cui-body-bg)',
+          borderStyle: 'solid',
+          borderWidth: 1,
+          borderColor: isSelected ? primaryTone : 'var(--cui-border-color)',
+          borderLeftWidth: 3,
+          borderLeftColor: primaryTone,
+          cursor: 'pointer',
+        }}
         onClick={handleClick}
       >
-        <div className="tree-item-expand" onClick={handleToggle}>
+        <button
+          type="button"
+          className="btn btn-sm p-0 border-0 d-inline-flex align-items-center justify-content-center"
+          style={{ width: 16, height: 16, color: 'var(--cui-secondary-color)' }}
+          onClick={handleToggle}
+          aria-label={isExpanded ? 'Collapse' : 'Expand'}
+        >
           {hasChildren ? (
             isExpanded ? (
               <ChevronDown size={16} />
@@ -84,52 +116,53 @@ export default function CategoryTreeItem({
               <ChevronRight size={16} />
             )
           ) : (
-            <span style={{ width: 16, display: 'inline-block' }} />
+            <span style={{ width: 16, display: 'inline-block' }} aria-hidden />
+          )}
+        </button>
+
+        <div className="d-flex align-items-center flex-wrap gap-2 flex-grow-1 min-w-0">
+          {category.activitys.length > 0 && (
+            <span
+              className="d-inline-flex align-items-center justify-content-center"
+              style={{ color: primaryTone }}
+            >
+                <CIcon icon={LIFECYCLE_STAGE_ICONS[category.activitys[0]]} size="sm" />
+            </span>
+          )}
+          <span className="fw-semibold text-truncate">{category.category_name}</span>
+          {category.tags.slice(0, 2).map((tag) => (
+            <CBadge key={tag} color="secondary" shape="rounded-pill">
+              {tag}
+            </CBadge>
+          ))}
+          {category.tags.length > 2 && (
+            <CBadge color="light" shape="rounded-pill">
+              +{category.tags.length - 2}
+            </CBadge>
           )}
         </div>
 
-        <div className="tree-item-content">
-          <div className="tree-item-header">
-            {category.activitys.length > 0 && (
-              <span className="tree-item-lifecycle-icon">
-                <CIcon icon={LIFECYCLE_STAGE_ICONS[category.activitys[0]]} size="sm" />
-              </span>
-            )}
-            <span className="tree-item-name">{category.category_name}</span>
-            {category.tags.length > 0 && (
-              <div className="tree-item-tags">
-                {category.tags.slice(0, 2).map((tag) => (
-                  <span key={tag} className="tag-badge">
-                    {tag}
-                  </span>
-                ))}
-                {category.tags.length > 2 && (
-                  <span className="tag-badge-more">+{category.tags.length - 2}</span>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="tree-item-meta">
+        <div className="d-flex align-items-center gap-1">
           {category.activitys.map((stage) => (
-            <span key={stage} className="lifecycle-badge" data-stage={stage}>
+            <CBadge key={stage} color={stageColor(stage)} shape="rounded-pill" title={stage}>
               {stage.charAt(0)}
-            </span>
+            </CBadge>
           ))}
         </div>
 
-        <button
-          className="btn btn-sm btn-success tree-item-add-sub"
+        <CButton
+          color="primary"
+          variant="ghost"
+          size="sm"
           onClick={handleAddSubcategory}
           title="Add Subcategory"
         >
           <Plus size={14} />
-        </button>
+        </CButton>
       </div>
 
       {hasChildren && isExpanded && (
-        <div className="tree-item-children">
+        <div className="mt-1 d-flex flex-column gap-1">
           {category.children.map((child) => (
             <CategoryTreeItem
               key={child.category_id}

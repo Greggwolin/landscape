@@ -181,27 +181,32 @@ export const newProjectSchema = z.object({
     }
 
     if (propertyCategory === 'Land Development') {
-      const siteArea = Number(data.site_area)
-      if (Number.isNaN(siteArea) || siteArea <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Site area is required for land development',
-          path: ['site_area']
-        })
+      // Site area is optional at creation (napkin mode) — validate positive if provided
+      if (data.site_area) {
+        const siteArea = Number(data.site_area)
+        if (Number.isNaN(siteArea) || siteArea < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Site area must be a positive number',
+            path: ['site_area']
+          })
+        }
       }
 
-      if (data.scale_input_method === 'units') {
+      // Scale fields only required when explicitly choosing units/density method
+      // 'later' and empty site_area skip these checks entirely
+      if (data.scale_input_method === 'units' && data.site_area) {
         const value = Number(data.total_lots_units)
         if (Number.isNaN(value) || value <= 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: 'Enter total lots/units or choose another method',
+            message: 'Enter total lots/units or choose "I\'ll add this later"',
             path: ['total_lots_units']
           })
         }
       }
 
-      if (data.scale_input_method === 'density') {
+      if (data.scale_input_method === 'density' && data.site_area) {
         const value = Number(data.density)
         if (Number.isNaN(value) || value <= 0) {
           ctx.addIssue({

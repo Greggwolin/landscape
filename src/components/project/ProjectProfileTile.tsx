@@ -28,6 +28,7 @@ import { useFieldRefreshListener } from '@/hooks/useFieldRefresh';
 import ProjectPhotosModal from './ProjectPhotosModal';
 import { useQuery } from '@tanstack/react-query';
 import { PERSPECTIVE_LABELS, PURPOSE_LABELS } from '@/types/project-taxonomy';
+import { getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 
 // Acquisition price summary types
 interface AcquisitionPriceSummary {
@@ -204,9 +205,9 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             {/* Line 1: Property Type | Subtype */}
             <ProfileField
               label="Property Type"
-              value={profile.project_type || profile.project_type_code}
+              value={getPropertyTypeLabel(profile.project_type_code || profile.project_type)}
             />
-            <ProfileField label="Subtype" value={profile.property_subtype} />
+            <ProfileField label="Subtype" value={getPropertyTypeLabel(profile.property_subtype)} />
 
             {/* Line 2: Project Name | Address */}
             <ProfileField label="Project Name" value={profile.project_name} />

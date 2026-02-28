@@ -1,7 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import {
+  CAlert,
+  CButton,
+  CFormCheck,
+  CFormInput,
+  CFormLabel,
+  CFormSelect,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
+} from '@coreui/react';
 import type {
   UnitCostCategoryReference,
   CategoryTag,
@@ -109,181 +121,146 @@ export default function AddCategoryModal({
   );
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-dialog modal-lg" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">Add New Category</h5>
-            <button className="btn-close" onClick={onClose} aria-label="Close">
-              <X size={20} />
-            </button>
+    <CModal visible onClose={onClose} size="lg" backdrop="static" alignment="center">
+      <CModalHeader closeButton>
+        <CModalTitle>Add New Category</CModalTitle>
+      </CModalHeader>
+      <form onSubmit={handleSubmit}>
+        <CModalBody>
+          <div className="mb-3">
+            <CFormLabel>
+              Category Name <span className="text-danger">*</span>
+            </CFormLabel>
+            <CFormInput
+              invalid={Boolean(formErrors.category_name)}
+              value={formData.category_name}
+              onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
+              placeholder="Enter category name"
+              autoFocus
+            />
+            {formErrors.category_name && (
+              <div className="invalid-feedback d-block">{formErrors.category_name}</div>
+            )}
           </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body">
-              {/* Category Name */}
-              <div className="mb-3">
-                <label className="form-label">
-                  Category Name <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  className={`form-control ${formErrors.category_name ? 'is-invalid' : ''}`}
-                  value={formData.category_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category_name: e.target.value })
-                  }
-                  placeholder="Enter category name"
-                  autoFocus
+          <div className="mb-3">
+            <CFormLabel>
+              Lifecycle Stages <span className="text-danger">*</span>
+            </CFormLabel>
+            <div className="d-flex flex-wrap gap-3">
+              {LIFECYCLE_STAGES.map((stage) => (
+                <CFormCheck
+                  key={stage}
+                  id={`add-stage-${stage}`}
+                  label={stage}
+                  checked={formData.activitys.includes(stage)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setFormData({
+                        ...formData,
+                        activitys: [...formData.activitys, stage],
+                      });
+                    } else {
+                      setFormData({
+                        ...formData,
+                        activitys: formData.activitys.filter((s) => s !== stage),
+                        parent_id: null,
+                      });
+                    }
+                  }}
                 />
-                {formErrors.category_name && (
-                  <div className="invalid-feedback">{formErrors.category_name}</div>
-                )}
-              </div>
+              ))}
+            </div>
+            {formErrors.activitys && (
+              <div className="text-danger small mt-1">{formErrors.activitys}</div>
+            )}
+            <small className="text-medium-emphasis">
+              Select all lifecycle stages this category applies to
+            </small>
+          </div>
 
-              {/* Lifecycle Stages */}
-              <div className="mb-3">
-                <label className="form-label">
-                  Lifecycle Stages <span className="text-danger">*</span>
-                </label>
-                <div className="lifecycle-stages-checkboxes">
-                  {LIFECYCLE_STAGES.map((stage) => (
-                    <div key={stage} className="form-check">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
-                        id={`add-stage-${stage}`}
-                        checked={formData.activitys.includes(stage)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({
-                              ...formData,
-                              activitys: [...formData.activitys, stage],
-                            });
-                          } else {
-                            setFormData({
-                              ...formData,
-                              activitys: formData.activitys.filter((s) => s !== stage),
-                              parent_id: null, // Reset parent when stages change
-                            });
-                          }
-                        }}
+          <div className="mb-3">
+            <CFormLabel>Parent Category (Optional)</CFormLabel>
+            <CFormSelect
+              value={formData.parent_id || ''}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  parent_id: e.target.value ? parseInt(e.target.value, 10) : null,
+                })
+              }
+            >
+              <option value="">None (Top Level)</option>
+              {availableParents.map((cat) => (
+                <option key={cat.category_id} value={cat.category_id}>
+                  {cat.category_name}
+                </option>
+              ))}
+            </CFormSelect>
+            <small className="text-medium-emphasis">
+              Parent must share at least one lifecycle stage
+            </small>
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel>Tags</CFormLabel>
+            {relevantTags.length === 0 ? (
+              <p className="text-medium-emphasis mb-0">
+                No tags available for the selected lifecycle stages
+              </p>
+            ) : (
+              <div className="d-flex flex-wrap gap-2">
+                {relevantTags.map((tag) => {
+                  const isSelected = formData.tags.includes(tag.tag_name);
+                  return (
+                    <button
+                      key={tag.tag_id}
+                      type="button"
+                      className="btn btn-sm p-0 border-0 bg-transparent"
+                      onClick={() => toggleTag(tag.tag_name)}
+                      title={tag.description || tag.tag_name}
+                    >
+                      <SemanticBadge
+                        intent="user-tag"
+                        value={tag.tag_name}
+                        userTagState={isSelected ? 'filled' : 'outline'}
+                        className="tag-chip-label"
                       />
-                      <label className="form-check-label" htmlFor={`add-stage-${stage}`}>
-                        {stage}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {formErrors.activitys && (
-                  <div className="text-danger small mt-1">{formErrors.activitys}</div>
-                )}
-                <small className="form-text text-muted">
-                  Select all lifecycle stages this category applies to
-                </small>
+                    </button>
+                  );
+                })}
               </div>
+            )}
+            {formData.tags.length > 0 && (
+              <small className="text-medium-emphasis d-block mt-1">
+                Selected: {formData.tags.join(', ')}
+              </small>
+            )}
+          </div>
 
-              {/* Parent Category (Optional) */}
-              <div className="mb-3">
-                <label className="form-label">Parent Category (Optional)</label>
-                <select
-                  className="form-select"
-                  value={formData.parent_id || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      parent_id: e.target.value ? parseInt(e.target.value) : null,
-                    })
-                  }
-                >
-                  <option value="">None (Top Level)</option>
-                  {availableParents.map((cat) => (
-                    <option key={cat.category_id} value={cat.category_id}>
-                      {cat.category_name}
-                    </option>
-                  ))}
-                </select>
-                <small className="form-text text-muted">
-                  Parent must share at least one lifecycle stage
-                </small>
-              </div>
+          <div className="mb-3">
+            <CFormLabel>Sort Order</CFormLabel>
+            <CFormInput
+              type="number"
+              value={formData.sort_order}
+              onChange={(e) =>
+                setFormData({ ...formData, sort_order: parseInt(e.target.value, 10) || 0 })
+              }
+            />
+            <small className="text-medium-emphasis">Lower numbers appear first in the list</small>
+          </div>
 
-              {/* Tags */}
-              <div className="mb-3">
-                <label className="form-label">Tags</label>
-                <div className="tags-selection">
-                  {relevantTags.length === 0 ? (
-                    <p className="text-muted">No tags available for the selected lifecycle stages</p>
-                  ) : (
-                    <div className="tags-chip-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
-                      {relevantTags.map((tag) => {
-                        const isSelected = formData.tags.includes(tag.tag_name);
-                        return (
-                      <button
-                        key={tag.tag_id}
-                        type="button"
-                        className={`tag-chip ${isSelected ? 'filled' : 'outline'}`}
-                        onClick={() => toggleTag(tag.tag_name)}
-                        title={tag.description || tag.tag_name}
-                      >
-                        <SemanticBadge
-                          intent="user-tag"
-                          value={tag.tag_name}
-                          userTagState={isSelected ? 'filled' : 'outline'}
-                          className="tag-chip-label"
-                        />
-                      </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                {formData.tags.length > 0 && (
-                  <small className="form-text text-muted">
-                    Selected: {formData.tags.join(', ')}
-                  </small>
-                )}
-              </div>
-
-              {/* Sort Order */}
-              <div className="mb-3">
-                <label className="form-label">Sort Order</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={formData.sort_order}
-                  onChange={(e) =>
-                    setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })
-                  }
-                />
-                <small className="form-text text-muted">
-                  Lower numbers appear first in the list
-                </small>
-              </div>
-
-              {formErrors.submit && (
-                <div className="alert alert-danger" role="alert">
-                  {formErrors.submit}
-                </div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onClose}
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                {isSaving ? 'Creating...' : 'Create Category'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          {formErrors.submit && <CAlert color="danger" className="mb-0">{formErrors.submit}</CAlert>}
+        </CModalBody>
+        <CModalFooter>
+          <CButton type="button" color="secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </CButton>
+          <CButton type="submit" color="primary" disabled={isSaving}>
+            {isSaving ? 'Creating...' : 'Create Category'}
+          </CButton>
+        </CModalFooter>
+      </form>
+    </CModal>
   );
 }

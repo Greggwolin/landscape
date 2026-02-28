@@ -30,6 +30,7 @@ from .views_instructions import (
     KpiDefinitionByTypeView,
 )
 from .views_help import HelpChatView
+from .views_debug import debug_test_tool
 from .views import (
     IntakeStartView,
     IntakeMappingSuggestionsView,
@@ -383,5 +384,12 @@ urlpatterns = [
         'landscaper/overrides/<int:override_id>/revert/',
         OverrideRevertView.as_view(),
         name='landscaper-override-revert'
+    ),
+
+    # ── TEMPORARY: Debug tool test endpoint (remove after P2 testing) ──
+    path(
+        'landscaper/debug/test-tool/',
+        debug_test_tool,
+        name='landscaper-debug-test-tool'
     ),
 ]

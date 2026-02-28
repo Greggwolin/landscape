@@ -34,6 +34,7 @@ from .media_views import (
     reset_document_media,
     lookup_items,
 )
+from .extraction_views import extract_for_project, persist_extraction
 from .api.corrections import ExtractionReviewViewSet
 from .api.section_detection import DocumentSectionViewSet
 from .tag_views import (
@@ -83,6 +84,10 @@ urlpatterns = [
     path('media/links/<int:link_id>/', delete_media_link, name='delete_media_link'),
     path('media/links/reorder/', reorder_media_links, name='reorder_media_links'),
     path('media/available/', available_media, name='available_media'),
+    # AI extraction for new-project flow (bypasses Next.js body-size limits)
+    path('extract-for-project/', extract_for_project, name='extract_for_project'),
+    # Persist extraction results after document upload
+    path('persist-extraction/', persist_extraction, name='persist_extraction'),
     # Tag management endpoints
     path('tags/', tag_list, name='dms_tag_list'),
     path('tags/<int:tag_id>/', tag_detail, name='dms_tag_detail'),

@@ -16,6 +16,7 @@ import { usePersistentForm, clearPersistedForm } from './new-project/usePersiste
 import { generateProjectName } from './new-project/utils'
 import { CButton } from '@coreui/react'
 import { X } from 'lucide-react'
+import { useTheme } from './CoreUIThemeProvider'
 import {
   deriveLegacyAnalysisType,
   type AnalysisPerspective,
@@ -132,6 +133,8 @@ const getSectionForField = (fieldName: string): SectionKey | undefined => {
 const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps) => {
   const router = useRouter()
   const { refreshProjects, selectProject } = useProjectContext()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
   // Debug logging
   console.log('[NewProjectModal] Rendered with:', {
@@ -180,6 +183,8 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   const [invalidSections, setInvalidSections] = useState<SectionKey[]>([])
   const [extractedFieldKeys, setExtractedFieldKeys] = useState<Set<string>>(new Set())
   const [pendingDocuments, setPendingDocuments] = useState<File[]>([])
+  // Cache extraction results per filename so they can be persisted at upload time
+  const extractionResultsCache = useRef<Record<string, ExtractedFields>>({})
 
   // DMS Template selection
   const [dmsTemplates, setDmsTemplates] = useState<Array<{ template_id: number; template_name: string; description: string | null; is_default: boolean }>>([])
@@ -309,6 +314,11 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     console.log('[handleDocumentExtracted] Received fields:', fields)
     console.log('[handleDocumentExtracted] File:', file.name)
 
+    // Cache extraction results for persistence at upload time
+    if (fields && Object.keys(fields).length > 0) {
+      extractionResultsCache.current[file.name] = fields
+    }
+
     // Store the file for DMS ingestion after project creation
     setPendingDocuments(prev => {
       // Avoid duplicates by checking filename
@@ -377,6 +387,11 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         if (!formData.analysis_purpose) {
           setValue('analysis_purpose', 'UNDERWRITING', { shouldDirty: true, shouldValidate: true })
           updatedKeys.add('analysis_purpose')
+        }
+        // Auto-set scale to 'later' if extraction didn't find site_area/total_lots
+        if (!fields.site_area?.value && !fields.total_lots_units?.value) {
+          setValue('scale_input_method', 'later', { shouldDirty: true, shouldValidate: true })
+          updatedKeys.add('scale_input_method')
         }
       }
     } else if (fields.total_units?.value) {
@@ -797,6 +812,12 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         dmsFormData.append('doc_type', docType)
         dmsFormData.append('run_full_extraction', 'true')
 
+        // Pass cached extraction results for persistence in doc_extracted_facts
+        const cachedResults = extractionResultsCache.current[doc.name]
+        if (cachedResults) {
+          dmsFormData.append('extraction_results', JSON.stringify(cachedResults))
+        }
+
         console.log(`[handleCreationSuccess] Starting upload: ${doc.name} as ${docType}`)
 
         const response = await fetch('/api/dms/upload', {
@@ -826,6 +847,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     selectProject(projectId)
     resetFormState()
     setPendingDocuments([])
+    extractionResultsCache.current = {}
     onClose()
     router.push(`/projects/${projectId}`)
   }
@@ -1491,7 +1513,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               analysisType={propertyCategory} // Pass property category for extraction context
               formData={formData}
               onDocumentExtracted={handleDocumentExtracted}
-              isDark={false}
+              isDark={isDark}
               initialFiles={initialFiles}
             />
           </div>

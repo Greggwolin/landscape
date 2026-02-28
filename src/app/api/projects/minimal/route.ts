@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
       ) VALUES (
         ${body.project_name},
         ${body.project_type_code},
-        ${body.property_subtype || body.development_type || null},
+        ${body.project_type_code || body.property_subtype || body.development_type || null},
         ${legacyAnalysisType},
         ${analysisPerspective},
         ${analysisPurpose},

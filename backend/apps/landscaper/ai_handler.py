@@ -849,6 +849,13 @@ mutations to any writable field — all without the user navigating away from {c
 When the user asks about data on a different tab, fetch it directly. Do NOT say
 "navigate to the Operations tab" or "switch to the Valuation page." You can access
 everything from here.
+
+CONTEXT-AWARE RESPONSES:
+When the user asks about UI elements like "what does this field do?" or "what does
+the Method input do?", assume they are referring to the current page ({current_tab}).
+Answer in that context — do not ask for clarification about which page or tab they mean.
+For example, on the valuation/income approach page, "Method" refers to the cap rate
+derivation method (Comp Sales, Band of Investment, Investor Survey).
 """
 
 
@@ -1166,11 +1173,12 @@ Call analyze_rent_roll_columns with the document_id. Then present results in a S
   AUTO-MAPPED: Unit, Tenant, Status, Sqft, Rent, Lease From, Lease To (checkmark each)
   SPLIT: BD/BA → Beds (integer) + Baths (decimal). Plan auto-derives. No manual mapping needed.
   AMBIGUOUS: [List any columns needing user decision, with sample values]
-  NON-STANDARD: [Dynamic column candidates — e.g., "Delinquent Rent → currency column", "Section 8 → yes/no"]
+  NON-STANDARD: [Dynamic column candidates — e.g., "Delinquent Rent → currency column"]
+  NATIVE FIELDS: [Built-in fields detected — e.g., "Section 8 → maps to native is_section8 field (also unlocks S8 Contract Date and S8 Contract Rent)"]
   SKIP SUGGESTED: [Computed totals or summary columns recommended to skip]
 
   OPTIONS:
-  A) [recommended — e.g., "Create Delinquency and Sec 8 columns, skip Sept Total"]
+  A) [recommended — e.g., "Map Section 8 to native field, create Delinquency column, skip Sept Total"]
   B) [alternative]
   C) Let me customize
 
@@ -1179,7 +1187,7 @@ That's it. One message. Wait for user response. Do NOT extract yet.
 === PHASE 2 — MAPPING CONFIRMATION (user responds) ===
 
 Parse the user's natural language response into mapping decisions. Confirm in ONE sentence:
-"Got it. Creating Sec 8 and Delinquency columns, skipping Sept Total. Extracting now."
+"Got it. Mapping Section 8 to native field, creating Delinquency column, skipping Sept Total. Extracting now."
 
 Call confirm_column_mapping with the appropriate parameters. This triggers extraction.
 
@@ -1888,6 +1896,48 @@ def _build_project_context_message(project_context: Dict[str, Any]) -> str:
     return "\n".join(context_parts)
 
 
+def get_project_document_context(project_id: int) -> str:
+    """
+    Returns a brief document awareness string listing documents
+    uploaded to this project, for injection into Landscaper's system prompt.
+    Returns empty string if no documents found.
+    """
+    if not project_id:
+        return ''
+
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT doc_name, doc_type, created_at
+                FROM landscape.core_doc
+                WHERE project_id = %s
+                  AND deleted_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 20
+            """, [project_id])
+            rows = cursor.fetchall()
+
+        if not rows:
+            return ''
+
+        lines = [
+            "\n=== PROJECT DOCUMENTS ===",
+            "The following documents have been uploaded to this project and are available "
+            "for analysis. Use the get_document_content tool to retrieve their contents "
+            "when relevant to the user's questions:",
+        ]
+        for doc_name, doc_type, created_at in rows:
+            date_str = created_at.strftime('%Y-%m-%d') if created_at else 'unknown'
+            lines.append(f"- {doc_name} ({doc_type}, uploaded {date_str})")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.warning("Failed to load project document context: %s", e)
+        return ''
+
+
 def _get_anthropic_client() -> Optional[anthropic.Anthropic]:
     """Get Anthropic client, returns None if API key not configured."""
     api_key = None
@@ -2014,6 +2064,12 @@ def get_landscaper_response(
                 full_system += f"\n\n=== PROJECT DATA ===\n{rich_context}"
         except Exception as e:
             logger.warning(f"Failed to load rich project context: {e}")
+
+    # Document awareness — inject on every turn so Landscaper knows what's available
+    if project_id:
+        doc_context = get_project_document_context(project_id)
+        if doc_context:
+            full_system += doc_context
 
     # Platform knowledge — always injected (full-context agent, 2K token cap)
     last_user_message = _get_last_user_message(messages)

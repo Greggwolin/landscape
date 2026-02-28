@@ -112,6 +112,7 @@ function formatCompact(value: number): string {
 
 export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTreemapProps) {
   const [coreColors, setCoreColors] = useState<string[]>([]);
+  const [popup, setPopup] = useState<{ label: string; total: number; pct: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -170,12 +171,15 @@ export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTree
   return (
     <CCard>
       <CCardHeader style={{ padding: '0.5rem 0.75rem' }}>
-        <span className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--cui-body-color)' }}>
           Expenses by Category
         </span>
       </CCardHeader>
       <CCardBody style={{ padding: '0.5rem' }}>
-        <div style={{ position: 'relative', width: '100%', paddingBottom: `${(TREEMAP_H / TREEMAP_W) * 100}%` }}>
+        <div
+          style={{ position: 'relative', width: '100%', paddingBottom: `${(TREEMAP_H / TREEMAP_W) * 100}%` }}
+          onMouseLeave={() => setPopup(null)}
+        >
           <svg
             viewBox={`0 0 ${TREEMAP_W} ${TREEMAP_H}`}
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
@@ -196,17 +200,25 @@ export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTree
                     height={Math.max(rect.h - 2, 0)}
                     rx={3}
                     fill={color}
-                    style={{ cursor: 'default' }}
-                  >
-                    <title>{`${rect.label}: ${formatCompact(rect.total)} (${pct}%)`}</title>
-                  </rect>
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      const svgEl = e.currentTarget.closest('svg');
+                      if (!svgEl) return;
+                      const bounds = svgEl.getBoundingClientRect();
+                      setPopup({
+                        label: rect.label, total: rect.total, pct,
+                        x: bounds.left + (rect.x + rect.w / 2) * (bounds.width / TREEMAP_W),
+                        y: bounds.top + rect.y * (bounds.height / TREEMAP_H),
+                      });
+                    }}
+                  />
                   {showLabel && (
                     <text
-                      x={rect.x + 6}
-                      y={rect.y + 16}
+                      x={rect.x + 5}
+                      y={rect.y + 14}
                       fill="white"
-                      fontSize="11"
-                      fontWeight="600"
+                      fontSize="10.5"
+                      fontWeight="400"
                       style={{ pointerEvents: 'none' }}
                     >
                       {rect.label}
@@ -215,20 +227,21 @@ export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTree
                   {showDetails && (
                     <>
                       <text
-                        x={rect.x + 6}
-                        y={rect.y + rect.h - 16}
+                        x={rect.x + 5}
+                        y={rect.y + rect.h - 14}
                         fill="rgba(255,255,255,0.95)"
-                        fontSize="13"
-                        fontWeight="700"
+                        fontSize="11.5"
+                        fontWeight="500"
                         style={{ pointerEvents: 'none' }}
                       >
                         {formatCompact(rect.total)}
                       </text>
                       <text
-                        x={rect.x + 6}
-                        y={rect.y + rect.h - 4}
+                        x={rect.x + 5}
+                        y={rect.y + rect.h - 3}
                         fill="rgba(255,255,255,0.7)"
                         fontSize="9.5"
+                        fontWeight="400"
                         style={{ pointerEvents: 'none' }}
                       >
                         {pct}%
@@ -239,6 +252,28 @@ export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTree
               );
             })}
           </svg>
+          {popup && (
+            <div
+              style={{
+                position: 'fixed',
+                left: popup.x,
+                top: popup.y - 8,
+                transform: 'translate(-50%, -100%)',
+                background: 'var(--cui-body-bg, #fff)',
+                border: '1px solid var(--cui-border-color)',
+                borderRadius: '6px',
+                padding: '0.5rem 0.75rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                zIndex: 1000,
+                fontSize: '0.75rem',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: '2px' }}>{popup.label}</div>
+              <div>{formatCompact(popup.total)} ({popup.pct}%)</div>
+            </div>
+          )}
         </div>
         <div style={{
           marginTop: '0.5rem',

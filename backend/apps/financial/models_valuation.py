@@ -1259,6 +1259,27 @@ class IncomeApproach(models.Model):
         help_text='Interval for discount rate sensitivity (0.0050 = 50 bps)'
     )
 
+    # ==========================================================================
+    # BAND OF INVESTMENT FIELDS (Migration 20260227)
+    # Independent market assumptions for cap rate derivation — NOT from tbl_debt_facility
+    # ==========================================================================
+    band_mortgage_ltv = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Market LTV ratio (e.g. 0.65 = 65%)'
+    )
+    band_mortgage_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Market interest rate (e.g. 0.065 = 6.5%)'
+    )
+    band_amortization_years = models.IntegerField(
+        null=True, blank=True,
+        help_text='Amortization period in years (e.g. 25)'
+    )
+    band_equity_dividend_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, null=True, blank=True,
+        help_text='Required equity dividend rate (e.g. 0.10 = 10%)'
+    )
+
     class Meta:
         managed = False
         db_table = 'tbl_income_approach'

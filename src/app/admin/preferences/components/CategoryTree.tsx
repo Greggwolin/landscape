@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Plus } from 'lucide-react';
+import { CButton, CCard, CCardBody, CCardHeader } from '@coreui/react';
 import type { UnitCostCategoryHierarchy, UnitCostCategoryReference } from '@/types/benchmarks';
 import CategoryTreeItem from './CategoryTreeItem';
 
@@ -27,33 +28,27 @@ export default function CategoryTree({
   const totalCategories = countCategories(categories);
 
   return (
-    <div className="category-tree">
-      <div className="tree-header">
-        <div className="tree-header-content">
-          <div className="tree-header-left">
-            <h5>Categories</h5>
-            <span className="tree-count">{totalCategories} total</span>
-          </div>
-          <p className="tree-header-description">
-            Browse and select categories to view details
-          </p>
+    <CCard className="h-100">
+      <CCardHeader
+        className="d-flex align-items-center justify-content-between gap-2"
+        style={{ backgroundColor: 'var(--surface-card-header)' }}
+      >
+        <div>
+          <h6 className="mb-0">Categories</h6>
+          <small className="text-medium-emphasis">{totalCategories} total</small>
         </div>
-        <button
-          className="btn btn-sm btn-primary"
-          onClick={onAddCategory}
-          title="Add Category"
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-
-      <div className="tree-content">
+        <CButton color="primary" size="sm" onClick={onAddCategory} title="Add Category">
+          <Plus size={14} className="me-1" />
+          Add
+        </CButton>
+      </CCardHeader>
+      <CCardBody className="p-2 overflow-auto">
         {categories.length === 0 ? (
-          <div className="tree-empty">
-            <p className="text-muted">No categories match the selected filters</p>
+          <div className="text-center py-4">
+            <p className="text-medium-emphasis mb-0">No categories match the selected filters</p>
           </div>
         ) : (
-          <div className="tree-list">
+          <div className="d-flex flex-column gap-1">
             {categories.map((category) => (
               <CategoryTreeItem
                 key={category.category_id}
@@ -68,8 +63,8 @@ export default function CategoryTree({
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </CCardBody>
+    </CCard>
   );
 }
 

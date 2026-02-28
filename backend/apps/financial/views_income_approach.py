@@ -542,3 +542,35 @@ def income_approach_dcf_monthly(request, project_id: int):
     result = dcf_service.calculate_monthly()
 
     return Response(result)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def income_approach_unit_rent_schedule(request, project_id: int):
+    """
+    GET /api/valuation/income-approach-data/{project_id}/unit-rent-schedule/
+
+    Returns per-unit monthly rent projections that reconcile to the DCF's GPR row.
+    Used for the audit-grade "Rent Schedule" subtab within Income Approach.
+
+    Query parameters:
+    - period: 'monthly' (default). Frontend aggregates to quarterly/annual.
+
+    Returns:
+    - periods: list of {period_id, period_label}
+    - units: list of unit records with per-period rent array
+    - gpr_by_period: sum of unit rents per period (must match DCF GPR)
+    - dcf_summary_rows: vacancy, credit loss, other income, NRI from DCF
+    - reconciliation: {ok: bool, mismatches: [...]}
+    """
+    from .services.unit_rent_schedule_service import UnitRentScheduleService
+
+    # Verify project exists
+    project = get_object_or_404(Project, project_id=project_id)
+
+    period = request.query_params.get('period', 'monthly')
+
+    service = UnitRentScheduleService(project_id)
+    result = service.generate(period=period)
+
+    return Response(result)

@@ -29,6 +29,8 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default=ROLE_ALPHA_TESTER
     )
+    plain_password = models.CharField(max_length=128, null=True, blank=True,
+                                      help_text='Stored for alpha admin visibility only.')
     is_verified = models.BooleanField(default=False)
     demo_projects_provisioned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

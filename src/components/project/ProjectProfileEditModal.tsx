@@ -40,6 +40,7 @@ import {
   type AnalysisPerspective,
   type AnalysisPurpose,
 } from '@/types/project-taxonomy';
+import { resolveCanonicalPropertyTypeCode } from '@/config/propertyTypeTokens';
 
 const toInputDate = (value?: string | null) => {
   if (!value) return '';
@@ -94,7 +95,9 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
         ? current.value_add_enabled ?? deriveDimensionsFromAnalysisType(current.analysis_type).value_add_enabled
         : false
     ),
-    property_type_code: current.project_type_code || current.project_type || undefined,
+    property_type_code: resolveCanonicalPropertyTypeCode(current.project_type_code)
+      || resolveCanonicalPropertyTypeCode(current.project_type)
+      || current.project_type_code || current.project_type || undefined,
     property_subtype: current.property_subtype,
     target_units: current.target_units,
     gross_acres: current.gross_acres,

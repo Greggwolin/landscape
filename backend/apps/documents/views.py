@@ -18,6 +18,7 @@ from .models import (
     AICorrectionLog,
     ExtractionCommitSnapshot,
 )
+from .utils import detect_extract_type
 from .serializers import DocumentSerializer, DocumentFolderSerializer
 from apps.multifamily.models import MultifamilyUnitType, MultifamilyUnit, MultifamilyLease
 from apps.knowledge.services.extraction_service import (
@@ -215,10 +216,11 @@ def upload_document(request):
             updated_at=timezone.now()
         )
 
-        # Queue for extraction
+        # Queue for extraction — detect type from filename and hint
+        resolved_type = detect_extract_type(file.name, doc_type_hint)
         extract_job = DMSExtractQueue.objects.create(
             doc_id=doc.doc_id,
-            extract_type='rent_roll',
+            extract_type=resolved_type,
             priority=5,
             status='pending'
         )
@@ -1143,10 +1145,11 @@ def upload_new_version(request, project_id, doc_id):
                 updated_at=timezone.now(),
             )
 
-            # Queue for processing
+            # Queue for processing — detect type from filename and doc_type
+            resolved_type = detect_extract_type(new_doc.doc_name, new_doc.doc_type)
             DMSExtractQueue.objects.create(
                 doc_id=new_doc.doc_id,
-                extract_type='general',
+                extract_type=resolved_type,
                 priority=5,
                 status='pending'
             )
@@ -1405,9 +1408,10 @@ def restore_document_version(request, project_id, doc_id):
         )
 
         # Queue for processing (restore creates a new active version)
+        resolved_type = detect_extract_type(new_doc.doc_name, new_doc.doc_type)
         DMSExtractQueue.objects.create(
             doc_id=new_doc.doc_id,
-            extract_type='general',
+            extract_type=resolved_type,
             priority=5,
             status='pending'
         )

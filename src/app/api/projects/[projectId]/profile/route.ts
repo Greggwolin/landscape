@@ -236,6 +236,13 @@ export async function PATCH(
       }
     }
 
+    // Keep project_type (legacy) in sync with project_type_code
+    if (body.property_type_code !== undefined) {
+      updates.push(`project_type = $${paramCount}`);
+      values.push(body.property_type_code);
+      paramCount++;
+    }
+
     // Auto-geocode when address, city, or county changes
     // This populates location_lat and location_lon for map display
     if (

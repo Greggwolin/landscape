@@ -64,6 +64,9 @@ interface Unit {
   rentPerSF: number;
   proformaRentPerSF: number;
   notes: string;
+  isSection8?: boolean;
+  section8ContractDate?: string | null;
+  section8ContractRent?: number | null;
 }
 
 interface ColumnConfig {
@@ -130,6 +133,12 @@ const getUnitValueForColumn = (
       return unit.proformaRentPerSF;
     case 'notes':
       return unit.notes;
+    case 'isSection8':
+      return unit.isSection8;
+    case 'section8ContractDate':
+      return unit.section8ContractDate;
+    case 'section8ContractRent':
+      return unit.section8ContractRent;
     default:
       // Dynamic column lookup: columnId is the column_key, unit.id is the row_id
       if (dynamicValues) {
@@ -584,6 +593,10 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'monthlyIncome', label: 'Monthly Income', category: 'financial', visible: false, type: 'calculated', description: 'Total monthly income (includes current rent + other fees)' },
   { id: 'rentPerSF', label: 'Rent/SF', category: 'financial', visible: false, type: 'calculated', description: 'Current rent divided by square footage' },
   { id: 'proformaRentPerSF', label: 'Proforma $/SF', category: 'financial', visible: false, type: 'calculated', description: 'Proforma rent divided by square footage' },
+  // Section 8
+  { id: 'isSection8', label: 'Sec. 8', category: 'tenant', visible: false, type: 'input', description: 'Unit has Section 8 voucher tenant' },
+  { id: 'section8ContractDate', label: 'S8 Contract Date', category: 'tenant', visible: false, type: 'input', description: 'HAP contract effective date' },
+  { id: 'section8ContractRent', label: 'S8 Contract Rent', category: 'financial', visible: false, type: 'input', description: 'Section 8 contract rent amount' },
   // Other
   { id: 'notes', label: 'Notes', category: 'unit', visible: false, type: 'input', description: 'Free-form notes for this unit' },
 ];
@@ -1165,6 +1178,28 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       return changed ? next : prev; // Only update state if something actually changed
     });
   }, [units, hasCustomizedColumns]);
+
+  // Auto-show Section 8 columns when any unit has is_section8 = true.
+  // Runs once per unit set, after auto-hide has already run.
+  const section8ShownRef = useRef(false);
+  useEffect(() => {
+    if (!units.length || section8ShownRef.current) return;
+    const hasSection8 = units.some((u) => u.isSection8 === true);
+    if (!hasSection8) return;
+    section8ShownRef.current = true;
+    const s8Ids = new Set(['isSection8', 'section8ContractDate', 'section8ContractRent']);
+    setColumns((prev) => {
+      let changed = false;
+      const next = prev.map((col) => {
+        if (s8Ids.has(col.id) && !col.visible) {
+          changed = true;
+          return { ...col, visible: true };
+        }
+        return col;
+      });
+      return changed ? next : prev;
+    });
+  }, [units]);
 
   // Get visible columns (base + any extra columns from pending changes)
   const visibleColumns = useMemo(() => {

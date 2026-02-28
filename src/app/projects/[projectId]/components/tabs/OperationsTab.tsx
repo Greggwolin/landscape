@@ -68,6 +68,11 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     reload
   } = useOperationsData(project.project_id);
 
+  // Extract row data early (before any useCallback that references them)
+  const vacancyRows: LineItemRow[] = vacancyDeductions?.rows || [];
+  const otherRows: LineItemRow[] = otherIncome?.rows || [];
+  const opexRows: LineItemRow[] = operatingExpenses?.rows || [];
+
   // Column visibility state (lifted here so chooser can render in header)
   const [hideLossToLease, setHideLossToLease] = useState(false);
   const [hidePostReno, setHidePostReno] = useState(!showPostRehab);
@@ -441,17 +446,14 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     );
   }
 
-  // Extract row data for sections
-  const vacancyRows: LineItemRow[] = vacancyDeductions?.rows || [];
-  const otherRows: LineItemRow[] = otherIncome?.rows || [];
-  const opexRows: LineItemRow[] = operatingExpenses?.rows || [];
+  // Row data already extracted above (before useCallbacks that reference them)
 
   // Calculate GPR for vacancy calculations
   const grossPotentialRent = totals?.gross_potential_rent || 0;
 
   return (
     <div className="d-flex gap-3 align-items-start">
-    <CCard style={{ flexShrink: 0 }}>
+    <CCard style={{ flex: '1 1 0', minWidth: '400px', overflow: 'auto' }}>
       {/* Header */}
       <OperationsHeader
         projectName={project.project_name}
@@ -585,8 +587,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       </CCardBody>
     </CCard>
 
-      {/* Right: Treemap Charts — fills remaining space */}
-      <div style={{ flex: '1 1 0', minWidth: '280px' }} className="d-flex flex-column gap-3">
+      {/* Right: Treemap Charts — flexible with min/max to prevent blowout */}
+      <div style={{ flex: '0 1 380px', minWidth: '360px', maxWidth: '420px' }} className="d-flex flex-column gap-3">
         <IncomeTreemap
           rentalRows={rentalRows}
           grossPotentialRent={grossPotentialRent}

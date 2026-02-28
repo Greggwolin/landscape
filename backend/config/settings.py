@@ -232,6 +232,11 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'extraction_file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'extraction_debug.log',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'apps.landscaper': {
@@ -241,6 +246,16 @@ LOGGING = {
         },
         'landscape.media_extraction': {
             'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'apps.knowledge.services.extraction_service': {
+            'handlers': ['console', 'extraction_file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'apps.documents': {
+            'handlers': ['console', 'extraction_file'],
             'level': 'INFO',
             'propagate': True,
         },

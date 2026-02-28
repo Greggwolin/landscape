@@ -12,6 +12,8 @@ import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
 import { LandscapeButton, PropertyTypeBadge } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
 import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
+import DeleteProjectDialog from '@/components/projects/DeleteProjectDialog';
+import type { DeleteProjectResult } from '@/hooks/useDeleteProject';
 import {
   type CanonicalPropertyTypeCode,
   getPropertyTypeLabel,
@@ -132,6 +134,7 @@ function ProjectAccordion({
   selectedProjectId,
   onProjectClick,
   onNewProject,
+  onDeleteProject,
   isLandscaperCollapsed,
   onToggleLandscaper,
 }: {
@@ -139,6 +142,7 @@ function ProjectAccordion({
   selectedProjectId: number | null;
   onProjectClick: (project: ProjectSummary) => void;
   onNewProject: () => void;
+  onDeleteProject: (project: ProjectSummary) => void;
   isLandscaperCollapsed: boolean;
   onToggleLandscaper: () => void;
 }) {
@@ -186,11 +190,13 @@ function ProjectAccordion({
             const isSelected = selectedProjectId === project.project_id;
             const isHovered = hoveredId === project.project_id;
             return (
-              <button
+              <div
                 key={project.project_id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 ref={(node) => node && itemRefs.current.set(project.project_id, node)}
                 onClick={() => onProjectClick(project)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onProjectClick(project); } }}
                 onMouseEnter={() => setHoveredId(project.project_id)}
                 onMouseLeave={() => setHoveredId(null)}
                 className="w-100 text-start"
@@ -216,11 +222,38 @@ function ProjectAccordion({
                       </span>
                     </div>
                   </div>
-                  <div className="text-end">
-                    <div className="fw-semibold" style={{ fontSize: '1rem' }}>{formatUnits(project)}</div>
+                  <div className="d-flex align-items-start gap-2">
+                    <div className="text-end">
+                      <div className="fw-semibold" style={{ fontSize: '1rem' }}>{formatUnits(project)}</div>
+                    </div>
+                    {isHovered && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteProject(project);
+                        }}
+                        title="Delete project"
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '4px',
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.875rem',
+                          lineHeight: 1,
+                          transition: 'color 150ms ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cui-danger)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--cui-secondary-color)')}
+                      >
+                        &#x1F5D1;
+                      </button>
+                    )}
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -305,13 +338,14 @@ function ProjectCountTiles({
 }
 
 export default function DashboardPage() {
-  const { projects, selectProject } = useProjectContext();
+  const { projects, selectProject, refreshProjects } = useProjectContext();
   const router = useRouter();
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<PropertyFilterKey>('ALL');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
 
   const sortedProjects = useMemo(() => {
     // Get last accessed timestamps from localStorage
@@ -441,6 +475,19 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDeleteProject = (project: ProjectSummary) => {
+    setDeleteTarget(project);
+  };
+
+  const handleProjectDeleted = (_result: DeleteProjectResult) => {
+    setDeleteTarget(null);
+    setSelectedProjectId(null);
+    // Refresh the project list
+    if (typeof refreshProjects === 'function') {
+      refreshProjects();
+    }
+  };
+
   const [isActivityExpanded, setActivityExpanded] = useState(true);
   const [isLandscaperCollapsed, setLandscaperCollapsed] = useState(false);
 
@@ -458,9 +505,9 @@ export default function DashboardPage() {
         <div
           className="flex-shrink-0 position-sticky top-0 d-flex flex-column gap-1"
           style={{
-            width: isLandscaperCollapsed ? '56px' : '30%',
-            minWidth: isLandscaperCollapsed ? '56px' : '350px',
-            maxWidth: isLandscaperCollapsed ? '56px' : '450px',
+            width: isLandscaperCollapsed ? '64px' : '30%',
+            minWidth: isLandscaperCollapsed ? '64px' : '350px',
+            maxWidth: isLandscaperCollapsed ? '64px' : '450px',
             height: 'calc(100vh - 100px)',
           }}
         >
@@ -519,6 +566,7 @@ export default function DashboardPage() {
               handleProjectClick(project.project_id);
             }}
             onNewProject={() => setIsNewProjectModalOpen(true)}
+            onDeleteProject={handleDeleteProject}
             isLandscaperCollapsed={isLandscaperCollapsed}
             onToggleLandscaper={toggleLandscaperCollapsed}
           />
@@ -564,6 +612,16 @@ export default function DashboardPage() {
         onClose={handleModalClose}
         initialFiles={pendingFiles.length > 0 ? pendingFiles : undefined}
       />
+
+      {deleteTarget && (
+        <DeleteProjectDialog
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          projectId={deleteTarget.project_id}
+          projectName={deleteTarget.project_name}
+          onDeleted={handleProjectDeleted}
+        />
+      )}
     </CContainer>
   );
 }

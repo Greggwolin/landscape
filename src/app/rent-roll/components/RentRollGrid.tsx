@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
@@ -41,6 +41,9 @@ interface Lease {
   bathrooms: number | null
   market_rent: number | null
   other_features: string | null
+  is_section8?: boolean
+  section8_contract_date?: string | null
+  section8_contract_rent?: number | null
 }
 
 interface Unit {
@@ -57,6 +60,9 @@ interface Unit {
   occupancy_status: string | null
   renovation_status: string
   other_features: string | null
+  is_section8?: boolean
+  section8_contract_date?: string | null
+  section8_contract_rent?: number | null
 }
 
 // Unified row type for grid display - works with either lease or unit data
@@ -79,6 +85,10 @@ interface RentRollRow {
   lease_end_date?: string
   base_rent_monthly: number  // from lease or unit.current_rent
   lease_status: string       // from lease or derived from occupancy_status
+  // Section 8
+  is_section8?: boolean
+  section8_contract_date?: string | null
+  section8_contract_rent?: number | null
   // Source tracking
   _source: 'lease' | 'unit'
 }
@@ -172,6 +182,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     message: string
     type: 'success' | 'error'
   } | null>(null)
+  const section8AutoShownRef = useRef(false)
   const [floorplanDialogOpen, setFloorplanDialogOpen] = useState(false)
   const [floorplanCheck, setFloorplanCheck] = useState<any>(null)
   const [pendingUpdate, setPendingUpdate] = useState<{
@@ -244,6 +255,9 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       base_rent_monthly: Number(unit.current_rent) || 0,
       lease_status: unit.occupancy_status?.toLowerCase() === 'vacant' ? 'VACANT' : 'ACTIVE',
       resident_name: null,
+      is_section8: unit.is_section8,
+      section8_contract_date: unit.section8_contract_date,
+      section8_contract_rent: unit.section8_contract_rent,
       _source: 'unit' as const
     }))
   }, [units])
@@ -276,6 +290,25 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     ['units', 'leases', 'unit_types'],
     refreshAllData
   )
+
+  // Auto-show Section 8 columns when any unit has is_section8 = true.
+  // Only triggers once on initial detection — user can hide them after.
+  useEffect(() => {
+    if (section8AutoShownRef.current || !gridApi) return
+    const hasSection8 = units.some((u: Unit) => u.is_section8 === true)
+    if (hasSection8) {
+      section8AutoShownRef.current = true
+      // AG-Grid v34: applyColumnState is on the grid API directly
+      gridApi.applyColumnState({
+        state: [
+          { colId: 'is_section8', hide: false },
+          { colId: 'section8_contract_date', hide: false },
+          { colId: 'section8_contract_rent', hide: false },
+        ],
+        applyOrder: false,
+      })
+    }
+  }, [units, gridApi])
 
   // Build dropdown options from unit types
   const unitTypeOptions = useMemo(() => {
@@ -863,6 +896,46 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       cellEditorParams: {
         values: ['ACTIVE', 'NOTICE_GIVEN', 'EXPIRED', 'MONTH_TO_MONTH', 'CANCELLED'],
       },
+    },
+    // Section 8 columns — hidden by default, auto-shown when any unit has is_section8
+    {
+      field: 'is_section8',
+      headerName: 'Sec. 8',
+      width: 80,
+      minWidth: 70,
+      hide: true,
+      cellRenderer: (params: any) => {
+        if (!params.data) return null
+        return params.value ? '✓' : ''
+      },
+      cellStyle: (params: any) => ({
+        textAlign: 'center',
+        ...(getPendingCellStyle(params) || {}),
+      }),
+    },
+    {
+      field: 'section8_contract_date',
+      headerName: 'S8 Contract Date',
+      width: 140,
+      minWidth: 120,
+      hide: true,
+      valueFormatter: (params: any) => {
+        if (!params.value) return ''
+        return formatDate(params.value)
+      },
+      cellStyle: (params: any) => getPendingCellStyle(params) || {},
+    },
+    {
+      field: 'section8_contract_rent',
+      headerName: 'S8 Contract Rent',
+      width: 140,
+      minWidth: 120,
+      hide: true,
+      valueFormatter: (params: any) => {
+        if (params.value == null) return ''
+        return formatCurrency(Number(params.value))
+      },
+      cellStyle: (params: any) => getPendingCellStyle(params) || {},
     },
     {
       headerName: '',

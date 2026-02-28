@@ -592,7 +592,9 @@
       "Bash(__NEW_LINE_3ebba35207161cf4__ echo \"1. Planning tab target tables identified and documented in code comment:\")",
       "Bash(__NEW_LINE_3ebba35207161cf4__ echo \"\")",
       "Bash(__NEW_LINE_a2c8739d12434159__ echo \"\")",
-      "Bash(__NEW_LINE_e74d67d3437a24a0__ echo \"\")"
+      "Bash(__NEW_LINE_e74d67d3437a24a0__ echo \"\")",
+      "mcp__Desktop_Commander__read_file",
+      "Bash(sed -n '50,120p' /Users/5150east/landscape/src/app/api/projects/[projectId]/landscaper/chat/route.ts)"
     ],
     "deny": [],
     "ask": [],

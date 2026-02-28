@@ -50,6 +50,9 @@ export interface Unit {
   renovation_date?: string | null;
   renovation_cost?: number | null;
   other_features?: string | null;
+  is_section8?: boolean;
+  section8_contract_date?: string | null;
+  section8_contract_rent?: number | null;
   current_lease?: {
     lease_id: number;
     resident_name?: string | null;

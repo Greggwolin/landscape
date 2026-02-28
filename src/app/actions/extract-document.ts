@@ -1,10 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+'use server'
+
 import Anthropic from '@anthropic-ai/sdk'
 
-// Allow up to 120 seconds for AI extraction of large documents
-export const maxDuration = 120;
-
-// Field extraction result structure
 interface ExtractedField {
   value: any
   confidence: number
@@ -14,6 +11,7 @@ interface ExtractionResult {
   extracted_fields: Record<string, ExtractedField>
   document_type: string
   raw_text_preview?: string
+  error?: string
 }
 
 const EXTRACTION_PROMPT = `You are a real estate document analyzer. Extract key property information from this document for creating a new project.
@@ -38,6 +36,7 @@ IMPORTANT for property_subtype detection:
 - Look for unit counts like "43-unit" or "120 units" which indicate MULTIFAMILY
 - If document mentions "warehouse", "distribution", "logistics" -> INDUSTRIAL
 - If document mentions "shopping", "strip mall", "retail center" -> RETAIL
+- If document mentions "master planned", "master-planned community", "MPC" -> MPC
 
 IMPORTANT for zip_code: Look carefully in:
 1. Property address lines (often after city, state)
@@ -54,6 +53,7 @@ Also determine the document_type from these options:
 - Property Flyer
 - Purchase Agreement
 - Due Diligence Report
+- Community Master Plan
 - Unknown Document
 
 Respond ONLY with valid JSON in this exact format:
@@ -72,20 +72,14 @@ For confidence scores:
 
 Only include fields where you found actual data. Do not make up values.`
 
-export async function POST(request: NextRequest) {
+export async function extractDocumentForProject(
+  filename: string,
+  mimeType: string,
+  base64Data: string
+): Promise<ExtractionResult> {
   try {
-    // Client sends base64-encoded file as JSON to avoid:
-    // 1. FormData body size limit (~1MB) in Next.js route handlers
-    // 2. Binary corruption when sending raw file body through Next.js
-    const body = await request.json()
-    const { filename, mimeType, data: base64 } = body as {
-      filename: string
-      mimeType: string
-      data: string
-    }
-
-    if (!base64 || !mimeType) {
-      return NextResponse.json({ error: 'Missing file data or mime type' }, { status: 400 })
+    if (!base64Data || !mimeType) {
+      return { extracted_fields: {}, document_type: 'Unknown', error: 'No file data provided' }
     }
 
     // Validate file type
@@ -100,72 +94,37 @@ export async function POST(request: NextRequest) {
     ]
 
     if (!allowedTypes.includes(mimeType)) {
-      return NextResponse.json(
-        { error: 'Unsupported file type. Please upload PDF, Word, Excel, or image files.' },
-        { status: 400 }
-      )
+      return { extracted_fields: {}, document_type: 'Unknown', error: 'Unsupported file type. Please upload PDF, Word, Excel, or image files.' }
     }
 
-    // Check file size from base64 (base64 is ~4/3 of original size)
-    const fileSizeMB = (base64.length * 3 / 4) / (1024 * 1024)
-    console.log(`Processing file: ${filename}, size: ~${fileSizeMB.toFixed(2)}MB, type: ${mimeType}`)
+    // base64Data is already base64 encoded from client
+    const fileSizeMB = (base64Data.length * 3 / 4) / (1024 * 1024)
+    console.log(`[Server Action] Processing file: ${filename}, size: ~${fileSizeMB.toFixed(2)}MB, type: ${mimeType}`)
 
     if (fileSizeMB > 25) {
-      return NextResponse.json(
-        { error: `File too large (~${fileSizeMB.toFixed(1)}MB). Please use a file under 25MB.` },
-        { status: 400 }
-      )
+      return { extracted_fields: {}, document_type: 'Unknown', error: `File too large (${fileSizeMB.toFixed(1)}MB). Please use a file under 25MB.` }
     }
 
-    // Check if we have Anthropic API key
     const anthropicKey = process.env.ANTHROPIC_API_KEY
     if (!anthropicKey) {
       console.warn('ANTHROPIC_API_KEY not set, cannot extract document')
-      return NextResponse.json(
-        { error: 'Document extraction service not configured. Check ANTHROPIC_API_KEY.' },
-        { status: 503 }
-      )
+      return { extracted_fields: {}, document_type: 'Unknown', error: 'Document extraction service not configured. Check ANTHROPIC_API_KEY.' }
     }
 
-    // Use Claude to extract document content
-    const result = await extractWithClaude(base64, mimeType, filename, anthropicKey)
-    return NextResponse.json(result)
+    // Call Claude for extraction
+    const anthropic = new Anthropic({ apiKey: anthropicKey })
 
-  } catch (error) {
-    console.error('Extraction error:', error)
-    // Return detailed error for debugging
-    const errorMsg = error instanceof Error ? error.message : 'Extraction failed'
-    return NextResponse.json(
-      { error: errorMsg },
-      { status: 500 }
-    )
-  }
-}
+    const isImage = mimeType.startsWith('image/')
+    const isPdf = mimeType === 'application/pdf'
 
-async function extractWithClaude(
-  base64Data: string,
-  mimeType: string,
-  filename: string,
-  apiKey: string
-): Promise<ExtractionResult> {
-  const anthropic = new Anthropic({ apiKey })
-
-  // Handle different file types
-  const isImage = mimeType.startsWith('image/')
-  const isPdf = mimeType === 'application/pdf'
-
-  if (!isImage && !isPdf) {
-    // For Word/Excel, we can't directly read them with Claude
-    return {
-      extracted_fields: {},
-      document_type: 'Unsupported Format',
-      raw_text_preview: `File "${filename}" is a ${mimeType} file. For best results, please convert to PDF or use image format.`
+    if (!isImage && !isPdf) {
+      return {
+        extracted_fields: {},
+        document_type: 'Unsupported Format',
+        raw_text_preview: `File "${filename}" is a ${mimeType} file. For best results, please convert to PDF or use image format.`
+      }
     }
-  }
 
-  try {
-    // Build content array based on file type
-    // Document type for PDFs is now in main API (SDK v0.65+)
     const content: Anthropic.MessageCreateParams['messages'][0]['content'] = []
 
     if (isPdf) {
@@ -178,7 +137,6 @@ async function extractWithClaude(
         }
       })
     } else {
-      // Use image type for images
       const mediaType = mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
       content.push({
         type: 'image',
@@ -190,7 +148,6 @@ async function extractWithClaude(
       })
     }
 
-    // Add the prompt
     content.push({
       type: 'text',
       text: `Filename: ${filename}\n\n${EXTRACTION_PROMPT}`
@@ -199,25 +156,18 @@ async function extractWithClaude(
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content
-        }
-      ]
+      messages: [{ role: 'user', content }]
     })
 
-    // Extract text content from response
     const textContent = response.content.find(c => c.type === 'text')
     if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text response from Claude')
+      return { extracted_fields: {}, document_type: 'Unknown', error: 'No text response from Claude' }
     }
 
-    // Parse JSON response
     const jsonMatch = textContent.text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       console.error('Claude response (no JSON found):', textContent.text)
-      throw new Error('Could not parse extraction response')
+      return { extracted_fields: {}, document_type: 'Unknown', error: 'Could not parse extraction response' }
     }
 
     const parsed = JSON.parse(jsonMatch[0])
@@ -229,12 +179,11 @@ async function extractWithClaude(
     }
 
   } catch (error) {
-    console.error('Claude extraction error:', error)
-    // Include more detail in the error message for debugging
+    console.error('Server Action extraction error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorDetail = error instanceof Error && 'status' in error
       ? ` (status: ${(error as { status?: number }).status})`
       : ''
-    throw new Error(`Failed to extract document: ${errorMessage}${errorDetail}`)
+    return { extracted_fields: {}, document_type: 'Unknown', error: `Failed to extract document: ${errorMessage}${errorDetail}` }
   }
 }

@@ -5,6 +5,8 @@ import { Send, Loader2 } from 'lucide-react'
 import type { NewProjectFormData } from './types'
 import NewProjectDropZone from '@/components/projects/onboarding/NewProjectDropZone'
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon'
+// Document extraction now goes directly to Django (bypasses Next.js body-size limits)
+const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
 
 export interface LandscaperMessage {
   id: string
@@ -190,20 +192,19 @@ const LandscaperPanel = ({
     setUserMessages(prev => [...prev, receiptMessage])
 
     try {
-      // Send file as raw body to avoid FormData body size limit (~1MB) in Next.js route handlers
-      const response = await fetch('/api/landscaper/extract-for-project', {
+      // Send file directly to Django via FormData — no Next.js body-size limits.
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const resp = await fetch(`${DJANGO_API}/api/dms/extract-for-project/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': file.type,
-          'X-Filename': encodeURIComponent(file.name),
-        },
-        body: file
+        body: formData,
       })
 
-      const result = await response.json()
+      const result = await resp.json()
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Extraction failed')
+      if (!resp.ok || result.error) {
+        throw new Error(result.error || `Extraction failed (${resp.status})`)
       }
 
       // Notify parent to populate form fields
@@ -212,10 +213,12 @@ const LandscaperPanel = ({
       }
 
       // Add summary message
+      const summaryContent = formatExtractionSummary(result, file.name)
+        + ((result as any).debug_orientation ? `\n\n${(result as any).debug_orientation}` : '')
       const summaryMessage: LandscaperMessage = {
         id: `summary-${Date.now()}`,
         role: 'landscaper',
-        content: formatExtractionSummary(result, file.name),
+        content: summaryContent,
         timestamp: new Date()
       }
       setUserMessages(prev => [...prev, summaryMessage])
@@ -270,7 +273,7 @@ const LandscaperPanel = ({
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch('/api/landscaper/extract-for-project', {
+        const response = await fetch(`${DJANGO_API}/api/dms/extract-for-project/`, {
           method: 'POST',
           body: formData
         })
@@ -473,7 +476,7 @@ const LandscaperPanel = ({
 
   return (
     <div
-      className={`flex h-full flex-col border ${
+      className={`flex h-full flex-col overflow-hidden border ${
         isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'
       }`}
       style={{ borderRadius: 'var(--cui-card-border-radius)' }}

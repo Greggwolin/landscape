@@ -47,6 +47,40 @@ interface UseIncomeApproachReturn {
   fetchDCF: () => Promise<void>;
 }
 
+/** Response type for the unit rent schedule endpoint */
+export interface UnitRentScheduleData {
+  project_id: number;
+  periods: Array<{ period_id: string; period_label: string }>;
+  units: Array<{
+    unit_id: number;
+    unit_number: string;
+    plan_name: string;
+    unit_type: string;
+    bedrooms: number | null;
+    bathrooms: number | null;
+    square_feet: number;
+    rents: number[];
+  }>;
+  gpr_by_period: number[];
+  dcf_gpr_by_period: number[];
+  dcf_summary_rows: Array<{
+    label: string;
+    values: number[];
+  }>;
+  reconciliation: {
+    ok: boolean;
+    mismatches: Array<{
+      period: number;
+      unit_sum: number;
+      dcf_gpr: number;
+      diff: number;
+    }>;
+  };
+  value_add_enabled: boolean;
+  total_periods: number;
+  period_type: string;
+}
+
 export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
   const queryClient = useQueryClient();
   const [data, setData] = useState<IncomeApproachData | null>(null);
@@ -252,12 +286,11 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     }
   }, [projectId]);
 
-  // Set active method (and fetch DCF if switching to DCF)
+  // Set active method (and fetch data as needed)
   const setActiveMethod = useCallback(
     (method: ValuationMethod) => {
       setActiveMethodState(method);
       if (method === 'dcf') {
-        // Fetch both annual (for legacy fallback) and monthly (for new grid)
         if (!dcfData && !isDCFLoading) {
           fetchDCF();
         }

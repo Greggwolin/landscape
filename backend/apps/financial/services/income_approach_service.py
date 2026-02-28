@@ -303,7 +303,7 @@ class IncomeApproachDataService:
         """
         with connection.cursor() as cursor:
             # First check tbl_income_approach for existing data
-            # Try to include migration 046 fields if they exist
+            # Includes migration 046 fields + band of investment fields
             try:
                 cursor.execute("""
                     SELECT
@@ -313,7 +313,11 @@ class IncomeApproachDataService:
                         noi_capitalization_basis,
                         stabilized_vacancy_rate,
                         cap_rate_interval,
-                        discount_rate_interval
+                        discount_rate_interval,
+                        band_mortgage_ltv,
+                        band_mortgage_rate,
+                        band_amortization_years,
+                        band_equity_dividend_rate
                     FROM landscape.tbl_income_approach
                     WHERE project_id = %s
                 """, [self.project_id])
@@ -351,11 +355,22 @@ class IncomeApproachDataService:
                     stab_vacancy = self._decimal_to_float(income_row[4], self.DEFAULTS['stabilized_vacancy_rate'])
                     cap_interval = self._decimal_to_float(income_row[5], self.DEFAULTS['cap_rate_interval'])
                     disc_interval = self._decimal_to_float(income_row[6], self.DEFAULTS['discount_rate_interval'])
+                    # Band of Investment fields (columns 7-10)
+                    if len(income_row) >= 11:
+                        band_ltv = self._decimal_to_float(income_row[7], None)
+                        band_rate = self._decimal_to_float(income_row[8], None)
+                        band_amort = income_row[9]  # integer, no conversion
+                        band_equity = self._decimal_to_float(income_row[10], None)
+                    else:
+                        band_ltv = band_rate = band_equity = None
+                        band_amort = None
                 else:
                     noi_basis = self.DEFAULTS['noi_capitalization_basis']
                     stab_vacancy = self.DEFAULTS['stabilized_vacancy_rate']
                     cap_interval = self.DEFAULTS['cap_rate_interval']
                     disc_interval = self.DEFAULTS['discount_rate_interval']
+                    band_ltv = band_rate = band_equity = None
+                    band_amort = None
             elif cap_assumption_row:
                 cap_rate = self._decimal_to_float(cap_assumption_row[0], self.DEFAULTS['selected_cap_rate'])
                 method = 'direct_entry'
@@ -364,6 +379,8 @@ class IncomeApproachDataService:
                 stab_vacancy = self.DEFAULTS['stabilized_vacancy_rate']
                 cap_interval = self.DEFAULTS['cap_rate_interval']
                 disc_interval = self.DEFAULTS['discount_rate_interval']
+                band_ltv = band_rate = band_equity = None
+                band_amort = None
             else:
                 cap_rate = self.DEFAULTS['selected_cap_rate']
                 method = self.DEFAULTS['market_cap_rate_method']
@@ -372,6 +389,8 @@ class IncomeApproachDataService:
                 stab_vacancy = self.DEFAULTS['stabilized_vacancy_rate']
                 cap_interval = self.DEFAULTS['cap_rate_interval']
                 disc_interval = self.DEFAULTS['discount_rate_interval']
+                band_ltv = band_rate = band_equity = None
+                band_amort = None
 
             return {
                 'selected_cap_rate': cap_rate,
@@ -382,6 +401,11 @@ class IncomeApproachDataService:
                 'stabilized_vacancy_rate': stab_vacancy,
                 'cap_rate_interval': cap_interval,
                 'discount_rate_interval': disc_interval,
+                # Band of Investment fields
+                'band_mortgage_ltv': band_ltv,
+                'band_mortgage_rate': band_rate,
+                'band_amortization_years': band_amort,
+                'band_equity_dividend_rate': band_equity,
             }
 
     def get_all_assumptions(self) -> Dict[str, Any]:
@@ -517,6 +541,14 @@ class IncomeApproachDataService:
                     'discount_rate_interval': 'discount_rate_interval',
                 })
 
+            # Band of Investment fields (Migration 20260227)
+            field_mapping.update({
+                'band_mortgage_ltv': 'band_mortgage_ltv',
+                'band_mortgage_rate': 'band_mortgage_rate',
+                'band_amortization_years': 'band_amortization_years',
+                'band_equity_dividend_rate': 'band_equity_dividend_rate',
+            })
+
             # Filter to only fields that exist in DB
             db_updates = {field_mapping[k]: v for k, v in updates.items() if k in field_mapping}
 
@@ -597,6 +629,9 @@ class IncomeApproachDataService:
             # Migration 046 fields
             'noi_capitalization_basis', 'stabilized_vacancy_rate',
             'cap_rate_interval', 'discount_rate_interval',
+            # Band of Investment fields (Migration 20260227)
+            'band_mortgage_ltv', 'band_mortgage_rate',
+            'band_amortization_years', 'band_equity_dividend_rate',
         ]
         if field in income_approach_fields:
             return self.update_capitalization_params({field: value})

@@ -12,6 +12,7 @@
  * - doc_type: Document type (default: 'Misc')
  * - workspace_id: DMS workspace (default: 1)
  * - run_full_extraction: If 'true', trigger comprehensive extraction (default: false)
+ * - extraction_results: JSON string of {field_name: {value, confidence}} from project-creation extraction (optional)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
     const docType = (formData.get('doc_type') as string) || 'Misc';
     const workspaceIdStr = formData.get('workspace_id') as string | null;
     const runFullExtraction = formData.get('run_full_extraction') === 'true';
+    const extractionResultsRaw = formData.get('extraction_results') as string | null;
 
     // Validate required fields
     if (!file) {
@@ -158,6 +160,33 @@ export async function POST(req: NextRequest) {
         'system'
       )
     `;
+
+    // Persist project-creation extraction results to doc_extracted_facts
+    if (extractionResultsRaw) {
+      try {
+        const extractionFields = JSON.parse(extractionResultsRaw);
+        const persistResponse = await fetch(
+          `${DJANGO_API_URL}/api/dms/persist-extraction/`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              doc_id: doc.doc_id,
+              extracted_fields: extractionFields,
+              extraction_method: 'project_creation',
+            }),
+          }
+        );
+        if (persistResponse.ok) {
+          const persistResult = await persistResponse.json();
+          console.log(`✅ Persisted ${persistResult.rows_written} extraction facts for doc_id=${doc.doc_id}`);
+        } else {
+          console.warn(`⚠️ Extraction persistence failed (non-fatal): ${persistResponse.status}`);
+        }
+      } catch (persistError) {
+        console.warn('⚠️ Extraction persistence error (non-fatal):', persistError);
+      }
+    }
 
     // Response object
     const response: {

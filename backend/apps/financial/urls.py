@@ -46,6 +46,7 @@ from .views_income_approach import (
     update_income_approach_assumptions,
     income_approach_dcf,
     income_approach_dcf_monthly,
+    income_approach_unit_rent_schedule,
 )
 from .views_dcf_analysis import (
     DcfAnalysisView,
@@ -129,6 +130,7 @@ urlpatterns = [
     path('valuation/income-approach-data/<int:project_id>/update/', update_income_approach_assumptions, name='income-approach-update'),
     path('valuation/income-approach-data/<int:project_id>/dcf/', income_approach_dcf, name='income-approach-dcf'),
     path('valuation/income-approach-data/<int:project_id>/dcf/monthly/', income_approach_dcf_monthly, name='income-approach-dcf-monthly'),
+    path('valuation/income-approach-data/<int:project_id>/unit-rent-schedule/', income_approach_unit_rent_schedule, name='income-approach-unit-rent-schedule'),
 
     # DCF Analysis endpoints (unified for CRE and Land Dev)
     path('valuation/dcf-analysis/<int:project_id>/', DcfAnalysisView.as_view(), name='dcf-analysis'),

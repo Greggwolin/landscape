@@ -61,6 +61,9 @@ class MultifamilyUnitSerializer(serializers.ModelSerializer):
             'renovation_date',
             'renovation_cost',
             'other_features',
+            'is_section8',
+            'section8_contract_date',
+            'section8_contract_rent',
             'current_lease',
             'created_at',
             'updated_at',
@@ -99,6 +102,9 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
     bathrooms = serializers.DecimalField(required=False, max_digits=3, decimal_places=2, allow_null=True)
     market_rent = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, allow_null=True)
     other_features = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    is_section8 = serializers.BooleanField(required=False, default=False)
+    section8_contract_date = serializers.DateField(required=False, allow_null=True)
+    section8_contract_rent = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, allow_null=True)
 
     class Meta:
         model = MultifamilyLease
@@ -130,6 +136,9 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
             'bathrooms',
             'market_rent',
             'other_features',
+            'is_section8',
+            'section8_contract_date',
+            'section8_contract_rent',
             'created_at',
             'updated_at',
         ]
@@ -146,6 +155,9 @@ class MultifamilyLeaseSerializer(serializers.ModelSerializer):
             data['bathrooms'] = instance.unit.bathrooms
             data['market_rent'] = instance.unit.market_rent
             data['other_features'] = instance.unit.other_features
+            data['is_section8'] = instance.unit.is_section8
+            data['section8_contract_date'] = instance.unit.section8_contract_date
+            data['section8_contract_rent'] = instance.unit.section8_contract_rent
         return data
 
     def update(self, instance, validated_data):

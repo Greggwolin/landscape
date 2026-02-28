@@ -390,7 +390,7 @@
 .ops-statement-grid {
   display: grid;
   /* grid-template-columns set via inline style for dynamic column visibility */
-  width: max-content;
+  width: 100%;
   font-size: 0.8125rem;
 }
 
@@ -419,6 +419,24 @@
   border-bottom: 1px solid var(--cui-border-color);
   /* When two-tier header is active, all cells align text to bottom */
   align-self: end;
+}
+
+/* Column resize handle — thin grab strip on right edge of header cells */
+.ops-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+.ops-col-resize-handle:hover,
+.ops-col-resize-handle:active {
+  background-color: var(--cui-primary);
+  opacity: 0.5;
 }
 
 /* Two-tier grouped header — top row with "Post Renovation" spanning two columns */

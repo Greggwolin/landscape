@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import {
+  CAlert,
+  CButton,
+  CModal,
+  CModalBody,
+  CModalFooter,
+  CModalHeader,
+  CModalTitle,
+  CSpinner,
+} from '@coreui/react';
 import type { UnitCostCategoryReference } from '@/types/benchmarks';
 import { getCategoryDeletionImpact, deleteCategory, type CategoryDeletionImpact } from '@/lib/api/categories';
 import { useToast } from '@/components/ui/toast';
@@ -64,128 +74,96 @@ export default function DeleteConfirmationModal({
   );
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              <AlertTriangle size={20} className="text-warning me-2" />
-              Confirm Delete Category
-            </h5>
-            <button className="btn-close" onClick={onClose} aria-label="Close">
-              <X size={20} />
-            </button>
+    <CModal visible onClose={onClose} backdrop="static" alignment="center">
+      <CModalHeader closeButton>
+        <CModalTitle className="d-flex align-items-center gap-2">
+          <AlertTriangle size={18} className="text-warning" />
+          Confirm Delete Category
+        </CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        {isLoading ? (
+          <div className="d-flex align-items-center gap-2 py-3">
+            <CSpinner size="sm" />
+            <span className="text-medium-emphasis">Checking deletion impact...</span>
           </div>
+        ) : error ? (
+          <CAlert color="danger" className="mb-0">
+            <strong>Error:</strong> {error}
+          </CAlert>
+        ) : (
+          <>
+            <p>
+              Are you sure you want to delete the category <strong>{category.category_name}</strong>?
+            </p>
 
-          <div className="modal-body">
-            {isLoading ? (
-              <div className="text-center py-4">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mt-2 text-muted">Checking deletion impact...</p>
-              </div>
-            ) : error ? (
-              <div className="alert alert-danger" role="alert">
-                <strong>Error:</strong> {error}
-              </div>
-            ) : (
-              <>
-                <p>
-                  Are you sure you want to delete the category <strong>{category.category_name}</strong>?
-                </p>
+            {impact && (
+              <div className="d-flex flex-column gap-2 mt-3">
+                <h6 className="mb-1">Deletion Impact</h6>
 
-                {impact && (
-                  <div className="deletion-impact mt-3">
-                    <h6 className="mb-3">Deletion Impact:</h6>
-
-                    {/* Child Categories */}
-                    {impact.child_categories.length > 0 && (
-                      <div className="impact-section mb-3">
-                        <div className="impact-label">
-                          <AlertTriangle size={16} className="text-warning me-2" />
-                          Child Categories ({impact.child_categories.length})
-                        </div>
-                        <div className="impact-details">
-                          <ul className="mb-0">
-                            {impact.child_categories.map((child) => (
-                              <li key={child.category_id}>{child.category_name}</li>
-                            ))}
-                          </ul>
-                          <small className="text-muted">
-                            These child categories will also be deleted (soft delete)
-                          </small>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Items */}
-                    {impact.item_count > 0 && (
-                      <div className="impact-section mb-3">
-                        <div className="impact-label">
-                          <AlertTriangle size={16} className="text-warning me-2" />
-                          Unit Cost Items ({impact.item_count})
-                        </div>
-                        <div className="impact-details">
-                          <small className="text-muted">
-                            {impact.item_count} item{impact.item_count !== 1 ? 's' : ''} linked to this category will become uncategorized
-                          </small>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Project Usage */}
-                    {impact.project_usage_count && impact.project_usage_count > 0 && (
-                      <div className="impact-section mb-3">
-                        <div className="impact-label">
-                          <AlertTriangle size={16} className="text-danger me-2" />
-                          Project Usage ({impact.project_usage_count})
-                        </div>
-                        <div className="impact-details">
-                          <small className="text-danger">
-                            This category is used in {impact.project_usage_count} active project{impact.project_usage_count !== 1 ? 's' : ''}
-                          </small>
-                        </div>
-                      </div>
-                    )}
-
-                    {!hasImpact && (
-                      <div className="alert alert-info mb-0">
-                        No dependencies found. This category can be safely deleted.
-                      </div>
-                    )}
-                  </div>
+                {impact.child_categories.length > 0 && (
+                  <CAlert color="warning" className="mb-0">
+                    <div className="fw-semibold mb-1">Child Categories ({impact.child_categories.length})</div>
+                    <ul className="mb-1">
+                      {impact.child_categories.map((child) => (
+                        <li key={child.category_id}>{child.category_name}</li>
+                      ))}
+                    </ul>
+                    <small>These child categories will also be deleted (soft delete).</small>
+                  </CAlert>
                 )}
 
-                {hasImpact && (
-                  <div className="alert alert-warning mt-3" role="alert">
-                    <strong>Note:</strong> This is a soft delete. The category will be marked as inactive but data will be preserved.
-                  </div>
+                {impact.item_count > 0 && (
+                  <CAlert color="warning" className="mb-0">
+                    <div className="fw-semibold mb-1">Unit Cost Items ({impact.item_count})</div>
+                    <small>
+                      {impact.item_count} item{impact.item_count !== 1 ? 's' : ''} linked to this
+                      category will become uncategorized.
+                    </small>
+                  </CAlert>
                 )}
-              </>
+
+                {impact.project_usage_count && impact.project_usage_count > 0 && (
+                  <CAlert color="danger" className="mb-0">
+                    <div className="fw-semibold mb-1">
+                      Project Usage ({impact.project_usage_count})
+                    </div>
+                    <small>
+                      This category is used in {impact.project_usage_count} active project
+                      {impact.project_usage_count !== 1 ? 's' : ''}.
+                    </small>
+                  </CAlert>
+                )}
+
+                {!hasImpact && (
+                  <CAlert color="info" className="mb-0">
+                    No dependencies found. This category can be safely deleted.
+                  </CAlert>
+                )}
+              </div>
             )}
-          </div>
 
-          <div className="modal-footer">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={isDeleting}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={handleDelete}
-              disabled={isLoading || isDeleting}
-            >
-              {isDeleting ? 'Deleting...' : 'Delete Category'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+            {hasImpact && (
+              <CAlert color="warning" className="mt-3 mb-0">
+                <strong>Note:</strong> This is a soft delete. The category will be marked as inactive.
+              </CAlert>
+            )}
+          </>
+        )}
+      </CModalBody>
+      <CModalFooter>
+        <CButton type="button" color="secondary" onClick={onClose} disabled={isDeleting}>
+          Cancel
+        </CButton>
+        <CButton
+          type="button"
+          color="danger"
+          onClick={handleDelete}
+          disabled={isLoading || isDeleting}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete Category'}
+        </CButton>
+      </CModalFooter>
+    </CModal>
   );
 }
