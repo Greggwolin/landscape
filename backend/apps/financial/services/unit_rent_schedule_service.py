@@ -75,10 +75,26 @@ class UnitRentScheduleService:
                 ba = int(bathrooms) if bathrooms == int(bathrooms) else bathrooms
                 unit_type_display = f'{bd}BR/{ba}BA'
 
+            # Build rich plan_name from unit_type + amenity (other_features)
+            # e.g. "2BR/2BA" + "XL patio" → "2 Bed 2 Bath XL Patio"
+            base_plan = unit_type_display
+            if bedrooms is not None and bathrooms is not None:
+                bd_int = int(bedrooms) if bedrooms == int(bedrooms) else bedrooms
+                ba_int = int(bathrooms) if bathrooms == int(bathrooms) else bathrooms
+                base_plan = f'{bd_int} Bed {ba_int} Bath'
+            amenity = ''
+            if hasattr(u, 'other_features') and u.other_features:
+                feat = u.other_features.strip()
+                # Only append meaningful amenity descriptors, skip generic notes
+                amenity_keywords = ['balcony', 'patio', 'tower', 'xl patio', 'garden', 'penthouse', 'loft', 'den']
+                if any(kw in feat.lower() for kw in amenity_keywords):
+                    amenity = feat.title()
+            plan_name = f'{base_plan} {amenity}'.strip() if amenity else base_plan
+
             result.append({
                 'unit_id': u.unit_id,
                 'unit_number': u.unit_number or '',
-                'plan_name': type_info.get('plan_name', u.unit_type or ''),
+                'plan_name': plan_name,
                 'unit_type': unit_type_display,
                 'bedrooms': bedrooms,
                 'bathrooms': bathrooms,

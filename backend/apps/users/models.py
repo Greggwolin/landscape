@@ -51,6 +51,7 @@ class UserLandscaperProfile(models.Model):
     markets_text = models.TextField(null=True, blank=True)
 
     compiled_instructions = models.TextField(null=True, blank=True)
+    custom_instructions = models.TextField(null=True, blank=True)
     onboarding_chat_history = models.JSONField(default=list)
     interaction_insights = models.JSONField(default=dict)
     document_insights = models.JSONField(default=dict)

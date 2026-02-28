@@ -294,13 +294,13 @@ export function RentScheduleGrid({ data, isLoading }: RentScheduleGridProps) {
     );
   }
 
-  // Column widths
-  const labelWidth = 80;
-  const planWidth = 140;
-  const typeWidth = 70;
-  const sfWidth = 80;
-  const periodWidth = timeScale === 'monthly' ? 90 : timeScale === 'quarterly' ? 110 : 130;
-  const totalWidth = 110;
+  // Column widths — sized to fit typical content, not stretch
+  const labelWidth = 56;
+  const planWidth = 160;
+  const typeWidth = 60;
+  const sfWidth = 60;
+  const periodWidth = timeScale === 'monthly' ? 72 : timeScale === 'quarterly' ? 82 : 92;
+  const totalWidth = 82;
 
   // Shared cell styles
   const cellBase: React.CSSProperties = {

@@ -1,37 +1,35 @@
 .uom-table {
   width: 100%;
   margin-top: 0;
-  color: #fff;
   border: 0;
   border-collapse: separate;
   border-spacing: 0;
 }
 
 .uom-table th {
-  background-color: var(--cui-table-header-bg, #1f2937);
-  color: var(--cui-table-header-color, #e5e7eb);
+  background-color: var(--cui-table-bg, var(--cui-tertiary-bg));
+  color: var(--cui-body-color);
   font-weight: 600;
 }
 
 .uom-table td,
 .uom-table th {
-  border: 1px solid rgba(51, 65, 85, 0.35);
-  border-color: rgba(51, 65, 85, 0.35);
+  border: 1px solid var(--cui-border-color);
   padding: 0.65rem 0.75rem;
   vertical-align: middle;
 }
 
 .uom-table thead th {
   border-top: 0 !important;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.4) !important;
+  border-bottom: 1px solid var(--cui-border-color) !important;
 }
 
 .uom-table tr {
-  background-color: var(--cui-body-bg, #0b1220);
+  background-color: var(--cui-body-bg);
 }
 
 .uom-table tbody td {
-  border-top: 1px solid rgba(51, 65, 85, 0.35);
+  border-top: 1px solid var(--cui-border-color);
 }
 
 .uom-row-editing {
@@ -46,9 +44,9 @@
 
 .uom-category-badge {
   font-size: 0.75rem;
-  background-color: rgba(var(--cui-secondary-rgb, 108, 117, 125), 0.36);
-  border: 1px solid rgba(var(--cui-secondary-rgb, 108, 117, 125), 0.6);
-  color: #fff;
+  background-color: color-mix(in srgb, var(--cui-secondary) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cui-secondary) 50%, transparent);
+  color: var(--cui-body-color);
   font-weight: 600;
 }
 
@@ -69,9 +67,9 @@
 }
 
 .uom-table-card {
-  background-color: var(--cui-card-bg, #0f172a);
-  border: 1px solid var(--cui-border-color, #334155);
+  background-color: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }

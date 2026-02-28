@@ -18,6 +18,7 @@ export interface AdminUser {
   is_verified: boolean;
   is_active: boolean;
   is_staff: boolean;
+  plain_password: string | null;
   created_at: string;
   last_login: string | null;
 }

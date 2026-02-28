@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
 import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
@@ -182,7 +182,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     message: string
     type: 'success' | 'error'
   } | null>(null)
-  const section8AutoShownRef = useRef(false)
+  // Detect Section 8 presence once — drives column visibility in columnDefs
+  const hasSection8 = useMemo(() => units.some((u: Unit) => u.is_section8 === true), [units])
   const [floorplanDialogOpen, setFloorplanDialogOpen] = useState(false)
   const [floorplanCheck, setFloorplanCheck] = useState<any>(null)
   const [pendingUpdate, setPendingUpdate] = useState<{
@@ -290,25 +291,6 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     ['units', 'leases', 'unit_types'],
     refreshAllData
   )
-
-  // Auto-show Section 8 columns when any unit has is_section8 = true.
-  // Only triggers once on initial detection — user can hide them after.
-  useEffect(() => {
-    if (section8AutoShownRef.current || !gridApi) return
-    const hasSection8 = units.some((u: Unit) => u.is_section8 === true)
-    if (hasSection8) {
-      section8AutoShownRef.current = true
-      // AG-Grid v34: applyColumnState is on the grid API directly
-      gridApi.applyColumnState({
-        state: [
-          { colId: 'is_section8', hide: false },
-          { colId: 'section8_contract_date', hide: false },
-          { colId: 'section8_contract_rent', hide: false },
-        ],
-        applyOrder: false,
-      })
-    }
-  }, [units, gridApi])
 
   // Build dropdown options from unit types
   const unitTypeOptions = useMemo(() => {
@@ -635,8 +617,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       headerName: 'Unit',
       pinned: 'left',
       editable: true,
-      width: 100,
-      minWidth: 80,
+      minWidth: 50,
       cellStyle: (params) => {
         const pending = getPendingCellStyle(params)
         return { fontWeight: 'bold', ...(pending || {}) }
@@ -652,15 +633,13 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'building_name',
       headerName: 'Building',
       editable: true,
-      width: 120,
-      minWidth: 100,
+      minWidth: 60,
     },
     {
       field: 'unit_type',
       headerName: 'Unit Type',
       editable: true,
-      width: 140,
-      minWidth: 120,
+      minWidth: 60,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
         values: unitTypeOptions.length > 0 ? unitTypeOptions : ['1BR', '2BR', '3BR', '4BR', 'Studio']
@@ -691,7 +670,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       headerName: 'Bed',
       field: 'bedrooms',
-      width: 80,
+      minWidth: 40,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
@@ -714,7 +693,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       headerName: 'Bath',
       field: 'bathrooms',
-      width: 80,
+      minWidth: 40,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
@@ -737,8 +716,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       headerName: 'Other',
       field: 'other_features',
-      width: 180,
-      minWidth: 150,
+      minWidth: 60,
       flex: 1,  // Takes remaining space
       editable: true,
       tooltipField: 'other_features',
@@ -753,7 +731,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'square_feet',
       headerName: 'SF',
       editable: true,
-      width: 90,
+      minWidth: 50,
       type: 'numericColumn',
       cellRenderer: (params: any) => {
         const pending = pendingCellRenderer(params)
@@ -767,7 +745,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'lease_start_date',
       headerName: 'Lease Start',
       editable: true,
-      width: 120,
+      minWidth: 70,
       cellRenderer: (params: any) => {
         const pending = pendingCellRenderer(params)
         if (pending !== undefined) return pending
@@ -780,7 +758,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'lease_end_date',
       headerName: 'Lease End',
       editable: true,
-      width: 120,
+      minWidth: 70,
       cellRenderer: (params: any) => {
         const pending = pendingCellRenderer(params)
         if (pending !== undefined) return pending
@@ -793,7 +771,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'base_rent_monthly',
       headerName: 'Monthly Rent',
       editable: true,
-      width: 130,
+      minWidth: 70,
       type: 'numericColumn',
       cellRenderer: (params: any) => {
         const pending = pendingCellRenderer(params)
@@ -806,7 +784,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       headerName: 'Loss-to-Lease',
       field: 'loss_to_lease',
-      width: 130,
+      minWidth: 70,
       type: 'numericColumn',
       headerTooltip: 'Market Rent - Current Rent. Positive = below market (opportunity), Negative = above market (risk). Uses market rent from Floorplans.',
       cellStyle: (params) => {
@@ -883,8 +861,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       field: 'lease_status',
       headerName: 'Status',
       editable: true,
-      width: 150,
-      minWidth: 130,
+      minWidth: 80,
       cellRenderer: (params: any) => {
         // Pending change display takes precedence over StatusBadge
         const pending = pendingCellRenderer(params)
@@ -897,13 +874,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         values: ['ACTIVE', 'NOTICE_GIVEN', 'EXPIRED', 'MONTH_TO_MONTH', 'CANCELLED'],
       },
     },
-    // Section 8 columns — hidden by default, auto-shown when any unit has is_section8
+    // Section 8 columns — shown when any unit has is_section8 = true
     {
       field: 'is_section8',
-      headerName: 'Sec. 8',
-      width: 80,
-      minWidth: 70,
-      hide: true,
+      headerName: 'Sec 8',
+      minWidth: 50,
+      hide: !hasSection8,
       cellRenderer: (params: any) => {
         if (!params.data) return null
         return params.value ? '✓' : ''
@@ -916,9 +892,8 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       field: 'section8_contract_date',
       headerName: 'S8 Contract Date',
-      width: 140,
-      minWidth: 120,
-      hide: true,
+      minWidth: 80,
+      hide: !hasSection8,
       valueFormatter: (params: any) => {
         if (!params.value) return ''
         return formatDate(params.value)
@@ -928,9 +903,9 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     {
       field: 'section8_contract_rent',
       headerName: 'S8 Contract Rent',
-      width: 140,
-      minWidth: 120,
-      hide: true,
+      minWidth: 80,
+      hide: !hasSection8,
+      type: 'numericColumn',
       valueFormatter: (params: any) => {
         if (params.value == null) return ''
         return formatCurrency(Number(params.value))
@@ -975,7 +950,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         )
       },
     },
-  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, handleAddRowAt, unitTypeMap, mutateLeases, showNotification, getPendingCellStyle, getPendingTooltip, pendingCellRenderer, hasPending, unitsWithChanges, getUnitSelectionState, selectAllForUnit, deselectAllForUnit])
+  ], [formatDate, formatCurrency, formatNumber, handleDeleteRow, handleAddRowAt, unitTypeMap, mutateLeases, showNotification, getPendingCellStyle, getPendingTooltip, pendingCellRenderer, hasPending, unitsWithChanges, getUnitSelectionState, selectAllForUnit, deselectAllForUnit, hasSection8])
 
   // Context menu with pending change actions
   const getContextMenuItems = useCallback((params: any) => {
@@ -1458,21 +1433,33 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
               resizable: true,
               sortable: true,
               filter: true,
-              suppressSizeToFit: true,  // Prevent auto-sizing that truncates
-              minWidth: 80,              // Minimum column width
-              wrapText: false,           // Keep single-line (no wrapping)
-              autoHeight: false,         // Fixed row height
+              minWidth: 50,
+              wrapText: false,
+              autoHeight: false,
+              wrapHeaderText: true,
+              autoHeaderHeight: true,
               cellStyle: (params) => {
                 const pendingStyle = getPendingCellStyle(params)
-                return pendingStyle || {}
+                return { whiteSpace: 'nowrap', ...(pendingStyle || {}) }
               },
             }}
-            suppressColumnVirtualisation={true}  // Render all columns (no truncation)
-            suppressHorizontalScroll={false}     // Enable horizontal scroll
-            domLayout="normal"                   // Normal layout (not autoHeight)
+            suppressColumnVirtualisation={true}
+            suppressHorizontalScroll={false}
+            domLayout="normal"
             theme="legacy"
             rowHeight={40}
             onGridReady={(params) => setGridApi(params.api)}
+            onFirstDataRendered={(params) => {
+              // Defer one frame so inline whiteSpace:'nowrap' is painted before measuring.
+              requestAnimationFrame(() => {
+                const allColIds = params.api.getColumns()
+                  ?.map((col: any) => col.getColId())
+                  .filter((id: string) => id !== 'actions' && id !== '_delta_select') ?? []
+                if (allColIds.length) {
+                  params.api.autoSizeColumns(allColIds, true) // true = skipHeader
+                }
+              })
+            }}
             onCellClicked={(params) => {
               // If this cell has a pending change, toggle acceptance on click
               handlePendingCellClick(params)

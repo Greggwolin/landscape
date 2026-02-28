@@ -2012,7 +2012,8 @@ def get_landscaper_response(
     tool_executor: Optional[Any] = None,
     additional_context: Optional[str] = None,
     page_context: Optional[str] = None,
-    is_admin: bool = False
+    is_admin: bool = False,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Generate AI response to user message using Claude API with tool use.
@@ -2030,6 +2031,7 @@ def get_landscaper_response(
                       If provided, only tools relevant to that context will be available.
         is_admin: Whether the caller is an admin/operator (grants admin tool access).
                       This improves reliability by reducing the tool count Claude sees.
+        user_id: Optional user ID for loading user-specific custom instructions.
 
     Returns:
         Dict with:
@@ -2049,7 +2051,23 @@ def get_landscaper_response(
 
     # Add project context to system prompt
     project_context_msg = _build_project_context_message(project_context)
-    full_system = f"{system_prompt}\n{scope_section}\n{field_rules}\n---\n{project_context_msg}"
+
+    # Inject user custom instructions (between field_rules and project_context)
+    user_instructions_section = ""
+    if user_id:
+        try:
+            from apps.users.models import UserLandscaperProfile
+            profile = UserLandscaperProfile.objects.filter(user_id=user_id).first()
+            if profile and profile.custom_instructions:
+                user_instructions_section = (
+                    "\n--- USER INSTRUCTIONS ---\n"
+                    f"{profile.custom_instructions}\n"
+                    "--- END USER INSTRUCTIONS ---\n"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to load user custom instructions: {e}")
+
+    full_system = f"{system_prompt}\n{scope_section}\n{field_rules}{user_instructions_section}\n---\n{project_context_msg}"
 
     # Add rich project context (structured data from relevant tables only)
     # Pass page_context so only sections relevant to the current page are included.

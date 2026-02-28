@@ -400,8 +400,10 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         serializer = AdminSetPasswordSerializer(data=request.data)
 
         if serializer.is_valid():
-            user.set_password(serializer.validated_data['password'])
-            user.save()
+            raw_password = serializer.validated_data['password']
+            user.set_password(raw_password)
+            user.plain_password = raw_password
+            user.save(update_fields=['password', 'plain_password'])
             return Response({'message': 'Password updated successfully'})
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

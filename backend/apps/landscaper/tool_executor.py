@@ -105,13 +105,15 @@ ALLOWED_UPDATES = {
             # Sizing
             'acres_gross', 'target_units', 'total_units',
             'gross_sf', 'lot_size_sf', 'lot_size_acres', 'net_rentable_area',
-            'building_count', 'number_of_stories', 'year_built',
+            'building_count', 'stories', 'year_built',
             # Pricing
             'price_range_low', 'price_range_high',
+            'price_per_unit', 'price_per_sf',
             # Financial
             'discount_rate_pct', 'cost_of_capital_pct',
             # Analysis
             'analysis_start_date', 'analysis_end_date', 'calculation_frequency',
+            'analysis_type', 'analysis_mode',
             # Ownership
             'legal_owner', 'developer_owner',
             # Status
@@ -119,11 +121,56 @@ ALLOWED_UPDATES = {
             # Property classification (added 2026-02-27, verified against live DB)
             'project_type_code', 'property_subtype', 'property_class', 'ownership_type',
             # Identification
-            'apn_primary', 'msa_id',
+            'apn_primary', 'apn_secondary', 'msa_id',
             # Valuation
             'asking_price',
             # Analysis configuration
             'analysis_perspective', 'analysis_purpose', 'value_source',
+            # Zoning & Site (added 2026-02-28, verified against live DB)
+            'current_zoning', 'proposed_zoning', 'general_plan', 'flood_zone',
+            'topography', 'site_shape',
+            # Existing use & assessed value
+            'existing_land_use', 'assessed_value',
+            # Acquisition
+            'acquisition_price', 'acquisition_date',
+            # Operating metrics — current
+            'cap_rate_current', 'cap_rate_proforma',
+            'current_gpr', 'current_other_income', 'current_gpi',
+            'current_vacancy_rate', 'current_egi', 'current_opex', 'current_noi',
+            # Operating metrics — proforma
+            'proforma_gpr', 'proforma_other_income', 'proforma_gpi',
+            'proforma_vacancy_rate', 'proforma_egi', 'proforma_opex', 'proforma_noi',
+            # Walkability & location scores
+            'walk_score', 'bike_score', 'transit_score',
+            # Site ratings
+            'site_utility_rating', 'location_rating', 'access_rating', 'visibility_rating',
+            # Building & improvement details
+            'construction_class', 'construction_type',
+            'condition_rating', 'quality_rating',
+            'land_to_building_ratio',
+            'effective_age', 'total_economic_life', 'remaining_economic_life',
+            # Parking
+            'parking_spaces', 'parking_ratio', 'parking_type',
+            # Primary count/area (flexible sizing)
+            'primary_count', 'primary_count_type',
+            'primary_area', 'primary_area_type',
+            # Planning & velocity
+            'planning_efficiency', 'velocity_override_reason',
+            # Project dates
+            'start_date',
+            # Listing & admin
+            'listing_brokerage', 'job_number', 'version_reference',
+            'project_focus', 'country',
+            # Value-add & OpEx config
+            'value_add_enabled', 'active_opex_discriminator',
+            # Takedown agreement
+            'has_takedown_agreement',
+            # Lotbank config
+            'lotbank_management_fee_pct', 'lotbank_default_provision_pct', 'lotbank_underwriting_fee',
+            # Collateral
+            'collateral_enforcement',
+            # Taxonomy flags
+            'uses_global_taxonomy', 'taxonomy_customized', 'jurisdiction_integrated',
         ],
         # Map friendly names to actual column names (for convenience)
         'field_aliases': {
@@ -138,6 +185,20 @@ ALLOWED_UPDATES = {
             'building_area': 'gross_sf',
             'lot_size': 'lot_size_sf',
             'site_area': 'lot_size_sf',
+            'number_of_stories': 'stories',
+            'num_stories': 'stories',
+            'number_of_buildings': 'building_count',
+            'num_buildings': 'building_count',
+            'nra': 'net_rentable_area',
+            'purchase_price': 'acquisition_price',
+            'cap_rate': 'cap_rate_current',
+            'vacancy_rate': 'current_vacancy_rate',
+            'noi': 'current_noi',
+            'walkscore': 'walk_score',
+            'bikescore': 'bike_score',
+            'transitscore': 'transit_score',
+            'parking': 'parking_spaces',
+            'zoning': 'current_zoning',
         },
         'pk_field': 'project_id',
         'schema': 'landscape'
@@ -329,6 +390,73 @@ FIELD_TYPES = {
     'phase_no': 'integer',
     # tbl_project expansion fields
     'asking_price': 'decimal',
+    'gross_sf': 'decimal',
+    'lot_size_sf': 'decimal',
+    'lot_size_acres': 'decimal',
+    'net_rentable_area': 'decimal',
+    'price_per_unit': 'decimal',
+    'price_per_sf': 'decimal',
+    'building_count': 'integer',
+    'stories': 'integer',
+    'market_velocity_annual': 'decimal',
+    # Acquisition
+    'acquisition_price': 'decimal',
+    'acquisition_date': 'date',
+    # Operating metrics — current & proforma
+    'cap_rate_current': 'decimal',
+    'cap_rate_proforma': 'decimal',
+    'current_gpr': 'decimal',
+    'current_other_income': 'decimal',
+    'current_gpi': 'decimal',
+    'current_vacancy_rate': 'decimal',
+    'current_egi': 'decimal',
+    'current_opex': 'decimal',
+    'current_noi': 'decimal',
+    'proforma_gpr': 'decimal',
+    'proforma_other_income': 'decimal',
+    'proforma_gpi': 'decimal',
+    'proforma_vacancy_rate': 'decimal',
+    'proforma_egi': 'decimal',
+    'proforma_opex': 'decimal',
+    'proforma_noi': 'decimal',
+    # Walkability & location scores
+    'walk_score': 'integer',
+    'bike_score': 'integer',
+    'transit_score': 'integer',
+    # Site ratings
+    'site_utility_rating': 'decimal',
+    'location_rating': 'decimal',
+    'access_rating': 'decimal',
+    'visibility_rating': 'decimal',
+    # Building & improvement details
+    'land_to_building_ratio': 'decimal',
+    'effective_age': 'integer',
+    'total_economic_life': 'integer',
+    'remaining_economic_life': 'integer',
+    # Parking
+    'parking_spaces': 'integer',
+    'parking_ratio': 'decimal',
+    # Primary count/area
+    'primary_count': 'integer',
+    'primary_area': 'decimal',
+    # Planning & velocity
+    'planning_efficiency': 'decimal',
+    # Project dates
+    'start_date': 'date',
+    'analysis_start_date': 'date',
+    'analysis_end_date': 'date',
+    # Value-add & OpEx config
+    'value_add_enabled': 'boolean',
+    # Takedown agreement
+    'has_takedown_agreement': 'boolean',
+    # Lotbank config
+    'lotbank_management_fee_pct': 'decimal',
+    'lotbank_default_provision_pct': 'decimal',
+    'lotbank_underwriting_fee': 'decimal',
+    # Taxonomy flags
+    'uses_global_taxonomy': 'boolean',
+    'taxonomy_customized': 'boolean',
+    'jurisdiction_integrated': 'boolean',
     # tbl_operating_expenses numeric fields
     'annual_amount': 'decimal',
     'amount_per_sf': 'decimal',

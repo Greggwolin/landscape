@@ -67,8 +67,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'company', 'phone', 'role', 'is_verified', 'is_active', 'is_staff', 'created_at', 'last_login', 'profile']
-        read_only_fields = ['id', 'created_at', 'is_verified', 'last_login']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'company', 'phone', 'role', 'is_verified', 'is_active', 'is_staff', 'created_at', 'last_login', 'plain_password', 'profile']
+        read_only_fields = ['id', 'created_at', 'is_verified', 'last_login', 'plain_password']
     
     def get_profile(self, obj):
         try:
@@ -126,6 +126,9 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
             password=password,
             **validated_data
         )
+        # Store plain password for admin visibility
+        user.plain_password = password
+        user.save(update_fields=['plain_password'])
         # Create profile
         UserProfile.objects.create(user=user)
         return user

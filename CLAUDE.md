@@ -41,7 +41,7 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
          │  Neon PostgreSQL      │
          │  Database: land_v2    │
          │  Schema: landscape    │
-         │  280 tables           │
+         │  280+ tables          │
          └───────────────────────┘
                      │
          ┌───────────┴───────────┐
@@ -111,8 +111,8 @@ landscape/
 │   │   ├── containers/       # Universal hierarchy
 │   │   ├── financial/        # Budget, actuals, variance
 │   │   ├── calculations/     # Python financial engine wrapper
-│   │   ├── documents/        # DMS
-│   │   ├── knowledge/        # RAG/embeddings
+│   │   ├── documents/        # DMS + extraction pipeline
+│   │   ├── knowledge/        # RAG/embeddings (40+ service files)
 │   │   ├── market_intel/     # Market data
 │   │   └── ...
 │   └── manage.py
@@ -121,7 +121,7 @@ landscape/
 │   ├── financial_engine_py/  # numpy-financial calculations
 │   └── market_ingest_py/     # Market data ingestion
 │
-├── migrations/               # Database migrations (36 files)
+├── migrations/               # Database migrations (36+ files)
 ├── scripts/                  # Node.js/bash utilities (77 files)
 ├── docs/                     # Documentation (numbered 00-14)
 ├── tests/                    # Playwright E2E tests
@@ -196,14 +196,26 @@ MXU  - Mixed Use
 **Use TanStack Table** (`@tanstack/react-table`) for all new table implementations.
 
 - Existing: Budget grid uses TanStack with optional virtualization
+- AG-Grid Community v34+ is used in the Rent Roll grid — extend only when needed for that component
 - Handsontable exists in legacy "Budget Grid Dark" - do not extend
-- AG Grid, Glide Data Grid are installed but not preferred
+
+### Tabular Data Formatting Rules
+
+All table and grid components must follow:
+
+1. **Size columns to cell content only** — Column width is driven by the widest cell value, never by the header text. Headers wrap to fit whatever width the content dictates.
+2. **Multi-word headers wrap** — headers with 2+ words render on multiple lines; the header never forces a column wider than its content requires.
+3. **Implementation by library:**
+   - **AG-Grid:** `autoSizeStrategy={{ type: 'fitCellContents', skipHeader: true }}`, `wrapHeaderText: true`, `autoHeaderHeight: true`, no fixed `width` (use `minWidth` only). CSS: `.ag-header-cell-label { white-space: normal }`
+   - **TanStack Table:** column `size` = `undefined`, CSS `white-space: normal` on `<th>`, browser layout algorithm sizes to content.
+   - **CoreUI / HTML:** `table-layout: auto`, `white-space: normal` on `<th>`, `white-space: nowrap` on `<td>`.
+4. **Exception:** Pinned utility columns may use fixed `width` + `maxWidth`.
 
 ### Styling
 
-- **Tailwind CSS** - Primary styling approach
-- **CSS variables** - Theme tokens in `src/styles/tokens.css`
-- **Dark mode** - Supported via CoreUI theme provider
+- **CoreUI CSS variables** — always use `var(--cui-*)` tokens; never hardcode hex colors
+- **Tailwind CSS** — secondary styling; forbidden patterns: `bg-slate-*`, `bg-gray-*`, `dark:` variants
+- **Dark mode** — supported via CoreUI theme provider; use CSS vars so it works automatically
 - Path aliases: `@/*` → `./src/*`
 
 ### File Naming
@@ -334,6 +346,10 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 /api/calculations/irr/                 # Financial calcs
 /api/calculations/npv/
 /api/calculations/dscr/
+/api/multifamily/units                 # Unit CRUD
+/api/multifamily/leases                # Lease CRUD
+/api/multifamily/turns                 # Turn tracking
+/api/knowledge/documents/{doc_id}/process/  # Sync doc processing
 ```
 
 ### Next.js Routes (Legacy - Reference Only)
@@ -373,12 +389,12 @@ Django uses DRF serializers with consistent envelope:
 | Step | Feature | Status | Key Gap |
 |------|---------|--------|---------|
 | 1 | Project Creation | ✅ WORKS | No Landscaper during creation |
-| 2 | Document Upload & Extraction | ⚠️ PARTIAL | Async pipeline orchestration unclear |
+| 2 | Document Upload & Extraction | ⚠️ PARTIAL | Async pipeline orchestration unclear; scanned PDFs require OCR preprocessing |
 | 3 | Document Management | ✅ WORKS | Full DMS with 30+ API routes |
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
 | 6 | Operations Tab | ⚠️ PARTIAL | Save endpoint still on legacy Next.js |
-| 7 | Landscaper Chat | ✅ WORKS | 50+ tools, thread-based, mutations |
+| 7 | Landscaper Chat | ✅ WORKS | 210+ tools, thread-based, mutations |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases |
@@ -393,19 +409,20 @@ Django uses DRF serializers with consistent envelope:
 2. **Operations save migration** — Move to Django from legacy Next.js route
 3. **Reports project scoping** — Remove hardcoded project 17
 4. **Waterfall calculate endpoint** — Wire to financial engine
-5. **Extraction pipeline verification** — End-to-end async flow
+5. **Extraction pipeline verification** — End-to-end async flow; OCR gap for scanned PDFs
 6. **PDF report generation** — At minimum property summary
 
 ### Known Technical Debt
 
 - 50 TODO/FIXME markers across 40 files
-- Multiple grid libraries need consolidation (TanStack preferred)
+- Multiple grid libraries need consolidation (TanStack preferred for new; AG-Grid retained in rent roll)
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
 - Operations save endpoint on legacy Next.js (being migrated)
 - Reports page hardcoded to project 17
 - Waterfall calc endpoint called but doesn't exist (404)
 - pgvector column commented out in Knowledge embeddings model
+- Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
 
 ### Navigation Architecture
 
@@ -418,11 +435,37 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with 50+ registered tools (`@register_tool` decorator)
+- Claude AI with **210+ registered tools** (`@register_tool` decorator)
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
 - Activity feed + extraction logs + scenario management
+- **Silent failure risk:** ALLOWED_UPDATES field mappings must match actual DB column names exactly — always verify tool writes against the DB directly, not just API response codes
+- **Comp tools:** Use unified comparables table with `property_type` discriminator — not separate land/MF tables
+
+### Ingestion Workbench (Design Phase — Feb 2026)
+
+The document ingestion UI is being redesigned as a persistent **split-panel workbench** (replacing the prior modal approach):
+
+- **Layout:** 380px Landscaper chat (left) + field table (right)
+- **Field status model:** `accepted` / `pending` / `conflict` / `waiting` / `empty`
+- **Tile tabs:** Project / Planning / Budget / Market / All
+- **Authority:** Implicit — emerges from user conflict resolution rather than a pre-set authority matrix
+- **OCR detection:** Landscaper detects scanned vs. native PDFs and responds with appropriate messaging
+- Implementation prompt not yet written; design locked in LK session transcripts
+
+### PDF / OCR Handling
+
+Two distinct failure modes — treat separately:
+
+| Problem | Symptom | Solution |
+|---------|---------|---------|
+| Scanned PDF | Extraction returns empty or near-zero confidence | OCRmyPDF preprocessing before ingestion |
+| Complex native PDF | Low confidence on specific fields (tables, columns) | Layout-aware LLM prompting on retry |
+
+**Landscaper behavior:** Must detect and surface the problem to the user rather than silently returning empty placeholders. Large files must be chunked with user notification if only partial extraction was possible.
+
+**Recommended stack:** OCRmyPDF (add text layer) + Ghostscript (compression). Integration point: `backend/apps/documents/` before `core_doc_text` ingestion step.
 
 ### RAG/Knowledge System
 
@@ -441,6 +484,7 @@ Django uses DRF serializers with consistent envelope:
 - **Income Approach:** 3 NOI bases (F-12 Current/Market/Stabilized), DCF monthly for MF
 - **Reconciliation:** Backend complete (weights, narrative versioning), no frontend
 - **Financial Engine:** `services/financial_engine_py/` with IRR/NPV/DSCR/waterfall tests
+- **Construction Loan Engine:** Phase 6A complete (draw-repay-redraw validated); Phase 6B land dev conversational parsing complete
 
 ---
 
@@ -490,10 +534,19 @@ Before committing changes:
 ### Adding a New React Component
 
 1. Create in appropriate `src/components/{domain}/` folder
-2. Use CoreUI components as base
+2. Use CoreUI components as base; CSS vars only (no hardcoded hex)
 3. Follow PascalCase naming
 4. Add 'use client' directive if using hooks/state
 5. Implement all three complexity modes if data-heavy
+6. Follow tabular formatting rules if component includes a grid/table
+
+### Adding a New Landscaper Tool
+
+1. Add function with `@register_tool` decorator in appropriate tools file
+2. Verify ALLOWED_UPDATES field names match actual DB column names exactly
+3. Write a test that confirms the value was written to the DB (not just API 200)
+4. Update tool count in this file under Landscaper Architecture
+5. Run server restart after changes
 
 ### Modifying Database Schema
 
@@ -534,6 +587,7 @@ When starting a new Claude Code session:
 5. Ask about current focus area if unclear
 
 ---
+
 ## Working Style
 
 ### Clarification Before Execution
@@ -554,6 +608,9 @@ DO ask clarifying questions when:
 - Required information (table names, component locations, etc.) is missing
 - The scope is ambiguous (e.g., "fix the budget" - which aspect?)
 
-*Last updated: 2026-02-15*
+---
+
+*Last updated: 2026-02-28*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Maintainer: Update when architecture decisions change*
+*Landscaper tool count: 210+*
+*Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

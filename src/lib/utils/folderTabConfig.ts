@@ -359,24 +359,13 @@ export function createFolderConfig(
 
     // ========================================
     // Position 6: Reports
-    // Subtabs: summary, export
+    // No subtabs - single page with collapsible panels
     // ========================================
     {
       id: 'reports',
       label: 'Reports',
       color: TILE_COLORS.reports,
-      subTabs: filterSubtabsByType(
-        [
-          { id: 'summary', label: 'Summary' },
-          { id: 'rent_schedule', label: 'Rent Schedule', projectTypes: ['multifamily'] },
-          { id: 'export', label: 'Export' },
-          { id: 'investment_committee', label: 'IC Review', hideForPurpose: ['VALUATION'] as AnalysisPurposeCode[] },
-        ],
-        projectType,
-        analysisType,
-        valueAddEnabled,
-        analysisPurpose
-      ),
+      subTabs: [],
     },
 
     // ========================================

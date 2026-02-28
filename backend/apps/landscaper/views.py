@@ -437,7 +437,8 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
                 message_history,
                 project_context,
                 tool_executor=tool_executor_fn,
-                page_context=page_context
+                page_context=page_context,
+                user_id=_uid,
             )
 
             # Include tool calls and field updates in metadata
@@ -1633,7 +1634,8 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 project_context,
                 tool_executor=tool_executor_fn,
                 additional_context=chat_context if chat_context else None,
-                page_context=page_context
+                page_context=page_context,
+                user_id=_uid,
             )
 
             # Build metadata
@@ -1839,6 +1841,7 @@ class GlobalChatViewSet(viewsets.ViewSet):
                 global_context,
                 tool_executor=tool_executor_fn,
                 page_context=page_context,
+                user_id=_uid,
             )
 
             # Store user message (with project=None for global)

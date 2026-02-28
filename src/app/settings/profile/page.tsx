@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+const CUSTOM_INSTRUCTIONS_MAX = 4000;
 
 function ProfileSettingsContent() {
   const { user, updateProfile, tokens, logout } = useAuth();
@@ -12,6 +13,12 @@ function ProfileSettingsContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Custom Landscaper Instructions
+  const [customInstructions, setCustomInstructions] = useState('');
+  const [savedCustomInstructions, setSavedCustomInstructions] = useState('');
+  const [isSavingInstructions, setIsSavingInstructions] = useState(false);
+  const [instructionsLoaded, setInstructionsLoaded] = useState(false);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -39,6 +46,56 @@ function ProfileSettingsContent() {
       });
     }
   }, [user]);
+
+  // Fetch custom instructions from landscaper profile
+  const fetchCustomInstructions = useCallback(async () => {
+    if (!tokens?.access) return;
+    try {
+      const res = await fetch(`${DJANGO_API_BASE}/api/users/landscaper-profile/`, {
+        headers: { 'Authorization': `Bearer ${tokens.access}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const val = data.custom_instructions || '';
+        setCustomInstructions(val);
+        setSavedCustomInstructions(val);
+        setInstructionsLoaded(true);
+      }
+    } catch {
+      // Profile may not exist yet — that's fine
+      setInstructionsLoaded(true);
+    }
+  }, [tokens?.access]);
+
+  useEffect(() => {
+    fetchCustomInstructions();
+  }, [fetchCustomInstructions]);
+
+  const handleSaveInstructions = async () => {
+    if (!tokens?.access) return;
+    setIsSavingInstructions(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`${DJANGO_API_BASE}/api/users/landscaper-profile/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokens.access}`,
+        },
+        body: JSON.stringify({ custom_instructions: customInstructions || null }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.custom_instructions?.[0] || err.detail || 'Failed to save');
+      }
+      setSavedCustomInstructions(customInstructions);
+      setMessage({ type: 'success', text: 'Custom instructions saved!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save instructions' });
+    } finally {
+      setIsSavingInstructions(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -425,6 +482,57 @@ function ProfileSettingsContent() {
           </form>
         )}
       </div>
+
+      {/* Custom Landscaper Instructions */}
+      {instructionsLoaded && (
+        <div className="bg-[#212529] rounded-lg border border-[#2d3238] p-6 mb-6">
+          <h2 className="text-lg font-medium text-white mb-2">Custom Landscaper Instructions</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Freeform instructions that shape how Landscaper responds to you.
+          </p>
+          <textarea
+            value={customInstructions}
+            onChange={(e) => setCustomInstructions(e.target.value)}
+            maxLength={CUSTOM_INSTRUCTIONS_MAX}
+            rows={5}
+            placeholder="e.g., Always format dollar values with commas. Prefer concise bullet points over paragraphs. Use IRR as the primary return metric."
+            className="w-full px-4 py-3 bg-[#2d3238] border border-[#3d4248] rounded-lg
+                       text-white placeholder-gray-500 focus:outline-none focus:ring-2
+                       focus:ring-blue-500 resize-y text-sm"
+          />
+          <div className="flex items-center justify-between mt-2">
+            <span className={`text-xs ${
+              customInstructions.length > CUSTOM_INSTRUCTIONS_MAX * 0.9
+                ? 'text-yellow-400'
+                : 'text-gray-500'
+            }`}>
+              {customInstructions.length.toLocaleString()} / {CUSTOM_INSTRUCTIONS_MAX.toLocaleString()} characters
+            </span>
+            <div className="flex gap-3">
+              {customInstructions !== savedCustomInstructions && (
+                <button
+                  type="button"
+                  onClick={() => setCustomInstructions(savedCustomInstructions)}
+                  className="px-4 py-2 text-sm bg-[#2d3238] hover:bg-[#3d4248] text-white
+                             rounded-lg transition"
+                >
+                  Discard
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveInstructions}
+                disabled={isSavingInstructions || customInstructions === savedCustomInstructions}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700
+                           disabled:bg-blue-800 disabled:opacity-50 text-white
+                           rounded-lg transition"
+              >
+                {isSavingInstructions ? 'Saving...' : 'Save Instructions'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Danger Zone */}
       <div className="bg-[#212529] rounded-lg border border-red-900/50 p-6">

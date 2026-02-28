@@ -594,7 +594,7 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'rentPerSF', label: 'Rent/SF', category: 'financial', visible: false, type: 'calculated', description: 'Current rent divided by square footage' },
   { id: 'proformaRentPerSF', label: 'Proforma $/SF', category: 'financial', visible: false, type: 'calculated', description: 'Proforma rent divided by square footage' },
   // Section 8
-  { id: 'isSection8', label: 'Sec. 8', category: 'tenant', visible: false, type: 'input', description: 'Unit has Section 8 voucher tenant' },
+  { id: 'isSection8', label: 'Sec 8', category: 'tenant', visible: false, type: 'input', description: 'Unit has Section 8 voucher tenant' },
   { id: 'section8ContractDate', label: 'S8 Contract Date', category: 'tenant', visible: false, type: 'input', description: 'HAP contract effective date' },
   { id: 'section8ContractRent', label: 'S8 Contract Rent', category: 'financial', visible: false, type: 'input', description: 'Section 8 contract rent amount' },
   // Other

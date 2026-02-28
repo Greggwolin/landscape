@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CModal, CModalBody, CModalHeader, CNav, CNavItem, CNavLink } from '@coreui/react';
+import { useAuth } from '@/contexts/AuthContext';
 import PreferencesPanel from './PreferencesPanel';
 import BenchmarksPanel from './BenchmarksPanel';
 import CostLibraryPanel from './CostLibraryPanel';
@@ -32,6 +33,8 @@ interface AdminModalProps {
 type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users' | 'landscaper';
 
 export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.is_staff === true;
   const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
 
   // ESC key handler
@@ -130,18 +133,20 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
               Report Configurator
             </CNavLink>
           </CNavItem>
-          <CNavItem>
-            <CNavLink
-              href="#"
-              active={activeTab === 'users'}
-              onClick={(e) => {
-                e.preventDefault();
-                setActiveTab('users');
-              }}
-            >
-              Users
-            </CNavLink>
-          </CNavItem>
+          {isAdmin && (
+            <CNavItem>
+              <CNavLink
+                href="#"
+                active={activeTab === 'users'}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab('users');
+                }}
+              >
+                Users
+              </CNavLink>
+            </CNavItem>
+          )}
 
           {/* Landscaper tab - visually separated with spacing before icon */}
           <CNavItem>

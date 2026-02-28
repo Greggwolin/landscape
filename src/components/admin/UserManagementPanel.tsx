@@ -249,6 +249,9 @@ export default function UserManagementPanel() {
                   Email
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--cui-secondary-color)' }}>
+                  Password
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--cui-secondary-color)' }}>
                   Organization
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -265,7 +268,7 @@ export default function UserManagementPanel() {
             <tbody style={{ borderTop: '1px solid var(--cui-border-color)' }}>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
+                  <td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
                     No users found
                   </td>
                 </tr>
@@ -306,6 +309,11 @@ export default function UserManagementPanel() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>{user.email}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm font-mono" style={{ color: 'var(--cui-body-color)' }}>
+                        {user.plain_password || <span style={{ color: 'var(--cui-secondary-color)' }}>—</span>}
+                      </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm" style={{ color: 'var(--cui-secondary-color)' }}>

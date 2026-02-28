@@ -1,3 +1,25 @@
+/* Header text wraps on word boundaries to keep columns narrow */
+.ag-theme-alpine .ag-header-cell-label,
+.ag-theme-alpine-dark .ag-header-cell-label {
+  white-space: normal !important;
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* Center the header text container */
+.ag-theme-alpine .ag-header-cell-comp-wrapper,
+.ag-theme-alpine-dark .ag-header-cell-comp-wrapper {
+  align-items: center;
+}
+
+/* Cell text stays on one line — columns size to this, headers wrap to fit */
+.ag-theme-alpine .ag-cell,
+.ag-theme-alpine-dark .ag-cell {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* AG-Grid Dark Theme Overrides */
 .ag-theme-alpine-dark {
   --ag-background-color: rgb(17 24 39);  /* gray-900 */

@@ -87,16 +87,20 @@ export default function CategoryTreeItem({
   return (
     <div>
       <div
-        className="d-flex align-items-center gap-2 border rounded px-2 py-2"
+        className="d-flex align-items-center gap-2 rounded px-2 py-2"
         style={{
           marginLeft: `${depth * 16}px`,
           backgroundColor: isSelected
             ? `color-mix(in srgb, ${primaryTone} 16%, var(--cui-body-bg))`
             : 'var(--cui-body-bg)',
           borderStyle: 'solid',
-          borderWidth: 1,
-          borderColor: isSelected ? primaryTone : 'var(--cui-border-color)',
+          borderTopWidth: 1,
+          borderRightWidth: 1,
+          borderBottomWidth: 1,
           borderLeftWidth: 3,
+          borderTopColor: isSelected ? primaryTone : 'var(--cui-border-color)',
+          borderRightColor: isSelected ? primaryTone : 'var(--cui-border-color)',
+          borderBottomColor: isSelected ? primaryTone : 'var(--cui-border-color)',
           borderLeftColor: primaryTone,
           cursor: 'pointer',
         }}
@@ -174,7 +178,7 @@ export default function CategoryTreeItem({
               onAddSubcategory={onAddSubcategory}
               depth={depth + 1}
               parentId={category.category_id}
-              parentName={category.category_name}
+              parentName={parentName ? `${parentName} > ${category.category_name}` : category.category_name}
             />
           ))}
         </div>

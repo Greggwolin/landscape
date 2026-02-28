@@ -3,6 +3,7 @@ Serializers for user-facing Landscaper onboarding data.
 """
 
 from rest_framework import serializers
+from django.core.validators import MaxLengthValidator
 
 from .models import UserLandscaperProfile
 
@@ -20,6 +21,12 @@ PRIMARY_TOOL_OPTIONS = ['argus', 'excel', 'both', 'other', 'none']
 
 class UserLandscaperProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
+    custom_instructions = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        validators=[MaxLengthValidator(4000)],
+    )
 
     class Meta:
         model = UserLandscaperProfile
@@ -34,6 +41,7 @@ class UserLandscaperProfileSerializer(serializers.ModelSerializer):
             'primary_tool',
             'markets_text',
             'compiled_instructions',
+            'custom_instructions',
             'onboarding_chat_history',
             'interaction_insights',
             'document_insights',

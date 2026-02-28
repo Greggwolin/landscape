@@ -272,7 +272,7 @@ const UnitOfMeasureManager: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="d-flex flex-column gap-3">
       {error && (
         <CAlert color="danger" className="mb-2">
           {error}

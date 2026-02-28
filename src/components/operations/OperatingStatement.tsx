@@ -642,12 +642,14 @@ export function OperatingStatement({
   if (!hideLossToLease) visibleColIndices.push(5);
   if (!hidePR) visibleColIndices.push(6, 7);
 
-  // ResizeObserver: measure container and distribute extra width proportionally
-  const gridRef = useRef<HTMLDivElement>(null);
+  // ResizeObserver: measure the scroll wrapper (parent) width to avoid
+  // infinite loops — changing gridTemplateColumns on the grid itself would
+  // re-trigger the observer if we measured the grid directly.
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
-    const el = gridRef.current;
+    const el = wrapperRef.current;
     if (!el) return;
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -947,9 +949,8 @@ export function OperatingStatement({
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="ops-statement-scroll">
+      <div ref={wrapperRef} className="ops-statement-scroll">
         <div
-          ref={gridRef}
           className={`ops-statement-grid${hideLossToLease ? ' ops-hide-ltl' : ''}${hidePR ? ' ops-hide-post' : ''}`}
           style={{ gridTemplateColumns: gridTemplateCols }}
         >
