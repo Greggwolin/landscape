@@ -24,7 +24,7 @@ function MetricCard({
     >
       <div className="card-body p-3">
         <div
-          className="text-uppercase text-body-secondary mb-2"
+          className="text-body-secondary mb-2"
           style={{ fontSize: '11px', letterSpacing: '0.5px' }}
         >
           {label}

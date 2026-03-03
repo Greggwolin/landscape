@@ -108,8 +108,7 @@ export const newProjectSchema = z.object({
       data.location_mode === 'address' &&
       data.street_address &&
       data.city &&
-      data.state &&
-      data.zip
+      data.state
 
     const hasCross =
       data.location_mode === 'cross_streets' &&

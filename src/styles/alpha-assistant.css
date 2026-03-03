@@ -51,7 +51,7 @@
 .help-content h6 {
   font-size: 0.85rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.5px;
 }
 

@@ -150,8 +150,8 @@ landscape_rich_schema_*.json
 cowork-session-logs/
 smoke-test-*.md
 Smoke_Test_*.md
-*_REPORT.md
-*_Audit.md
+/P2_TOOL_TEST_REPORT.md
+/Document_Ingestion_Modal_Discovery_Audit.md
 
 # Throwaway debug / one-off scripts
 check-fk.js
@@ -162,9 +162,13 @@ scripts/debug-*.js
 scripts/list-projects.js
 scripts/verify-deletion.js
 
-# Screenshots & screen recordings (reference images committed selectively)
+# Screenshots & screen recordings (keep local only)
 reference/images/screenshots/*.mov
 reference/images/screenshots/*.mp4
+reference/images/screenshots/*.png
+
+# Large reference materials (keep local only — too large for GitHub)
+reference/landdev/
 
 # Rent schedule debug images
 rent-schedule-*.png

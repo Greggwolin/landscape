@@ -10,8 +10,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
 import CIcon from '@coreui/icons-react';
-import { cilBug, cilSettings, cilMoon, cilSun, cilLifeRing } from '@coreui/icons';
+import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
 import { useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
+import { HelpIcon } from '@/components/icons/HelpIcon';
 
 /**
  * TopNavigationBar - Tier 1 Global Navigation
@@ -174,7 +175,7 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               aria-label="Help"
               title="Help"
             >
-              <CIcon icon={cilLifeRing} size="lg" />
+              <HelpIcon aria-hidden="true" style={{ width: '33px', height: '33px' }} />
             </button>
 
             {/* Settings Button */}

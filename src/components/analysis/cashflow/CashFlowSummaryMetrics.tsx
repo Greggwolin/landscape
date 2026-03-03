@@ -72,7 +72,7 @@ function MetricCard({
     >
       <CCardBody className="p-3">
         <div
-          className="text-uppercase mb-1"
+          className="mb-1"
           style={{
             fontSize: '0.7rem',
             fontWeight: 600,
@@ -127,7 +127,6 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
             {/* Gross Revenue */}
             <div className="d-flex justify-content-between mb-2">
               <span
-                className="text-uppercase"
                 style={{
                   fontSize: '0.7rem',
                   fontWeight: 600,
@@ -209,7 +208,6 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
               style={{ borderTop: '1px solid var(--cui-border-color)' }}
             >
               <span
-                className="text-uppercase"
                 style={{
                   fontSize: '0.7rem',
                   fontWeight: 600,

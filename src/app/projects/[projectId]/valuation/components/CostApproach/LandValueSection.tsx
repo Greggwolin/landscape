@@ -160,7 +160,7 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
             >
               <div className="row g-3 small">
                 <div className="col-4">
-                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                  <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
                     Avg $/SF (Adjusted)
                   </div>
                   <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
@@ -168,7 +168,7 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
                   </div>
                 </div>
                 <div className="col-4">
-                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                  <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
                     Subject Land Acres
                   </div>
                   <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
@@ -176,7 +176,7 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
                   </div>
                 </div>
                 <div className="col-4">
-                  <div className="text-uppercase" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
+                  <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.7rem' }}>
                     Indicated Value
                   </div>
                   <div className="fs-5 fw-semibold" style={{ color: 'var(--cui-body-color)' }}>

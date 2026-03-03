@@ -176,7 +176,7 @@ function buildPropertyPopupHtml(group: PropertyGroupForPopup, color: string): st
     </div>
     ${group.distance ? `<div style="font-size:10px;color:#64748b;margin-bottom:6px;">${group.distance} mi from subject</div>` : ''}
     <div style="border-top:1px solid rgba(255,255,255,0.15);padding-top:6px;margin-top:4px;">
-      <div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;font-weight:600;">Floorplans (${group.floorplans.length})</div>
+      <div style="font-size:9px;color:#64748b;letter-spacing:0.05em;margin-bottom:4px;font-weight:600;">Floorplans (${group.floorplans.length})</div>
       ${fpRows}
     </div>
   </div>`;
@@ -932,7 +932,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
               style={{
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                textTransform: 'uppercase',
+                
                 letterSpacing: '0.04em',
               }}
             >

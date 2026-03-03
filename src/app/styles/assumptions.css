@@ -186,7 +186,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #d1d5db;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.5px;
 }
 

@@ -294,9 +294,21 @@ export default function NewProjectOnboardingModal({
       if (fields.has('total_units')) payload.total_units = Number(fields.get('total_units')?.value);
       if (fields.has('rentable_sf')) payload.gross_sf = Number(fields.get('rentable_sf')?.value);
 
+      // Read JWT from localStorage so the API route can tag created_by_id
+      const storedTokens = typeof window !== 'undefined'
+        ? localStorage.getItem('auth_tokens')
+        : null;
+      const accessToken = storedTokens ? JSON.parse(storedTokens).access : null;
+      const fetchHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken) {
+        fetchHeaders['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch('/api/projects/minimal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: fetchHeaders,
         body: JSON.stringify(payload),
       });
 

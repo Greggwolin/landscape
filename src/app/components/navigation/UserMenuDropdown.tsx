@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import Link from 'next/link';
-import { LogOut, User, Shield } from 'lucide-react';
+import React from 'react';
+import { useRouter } from 'next/navigation';
 import CIcon from '@coreui/icons-react';
-import { cilUser } from '@coreui/icons';
-import { useOutsideClick } from '@/app/hooks/useOutsideClick';
+import { cilAccountLogout, cilPeople, cilUser } from '@coreui/icons';
+import {
+  CDropdown,
+  CDropdownDivider,
+  CDropdownHeader,
+  CDropdownItem,
+  CDropdownMenu,
+  CDropdownToggle,
+  CSpinner,
+} from '@coreui/react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Z_INDEX } from './constants';
 
@@ -16,171 +23,98 @@ import { Z_INDEX } from './constants';
  * Shows different options based on auth status and user role.
  */
 export default function UserMenuDropdown() {
- const [isOpen, setIsOpen] = useState(false);
- const dropdownRef = useRef<HTMLDivElement>(null);
- const { user, isAuthenticated, logout, isLoading } = useAuth();
+  const router = useRouter();
+  const { user, isAuthenticated, logout, isLoading } = useAuth();
 
- useOutsideClick(dropdownRef, () => setIsOpen(false));
+  const handleNavigate = (href: string) => {
+    router.push(href);
+  };
 
- const handleLogout = () => {
- setIsOpen(false);
- logout();
- };
+  const handleLogout = () => {
+    logout();
+  };
 
- const closeMenu = () => setIsOpen(false);
+  const getDisplayName = () => {
+    if (!user) return 'Sign In';
+    if (user.first_name) return user.first_name;
+    return user.username;
+  };
 
- // Get display name for the button
- const getDisplayName = () => {
- if (!user) return 'Sign In';
- if (user.first_name) return user.first_name;
- return user.username;
- };
+  return (
+    <CDropdown alignment="end" variant="nav-item">
+      <CDropdownToggle
+        caret={false}
+        color="primary"
+        className="d-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold border-0"
+        aria-label="User menu"
+      >
+        <CIcon icon={cilUser} />
+        {getDisplayName()}
+      </CDropdownToggle>
 
- return (
- <div className="relative" ref={dropdownRef}>
- <button
- type="button"
- onClick={() => setIsOpen((prev) => !prev)}
- aria-haspopup="true"
- aria-expanded={isOpen}
- aria-label="User menu"
- className="d-flex align-items-center gap-2 px-3 py-2 rounded font-medium text-sm transition-colors"
- style={{
- backgroundColor: 'var(--cui-primary)',
- color: 'var(--cui-body-color)',
- border: 'none',
- }}
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--cui-primary)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--cui-primary)';
- }}
- >
- <CIcon icon={cilUser} />
- {getDisplayName()}
- </button>
+      <CDropdownMenu style={{ minWidth: '16rem', zIndex: Z_INDEX.DROPDOWN }}>
+        {isLoading ? (
+          <div className="py-4 text-center">
+            <CSpinner color="primary" size="sm" />
+          </div>
+        ) : isAuthenticated && user ? (
+          <>
+            <CDropdownHeader className="py-3">
+              <div className="fw-semibold">
+                {user.first_name && user.last_name
+                  ? `${user.first_name} ${user.last_name}`
+                  : user.username}
+              </div>
+              <div className="small text-body-secondary">{user.email}</div>
+            </CDropdownHeader>
 
- {isOpen && (
- <div
- className="absolute right-0 mt-2 w-64 rounded-md border shadow-lg"
- style={{
- backgroundColor: 'var(--cui-body-bg)',
- borderColor: 'var(--cui-border-color)',
- zIndex: Z_INDEX.DROPDOWN,
- }}
- >
- {isLoading ? (
- <div className="py-4 text-center">
- <div className="animate-spin inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full text-blue-500" />
- </div>
- ) : isAuthenticated && user ? (
- <>
- {/* User Info Header */}
- <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--cui-border-color)' }}>
- <p className="text-sm font-medium" style={{ color: 'var(--cui-body-color)' }}>
- {user.first_name && user.last_name
- ? `${user.first_name} ${user.last_name}`
- : user.username}
- </p>
- <p className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
- {user.email}
- </p>
- </div>
+            <CDropdownItem
+              onClick={() => handleNavigate('/settings/profile')}
+              className="d-flex align-items-center gap-2"
+            >
+              <CIcon icon={cilUser} />
+              Profile Settings
+            </CDropdownItem>
 
- {/* Menu Items */}
- <div className="py-2">
- <Link
- href="/settings/profile"
- onClick={closeMenu}
- className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
- style={{ color: 'var(--cui-body-color)' }}
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'transparent';
- }}
- >
- <User className="h-4 w-4" />
- Profile Settings
- </Link>
+            {user.is_staff && (
+              <CDropdownItem
+                onClick={() => handleNavigate('/admin/users')}
+                className="d-flex align-items-center gap-2"
+              >
+                <CIcon icon={cilPeople} />
+                User Management
+              </CDropdownItem>
+            )}
 
- {/* Admin Only: User Management */}
- {user.is_staff && (
- <Link
- href="/admin/users"
- onClick={closeMenu}
- className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
- style={{ color: 'var(--cui-body-color)' }}
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'transparent';
- }}
- >
- <Shield className="h-4 w-4" />
- User Management
- </Link>
- )}
- </div>
+            <CDropdownDivider />
 
- {/* Logout */}
- <div className="py-2 border-t" style={{ borderColor: 'var(--cui-border-color)' }}>
- <button
- type="button"
- onClick={handleLogout}
- className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors text-red-400"
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'transparent';
- }}
- >
- <LogOut className="h-4 w-4" />
- Sign Out
- </button>
- </div>
- </>
- ) : (
- /* Not Authenticated */
- <div className="py-2">
- <Link
- href="/login"
- onClick={closeMenu}
- className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
- style={{ color: 'var(--cui-body-color)' }}
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'transparent';
- }}
- >
- <User className="h-4 w-4" />
- Sign In
- </Link>
- <Link
- href="/register"
- onClick={closeMenu}
- className="flex items-center gap-3 w-full px-4 py-2 text-left text-sm transition-colors"
- style={{ color: 'var(--cui-body-color)' }}
- onMouseEnter={(e) => {
- e.currentTarget.style.backgroundColor = 'var(--nav-hover-bg)';
- }}
- onMouseLeave={(e) => {
- e.currentTarget.style.backgroundColor = 'transparent';
- }}
- >
- <CIcon icon={cilUser} className="h-4 w-4" />
- Create Account
- </Link>
- </div>
- )}
- </div>
- )}
- </div>
- );
+            <CDropdownItem
+              onClick={handleLogout}
+              className="d-flex align-items-center gap-2 text-danger"
+            >
+              <CIcon icon={cilAccountLogout} />
+              Sign Out
+            </CDropdownItem>
+          </>
+        ) : (
+          <>
+            <CDropdownItem
+              onClick={() => handleNavigate('/login')}
+              className="d-flex align-items-center gap-2"
+            >
+              <CIcon icon={cilUser} />
+              Sign In
+            </CDropdownItem>
+            <CDropdownItem
+              onClick={() => handleNavigate('/register')}
+              className="d-flex align-items-center gap-2"
+            >
+              <CIcon icon={cilUser} />
+              Create Account
+            </CDropdownItem>
+          </>
+        )}
+      </CDropdownMenu>
+    </CDropdown>
+  );
 }

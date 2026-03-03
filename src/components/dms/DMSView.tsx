@@ -890,21 +890,6 @@ function DMSViewInner({
               {panelExpanded && (
                 <CCardBody className="p-0">
                   <div style={{ backgroundColor: 'var(--cui-body-bg)' }}>
-                  {/* Breadcrumb */}
-                  {!viewingTrash && (
-                    <div className="px-6 py-2 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
-                      <div className="flex items-center gap-2 text-sm">
-                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Home</button>
-                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                        <button style={{ color: 'var(--cui-primary)' }} className="hover:underline">Projects</button>
-                        <span style={{ color: 'var(--cui-secondary-color)' }}>{'>'}</span>
-                        <span className="truncate" style={{ color: 'var(--cui-body-color)' }}>
-                          {projectName}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Toolbar */}
                   <div className="px-4 py-1 border-b" style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}>
                     <div className="flex items-center gap-3">

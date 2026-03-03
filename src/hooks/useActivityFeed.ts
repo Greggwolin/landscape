@@ -56,7 +56,7 @@ export function useActivityFeed(projectId?: string | number) {
       }
       return response.json();
     },
-    enabled: Boolean(id),
+    enabled: Boolean(id) && id !== '0',
     staleTime: 30_000, // 30 seconds
     refetchInterval: 60_000, // Auto-refresh every minute
   });

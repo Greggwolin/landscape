@@ -301,7 +301,7 @@ function MetricCard({ label, value, subvalue, highlight = false }: MetricCardPro
     <div className="col-12 col-sm-6 col-md-4 col-lg-3">
       <CCard className={`h-100 ${highlight ? 'border-primary' : ''}`}>
         <CCardBody>
-          <div className="text-body-secondary text-uppercase small mb-1">
+          <div className="text-body-secondary small mb-1">
             {label}
           </div>
           <div className={`h3 fw-bold mb-0 ${highlight ? 'text-primary' : ''}`}>

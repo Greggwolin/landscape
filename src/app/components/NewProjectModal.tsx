@@ -158,6 +158,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     setValue,
     setFocus,
     register,
+    trigger,
     formState: { isDirty, errors }
   } = form
 
@@ -229,6 +230,19 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     )
     setValue('analysis_type', derivedType, { shouldDirty: false, shouldValidate: false })
   }, [analysisPerspective, analysisPurpose, valueAddEnabled, setValue])
+
+  // Auto-select DMS template based on analysis_purpose
+  useEffect(() => {
+    if (!analysisPurpose || dmsTemplates.length === 0) return
+    if (analysisPurpose === 'VALUATION') {
+      const valTemplate = dmsTemplates.find(t => t.template_name.toLowerCase().includes('valuation'))
+      if (valTemplate) setSelectedTemplateId(valTemplate.template_id)
+    } else {
+      // Reset to default template for non-Valuation purposes
+      const defaultTpl = dmsTemplates.find(t => t.is_default)
+      if (defaultTpl) setSelectedTemplateId(defaultTpl.template_id)
+    }
+  }, [analysisPurpose, dmsTemplates])
 
   const assetSectionRef = useRef<HTMLDivElement>(null)
   const locationSectionRef = useRef<HTMLDivElement>(null)
@@ -460,6 +474,10 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     }
 
     setExtractedFieldKeys(updatedKeys)
+
+    // Re-validate entire form so cross-field errors (e.g. location) clear properly
+    // Individual setValue calls only re-validate their own field, not superRefine checks
+    trigger()
 
     // Forward geocode address to get coordinates for map zoom
     // Only if we have address components but no lat/lng
@@ -843,8 +861,12 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
       console.log(`[handleCreationSuccess] Upload results: ${succeeded} succeeded, ${failed} failed`)
     }
 
-    await refreshProjects()
+    // Fire-and-forget: refresh the SWR cache in the background.
+    // Don't await — the project page has its own fallback fetch if the
+    // project isn't in cache yet when we navigate.
+    refreshProjects()
     selectProject(projectId)
+
     resetFormState()
     setPendingDocuments([])
     extractionResultsCache.current = {}
@@ -914,11 +936,21 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         dms_template_id: selectedTemplateId || undefined
       }
 
+      // Read JWT from localStorage so the API route can tag created_by_id
+      const storedTokens = typeof window !== 'undefined'
+        ? localStorage.getItem('auth_tokens')
+        : null
+      const accessToken = storedTokens ? JSON.parse(storedTokens).access : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`
+      }
+
       const response = await fetch('/api/projects/minimal', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(payload)
       })
 
@@ -1539,6 +1571,11 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
             Clear form
           </button>
           <div className="d-flex align-items-center gap-3">
+            {globalError && (
+              <div className="alert alert-danger py-1 px-3 mb-0 small">
+                {globalError}
+              </div>
+            )}
             <CButton
               type="button"
               color="secondary"
@@ -1557,8 +1594,60 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
               {isSubmitting ? 'Creating...' : 'Create Project'}
             </CButton>
           </div>
+          {process.env.NODE_ENV === 'development' && <DevCleanupButton />}
         </footer>
       </div>
+    </div>
+  )
+}
+
+/**
+ * DEV-ONLY: Inline cleanup button for removing test projects and all dependent data.
+ */
+function DevCleanupButton() {
+  const [cleanupId, setCleanupId] = useState('')
+  const [cleanupStatus, setCleanupStatus] = useState<string | null>(null)
+
+  const handleCleanup = async () => {
+    const id = parseInt(cleanupId, 10)
+    if (!Number.isFinite(id) || id <= 0) {
+      setCleanupStatus('Enter a valid project ID')
+      return
+    }
+    if (!window.confirm(`Delete project ${id} and ALL its data? This cannot be undone.`)) return
+
+    setCleanupStatus('Deleting...')
+    try {
+      const res = await fetch(`/api/dev/cleanup-project?project_id=${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (res.ok) {
+        setCleanupStatus(`Deleted project ${id} (${data.project_name})`)
+        setCleanupId('')
+      } else {
+        setCleanupStatus(`Error: ${data.error || data.detail}`)
+      }
+    } catch (e) {
+      setCleanupStatus(`Network error: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  return (
+    <div style={{ borderTop: '1px dashed var(--cui-border-color)', padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, opacity: 0.7 }}>
+      <span style={{ color: 'var(--cui-warning)' }}>DEV</span>
+      <input
+        type="text"
+        placeholder="Project ID"
+        value={cleanupId}
+        onChange={e => { setCleanupId(e.target.value); setCleanupStatus(null) }}
+        style={{ width: 80, padding: '2px 6px', fontSize: 12, background: 'var(--cui-body-bg)', color: 'var(--cui-body-color)', border: '1px solid var(--cui-border-color)', borderRadius: 4 }}
+      />
+      <button
+        onClick={handleCleanup}
+        style={{ fontSize: 12, padding: '2px 8px', cursor: 'pointer', background: 'var(--cui-danger)', color: '#fff', border: 'none', borderRadius: 4 }}
+      >
+        Cleanup
+      </button>
+      {cleanupStatus && <span style={{ fontSize: 11 }}>{cleanupStatus}</span>}
     </div>
   )
 }

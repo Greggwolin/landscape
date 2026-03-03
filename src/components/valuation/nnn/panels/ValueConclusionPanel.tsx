@@ -37,7 +37,6 @@ const sectionHeadStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--cui-secondary-color)',
 };
@@ -47,7 +46,6 @@ const sectionBodyStyle: React.CSSProperties = { padding: '14px 16px' };
 const labelStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'var(--cui-tertiary-color, var(--text-secondary))',
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.07em',
   marginBottom: 4,
 };

@@ -48,7 +48,7 @@ export default function MetricCard({
       <CCardBody>
         <div className="d-flex flex-column h-100">
           {/* Label */}
-          <div className="text-muted small text-uppercase mb-2" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+          <div className="text-muted small mb-2" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
             {label}
           </div>
 

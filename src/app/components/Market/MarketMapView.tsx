@@ -498,7 +498,7 @@ export default function MarketMapView({
           zIndex: 1
         }}
       >
-        <div className="small fw-semibold mb-2" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>
+        <div className="small fw-semibold mb-2" style={{ fontSize: '10px', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>
           Map Layers
         </div>
         <div className="mb-2">
@@ -559,7 +559,7 @@ export default function MarketMapView({
           </div>
           {showComps && comps.length > 0 && (
             <>
-              <div className="mt-1" style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>Recent Sales</div>
+              <div className="mt-1" style={{ fontSize: '9px', letterSpacing: '0.5px', color: 'var(--cui-secondary-color)' }}>Recent Sales</div>
               <div className="d-flex align-items-center gap-2">
                 <div style={{ width: '10px', height: '10px', backgroundColor: '#22c55e', borderRadius: '50%', border: '1.5px solid white', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }}></div>
                 <span>Below 25th %ile</span>

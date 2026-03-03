@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
+import { getUserFromRequest } from '@/lib/auth'
 import {
   deriveDimensionsFromAnalysisType,
   deriveLegacyAnalysisType,
@@ -82,11 +83,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as MinimalProjectRequest
 
-    console.log('=== PROJECT CREATION TRACE ===')
-    console.log('PROJECT INPUT BODY:', JSON.stringify(body, null, 2))
-    console.log('RECEIVED LATITUDE:', body.latitude, 'type:', typeof body.latitude)
-    console.log('RECEIVED LONGITUDE:', body.longitude, 'type:', typeof body.longitude)
-
     if (!body.project_name || !body.project_type_code) {
       return NextResponse.json(
         { error: 'project_name and project_type_code are required' },
@@ -111,9 +107,6 @@ export async function POST(request: NextRequest) {
     const latitude = typeof body.latitude === 'number' && Number.isFinite(body.latitude) ? body.latitude : null
     const longitude = typeof body.longitude === 'number' && Number.isFinite(body.longitude) ? body.longitude : null
 
-    console.log('FINAL LATITUDE TO INSERT:', latitude)
-    console.log('FINAL LONGITUDE TO INSERT:', longitude)
-    console.log('=== END PROJECT CREATION TRACE ===')
     const streetAddress = body.street_address?.trim() || null
     const city = body.city?.trim() || null
     const state = body.state?.trim()?.toUpperCase() || null
@@ -131,6 +124,10 @@ export async function POST(request: NextRequest) {
     const jurisdictionCity = city
     const jurisdictionState = state
     const jurisdictionCounty = county
+
+    // Extract authenticated user (if present) for ownership tagging
+    const requestUser = getUserFromRequest(request)
+    const createdById = requestUser?.userId ?? null
 
     // Resolve DMS template: use provided value, or look up the workspace default
     let dmsTemplateId: number | null = null
@@ -185,6 +182,7 @@ export async function POST(request: NextRequest) {
         dms_template_id,
         analysis_mode,
         is_active,
+        created_by_id,
         created_at,
         updated_at
       ) VALUES (
@@ -215,6 +213,7 @@ export async function POST(request: NextRequest) {
         ${dmsTemplateId},
         'napkin',
         true,
+        ${createdById},
         NOW(),
         NOW()
       )
@@ -234,20 +233,24 @@ export async function POST(request: NextRequest) {
 
     const newProjectId = inserted[0].project_id
 
-    // Seed dms_project_doc_types from the resolved template
+    // Seed dms_project_doc_types from the resolved template (non-fatal)
     if (dmsTemplateId) {
-      await sql`
-        INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
-        SELECT
-          ${newProjectId},
-          dt.doc_type_name,
-          dt.ord::int,
-          TRUE
-        FROM landscape.dms_templates t
-        CROSS JOIN LATERAL unnest(t.doc_type_options) WITH ORDINALITY AS dt(doc_type_name, ord)
-        WHERE t.template_id = ${dmsTemplateId}
-        ON CONFLICT (project_id, doc_type_name) DO NOTHING
-      `
+      try {
+        await sql`
+          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+          SELECT
+            ${newProjectId},
+            dt.doc_type_name,
+            dt.ord::int,
+            TRUE
+          FROM landscape.dms_templates t
+          CROSS JOIN LATERAL unnest(t.doc_type_options) WITH ORDINALITY AS dt(doc_type_name, ord)
+          WHERE t.template_id = ${dmsTemplateId}
+          ON CONFLICT (project_id, doc_type_name) DO NOTHING
+        `
+      } catch (dmsError) {
+        console.warn('DMS doc type seeding failed (non-fatal):', dmsError)
+      }
     }
 
     return NextResponse.json({
@@ -256,8 +259,10 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Minimal project creation failed:', error)
     const message = error instanceof Error ? error.message : String(error)
+    const stack = error instanceof Error ? error.stack : undefined
+    console.error('Error details:', { message, stack })
     return NextResponse.json(
-      { error: 'Failed to create project', details: message },
+      { error: message || 'Failed to create project', details: message },
       { status: 500 }
     )
   }

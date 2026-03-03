@@ -219,6 +219,11 @@ export function useLandscaperThreads({
    * Load all threads for the current project/page context.
    */
   const loadThreads = useCallback(async () => {
+    // Guard: skip API call for invalid project IDs
+    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
+      return [];
+    }
+
     try {
       const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
       url.searchParams.set('project_id', projectId);
@@ -269,6 +274,11 @@ export function useLandscaperThreads({
    * Get or create an active thread for the current page context.
    */
   const initializeThread = useCallback(async () => {
+    // Guard: skip initialization for invalid project IDs
+    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
+      return;
+    }
+
     if (initializingRef.current) return;
     initializingRef.current = true;
     setIsThreadLoading(true);

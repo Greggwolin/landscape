@@ -170,7 +170,7 @@ div.planning-tile-active > .planning-tile-header {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--cui-secondary-color);
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.025em;
   margin-bottom: 0.5rem;
 }

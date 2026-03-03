@@ -252,21 +252,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse JSON response
+    // Parse JSON response — multiple strategies to handle AI response variations
     let analysis;
     try {
-      // Strip any markdown fences if present
       let raw = textBlock.text.trim();
-      if (raw.startsWith('```')) {
-        raw = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+
+      // Strategy 1: Strip markdown fences (```json ... ``` in various forms)
+      // Handles: ```json\n{...}\n```, ```json{...}```, ``` json\n{...}\n```
+      raw = raw.replace(/^```\s*(?:json)?\s*\n?/, '').replace(/\n?\s*```\s*$/, '');
+
+      // Strategy 2: If still not starting with { or [, try to extract JSON object
+      if (!raw.startsWith('{') && !raw.startsWith('[')) {
+        const jsonMatch = raw.match(/(\{[\s\S]*\})/);
+        if (jsonMatch) {
+          raw = jsonMatch[1];
+        }
       }
+
       analysis = JSON.parse(raw);
+
+      // Validate expected shape — summary must be a plain string, not nested JSON
+      if (typeof analysis.summary !== 'string' || !Array.isArray(analysis.sections)) {
+        throw new Error('Unexpected response shape');
+      }
     } catch {
-      // If JSON parsing fails, wrap the raw text as a summary
-      analysis = {
-        summary: textBlock.text,
-        sections: [],
-      };
+      // Last resort: try to extract any JSON object from the full response
+      try {
+        const fullText = textBlock.text;
+        const braceStart = fullText.indexOf('{');
+        const braceEnd = fullText.lastIndexOf('}');
+        if (braceStart !== -1 && braceEnd > braceStart) {
+          const extracted = JSON.parse(fullText.substring(braceStart, braceEnd + 1));
+          if (typeof extracted.summary === 'string') {
+            analysis = extracted;
+          } else {
+            throw new Error('No valid summary in extracted JSON');
+          }
+        } else {
+          throw new Error('No JSON object found');
+        }
+      } catch {
+        // True fallback — use the text but strip any fence artifacts
+        const cleanText = textBlock.text
+          .replace(/^```\s*(?:json)?\s*\n?/g, '')
+          .replace(/\n?\s*```\s*$/g, '')
+          .replace(/^\s*\{\s*"summary"\s*:\s*"/, '')  // Strip JSON wrapper if partially present
+          .trim();
+        analysis = {
+          summary: cleanText.length > 0 ? cleanText : 'Analysis generation produced an unparseable response. Please regenerate.',
+          sections: [],
+        };
+      }
     }
 
     return NextResponse.json({

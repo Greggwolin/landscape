@@ -131,17 +131,19 @@ function PageGuide({ currentPage }: { currentPage: string | undefined }) {
     if (!currentPage || currentPage === lastFetchedPage.current) return;
     lastFetchedPage.current = currentPage;
 
-    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
     setLoading(true);
 
     (async () => {
       try {
         const res = await fetch(
           `${DJANGO_API_URL}/api/knowledge/platform/alpha-help/?page_context=${encodeURIComponent(currentPage)}`,
+          { signal: controller.signal },
         );
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setContent({
             page_name: currentPage,
             page_title: PAGE_LABELS[currentPage] || currentPage,
@@ -151,13 +153,17 @@ function PageGuide({ currentPage }: { currentPage: string | undefined }) {
           });
         }
       } catch {
-        if (!cancelled) setContent(null);
+        if (!controller.signal.aborted) setContent(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        clearTimeout(timeoutId);
+        if (!controller.signal.aborted) setLoading(false);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [currentPage]);
 
   const label = currentPage ? PAGE_LABELS[currentPage] || currentPage : null;
