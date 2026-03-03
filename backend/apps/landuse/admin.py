@@ -8,9 +8,9 @@ from .models import InventoryItem, Family, Type
 class FamilyAdmin(admin.ModelAdmin):
     """Admin interface for Family lookup model."""
 
-    list_display = ['family_id', 'name', 'is_active']
-    list_filter = ['is_active']
-    search_fields = ['name', 'description']
+    list_display = ['family_id', 'name', 'code', 'active']
+    list_filter = ['active']
+    search_fields = ['name', 'code']
     readonly_fields = ['family_id']
 
 
@@ -18,9 +18,9 @@ class FamilyAdmin(admin.ModelAdmin):
 class TypeAdmin(admin.ModelAdmin):
     """Admin interface for Type lookup model."""
 
-    list_display = ['type_id', 'name', 'is_active']
-    list_filter = ['is_active']
-    search_fields = ['name', 'description']
+    list_display = ['type_id', 'name', 'code', 'active']
+    list_filter = ['active']
+    search_fields = ['name', 'code']
     readonly_fields = ['type_id']
 
 

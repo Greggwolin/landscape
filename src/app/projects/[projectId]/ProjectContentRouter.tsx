@@ -21,6 +21,8 @@ import React, { memo, Suspense } from 'react';
 import ProjectTab from './components/tabs/ProjectTab';
 import PropertyTab from './components/tabs/PropertyTab';
 import PlanningTab from './components/tabs/PlanningTab';
+import ParcelsTab from './components/tabs/ParcelsTab';
+import LandUseTab from './components/tabs/LandUseTab';
 import MarketTab from './components/tabs/MarketTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import OperationsTab from './components/tabs/OperationsTab';
@@ -160,13 +162,13 @@ function ProjectContentRouter({
             return <MarketTab project={project} />;
           // Land development subtabs
           case 'land-use':
-            return <PlanningTab project={project} />;
+            return <LandUseTab project={project} />;
           case 'parcels':
-            return <ComingSoon folder="property" tab="parcels" icon="🗺️" />;
+            return <ParcelsTab project={project} />;
           default:
             // Default based on project type
             if (!isIncome) {
-              return <PlanningTab project={project} />;
+              return <LandUseTab project={project} />;
             }
             return <LocationSubTab project={project} />;
         }
