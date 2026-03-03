@@ -366,7 +366,7 @@ export function ReconciliationPanel({
                     <div className="mb-3">
                       <div
                         className="mb-2"
-                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', letterSpacing: '0.05em' }}
                       >
                         Key Metrics
                       </div>
@@ -389,7 +389,7 @@ export function ReconciliationPanel({
                     <div className="mb-3">
                       <label
                         className="d-block mb-1"
-                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', letterSpacing: '0.05em' }}
                       >
                         Concluded Value
                       </label>
@@ -418,7 +418,7 @@ export function ReconciliationPanel({
                     <div className="mb-3">
                       <label
                         className="d-block mb-1"
-                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', letterSpacing: '0.05em' }}
                       >
                         Weight
                       </label>
@@ -442,7 +442,7 @@ export function ReconciliationPanel({
                     <div>
                       <div
                         className="mb-1"
-                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                        style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--cui-secondary-color)', letterSpacing: '0.05em' }}
                       >
                         Reliability Analysis
                       </div>

@@ -69,12 +69,15 @@ type AnalysisTypeTileConfig = {
   tile_development_budget: boolean
 }
 
+// Fallback mapping: regex on project_type → canonical short code.
+// Values MUST match PROJECT_TYPE_MAP keys in tileConfig.ts so
+// getProjectCategory() returns the correct category for tab routing.
 const PROPERTY_TYPE_FALLBACKS: Array<[RegExp, string]> = [
-  [/retail/i, 'COMMERCIAL'],
-  [/office/i, 'OFFICE'],
-  [/multifamily|multi-family/i, 'MULTIFAMILY'],
-  [/mixed/i, 'MIXED_USE'],
-  [/master\s+planned/i, 'MPC'],
+  [/retail/i, 'RET'],
+  [/office/i, 'OFF'],
+  [/multifamily|multi-family/i, 'MF'],
+  [/mixed/i, 'MXU'],
+  [/master\s+planned/i, 'LAND'],
 ]
 
 const CARNEY_PROJECT_ID = 8

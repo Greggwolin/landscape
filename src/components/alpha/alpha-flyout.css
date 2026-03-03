@@ -163,7 +163,7 @@
 .alpha-flyout .help-content h6 {
   font-size: 0.8rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.5px;
   margin-bottom: 0.5rem;
 }

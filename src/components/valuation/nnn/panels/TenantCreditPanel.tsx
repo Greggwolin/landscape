@@ -47,7 +47,6 @@ const sectionHeadStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--cui-secondary-color)',
 };
@@ -57,7 +56,6 @@ const sectionBodyStyle: React.CSSProperties = { padding: '14px 16px' };
 const labelStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'var(--cui-tertiary-color, var(--text-secondary))',
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.06em',
   marginBottom: 3,
 };
@@ -254,7 +252,6 @@ function Chip({ label, variant }: { label: string; variant: 'green' | 'amber' | 
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 3,
-      fontSize: 10, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' as const,
       ...styles[variant],
     }}>
       {label}
@@ -266,7 +263,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'left' | '
   return (
     <th style={{
       textAlign: align || 'left', padding: '7px 11px', fontSize: 10, fontWeight: 600,
-      textTransform: 'uppercase' as const, letterSpacing: '0.07em',
+      letterSpacing: '0.07em',
       color: 'var(--cui-tertiary-color, var(--text-secondary))',
       borderBottom: '1px solid var(--cui-border-color)', whiteSpace: 'nowrap' as const,
     }}>{children}</th>

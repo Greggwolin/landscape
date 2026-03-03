@@ -45,7 +45,6 @@ const sectionHeadStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--cui-secondary-color)',
 };
@@ -66,7 +65,6 @@ const kpiStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'var(--cui-tertiary-color, var(--text-secondary))',
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.07em',
   marginBottom: 4,
 };
@@ -256,7 +254,6 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'left' | '
       padding: '7px 11px',
       fontSize: 10,
       fontWeight: 600,
-      textTransform: 'uppercase' as const,
       letterSpacing: '0.07em',
       color: 'var(--cui-tertiary-color, var(--text-secondary))',
       borderBottom: '1px solid var(--cui-border-color)',
@@ -299,7 +296,6 @@ function ConceptChip({ label }: { label: string }) {
       fontSize: 10,
       fontWeight: 600,
       letterSpacing: '0.03em',
-      textTransform: 'uppercase' as const,
       background: 'var(--chip-info, rgba(37,99,235,0.12))',
       color: 'var(--chip-horizontal-text, #1d4ed8)',
       border: '1px solid var(--chip-horizontal-border, rgba(37,99,235,0.45))',

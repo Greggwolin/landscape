@@ -158,7 +158,7 @@
   margin-bottom: 1rem;
   color: var(--cui-body-color);
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
 }
 
 .narrative-canvas-content p {

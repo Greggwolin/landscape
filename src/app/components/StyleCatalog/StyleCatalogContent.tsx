@@ -478,7 +478,7 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
               style={{
                 fontSize: '0.65rem',
                 letterSpacing: '0.2em',
-                textTransform: 'uppercase',
+                
                 color: 'var(--cui-secondary-color)',
                 marginBottom: '0.5rem'
               }}

@@ -87,7 +87,7 @@ export function BadgeIntentsSection() {
           style={{
             fontSize: '0.65rem',
             letterSpacing: '0.2em',
-            textTransform: 'uppercase',
+            
             color: 'var(--cui-secondary-color)',
             marginBottom: '12px',
           }}

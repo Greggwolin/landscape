@@ -35,7 +35,6 @@ const sectionHeadStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--cui-secondary-color)',
 };
@@ -92,7 +91,7 @@ function NNNComparableSales() {
                         fontWeight: 700,
                         padding: '2px 7px',
                         borderRadius: 3,
-                        textTransform: 'uppercase',
+                        
                         letterSpacing: '0.06em',
                       }}>
                         Subject
@@ -127,7 +126,6 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'left' | '
       padding: '7px 11px',
       fontSize: 10,
       fontWeight: 600,
-      textTransform: 'uppercase' as const,
       letterSpacing: '0.07em',
       color: 'var(--cui-tertiary-color, var(--text-secondary))',
       borderBottom: '1px solid var(--cui-border-color)',

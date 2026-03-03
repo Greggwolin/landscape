@@ -86,7 +86,7 @@
 .help-guide-section-title {
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.03em;
   margin-bottom: 0.25rem;
 }

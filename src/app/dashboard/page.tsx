@@ -387,6 +387,13 @@ export default function DashboardPage() {
     }
   }, [filteredProjects, selectedProjectId]);
 
+  // Resolve a valid project ID for Landscaper and Activity Feed.
+  // Prefer selectedProjectId, fall back to the first project in the list.
+  const landscaperProjectId = useMemo(() => {
+    if (selectedProjectId && selectedProjectId > 0) return selectedProjectId;
+    return sortedProjects.length > 0 ? sortedProjects[0].project_id : null;
+  }, [selectedProjectId, sortedProjects]);
+
   const handleProjectClick = (projectId: number) => {
     const project = projects.find((p) => p.project_id === projectId);
     if (project) {
@@ -522,12 +529,18 @@ export default function DashboardPage() {
                   minHeight: '200px',
                 }}
               >
+                {landscaperProjectId ? (
                 <LandscaperChat
-                  projectId={0}
+                  projectId={landscaperProjectId}
                   activeTab="dashboard"
                   isExpanded={!isActivityExpanded}
                   onToggleExpand={() => setActivityExpanded(!isActivityExpanded)}
                 />
+              ) : (
+                <div className="d-flex align-items-center justify-content-center h-100 text-body-secondary">
+                  <small>Select a project to start chatting</small>
+                </div>
+              )}
               </CCard>
 
               {/* Activity Feed - Bottom */}
@@ -539,11 +552,20 @@ export default function DashboardPage() {
                   transition: 'height 0.2s ease',
                 }}
               >
+                {landscaperProjectId ? (
                 <ActivityFeed
-                  projectId={0}
+                  projectId={landscaperProjectId}
                   isExpanded={isActivityExpanded}
                   onToggle={() => setActivityExpanded(!isActivityExpanded)}
                 />
+              ) : (
+                <div
+                  className="d-flex align-items-center justify-content-center text-body-secondary"
+                  style={{ height: '48px', cursor: 'default' }}
+                >
+                  <small>Activity</small>
+                </div>
+              )}
               </CCard>
             </>
           )}

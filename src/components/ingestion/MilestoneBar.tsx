@@ -44,7 +44,7 @@ export function MilestoneBar({ milestones, onReadyClick, isReady = false }: Mile
       {/* Progress section */}
       <div className="flex-grow-1">
         <div
-          className="text-uppercase text-body-secondary mb-2"
+          className="text-body-secondary mb-2"
           style={{ fontSize: '11px', letterSpacing: '0.5px' }}
         >
           Diligence Completeness

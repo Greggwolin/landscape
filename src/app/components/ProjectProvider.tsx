@@ -55,7 +55,7 @@ interface ProjectContextValue {
   activeProjectId: number | null
   activeProject: ProjectSummary | null
   selectProject: (projectId: number | null) => void
-  refreshProjects: () => void
+  refreshProjects: () => Promise<ProjectSummary[] | undefined>
   isLoading: boolean
   isReady: boolean
   error?: Error
@@ -101,7 +101,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { data, error, isLoading, mutate } = useSWR<ProjectSummary[]>(
     swrKey,
     fetcher,
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 5000,
+    }
   )
   const [activeProjectId, setActiveProjectId] = useState<number | null>(() => {
     // Initialize from localStorage if available
@@ -148,8 +152,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [])
 
-  const refreshProjects = useCallback(() => {
-    void mutate(undefined, { revalidate: true })
+  const refreshProjects = useCallback(async () => {
+    const updated = await mutate(undefined, { revalidate: true })
+    return updated
   }, [mutate])
 
   // Combined loading state includes both auth initialization and data fetching

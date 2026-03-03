@@ -65,7 +65,7 @@ export default function ReportsTab({ project }: ReportsTabProps) {
 
             {/* Inflows */}
             <h6
-              className="text-uppercase text-body-secondary fw-semibold mb-3"
+              className="text-body-secondary fw-semibold mb-3"
               style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}
             >
               Inflows
@@ -104,7 +104,7 @@ export default function ReportsTab({ project }: ReportsTabProps) {
 
             {/* Outflows */}
             <h6
-              className="text-uppercase text-body-secondary fw-semibold mb-3"
+              className="text-body-secondary fw-semibold mb-3"
               style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}
             >
               Outflows

@@ -309,7 +309,7 @@ textarea.form-control {
 }
 
 .metric-label {
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   font-size: 11px;
   color: var(--gray-500);
   letter-spacing: 0.08em;
@@ -396,7 +396,7 @@ textarea.form-control {
 
 .card-title {
   font-size: 13px;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   color: var(--gray-500);
   letter-spacing: 0.08em;
   margin-bottom: 14px;

@@ -15,12 +15,12 @@
 
 'use client';
 
-import React, { Suspense, useState, useCallback, useEffect } from 'react';
+import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { CCard, CCardHeader, CCardBody, CToast, CToastBody, CToaster } from '@coreui/react';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
-import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useProjectContext, type ProjectSummary } from '@/app/components/ProjectProvider';
 import { LandscaperPanel } from '@/components/landscaper/LandscaperPanel';
 import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
 import { ActiveProjectBar } from './components/ActiveProjectBar';
@@ -50,9 +50,35 @@ const COLLAPSED_WIDTH = 64;
 function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientProps) {
   const { projects, activeProject, isLoading } = useProjectContext();
 
-  // Find current project
-  const currentProject =
-    projects.find((p) => p.project_id === projectId) || activeProject;
+  // Find current project from SWR-cached list
+  const projectFromCache =
+    projects.find((p) => p.project_id === projectId) || (activeProject?.project_id === projectId ? activeProject : null);
+
+  // Fallback: if project isn't in the SWR list (e.g. created_by mismatch, stale cache),
+  // fetch it directly so the layout renders correct tabs for its property type.
+  const [fallbackProject, setFallbackProject] = useState<ProjectSummary | null>(null);
+  const fallbackAttempted = useRef(false);
+
+  useEffect(() => {
+    // Reset when projectId changes
+    setFallbackProject(null);
+    fallbackAttempted.current = false;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectFromCache || isLoading || fallbackAttempted.current) return;
+    fallbackAttempted.current = true;
+
+    fetch(`/api/projects/${projectId}`)
+      .then(res => {
+        if (!res.ok) return Promise.reject(res.status);
+        return res.json();
+      })
+      .then((data: ProjectSummary) => setFallbackProject(data))
+      .catch(() => { /* silently fail — page.tsx handles error display */ });
+  }, [projectFromCache, isLoading, projectId]);
+
+  const currentProject = projectFromCache ?? fallbackProject;
 
   // Get folder navigation state
   // Use project_type_code (canonical short code like 'RET', 'MF') for category routing.
@@ -67,8 +93,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     setFolderTab,
     folderConfig,
   } = useFolderNavigation({
-    propertyType: effectivePropertyType,
-    analysisType: currentProject?.analysis_type,
+    propertyType: effectivePropertyType ?? undefined,
+    analysisType: currentProject?.analysis_type ?? undefined,
     analysisPerspective: currentProject?.analysis_perspective,
     analysisPurpose: currentProject?.analysis_purpose,
     valueAddEnabled: currentProject?.value_add_enabled ?? false,
@@ -192,7 +218,10 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   );
   const landscaperContextColor = activeFolderConfig?.color || 'var(--cui-tertiary-bg)';
 
-  if (isLoading) {
+  // Guard: show loading skeleton until project data is resolved.
+  // Without this, effectivePropertyType is undefined → getProjectCategory(undefined)
+  // defaults to 'land_development' → wrong tabs render for income property types (MF, OFF, etc.).
+  if (isLoading || !currentProject) {
     return (
       <div className="project-layout-container">
         <div className="project-bar-placeholder" style={{ height: '48px', borderBottom: '1px solid var(--cui-border-color)' }} />

@@ -1088,7 +1088,7 @@
 .ops-value-add-section-title {
   font-size: 0.75rem;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   color: var(--cui-secondary-color);
   border-bottom: 1px solid var(--cui-border-color);
   padding-bottom: 0.5rem;
@@ -1550,7 +1550,7 @@
   font-size: 0.65rem;
   font-weight: 500;
   opacity: 0.9;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.03em;
   line-height: 1;
 }
@@ -1626,7 +1626,7 @@
 .va-metric-label {
   font-size: 0.55rem;
   color: var(--cui-secondary-color);
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.05em;
 }
 
@@ -1848,7 +1848,7 @@
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.5px;
   margin-right: 6px;
 }

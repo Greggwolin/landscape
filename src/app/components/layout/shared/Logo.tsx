@@ -22,7 +22,7 @@ const LogoText = styled.span<LogoTextProps>`
   line-height: 1.2;
   font-weight: 600;
   letter-spacing: 0.15px;
-  text-transform: uppercase;
+  
   margin-inline-start: 10px;
 `
 

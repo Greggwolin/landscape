@@ -27,6 +27,7 @@ import re
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
+from decouple import config as decouple_config
 from django.conf import settings
 from django.db import transaction
 
@@ -173,7 +174,7 @@ def _call_haiku_extraction(response_text: str) -> Optional[Dict]:
         logger.error("[FactExtractor] anthropic package not installed")
         return None
 
-    api_key = os.getenv('ANTHROPIC_API_KEY') or getattr(settings, 'ANTHROPIC_API_KEY', None)
+    api_key = decouple_config('ANTHROPIC_API_KEY', default='') or getattr(settings, 'ANTHROPIC_API_KEY', None)
     if not api_key:
         logger.warning("[FactExtractor] ANTHROPIC_API_KEY not set")
         return None

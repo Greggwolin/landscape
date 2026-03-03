@@ -350,7 +350,7 @@
 
 .sidebar-title {
     font-size: 10px;
-    text-transform: uppercase;
+    /* text-transform: uppercase removed — proper case only */
     letter-spacing: 1px;
     color: #64748b;
     margin-bottom: 12px;
@@ -489,7 +489,7 @@
 .metric-box-label {
     font-size: 11px;
     color: #64748b;
-    text-transform: uppercase;
+    /* text-transform: uppercase removed — proper case only */
     letter-spacing: 0.5px;
     margin-bottom: 8px;
 }
@@ -570,7 +570,7 @@
     font-weight: 600;
     color: #94a3b8;
     font-size: 11px;
-    text-transform: uppercase;
+    /* text-transform: uppercase removed — proper case only */
     letter-spacing: 0.5px;
 }
 

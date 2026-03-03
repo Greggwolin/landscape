@@ -6,3 +6,4 @@
  */
 
 export { LandscaperIcon } from './LandscaperIcon';
+export { HelpIcon } from './HelpIcon';

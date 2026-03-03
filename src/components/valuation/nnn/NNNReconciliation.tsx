@@ -45,7 +45,6 @@ const sectionHeadStyle: React.CSSProperties = {
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
   color: 'var(--cui-secondary-color)',
 };
@@ -55,7 +54,6 @@ const sectionBodyStyle: React.CSSProperties = { padding: '14px 16px' };
 const labelStyle: React.CSSProperties = {
   fontSize: 10,
   color: 'var(--cui-tertiary-color, var(--text-secondary))',
-  textTransform: 'uppercase' as const,
   letterSpacing: '0.07em',
   marginBottom: 4,
 };
@@ -171,7 +169,6 @@ function NNNReconciliation() {
                   marginBottom: 10,
                 }}>
                   <div style={{
-                    fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const,
                     letterSpacing: '0.07em', marginBottom: 3, color: labelColor,
                   }}>
                     {isRisk ? (item.severity === 'red' ? '✕' : '⚠') : '✓'} {item.label}
@@ -241,7 +238,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'left' | '
   return (
     <th style={{
       textAlign: align || 'left', padding: '7px 11px', fontSize: 10, fontWeight: 600,
-      textTransform: 'uppercase' as const, letterSpacing: '0.07em',
+      letterSpacing: '0.07em',
       color: 'var(--cui-tertiary-color, var(--text-secondary))',
       borderBottom: '1px solid var(--cui-border-color)', whiteSpace: 'nowrap' as const,
     }}>{children}</th>

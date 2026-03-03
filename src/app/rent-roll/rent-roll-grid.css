@@ -34,7 +34,7 @@
 .ag-theme-alpine-dark .ag-header-cell-label {
   font-weight: 600;
   font-size: 0.75rem;
-  text-transform: uppercase;
+  /* text-transform: uppercase removed — proper case only */
   letter-spacing: 0.05em;
 }
 

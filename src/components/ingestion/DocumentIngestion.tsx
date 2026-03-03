@@ -423,7 +423,7 @@ export function DocumentIngestion({
             }}
           >
             <div
-              className="text-uppercase text-body-secondary mb-3 pb-2"
+              className="text-body-secondary mb-3 pb-2"
               style={{
                 fontSize: '11px',
                 letterSpacing: '1px',
