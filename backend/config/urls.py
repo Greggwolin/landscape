@@ -7,6 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
+from apps.projects import views_devtools
 from apps.knowledge.views import alpha_views
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -20,6 +21,7 @@ from apps.documents.media_views import lookup_items
 
 urlpatterns = [
     # Django Admin
+    path("admin/logs/", views_devtools.django_log_viewer),
     path("admin/", admin.site.urls),
 
     # API Documentation

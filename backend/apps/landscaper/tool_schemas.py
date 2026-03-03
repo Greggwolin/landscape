@@ -3783,4 +3783,53 @@ LANDSCAPER_TOOLS = [
             },
         },
     },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Location Analysis Narrative Tools (tbl_narrative_version)
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "get_location_analysis",
+        "description": "Retrieve the saved location analysis narrative for a specific tier. Tier must be 't1' (National & State), 't2' (MSA), or 't3' (City & Neighborhood). Returns the latest version including summary, sections, and generation timestamp.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tier": {
+                    "type": "string",
+                    "enum": ["t1", "t2", "t3"],
+                    "description": "Analysis tier: t1=National/State, t2=MSA, t3=City/Neighborhood",
+                },
+            },
+            "required": ["tier"],
+        },
+    },
+    {
+        "name": "update_location_analysis",
+        "description": "Update the location analysis narrative text for a specific tier. Use this when the user asks to revise, edit, or improve the location analysis content. You can update the summary, individual section content, or both. The revised version is persisted as a new version in the database.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tier": {
+                    "type": "string",
+                    "enum": ["t1", "t2", "t3"],
+                    "description": "Analysis tier to update",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Updated executive summary (2-3 paragraphs). Omit to keep existing.",
+                },
+                "sections": {
+                    "type": "array",
+                    "description": "Updated sections array. Each item has 'title' and 'content'. Omit to keep existing.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                    },
+                },
+                "reason": {"type": "string"},
+            },
+            "required": ["tier"],
+        },
+    },
 ]

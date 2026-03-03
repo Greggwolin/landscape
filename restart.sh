@@ -15,24 +15,39 @@ cd "$SCRIPT_DIR"
 cd backend
 mkdir -p logs
 source venv/bin/activate
-nohup python manage.py runserver 8000 >> logs/django.log 2>&1 &
+nohup env -u DEBUG python manage.py runserver 8000 >> logs/django.log 2>&1 &
 DJANGO_PID=$!
 
 # Start Next.js in detached background
 cd "$SCRIPT_DIR"
-nohup npm run dev > /dev/null 2>&1 &
+nohup npm run dev > /tmp/landscape-next.log 2>&1 &
 NEXT_PID=$!
 
+wait_for_port() {
+  local port=$1
+  local max_attempts=$2
+  local attempt=1
+
+  while [ $attempt -le $max_attempts ]; do
+    if lsof -i :"$port" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+
+  return 1
+}
+
 # Verify processes started
-sleep 1
 ERRORS=""
 
-if ! kill -0 $DJANGO_PID 2>/dev/null; then
+if ! wait_for_port 8000 15; then
   ERRORS="${ERRORS}❌ Django failed to start. Check backend/logs/django.log\n"
 fi
 
-if ! kill -0 $NEXT_PID 2>/dev/null; then
-  ERRORS="${ERRORS}❌ Next.js failed to start.\n"
+if ! wait_for_port 3000 20; then
+  ERRORS="${ERRORS}❌ Next.js failed to start. Check /tmp/landscape-next.log\n"
 fi
 
 if [ -n "$ERRORS" ]; then

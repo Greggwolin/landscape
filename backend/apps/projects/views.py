@@ -82,6 +82,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return ProjectListSerializer
         return ProjectSerializer
 
+    def perform_create(self, serializer):
+        """Set created_by to the authenticated user on project creation."""
+        if self.request.user and self.request.user.is_authenticated:
+            serializer.save(created_by=self.request.user)
+        else:
+            serializer.save()
+
     def destroy(self, request, *args, **kwargs):
         """
         DELETE /api/projects/:id/

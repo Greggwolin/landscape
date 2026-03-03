@@ -57,7 +57,9 @@ Return ONLY valid JSON, no other text."""
 def _get_anthropic_client():
     """Get Anthropic client, importing lazily."""
     from anthropic import Anthropic
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    from decouple import config as decouple_config
+    # Try decouple first (reads backend/.env), fall back to os.environ
+    api_key = decouple_config('ANTHROPIC_API_KEY', default='') or os.environ.get('ANTHROPIC_API_KEY')
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not set")
     return Anthropic(api_key=api_key)

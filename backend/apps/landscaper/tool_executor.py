@@ -17004,6 +17004,153 @@ def handle_convert_draft_to_project(tool_input, project_id, user_id=None, propos
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Location Analysis Narrative Tools (tbl_narrative_version)
+# Added 2026-03-01
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_location_analysis')
+def handle_get_location_analysis(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Retrieve the latest location analysis for a tier."""
+    tier = tool_input.get('tier', '')
+    if tier not in ('t1', 't2', 't3'):
+        return {'success': False, 'error': 'tier must be t1, t2, or t3'}
+
+    approach_type = f'location_{tier}'
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, version_number, content, created_at
+                FROM landscape.tbl_narrative_version
+                WHERE project_id = %s AND approach_type = %s
+                ORDER BY version_number DESC
+                LIMIT 1
+            """, [project_id, approach_type])
+            row = cursor.fetchone()
+
+        if not row:
+            return {'success': True, 'analysis': None, 'message': f'No {tier} analysis saved yet.'}
+
+        import json
+        content = row[2]
+        if isinstance(content, str):
+            content = json.loads(content)
+
+        return {
+            'success': True,
+            'id': row[0],
+            'version_number': row[1],
+            'analysis': content,
+            'saved_at': row[3].isoformat() if row[3] else None,
+        }
+    except Exception as e:
+        logger.error(f"Error loading location analysis {tier}: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_location_analysis', is_mutation=True)
+def handle_update_location_analysis(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Update a location analysis narrative and persist as a new version."""
+    tier = tool_input.get('tier', '')
+    if tier not in ('t1', 't2', 't3'):
+        return {'success': False, 'error': 'tier must be t1, t2, or t3'}
+
+    approach_type = f'location_{tier}'
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        updates = {}
+        if 'summary' in tool_input:
+            updates['summary'] = tool_input['summary']
+        if 'sections' in tool_input:
+            updates['sections'] = tool_input['sections']
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='narrative_update',
+            table_name='tbl_narrative_version',
+            field_name=approach_type,
+            proposed_value=updates,
+            current_value=None,
+            reason=tool_input.get('reason', f'Update {tier} location analysis'),
+            source_message_id=source_message_id,
+        )
+
+    import json
+    from django.db import connection
+
+    try:
+        # Load current version
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, version_number, content
+                FROM landscape.tbl_narrative_version
+                WHERE project_id = %s AND approach_type = %s
+                ORDER BY version_number DESC
+                LIMIT 1
+            """, [project_id, approach_type])
+            row = cursor.fetchone()
+
+        if not row:
+            return {'success': False, 'error': f'No existing {tier} analysis to update. Generate one first.'}
+
+        current_content = row[2]
+        if isinstance(current_content, str):
+            current_content = json.loads(current_content)
+        current_version = row[1]
+
+        # Merge updates
+        if 'summary' in tool_input:
+            current_content['summary'] = tool_input['summary']
+        if 'sections' in tool_input:
+            current_content['sections'] = tool_input['sections']
+        current_content['generatedAt'] = __import__('datetime').datetime.utcnow().isoformat() + 'Z'
+
+        # Insert as new version
+        next_version = current_version + 1
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO landscape.tbl_narrative_version (
+                    id, project_id, approach_type, version_number,
+                    content, content_html, content_plain,
+                    status, created_at, updated_at
+                ) VALUES (
+                    nextval('landscape.tbl_narrative_version_id_seq'),
+                    %s, %s, %s,
+                    %s::jsonb, %s, %s,
+                    'draft', NOW(), NOW()
+                )
+                RETURNING id, version_number
+            """, [
+                project_id, approach_type, next_version,
+                json.dumps(current_content),
+                current_content.get('summary', ''),
+                current_content.get('summary', ''),
+            ])
+            insert_row = cursor.fetchone()
+
+        return {
+            'success': True,
+            'id': insert_row[0],
+            'version_number': insert_row[1],
+            'tier': tier,
+            'message': f'Location analysis {tier.upper()} updated (version {insert_row[1]}). Refresh the Location tab to see changes.',
+        }
+    except Exception as e:
+        logger.error(f"Error updating location analysis {tier}: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # External tool modules (auto-register via @register_tool on import)
 # ─────────────────────────────────────────────────────────────────────────────
 from .tools import whatif_tools  # noqa: E402, F401
