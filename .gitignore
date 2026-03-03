@@ -142,3 +142,32 @@ test-results/
 .next_stale*
 .next_stale_*
 landscape_rich_schema_*.json
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Session / smoke-test logs
+cowork-session-logs/
+smoke-test-*.md
+Smoke_Test_*.md
+*_REPORT.md
+*_Audit.md
+
+# Throwaway debug / one-off scripts
+check-fk.js
+scripts/delete-proj-*.js
+scripts/delete-project-*.js
+scripts/check-*.js
+scripts/debug-*.js
+scripts/list-projects.js
+scripts/verify-deletion.js
+
+# Screenshots & screen recordings (reference images committed selectively)
+reference/images/screenshots/*.mov
+reference/images/screenshots/*.mp4
+
+# Rent schedule debug images
+rent-schedule-*.png
+
+# Claude local settings (machine-specific)
+.claude/settings.local.json
