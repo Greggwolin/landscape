@@ -192,39 +192,37 @@ export default function DetailColumn({
               {products.length === 0 ? (
                 <div className="lup-spec-empty">No lot products defined for this type.</div>
               ) : (
-                <div className="lup-product-chips">
-                  {products.map(prod => {
-                    const sel = productSelMap.get(prod.product_id);
-                    const isProductActive = sel?.isActive ?? false;
+                <div className="lup-product-columns">
+                  {groupByWidth(products).map(([width, prods]) => (
+                    <div key={width} className="lup-width-group">
+                      <div className="lup-width-header">{width}&apos;</div>
+                      {prods.map(prod => {
+                        const sel = productSelMap.get(prod.product_id);
+                        const isProductActive = sel?.isActive ?? false;
 
-                    return (
-                      <button
-                        key={prod.product_id}
-                        className={`lup-product-chip${isProductActive ? ' active' : ''}`}
-                        disabled={!isTypeActive || !typeSel}
-                        onClick={() => {
-                          if (!typeSel) return;
-                          onToggleProduct(
-                            typeSel.project_land_use_id,
-                            prod.product_id,
-                            !isProductActive
-                          );
-                        }}
-                      >
-                        <span className="lup-chip-code">{prod.code}</span>
-                        {prod.lot_w_ft && prod.lot_d_ft && (
-                          <span className="lup-chip-dims">
-                            {prod.lot_w_ft}&apos; x {prod.lot_d_ft}&apos;
-                          </span>
-                        )}
-                        {prod.lot_area_sf && (
-                          <span className="lup-chip-area">
-                            {Number(prod.lot_area_sf).toLocaleString()} sf
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                        return (
+                          <button
+                            key={prod.product_id}
+                            className={`lup-product-chip${isProductActive ? ' active' : ''}`}
+                            disabled={!isTypeActive || !typeSel}
+                            onClick={() => {
+                              if (!typeSel) return;
+                              onToggleProduct(
+                                typeSel.project_land_use_id,
+                                prod.product_id,
+                                !isProductActive
+                              );
+                            }}
+                          >
+                            <span className="lup-chip-code">{prod.code}</span>
+                            {prod.lot_area_sf && (
+                              <span className="lup-chip-area">{n(prod.lot_area_sf)} sf</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -246,34 +244,60 @@ function SpecRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Strip unnecessary trailing decimals: 2.00 → 2, 4.50 → 4.5 */
+function n(v: number | null): string {
+  if (v === null || v === undefined) return '';
+  return parseFloat(String(v)).toLocaleString();
+}
+
 function formatNum(v: number | null): string {
-  if (v === null || v === undefined) return '—';
-  return v.toLocaleString();
+  return n(v) || '—';
 }
 
 function formatFt(v: number | null): string {
-  if (v === null || v === undefined) return '—';
-  return `${v.toLocaleString()}'`;
+  const s = n(v);
+  return s ? `${s}'` : '—';
 }
 
 function formatSf(v: number | null): string {
-  if (v === null || v === undefined) return '—';
-  return `${v.toLocaleString()} sf`;
+  const s = n(v);
+  return s ? `${s} sf` : '—';
 }
 
 function formatPct(v: number | null): string {
-  if (v === null || v === undefined) return '—';
-  return `${v}%`;
+  const s = n(v);
+  return s ? `${s}%` : '—';
 }
 
 function formatRange(min: number | null, max: number | null): string {
-  if (min === null && max === null) return '—';
-  if (min !== null && max !== null) return `${min} – ${max}`;
-  if (min !== null) return `${min}+`;
-  return `≤ ${max}`;
+  const a = n(min), b = n(max);
+  if (!a && !b) return '—';
+  if (a && b) return `${a} – ${b}`;
+  if (a) return `${a}+`;
+  return `≤ ${b}`;
 }
 
 function formatSetbacks(f: number | null, s: number | null, c: number | null, r: number | null): string {
-  const parts = [f, s, c, r].map(v => v !== null ? `${v}'` : '—');
+  const parts = [f, s, c, r].map(v => { const s = n(v); return s ? `${s}'` : '—'; });
   return parts.join(' / ');
+}
+
+/** Group products by lot width, sorted small→large. Within each group, sort by depth. */
+function groupByWidth(products: LotProduct[]): [string, LotProduct[]][] {
+  const groups = new Map<string, LotProduct[]>();
+  const sorted = [...products].sort((a, b) => {
+    const wa = parseFloat(String(a.lot_w_ft ?? 0));
+    const wb = parseFloat(String(b.lot_w_ft ?? 0));
+    if (wa !== wb) return wa - wb;
+    const da = parseFloat(String(a.lot_d_ft ?? 0));
+    const db = parseFloat(String(b.lot_d_ft ?? 0));
+    return da - db;
+  });
+  for (const prod of sorted) {
+    const key = prod.lot_w_ft ? String(parseFloat(String(prod.lot_w_ft))) : '—';
+    const list = groups.get(key) || [];
+    list.push(prod);
+    groups.set(key, list);
+  }
+  return Array.from(groups.entries());
 }

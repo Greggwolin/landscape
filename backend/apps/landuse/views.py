@@ -116,7 +116,7 @@ class LotProductViewSet(viewsets.ModelViewSet):
         if active_only is None or active_only.lower() != 'false':
             queryset = queryset.filter(is_active=True)
 
-        return queryset.order_by('code')
+        return queryset.order_by('lot_area_sf', 'code')
 
     def perform_destroy(self, instance):
         """Soft delete lot products."""

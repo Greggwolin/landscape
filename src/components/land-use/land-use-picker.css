@@ -434,17 +434,39 @@
   border-radius: 4px;
 }
 
-.lup-product-chips {
+.lup-product-columns {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 12px;
+}
+
+.lup-width-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lup-width-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  text-align: center;
+  padding: 3px 8px;
+  background-color: var(--cui-tertiary-bg);
+  border: 1px solid rgb(200, 200, 200);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
 }
 
 .lup-product-chip {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 1px;
+  padding: 5px 8px;
   border: 1px solid var(--cui-border-color);
   border-radius: 6px;
   background-color: var(--cui-body-bg);
@@ -452,6 +474,8 @@
   transition: all 0.15s;
   font-size: 12px;
   color: var(--cui-body-color);
+  text-align: center;
+  white-space: nowrap;
 }
 
 .lup-product-chip:hover:not(:disabled) {
@@ -472,7 +496,6 @@
 
 .lup-chip-code {
   font-weight: 600;
-  font-family: 'Monaco', 'Menlo', monospace;
   font-size: 11px;
 }
 
@@ -498,7 +521,6 @@
   align-items: center;
   gap: 0;
   padding: 12px 20px;
-  border-top: 1px solid var(--cui-border-color);
   background-color: var(--cui-tertiary-bg);
 }
 
@@ -530,4 +552,56 @@
   height: 24px;
   background-color: var(--cui-border-color);
   margin: 0 20px;
+}
+
+/* ─── Selected Products List ──────────────────────── */
+.lup-summary-section {
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lup-selected-products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lup-selected-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lup-selected-type-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cui-secondary-color);
+  min-width: 120px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+.lup-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.lup-selected-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--cui-success);
+  border-radius: 4px;
+  color: var(--cui-success);
+  background-color: var(--cui-body-bg);
+}
+
+.lup-selected-pill-area {
+  font-weight: 400;
+  opacity: 0.7;
 }

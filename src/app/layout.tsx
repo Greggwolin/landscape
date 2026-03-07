@@ -13,6 +13,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import NavigationLayout from "@/app/components/NavigationLayout";
 import { HelpLandscaperProvider } from "@/contexts/HelpLandscaperContext";
+import { LandscaperThinkingProvider } from "@/contexts/LandscaperThinkingContext";
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';
@@ -35,11 +36,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <ToastProvider>
                 <ProjectProvider>
                   <IssueReporterProvider>
-                    <HelpLandscaperProvider>
-                      <NavigationLayout>
-                        {children}
-                      </NavigationLayout>
-                    </HelpLandscaperProvider>
+                    <LandscaperThinkingProvider>
+                      <HelpLandscaperProvider>
+                        <NavigationLayout>
+                          {children}
+                        </NavigationLayout>
+                      </HelpLandscaperProvider>
+                    </LandscaperThinkingProvider>
                   </IssueReporterProvider>
                 </ProjectProvider>
               </ToastProvider>

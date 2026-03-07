@@ -31,7 +31,13 @@ import { useResizablePanel } from '@/hooks/useResizablePanel';
 import { FileDropProvider, useFileDrop } from '@/contexts/FileDropContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { DropZoneWrapper } from '@/components/ui/DropZoneWrapper';
+import { useExtractionStagingCount } from '@/hooks/useExtractionStagingCount';
+import { useProjectCreation } from '@/hooks/useProjectCreation';
+import IngestionWorkbenchPanel from './components/IngestionWorkbenchPanel';
+import { WorkbenchProvider, useWorkbench } from '@/contexts/WorkbenchContext';
+import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
+import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/folder-tabs.css';
 import '@/styles/resizable-panel.css';
 
@@ -154,6 +160,12 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     collapsedWidth: COLLAPSED_WIDTH,
   });
 
+  // Extraction staging indicator + floating workbench panel
+  const { state: workbenchState, openWorkbench, closeWorkbench, pendingIntakeDocs, clearPendingIntakeDocs } = useWorkbench();
+  const [localWorkbenchOpen, setLocalWorkbenchOpen] = useState(false);
+  const workbenchOpen = workbenchState.isOpen || localWorkbenchOpen;
+  const { pendingCount: stagingPendingCount } = useExtractionStagingCount(projectId);
+
   // File drop notification state
   const [dropToast, setDropToast] = useState<string | null>(null);
   const { pendingFiles } = useFileDrop();
@@ -178,6 +190,16 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     const timer = setTimeout(() => setDropToast(null), 5000);
     return () => clearTimeout(timer);
   }, [dropToast]);
+
+  // Auto-dismiss "Creating..." banner when user lands on the created project page
+  const { jobs: creationJobs, dismissJob } = useProjectCreation();
+  useEffect(() => {
+    for (const job of creationJobs) {
+      if (job.projectId === projectId && job.status === 'complete') {
+        dismissJob(job.clientId);
+      }
+    }
+  }, [creationJobs, projectId, dismissJob]);
 
   // Handle folder/tab navigation
   const handleNavigate = (folder: string, tab: string) => {
@@ -245,6 +267,77 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         folders={folderConfig.folders}
         currentFolder={currentFolder}
         onFolderNavigate={handleNavigate}
+      />
+
+      {/* Extraction staging indicator — fixed in top nav bar area */}
+      {stagingPendingCount > 0 && (
+        <button
+          className={`extraction-indicator extraction-indicator--pending${workbenchOpen ? ' extraction-indicator--active' : ''}`}
+          onClick={() => {
+            if (workbenchState.isOpen) {
+              closeWorkbench();
+            } else {
+              setLocalWorkbenchOpen(prev => !prev);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            top: 14,
+            right: 340,
+            zIndex: 51,
+          }}
+          title={`${stagingPendingCount} fields pending review`}
+        >
+          <span className="ei-badge">{stagingPendingCount}</span>
+          fields pending review
+        </button>
+      )}
+
+      {/* Floating Workbench Panel */}
+      {workbenchOpen && (
+        <IngestionWorkbenchPanel
+          projectId={projectId}
+          project={currentProject as { project_id: number; project_name: string }}
+          folders={folderConfig.folders}
+          isLandDev={!isIncomeProperty(effectivePropertyType ?? undefined)}
+          docId={workbenchState.docId}
+          intakeUuid={workbenchState.intakeUuid}
+          docName={workbenchState.docName}
+          docType={workbenchState.docType}
+          onClose={() => {
+            // Fire-and-forget: abandon pending staging rows, mark session
+            // abandoned, delete the UploadThing file, and soft-delete core_doc
+            if (workbenchState.docId || workbenchState.intakeUuid) {
+              const djangoApi = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+              // 1. Bulk-reject staging rows + mark intake session abandoned
+              fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  doc_id: workbenchState.docId,
+                  intake_uuid: workbenchState.intakeUuid,
+                }),
+              }).catch((err) => console.warn('[Workbench] abandon failed:', err));
+
+              // 2. Delete backing file from UploadThing + soft-delete core_doc
+              if (workbenchState.docId) {
+                fetch(`/api/dms/documents/${workbenchState.docId}/delete`, {
+                  method: 'DELETE',
+                }).catch((err) => console.warn('[Workbench] UT delete failed:', err));
+              }
+            }
+            closeWorkbench();
+            setLocalWorkbenchOpen(false);
+          }}
+        />
+      )}
+
+      {/* IntakeChoiceModal — mounted at layout level so it's accessible from any tab */}
+      <IntakeChoiceModal
+        visible={pendingIntakeDocs.length > 0}
+        projectId={projectId}
+        docs={pendingIntakeDocs}
+        onClose={clearPendingIntakeDocs}
       />
 
       {/* Two-column split below the project bar */}
@@ -410,6 +503,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClientProps) {
   return (
     <FileDropProvider>
+    <WorkbenchProvider>
     <LandscaperCollisionProvider>
     <Suspense
       fallback={
@@ -468,6 +562,7 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
       </ProjectLayoutClientInner>
     </Suspense>
     </LandscaperCollisionProvider>
+    </WorkbenchProvider>
     </FileDropProvider>
   );
 }

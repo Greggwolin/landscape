@@ -264,6 +264,22 @@ export default function LandUsePicker({ projectId }: Props) {
     return { selectedTypes, selectedProducts, totalParcels, coveredParcels };
   }, [allTypeSelections, parcelCounts]);
 
+  // Flat list of selected products with type context
+  const selectedProductsList = useMemo(() => {
+    const list: { typeName: string; typeCode: string; familyCode: string; product: ProductSelection }[] = [];
+    for (const t of allTypeSelections) {
+      if (!t.is_active) continue;
+      for (const p of t.product_selections) {
+        if (!p.is_active) continue;
+        list.push({ typeName: t.type_name, typeCode: t.type_code, familyCode: t.family_code, product: p });
+      }
+    }
+    return list.sort((a, b) => {
+      if (a.typeCode !== b.typeCode) return a.typeCode.localeCompare(b.typeCode);
+      return (parseFloat(String(a.product.lot_area_sf ?? 0))) - (parseFloat(String(b.product.lot_area_sf ?? 0)));
+    });
+  }, [allTypeSelections]);
+
   const selectedFamily = families.find(f => f.family_id === selectedFamilyId) || null;
 
   if (loading) {
@@ -332,6 +348,7 @@ export default function LandUsePicker({ projectId }: Props) {
         selectedProducts={summaryStats.selectedProducts}
         coveredParcels={summaryStats.coveredParcels}
         totalParcels={summaryStats.totalParcels}
+        productsList={selectedProductsList}
       />
     </div>
   );

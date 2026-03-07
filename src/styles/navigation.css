@@ -191,3 +191,168 @@
     font-size: 0.875rem;
   }
 }
+
+/* ─── Project Creation Banner ─── */
+
+.project-creation-banner-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  z-index: 49; /* just below sticky nav (50) */
+}
+
+.pcb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem var(--app-padding, 1rem);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+/* ── Pending state ── */
+.pcb-pending {
+  background-color: var(--cui-info-bg, var(--cui-body-bg));
+  color: var(--cui-body-color);
+}
+
+.pcb-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--cui-border-color);
+  border-top-color: var(--cui-primary);
+  border-radius: 50%;
+  animation: pcb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pcb-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Complete state ── */
+.pcb-complete {
+  background-color: var(--cui-success-bg, var(--cui-body-bg));
+  color: var(--cui-body-color);
+}
+
+.pcb-check {
+  color: var(--cui-success);
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.pcb-link {
+  margin-left: auto;
+  color: var(--cui-primary);
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.pcb-link:hover {
+  background-color: var(--cui-tertiary-bg);
+  text-decoration: underline;
+}
+
+/* ── Failed state ── */
+.pcb-failed {
+  background-color: var(--cui-danger-bg, var(--cui-body-bg));
+  color: var(--cui-body-color);
+}
+
+.pcb-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--cui-danger);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Shared ── */
+.pcb-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pcb-dismiss {
+  background: none;
+  border: none;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.pcb-dismiss:hover {
+  background-color: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+}
+
+/* ─── Extraction Indicator (Top Nav) ─── */
+
+.extraction-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.extraction-indicator:hover {
+  filter: brightness(1.1);
+}
+
+.extraction-indicator--pending {
+  background: var(--cui-warning);
+  color: #1a1a1a;
+}
+
+.extraction-indicator--extracting {
+  background: var(--cui-info);
+  color: #fff;
+}
+
+.extraction-indicator .ei-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pcb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.extraction-indicator .ei-badge {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.extraction-indicator--active {
+  box-shadow: 0 0 0 2px var(--cui-primary);
+}
