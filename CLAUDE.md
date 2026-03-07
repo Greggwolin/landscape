@@ -158,15 +158,7 @@ Project
 
 ### Progressive Complexity Modes
 
-Three UI modes controlling field visibility:
-
-| Mode     | Fields Shown | Use Case |
-|----------|--------------|----------|
-| Napkin   | 7 fields     | Quick feasibility |
-| Standard | 11 fields    | Working analysis |
-| Detail   | 15+ fields   | Institutional underwriting |
-
-Mode selector appears in budget grid and other data-heavy components.
+Removed from UI. Landscaper now manages complexity contextually based on available data. Do not reference napkin/standard/detail modes in new code. CLAUDE.md references to these modes are retained for historical context only.
 
 ### Project Type Codes
 
@@ -409,7 +401,7 @@ Django uses DRF serializers with consistent envelope:
 2. **Operations save migration** — Move to Django from legacy Next.js route
 3. **Reports project scoping** — Remove hardcoded project 17
 4. **Waterfall calculate endpoint** — Wire to financial engine
-5. **Extraction pipeline verification** — End-to-end async flow; OCR gap for scanned PDFs
+5. **Extraction pipeline** — Ingestion Workbench implemented and committed. Known gap: scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution).
 6. **PDF report generation** — At minimum property summary
 
 ### Known Technical Debt
@@ -435,7 +427,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **210+ registered tools** (`@register_tool` decorator)
+- Claude AI with **217 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools added Mar 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -443,16 +435,48 @@ Django uses DRF serializers with consistent envelope:
 - **Silent failure risk:** ALLOWED_UPDATES field mappings must match actual DB column names exactly — always verify tool writes against the DB directly, not just API response codes
 - **Comp tools:** Use unified comparables table with `property_type` discriminator — not separate land/MF tables
 
-### Ingestion Workbench (Design Phase — Feb 2026)
+### Ingestion Workbench (Implemented — Mar 2026)
 
-The document ingestion UI is being redesigned as a persistent **split-panel workbench** (replacing the prior modal approach):
+The Ingestion Workbench is a fully implemented split-panel modal replacing MappingScreen and the old `dms_extract_queue` intake flow.
 
-- **Layout:** 380px Landscaper chat (left) + field table (right)
-- **Field status model:** `accepted` / `pending` / `conflict` / `waiting` / `empty`
-- **Tile tabs:** Project / Planning / Budget / Market / All
-- **Authority:** Implicit — emerges from user conflict resolution rather than a pre-set authority matrix
-- **OCR detection:** Landscaper detects scanned vs. native PDFs and responds with appropriate messaging
-- Implementation prompt not yet written; design locked in LK session transcripts
+**Layout:** 380px Landscaper chat (left) + field review table (right), 1200px wide modal
+
+**Entry flow:**
+1. File drop → `IntakeChoiceModal` (client-side classification, file not yet uploaded)
+2. "Structured Ingestion" selected → file uploads to UploadThing immediately → Workbench opens
+3. Extraction triggers knowledge service pipeline (`ai_extraction_staging`) — bypasses old `dms_extract_queue` entirely
+4. User reviews fields → commits → DMS record created, fields written to project tables
+5. Cancel / X close → abandon endpoint called (bulk-reject staging rows, mark session abandoned) + UploadThing file deleted + `core_doc` soft-deleted
+
+**Field status model:** `accepted` (green) / `pending` (yellow) / `conflict` (orange) / `waiting` (gray) / `empty` (light gray)
+
+**Tile tabs:** Property-type-aware. Multifamily: Project / Property / Operations / Valuation / All. Land Dev: Project / Planning / Budget / Valuation / All. Each tab shows field count badge.
+
+**Field scoping:** Workbench shows only fields from the current `doc_id`, not all pending project staging rows.
+
+**Quote stripping:** `_clean_extracted_value()` in `extraction_service.py` strips wrapping quotes before staging INSERT. `_strip_wrapping_quotes()` in `workbench_views.py` cleans existing data on read.
+
+**Landscaper integration:** `pageContext="ingestion"` with 5 dedicated tools + live `<ingestion_state>` block injected into system prompt. Tools: `get_ingestion_staging`, `update_staging_field`, `approve_staging_field`, `reject_staging_field`, `explain_extraction`.
+
+**Source citation:** `source_snippet` populated at 87.5% coverage (batched extraction path). `source_page` not yet populated — extraction prompt does not request page numbers (post-alpha backlog).
+
+**Key files:**
+- `src/contexts/WorkbenchContext.tsx` — state bridge
+- `src/app/.../tabs/IngestionWorkbench.tsx` — main panel component
+- `src/app/.../IngestionWorkbenchPanel.tsx` — pass-through wrapper
+- `src/components/intelligence/IntakeChoiceModal.tsx` — entry point
+- `src/hooks/useExtractionStaging.ts` — staging data + mutations
+- `backend/apps/knowledge/views/workbench_views.py` — list, update, commit, abandon endpoints
+- `backend/apps/landscaper/tools/ingestion_tools.py` — 5 ingestion tools (NEW)
+- `src/app/api/dms/documents/[id]/delete/route.ts` — UploadThing delete + core_doc soft-delete
+
+**MappingScreen:** Deleted. Removed from `IntelligenceTab.tsx`. Draft sessions show "In Progress" badge.
+
+**Known gaps (post-alpha):**
+- `source_page` never populated by extraction pipeline
+- `intake_session_id` not on `ai_extraction_staging` (uses `doc_id` filter instead — Option B deferred)
+- `rent_comp_name` field registry bug: tenant names from rent rolls misclassified as rent comparable names
+- Implicit authority auto-resolution wired at schema level (`ingestion_source_authority` table exists) but logic not implemented
 
 ### PDF / OCR Handling
 
@@ -610,7 +634,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-02-28*
+*Last updated: 2026-03-07*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: 210+*
+*Landscaper tool count: 217*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

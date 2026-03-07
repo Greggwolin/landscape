@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-02-21
-**Version:** 4.1
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul)
+**Last Updated:** 2026-03-07
+**Version:** 4.2
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint)
 
 ---
 
@@ -9,7 +9,25 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul (February 21, 2026)**
+### 🆕 **Latest Update: Ingestion Workbench + Alpha Prep Sprint (March 7, 2026)**
+
+**AI-Assisted Document Ingestion, Extraction Pipeline, and Cross-Feature Polish**
+
+Major sprint delivering the Ingestion Workbench and wide-ranging alpha readiness improvements:
+
+- ✅ **Ingestion Workbench** — Split-panel floating workbench (380px Landscaper chat + field table) for AI-assisted document review
+- ✅ **Extraction pipeline overhaul** — Batched staging with conflict detection, tile-based field scoping, quote stripping for clean values
+- ✅ **5 ingestion Landscaper tools** — `explain_extraction`, `suggest_value_correction`, `approve_field`, `reject_field`, `get_extraction_summary` (tool count → 217)
+- ✅ **IntakeChoiceModal routing** — "Structured Ingestion" now opens workbench instead of legacy MappingScreen
+- ✅ **Source citation integrity** — Unified "Evidence" label for source snippets, graceful fallback for missing sources
+- ✅ **Income approach enhancements** — NOI basis refinements, operations tab improvements
+- ✅ **UI polish** — Navigation, project creation, HelpIcon animations, land use refinements
+- ✅ **DMS improvements** — Document delete endpoint, multifamily model updates
+- ✅ **Land Use tab** — 3-column picker with parcels tab migration
+- ✅ **NNN valuation** — NNN SLB tools and UI added to Landscaper
+- 📁 **Location:** See `docs/09-session-notes/2026-03-07-ingestion-workbench-commit-organization.md`
+
+### Previous Update: CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul (February 21, 2026)
 
 **UI Polish, Valuation Workflow Completion, and GIS Improvements**
 
