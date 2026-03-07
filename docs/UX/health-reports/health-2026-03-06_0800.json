@@ -1,0 +1,64 @@
+{
+  "report": "Landscape Platform Health Check",
+  "timestamp": "2026-03-06T15:00:19Z",
+  "mode": "all",
+  "branch": "feature/alpha-prep",
+  "results": [
+    {
+  "agent": "coreui-compliance-auditor",
+  "timestamp": "2026-03-06T15:00:04Z",
+  "status": "FAIL",
+  "total_violations": 6286,
+  "breakdown": {
+    "mui_imports": 139,
+    "hardcoded_hex_css": 769,
+    "forbidden_tailwind": 845,
+    "dark_variants": 80,
+    "inline_styles": 4453
+  }
+}
+,
+    {
+  "agent": "django-api-route-enforcer",
+  "timestamp": "2026-03-06T15:00:07Z",
+  "status": "PASS",
+  "new_nextjs_violations": 0,
+  "violation_files": [],
+  "context": {
+    "total_nextjs_routes": 415,
+    "total_django_viewsets": 22
+  }
+}
+,
+    {
+  "agent": "claudemd-sync-checker",
+  "timestamp": "2026-03-06T15:00:07Z",
+  "status": "WARN",
+  "stale_file_count": 4,
+  "stale_files": [{"file":"backend/apps/landuse/views.py","hours_newer":65},{"file":"backend/apps/projects/views.py","hours_newer":64},{"file":"backend/apps/landuse/urls.py","hours_newer":64},{"file":"backend/apps/knowledge/urls.py","hours_newer":67}]
+}
+,
+    {"agent":"extraction-queue-monitor","status":"SKIP","message":"Extraction table not found"}
+,
+    {
+  "agent": "dead-tool-detector",
+  "timestamp": "2026-03-06T15:00:19.771358+00:00",
+  "status": "PASS",
+  "tools_scanned": 7,
+  "dead_table_refs": 0,
+  "dead_column_refs": 0,
+  "dead_tables": [],
+  "dead_columns": []
+}
+,
+    {
+  "agent": "allowed-updates-auditor",
+  "timestamp": "2026-03-06T15:00:19.838125+00:00",
+  "status": "PASS",
+  "tools_checked": 0,
+  "critical_mismatches": 0,
+  "details": []
+}
+
+  ]
+}
