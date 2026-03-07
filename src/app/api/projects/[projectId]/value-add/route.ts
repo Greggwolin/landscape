@@ -71,10 +71,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     `;
 
     if (result.length === 0) {
-      // Return defaults with project_id but no value_add_id (not yet saved)
+      // No assumptions configured yet — return nulls so the UI shows empty state
       return NextResponse.json({
         project_id: projectIdNum,
-        ...DEFAULTS,
+        is_enabled: false,
+        reno_start_month: null,
+        reno_starts_per_month: null,
+        months_to_complete: null,
+        reno_cost_per_sf: null,
+        reno_cost_basis: 'sf',
+        relocation_incentive: null,
+        rent_premium_pct: null,
+        relet_lag_months: null,
+        renovate_all: true,
+        units_to_renovate: null,
         created_at: null,
         updated_at: null,
       });

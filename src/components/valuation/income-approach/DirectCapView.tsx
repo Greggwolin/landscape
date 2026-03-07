@@ -10,7 +10,7 @@
  */
 
 import React, { useState } from 'react';
-import type { DirectCapViewProps, OpExItem, NOIBasis, ValueTile } from '@/types/income-approach';
+import type { DirectCapViewProps, OpExItem, OpExGroup, NOIBasis, ValueTile } from '@/types/income-approach';
 import {
   formatCurrency,
   formatPercent,
@@ -34,6 +34,7 @@ export function DirectCapView({
   propertySummary,
   rentRollItems,
   opexItems,
+  opexGroups,
   sensitivityMatrix,
   keyMetrics,
   selectedBasis,
@@ -138,6 +139,7 @@ export function DirectCapView({
             <MultiColumnPLTable
               tiles={visibleTiles}
               opexItems={opexItems}
+              opexGroups={opexGroups}
               unitCount={unitCount}
               totalSf={totalSf}
               selectedBasis={selectedBasis}
@@ -228,15 +230,48 @@ export function DirectCapView({
                   </td>
                 </tr>
 
-                {opexItems.map((item, idx) => (
-                  <TableRow
-                    key={idx}
-                    label={item.category || item.expense_type}
-                    amount={item.annual_amount}
-                    unitCount={unitCount}
-                    totalSf={totalSf}
-                  />
-                ))}
+                {opexGroups && opexGroups.length > 0 ? (
+                  <>
+                    {opexGroups.map((group) => (
+                      <React.Fragment key={group.parent_category}>
+                        <tr>
+                          <td
+                            colSpan={4}
+                            style={{
+                              paddingTop: '0.5rem',
+                              paddingBottom: '0.25rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              color: 'var(--cui-secondary-color)',
+                              paddingLeft: '0.5rem',
+                            }}
+                          >
+                            {group.label}
+                          </td>
+                        </tr>
+                        {group.items.map((item, idx) => (
+                          <TableRow
+                            key={idx}
+                            label={item.label || item.category || item.expense_type}
+                            amount={item.annual_amount}
+                            unitCount={unitCount}
+                            totalSf={totalSf}
+                          />
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </>
+                ) : (
+                  opexItems.map((item, idx) => (
+                    <TableRow
+                      key={idx}
+                      label={item.label || item.category || item.expense_type}
+                      amount={item.annual_amount}
+                      unitCount={unitCount}
+                      totalSf={totalSf}
+                    />
+                  ))
+                )}
 
                 <TableRow
                   label={`Management Fee (${formatPercent(calculation.management_fee_pct, 1)})`}
@@ -486,6 +521,7 @@ function MetricCard({ label, value }: MetricCardProps) {
 interface MultiColumnPLTableProps {
   tiles: ValueTile[];
   opexItems: OpExItem[];
+  opexGroups?: OpExGroup[];
   unitCount: number;
   totalSf: number;
   selectedBasis: NOIBasis;
@@ -495,6 +531,7 @@ interface MultiColumnPLTableProps {
 function MultiColumnPLTable({
   tiles,
   opexItems,
+  opexGroups,
   unitCount,
   totalSf,
   selectedBasis,
@@ -605,15 +642,48 @@ function MultiColumnPLTable({
           </td>
         </tr>
 
-        {opexItems.map((item, idx) => (
-          <MultiColRow
-            key={idx}
-            label={item.category || item.expense_type}
-            values={tiles.map(() => item.annual_amount)}
-            tileIds={tiles.map((t) => t.id)}
-            selectedBasis={selectedBasis}
-          />
-        ))}
+        {opexGroups && opexGroups.length > 0 ? (
+          <>
+            {opexGroups.map((group) => (
+              <React.Fragment key={group.parent_category}>
+                <tr>
+                  <td
+                    colSpan={colCount + 1}
+                    style={{
+                      paddingTop: '0.5rem',
+                      paddingBottom: '0.25rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--cui-secondary-color)',
+                      paddingLeft: '0.5rem',
+                    }}
+                  >
+                    {group.label}
+                  </td>
+                </tr>
+                {group.items.map((item, idx) => (
+                  <MultiColRow
+                    key={idx}
+                    label={item.label || item.category || item.expense_type}
+                    values={tiles.map(() => item.annual_amount)}
+                    tileIds={tiles.map((t) => t.id)}
+                    selectedBasis={selectedBasis}
+                  />
+                ))}
+              </React.Fragment>
+            ))}
+          </>
+        ) : (
+          opexItems.map((item, idx) => (
+            <MultiColRow
+              key={idx}
+              label={item.label || item.category || item.expense_type}
+              values={tiles.map(() => item.annual_amount)}
+              tileIds={tiles.map((t) => t.id)}
+              selectedBasis={selectedBasis}
+            />
+          ))
+        )}
 
         <MultiColRow
           label="Management Fee"

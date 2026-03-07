@@ -583,7 +583,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           COALESCE(parent_category, 'unclassified') as parent_category
         FROM tbl_operating_expenses
         WHERE project_id = ${projectIdNum}
-          AND LOWER(COALESCE(parent_category, '')) != 'management'
+          AND NOT (
+            expense_category ILIKE '%management_fee%'
+            OR expense_category ILIKE '%management fee%'
+            OR COALESCE(category_id, 0) = 310
+          )
         ORDER BY parent_category, expense_category, updated_at DESC
       `;
 
@@ -871,9 +875,41 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const postRenoNRI = postRenoGPR + vacancyDeductions.section_total.post_reno;
     const postRenoEGI = postRenoNRI + otherIncome.section_total.post_reno;
 
-    // Calculate Management Fee (EGI × management_fee_pct)
+    // Management Fee: prefer extracted dollar amount from tbl_operating_expenses,
+    // fall back to calculated (EGI × management_fee_pct) if none exists.
+    const extractedMgmtFeeRows = await sql`
+      SELECT annual_amount, source, value_source
+      FROM tbl_operating_expenses
+      WHERE project_id = ${projectIdNum}
+        AND (expense_category ILIKE '%management_fee%'
+             OR expense_category ILIKE '%management fee%'
+             OR category_id = 310)
+      LIMIT 1
+    `;
+    const extractedMgmtFee = extractedMgmtFeeRows.length > 0
+      ? parseFloat(extractedMgmtFeeRows[0].annual_amount) || 0
+      : 0;
+
     const managementFeePct = assumptions.management_fee_pct;
-    const managementFeeAsIs = effectiveGrossIncome * managementFeePct;
+    let managementFeeAsIs: number;
+    let managementFeeLabel: string;
+    let managementFeeIsReadonly: boolean;
+
+    let managementFeeTooltip: string | undefined;
+
+    if (extractedMgmtFee > 0) {
+      // Use the document-extracted value as the current/as-is amount
+      managementFeeAsIs = extractedMgmtFee;
+      const impliedPct = effectiveGrossIncome > 0 ? extractedMgmtFee / effectiveGrossIncome : 0;
+      managementFeeLabel = 'Management Fee';
+      managementFeeTooltip = `Extracted: $${Math.round(extractedMgmtFee).toLocaleString()} — ${(impliedPct * 100).toFixed(1)}% of EGI`;
+      managementFeeIsReadonly = false;
+    } else {
+      managementFeeAsIs = effectiveGrossIncome * managementFeePct;
+      managementFeeLabel = 'Management Fee';
+      managementFeeTooltip = `Calculated: ${(managementFeePct * 100).toFixed(1)}% of EGI`;
+      managementFeeIsReadonly = true;
+    }
     const managementFeeMarket = effectiveGrossIncomeMarket * managementFeePct;
     const managementFeePostReno = postRenoEGI * managementFeePct;
 
@@ -887,22 +923,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const calculatedExpenseRows = [
       {
         line_item_key: 'calculated_management_fee',
-        label: `Management Fee (${(managementFeePct * 100).toFixed(1)}%)`,
+        label: managementFeeLabel,
+        tooltip: managementFeeTooltip,
         level: 1,
         is_calculated: false,
-        is_readonly: true,
-        is_percentage: true,
+        is_readonly: managementFeeIsReadonly,
+        is_percentage: extractedMgmtFee <= 0,
         parent_category: 'management_reserves',
-        calculation_base: 'egi',
+        calculation_base: extractedMgmtFee > 0 ? 'fixed' : 'egi',
         as_is: {
-          rate: managementFeePct,
+          rate: extractedMgmtFee > 0 ? (unitCount > 0 ? managementFeeAsIs / unitCount : 0) : managementFeePct,
           total: managementFeeAsIs
         },
         post_reno: {
           rate: managementFeePct,
           total: managementFeePostReno
         },
-        evidence: {},
+        evidence: extractedMgmtFee > 0 ? { source: extractedMgmtFeeRows[0].source || 'extraction' } : {},
         children: []
       },
       {
@@ -950,8 +987,31 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         children: calculatedExpenseRows
       };
 
-      // Add the management & reserves category to the expense rows
-      const allOpexRows = [...legacyRows, managementReservesCategory];
+      // Move any 'management' parent-category legacy rows into the
+      // calculated Management & Reserves section so they group together.
+      const managementLegacyRows = legacyRows.filter(
+        (r: any) => r.parent_category === 'management'
+      );
+      const nonManagementLegacyRows = legacyRows.filter(
+        (r: any) => r.parent_category !== 'management'
+      );
+      if (managementLegacyRows.length > 0) {
+        // Flatten children from management legacy parent rows into the calculated section
+        for (const mgmtRow of managementLegacyRows) {
+          if (mgmtRow.children && Array.isArray(mgmtRow.children)) {
+            managementReservesCategory.children.push(...mgmtRow.children);
+          }
+        }
+        // Recalculate the management_reserves parent totals
+        const mgmtChildrenTotal = managementReservesCategory.children.reduce(
+          (sum: number, c: any) => sum + (c.as_is?.total || 0), 0
+        );
+        managementReservesCategory.as_is = {
+          rate: unitCount > 0 ? mgmtChildrenTotal / unitCount : 0,
+          total: mgmtChildrenTotal
+        };
+      }
+      const allOpexRows = [...nonManagementLegacyRows, managementReservesCategory];
 
       const totalBaseOpex = legacyTotal;
       const totalCalculatedExpenses = managementFeeAsIs + replacementReserves;

@@ -188,9 +188,9 @@ function SelectableExpenseRow({
     })
   }), [row.opex_id, row.label, row.line_item_key, row.parent_category, isDraggable, isEditingName]);
 
-  if (isDraggable && !isEditingName) {
-    drag(ref);
-  }
+  // NOTE: drag connector is applied directly as a ref on the ⋮⋮ span in JSX.
+  // .ops-row uses display:contents which removes it from DOM layout and
+  // breaks react-dnd event handling on the row container.
 
   let rowClass = 'ops-row ops-child-row';
   if (isDraggable) rowClass += ' draggable-opex-row';
@@ -241,14 +241,14 @@ function SelectableExpenseRow({
         ) : (
           <span className="ops-label-inline">
             {isDraggable && (
-              <span className="ops-drag-handle" title="Drag to categorize">
+              <span ref={isDraggable && !isEditingName ? drag : undefined} className="ops-drag-handle" title="Drag to categorize" style={{ cursor: 'grab' }}>
                 ⋮⋮
               </span>
             )}
             <span
               className={isDraggable ? 'ops-editable-label' : ''}
               onDoubleClick={handleDoubleClick}
-              title={isDraggable ? 'Double-click to edit' : undefined}
+              title={row.tooltip || (isDraggable ? 'Double-click to edit' : undefined)}
             >
               {row.label}
             </span>

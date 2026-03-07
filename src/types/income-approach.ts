@@ -70,15 +70,26 @@ export interface RentRollData {
 
 export interface OpExItem {
   category: string;
+  label?: string;
   expense_type: string;
   annual_amount: number;
   per_unit: number;
   per_sf: number;
 }
 
+export interface OpExGroup {
+  parent_category: string;
+  label: string;
+  annual_amount: number;
+  per_unit: number;
+  per_sf: number;
+  items: OpExItem[];
+}
+
 export interface OperatingExpensesData {
   total: number;
   items: OpExItem[];
+  groups?: OpExGroup[];
 }
 
 // ============================================================================
@@ -230,6 +241,7 @@ export interface DirectCapViewProps {
   propertySummary: PropertySummary;
   rentRollItems: RentRollItem[];
   opexItems: OpExItem[];
+  opexGroups?: OpExGroup[];
   sensitivityMatrix: SensitivityPoint[];
   keyMetrics: KeyMetrics;
   selectedBasis: NOIBasis;

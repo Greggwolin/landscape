@@ -293,10 +293,10 @@ class DCFCalculationService:
             rent_row = cursor.fetchone()
             current_annual_rent = float(rent_row[0]) if rent_row else 0
 
-            # Fallback to unit types
+            # Fallback to unit types (floor plan matrix)
             if current_annual_rent == 0:
                 cursor.execute("""
-                    SELECT COALESCE(SUM(unit_count * current_market_rent), 0) * 12 as annual_rent
+                    SELECT COALESCE(SUM(unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as annual_rent
                     FROM landscape.tbl_multifamily_unit_type
                     WHERE project_id = %s
                 """, [self.project_id])
