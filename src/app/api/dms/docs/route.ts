@@ -251,52 +251,69 @@ export async function POST(req: NextRequest) {
 
     console.log(`📝 Created ingestion history for doc_id=${doc.doc_id}`);
 
-    // Queue document for extraction (creates DMSExtractQueue job)
-    // Background worker will process it and create assertions/embeddings
+    // ── Post-upload extraction routing ────────────────────────────────────
+    //
+    // Two pipelines exist:
+    //   1. Legacy dms_extract_queue → manual `process_extractions` worker → dms_assertion
+    //   2. Knowledge extraction service → ai_extraction_staging (Workbench)
+    //
+    // When intent=structured_ingestion the IntakeChoiceModal fires
+    // POST /api/knowledge/documents/{doc_id}/extract-batched/ separately,
+    // so we skip the legacy queue insert to avoid orphaned "pending" rows.
+    //
+    // RAG processing (text extraction → chunking → embeddings) runs for ALL
+    // intents since it feeds the knowledge base, not the workbench.
+
+    const intent = system.intent; // 'structured_ingestion' | 'global_intelligence' | 'dms_only' | undefined
+
     let processing: {
       status: string;
       queue_id: number | null;
       error: string | null;
     } = {
-      status: 'pending',
+      status: intent === 'structured_ingestion' ? 'deferred_to_workbench' : 'pending',
       queue_id: null,
       error: null,
     };
 
     try {
-      // Determine extract type based on doc_type
-      const extractType = system.doc_type?.toLowerCase().includes('rent') ? 'rent_roll' : 'general';
+      // Skip legacy extract queue for structured_ingestion — Workbench triggers
+      // the knowledge extraction service via IntakeChoiceModal.
+      if (intent !== 'structured_ingestion') {
+        const extractType = system.doc_type?.toLowerCase().includes('rent') ? 'rent_roll' : 'general';
 
-      // Insert into DMSExtractQueue directly
-      const queueResult = await sql`
-        INSERT INTO landscape.dms_extract_queue (
-          doc_id,
-          extract_type,
-          priority,
-          status,
-          created_at
-        ) VALUES (
-          ${parseInt(doc.doc_id)},
-          ${extractType},
-          5,
-          'pending',
-          NOW()
-        )
-        RETURNING queue_id, status
-      `;
+        const queueResult = await sql`
+          INSERT INTO landscape.dms_extract_queue (
+            doc_id,
+            extract_type,
+            priority,
+            status,
+            created_at
+          ) VALUES (
+            ${parseInt(doc.doc_id)},
+            ${extractType},
+            5,
+            'pending',
+            NOW()
+          )
+          RETURNING queue_id, status
+        `;
 
-      if (queueResult.length > 0) {
-        processing = {
-          status: 'queued',
-          queue_id: queueResult[0].queue_id,
-          error: null,
-        };
-        console.log(`🔄 Queued document ${doc.doc_id} for extraction (queue_id=${processing.queue_id})`);
+        if (queueResult.length > 0) {
+          processing = {
+            status: 'queued',
+            queue_id: queueResult[0].queue_id,
+            error: null,
+          };
+          console.log(`🔄 Queued document ${doc.doc_id} for extraction (queue_id=${processing.queue_id})`);
+        }
+      } else {
+        console.log(`🧩 Skipping dms_extract_queue for doc ${doc.doc_id} — routed to Workbench pipeline`);
       }
 
-      // Trigger synchronous RAG processing (text extraction → chunking → embeddings)
-      // This runs in parallel with the response - fire and forget
-      // The sync endpoint handles its own status updates to core_doc
+      // Trigger RAG processing (text extraction → chunking → embeddings)
+      // Runs for ALL intents — feeds knowledge base, not the workbench.
+      // Fire-and-forget: runs in parallel with the response.
       fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -310,7 +327,6 @@ export async function POST(req: NextRequest) {
           }
         })
         .catch((processError) => {
-          // Log but don't fail - document is saved, processing can be retried manually
           console.error(`⚠️ RAG processing error for doc_id=${doc.doc_id}:`, processError);
         });
 

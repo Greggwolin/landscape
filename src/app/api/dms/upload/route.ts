@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify({
                 project_id: projectId,
                 property_type: 'multifamily',
-                batches: ['core_property', 'financials', 'deal_market', 'rent_roll', 'opex'],
+                batches: ['core_property', 'financials', 'deal_market', 'opex', 'unit_types', 'comparables'],
               }),
             }
           );

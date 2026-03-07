@@ -1042,22 +1042,25 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         }
       });
 
-      // Only include unit types that have actual units assigned in the units table
+      // Count actual units per type from individual unit records (if any)
       const actualUnitCountByType = new Map<string, number>();
       unitsData.forEach(u => {
         actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
       });
 
+      // Show unit types that either have individual units OR have unit_count from extraction
       const transformedFloorPlans: FloorPlan[] = unitTypesData
-        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0)
+        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0
+          || (ut.unit_count && ut.unit_count > 0)
+          || (ut.total_units && ut.total_units > 0))
         .map(ut => {
           const leaseRents = rentsByUnitType.get(ut.unit_type_code);
           const avgLeaseRent = leaseRents && leaseRents.length > 0
             ? Math.round(leaseRents.reduce((a, b) => a + b, 0) / leaseRents.length)
             : 0;
-          // Use actual lease rent if available, otherwise fall back to market rent
-          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_market_rent || 0);
-          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.total_units;
+          // Use actual lease rent if available, otherwise fall back to market rent or current_rent_avg
+          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_rent_avg || ut.current_market_rent || 0);
+          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.unit_count || ut.total_units;
 
           return {
             id: ut.unit_type_id.toString(),
@@ -1669,39 +1672,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // vs. single-asset types (retail, industrial, hotel) that don't use unit/floorPlan data
   const isUnitBased = projectType === 'MF' || projectType === 'OFF';
 
-  // Show empty state only for unit-based property types with no data yet.
-  // Single-asset types (retail, industrial, hotel) always render PhysicalDescription.
-  if (isUnitBased && units.length === 0 && floorPlans.length === 0) {
-    return (
-      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
-        <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
-          <div className="mb-6">
-            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
-            No Property Data Yet
-          </h2>
-          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
-            This project doesn&apos;t have any unit or floorplan data yet. Upload a rent roll or manually add unit information to get started.
-          </p>
-          <div className="rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
-            <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
-              <strong>To add data:</strong>
-            </p>
-            <ul className="text-sm space-y-1 ml-4 list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
-              <li>Navigate to the Rent Roll page to upload a rent roll spreadsheet</li>
-              <li>Use the Django admin panel to manually add unit types and units</li>
-              <li>Import data via the API endpoints</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Does this project have unit-level data (floor plans, rent roll)?
+  // PhysicalDescription always renders — the empty state below only applies
+  // to the Floor Plan Matrix section when no unit/floorPlan data exists.
   const hasUnitData = floorPlans.length > 0 || units.length > 0;
 
   // Render content based on activeTab (controlled by folder tabs)
@@ -1753,7 +1726,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     Floor Plan Matrix
                   </h3>
                   <span className="studio-badge-info">
-                    Aggregates from Units
+                    {units.length > 0 ? 'Aggregates from Units' : 'From Extraction'}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs">

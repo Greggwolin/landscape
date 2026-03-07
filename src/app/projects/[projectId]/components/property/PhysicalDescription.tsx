@@ -354,7 +354,7 @@ function SectionProgress({ filled, total, showAll, onToggle }: SectionProgressPr
           fontWeight: 500,
           cursor: 'pointer',
           transition: 'all 0.15s ease',
-          whiteSpace: 'nowrap',
+          whiteSpace: 'nowrap' as const,
         }}
         title={showAll ? 'Click to show only populated fields' : 'Click to show all fields'}
       >
