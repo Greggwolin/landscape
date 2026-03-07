@@ -380,6 +380,8 @@ class ExtractionWriter:
                 return self._write_opex(mapping, value, selector)
             elif 'revenue_other' in target_table:
                 return self._write_income_upsert(mapping, value)
+            elif 'assumption' in target_table:
+                return self._write_assumption(mapping, value, mapping.selector_json or {})
             return False, f"Unknown upsert target table: {target_table}"
 
         # ── Land Development write types ─────────────────────────────────────
@@ -907,6 +909,15 @@ class ExtractionWriter:
         """
         table = 'tbl_multifamily_unit_type'
 
+        # If value is a JSON string from staging, parse it to dict
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    value = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # Not JSON — fall through to single-column update
+
         # If value is a dict (full unit type data from array extraction)
         if isinstance(value, dict):
             return self._insert_full_unit_type(value)
@@ -951,14 +962,21 @@ class ExtractionWriter:
             """, [self.project_id, unit_type_name, unit_type_name])
             row = cursor.fetchone()
 
-        # Map extracted field names to column names
+        # Map extracted field names to actual DB column names on tbl_multifamily_unit_type
         field_mapping = {
             'bedrooms': 'bedrooms', 'beds': 'bedrooms',
             'bathrooms': 'bathrooms', 'baths': 'bathrooms',
             'unit_count': 'unit_count', 'count': 'unit_count',
-            'avg_sqft': 'avg_sqft', 'square_feet': 'avg_sqft', 'sf': 'avg_sqft',
-            'market_rent': 'market_rent', 'rent': 'market_rent',
-            'current_rent': 'current_rent', 'in_place_rent': 'current_rent',
+            'total_units': 'total_units', 'total_units_by_type': 'total_units',
+            'avg_sqft': 'avg_square_feet', 'sf_avg': 'avg_square_feet',
+            'square_feet': 'avg_square_feet', 'sf': 'avg_square_feet',
+            'avg_square_feet': 'avg_square_feet',
+            'market_rent': 'market_rent', 'rent_market': 'market_rent',
+            'rent': 'market_rent',
+            'current_market_rent': 'current_market_rent',
+            'current_rent_avg': 'current_rent_avg',
+            'in_place_rent': 'current_rent_avg',
+            'concessions_avg': 'concessions_avg',
         }
 
         # Build update dict
@@ -966,6 +984,18 @@ class ExtractionWriter:
         for key, col in field_mapping.items():
             if key in data and data[key] is not None:
                 columns[col] = data[key]
+
+        # If a rent roll exists, don't overwrite avg_square_feet — it's
+        # calculated from individual unit records and is more accurate.
+        if 'avg_square_feet' in columns:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM landscape.tbl_multifamily_unit
+                    WHERE project_id = %s AND square_feet IS NOT NULL
+                    LIMIT 1
+                """, [self.project_id])
+                if cursor.fetchone():
+                    del columns['avg_square_feet']
 
         if row:
             # Update existing
@@ -983,15 +1013,22 @@ class ExtractionWriter:
         else:
             # Insert new
             columns['unit_type_name'] = unit_type_name
+            # Derive unit_type_code from extracted data or unit_type_name
+            unit_type_code = data.get('unit_type_code') or unit_type_name
+            columns['unit_type_code'] = unit_type_code
             col_names = ', '.join(columns.keys())
             placeholders = ', '.join(['%s'] * len(columns))
-            values = list(columns.values()) + [self.project_id]
 
             with connection.cursor() as cursor:
                 cursor.execute(f"""
                     INSERT INTO landscape.tbl_multifamily_unit_type
                     (project_id, {col_names}, created_at, updated_at)
                     VALUES (%s, {placeholders}, NOW(), NOW())
+                    ON CONFLICT (project_id, unit_type_code)
+                    DO UPDATE SET
+                        unit_type_name = EXCLUDED.unit_type_name,
+                        {', '.join([f"{k} = EXCLUDED.{k}" for k in columns.keys() if k not in ('unit_type_name', 'unit_type_code')])},
+                        updated_at = NOW()
                 """, [self.project_id] + list(columns.values()))
             return True, f"Inserted unit_type: {unit_type_name}"
 
@@ -1007,15 +1044,19 @@ class ExtractionWriter:
         For array extractions from chunked rent roll, value is a dict with all unit fields.
         We match on unit_number for upsert.
         """
-        print(f"=== _WRITE_UNIT_UPSERT CALLED ===", flush=True)
-        print(f"PROJECT: {self.project_id}, VALUE TYPE: {type(value)}, SCOPE_ID: {scope_id}", flush=True)
-        print(f"VALUE: {value}", flush=True)
-
         table = 'tbl_multifamily_unit'
+
+        # If value is a JSON string from staging, parse it to dict
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    value = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # Not JSON — fall through to single-column update
 
         # If value is a dict (full unit data from chunked extraction)
         if isinstance(value, dict):
-            print(f"=== CALLING _insert_full_unit ===")
             return self._insert_full_unit(value)
 
         # Single column update - need scope_id (unit_id)

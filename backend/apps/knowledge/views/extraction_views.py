@@ -2536,13 +2536,115 @@ def approve_high_confidence(request, project_id: int):
         except Exception as e:
             logger.error(f"Unit type aggregation failed for project {project_id}: {e}")
 
+    # Auto-populate MSA market text field from county + state (uses COUNTY_TO_MSA lookup)
+    msa_market_text = None
+    if len(applied) > 0:
+        try:
+            from ..services.extraction_service import auto_populate_msa
+            msa_market_text = auto_populate_msa(int(project_id))
+        except Exception as e:
+            logger.warning(f"MSA market text auto-populate failed for project {project_id}: {e}")
+
+    # Auto-populate MSA from city + state if msa_id is NULL
+    # Always attempt this — city/state may have been set in a prior approve run
+    msa_set = False
+    if True:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT city, state, msa_id FROM landscape.tbl_project
+                    WHERE project_id = %s
+                """, [int(project_id)])
+                proj = cursor.fetchone()
+                if proj and proj[0] and proj[1] and not proj[2]:
+                    city = proj[0].strip()
+                    state = proj[1].strip()
+                    # Normalize state to 2-letter abbreviation
+                    state_map = {
+                        'california': 'CA', 'arizona': 'AZ', 'texas': 'TX',
+                        'florida': 'FL', 'nevada': 'NV', 'colorado': 'CO',
+                        'washington': 'WA', 'oregon': 'OR', 'utah': 'UT',
+                        'georgia': 'GA', 'north carolina': 'NC', 'tennessee': 'TN',
+                        'illinois': 'IL', 'new york': 'NY', 'pennsylvania': 'PA',
+                        'ohio': 'OH', 'michigan': 'MI', 'virginia': 'VA',
+                        'maryland': 'MD', 'massachusetts': 'MA', 'new jersey': 'NJ',
+                        'indiana': 'IN', 'minnesota': 'MN', 'missouri': 'MO',
+                        'south carolina': 'SC', 'alabama': 'AL', 'louisiana': 'LA',
+                        'kentucky': 'KY', 'oklahoma': 'OK', 'connecticut': 'CT',
+                        'iowa': 'IA', 'mississippi': 'MS', 'arkansas': 'AR',
+                        'kansas': 'KS', 'nebraska': 'NE', 'idaho': 'ID',
+                        'hawaii': 'HI', 'new mexico': 'NM', 'west virginia': 'WV',
+                        'montana': 'MT', 'rhode island': 'RI', 'delaware': 'DE',
+                        'south dakota': 'SD', 'north dakota': 'ND', 'alaska': 'AK',
+                        'vermont': 'VT', 'wyoming': 'WY', 'maine': 'ME',
+                        'new hampshire': 'NH', 'wisconsin': 'WI',
+                        'district of columbia': 'DC',
+                    }
+                    state_abbr = state_map.get(state.lower(), state) if len(state) > 2 else state.upper()
+
+                    # Also fix state in tbl_project if it was stored as full name
+                    if len(state) > 2 and state_abbr != state:
+                        cursor.execute("""
+                            UPDATE landscape.tbl_project SET state = %s WHERE project_id = %s
+                        """, [state_abbr, int(project_id)])
+                        logger.info(f"Normalized state '{state}' -> '{state_abbr}' for project {project_id}")
+
+                    # Try exact match on primary_city + state
+                    cursor.execute("""
+                        SELECT msa_id FROM landscape.tbl_msa
+                        WHERE LOWER(primary_city) = LOWER(%s)
+                          AND state_abbreviation = %s
+                          AND is_active = true
+                        LIMIT 1
+                    """, [city, state_abbr])
+                    msa_row = cursor.fetchone()
+
+                    # Fallback: fuzzy match on msa_name containing city
+                    if not msa_row:
+                        cursor.execute("""
+                            SELECT msa_id FROM landscape.tbl_msa
+                            WHERE msa_name ILIKE %s
+                              AND state_abbreviation = %s
+                              AND is_active = true
+                            LIMIT 1
+                        """, [f'%{city}%', state_abbr])
+                        msa_row = cursor.fetchone()
+
+                    # Fallback 2: match on county name = primary_city (e.g. "Los Angeles" county → LA MSA)
+                    if not msa_row:
+                        cursor.execute("""
+                            SELECT county FROM landscape.tbl_project WHERE project_id = %s
+                        """, [int(project_id)])
+                        county_row = cursor.fetchone()
+                        if county_row and county_row[0]:
+                            county_name = county_row[0].strip().replace(' County', '').replace(' county', '')
+                            cursor.execute("""
+                                SELECT msa_id FROM landscape.tbl_msa
+                                WHERE (LOWER(primary_city) = LOWER(%s) OR msa_name ILIKE %s)
+                                  AND state_abbreviation = %s
+                                  AND is_active = true
+                                LIMIT 1
+                            """, [county_name, f'%{county_name}%', state_abbr])
+                            msa_row = cursor.fetchone()
+
+                    if msa_row:
+                        cursor.execute("""
+                            UPDATE landscape.tbl_project SET msa_id = %s WHERE project_id = %s AND msa_id IS NULL
+                        """, [msa_row[0], int(project_id)])
+                        msa_set = True
+                        logger.info(f"Auto-set msa_id={msa_row[0]} for project {project_id} (city={city}, state={state_abbr})")
+        except Exception as e:
+            logger.error(f"MSA auto-lookup failed for project {project_id}: {e}")
+
     return JsonResponse({
         'success': True,
         'approved': len(approved),
         'applied_to_model': len(applied),
         'fields': list(set(applied)),
         'failed': failed,
-        'unit_types_created': unit_types_created
+        'unit_types_created': unit_types_created,
+        'msa_set': msa_set,
+        'msa_market_text': msa_market_text,
     })
 
 
