@@ -5,6 +5,7 @@ import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
+import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 import { ThreadList } from './ThreadList';
@@ -258,6 +259,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     subtabContext,
     onToolResult,
   });
+
+  // Sync project landscaper loading state to global context (drives HelpIcon propeller)
+  const { setIsThinking } = useLandscaperThinking();
+  useEffect(() => { setIsThinking(isLoading); }, [isLoading, setIsThinking]);
 
   // Expose sendMessage to parent via imperative handle (for programmatic chat injection)
   useImperativeHandle(ref, () => ({ sendMessage }), [sendMessage]);

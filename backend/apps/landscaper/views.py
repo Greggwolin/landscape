@@ -1596,6 +1596,7 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 'project_type': project.project_type or 'Unknown',
                 'project_type_code': project.project_type_code,
                 'thread_id': str(thread.id),
+                'subtab_context': getattr(thread, 'subtab_context', None),
                 'analysis_perspective': getattr(project, 'analysis_perspective', None),
                 'analysis_purpose': getattr(project, 'analysis_purpose', None),
                 'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
@@ -1955,10 +1956,11 @@ class IntakeStartView(APIView):
 
         # Create the intake session
         user = request.user if request.user and request.user.is_authenticated else None
+        document_type = serializer.validated_data.get('document_type') or None
         session = IntakeSession.objects.create(
             project=project,
             doc_id=doc_id,
-            document_type=None,
+            document_type=document_type,
             status='draft',
             created_by=user,
         )
@@ -1969,6 +1971,7 @@ class IntakeStartView(APIView):
             'status': session.status,
             'projectId': project_id,
             'docId': doc_id,
+            'documentType': document_type,
         }, status=status.HTTP_201_CREATED)
 
 

@@ -377,6 +377,21 @@ PAGE_TOOLS = {
     ],
 
     # -------------------------------------------------------------------------
+    # INGESTION WORKBENCH (post-upload structured extraction review)
+    # -------------------------------------------------------------------------
+    "ingestion": [
+        # Read/write to ai_extraction_staging for field review
+        "get_ingestion_staging",
+        "update_staging_field",
+        "approve_staging_field",
+        "reject_staging_field",
+        "explain_extraction",
+        # Document content access for source verification
+        "get_document_content",
+        "get_document_page",
+    ],
+
+    # -------------------------------------------------------------------------
     # INVESTMENT COMMITTEE PAGE (Phase 7)
     # -------------------------------------------------------------------------
     "investment_committee": [
@@ -458,6 +473,8 @@ def normalize_page_context(
         return ctx if ctx in PAGE_TOOLS else ("documents" if ctx == "document" else ctx)
     if ctx in ("investment_committee", "ic", "ic_review"):
         return "investment_committee"
+    if ctx in ("ingestion", "workbench", "intake"):
+        return "ingestion"
 
     return default_home
 

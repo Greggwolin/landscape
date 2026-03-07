@@ -37,6 +37,7 @@ export interface StageFilesOptions {
 export interface PendingIntakeDoc {
   docId: number;
   docName: string;
+  docType: string | null;
 }
 
 interface UploadStagingContextValue {
@@ -306,6 +307,11 @@ export function UploadStagingProvider({
           | undefined;
 
         // 2. Create document record
+        // When route is 'extract', signal structured_ingestion intent so the
+        // backend skips the legacy dms_extract_queue insert — the Workbench
+        // triggers the knowledge extraction service separately.
+        const intent = effectiveRoute === 'extract' ? 'structured_ingestion' : undefined;
+
         const payload = {
           system: {
             project_id: (serverData?.project_id as number) ?? projectId,
@@ -318,6 +324,7 @@ export function UploadStagingProvider({
             file_size_bytes: (serverData?.file_size_bytes as number) ?? staged.file.size,
             mime_type: (serverData?.mime_type as string) ?? staged.file.type,
             version_no: 1,
+            ...(intent && { intent }),
           },
           profile: {},
           ai: { source: 'staging-tray' },
@@ -342,7 +349,11 @@ export function UploadStagingProvider({
         if (effectiveRoute === 'extract' && docResult.doc?.doc_id) {
           setPendingIntakeDocs(prev => [
             ...prev,
-            { docId: docResult.doc.doc_id, docName: staged.file.name },
+            {
+              docId: docResult.doc.doc_id,
+              docName: staged.file.name,
+              docType: effectiveDocType,
+            },
           ]);
         }
 

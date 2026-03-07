@@ -33,8 +33,7 @@ import ReportsTab from './components/tabs/ReportsTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import CapitalizationTab from './components/tabs/CapitalizationTab';
 import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
-// RenovationSubTab: removed from Property sub-tabs, will be integrated into Operations (layout TBD)
-// import RenovationSubTab from './components/tabs/RenovationSubTab';
+import RenovationSubTab from './components/tabs/RenovationSubTab';
 import LocationSubTab from './components/tabs/LocationSubTab';
 import MarketSupplySubTab from './components/tabs/MarketSupplySubTab';
 import { MapTab } from '@/components/map-tab';
@@ -154,6 +153,9 @@ function ProjectContentRouter({
           // Rent Roll - income properties
           case 'rent-roll':
             return <PropertyTab project={project} activeTab="rent-roll" />;
+          // Renovation sub-tab - value-add projects
+          case 'renovation':
+            return <RenovationSubTab project={project} />;
           // Acquisition sub-tab - ALL project types
           case 'acquisition':
             return <AcquisitionSubTab project={project} />;

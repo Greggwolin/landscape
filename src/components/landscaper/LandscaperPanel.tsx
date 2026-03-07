@@ -17,6 +17,7 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import IntakeChoiceModal, { type PendingIntakeDoc } from '@/components/intelligence/IntakeChoiceModal';
+import { classifyFile } from '@/components/dms/staging/classifyFile';
 import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
@@ -232,9 +233,11 @@ export function LandscaperPanel({
 
           if (response.ok) {
             const docResult = await response.json();
-            console.log(`Document created: doc_id=${docResult.doc?.doc_id}`);
-            if (docResult.doc?.doc_id) {
-              createdDocs.push(docResult.doc.doc_id);
+            // Handle both new doc and collision (existing doc) responses
+            const docId = docResult.doc?.doc_id || docResult.existing_doc?.doc_id;
+            console.log(`Document record: doc_id=${docId}`, docResult.collision ? '(collision — reusing existing)' : '(new)');
+            if (docId) {
+              createdDocs.push(docId);
             }
           } else {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -252,281 +255,20 @@ export function LandscaperPanel({
       if (createdDocs.length > 0) {
         setDropNotice(`Uploaded ${createdDocs.length} document${createdDocs.length > 1 ? 's' : ''} to project.`);
 
-        // Surface intake choice modal for uploaded docs
+        // Surface intake choice modal — user decides what to do with the uploaded docs.
+        // Extraction is deferred to the intake pipeline (IntakeChoiceModal → intake/start → Workbench).
+        // This replaces the old auto-extract behavior that bypassed classification and user confirmation.
         setLandscaperIntakeDocs(
-          createdDocs.map((docId, i) => ({
-            docId,
-            docName: files[i]?.name || `Document ${docId}`,
-          }))
+          createdDocs.map((docId, i) => {
+            const file = files[i];
+            const classification = file ? classifyFile(file) : null;
+            return {
+              docId,
+              docName: file?.name || `Document ${docId}`,
+              docType: classification?.docType || null,
+            };
+          })
         );
-
-        // Trigger AI extraction using Python backend (comprehensive extraction service)
-        if (files.length > 0 && createdDocs.length > 0) {
-          setUploadMessage('Processing document for extraction...');
-          setUploadProgress(80);
-
-          try {
-            const docId = createdDocs[0];
-            const backendUrl =
-              process.env.NEXT_PUBLIC_DJANGO_API_URL ||
-              process.env.DJANGO_API_URL ||
-              'http://localhost:8000';
-
-            // Run synchronous processing to ensure text + embeddings exist before extraction
-            const processResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/process/`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-            });
-
-            const processText = await processResponse.text();
-            let processBody: any = {};
-            try {
-              processBody = processText ? JSON.parse(processText) : {};
-            } catch (err) {
-              processBody = { raw: processText || '', parseError: (err as Error)?.message };
-            }
-
-            const processedOk =
-              processResponse.ok &&
-              (processBody?.success === true ||
-                processBody?.status === 'ready' ||
-                (processBody?.chunks_created ?? 0) > 0 ||
-                (processBody?.embeddings_created ?? 0) > 0);
-
-            if (!processedOk) {
-              console.error(
-                'Document processing failed:',
-                processResponse.status,
-                processBody || processText || 'Unknown'
-              );
-              setDropNotice(
-                `Uploaded ${createdDocs.length} document(s). Processing failed: ${
-                  processBody?.error || processBody?.raw || processText || processResponse.statusText
-                }`
-              );
-              return;
-            }
-
-            // Prefer processing response counts; fall back to status check
-            let embeddingsReady =
-              (processBody?.embeddings_created ?? 0) > 0 ||
-              (processBody?.chunks_created ?? 0) > 0 ||
-              processBody?.status === 'ready';
-
-            let statusBody: any = null;
-
-            if (!embeddingsReady) {
-              const statusResponse = await fetch(
-                `${backendUrl}/api/knowledge/documents/${docId}/status/`,
-                { headers: { 'Content-Type': 'application/json' } }
-              );
-              const statusText = await statusResponse.text();
-              try {
-                statusBody = statusText ? JSON.parse(statusText) : {};
-              } catch (err) {
-                statusBody = {
-                  raw: statusText || '',
-                  parseError: (err as Error)?.message,
-                };
-              }
-
-              embeddingsReady =
-                statusResponse.ok &&
-                statusBody?.success &&
-                (statusBody?.document?.embeddings_count ?? 0) > 0;
-
-              if (!embeddingsReady) {
-                console.error('Document not ready for extraction:', statusResponse.status, statusBody);
-                setDropNotice(
-                  `Uploaded ${createdDocs.length} document(s). Processing incomplete: ${
-                    statusBody?.document?.processing_status ||
-                    statusBody?.raw ||
-                    processBody?.status ||
-                    'pending'
-                  }${
-                    statusBody?.document?.processing_error
-                      ? ` - ${statusBody.document.processing_error}`
-                      : ''
-                  }`
-                );
-                return;
-              }
-            }
-
-            if (!embeddingsReady) {
-              console.error('Document not ready for extraction:', statusResponse.status, statusBody);
-              setDropNotice(
-                `Uploaded ${createdDocs.length} document(s). Processing incomplete: ${
-                  statusBody?.document?.processing_status || 'pending'
-                }${statusBody?.document?.processing_error ? ` - ${statusBody.document.processing_error}` : ''}`
-              );
-              return;
-            }
-
-            setUploadMessage('Running AI extraction...');
-            setUploadProgress(90);
-
-            // Detect document type from filename to choose appropriate extraction batches
-            const docName = files[0]?.name?.toLowerCase() || '';
-            const isRentRoll = docName.includes('rent roll') ||
-                              docName.includes('rentroll') ||
-                              docName.includes('rent_roll') ||
-                              docName.includes('unit list') ||
-                              docName.includes('lease list');
-            const isT12 = docName.includes('t-12') ||
-                         docName.includes('t12') ||
-                         docName.includes('trailing') ||
-                         docName.includes('operating statement');
-
-            // Check if file is Excel or CSV (structured format that supports column mapping)
-            const fileExt = files[0]?.name?.split('.').pop()?.toLowerCase() || '';
-            const isStructuredFile = ['xlsx', 'xls', 'csv'].includes(fileExt);
-
-            // For structured rent roll files, use conversational column mapping via Landscaper chat
-            if (isRentRoll && isStructuredFile) {
-              const chatMsg = `I've uploaded "${files[0].name}" (document ID: ${docId}). Please analyze the columns for rent roll mapping.`;
-              chatRef.current?.sendMessage(chatMsg);
-              setDropNotice(null);
-              setIsUploading(false);
-              setUploadProgress(0);
-              setUploadMessage('');
-              return;
-            }
-
-            // Select extraction approach based on document type
-            let extractResponse: Response;
-
-            if (isRentRoll) {
-              // Use dedicated chunked rent roll extraction endpoint for PDF rent rolls
-              // This handles large rent rolls (100+ units) by processing in chunks
-              extractResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/extract-rent-roll/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  project_id: projectId,
-                  property_type: 'multifamily',
-                }),
-              });
-            } else {
-              // Use batched extraction for other document types
-              let batches: string[];
-              if (isT12) {
-                // T-12s focus on operating expenses and income
-                batches = ['core_property', 'financials'];
-              } else {
-                // Default for OMs and other documents
-                batches = ['core_property', 'financials', 'deal_market'];
-              }
-
-              extractResponse = await fetch(`${backendUrl}/api/knowledge/documents/${docId}/extract-batched/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  project_id: projectId,
-                  property_type: 'multifamily',
-                  batches,
-                }),
-              });
-            }
-
-            if (extractResponse.ok) {
-              const extractData = await extractResponse.json();
-              console.log('Python extraction result:', extractData);
-
-              // Get pending extractions to show in modal
-              const pendingResponse = await fetch(`${backendUrl}/api/knowledge/projects/${projectId}/extractions/pending/`);
-              const pendingData = pendingResponse.ok ? await pendingResponse.json() : { extractions: [], summary: null };
-
-              if (extractData.success && (extractData.total_staged > 0 || pendingData.extractions?.length > 0)) {
-                if (isRentRoll) {
-                  // Rent roll delta review is now handled inline in the grid
-                  // via usePendingRentRollChanges — just notify and let the hook pick it up
-                  refreshPendingExtractions();
-                  setDropNotice(`Extraction complete! Rent roll changes are highlighted in the grid for review.`);
-                  setIsUploading(false);
-                  setUploadProgress(0);
-                  setUploadMessage('');
-                  return;
-                }
-
-                // Convert extraction staging format to field_mappings format for modal
-                // field_key contains the proper field name (e.g., "replacement_reserves")
-                // target_field contains the generic column name (e.g., "value")
-                const fieldMappings = (pendingData.extractions || []).map((ext: {
-                  extraction_id?: number;
-                  source_text?: string;
-                  source_snippet?: string;
-                  target_field?: string;
-                  field_key?: string;
-                  extracted_value?: unknown;
-                  confidence_score?: number;
-                  scope?: string;
-                  scope_label?: string;
-                  status?: 'pending' | 'conflict';
-                  conflict_existing_value?: unknown;
-                  conflict_existing_doc_name?: string;
-                  conflict_existing_confidence?: number;
-                }) => ({
-                  extraction_id: ext.extraction_id,
-                  source_text: ext.source_snippet || ext.source_text || '',
-                  suggested_field: ext.field_key || ext.target_field || '',
-                  suggested_value: typeof ext.extracted_value === 'string'
-                    ? ext.extracted_value
-                    : JSON.stringify(ext.extracted_value),
-                  confidence: ext.confidence_score || 0.8,
-                  scope: ext.scope,
-                  scope_label: ext.scope_label,
-                  status: ext.status,
-                  conflict_existing_value: ext.conflict_existing_value
-                    ? typeof ext.conflict_existing_value === 'string'
-                      ? ext.conflict_existing_value
-                      : JSON.stringify(ext.conflict_existing_value)
-                    : undefined,
-                  conflict_existing_doc_name: ext.conflict_existing_doc_name,
-                  conflict_existing_confidence: ext.conflict_existing_confidence,
-                }));
-
-                if (fieldMappings.length > 0) {
-                  setExtractionResult({
-                    doc_id: docId,
-                    doc_name: files[0].name,
-                    field_mappings: fieldMappings,
-                    summary: pendingData.summary,
-                  });
-                  setPendingFile(files[0]);
-                  setShowExtractionModal(true);
-                  setDropNotice(null);
-                } else {
-                  setDropNotice(`Uploaded ${createdDocs.length} document(s). ${extractData.total_staged || 0} fields extracted and staged.`);
-                }
-              } else {
-                const errorMsg = extractData.error || 'No extractable fields found.';
-                setDropNotice(`Uploaded ${createdDocs.length} document(s). ${errorMsg}`);
-              }
-            } else {
-              const rawError = await extractResponse.text();
-              let errorData: { error?: string } = {};
-              try {
-                errorData = JSON.parse(rawError);
-              } catch {
-                // keep raw text
-              }
-              console.error(
-                'Python extraction failed:',
-                extractResponse.status,
-                errorData.error || rawError || 'Unknown'
-              );
-              setDropNotice(
-                `Uploaded ${createdDocs.length} document(s). Extraction error: ${
-                  errorData.error || rawError || 'Unknown'
-                }`
-              );
-            }
-          } catch (extractError) {
-            console.error('Extraction error:', extractError);
-            setDropNotice(`Uploaded ${createdDocs.length} document(s). Extraction failed: ${extractError instanceof Error ? extractError.message : 'Unknown error'}`);
-          }
-        }
       } else {
         setDropNotice('Files uploaded but document records could not be created.');
       }

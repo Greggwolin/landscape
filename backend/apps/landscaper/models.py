@@ -830,6 +830,54 @@ class IntakeSession(models.Model):
         return f"Intake {self.intake_uuid} ({self.status})"
 
 
+class IntakeSourceAuthority(models.Model):
+    """
+    Tracks which document is authoritative for a given field or scope.
+
+    Implicit authority — emerges from user conflict resolution rather than
+    a pre-set authority matrix. When the user resolves a conflict by accepting
+    source A over source B, a record is created here.
+
+    Maps to landscape.ingestion_source_authority table.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    project = models.ForeignKey(
+        'projects.Project',
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='source_authorities'
+    )
+    source_a_doc_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='Trusted document ID (the one accepted)'
+    )
+    source_b_doc_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='Overridden document ID (the one rejected)'
+    )
+    field_key = models.CharField(
+        max_length=100, null=True, blank=True,
+        help_text='Specific field key, or NULL for whole-document authority'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column='created_by',
+        related_name='source_authority_decisions'
+    )
+
+    class Meta:
+        db_table = 'landscape"."ingestion_source_authority'
+        verbose_name = 'Intake Source Authority'
+        verbose_name_plural = 'Intake Source Authorities'
+
+    def __str__(self):
+        return f"Authority: doc {self.source_a_doc_id} > doc {self.source_b_doc_id} (field: {self.field_key or 'all'})"
+
+
 class ModelOverride(models.Model):
     """
     Calculated field overrides — red dot governance for Landscaper Intelligence v1.

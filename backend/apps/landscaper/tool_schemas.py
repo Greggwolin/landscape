@@ -3801,6 +3801,75 @@ LANDSCAPER_TOOLS = [
             "required": ["tier"],
         },
     },
+    # ── Ingestion Workbench tools ──────────────────────────────────────────────
+    {
+        "name": "get_ingestion_staging",
+        "description": "Get extracted field values from the ingestion workbench for the current document. Returns field_key, extracted_value, confidence, status (pending/accepted/rejected/conflict), source page/snippet for each field. Use this to understand what was extracted and help the user review values.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to get staging rows for"},
+                "status_filter": {"type": "string", "enum": ["pending", "accepted", "rejected", "conflict", "all"], "description": "Filter by status. Default: all"},
+                "field_key_filter": {"type": "string", "description": "Filter by field_key (exact match or partial)"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "update_staging_field",
+        "description": "Update the extracted value of a staging field. Use when the user wants to correct or override an extracted value before accepting it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_id": {"type": "integer", "description": "The extraction_id of the staging row to update"},
+                "new_value": {"description": "The corrected value to set (string, number, or object)"},
+                "reason": {"type": "string", "description": "Why the value was changed"},
+            },
+            "required": ["extraction_id", "new_value", "reason"],
+        },
+    },
+    {
+        "name": "approve_staging_field",
+        "description": "Accept/approve an extracted field value, marking it ready for commit. Can approve a single field or multiple fields at once.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "List of extraction_id values to approve",
+                },
+            },
+            "required": ["extraction_ids"],
+        },
+    },
+    {
+        "name": "reject_staging_field",
+        "description": "Reject an extracted field value. Use when the extraction is wrong and should not be committed.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "List of extraction_id values to reject",
+                },
+                "reason": {"type": "string", "description": "Why the fields are being rejected"},
+            },
+            "required": ["extraction_ids", "reason"],
+        },
+    },
+    {
+        "name": "explain_extraction",
+        "description": "Explain why a specific field was extracted with its current value. Returns the source snippet evidence, confidence score, extraction method, and document context. Use when the user asks 'why did you extract this value?' or wants to understand where a value came from.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_id": {"type": "integer", "description": "The extraction_id to explain"},
+            },
+            "required": ["extraction_id"],
+        },
+    },
     {
         "name": "update_location_analysis",
         "description": "Update the location analysis narrative text for a specific tier. Use this when the user asks to revise, edit, or improve the location analysis content. You can update the summary, individual section content, or both. The revised version is persisted as a new version in the database.",
