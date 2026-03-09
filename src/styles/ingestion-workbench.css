@@ -6,13 +6,14 @@
 /* ── Floating Panel Overlay ────────────── */
 .wb-floating-panel {
   position: fixed;
-  top: 116px; /* 58px top nav + 48px project bar + 10px gap */
-  right: 16px;
-  width: min(1200px, 90vw);
-  height: 70vh;
-  z-index: 45; /* above page content, below modals (100) */
+  top: calc(106px + 3rem); /* below top nav (58px) + folder tabs (48px) + 3rem gap */
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1200px, 92vw);
+  height: calc(100vh - 106px - 3rem - 12px);
+  z-index: 1050; /* above navbars and page content */
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.18);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -21,12 +22,13 @@
 .wb-floating-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 44;
-  background: transparent;
+  z-index: 1040;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 /* Shell */
 .wb-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -81,25 +83,42 @@
 .wb-header .hdr-spacer {
   flex: 1;
 }
-.wb-header .hdr-doc-count {
+/* ── Extraction progress indicators ── */
+.wb-header .hdr-extraction-status {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--cui-secondary-color);
+  padding: 3px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
-.wb-header .pulse-dot {
-  width: 6px;
-  height: 6px;
+.wb-header .hdr-extraction-status.extracting {
+  background: rgba(51, 153, 255, 0.12);
+  color: var(--cui-info);
+  font-weight: 500;
+}
+.wb-header .hdr-extraction-status.ready {
+  background: rgba(46, 184, 92, 0.12);
+  color: var(--cui-success);
+  font-weight: 600;
+}
+.wb-header .extraction-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(51, 153, 255, 0.3);
+  border-top-color: var(--cui-info);
   border-radius: 50%;
-  background: var(--cui-success);
-  animation: pulse-glow 2s infinite;
+  animation: extraction-spin 0.8s linear infinite;
 }
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes extraction-spin {
+  to { transform: rotate(360deg); }
 }
-.wb-header .model-ready {
+.wb-header .extraction-check {
+  font-size: 11px;
+  font-weight: 700;
+}
+.wb-header .hdr-review-progress {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 12px;
   padding: 3px 10px;
@@ -107,9 +126,37 @@
   background: var(--cui-tertiary-bg);
   color: var(--cui-body-color);
 }
-.wb-header .model-ready .pct {
-  color: var(--cui-warning);
+
+/* ── Extraction empty state (shown during extraction) ── */
+.wb-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+.wb-empty-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(51, 153, 255, 0.2);
+  border-top-color: var(--cui-info);
+  border-radius: 50%;
+  animation: extraction-spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+.wb-empty-title {
+  font-size: 14px;
   font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0 0 6px;
+}
+.wb-empty-desc {
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+  margin: 0;
+  max-width: 320px;
+  line-height: 1.5;
 }
 .wb-header .btn-commit-all {
   padding: 6px 14px;
@@ -126,6 +173,98 @@
   filter: brightness(1.1);
 }
 .wb-header .btn-commit-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cancel Ingestion button */
+.wb-header .btn-cancel-ingestion {
+  padding: 6px 14px;
+  margin-left: 6px;
+  border: 1px solid var(--cui-danger);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cui-danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.wb-header .btn-cancel-ingestion:hover {
+  background: var(--cui-danger);
+  color: #fff;
+}
+.wb-header .btn-cancel-ingestion:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Cancel confirmation overlay */
+.wb-cancel-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.wb-cancel-dialog {
+  background: var(--cui-body-bg, #1e1e2e);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 10px;
+  padding: 28px 32px;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.wb-cancel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  margin: 0 0 8px;
+}
+.wb-cancel-desc {
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+  margin: 0 0 20px;
+  line-height: 1.4;
+}
+.wb-cancel-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.wb-cancel-back {
+  padding: 8px 18px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cui-body-color);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.wb-cancel-back:hover {
+  background: var(--cui-tertiary-bg);
+}
+.wb-cancel-confirm {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--cui-danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wb-cancel-confirm:hover {
+  filter: brightness(1.1);
+}
+.wb-cancel-confirm:disabled,
+.wb-cancel-back:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -580,6 +719,37 @@
   color: var(--cui-secondary-color);
   margin-top: 4px;
 }
+/* Existing (DB) value — non-clickable, dimmed border */
+.wb-conf-expand .conf-option.conf-existing {
+  cursor: default;
+  border-style: dashed;
+  opacity: 0.75;
+}
+.wb-conf-expand .conf-option.conf-existing:hover {
+  border-color: var(--cui-border-color);
+  background: transparent;
+}
+/* Badges for Current vs New labels */
+.conf-existing-badge,
+.conf-new-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.conf-existing-badge {
+  background: var(--cui-secondary-bg, rgba(128,128,128,.15));
+  color: var(--cui-secondary-color);
+}
+.conf-new-badge {
+  background: var(--cui-info-bg-subtle, rgba(0,180,255,.12));
+  color: var(--cui-info);
+}
 
 /* Field sub-heading within a section */
 .wb-field-subhead {
@@ -664,4 +834,309 @@
 .intake-choice-modal.modal {
   /* Override CoreUI vertical centering */
   align-items: flex-start;
+}
+
+/* ────────────────────────────────────────────────
+   Rent Roll Mapper — Column Mapping UI
+   Appears as section above standard field rows
+   ──────────────────────────────────────────────── */
+
+/* Trigger button (pre-parse state) */
+.rrm-trigger {
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--cui-border-color);
+}
+.rrm-trigger-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px dashed var(--cui-border-color);
+  border-radius: 8px;
+  background: var(--cui-tertiary-bg);
+}
+.rrm-trigger-icon {
+  font-size: 24px;
+  color: var(--cui-primary);
+  flex-shrink: 0;
+}
+.rrm-trigger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.rrm-trigger-text strong {
+  font-size: 13px;
+  color: var(--cui-body-color);
+}
+.rrm-trigger-text span {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+}
+.rrm-trigger-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--cui-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rrm-trigger-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* Loading state */
+.rrm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  color: var(--cui-secondary-color);
+  font-size: 12px;
+  border-bottom: 2px solid var(--cui-border-color);
+}
+
+/* Error state */
+.rrm-error {
+  padding: 16px;
+  text-align: center;
+  color: var(--cui-danger);
+  font-size: 12px;
+  border-bottom: 2px solid var(--cui-border-color);
+}
+
+/* Complete state */
+.rrm-complete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 2px solid var(--cui-border-color);
+  background: rgba(46, 184, 92, 0.06);
+}
+.rrm-complete-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--cui-success);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.rrm-complete-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.rrm-complete-text strong {
+  color: var(--cui-body-color);
+}
+.rrm-complete-text span {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+}
+
+/* Mapper container */
+.rrm-mapper {
+  border-bottom: 2px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mapper header */
+.rrm-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--cui-secondary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  flex-shrink: 0;
+}
+.rrm-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cui-body-color);
+}
+.rrm-meta {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+}
+.rrm-meta.warn {
+  color: var(--cui-warning);
+  font-weight: 600;
+}
+.rrm-commit-btn {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--cui-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rrm-commit-btn:hover {
+  filter: brightness(1.1);
+}
+.rrm-commit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Warning bar */
+.rrm-warn-bar {
+  padding: 5px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(249, 177, 21, 0.1);
+  color: var(--cui-warning);
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+/* Column headers */
+.rrm-col-headers {
+  display: grid;
+  grid-template-columns: 150px 1fr 200px 90px;
+  gap: 8px;
+  padding: 5px 16px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-body-bg);
+  flex-shrink: 0;
+}
+
+/* Scroll area for mapping rows */
+.rrm-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* Mapping row */
+.rrm-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 200px 90px;
+  gap: 8px;
+  padding: 0 16px;
+  height: 36px;
+  align-items: center;
+  font-size: 12px;
+  border-bottom: 1px solid var(--cui-border-color-translucent, rgba(0,0,0,.06));
+  transition: background 0.1s;
+}
+.rrm-row:hover {
+  background: var(--cui-tertiary-bg);
+}
+.rrm-row.skipped {
+  opacity: 0.5;
+}
+.rrm-row.duplicate {
+  background: rgba(229, 83, 83, 0.06);
+}
+
+/* Source column cell */
+.rrm-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rrm-bdba-tag {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--cui-info);
+  color: #fff;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Sample values cell */
+.rrm-samples {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+.rrm-sample {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+}
+
+/* Target select cell */
+.rrm-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rrm-select {
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  font-size: 11px;
+  cursor: pointer;
+}
+.rrm-select:focus {
+  outline: none;
+  border-color: var(--cui-primary);
+}
+.rrm-dyn-label {
+  font-size: 10px;
+  color: var(--cui-info);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Status cell */
+.rrm-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.rrm-confidence {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rrm-dup-warn {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--cui-danger);
+  color: #fff;
+  font-weight: 600;
 }

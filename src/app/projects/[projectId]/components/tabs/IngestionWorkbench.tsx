@@ -7,6 +7,8 @@ import {
   type StagingSection,
 } from '@/hooks/useExtractionStaging';
 import { LandscaperChatThreaded, type LandscaperChatHandle } from '@/components/landscaper/LandscaperChatThreaded';
+import RentRollMapper from '@/components/ingestion/RentRollMapper';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
 import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import '@/styles/ingestion-workbench.css';
 
@@ -32,15 +34,79 @@ interface IngestionWorkbenchProps {
   /** Detected document type */
   docType?: string | null;
   onClose?: () => void;
+  /** Called instead of onClose after a successful commit — skips the abandon flow */
+  onDone?: () => void;
 }
 
 // ─────────────────────────────────────────────────
 // Utility: format extracted value for display
 // ─────────────────────────────────────────────────
+
+/** Priority keys to show when summarizing a JSON object (order matters) */
+const SUMMARY_KEYS = [
+  'unit_type', 'name', 'label', 'type', 'description',
+  'unit_count', 'count', 'quantity',
+  'bedrooms', 'bathrooms', 'beds', 'baths',
+  'avg_sf', 'sqft', 'square_feet', 'area',
+  'avg_rent', 'rent', 'market_rent', 'monthly_rent',
+];
+
+function formatObjectValue(obj: Record<string, unknown>): string {
+  // Pick the most informative fields for a human-readable summary
+  const parts: string[] = [];
+  for (const key of SUMMARY_KEYS) {
+    if (key in obj && obj[key] !== null && obj[key] !== undefined && obj[key] !== '') {
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      parts.push(`${label}: ${obj[key]}`);
+    }
+    if (parts.length >= 4) break; // Cap at 4 fields for readability
+  }
+  // If no priority keys matched, show first 3 key-value pairs
+  if (parts.length === 0) {
+    const entries = Object.entries(obj).filter(([, v]) => v !== null && v !== undefined);
+    for (const [k, v] of entries.slice(0, 3)) {
+      const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      parts.push(`${label}: ${v}`);
+    }
+  }
+  return parts.join(' · ') || JSON.stringify(obj);
+}
+
 function formatValue(val: unknown): string {
   if (val === null || val === undefined) return '';
-  if (typeof val === 'object') return JSON.stringify(val);
-  return String(val);
+  if (typeof val === 'object' && val !== null) {
+    // If it's an array, format each element
+    if (Array.isArray(val)) {
+      return val.map(item =>
+        typeof item === 'object' && item !== null
+          ? formatObjectValue(item as Record<string, unknown>)
+          : String(item)
+      ).join('; ');
+    }
+    // It's a plain object — format as readable summary
+    return formatObjectValue(val as Record<string, unknown>);
+  }
+  const str = String(val);
+  // If string looks like JSON, try to parse and format it
+  if (str.startsWith('{') || str.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return Array.isArray(parsed)
+          ? parsed.map(item =>
+              typeof item === 'object' && item !== null
+                ? formatObjectValue(item as Record<string, unknown>)
+                : String(item)
+            ).join('; ')
+          : formatObjectValue(parsed as Record<string, unknown>);
+      }
+    } catch {
+      // Not valid JSON — fall through to string handling
+    }
+  }
+  // Strip trailing .00 from whole-dollar numeric values (e.g., "1590.00" → "1590")
+  if (/^\d+\.00$/.test(str)) return str.replace(/\.00$/, '');
+  return str;
 }
 
 // ─────────────────────────────────────────────────
@@ -218,6 +284,21 @@ function FieldRow({
       </div>
       {uiStatus === 'conflict' && expanded && (
         <div className="wb-conf-expand">
+          {/* Show existing DB value if available (the value that triggered the conflict) */}
+          {row.conflict_existing && (
+            <div className="conf-option conf-existing" title="Currently accepted value in the database">
+              <div className="conf-source">
+                <span className="conf-existing-badge">Current</span>
+                {row.conflict_existing.existing_source || 'Existing data'}
+              </div>
+              <div className="conf-value">{formatValue(row.conflict_existing.existing_value)}</div>
+              <div className="conf-confidence">
+                {row.conflict_existing.existing_confidence !== null
+                  ? `${Math.round(row.conflict_existing.existing_confidence * 100)}% confidence`
+                  : 'Previously accepted'}
+              </div>
+            </div>
+          )}
           {conflictRows.map((cr) => (
             <div
               key={cr.extraction_id}
@@ -232,7 +313,10 @@ function FieldRow({
                 }
               }}
             >
-              <div className="conf-source">{cr.source_label || 'Unknown source'}</div>
+              <div className="conf-source">
+                <span className="conf-new-badge">New</span>
+                {cr.source_label || 'Unknown source'}
+              </div>
               <div className="conf-value">{formatValue(cr.extracted_value)}</div>
               <div className="conf-confidence">
                 {cr.confidence_score !== null
@@ -361,12 +445,13 @@ export default function IngestionWorkbench({
   docName,
   docType,
   onClose,
+  onDone,
 }: IngestionWorkbenchProps) {
   const {
     sections,
     allRows,
     sectionCounts,
-    modelReadyPct,
+    isExtracting,
     isLoading,
     error,
     approveField,
@@ -375,7 +460,9 @@ export default function IngestionWorkbench({
     commitSection,
     commitAllAccepted,
     isCommitting,
+    isCommitSuccess,
     commitError,
+    commitResult,
     updateFieldValue,
     abandonSession,
   } = useExtractionStaging(projectId, folders, isLandDev, docId);
@@ -384,9 +471,36 @@ export default function IngestionWorkbench({
   const [activeTab, setActiveTab] = useState<string>('all');
   const [conflictsOnly, setConflictsOnly] = useState(false);
   const briefingSent = useRef(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [rentRollCommitted, setRentRollCommitted] = useState(false);
+
+  // Notify WorkbenchContext when commit succeeds so other components can refresh
+  const { notifyCommitSuccess } = useWorkbench();
+  useEffect(() => {
+    if (isCommitSuccess || rentRollCommitted) {
+      notifyCommitSuccess();
+    }
+  }, [isCommitSuccess, rentRollCommitted, notifyCommitSuccess]);
+
+  // Auto-close the workbench after a successful commit (standard or rent roll).
+  // Brief delay lets the user see the success state before the modal disappears.
+  useEffect(() => {
+    if ((isCommitSuccess || rentRollCommitted) && (onDone || onClose)) {
+      const timer = setTimeout(() => {
+        (onDone || onClose)?.();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isCommitSuccess, rentRollCommitted, onDone, onClose]);
 
   // Show chat panel when we have an intake session
   const showChat = !!intakeUuid;
+
+  // Detect rent roll document for mapper section
+  const isRentRoll = Boolean(
+    docType && /rent.?roll/i.test(docType)
+  );
 
   // Build tile tabs dynamically from sections that have data
   const tileTabs = useMemo(() => {
@@ -429,11 +543,6 @@ export default function IngestionWorkbench({
     0
   );
 
-  const docCount = useMemo(() => {
-    const docIds = new Set(allRows.map((r) => r.doc_id).filter(Boolean));
-    return docIds.size;
-  }, [allRows]);
-
   const totalAccepted = allRows.filter(
     (r) => r.status === 'accepted'
   ).length;
@@ -455,33 +564,86 @@ export default function IngestionWorkbench({
     [updateFieldValue],
   );
 
-  // Send opening briefing message once extraction data is loaded
+  // Pending floor plan replacement data (from commit response)
+  const [pendingFloorPlan, setPendingFloorPlan] = useState<{
+    staging_ids: number[];
+    message: string;
+  } | null>(null);
+
+  const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+  // Wrap commitAllAccepted to handle floor_plan_prompt in response
+  const handleCommitAll = useCallback(async () => {
+    try {
+      const result = await commitAllAccepted();
+      if (result?.floor_plan_prompt) {
+        const fp = result.floor_plan_prompt;
+        // Send Landscaper message for user to decide
+        if (showChat && chatRef.current) {
+          chatRef.current.sendMessage(fp.message, { hidden: true });
+        }
+        // Store staging IDs for the confirm/reject flow
+        setPendingFloorPlan({
+          staging_ids: fp.staging_ids,
+          message: fp.message,
+        });
+      }
+    } catch {
+      // Error is handled by the mutation's onError
+    }
+  }, [commitAllAccepted, showChat]);
+
+  // Apply floor plan replacement after user confirms
+  const handleApplyFloorPlan = useCallback(async () => {
+    if (!pendingFloorPlan) return;
+    try {
+      const res = await fetch(
+        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/apply-floor-plan/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staging_ids: pendingFloorPlan.staging_ids }),
+        }
+      );
+      if (res.ok) {
+        if (showChat && chatRef.current) {
+          chatRef.current.sendMessage(
+            'Floor plan matrix has been replaced with the rent roll data.',
+            { hidden: true }
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[Workbench] apply-floor-plan error:', err);
+    }
+    setPendingFloorPlan(null);
+  }, [pendingFloorPlan, projectId, showChat, DJANGO_API]);
+
+  const handleDismissFloorPlan = useCallback(() => {
+    setPendingFloorPlan(null);
+  }, []);
+
+  // Send opening briefing prompt once extraction data has arrived.
+  // Instead of building a stale client-side summary, we ask the Landscaper
+  // to call get_ingestion_staging and provide a live briefing from the DB.
+  // We wait for isExtracting to become false (rows arrived) before sending.
   useEffect(() => {
-    if (briefingSent.current || isLoading || !showChat || allRows.length === 0) return;
+    if (briefingSent.current || isLoading || !showChat || !docId) return;
+    if (isExtracting) return; // still extracting — no rows yet
+    if (allRows.length === 0) return; // edge case: extraction finished but empty
+
     briefingSent.current = true;
 
-    const tileAreas = sections.map(s => s.label).join(', ');
-    const conflictCount = sections.reduce((sum, s) => sum + s.statusCounts.conflict, 0);
-    const lowConfCount = allRows.filter(r => r.confidence_score !== null && r.confidence_score < 0.6).length;
+    // Send a user-style prompt that instructs Landscaper to call its tool
+    const prompt = [
+      `I just uploaded "${docName || 'a document'}"${docType ? ` (${docType})` : ''} for structured ingestion.`,
+      `Please use your get_ingestion_staging tool with doc_id=${docId} to review the extracted fields,`,
+      `then give me a brief summary: how many fields were extracted, which categories they fall into,`,
+      `and whether any have conflicts or low confidence that need my attention.`,
+    ].join(' ');
 
-    let briefing = `I've analyzed ${docName || 'this document'}.`;
-    if (docType) briefing += ` This appears to be a ${docType}.`;
-    briefing += ` I found ${allRows.length} extractable fields across ${tileAreas}.`;
-
-    if (conflictCount > 0 || lowConfCount > 0) {
-      const flags: string[] = [];
-      if (conflictCount > 0) flags.push(`${conflictCount} conflict${conflictCount !== 1 ? 's' : ''}`);
-      if (lowConfCount > 0) flags.push(`${lowConfCount} low-confidence field${lowConfCount !== 1 ? 's' : ''}`);
-      briefing += `\n\n${flags.join(' and ')} flagged for your attention. You can ask me about any field before committing.`;
-    } else {
-      briefing += '\n\nAll fields look good. You can review and commit when ready.';
-    }
-
-    // Send via Landscaper chat
-    setTimeout(() => {
-      chatRef.current?.sendMessage(briefing);
-    }, 500);
-  }, [isLoading, showChat, allRows, sections, docName, docType]);
+    chatRef.current?.sendMessage(prompt, { hidden: true });
+  }, [isLoading, showChat, isExtracting, allRows.length, docId, docName, docType]);
 
   if (isLoading) {
     return (
@@ -531,46 +693,93 @@ export default function IngestionWorkbench({
           <span className="hdr-badge">{project.project_name}</span>
         )}
         <span className="hdr-spacer" />
-        <span className="hdr-doc-count">
-          <span className="pulse-dot" />
-          {docCount} document{docCount !== 1 ? 's' : ''} processed
-        </span>
-        <span className="model-ready">
-          Model ready: <span className="pct">{modelReadyPct}%</span>
-        </span>
+        {isExtracting ? (
+          /* Phase 1: Extraction in-flight — show analyzing indicator */
+          <span className="hdr-extraction-status extracting">
+            <span className="extraction-spinner" />
+            Analyzing document…
+          </span>
+        ) : (
+          /* Phase 2: Fields have arrived — show field count + review progress */
+          <>
+            <span className="hdr-extraction-status ready">
+              <span className="extraction-check">✓</span>
+              {allRows.length} field{allRows.length !== 1 ? 's' : ''} extracted
+            </span>
+            <span className="hdr-review-progress">
+              {totalAccepted} / {allRows.length} reviewed
+            </span>
+          </>
+        )}
         <button
           className="btn-commit-all"
-          onClick={() => commitAllAccepted(undefined as void)}
-          disabled={totalAccepted === 0 || isCommitting}
+          onClick={handleCommitAll}
+          disabled={totalAccepted === 0 || isCommitting || isCommitSuccess || rentRollCommitted}
+          style={(isCommitSuccess || rentRollCommitted) ? { background: 'var(--cui-success)', opacity: 1 } : undefined}
         >
           {isCommitting
             ? 'Committing...'
-            : `Commit All Accepted \u2192 Project`}
+            : (isCommitSuccess || rentRollCommitted)
+              ? '✓ Committed — closing...'
+              : `Commit All Accepted \u2192 Project`}
         </button>
-        {onClose && (
-          <button
-            className="btn-action"
-            onClick={onClose}
-            title="Close workbench"
-            style={{
-              marginLeft: 4,
-              width: 28,
-              height: 28,
-              borderRadius: 4,
-              border: '1px solid rgba(255,255,255,.25)',
-              background: 'transparent',
-              color: '#fff',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 14,
-            }}
-          >
-            ✕
-          </button>
+        {(onClose || onDone) && (
+          (isCommitSuccess || rentRollCommitted) ? (
+            <button
+              className="btn-cancel-ingestion"
+              style={{ borderColor: 'var(--cui-success)', color: 'var(--cui-success)' }}
+              onClick={() => (onDone || onClose)?.()}
+            >
+              Done
+            </button>
+          ) : (
+            <button
+              className="btn-cancel-ingestion"
+              onClick={() => setShowCancelConfirm(true)}
+              disabled={isCancelling}
+            >
+              {isCancelling ? 'Cancelling...' : 'Cancel Ingestion'}
+            </button>
+          )
         )}
       </div>
+
+      {/* ── Cancel confirmation overlay ── */}
+      {showCancelConfirm && (
+        <div className="wb-cancel-overlay">
+          <div className="wb-cancel-dialog">
+            <p className="wb-cancel-title">Cancel this ingestion?</p>
+            <p className="wb-cancel-desc">
+              All pending extractions will be discarded and the uploaded file will be deleted.
+            </p>
+            <div className="wb-cancel-actions">
+              <button
+                className="wb-cancel-back"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={isCancelling}
+              >
+                Go Back
+              </button>
+              <button
+                className="wb-cancel-confirm"
+                disabled={isCancelling}
+                onClick={async () => {
+                  setIsCancelling(true);
+                  try {
+                    onClose?.();
+                  } catch {
+                    // onClose is fire-and-forget in ProjectLayoutClient
+                  }
+                  setShowCancelConfirm(false);
+                  setIsCancelling(false);
+                }}
+              >
+                {isCancelling ? 'Cancelling...' : 'Discard & Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Body: Chat (left) + Field Table (right) ── */}
       <div className="wb-body">
@@ -631,6 +840,16 @@ export default function IngestionWorkbench({
 
           {/* Field scroll */}
           <div className="wb-field-scroll">
+            {/* Rent Roll Mapper — appears above standard field rows in Property tile */}
+            {docId && isRentRoll && (effectiveTab === 'all' || effectiveTab === 'property') && (
+              <RentRollMapper
+                projectId={projectId}
+                docId={docId}
+                onCommitComplete={() => {
+                  setRentRollCommitted(true);
+                }}
+              />
+            )}
             {filteredSections.map((section) => (
               <SectionBlock
                 key={section.id}
@@ -642,14 +861,23 @@ export default function IngestionWorkbench({
                 onEditValue={handleEditValue}
               />
             ))}
-            {filteredSections.length === 0 && (
-              <div
-                className="text-center py-10"
-                style={{ color: 'var(--cui-secondary-color)', fontSize: 13 }}
-              >
-                {conflictsOnly
-                  ? 'No conflicts to resolve.'
-                  : 'No extraction data available for this project.'}
+            {filteredSections.length === 0 && !isRentRoll && (
+              <div className="wb-empty-state">
+                {isExtracting ? (
+                  <>
+                    <div className="wb-empty-spinner" />
+                    <p className="wb-empty-title">
+                      Analyzing {docName || 'document'}…
+                    </p>
+                    <p className="wb-empty-desc">
+                      Extracting fields from your document. Results will appear here automatically.
+                    </p>
+                  </>
+                ) : conflictsOnly ? (
+                  <p className="wb-empty-desc">No conflicts to resolve.</p>
+                ) : (
+                  <p className="wb-empty-desc">No extraction data available for this document.</p>
+                )}
               </div>
             )}
           </div>
@@ -664,6 +892,60 @@ export default function IngestionWorkbench({
               flexShrink: 0,
             }}>
               Commit error: {String(commitError instanceof Error ? commitError.message : commitError)}
+            </div>
+          )}
+
+          {/* Partial commit failure banner — fields that failed to flatten */}
+          {commitResult && commitResult.failed > 0 && (
+            <div style={{
+              padding: '8px 16px',
+              fontSize: 12,
+              background: 'var(--cui-warning-bg, #fff3cd)',
+              borderTop: '1px solid var(--cui-warning, #ffc107)',
+              color: 'var(--cui-body-color)',
+              flexShrink: 0,
+            }}>
+              <strong>{commitResult.committed} field(s) committed, {commitResult.failed} failed to write:</strong>
+              <ul style={{ margin: '4px 0 0 16px', padding: 0, listStyle: 'disc' }}>
+                {commitResult.errors.slice(0, 5).map((e, i) => (
+                  <li key={i}><code>{e.field_key}</code>: {e.error}</li>
+                ))}
+                {commitResult.errors.length > 5 && (
+                  <li>…and {commitResult.errors.length - 5} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {/* Floor plan replacement prompt */}
+          {pendingFloorPlan && (
+            <div style={{
+              padding: '8px 16px',
+              fontSize: 12,
+              background: 'var(--cui-warning-bg, #fff3cd)',
+              borderTop: '1px solid var(--cui-warning, #ffc107)',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <span style={{ flex: 1, color: 'var(--cui-body-color)' }}>
+                ⚠ Floor plan matrix conflict detected. Check Landscaper chat for details.
+              </span>
+              <button
+                className="btn-bulk primary"
+                style={{ fontSize: 11, padding: '3px 10px' }}
+                onClick={handleApplyFloorPlan}
+              >
+                Replace Floor Plan
+              </button>
+              <button
+                className="btn-bulk"
+                style={{ fontSize: 11, padding: '3px 10px' }}
+                onClick={handleDismissFloorPlan}
+              >
+                Keep Existing
+              </button>
             </div>
           )}
 
@@ -696,7 +978,7 @@ export default function IngestionWorkbench({
               </button>
               <button
                 className="btn-bulk primary"
-                onClick={() => commitAllAccepted(undefined as void)}
+                onClick={handleCommitAll}
                 disabled={totalAccepted === 0 || isCommitting}
               >
                 {isCommitting ? 'Committing...' : 'Commit All \u2192'}

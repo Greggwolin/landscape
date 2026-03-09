@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nextjs",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "django",
+      "runtimeExecutable": "./backend/venv/bin/python",
+      "runtimeArgs": ["backend/manage.py", "runserver", "8000"],
+      "port": 8000
+    }
+  ]
+}

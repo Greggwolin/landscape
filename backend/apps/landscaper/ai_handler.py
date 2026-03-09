@@ -768,11 +768,11 @@ def _needs_user_knowledge(message: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Model to use for responses
-CLAUDE_MODEL = "claude-opus-4-20250514"
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
 ANTHROPIC_TIMEOUT_SECONDS = 120
 
 # Maximum tokens for response
-MAX_TOKENS = 16384
+MAX_TOKENS = 4096  # Lowered from 16384 — forces concise responses; tool calls still fit
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -810,10 +810,15 @@ def get_tools_for_context(
         analysis_purpose=analysis_purpose,
         subtab_context=None,
     )
-    tool_names = get_tools_for_page(effective_context)
+    tool_names = get_tools_for_page(
+        effective_context,
+        project_type_code=project_type_code,
+        project_type=project_type,
+    )
+    _allowed = set(tool_names)
     filtered_tools = [
         tool for tool in LANDSCAPER_TOOLS
-        if tool.get("name") in tool_names
+        if tool.get("name") in _allowed
     ]
 
     logger.info(
@@ -976,6 +981,27 @@ RESPONSE FORMAT — BE CONCISE:
 - Do not add editorial commentary ("this is typical for...", "this means...") unless asked.
 - Use labels from the data (GBA, Site SF, NRA) not verbose descriptions.
 
+DATA INTEGRITY — ALWAYS QUERY THE DATABASE (CRITICAL):
+When the user asks about the CURRENT STATE of project data — unit values, field populations,
+counts, averages, totals, or any question about what IS in the database — you MUST call the
+appropriate read tool (get_units, get_leases, etc.) BEFORE answering. NEVER answer data-state
+questions from conversation history or from what you previously claimed to set.
+
+Previous tool calls may have silently failed. Your conversation memory of "I updated X" is
+NOT proof that the value exists in the database. The ONLY source of truth is a fresh read
+from the database.
+
+Examples of questions that REQUIRE a fresh DB read:
+- "Which units don't have market rents?"
+- "What's the average rent?"
+- "Show me all vacant units"
+- "Did the update work?"
+- "What are the current values?"
+- "How many units have [field] populated?"
+
+If you answer any of these from memory without calling a read tool, you are likely giving
+the user incorrect information.
+
 DATA LOOKUP PRIORITY (CRITICAL):
 When the user asks about property data (site coverage, FAR, building specs, unit mix, rents,
 expenses, or any factual question about the property):
@@ -1103,10 +1129,27 @@ PARTIAL UPDATES with update_units:
 - The system will automatically preserve existing values for fields you don't include
 - If you want to CLEAR a field (set to null), explicitly include it with null value
 
-POST-MUTATION VERIFICATION:
-- After calling update_units, call get_units to verify at least 2-3 units received the correct values
+BULK UPDATES BY FILTER (PREFERRED for type-wide changes):
+When updating the SAME field to the SAME value for all units of a given type, use bulk_updates
+instead of records. This is faster and guaranteed to hit every matching unit.
+- Example: update_units({"bulk_updates": [
+    {"filter": {"unit_type": "1BR/1BA"}, "set": {"market_rent": 3200}},
+    {"filter": {"unit_type": "2BR/2BA"}, "set": {"market_rent": 3750}}
+  ], "reason": "Set market rents by plan type"})
+- Supported filter fields: unit_type, building_name, occupancy_status, bedrooms, bathrooms
+- Supported set fields: market_rent, current_rent, occupancy_status, unit_type, square_feet,
+  parking_rent, pet_rent, past_due_amount, deposit_amount, tenant_name, building_name
+- ALWAYS prefer bulk_updates when the user says "set X for all units of type Y"
+- The response includes per-filter update counts so you can verify all units were hit
+
+POST-MUTATION VERIFICATION (CRITICAL):
+After calling update_units, create_units, update_leases, or any mutation tool:
+- ALWAYS call the corresponding read tool (get_units, get_leases) to verify values actually persisted
+- Do NOT tell the user "Done, values updated" without verification from a fresh DB read
 - If verification shows values didn't change, report the issue to the user — do NOT claim success
 - Include the verified values in your response: "Verified: Unit 101 market_rent is now $1,200"
+- When the tool response includes "not_found" entries or "skipped_fields", explicitly tell
+  the user which units or fields failed — do not summarize as "all updated successfully"
 - update_operating_expenses returns a 'verification' object with db_total and db_expenses showing
   what's actually in the database AFTER the write. ALWAYS check this against your source data.
   If db_total doesn't match the target, tell the user — do NOT claim success.
@@ -1454,8 +1497,8 @@ BAD response:
 ### REMEMBER:
 - You have LIMITED tools in Alpha Assistant context
 - Don't pretend to diagnose things you can't see
-- Acknowledge → Offer feedback → Move on
-- Use the log_alpha_feedback tool when users confirm they want to submit feedback
+- Acknowledge the issue → Move on
+- Do NOT proactively log feedback or call feedback tools — the platform handles feedback capture separately
 """
 
 
@@ -2510,10 +2553,13 @@ def get_landscaper_response(
                 include_extraction=include_extraction,
                 is_admin=is_admin,
                 project_id=_pid,
+                project_type_code=project_context.get('project_type_code'),
+                project_type=project_context.get('project_type'),
             )
+            _allowed = set(available_tool_names)
             filtered_tools = [
                 tool for tool in LANDSCAPER_TOOLS
-                if tool.get('name') in available_tool_names
+                if tool.get('name') in _allowed
             ]
             api_kwargs['tools'] = filtered_tools
             # DIAGNOSTIC: Log which tools are sent to Claude

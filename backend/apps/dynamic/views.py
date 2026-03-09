@@ -42,10 +42,13 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
             is_active=True
         )
 
-        # Filter by table if specified
+        # Filter by table if specified — normalize to match with or without tbl_ prefix
         table_name = self.request.query_params.get('table_name') or self.request.query_params.get('table')
         if table_name:
-            queryset = queryset.filter(table_name=table_name)
+            # Accept both 'multifamily_unit' and 'tbl_multifamily_unit'
+            bare = table_name.removeprefix('tbl_')
+            prefixed = f'tbl_{bare}'
+            queryset = queryset.filter(table_name__in=[bare, prefixed])
 
         # Filter by proposed status
         proposed = self.request.query_params.get('proposed')
@@ -80,8 +83,11 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
             )
 
         # Get column definitions (only active, non-proposed columns)
+        # Normalize table_name to match with or without tbl_ prefix
+        bare = table_name.removeprefix('tbl_')
+        prefixed = f'tbl_{bare}'
         columns = self.get_queryset().filter(
-            table_name=table_name,
+            table_name__in=[bare, prefixed],
             is_proposed=False
         )
 

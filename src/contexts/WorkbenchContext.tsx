@@ -42,6 +42,11 @@ interface WorkbenchContextValue {
   pendingIntakeDocs: PendingIntakeDoc[];
   addPendingIntakeDocs: (docs: PendingIntakeDoc[]) => void;
   clearPendingIntakeDocs: () => void;
+
+  /** Timestamp of the last successful workbench commit — consumers watch this to trigger refresh */
+  lastCommitTimestamp: number;
+  /** Signal that a commit succeeded — increments lastCommitTimestamp */
+  notifyCommitSuccess: () => void;
 }
 
 const defaultState: WorkbenchState = {
@@ -59,11 +64,14 @@ const WorkbenchContext = createContext<WorkbenchContextValue>({
   pendingIntakeDocs: [],
   addPendingIntakeDocs: () => {},
   clearPendingIntakeDocs: () => {},
+  lastCommitTimestamp: 0,
+  notifyCommitSuccess: () => {},
 });
 
 export function WorkbenchProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WorkbenchState>(defaultState);
   const [pendingIntakeDocs, setPendingIntakeDocs] = useState<PendingIntakeDoc[]>([]);
+  const [lastCommitTimestamp, setLastCommitTimestamp] = useState(0);
 
   const openWorkbench = useCallback(
     (params: { docId: number; docName: string; docType: string | null; intakeUuid: string }) => {
@@ -90,6 +98,10 @@ export function WorkbenchProvider({ children }: { children: React.ReactNode }) {
     setPendingIntakeDocs([]);
   }, []);
 
+  const notifyCommitSuccess = useCallback(() => {
+    setLastCommitTimestamp(Date.now());
+  }, []);
+
   return (
     <WorkbenchContext.Provider
       value={{
@@ -99,6 +111,8 @@ export function WorkbenchProvider({ children }: { children: React.ReactNode }) {
         pendingIntakeDocs,
         addPendingIntakeDocs,
         clearPendingIntakeDocs,
+        lastCommitTimestamp,
+        notifyCommitSuccess,
       }}
     >
       {children}

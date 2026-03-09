@@ -325,10 +325,10 @@ class ProjectCloner:
         )
 
     def _clone_operating_expenses(self, source_project_id: int, new_project_id: int):
-        """Clone tbl_operating_expense records."""
+        """Clone tbl_operating_expenses records."""
         self._clone_simple_table(
-            'tbl_operating_expense',
-            'expense_id',
+            'tbl_operating_expenses',
+            'opex_id',
             source_project_id,
             new_project_id,
             'project_id'
@@ -442,9 +442,9 @@ class ProjectCloner:
         logger.info(f"Cloned {count} rent roll units")
 
     def _clone_rent_comparables(self, source_project_id: int, new_project_id: int):
-        """Clone tbl_rent_comparable records."""
+        """Clone tbl_rental_comparable records."""
         self._clone_simple_table(
-            'tbl_rent_comparable',
+            'tbl_rental_comparable',
             'comparable_id',
             source_project_id,
             new_project_id,

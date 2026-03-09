@@ -5,6 +5,9 @@ import { CAlert, CButton, CBadge, CSpinner } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilTrash, cilReload, cilChevronBottom, cilChevronTop, cilWarning } from '@coreui/icons';
 import { useExtractionQueue, type ExtractQueueItem } from '@/hooks/useExtractionQueue';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 interface ExtractionQueueSectionProps {
   projectId: number;
@@ -45,8 +48,53 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
     retryItems,
     refresh,
   } = useExtractionQueue(projectId);
+  const { openWorkbench } = useWorkbench();
   const [expanded, setExpanded] = useState(false);
   const [acting, setActing] = useState(false);
+
+  /** Open the Ingestion Workbench for a pending/processing queue item */
+  const handleOpenWorkbench = async (item: ExtractQueueItem) => {
+    if (acting) return;
+    setActing(true);
+    try {
+      // Create (or resume) an intake session so the Workbench has an intakeUuid
+      const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          doc_id: item.doc_id,
+          intent: 'structured_ingestion',
+          document_type: item.doc_type,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.status === 201 && data.intakeUuid) {
+        openWorkbench({
+          docId: item.doc_id,
+          docName: item.doc_name,
+          docType: item.doc_type,
+          intakeUuid: data.intakeUuid,
+        });
+
+        // Fire-and-forget extraction trigger
+        fetch(`${DJANGO_API_URL}/api/knowledge/documents/${item.doc_id}/extract-batched/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_id: projectId }),
+        }).catch(err =>
+          console.warn('[ExtractionQueue] Extraction trigger failed:', err)
+        );
+      } else {
+        console.error('[ExtractionQueue] Failed to start intake:', data);
+      }
+    } catch (err) {
+      console.error('[ExtractionQueue] Error opening workbench:', err);
+    } finally {
+      setActing(false);
+    }
+  };
 
   // Don't render if no items
   if (!isLoading && total === 0) return null;
@@ -98,7 +146,18 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
             Extraction Queue
           </span>
           {actionableCount > 0 && (
-            <CBadge color="warning" shape="rounded-pill" className="ms-1">
+            <CBadge
+              color="warning"
+              shape="rounded-pill"
+              className="ms-1"
+              style={{ cursor: 'pointer' }}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                const firstPending = items.find(i => i.status === 'pending' || i.status === 'processing');
+                if (firstPending) handleOpenWorkbench(firstPending);
+              }}
+              title="Open Ingestion Workbench"
+            >
               {actionableCount}
             </CBadge>
           )}
@@ -154,11 +213,18 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
               )}
 
               {/* Item list */}
-              {items.map((item: ExtractQueueItem) => (
+              {items.map((item: ExtractQueueItem) => {
+                const isClickable = item.status === 'pending' || item.status === 'processing';
+                return (
                 <div
                   key={item.queue_id}
                   className="d-flex align-items-center justify-content-between px-3 py-2"
-                  style={{ borderBottom: '1px solid var(--cui-border-color-translucent)' }}
+                  style={{
+                    borderBottom: '1px solid var(--cui-border-color-translucent)',
+                    cursor: isClickable ? 'pointer' : 'default',
+                  }}
+                  onClick={isClickable ? () => handleOpenWorkbench(item) : undefined}
+                  title={isClickable ? 'Click to open Ingestion Workbench' : undefined}
                 >
                   <div className="d-flex flex-column" style={{ minWidth: 0, flex: 1 }}>
                     <div className="d-flex align-items-center gap-2">
@@ -223,7 +289,8 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {items.length === 0 && (
                 <div className="text-center text-body-secondary small py-3">

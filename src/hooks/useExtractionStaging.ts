@@ -24,6 +24,12 @@ export interface StagingRow {
   source_page: number | null;
   created_at: string;
   conflict_with_extraction_id?: number | null;
+  /** Enriched conflict data: the existing DB value that this row conflicts with */
+  conflict_existing?: {
+    existing_value: unknown;
+    existing_confidence: number | null;
+    existing_source: string | null;
+  } | null;
   /** Internal UI enrichment (set by detectConflicts) */
   _uiStatus?: 'conflict' | undefined;
   /** Folder ID assigned by scope→folder mapping (set by buildSections) */
@@ -105,6 +111,14 @@ function detectConflicts(rows: StagingRow[]): StagingRow[] {
   }
 
   return rows.map(row => {
+    // Honor backend conflict detection (conflict_with_extraction_id set by extraction_service)
+    if (row.conflict_with_extraction_id) {
+      return { ...row, _uiStatus: 'conflict' as const };
+    }
+    // Also check DB status for rows already marked as conflict
+    if (row.status === 'conflict') {
+      return { ...row, _uiStatus: 'conflict' as const };
+    }
     const group = byKey.get(row.field_key) || [];
     const pendingInGroup = group.filter(r => r.status === 'pending');
     if (pendingInGroup.length >= 2) {
@@ -271,10 +285,24 @@ export function useExtractionStaging(
     },
     enabled: !!projectId,
     refetchOnWindowFocus: false,
-    staleTime: 30_000,
+    staleTime: 5_000,
+    // Poll aggressively (3s) when scoped to a doc and no rows have arrived yet
+    // (extraction is in-flight). Slow to 15s once results exist (user is reviewing).
+    refetchInterval: (query) => {
+      if (!docId) return false; // No doc scope — no auto-polling
+      const qData = query.state.data as ApiResponse | undefined;
+      return (qData?.extractions?.length ?? 0) === 0
+        ? 3_000   // Awaiting extraction — fast poll
+        : 15_000; // Results exist — slow poll for background updates
+    },
   });
 
   const allRows = data?.extractions || [];
+
+  // True when we're scoped to a doc and the extraction pipeline hasn't produced
+  // any staging rows yet — indicates extraction is still in-flight.
+  const isExtracting = !!docId && !isLoading && allRows.length === 0;
+
   const sections = useMemo(
     () => buildSections(allRows, folders, isLandDev),
     [allRows, folders, isLandDev],
@@ -482,20 +510,26 @@ export function useExtractionStaging(
     sectionCounts,
     totalExpected,
     modelReadyPct,
+    isExtracting,
     isLoading,
     error,
     // Mutations
     approveField: approveField.mutate,
     rejectField: rejectField.mutate,
     acceptAllPending: acceptAllPending.mutate,
-    commitSection: commitSection.mutate,
-    commitAllAccepted: commitAllAccepted.mutate,
+    commitSection: commitSection.mutateAsync,
+    commitAllAccepted: commitAllAccepted.mutateAsync,
     updateFieldValue: updateFieldValue.mutate,
     abandonSession: abandonSession.mutateAsync,
     // Loading states
     isApproving: approveField.isPending,
     isRejecting: rejectField.isPending,
     isCommitting: commitAllAccepted.isPending || commitSection.isPending,
+    isCommitSuccess: commitAllAccepted.isSuccess,
     commitError: commitAllAccepted.error || commitSection.error,
+    /** Last commit result — includes { committed, failed, errors[] } */
+    commitResult: (commitAllAccepted.data || commitSection.data) as
+      | { committed: number; failed: number; errors: Array<{ extraction_id: number; field_key: string; error: string }> }
+      | undefined,
   };
 }

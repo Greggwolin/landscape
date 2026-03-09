@@ -176,3 +176,6 @@ rent-schedule-*.png
 # Claude local settings (machine-specific)
 .claude/settings.local.json
 .aider*
+broken_uploadthing_urls_report.txt
+uploadthing_url_check.csv
+reference/images/screenshots/Untitled.jpg

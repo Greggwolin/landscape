@@ -51,6 +51,7 @@ export interface Unit {
   current_rent?: number | null;
   market_rent: number;
   occupancy_status?: string | null;
+  tenant_name?: string | null;
   renovation_status: string;
   renovation_date?: string | null;
   renovation_cost?: number | null;

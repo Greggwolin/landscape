@@ -115,12 +115,17 @@ urlpatterns = [
     path('library/documents/<int:doc_id>/geo-tags/', knowledge_library_views.knowledge_library_geo_tags, name='knowledge_library_geo_tags'),
     path('library/documents/<int:doc_id>/geo-tags/<int:geo_tag_id>/', knowledge_library_views.knowledge_library_delete_geo_tag, name='knowledge_library_delete_geo_tag'),
 
+    # Rent Roll Mapper endpoints (Workbench column mapping flow)
+    path('projects/<int:project_id>/rent-roll/parse-columns/', workbench_views.parse_rent_roll_columns, name='workbench-rr-parse-columns'),
+    path('projects/<int:project_id>/rent-roll/commit-mapping/', workbench_views.commit_rent_roll_mapping, name='workbench-rr-commit-mapping'),
+
     # Ingestion Workbench endpoints (section-aware extraction staging)
     # NOTE: accept-all-pending/ and commit/ must appear before <int:extraction_id>/ patterns
     path('projects/<int:project_id>/extraction-staging/', workbench_views.list_staging, name='workbench-staging-list'),
     path('projects/<int:project_id>/extraction-staging/abandon/', workbench_views.abandon_session, name='workbench-staging-abandon'),
     path('projects/<int:project_id>/extraction-staging/accept-all-pending/', workbench_views.accept_all_pending, name='workbench-staging-accept-all'),
     path('projects/<int:project_id>/extraction-staging/commit/', workbench_views.commit_staging, name='workbench-staging-commit'),
+    path('projects/<int:project_id>/extraction-staging/apply-floor-plan/', workbench_views.apply_floor_plan, name='workbench-staging-apply-floor-plan'),
     path('projects/<int:project_id>/extraction-staging/<int:extraction_id>/approve/', workbench_views.approve_staging, name='workbench-staging-approve'),
     path('projects/<int:project_id>/extraction-staging/<int:extraction_id>/reject/', workbench_views.reject_staging, name='workbench-staging-reject'),
     path('projects/<int:project_id>/extraction-staging/<int:extraction_id>/update-value/', workbench_views.update_staging_value, name='workbench-staging-update-value'),

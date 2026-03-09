@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-07
-**Version:** 4.2
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint)
+**Last Updated:** 2026-03-08
+**Version:** 4.3
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026)
 
 ---
 
@@ -9,7 +9,21 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Ingestion Workbench + Alpha Prep Sprint (March 7, 2026)**
+### 🆕 **Latest Update: Schema Refresh + Extraction Pipeline Fixes (March 8, 2026)**
+
+**Rich Schema Regeneration and Ingestion Pipeline Reliability**
+
+Schema documentation refresh and extraction polling reliability fixes:
+
+- ✅ **Rich schema regenerated** — `docs/schema/landscape_rich_schema_2026-03-08.json` — 324 tables, 42 views (post dead-table cleanup; originally 374 before dropping 9 dead/duplicate tables + 1 contacts_legacy)
+- ✅ **Delta vs Mar 7 snapshot** — +2 tables, +6 indexes, +8 constraints, +5 FKs, +1 trigger, +1 routine
+- ✅ **Abridged schema markdown** — `docs/schema/landscape_rich_schema_2026-03-08_abridged.md` (305 KB)
+- ✅ **MappingScreen polling fix** — Polling now checks `/extractions/` (all statuses) and `/extraction-jobs/` (job completion) in addition to `/extractions/pending/`, preventing infinite loop when results land in non-pending status
+- ✅ **Collision handling verified** — `LandscaperPanel` correctly reads `doc_id` from both `doc` and `existing_doc` response shapes
+- ✅ **CLAUDE.md schema count updated** — 324 tables (post dead-table cleanup)
+- 📁 **Location:** `docs/schema/landscape_rich_schema_2026-03-08.json`
+
+### Previous Update: Ingestion Workbench + Alpha Prep Sprint (March 7, 2026)
 
 **AI-Assisted Document Ingestion, Extraction Pipeline, and Cross-Feature Polish**
 
@@ -408,7 +422,7 @@ Implemented comprehensive income analysis tools for multifamily underwriting:
 - 📁 **Location:** `services/financial_engine_py/` - See [MIGRATION_STATUS.md](../../../services/financial_engine_py/MIGRATION_STATUS.md)
 
 ### Current Capabilities
-✅ **Complete data layer** (353 tables, 42 views per Feb 12 schema export)
+✅ **Complete data layer** (324 tables, 42 views — post dead-table cleanup Mar 8)
 ✅ **Python Financial Engine** - IRR, XIRR, NPV, DSCR, equity multiple (5-10x faster)
 ✅ **Dependency resolution engine** with circular detection
 ✅ **S-curve timing distribution** (4 profiles)

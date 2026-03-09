@@ -38,6 +38,7 @@ from .serializers import (
 )
 from .ai_handler import get_landscaper_response
 from .tool_executor import execute_tool
+from .feedback_utils import detect_feedback_tag, strip_feedback_tag, capture_feedback
 from apps.projects.models import Project
 
 
@@ -389,12 +390,19 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
         project = _require_project_access(request.user, int(project_id))
 
         try:
-            # Create user message
+            original_content = request.data.get('content', '')
+            
+            # Check for feedback tag (#FB) and capture if present
+            has_feedback = detect_feedback_tag(original_content)
+            logger.info(f"[FEEDBACK_DEBUG] original_content='{original_content}', has_feedback={has_feedback}")
+            
+            # Create user message (with #FB stripped if present)
+            processed_content = strip_feedback_tag(original_content) if has_feedback else original_content
             user_message_data = {
                 'project': project_id,
                 'user': request.data.get('user'),
                 'role': 'user',
-                'content': request.data.get('content', ''),
+                'content': processed_content,
             }
             user_message_serializer = ChatMessageCreateSerializer(data=user_message_data)
             user_message_serializer.is_valid(raise_exception=True)
@@ -403,6 +411,22 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             # Get chat history for context (with tool call/result context)
             messages = self.get_queryset()
             message_history = _build_message_history_with_tool_context(messages)
+            
+            # Capture feedback if #FB was detected
+            if has_feedback:
+                user_email = None
+                if hasattr(request, 'user') and request.user.is_authenticated:
+                    user_email = getattr(request.user, 'email', None)
+                
+                capture_feedback(
+                    user_message=original_content,
+                    user_email=user_email,
+                    user_id=request.data.get('user'),
+                    project_id=project.project_id,
+                    project_name=project.project_name,
+                    page_context=request.data.get('page_context'),
+                    message_history=message_history,
+                )
 
             # Get project context with full details
             project_context = {
@@ -1565,11 +1589,35 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
         thread = self._get_authorized_thread()
 
         try:
+            # --- #FB feedback detection: capture to Discord and strip before Claude sees it ---
+            original_content = request.data.get('content', '')
+            has_feedback = detect_feedback_tag(original_content)
+            if has_feedback:
+                logger.info("[FEEDBACK] #FB detected in thread message for project %s", thread.project_id)
+                user_email = getattr(request.user, 'email', None) if hasattr(request, 'user') else None
+                try:
+                    project_obj = Project.objects.filter(project_id=thread.project_id).first()
+                    project_name = project_obj.project_name if project_obj else None
+                except Exception:
+                    project_name = None
+                capture_feedback(
+                    user_message=original_content,
+                    user_email=user_email,
+                    user_id=getattr(request.user, 'id', None),
+                    project_id=thread.project_id,
+                    project_name=project_name,
+                    page_context=page_context,
+                )
+                original_content = strip_feedback_tag(original_content)
+                logger.info("[FEEDBACK] Stripped message: '%s'", original_content[:80])
+
             # Create user message
+            is_hidden = request.data.get('hidden', False)
             user_message = ThreadMessage.objects.create(
                 thread=thread,
                 role='user',
-                content=request.data.get('content', ''),
+                content=original_content,
+                metadata={'hidden': True} if is_hidden else None,
             )
 
             # Get message history for context (with tool call/result context)
@@ -1964,6 +2012,25 @@ class IntakeStartView(APIView):
             status='draft',
             created_by=user,
         )
+
+        # Hide the doc from DMS during structured ingestion — the commit
+        # endpoints flip deleted_at back to NULL on success.
+        if doc_id:
+            from django.db import connection as db_conn
+            with db_conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE landscape.core_doc
+                    SET deleted_at = NOW()
+                    WHERE doc_id = %s AND deleted_at IS NULL
+                    """,
+                    [int(doc_id)],
+                )
+                if cursor.rowcount:
+                    logger.info(
+                        f"Hid core_doc {doc_id} during structured ingestion "
+                        f"(intake_uuid={session.intake_uuid})"
+                    )
 
         return Response({
             'intakeUuid': str(session.intake_uuid),

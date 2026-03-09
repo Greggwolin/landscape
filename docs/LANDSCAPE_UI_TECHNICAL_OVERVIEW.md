@@ -1,5 +1,5 @@
 # Landscape Application — UI Technical Overview
-Date generated: 2026-02-21
+Date generated: 2026-03-08
 
 ## Document Notes
 - This document is generated from the current repository state and does not validate runtime feature flags or production deployments.
@@ -10,10 +10,16 @@ Date generated: 2026-02-21
 - `docs/HEADER_COLOR_HIERARCHY.md` does not exist in this repo; styling notes are based on `src/styles/tokens.css` and related CoreUI files.
 
 ## Recent Changes Summary
-- Git log highlights recent UI work (Feb 21): CoreUI theme expansion and badge contrast fixes, DMS MediaPickerModal improvements, ProjectTab/PropertyTab/physical description enhancements, MapCanvas overhaul with GIS parcel improvements, valuation and reconciliation panel updates.
-- New contexts added since last update: `UploadStagingContext` for drag-drop file staging.
+- Git log highlights major work since Feb 21:
+- **Ingestion Workbench** (Mar 7): Split-panel floating modal (380px Landscaper chat + field review table) replacing legacy MappingScreen for AI-assisted document review. Entry via `IntakeChoiceModal` → "Structured Ingestion". Key files: `IngestionWorkbench.tsx`, `WorkbenchContext.tsx`, `useExtractionStaging.ts`, `workbench_views.py`, `ingestion_tools.py`.
+- **Extraction pipeline overhaul** (Mar 7): Batched staging with conflict detection, tile-based field scoping by property type, quote stripping for clean values. 5 new ingestion Landscaper tools (tool count → 217).
+- **MappingScreen polling fix** (Mar 8): Polling now checks all extraction statuses + job completion, preventing infinite loop on non-pending results.
+- **Alpha prep sprint** (Mar 7): Income approach enhancements, NNN SLB valuation tools, Land Use 3-column picker, DMS delete endpoint, UI polish across navigation/project creation.
+- **Schema refresh** (Mar 8): 324 tables (down from 374 after dead-table cleanup — 9 duplicate/backup/deprecated tables + 1 contacts_legacy dropped), 42 views.
+- New contexts since last update: `UploadStagingContext` (drag-drop staging), `WorkbenchContext` (ingestion state bridge).
 - ReconciliationPanel is now a real component (was previously stubbed per Alpha audit).
-- New property sub-components: `PhysicalDescription`, `FloorPlanMatrix`, `IndicatedValueSummary`.
+- New sub-components: `PhysicalDescription`, `FloorPlanMatrix`, `IndicatedValueSummary`.
+- Legacy MappingScreen deleted; replaced by Ingestion Workbench.
 - 407 legacy Next.js API routes still present; Django backend expanded to 23 apps.
 - Anthropic SDK pinned for Pydantic compatibility (Feb 21).
 
@@ -233,7 +239,8 @@ Notable behaviors/state:
 - Chat experience: `LandscaperChatThreaded` (`src/components/landscaper/LandscaperChatThreaded.tsx`) with thread list, mutation confirmations, and tool result triggers. 150s frontend timeout.
 - Thread management: `ThreadList` (`src/components/landscaper/ThreadList.tsx`) lists threads by page context; threads auto-generate titles via Claude Haiku.
 - Activity feed: `ActivityFeed` (`src/components/landscaper/ActivityFeed.tsx`) with API-driven items and fallback mock data (60s auto-refresh via `useActivityFeed`).
-- File drop handling: `DropZoneWrapper` (`src/components/ui/DropZoneWrapper.tsx`) routes dropped files into `FileDropContext` (`src/contexts/FileDropContext.tsx`), then `LandscaperPanel` consumes and uploads them via UploadThing and `POST /api/dms/docs`.
+- File drop handling: `DropZoneWrapper` (`src/components/ui/DropZoneWrapper.tsx`) routes dropped files into `FileDropContext` (`src/contexts/FileDropContext.tsx`), then `LandscaperPanel` consumes and uploads them via UploadThing and `POST /api/dms/docs`. Collision detection reads `doc_id` from both `doc` and `existing_doc` response shapes.
+- Ingestion Workbench: `IntakeChoiceModal` (`src/components/intelligence/IntakeChoiceModal.tsx`) classifies dropped files → "Structured Ingestion" opens `IngestionWorkbench` (`src/app/projects/[projectId]/components/tabs/IngestionWorkbench.tsx`) as a 1200px split-panel modal with Landscaper chat (left, `pageContext="ingestion"`) + field review table (right). State bridge via `WorkbenchContext` (`src/contexts/WorkbenchContext.tsx`). Extraction data via `useExtractionStaging` (`src/hooks/useExtractionStaging.ts`). 5 dedicated ingestion tools: `get_ingestion_staging`, `update_staging_field`, `approve_staging_field`, `reject_staging_field`, `explain_extraction`. Legacy MappingScreen deleted.
 - Extraction badge behavior: `ProjectLayoutClient` uses `useExtractionJobStatus` and `usePendingRentRollExtractions` to display rent roll processing/pending changes on the Property → Rent Roll subtab; badge clicks navigate to rent roll.
 - Mutation proposals: `MutationProposalCard` (`src/components/landscaper/MutationProposalCard.tsx`) shows proposed changes with confirm/reject buttons (Level 2 Autonomy).
 - What-If scenarios: `ScenarioHistoryPanel` and `ScenarioSaveModal` in `src/components/landscaper/` for scenario management.
@@ -241,7 +248,7 @@ Notable behaviors/state:
 - Collision handling: `LandscaperCollisionContext` (`src/contexts/LandscaperCollisionContext.tsx`) wires upload collisions into chat; DMS audit notes that the collision-to-chat flow is not fully wired everywhere.
 - Knowledge Library access: `AdminModal` → `LandscaperAdminPanel` (`src/components/admin/LandscaperAdminPanel.tsx`) mounts `KnowledgeLibraryPanel` (`src/components/admin/knowledge-library/KnowledgeLibraryPanel.tsx`).
 - Admin configuration: Extraction Mappings CRUD panel, Custom Instructions panel, KPI Definition Manager. Model Configuration and Training Feedback sections are placeholders.
-- Backend: 50+ registered tools across 7 tool modules, page-scoped tool registry (reduces from 135 to 15-25 tools per page), 40+ Django API endpoints. AI handler uses `claude-3-5-sonnet-20241022` with 16,384 max tokens, 120s timeout, 5-iteration tool loop with 75s budget.
+- Backend: 217 registered tools across 7+ tool modules (including 5 ingestion-specific tools added Mar 2026), page-scoped tool registry (reduces available tools to 15-25 per page), 40+ Django API endpoints. AI handler uses `claude-3-5-sonnet-20241022` with 16,384 max tokens, 120s timeout, 5-iteration tool loop with 75s budget.
 - Known gaps: Activity feed mark-read not proxied through Next.js; RAG search not project-scoped (cross-project leakage risk); hardcoded `localhost:8000` URLs in ChatInterface.tsx and AdviceAdherencePanel.tsx; dual chat stacks not unified (main vs. knowledge chat).
 
 ## 4. Document Management System
@@ -249,7 +256,8 @@ Notable behaviors/state:
 - The global `/dms` route is removed and replaced by the AdminModal Knowledge Library panel (per implementation status and DMS audit).
 - Core UI: `DMSView` (`src/components/dms/DMSView.tsx`) combines filters, document list, and preview panel with modals for delete/rename/restore.
 - Media pipeline: `MediaPreviewModal` (`src/components/dms/modals/MediaPreviewModal.tsx`) and `ProjectMediaGallery` (`src/components/dms/ProjectMediaGallery.tsx`) surface extracted images and classifications.
-- Key gaps from `docs/DMS_AUDIT_REPORT.md` (2026-02-19): version history UI, template/attribute management UI, collision → Landscaper chat wiring, async extraction worker, and bulk delete API.
+- Ingestion pipeline: `IntakeChoiceModal` → Ingestion Workbench (replaced legacy MappingScreen and `dms_extract_queue` intake flow). Backend: `workbench_views.py` (list, update, commit, abandon), `ingestion_tools.py` (5 tools).
+- Key gaps from `docs/DMS_AUDIT_REPORT.md` (2026-02-19): version history UI, template/attribute management UI, collision → Landscaper chat wiring (partially addressed), and bulk delete API. Scanned PDF/OCR pipeline not yet implemented (OCRmyPDF identified).
 
 ## 5. Component Architecture
 - Layout wrappers: `NavigationLayout` (`src/app/components/NavigationLayout.tsx`) and `ProjectLayoutClient` control global and project-level chrome.
@@ -281,6 +289,7 @@ Notable behaviors/state:
 - `LandscaperCollisionContext` (`src/contexts/LandscaperCollisionContext.tsx`) for DMS collision resolution.
 - `ScenarioContext` (`src/contexts/ScenarioContext.tsx`) for scenario selection.
 - `UploadStagingContext` (`src/contexts/UploadStagingContext.tsx`) for drag-drop file staging workflow.
+- `WorkbenchContext` (`src/contexts/WorkbenchContext.tsx`) for ingestion workbench state bridge (doc_id, project_id, extraction status).
 - Internal-only / deprecated contexts:
 - `ComplexityModeContext` (`src/contexts/ComplexityModeContext.tsx`) — internal-only; no user-facing toggle.
 - `ProjectModeContext` (`src/contexts/ProjectModeContext.tsx`) — deprecated; provider still wraps project layout but no consumers found.
@@ -288,10 +297,11 @@ Notable behaviors/state:
 ## 8. Key User Flows
 - Login → Dashboard → select project → open `/projects/[projectId]` workspace via folder tabs.
 - Project workspace → Documents tab → upload files (DMS or drag-drop) → extraction processing → rent roll pending changes highlighted in Property → Rent Roll.
+- Document ingestion: File drop → `IntakeChoiceModal` (classification) → "Structured Ingestion" → file uploads to UploadThing → Ingestion Workbench opens → extraction runs → user reviews fields (accepted/pending/conflict) → commit writes to project tables. Cancel cleans up staging rows + UploadThing file + soft-deletes `core_doc`.
 - Operations tab → edit line items → auto-save and value-add toggle → refresh via Landscaper mutation events.
 - Valuation tab → Sales Comparison / Cost / Income approaches → ReconciliationPanel (now functional, was previously stubbed) with weights and narrative versioning.
 - Settings (AdminModal) → Landscaper tab → Knowledge Library or Extraction Mappings.
-- Landscaper chat → threaded conversations per page context → tool execution (50+ tools) → mutation proposals → user confirm/reject → auto-refresh affected tabs.
+- Landscaper chat → threaded conversations per page context → tool execution (217 tools) → mutation proposals → user confirm/reject → auto-refresh affected tabs.
 
 ## Appendix A: File Structure
 - `src/app/` — App Router routes and layouts.

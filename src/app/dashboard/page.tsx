@@ -20,6 +20,7 @@ import {
   getPropertyTypeTokenRef,
   resolveCanonicalPropertyTypeCode,
 } from '@/config/propertyTypeTokens';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 type PropertyFilterKey = 'ALL' | 'LAND' | 'MF' | 'COMMERCIAL' | 'RET' | 'OFF' | 'IND';
 
@@ -450,6 +451,7 @@ export default function DashboardPage() {
 
         await fetch('/api/dms/upload', {
           method: 'POST',
+          headers: { ...getAuthHeaders() },
           body: formData
         });
       }
@@ -472,6 +474,7 @@ export default function DashboardPage() {
 
         await fetch('/api/dms/upload', {
           method: 'POST',
+          headers: { ...getAuthHeaders() },
           body: formData
         });
       }

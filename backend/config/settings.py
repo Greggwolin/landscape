@@ -336,3 +336,10 @@ DEMO_PROJECT_IDS = {
     'chadron': 17,       # Chadron Terrace - Multifamily demo
     'peoria_lakes': 7,   # Peoria Lakes MPC - Land development demo
 }
+
+# ============================================================================
+# FEEDBACK CAPTURE CONFIGURATION
+# ============================================================================
+# Discord webhook URL for capturing alpha tester feedback from Landscaper chat
+# Messages containing #FB will be forwarded to this webhook with context
+LANDSCAPER_FEEDBACK_WEBHOOK_URL = config('LANDSCAPER_FEEDBACK_WEBHOOK_URL', default=None)

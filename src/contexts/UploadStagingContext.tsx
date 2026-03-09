@@ -25,6 +25,7 @@ import {
   type StagingRoute,
   type CollisionInfo,
 } from '@/components/dms/staging/classifyFile';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 // ============================================
 // CONTEXT VALUE
@@ -263,6 +264,7 @@ export function UploadStagingProvider({
             `/api/projects/${projectId}/dms/docs/${staged.collision.existingDoc.doc_id}/version`,
             {
               method: 'POST',
+              headers: { ...getAuthHeaders() },
               body: formData,
             }
           );
@@ -273,6 +275,19 @@ export function UploadStagingProvider({
           }
 
           dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
+
+          // If file was routed for extraction, still surface the intake choice
+          // modal so the user can choose structured ingestion on the existing doc.
+          if (effectiveRoute === 'extract') {
+            setPendingIntakeDocs(prev => [
+              ...prev,
+              {
+                docId: staged.collision!.existingDoc.doc_id,
+                docName: staged.file.name,
+                docType: effectiveDocType,
+              },
+            ]);
+          }
           return;
         } catch (error) {
           console.error(`[STAGING] Version upload error for ${staged.file.name}:`, error);
@@ -332,7 +347,7 @@ export function UploadStagingProvider({
 
         const response = await fetch('/api/dms/docs', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(payload),
         });
 

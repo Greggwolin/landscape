@@ -153,10 +153,68 @@ def _get_anthropic_client() -> Anthropic:
 # Conflict Detection Helpers
 # =============================================================================
 
-def normalize_value_for_comparison(value: Any) -> str:
+def _normalize_address(text: str) -> str:
+    """
+    Expand common address abbreviations and normalize for comparison.
+    '21501 S. Vermont Ave' → '21501 south vermont avenue'
+    """
+    import re
+    # Common abbreviation → full form mappings
+    ABBREVS = {
+        r'\bst\.?\b': 'street',
+        r'\bave\.?\b': 'avenue',
+        r'\bblvd\.?\b': 'boulevard',
+        r'\bdr\.?\b': 'drive',
+        r'\bln\.?\b': 'lane',
+        r'\brd\.?\b': 'road',
+        r'\bct\.?\b': 'court',
+        r'\bpl\.?\b': 'place',
+        r'\bcir\.?\b': 'circle',
+        r'\bpkwy\.?\b': 'parkway',
+        r'\bhwy\.?\b': 'highway',
+        r'\bter\.?\b': 'terrace',
+        r'\bway\.?\b': 'way',
+        r'\bn\.?\b': 'north',
+        r'\bs\.?\b': 'south',
+        r'\be\.?\b': 'east',
+        r'\bw\.?\b': 'west',
+        r'\bne\.?\b': 'northeast',
+        r'\bnw\.?\b': 'northwest',
+        r'\bse\.?\b': 'southeast',
+        r'\bsw\.?\b': 'southwest',
+        r'\bapt\.?\b': 'apartment',
+        r'\bste\.?\b': 'suite',
+        r'\bbldg\.?\b': 'building',
+        r'\bfl\.?\b': 'floor',
+    }
+    result = text.lower().strip()
+    # Remove commas, periods not part of abbreviations handled above
+    result = result.replace(',', ' ')
+    for pattern, replacement in ABBREVS.items():
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    # Collapse multiple spaces
+    result = re.sub(r'\s+', ' ', result).strip()
+    # Remove remaining periods
+    result = result.replace('.', '')
+    return result
+
+
+# Field keys that represent address/location fields (case-insensitive prefix match)
+ADDRESS_FIELD_KEYS = {
+    'property_address', 'address', 'street_address', 'site_address',
+    'mailing_address', 'physical_address', 'project_address',
+    'city', 'state', 'zip', 'zip_code', 'county',
+}
+
+
+def normalize_value_for_comparison(value: Any, field_key: str = '') -> str:
     """
     Normalize value for comparison to detect conflicts.
-    Handles numeric precision, string casing, whitespace.
+    Handles numeric precision, string casing, whitespace, and address abbreviations.
+
+    Args:
+        value: The value to normalize
+        field_key: The field key (used for context-aware normalization like addresses)
     """
     if value is None:
         return ''
@@ -183,6 +241,11 @@ def normalize_value_for_comparison(value: Any) -> str:
         return f"{num:.2f}"
     except (ValueError, TypeError):
         pass
+
+    # Address-aware normalization: expand abbreviations for address fields
+    fk_lower = field_key.lower() if field_key else ''
+    if fk_lower in ADDRESS_FIELD_KEYS or 'address' in fk_lower:
+        return _normalize_address(str_val)
 
     # Normalize strings - lowercase and strip whitespace
     return str_val.lower().strip()
@@ -499,9 +562,9 @@ def check_for_conflict(
     if is_empty_value(new_value):
         return None
 
-    # Normalize both values for comparison
-    norm_existing = normalize_value_for_comparison(existing['value'])
-    norm_new = normalize_value_for_comparison(new_value)
+    # Normalize both values for comparison (pass field_key for address-aware normalization)
+    norm_existing = normalize_value_for_comparison(existing['value'], field_key=field_key)
+    norm_new = normalize_value_for_comparison(new_value, field_key=field_key)
 
     if norm_existing == norm_new:
         # Same value - no conflict
@@ -547,10 +610,10 @@ For each unit type row, extract:
 - bathrooms: Number of bathrooms (decimal, e.g., 1.0, 1.5, 2.0)
 - avg_square_feet: Average square footage for this type (integer)
 - unit_count: Number of units of this type (integer)
-- market_rent: Market rent per unit per month (decimal)
+- market_rent: Market rent per unit per month (decimal) — ONLY if explicitly stated in the document as "market rent". Do NOT infer or calculate this from current rent or any other column.
 
-Return as JSON array of objects. Only include data you find in the document.
-Example: [{"unit_type_name": "1BR/1BA", "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "unit_count": 5, "market_rent": 1850}]''',
+Return as JSON array of objects. Only include data you find in the document. Omit any field not explicitly present.
+Example: [{"unit_type_name": "1BR/1BA", "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "unit_count": 5}]''',
         'required_fields': ['unit_type_name', 'bedrooms', 'unit_count'],
     },
     'rent_roll': {
@@ -1632,15 +1695,16 @@ Fields: {', '.join(scope_fields['unit_type'])}
 
 Extract as array - one entry per unit type found in unit mix or rent roll summaries:
 {{
-  "market_rent": {{
+  "unit_count": {{
     "value": [
-      {{"unit_type_name": "1BR/1BA", "value": 2400}},
-      {{"unit_type_name": "2BR/2BA", "value": 3150}}
+      {{"unit_type_name": "1BR/1BA", "unit_count": 5, "bedrooms": 1, "avg_square_feet": 650}},
+      {{"unit_type_name": "2BR/2BA", "unit_count": 21, "bedrooms": 2, "avg_square_feet": 950}}
     ],
     "confidence": "high",
     "source_quote": "Unit Mix Summary"
   }}
 }}
+IMPORTANT: Do NOT include market_rent unless the document has a separate column explicitly labeled "Market Rent", "Asking Rent", or "Stabilized Rent" distinct from current/in-place rent.
 """
 
         if 'unit' in scope_fields:
@@ -1652,14 +1716,16 @@ Extract ALL units from rent roll as array:
 {{
   "unit_number": {{
     "value": [
-      {{"unit_number": "101", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "market_rent": 1650, "occupancy_status": "Occupied"}},
-      {{"unit_number": "102", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150, "market_rent": 2250, "occupancy_status": "Vacant"}}
+      {{"unit_number": "101", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "occupancy_status": "Occupied"}},
+      {{"unit_number": "102", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150, "occupancy_status": "Vacant"}}
     ],
     "confidence": "high",
     "source_quote": "Rent Roll, pages 30-34"
   }}
 }}
-IMPORTANT: Extract ALL units in the rent roll, not just a sample.
+IMPORTANT:
+- Extract ALL units in the rent roll, not just a sample.
+- Do NOT include market_rent unless the document has a separate column explicitly labeled "Market Rent", "Asking Rent", or "Stabilized Rent". If there is only one rent column, map it to current_rent and omit market_rent entirely.
 """
 
         if 'sales_comp' in scope_fields:
@@ -2286,6 +2352,30 @@ class BatchedExtractionService:
                 'batches_run': 0,
             }
 
+        # Backfill core_doc_text if missing — the rent-roll mapper and other
+        # downstream consumers read from this table, so ensure it's populated
+        # whenever the batched extraction pipeline has successfully loaded text.
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM landscape.core_doc_text WHERE doc_id = %s",
+                    [doc_id],
+                )
+                if not cursor.fetchone():
+                    word_count = len(doc_content.split())
+                    cursor.execute("""
+                        INSERT INTO landscape.core_doc_text
+                            (doc_id, extracted_text, word_count, extraction_method)
+                        VALUES (%s, %s, %s, 'batched_extraction_backfill')
+                    """, [doc_id, doc_content, word_count])
+                    logger.info(
+                        f"Backfilled core_doc_text for doc {doc_id} "
+                        f"({word_count} words)"
+                    )
+        except Exception as e:
+            # Non-fatal — extraction can proceed without this
+            logger.warning(f"core_doc_text backfill failed for doc {doc_id}: {e}")
+
         # Get document info for staging
         doc_info = self._get_document_info(doc_id)
         if not doc_info:
@@ -2385,7 +2475,14 @@ class BatchedExtractionService:
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=8000,
-                system="You are a real estate document analyst. Extract data precisely and completely. Return ONLY valid JSON.",
+                system=(
+                    "You are a real estate document analyst. "
+                    "Extract data precisely and completely from the provided document text. "
+                    "Do NOT infer, calculate, fabricate, or estimate any values — only extract data that is explicitly and literally present in the document. "
+                    "If a field value is not explicitly stated in the document text, omit it entirely. "
+                    "Never derive market rent from current rent, or vice versa. "
+                    "Return ONLY valid JSON."
+                ),
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -2568,7 +2665,7 @@ Extract ALL units from rent roll tables. Return array under "unit_number":
 {{
   "unit_number": {{
     "value": [
-      {{"unit_number": "100", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "market_rent": 1650, "occupancy_status": "Occupied"}},
+      {{"unit_number": "100", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "occupancy_status": "Occupied"}},
       {{"unit_number": "101", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150}}
     ],
     "confidence": "high",
@@ -2579,7 +2676,7 @@ Extract ALL units from rent roll tables. Return array under "unit_number":
 IMPORTANT:
 - Extract ALL units, not just a sample.
 - **current_rent**: The ACTUAL in-place monthly rent the tenant is paying. Extract from columns labeled "Actual Rent", "Current Rent", "In-Place Rent", "Monthly Rent", or "Rent Amount". Do NOT use "Market Rent" or "Stabilized Rent" columns for this field.
-- **market_rent**: The market/asking/stabilized rent. Extract from columns labeled "Market Rent", "Asking Rent", "Stabilized Rent", or "Proforma Rent".""")
+- **market_rent**: ONLY include this field if the document has a separate column explicitly labeled "Market Rent", "Asking Rent", "Stabilized Rent", or "Proforma Rent". Do NOT infer or compute market rent from other columns. If there is only one rent column, map it to current_rent and omit market_rent entirely.""")
 
         if 'unit_type' in scopes:
             ut_field_keys = [f.field_key for f in fields if f.scope == 'unit_type'][:6]
@@ -2589,18 +2686,18 @@ Fields: {', '.join(ut_field_keys)}...
 
 CRITICAL: These fields are ARRAY-SCOPED. Do NOT return them as individual scalar values.
 Find the UNIT MIX SUMMARY table (floor plan types with unit counts) and return ALL unit_type
-fields together as a SINGLE ARRAY under the key "market_rent".
+fields together as a SINGLE ARRAY under the key "unit_count".
 
 Each array element represents one floor plan / unit type with ALL its attributes bundled together.
 Do NOT return avg_square_feet, unit_count, total_units_by_type, bedrooms, etc. as separate top-level keys.
 
-Return format — one key "market_rent" containing an array:
+Return format — one key "unit_count" containing an array:
 ```json
 {{
-  "market_rent": {{
+  "unit_count": {{
     "value": [
-      {{"unit_type_name": "1BR/1BA", "unit_count": 5, "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "market_rent": 1650, "current_rent_avg": 1550}},
-      {{"unit_type_name": "2BR/2BA", "unit_count": 21, "bedrooms": 2, "bathrooms": 2, "avg_square_feet": 950, "market_rent": 2150, "current_rent_avg": 1950}}
+      {{"unit_type_name": "1BR/1BA", "unit_count": 5, "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "current_rent_avg": 1550}},
+      {{"unit_type_name": "2BR/2BA", "unit_count": 21, "bedrooms": 2, "bathrooms": 2, "avg_square_feet": 950, "current_rent_avg": 1950}}
     ],
     "confidence": "high",
     "source_quote": "Unit Mix Summary table"
@@ -2608,9 +2705,10 @@ Return format — one key "market_rent" containing an array:
 }}
 ```
 IMPORTANT:
-- **market_rent**: Stabilized / proforma / asking rent per unit type. This is the TARGET rent, NOT the in-place rent.
+- **market_rent**: Stabilized / proforma / asking rent per unit type. ONLY include if the document has a separate column or table explicitly showing market/asking/stabilized/proforma rents distinct from current/in-place rents. Do NOT infer market_rent from current rents. If the document shows only one rent figure, omit market_rent.
 - **current_rent_avg**: In-place / current average rent per unit type. Compute this as: (total monthly rent for this unit type) / (number of occupied units of this type). Do NOT copy the stabilized/market rent into this field. If the document only shows one rent column labeled "Market Rent" or "Stabilized Rent", leave current_rent_avg empty.
 - Include BOTH if the document clearly shows two separate rent columns (e.g., "Current" and "Market" or "In-Place" and "Proforma").
+- If the document does NOT contain a unit mix summary table, do NOT synthesize one from rent roll data — skip the unit_type scope entirely.
 
 WRONG (do NOT do this):
 ```json
@@ -2875,7 +2973,7 @@ Include a note in source_quote indicating whether value is monthly or annual."""
                     # Check if this is an array-scope field
                     for f in fields:
                         if f.scope in array_scopes and field_key in [
-                            'unit_number', 'market_rent', 'sales_comp_name', 'rent_comp_name'
+                            'unit_number', 'unit_count', 'market_rent', 'sales_comp_name', 'rent_comp_name'
                         ]:
                             field = f
                             break
@@ -3085,13 +3183,16 @@ RENT_ROLL_CONFIG = {
         'bathrooms',
         'square_feet',
         'current_rent',
-        'market_rent',
         'occupancy_status',
         'lease_start',
         'lease_end',
         'tenant_name',
         'move_in_date',
         'rent_effective_date',
+    ],
+    # Optional fields — only included if detected in document column headers
+    'optional_fields': [
+        'market_rent',
     ],
 }
 
@@ -3371,7 +3472,18 @@ CRITICAL: For tenant_name, extract the EXACT name from the source. NEVER use pla
     ) -> str:
         """Build prompt for extracting a specific chunk of units."""
 
-        fields = RENT_ROLL_CONFIG['fields_per_unit']
+        fields = list(RENT_ROLL_CONFIG['fields_per_unit'])
+
+        # Include optional fields only if their keywords appear in the document
+        doc_lower = doc_content[:5000].lower()  # Check header area only
+        optional_keywords = {
+            'market_rent': ['market rent', 'asking rent', 'mkt rent', 'pro forma rent', 'stabilized rent', 'proforma rent'],
+        }
+        for opt_field in RENT_ROLL_CONFIG.get('optional_fields', []):
+            keywords = optional_keywords.get(opt_field, [opt_field.replace('_', ' ')])
+            if any(kw in doc_lower for kw in keywords):
+                fields.append(opt_field)
+
         field_list = "\n".join([f"- {f}" for f in fields])
 
         # Truncate content if very long
@@ -3421,7 +3533,6 @@ Return a JSON array of unit objects:
     "bathrooms": 1,
     "square_feet": 650,
     "current_rent": 1595,
-    "market_rent": 1650,
     "occupancy_status": "Occupied",
     "lease_start": "2024-01-15",
     "lease_end": "2025-01-14",
@@ -3436,7 +3547,6 @@ Return a JSON array of unit objects:
     "bathrooms": 2,
     "square_feet": 950,
     "current_rent": 2150,
-    "market_rent": 2250,
     "occupancy_status": "Vacant"
   }}
 ]
@@ -3444,6 +3554,7 @@ Return a JSON array of unit objects:
 
 RULES:
 - Extract ONLY units in the requested range for this chunk
+- Extract ONLY fields listed in FIELDS TO EXTRACT above — do NOT add fields not listed
 - Numeric fields: numbers only (1595 not "$1,595")
 - Dates: ISO format "YYYY-MM-DD"
 - Include all available fields; omit if not found

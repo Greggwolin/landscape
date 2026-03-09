@@ -131,7 +131,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (prev !== null && data.some(p => p.project_id === prev)) {
           return prev
         }
-        // Otherwise default to first project
+        // Stored project ID is stale (doesn't exist or user lost access) — clear it
+        if (prev !== null && typeof window !== 'undefined') {
+          localStorage.removeItem('activeProjectId')
+          localStorage.removeItem('activeProjectTimestamp')
+        }
+        // Default to first project
         return data[0].project_id
       })
     }

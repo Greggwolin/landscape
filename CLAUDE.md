@@ -41,7 +41,7 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
          │  Neon PostgreSQL      │
          │  Database: land_v2    │
          │  Schema: landscape    │
-         │  280+ tables          │
+         │  324 tables           │
          └───────────────────────┘
                      │
          ┌───────────┴───────────┐
@@ -634,7 +634,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-07*
+*Last updated: 2026-03-08*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 217*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

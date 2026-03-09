@@ -11,6 +11,7 @@ import { PropertyOverview } from './PropertyOverview';
 import { IngestionChat } from './IngestionChat';
 import { MilestoneBar } from './MilestoneBar';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import type {
   IngestionDocument,
   PropertySummary,
@@ -250,6 +251,7 @@ export function DocumentIngestion({
 
         const response = await fetch('/api/dms/upload', {
           method: 'POST',
+          headers: { ...getAuthHeaders() },
           body: formData,
         });
 

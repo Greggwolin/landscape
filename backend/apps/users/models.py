@@ -66,3 +66,41 @@ class UserLandscaperProfile(models.Model):
 
     def __str__(self):
         return f"LandscaperProfile for {self.user.email}"
+
+
+class UserGridPreference(models.Model):
+    """
+    Per-user, per-project grid layout preferences (column order, visibility).
+    Supports multiple grids via grid_id (e.g. 'rent_roll', 'budget').
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='grid_preferences',
+        db_column='user_id',
+    )
+    project_id = models.BigIntegerField(help_text="FK to tbl_project.project_id")
+    grid_id = models.CharField(
+        max_length=50,
+        help_text="Grid identifier, e.g. 'rent_roll', 'budget'",
+    )
+    column_order = models.JSONField(
+        default=list,
+        help_text='Ordered list of column IDs, e.g. ["unitNumber","bedrooms",...]',
+    )
+    column_visibility = models.JSONField(
+        default=dict,
+        help_text='Column ID → boolean, e.g. {"unitNumber": true, "notes": false}',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_user_grid_preference'
+        unique_together = [('user', 'project_id', 'grid_id')]
+        verbose_name = "User Grid Preference"
+        verbose_name_plural = "User Grid Preferences"
+
+    def __str__(self):
+        return f"GridPref user={self.user_id} project={self.project_id} grid={self.grid_id}"

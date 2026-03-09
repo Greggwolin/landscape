@@ -27,6 +27,8 @@ interface IngestionWorkbenchPanelProps {
   /** Detected document type */
   docType?: string | null;
   onClose: () => void;
+  /** Called instead of onClose after a successful commit — skips the abandon flow */
+  onDone?: () => void;
 }
 
 /**
@@ -44,11 +46,13 @@ export default function IngestionWorkbenchPanel({
   docName,
   docType,
   onClose,
+  onDone,
 }: IngestionWorkbenchPanelProps) {
   return (
     <>
-      {/* Transparent backdrop — click to close */}
-      <div className="wb-floating-backdrop" onClick={onClose} />
+      {/* Dim backdrop — does NOT close on click (prevents accidental data loss).
+          Workbench can only be closed via the Cancel / Close button in the header. */}
+      <div className="wb-floating-backdrop" />
 
       {/* Floating panel */}
       <div className="wb-floating-panel">
@@ -62,6 +66,7 @@ export default function IngestionWorkbenchPanel({
           docName={docName}
           docType={docType}
           onClose={onClose}
+          onDone={onDone}
         />
       </div>
     </>

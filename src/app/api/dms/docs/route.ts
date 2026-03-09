@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { CreateDocZ } from './schema';
 import { z } from 'zod';
+import { getUserFromRequest, userOwnsProject } from '@/lib/auth';
 
 const DJANGO_API_URL =
   process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -22,6 +23,17 @@ export async function POST(req: NextRequest) {
 
     // Validate request body
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
+
+    // Auth: identify uploader and verify project ownership
+    const requestUser = getUserFromRequest(req);
+    if (!requestUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const ownsProject = await userOwnsProject(requestUser.userId, system.project_id);
+    if (!ownsProject) {
+      return NextResponse.json({ error: 'You do not have access to this project' }, { status: 403 });
+    }
 
     // Validate doc_type against project-owned doc types (dms_project_doc_types).
     // If missing, auto-insert as a custom project doc type to prevent drift.
@@ -170,6 +182,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert document into core_doc
+    // When intent=structured_ingestion, hide from DMS until commit by setting
+    // deleted_at. commit_staging will flip deleted_at → NULL on success.
+    const hideUntilCommit = system.intent === 'structured_ingestion';
+
     const inserted = await sql`
       INSERT INTO landscape.core_doc (
         project_id,
@@ -187,7 +203,8 @@ export async function POST(req: NextRequest) {
         file_size_bytes,
         profile_json,
         created_by,
-        updated_by
+        updated_by,
+        deleted_at
       ) VALUES (
         ${system.project_id},
         ${system.workspace_id ?? null},
@@ -203,8 +220,9 @@ export async function POST(req: NextRequest) {
         ${system.mime_type ?? null},
         ${system.file_size_bytes ?? null},
         ${JSON.stringify(profile)}::jsonb,
-        ${system.uploaded_by ?? null},
-        ${system.uploaded_by ?? null}
+        ${requestUser.userId},
+        ${requestUser.userId},
+        ${hideUntilCommit ? new Date().toISOString() : null}
       )
       RETURNING doc_id, version_no, doc_name, status, created_at
     `;

@@ -15,7 +15,9 @@ cd "$SCRIPT_DIR"
 cd backend
 mkdir -p logs
 source venv/bin/activate
-nohup env -u DEBUG python manage.py runserver 8000 >> logs/django.log 2>&1 &
+# Force ANTHROPIC_API_KEY from .env file (override shell environment)
+NEW_KEY=$(grep "^ANTHROPIC_API_KEY=" .env | cut -d'=' -f2)
+nohup env -u DEBUG ANTHROPIC_API_KEY="$NEW_KEY" python manage.py runserver 8000 >> logs/django.log 2>&1 &
 DJANGO_PID=$!
 
 # Start Next.js in detached background

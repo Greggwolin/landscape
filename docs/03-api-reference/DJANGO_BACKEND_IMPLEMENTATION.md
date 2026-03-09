@@ -14,7 +14,7 @@ The Django backend for the Landscape Platform has been successfully deployed as 
 **Core Framework:**
 - Django 5.0.1
 - Django REST Framework 3.14.0
-- PostgreSQL (Neon Cloud) - 183 tables in `landscape` schema
+- PostgreSQL (Neon Cloud) - 324 tables in `landscape` schema
 
 **Authentication:**
 - djangorestframework-simplejwt 5.3.0 (JWT)
@@ -68,7 +68,7 @@ The implementation uses a **custom PostgreSQL backend** (`db_backend.base`) that
 
 **Why this is necessary:**
 - Neon's pooled connections don't support `search_path` in startup options
-- All 183 tables reside in the `landscape` schema
+- All 324 tables reside in the `landscape` schema
 - Models use `managed = False` to prevent Django from modifying the existing schema
 
 **Important:** All Django models use `db_table = 'table_name'` (without schema prefix) because the search_path is automatically set.
@@ -352,7 +352,7 @@ mypy apps/
 
 ## Current Database Schema
 
-**Active Schema:** `landscape` (183 tables)
+**Active Schema:** `landscape` (324 tables)
 
 **Key Tables Mapped:**
 - ✅ `tbl_project` - Projects (7 records)

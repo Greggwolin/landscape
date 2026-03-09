@@ -276,7 +276,7 @@ def _lookup_extraction_mapping_label(conn, normalized_label: str, doc_type: str)
                 SELECT source_pattern, source_aliases
                 FROM landscape.tbl_extraction_mapping
                 WHERE document_type = %s
-                  AND target_table IN ('tbl_operating_expense', 'tbl_operating_expenses')
+                  AND target_table = 'tbl_operating_expenses'
                   AND is_active = TRUE
             """, [doc_type])
             rows = cursor.fetchall()

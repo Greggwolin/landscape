@@ -567,12 +567,13 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "update_units",
-        "description": "Create or update individual units.",
+        "description": "Create or update units. Two modes: (1) per-unit 'records' with unit_number, (2) 'bulk_updates' to set fields on ALL units matching a filter (preferred for type-wide changes like setting market_rent by plan). Provide records OR bulk_updates, not both.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "records": {
                     "type": "array",
+                    "description": "Per-unit updates. Each record must have unit_number.",
                     "items": {
                         "type": "object",
                         "properties": {
@@ -600,9 +601,20 @@ LANDSCAPER_TOOLS = [
                         "required": ["unit_number"],
                     },
                 },
+                "bulk_updates": {
+                    "type": "array",
+                    "description": "Bulk updates by filter. PREFERRED when setting the same value for all units of a type. Each entry: {filter: {unit_type: '1BR/1BA'}, set: {market_rent: 3200}}. Filter fields: unit_type, building_name, occupancy_status, bedrooms, bathrooms.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filter": {"type": "object", "description": "Fields to match (unit_type, building_name, etc.)"},
+                            "set": {"type": "object", "description": "Fields to update (market_rent, current_rent, etc.)"},
+                        },
+                        "required": ["filter", "set"],
+                    },
+                },
                 "reason": {"type": "string"},
             },
-            "required": ["records"],
         },
     },
     {
@@ -2958,23 +2970,12 @@ LANDSCAPER_TOOLS = [
             },
         },
     },
-    {
-        "name": "log_alpha_feedback",
-        "description": "Log user feedback (bug, suggestion, question).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "feedback_type": {
-                    "type": "string",
-                    "enum": ["bug", "suggestion", "question", "confusion"],
-                },
-                "summary": {"type": "string"},
-                "user_quote": {"type": "string"},
-                "page_context": {"type": "string"},
-            },
-            "required": ["feedback_type", "summary"],
-        },
-    },
+    # log_alpha_feedback REMOVED from Claude's tool list.
+    # Claude was proactively calling this on normal user messages (interpreting
+    # suggestions as feedback). Feedback now captured via:
+    #   - #FB hashtag detection in ThreadMessageViewSet.create()
+    #   - Automatic help panel logging via HelpChatView
+    # The handler in tool_executor.py is retained for backward compat.
     {
         "name": "create_analysis_draft",
         "description": "Create a new analysis draft for conversational underwriting.",

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useSyncExternalStore } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { getAuthHeaders } from '@/lib/authHeaders'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,7 @@ export function useProjectCreation() {
 
             const response = await fetch('/api/dms/upload', {
               method: 'POST',
+              headers: { ...getAuthHeaders() },
               body: dmsFormData,
             })
 

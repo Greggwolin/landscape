@@ -17,6 +17,7 @@ from ..services.rag_retrieval import RAGRetriever
 from ..services.landscaper_ai import get_landscaper_response
 from ..services.query_builder import QueryBuilder
 from ..services.global_knowledge import retrieve_global_context
+from apps.landscaper.feedback_utils import detect_feedback_tag, strip_feedback_tag, capture_feedback
 from ..contracts import (
     ChatResponse,
     ChatHistoryResponse,
@@ -145,6 +146,28 @@ def _send_message(request, project_id: int) -> JsonResponse:
 
         if not user_message:
             return JsonResponse(error_response('Message is required'), status=400)
+
+        # --- #FB feedback detection: capture to Discord and strip before Claude sees it ---
+        has_feedback = detect_feedback_tag(user_message)
+        if has_feedback:
+            logger.info("[FEEDBACK] #FB detected in message for project %s", project_id)
+            user_email = getattr(request.user, 'email', None) if hasattr(request, 'user') else None
+            try:
+                from apps.projects.models import Project
+                project_obj = Project.objects.filter(project_id=project_id).first()
+                project_name = project_obj.project_name if project_obj else None
+            except Exception:
+                project_name = None
+            capture_feedback(
+                user_message=user_message,
+                user_email=user_email,
+                user_id=getattr(request.user, 'id', None),
+                project_id=project_id,
+                project_name=project_name,
+                page_context=page_context,
+            )
+            user_message = strip_feedback_tag(user_message)
+            logger.info("[FEEDBACK] Stripped message: '%s'", user_message[:80])
 
         if client_request_id:
             cached = check_idempotency(project_id, client_request_id)

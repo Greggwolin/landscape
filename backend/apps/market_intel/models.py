@@ -28,7 +28,7 @@ class AIIngestionHistory(models.Model):
 class RentComparable(models.Model):
     """
     Model for rent comparables/competing properties.
-    Maps to landscape.tbl_rent_comparable
+    Maps to landscape.tbl_rental_comparable
     """
 
     comparable_id = models.AutoField(primary_key=True)
@@ -55,12 +55,14 @@ class RentComparable(models.Model):
     data_source = models.CharField(max_length=100, null=True, blank=True)  # e.g., "CoStar", "Apartments.com"
     as_of_date = models.DateField()
     is_active = models.BooleanField(default=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
-        db_table = 'tbl_rent_comparable'
+        db_table = 'tbl_rental_comparable'
         ordering = ['project', 'distance_miles', 'unit_type']
 
     def __str__(self):
