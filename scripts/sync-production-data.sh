@@ -163,6 +163,10 @@ sync_users() {
     psql "$PROD_DB_URL" -X -v ON_ERROR_STOP=1 <<SQL
 BEGIN;
 
+DROP TABLE IF EXISTS tmp_local_auth_user;
+DROP TABLE IF EXISTS tmp_local_user_profile;
+DROP TABLE IF EXISTS tmp_user_id_map;
+
 CREATE TEMP TABLE tmp_local_auth_user (LIKE landscape.auth_user INCLUDING DEFAULTS);
 CREATE TEMP TABLE tmp_local_user_profile (LIKE landscape.user_profile INCLUDING DEFAULTS);
 CREATE TEMP TABLE tmp_user_id_map (
@@ -289,6 +293,8 @@ sync_project_owners() {
     if [ "$DRY_RUN" = true ]; then
         echo -e "${YELLOW}Dry run: computing candidate owner updates.${NC}"
         psql "$PROD_DB_URL" -X -v ON_ERROR_STOP=1 <<SQL
+DROP TABLE IF EXISTS tmp_local_project_owner_map;
+
 CREATE TEMP TABLE tmp_local_project_owner_map (
   project_id integer,
   local_created_by_id integer,
@@ -313,8 +319,11 @@ SQL
     fi
 
     echo "Applying owner backfill for null-owned projects..."
-    psql "$PROD_DB_URL" -X -v ON_ERROR_STOP=1 <<SQL
+psql "$PROD_DB_URL" -X -v ON_ERROR_STOP=1 <<SQL
 BEGIN;
+
+DROP TABLE IF EXISTS tmp_local_project_owner_map;
+DROP TABLE IF EXISTS tmp_updated_projects;
 
 CREATE TEMP TABLE tmp_local_project_owner_map (
   project_id integer,
@@ -323,7 +332,12 @@ CREATE TEMP TABLE tmp_local_project_owner_map (
 );
 \\copy tmp_local_project_owner_map FROM '$local_owner_stage' WITH (FORMAT csv, HEADER true, DELIMITER E'\t')
 
-CREATE TEMP TABLE tmp_updated_projects AS
+CREATE TEMP TABLE tmp_updated_projects (
+  project_id integer,
+  project_name varchar(255),
+  prod_user_id integer
+);
+
 WITH mapped AS (
   SELECT
     p.project_id,
@@ -332,14 +346,19 @@ WITH mapped AS (
   JOIN tmp_local_project_owner_map l ON l.project_id = p.project_id
   JOIN landscape.auth_user pu ON pu.username = l.username
   WHERE p.created_by_id IS NULL
+),
+updated AS (
+  UPDATE landscape.tbl_project p
+  SET created_by_id = m.prod_user_id,
+      updated_at = NOW()
+  FROM mapped m
+  WHERE p.project_id = m.project_id
+    AND p.created_by_id IS NULL
+  RETURNING p.project_id, p.project_name, m.prod_user_id
 )
-UPDATE landscape.tbl_project p
-SET created_by_id = m.prod_user_id,
-    updated_at = NOW()
-FROM mapped m
-WHERE p.project_id = m.project_id
-  AND p.created_by_id IS NULL
-RETURNING p.project_id, p.project_name, m.prod_user_id;
+INSERT INTO tmp_updated_projects (project_id, project_name, prod_user_id)
+SELECT project_id, project_name, prod_user_id
+FROM updated;
 
 COMMIT;
 
