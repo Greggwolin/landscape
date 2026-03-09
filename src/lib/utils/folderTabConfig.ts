@@ -267,6 +267,20 @@ export function createFolderConfig(
               'mixed_use',
             ],
           },
+          // Renovation - income properties with value-add enabled
+          {
+            id: 'renovation',
+            label: 'Renovation',
+            projectTypes: [
+              'multifamily',
+              'office',
+              'retail',
+              'industrial',
+              'hotel',
+              'mixed_use',
+            ],
+            requiresValueAdd: true,
+          },
           // Acquisition - ALL project types (land dev also has acquisition costs)
           // Hidden for VALUATION purpose (appraisal context has no acquisition)
           {

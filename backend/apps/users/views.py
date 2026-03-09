@@ -11,8 +11,8 @@ from rest_framework.views import APIView
 import hashlib
 import uuid
 
-from .models import UserLandscaperProfile, UserSettings
-from .serializers import UserLandscaperProfileSerializer
+from .models import UserGridPreference, UserLandscaperProfile, UserSettings
+from .serializers import UserGridPreferenceSerializer, UserLandscaperProfileSerializer
 from .services import (
     compile_landscaper_instructions,
     detect_confidential_markers,
@@ -177,6 +177,59 @@ def user_landscaper_document(request):
         return Response({'message': 'Document upload cancelled.'})
 
     return Response({'error': 'Unknown action'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def grid_preferences(request):
+    """
+    GET  /api/users/grid-preferences/?project_id=123&grid_id=rent_roll
+    PUT  /api/users/grid-preferences/
+         Body: { project_id, grid_id, column_order, column_visibility }
+
+    Upserts the authenticated user's column order & visibility for a
+    specific project + grid combination.
+    """
+    if request.method == 'GET':
+        project_id = request.query_params.get('project_id')
+        grid_id = request.query_params.get('grid_id')
+        if not project_id or not grid_id:
+            return Response(
+                {'error': 'project_id and grid_id query params are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            pref = UserGridPreference.objects.get(
+                user=request.user,
+                project_id=int(project_id),
+                grid_id=grid_id,
+            )
+            return Response(UserGridPreferenceSerializer(pref).data)
+        except UserGridPreference.DoesNotExist:
+            return Response({}, status=status.HTTP_200_OK)
+
+    # PUT — upsert
+    project_id = request.data.get('project_id')
+    grid_id = request.data.get('grid_id')
+    if not project_id or not grid_id:
+        return Response(
+            {'error': 'project_id and grid_id are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    pref, created = UserGridPreference.objects.update_or_create(
+        user=request.user,
+        project_id=int(project_id),
+        grid_id=grid_id,
+        defaults={
+            'column_order': request.data.get('column_order', []),
+            'column_visibility': request.data.get('column_visibility', {}),
+        },
+    )
+    return Response(
+        UserGridPreferenceSerializer(pref).data,
+        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+    )
 
 
 @api_view(['GET', 'PUT'])

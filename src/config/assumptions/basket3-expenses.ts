@@ -5,7 +5,7 @@ export const basket3Config: BasketConfig = {
   basketName: "The Cash Out",
   basketDescription: "Operating expenses and capital expenditures.",
   icon: "trending-down",
-  tableName: "tbl_operating_expense",
+  tableName: "tbl_operating_expenses",
   relatedTables: ['tbl_capex_reserve', 'tbl_expense_detail'],
 
   fieldGroups: [

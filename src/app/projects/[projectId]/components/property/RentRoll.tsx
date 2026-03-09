@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   CCard,
   CCardHeader,
@@ -20,11 +20,14 @@ import {
 import { Columns } from 'lucide-react';
 import { formatCurrency, formatNumber } from '@/utils/formatNumber';
 import { SemanticBadge } from '@/components/ui/landscape';
+import { useDynamicColumns } from '@/hooks/useDynamicColumns';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
 
 // Column definitions for visibility toggle
 const COLUMNS = [
   { key: 'unitNumber', label: 'Unit', default: true },
   { key: 'unitType', label: 'Type', default: true },
+  { key: 'tenant', label: 'Tenant', default: true },
   { key: 'bdBa', label: 'Bd/Ba', default: true },
   { key: 'sqft', label: 'Sq Ft', default: true },
   { key: 'currentRent', label: 'Current Rent', default: true },
@@ -34,7 +37,7 @@ const COLUMNS = [
   { key: 'status', label: 'Status', default: true },
 ] as const;
 
-type ColumnKey = typeof COLUMNS[number]['key'];
+type ColumnKey = typeof COLUMNS[number]['key'] | string;
 import { unitsAPI, leasesAPI, Unit, Lease } from '@/lib/api/multifamily';
 
 interface RentRollProps {
@@ -73,9 +76,40 @@ export default function RentRoll({ projectId }: RentRollProps) {
   const [leases, setLeases] = useState<Lease[]>([]);
   const [sortField, setSortField] = useState<SortField>('unitNumber');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  // Fetch dynamic columns for multifamily_unit (logical table name, no tbl_ prefix)
+  const unitIds = useMemo(() => units.map(u => u.unit_id), [units]);
+  const {
+    columns: dynamicColumns,
+    values: dynamicValues,
+  } = useDynamicColumns(projectId, 'multifamily_unit', unitIds.length > 0 ? unitIds : undefined);
+
+  // Build combined column list (static + dynamic)
+  const allColumns = useMemo(() => {
+    const base: Array<{key: string; label: string; default: boolean}> = COLUMNS.map(c => ({ key: c.key as string, label: c.label as string, default: c.default }));
+    for (const dc of dynamicColumns) {
+      if (dc.is_active) {
+        base.push({ key: `dyn_${dc.column_key}`, label: dc.display_label, default: true });
+      }
+    }
+    return base;
+  }, [dynamicColumns]);
+
   const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(
     new Set(COLUMNS.filter(c => c.default).map(c => c.key))
   );
+
+  // Add dynamic columns to visible set when they arrive
+  useEffect(() => {
+    if (dynamicColumns.length > 0) {
+      setVisibleColumns(prev => {
+        const newSet = new Set(prev);
+        for (const dc of dynamicColumns) {
+          if (dc.is_active) newSet.add(`dyn_${dc.column_key}`);
+        }
+        return newSet;
+      });
+    }
+  }, [dynamicColumns]);
 
   // Toggle column visibility
   const toggleColumn = (key: ColumnKey) => {
@@ -92,29 +126,37 @@ export default function RentRoll({ projectId }: RentRollProps) {
 
   const isColumnVisible = (key: ColumnKey) => visibleColumns.has(key);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        const [unitsData, leasesData] = await Promise.all([
-          unitsAPI.list(projectId),
-          leasesAPI.list(projectId),
-        ]);
+      const [unitsData, leasesData] = await Promise.all([
+        unitsAPI.list(projectId),
+        leasesAPI.list(projectId),
+      ]);
 
-        setUnits(unitsData);
-        setLeases(leasesData);
-      } catch (err) {
-        console.error('[RentRoll] Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-      } finally {
-        setLoading(false);
-      }
+      setUnits(unitsData);
+      setLeases(leasesData);
+    } catch (err) {
+      console.error('[RentRoll] Error fetching data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
     }
-
-    fetchData();
   }, [projectId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Auto-refresh when workbench commits
+  const { lastCommitTimestamp } = useWorkbench();
+  useEffect(() => {
+    if (lastCommitTimestamp > 0) {
+      fetchData();
+    }
+  }, [lastCommitTimestamp, fetchData]);
 
   // Build rent roll rows by joining units with their active leases
   const rentRollRows: RentRollRow[] = useMemo(() => {
@@ -133,7 +175,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
       const currentRent = lease?.base_rent_monthly ? Number(lease.base_rent_monthly) : null;
       const sqft = unit.square_feet || 0;
 
-      // Determine occupancy status
+      // Determine occupancy status: lease > unit field > tenant name inference
       let occupancyStatus: RentRollRow['occupancyStatus'] = 'Vacant';
       if (lease) {
         switch (lease.lease_status) {
@@ -149,6 +191,17 @@ export default function RentRoll({ projectId }: RentRollProps) {
           default:
             occupancyStatus = lease.lease_status === 'EXPIRED' ? 'Vacant' : 'Occupied';
         }
+      } else if (unit.occupancy_status) {
+        // Use the unit-level occupancy status (set by rent roll import)
+        const raw = unit.occupancy_status.toLowerCase();
+        if (raw === 'occupied' || raw === 'current') occupancyStatus = 'Occupied';
+        else if (raw === 'notice') occupancyStatus = 'Notice';
+        else if (raw === 'month-to-month' || raw === 'mtm') occupancyStatus = 'Month-to-Month';
+        else if (raw === 'vacant' || raw === 'down') occupancyStatus = 'Vacant';
+        else occupancyStatus = 'Occupied'; // non-empty unknown status likely means occupied
+      } else if (unit.tenant_name) {
+        // If we have a tenant name but no lease/status, infer occupied
+        occupancyStatus = 'Occupied';
       }
 
       return {
@@ -162,7 +215,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
         rentPerSF: currentRent && sqft > 0 ? Math.round((currentRent / sqft) * 100) / 100 : null,
         leaseStart: lease?.lease_start_date || unit.current_lease?.lease_start_date || null,
         leaseEnd: lease?.lease_end_date || unit.current_lease?.lease_end_date || null,
-        residentName: lease?.resident_name || null,
+        residentName: lease?.resident_name || unit.tenant_name || null,
         leaseStatus: lease?.lease_status || 'VACANT',
         occupancyStatus,
       };
@@ -314,7 +367,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
                 minWidth: '150px',
               }}
             >
-              {COLUMNS.map(col => (
+              {allColumns.map(col => (
                 <div
                   key={col.key}
                   className="px-3 py-1"
@@ -354,6 +407,9 @@ export default function RentRoll({ projectId }: RentRollProps) {
                   >
                     Type {renderSortIndicator('unitType')}
                   </CTableHeaderCell>
+                )}
+                {isColumnVisible('tenant') && (
+                  <CTableHeaderCell style={{ color: 'var(--studio-text-secondary)' }}>Tenant</CTableHeaderCell>
                 )}
                 {isColumnVisible('bdBa') && (
                   <CTableHeaderCell style={{ color: 'var(--studio-text-secondary)' }}>Bd/Ba</CTableHeaderCell>
@@ -400,6 +456,11 @@ export default function RentRoll({ projectId }: RentRollProps) {
                     Status {renderSortIndicator('occupancyStatus')}
                   </CTableHeaderCell>
                 )}
+                {dynamicColumns.filter(dc => dc.is_active && isColumnVisible(`dyn_${dc.column_key}`)).map(dc => (
+                  <CTableHeaderCell key={dc.column_key} style={{ color: 'var(--studio-text-secondary)' }}>
+                    {dc.display_label}
+                  </CTableHeaderCell>
+                ))}
               </CTableRow>
             </CTableHead>
             <CTableBody>
@@ -416,6 +477,11 @@ export default function RentRoll({ projectId }: RentRollProps) {
                   {isColumnVisible('unitType') && (
                     <CTableDataCell style={{ color: 'var(--studio-text-secondary)' }}>
                       {row.unitType}
+                    </CTableDataCell>
+                  )}
+                  {isColumnVisible('tenant') && (
+                    <CTableDataCell style={{ color: 'var(--studio-text-secondary)' }}>
+                      {row.residentName || '—'}
                     </CTableDataCell>
                   )}
                   {isColumnVisible('bdBa') && (
@@ -459,6 +525,15 @@ export default function RentRoll({ projectId }: RentRollProps) {
                       </SemanticBadge>
                     </CTableDataCell>
                   )}
+                  {dynamicColumns.filter(dc => dc.is_active && isColumnVisible(`dyn_${dc.column_key}`)).map(dc => {
+                    const rowVals = dynamicValues[String(row.unitId)];
+                    const val = rowVals?.[dc.column_key];
+                    return (
+                      <CTableDataCell key={dc.column_key} style={{ color: 'var(--studio-text-secondary)' }}>
+                        {val != null ? String(val) : '—'}
+                      </CTableDataCell>
+                    );
+                  })}
                 </CTableRow>
               ))}
               {filteredRows.length === 0 && (

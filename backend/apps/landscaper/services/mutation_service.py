@@ -19,7 +19,16 @@ from decimal import Decimal
 from django.db import connection, transaction
 from django.utils import timezone
 
+from apps.multifamily.models import normalize_unit_type_code
+
 logger = logging.getLogger(__name__)
+
+
+def _normalize_unit_type(raw: str) -> str:
+    """Thin wrapper — normalizes free-text unit type to canonical code (e.g. '1BR/1BA')."""
+    if not raw:
+        return raw or ''
+    return normalize_unit_type_code(raw)
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -28,6 +37,36 @@ class DecimalEncoder(json.JSONEncoder):
         if isinstance(obj, Decimal):
             return float(obj)
         return super().default(obj)
+
+
+import re
+
+# Common prefixes the AI might prepend to unit numbers
+_UNIT_PREFIX_RE = re.compile(
+    r'^(?:unit|apt|suite|ste|room|rm|space|sp|#)\s*[#:\-.]?\s*',
+    re.IGNORECASE,
+)
+
+
+def _normalize_unit_number(raw: str) -> str:
+    """
+    Normalize a unit number for fuzzy matching.
+
+    Strips common prefixes (Unit, Apt, #, etc.), collapses whitespace,
+    and upper-cases so that "Unit 101-A", "unit 101a", "Apt #101-A",
+    and "101-A" all resolve to the same canonical form.
+
+    The canonical form is stored nowhere — it's only used transiently
+    for matching incoming AI payloads against existing DB rows.
+    """
+    if not raw:
+        return ''
+    s = str(raw).strip()
+    # Strip common prefixes
+    s = _UNIT_PREFIX_RE.sub('', s).strip()
+    # Collapse internal whitespace
+    s = re.sub(r'\s+', ' ', s)
+    return s.upper()
 
 
 # =============================================================================
@@ -173,11 +212,11 @@ MUTABLE_FIELDS = {
         "adjustment_type", "adjustment_pct", "adjustment_amount",
         "justification", "user_adjustment_pct", "ai_accepted", "user_notes", "last_modified_by",
     ],
-    "tbl_rent_comparable": [
+    "tbl_rental_comparable": [
         "property_name", "address", "distance_miles", "year_built", "total_units",
         "unit_type", "bedrooms", "bathrooms", "avg_sqft", "asking_rent",
         "effective_rent", "concessions", "amenities", "notes", "data_source",
-        "as_of_date", "is_active",
+        "as_of_date", "is_active", "latitude", "longitude",
     ],
     # Capital Stack Tables
     "tbl_loan": [
@@ -356,7 +395,7 @@ PK_COLUMNS = {
     # Comparables tables
     "tbl_sales_comparables": "comparable_id",
     "tbl_sales_comp_adjustments": "adjustment_id",
-    "tbl_rent_comparable": "comparable_id",
+    "tbl_rental_comparable": "comparable_id",
     # Capital stack tables
     "tbl_loan": "loan_id",
     "tbl_equity_structure": "equity_structure_id",
@@ -1089,8 +1128,8 @@ class MutationService:
                                 RETURNING unit_type_id, (xmax = 0) as is_insert
                             """, [
                                 project_id,
-                                rec.get("unit_type_code"),
-                                rec.get("unit_type_name"),
+                                _normalize_unit_type(rec.get("unit_type_code", "")),
+                                rec.get("unit_type_name") or rec.get("unit_type_code", ""),
                                 rec.get("bedrooms", 0),
                                 rec.get("bathrooms", 1),
                                 rec.get("avg_square_feet", 0),
@@ -1102,7 +1141,7 @@ class MutationService:
                                 created_count += 1
                             else:
                                 updated_count += 1
-                            results.append({"unit_type_id": row[0], "code": rec.get("unit_type_code")})
+                            results.append({"unit_type_id": row[0], "code": _normalize_unit_type(rec.get("unit_type_code", ""))})
 
                     elif table_name == "tbl_multifamily_unit":
                         # Batched upsert: prepare all records first, then execute
@@ -1120,9 +1159,12 @@ class MutationService:
                         }
 
                         # Updatable unit fields (used to detect partial vs full records)
+                        # Includes core fields + extended fields added for rent roll grid
                         _UNIT_DATA_FIELDS = {
                             'unit_type', 'bedrooms', 'bathrooms', 'square_feet',
                             'current_rent', 'market_rent', 'occupancy_status',
+                            'parking_rent', 'pet_rent', 'past_due_amount', 'deposit_amount',
+                            'tenant_name', 'building_name',
                         }
 
                         # Phase 1: Normalize all records, tracking which fields
@@ -1140,6 +1182,9 @@ class MutationService:
                                 ba = rec.get("bathrooms", 1)
                                 unit_type = f"{int(br)}BR/{int(ba)}BA"
                                 provided_fields.add("unit_type")
+                            # Normalize to canonical format (e.g. "1 Bedroom / 1 Bath" → "1BR/1BA")
+                            if unit_type:
+                                unit_type = _normalize_unit_type(unit_type)
 
                             bedrooms = rec.get("bedrooms", 0)
                             if "bedrooms" in rec:
@@ -1169,8 +1214,30 @@ class MutationService:
                             else:
                                 occupancy_status = "occupied"  # default for new units only
 
+                            # Extended fields — track as provided only if explicitly in the record
+                            parking_rent = rec.get("parking_rent")
+                            if "parking_rent" in rec:
+                                provided_fields.add("parking_rent")
+                            pet_rent = rec.get("pet_rent")
+                            if "pet_rent" in rec:
+                                provided_fields.add("pet_rent")
+                            past_due_amount = rec.get("past_due_amount")
+                            if "past_due_amount" in rec:
+                                provided_fields.add("past_due_amount")
+                            deposit_amount = rec.get("deposit_amount")
+                            if "deposit_amount" in rec:
+                                provided_fields.add("deposit_amount")
+                            tenant_name = rec.get("tenant_name")
+                            if "tenant_name" in rec:
+                                provided_fields.add("tenant_name")
+                            building_name = rec.get("building_name")
+                            if "building_name" in rec:
+                                provided_fields.add("building_name")
+
+                            raw_unit_number = str(rec.get("unit_number", "")).strip()
                             normalized.append({
-                                "unit_number": rec.get("unit_number"),
+                                "unit_number": raw_unit_number,
+                                "_unit_number_canonical": _normalize_unit_number(raw_unit_number),
                                 "unit_type": unit_type,
                                 "bedrooms": bedrooms,
                                 "bathrooms": bathrooms,
@@ -1178,6 +1245,12 @@ class MutationService:
                                 "current_rent": current_rent,
                                 "market_rent": market_rent,
                                 "occupancy_status": occupancy_status,
+                                "parking_rent": parking_rent,
+                                "pet_rent": pet_rent,
+                                "past_due_amount": past_due_amount,
+                                "deposit_amount": deposit_amount,
+                                "tenant_name": tenant_name,
+                                "building_name": building_name,
                                 "lease_start_date": rec.get("lease_start_date"),
                                 "lease_end_date": rec.get("lease_end_date"),
                                 "lease_term_months": rec.get("lease_term_months"),
@@ -1215,17 +1288,26 @@ class MutationService:
                             for r in normalized
                         )
 
-                        # ALWAYS pre-load existing data for merge when updating existing units
-                        unit_numbers_to_load = [r["unit_number"] for r in normalized]
+                        # ALWAYS pre-load existing data for merge when updating existing units.
+                        # Load ALL units for the project so we can fuzzy-match by
+                        # canonical unit number (strips prefixes like "Unit ", "Apt #", etc.)
                         cursor.execute("""
                             SELECT unit_number, unit_type, bedrooms, bathrooms,
-                                   square_feet, current_rent, market_rent, occupancy_status
+                                   square_feet, current_rent, market_rent, occupancy_status,
+                                   parking_rent, pet_rent, past_due_amount, deposit_amount,
+                                   tenant_name, building_name
                             FROM landscape.tbl_multifamily_unit
-                            WHERE project_id = %s AND unit_number = ANY(%s::text[])
-                        """, [project_id, unit_numbers_to_load])
+                            WHERE project_id = %s
+                        """, [project_id])
+                        # existing_map keyed by CANONICAL unit number for fuzzy matching
                         existing_map = {}
+                        # Maps canonical → actual DB unit_number (for fixing incoming records)
+                        _canonical_to_db = {}
                         for row in cursor.fetchall():
-                            existing_map[row[0]] = {
+                            db_unit_number = row[0]
+                            canonical = _normalize_unit_number(db_unit_number)
+                            _canonical_to_db[canonical] = db_unit_number
+                            existing_map[canonical] = {
                                 "unit_type": row[1] or "",
                                 "bedrooms": float(row[2]) if row[2] else 0,
                                 "bathrooms": float(row[3]) if row[3] else 1,
@@ -1233,12 +1315,36 @@ class MutationService:
                                 "current_rent": float(row[5]) if row[5] else 0,
                                 "market_rent": float(row[6]) if row[6] else 0,
                                 "occupancy_status": row[7] or "occupied",
+                                "parking_rent": float(row[8]) if row[8] else None,
+                                "pet_rent": float(row[9]) if row[9] else None,
+                                "past_due_amount": float(row[10]) if row[10] else None,
+                                "deposit_amount": float(row[11]) if row[11] else None,
+                                "tenant_name": row[12],
+                                "building_name": row[13],
                             }
+
+                        # Resolve each incoming record's unit_number to the actual DB value
+                        # via canonical matching.  This fixes AI-generated prefixes like
+                        # "Unit 101-A" → "101-A" and case mismatches like "101-a" → "101-A".
+                        _fuzzy_fixed = 0
+                        for rec in normalized:
+                            canonical = rec["_unit_number_canonical"]
+                            db_name = _canonical_to_db.get(canonical)
+                            if db_name and db_name != rec["unit_number"]:
+                                logger.info(
+                                    f"[Mutation] Fuzzy unit match: '{rec['unit_number']}' → '{db_name}'"
+                                )
+                                rec["unit_number"] = db_name
+                                _fuzzy_fixed += 1
+
+                        if _fuzzy_fixed:
+                            logger.info(f"[Mutation] Fuzzy-fixed {_fuzzy_fixed} unit number(s)")
 
                         # Merge: for each record, preserve existing values for unspecified fields
                         # AND for fields where the new value is a suspicious default (0, 1)
                         for rec in normalized:
-                            existing = existing_map.get(rec["unit_number"])
+                            canonical = rec["_unit_number_canonical"]
+                            existing = existing_map.get(canonical)
                             if existing:
                                 for field in _UNIT_DATA_FIELDS:
                                     if field not in rec["_provided_fields"]:
@@ -1281,17 +1387,24 @@ class MutationService:
                         # Also trigger update-only if >50% of units already exist (original heuristic)
                         is_majority_existing = existing_count > total_in_request * 0.5
 
+                        not_found_units = []
                         if is_narrow_update or is_majority_existing:
-                            new_units = [r for r in normalized if r["unit_number"] not in existing_unit_numbers]
+                            new_units = [r for r in normalized if r["_unit_number_canonical"] not in existing_unit_numbers]
                             if new_units:
-                                skipped_numbers = [r["unit_number"] for r in new_units]
+                                not_found_units = [r["unit_number"] for r in new_units]
                                 reason = "narrow field update" if is_narrow_update else "majority exist"
-                                logger.warning(f"[Mutation] UPDATE-ONLY mode ({reason}): skipping {len(new_units)} non-existent units: {skipped_numbers[:10]}")
-                                normalized = [r for r in normalized if r["unit_number"] in existing_unit_numbers]
+                                logger.warning(f"[Mutation] UPDATE-ONLY mode ({reason}): skipping {len(new_units)} non-existent units: {not_found_units[:10]}")
+                                normalized = [r for r in normalized if r["_unit_number_canonical"] in existing_unit_numbers]
 
                         if not normalized:
                             logger.warning(f"[Mutation] No valid units to upsert after filtering")
-                            return {"success": True, "created": 0, "updated": 0, "results": [], "message": "No matching units found to update"}
+                            return {
+                                "success": False,
+                                "created": 0, "updated": 0, "matched": 0,
+                                "not_found": not_found_units,
+                                "results": [],
+                                "error": f"None of the specified unit numbers were found in this project: {not_found_units}",
+                            }
 
                         # Phase 2: Batch upsert all units in one query using UNNEST
                         unit_numbers = [r["unit_number"] for r in normalized]
@@ -1302,11 +1415,22 @@ class MutationService:
                         current_rent_list = [r["current_rent"] for r in normalized]
                         market_rent_list = [r["market_rent"] for r in normalized]
                         status_list = [r["occupancy_status"] for r in normalized]
+                        parking_rent_list = [r["parking_rent"] for r in normalized]
+                        pet_rent_list = [r["pet_rent"] for r in normalized]
+                        past_due_list = [r["past_due_amount"] for r in normalized]
+                        deposit_list = [r["deposit_amount"] for r in normalized]
+                        tenant_name_list = [r["tenant_name"] for r in normalized]
+                        building_name_list = [r["building_name"] for r in normalized]
+
+                        from django.db import connection as _diag_conn
 
                         cursor.execute("""
                             INSERT INTO landscape.tbl_multifamily_unit
                             (project_id, unit_number, unit_type, bedrooms, bathrooms, square_feet,
-                             current_rent, market_rent, occupancy_status, created_at, updated_at)
+                             current_rent, market_rent, occupancy_status,
+                             parking_rent, pet_rent, past_due_amount, deposit_amount,
+                             tenant_name, building_name,
+                             created_at, updated_at)
                             SELECT
                                 %s,
                                 unnest(%s::text[]),
@@ -1316,6 +1440,12 @@ class MutationService:
                                 unnest(%s::numeric[]),
                                 unnest(%s::numeric[]),
                                 unnest(%s::numeric[]),
+                                unnest(%s::text[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::numeric[]),
+                                unnest(%s::text[]),
                                 unnest(%s::text[]),
                                 NOW(), NOW()
                             ON CONFLICT (project_id, unit_number)
@@ -1327,6 +1457,12 @@ class MutationService:
                                 current_rent = EXCLUDED.current_rent,
                                 market_rent = EXCLUDED.market_rent,
                                 occupancy_status = EXCLUDED.occupancy_status,
+                                parking_rent = COALESCE(EXCLUDED.parking_rent, landscape.tbl_multifamily_unit.parking_rent),
+                                pet_rent = COALESCE(EXCLUDED.pet_rent, landscape.tbl_multifamily_unit.pet_rent),
+                                past_due_amount = COALESCE(EXCLUDED.past_due_amount, landscape.tbl_multifamily_unit.past_due_amount),
+                                deposit_amount = COALESCE(EXCLUDED.deposit_amount, landscape.tbl_multifamily_unit.deposit_amount),
+                                tenant_name = COALESCE(EXCLUDED.tenant_name, landscape.tbl_multifamily_unit.tenant_name),
+                                building_name = COALESCE(EXCLUDED.building_name, landscape.tbl_multifamily_unit.building_name),
                                 updated_at = NOW()
                             RETURNING unit_id, unit_number, (xmax = 0) as is_insert
                         """, [
@@ -1339,9 +1475,16 @@ class MutationService:
                             current_rent_list,
                             market_rent_list,
                             status_list,
+                            parking_rent_list,
+                            pet_rent_list,
+                            past_due_list,
+                            deposit_list,
+                            tenant_name_list,
+                            building_name_list,
                         ])
 
                         unit_rows = cursor.fetchall()
+
                         unit_id_map = {}  # unit_number -> unit_id
                         for row in unit_rows:
                             unit_id, unit_number, is_insert = row[0], row[1], row[2]
@@ -1354,6 +1497,12 @@ class MutationService:
 
                         logger.info(f"[Mutation] Units upserted: {created_count} created, {updated_count} updated")
 
+                        if unit_numbers:
+                            cursor.execute("""
+                                SELECT unit_number, market_rent, current_rent
+                                FROM landscape.tbl_multifamily_unit
+                                WHERE project_id = %s AND unit_number = ANY(%s::text[])
+                            """, [project_id, unit_numbers])
                         # Phase 3: Batch lease upsert
                         # Get all existing leases for these units in one query
                         all_unit_ids = list(unit_id_map.values())
@@ -1501,12 +1650,27 @@ class MutationService:
                         "success": True,
                         "created": created_count,
                         "updated": updated_count,
+                        "matched": created_count + updated_count,
                         "total": len(records),
                         "results": results,
                     }
                     if table_name == "tbl_multifamily_unit":
                         response["leases_created"] = len(records)  # One lease per unit
                         response["floorplan_types_created"] = len(unit_type_stats)
+                        # Include not_found units so the AI can report which ones failed
+                        if not_found_units:
+                            response["not_found"] = not_found_units
+                            response["message"] = (
+                                f"Updated {updated_count} units. "
+                                f"{len(not_found_units)} unit number(s) not found in this project: "
+                                f"{not_found_units}"
+                            )
+                        # Warn if units matched but nothing was actually updated
+                        if created_count + updated_count == 0:
+                            response["warning"] = (
+                                "Units were found but no fields were actually updated. "
+                                "Check that field names match allowed fields."
+                            )
                     return response
 
                 elif mutation_type == "unit_delete" and isinstance(proposed_value, dict):

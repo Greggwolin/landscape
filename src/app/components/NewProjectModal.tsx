@@ -17,6 +17,7 @@ import { generateProjectName } from './new-project/utils'
 import { CButton } from '@coreui/react'
 import { X } from 'lucide-react'
 import { useTheme } from './CoreUIThemeProvider'
+import { useProjectCreation } from '@/hooks/useProjectCreation'
 import {
   deriveLegacyAnalysisType,
   type AnalysisPerspective,
@@ -135,6 +136,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   const { refreshProjects, selectProject } = useProjectContext()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { startCreation } = useProjectCreation()
 
   // Debug logging
   console.log('[NewProjectModal] Rendered with:', {
@@ -795,82 +797,29 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
       }
     }
 
-    console.log(`[handleCreationSuccess] Total files to upload: ${filesToUpload.length}`)
-    console.log(`[handleCreationSuccess] File names:`, filesToUpload.map(f => f.name))
+    const projectName = formData.project_name || `Project ${projectId}`
 
-    // Upload all documents to DMS with deep extraction
-    // Use Promise.allSettled to start all uploads and wait for them to complete
-    if (filesToUpload.length > 0) {
-      const uploadPromises = filesToUpload.map(async (doc) => {
-        const dmsFormData = new FormData()
-        dmsFormData.append('file', doc)
-        dmsFormData.append('project_id', projectId.toString())
-
-        // Detect document type from filename
-        // Map to DMS folder names from Commercial / Multifam template:
-        // {Offering, Property Data, Market Data, Diligence, Agreements, Leases, Title & Survey, Operations, Corresponsdence, Accounting, Misc}
-        const nameLower = doc.name.toLowerCase()
-        let docType = 'Misc'
-        if (nameLower.includes('rent') || nameLower.includes('roll')) {
-          docType = 'Property Data'  // Rent rolls go to Property Data folder
-        } else if (nameLower.includes('t-12') || nameLower.includes('t12') || nameLower.includes('operating')) {
-          docType = 'Operations'  // T-12 / Operating statements go to Operations folder
-        } else if (nameLower.includes('om') || nameLower.includes('offering') || nameLower.includes('memorandum')) {
-          docType = 'Offering'  // OMs go to Offering folder
-        } else if (nameLower.includes('lease')) {
-          docType = 'Leases'
-        } else if (nameLower.includes('survey') || nameLower.includes('title')) {
-          docType = 'Title & Survey'
-        } else if (nameLower.includes('market') || nameLower.includes('comp')) {
-          docType = 'Market Data'
-        } else if (nameLower.includes('agreement') || nameLower.includes('contract') || nameLower.includes('psa')) {
-          docType = 'Agreements'
-        }
-
-        dmsFormData.append('doc_type', docType)
-        dmsFormData.append('run_full_extraction', 'true')
-
-        // Pass cached extraction results for persistence in doc_extracted_facts
-        const cachedResults = extractionResultsCache.current[doc.name]
-        if (cachedResults) {
-          dmsFormData.append('extraction_results', JSON.stringify(cachedResults))
-        }
-
-        console.log(`[handleCreationSuccess] Starting upload: ${doc.name} as ${docType}`)
-
-        const response = await fetch('/api/dms/upload', {
-          method: 'POST',
-          body: dmsFormData
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`[handleCreationSuccess] Upload failed for ${doc.name}:`, response.status, errorText)
-          throw new Error(`Upload failed: ${response.status}`)
-        }
-
-        const result = await response.json()
-        console.log(`[handleCreationSuccess] Upload success for ${doc.name}:`, result)
-        return { file: doc.name, result }
-      })
-
-      // Wait for all uploads to complete (or fail)
-      const results = await Promise.allSettled(uploadPromises)
-      const succeeded = results.filter(r => r.status === 'fulfilled').length
-      const failed = results.filter(r => r.status === 'rejected').length
-      console.log(`[handleCreationSuccess] Upload results: ${succeeded} succeeded, ${failed} failed`)
-    }
-
-    // Fire-and-forget: refresh the SWR cache in the background.
-    // Don't await — the project page has its own fallback fetch if the
-    // project isn't in cache yet when we navigate.
-    refreshProjects()
-    selectProject(projectId)
-
+    // Close immediately — hand off document uploads to the background hook.
+    // The banner in the nav bar will show progress.
     resetFormState()
     setPendingDocuments([])
-    extractionResultsCache.current = {}
     onClose()
+
+    // If there are files to upload, delegate to background hook (banner shows progress)
+    if (filesToUpload.length > 0) {
+      startCreation({
+        projectId,
+        projectName,
+        files: filesToUpload,
+        extractionResultsCache: { ...extractionResultsCache.current },
+      })
+    } else {
+      // No files — project is immediately ready
+      refreshProjects()
+    }
+
+    extractionResultsCache.current = {}
+    selectProject(projectId)
     router.push(`/projects/${projectId}`)
   }
 

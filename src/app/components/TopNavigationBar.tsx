@@ -12,6 +12,7 @@ import UserMenuDropdown from './navigation/UserMenuDropdown';
 import CIcon from '@coreui/icons-react';
 import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
 import { useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
+import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { HelpIcon } from '@/components/icons/HelpIcon';
 
 /**
@@ -38,7 +39,9 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
-  const { isOpen: isHelpOpen, toggleHelp } = useHelpLandscaper();
+  const { isOpen: isHelpOpen, toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
+  const { isThinking: isProjectLandscaperThinking } = useLandscaperThinking();
+  const isLandscaperThinking = isProjectLandscaperThinking || isHelpLoading;
   const [showBugHint, setShowBugHint] = React.useState(false);
   const logoSrc = '/logo-invert.png';
 
@@ -175,7 +178,7 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               aria-label="Help"
               title="Help"
             >
-              <HelpIcon aria-hidden="true" style={{ width: '33px', height: '33px' }} />
+              <HelpIcon aria-hidden="true" style={{ width: '33px', height: '33px' }} isThinking={isLandscaperThinking} />
             </button>
 
             {/* Settings Button */}

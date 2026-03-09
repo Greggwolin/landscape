@@ -54,6 +54,7 @@ export interface PostRenoInputs {
 export interface LineItemRow {
   line_item_key: string;
   label: string;
+  tooltip?: string;
   category_id?: number;
   parent_key?: string;
   level: number; // 0=parent, 1=child

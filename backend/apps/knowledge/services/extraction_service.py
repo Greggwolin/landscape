@@ -153,10 +153,68 @@ def _get_anthropic_client() -> Anthropic:
 # Conflict Detection Helpers
 # =============================================================================
 
-def normalize_value_for_comparison(value: Any) -> str:
+def _normalize_address(text: str) -> str:
+    """
+    Expand common address abbreviations and normalize for comparison.
+    '21501 S. Vermont Ave' → '21501 south vermont avenue'
+    """
+    import re
+    # Common abbreviation → full form mappings
+    ABBREVS = {
+        r'\bst\.?\b': 'street',
+        r'\bave\.?\b': 'avenue',
+        r'\bblvd\.?\b': 'boulevard',
+        r'\bdr\.?\b': 'drive',
+        r'\bln\.?\b': 'lane',
+        r'\brd\.?\b': 'road',
+        r'\bct\.?\b': 'court',
+        r'\bpl\.?\b': 'place',
+        r'\bcir\.?\b': 'circle',
+        r'\bpkwy\.?\b': 'parkway',
+        r'\bhwy\.?\b': 'highway',
+        r'\bter\.?\b': 'terrace',
+        r'\bway\.?\b': 'way',
+        r'\bn\.?\b': 'north',
+        r'\bs\.?\b': 'south',
+        r'\be\.?\b': 'east',
+        r'\bw\.?\b': 'west',
+        r'\bne\.?\b': 'northeast',
+        r'\bnw\.?\b': 'northwest',
+        r'\bse\.?\b': 'southeast',
+        r'\bsw\.?\b': 'southwest',
+        r'\bapt\.?\b': 'apartment',
+        r'\bste\.?\b': 'suite',
+        r'\bbldg\.?\b': 'building',
+        r'\bfl\.?\b': 'floor',
+    }
+    result = text.lower().strip()
+    # Remove commas, periods not part of abbreviations handled above
+    result = result.replace(',', ' ')
+    for pattern, replacement in ABBREVS.items():
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    # Collapse multiple spaces
+    result = re.sub(r'\s+', ' ', result).strip()
+    # Remove remaining periods
+    result = result.replace('.', '')
+    return result
+
+
+# Field keys that represent address/location fields (case-insensitive prefix match)
+ADDRESS_FIELD_KEYS = {
+    'property_address', 'address', 'street_address', 'site_address',
+    'mailing_address', 'physical_address', 'project_address',
+    'city', 'state', 'zip', 'zip_code', 'county',
+}
+
+
+def normalize_value_for_comparison(value: Any, field_key: str = '') -> str:
     """
     Normalize value for comparison to detect conflicts.
-    Handles numeric precision, string casing, whitespace.
+    Handles numeric precision, string casing, whitespace, and address abbreviations.
+
+    Args:
+        value: The value to normalize
+        field_key: The field key (used for context-aware normalization like addresses)
     """
     if value is None:
         return ''
@@ -183,6 +241,11 @@ def normalize_value_for_comparison(value: Any) -> str:
         return f"{num:.2f}"
     except (ValueError, TypeError):
         pass
+
+    # Address-aware normalization: expand abbreviations for address fields
+    fk_lower = field_key.lower() if field_key else ''
+    if fk_lower in ADDRESS_FIELD_KEYS or 'address' in fk_lower:
+        return _normalize_address(str_val)
 
     # Normalize strings - lowercase and strip whitespace
     return str_val.lower().strip()
@@ -499,9 +562,9 @@ def check_for_conflict(
     if is_empty_value(new_value):
         return None
 
-    # Normalize both values for comparison
-    norm_existing = normalize_value_for_comparison(existing['value'])
-    norm_new = normalize_value_for_comparison(new_value)
+    # Normalize both values for comparison (pass field_key for address-aware normalization)
+    norm_existing = normalize_value_for_comparison(existing['value'], field_key=field_key)
+    norm_new = normalize_value_for_comparison(new_value, field_key=field_key)
 
     if norm_existing == norm_new:
         # Same value - no conflict
@@ -534,17 +597,24 @@ def get_doc_name(doc_id: int) -> Optional[str]:
 # Extraction type configurations
 EXTRACTION_CONFIGS = {
     'unit_mix': {
-        'target_table': 'tbl_mf_unit',
-        'prompt_template': '''Extract unit mix data from the document. For each unit type, provide:
-- unit_type: The unit type name (e.g., "1BR/1BA", "2BR/2BA", "Studio")
+        'target_table': 'tbl_multifamily_unit_type',
+        'prompt_template': '''Extract the UNIT MIX SUMMARY from this document. This is the table that shows
+each floor plan / unit type with a count of how many units of that type exist.
+
+Look for summary tables with columns like: Unit Type, # Units, Avg SF, Market Rent.
+Do NOT extract individual unit listings (rent rolls) — only the aggregated unit type summary.
+
+For each unit type row, extract:
+- unit_type_name: The unit type designation (e.g., "1BR/1BA", "2BR/2BA", "Studio", "1 Bed / 1 Bath")
 - bedrooms: Number of bedrooms (integer)
 - bathrooms: Number of bathrooms (decimal, e.g., 1.0, 1.5, 2.0)
-- sf_avg: Average square footage (integer)
+- avg_square_feet: Average square footage for this type (integer)
 - unit_count: Number of units of this type (integer)
-- rent_market: Market rent per unit (decimal)
+- market_rent: Market rent per unit per month (decimal) — ONLY if explicitly stated in the document as "market rent". Do NOT infer or calculate this from current rent or any other column.
 
-Return as JSON array of objects. Only include data you find in the documents.''',
-        'required_fields': ['unit_type', 'bedrooms', 'sf_avg', 'unit_count'],
+Return as JSON array of objects. Only include data you find in the document. Omit any field not explicitly present.
+Example: [{"unit_type_name": "1BR/1BA", "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "unit_count": 5}]''',
+        'required_fields': ['unit_type_name', 'bedrooms', 'unit_count'],
     },
     'rent_roll': {
         'target_table': 'tbl_mf_unit',
@@ -1151,7 +1221,9 @@ DOCUMENT CONTENT:
     ) -> bool:
         """Apply a single extraction to its target table."""
         if extraction_type == 'unit_mix':
-            return self._apply_unit_mix(cursor, value)
+            # unit_mix is handled via field registry + ExtractionWriter path
+            logger.warning("Legacy _apply_unit_mix called — use field registry path instead")
+            return False
         elif extraction_type == 'rent_roll':
             return self._apply_rent_roll(cursor, value)
         elif extraction_type == 'opex':
@@ -1162,35 +1234,6 @@ DOCUMENT CONTENT:
             return self._apply_acquisition(cursor, value)
 
         return False
-
-    def _apply_unit_mix(self, cursor, value: Dict) -> bool:
-        """Insert unit mix data into tbl_mf_unit."""
-        cursor.execute("""
-            INSERT INTO landscape.tbl_mf_unit (
-                project_id,
-                unit_type,
-                bedrooms,
-                bathrooms,
-                sf_avg,
-                unit_count,
-                rent_market
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (project_id, unit_type) DO UPDATE SET
-                bedrooms = EXCLUDED.bedrooms,
-                bathrooms = EXCLUDED.bathrooms,
-                sf_avg = EXCLUDED.sf_avg,
-                unit_count = EXCLUDED.unit_count,
-                rent_market = EXCLUDED.rent_market
-        """, [
-            self.project_id,
-            value.get('unit_type'),
-            value.get('bedrooms'),
-            value.get('bathrooms'),
-            value.get('sf_avg'),
-            value.get('unit_count'),
-            value.get('rent_market'),
-        ])
-        return True
 
     def _apply_rent_roll(self, cursor, value: Dict) -> bool:
         """Insert rent roll data."""
@@ -1652,15 +1695,16 @@ Fields: {', '.join(scope_fields['unit_type'])}
 
 Extract as array - one entry per unit type found in unit mix or rent roll summaries:
 {{
-  "market_rent": {{
+  "unit_count": {{
     "value": [
-      {{"unit_type_name": "1BR/1BA", "value": 2400}},
-      {{"unit_type_name": "2BR/2BA", "value": 3150}}
+      {{"unit_type_name": "1BR/1BA", "unit_count": 5, "bedrooms": 1, "avg_square_feet": 650}},
+      {{"unit_type_name": "2BR/2BA", "unit_count": 21, "bedrooms": 2, "avg_square_feet": 950}}
     ],
     "confidence": "high",
     "source_quote": "Unit Mix Summary"
   }}
 }}
+IMPORTANT: Do NOT include market_rent unless the document has a separate column explicitly labeled "Market Rent", "Asking Rent", or "Stabilized Rent" distinct from current/in-place rent.
 """
 
         if 'unit' in scope_fields:
@@ -1672,14 +1716,16 @@ Extract ALL units from rent roll as array:
 {{
   "unit_number": {{
     "value": [
-      {{"unit_number": "101", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "market_rent": 1650, "occupancy_status": "Occupied"}},
-      {{"unit_number": "102", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150, "market_rent": 2250, "occupancy_status": "Vacant"}}
+      {{"unit_number": "101", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "occupancy_status": "Occupied"}},
+      {{"unit_number": "102", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150, "occupancy_status": "Vacant"}}
     ],
     "confidence": "high",
     "source_quote": "Rent Roll, pages 30-34"
   }}
 }}
-IMPORTANT: Extract ALL units in the rent roll, not just a sample.
+IMPORTANT:
+- Extract ALL units in the rent roll, not just a sample.
+- Do NOT include market_rent unless the document has a separate column explicitly labeled "Market Rent", "Asking Rent", or "Stabilized Rent". If there is only one rent column, map it to current_rent and omit market_rent entirely.
 """
 
         if 'sales_comp' in scope_fields:
@@ -2306,6 +2352,30 @@ class BatchedExtractionService:
                 'batches_run': 0,
             }
 
+        # Backfill core_doc_text if missing — the rent-roll mapper and other
+        # downstream consumers read from this table, so ensure it's populated
+        # whenever the batched extraction pipeline has successfully loaded text.
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM landscape.core_doc_text WHERE doc_id = %s",
+                    [doc_id],
+                )
+                if not cursor.fetchone():
+                    word_count = len(doc_content.split())
+                    cursor.execute("""
+                        INSERT INTO landscape.core_doc_text
+                            (doc_id, extracted_text, word_count, extraction_method)
+                        VALUES (%s, %s, %s, 'batched_extraction_backfill')
+                    """, [doc_id, doc_content, word_count])
+                    logger.info(
+                        f"Backfilled core_doc_text for doc {doc_id} "
+                        f"({word_count} words)"
+                    )
+        except Exception as e:
+            # Non-fatal — extraction can proceed without this
+            logger.warning(f"core_doc_text backfill failed for doc {doc_id}: {e}")
+
         # Get document info for staging
         doc_info = self._get_document_info(doc_id)
         if not doc_info:
@@ -2405,7 +2475,14 @@ class BatchedExtractionService:
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=8000,
-                system="You are a real estate document analyst. Extract data precisely and completely. Return ONLY valid JSON.",
+                system=(
+                    "You are a real estate document analyst. "
+                    "Extract data precisely and completely from the provided document text. "
+                    "Do NOT infer, calculate, fabricate, or estimate any values — only extract data that is explicitly and literally present in the document. "
+                    "If a field value is not explicitly stated in the document text, omit it entirely. "
+                    "Never derive market rent from current rent, or vice versa. "
+                    "Return ONLY valid JSON."
+                ),
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -2460,6 +2537,29 @@ class BatchedExtractionService:
                 'fields': len(fields),
             }
 
+    # Inline hints for fields that Claude commonly misses or confuses
+    FIELD_HINTS = {
+        'zip_code': 'IMPORTANT: 5-digit US ZIP code only (e.g. 90501). NOT the street number.',
+        'county': 'County name (e.g. "Los Angeles"). Check headers, legal description, or assessor info.',
+        'state': 'Two-letter abbreviation (e.g. CA, AZ, TX). NOT the full state name.',
+        'cap_rate_current': 'Current/in-place cap rate. Often shown as "X.XX% Cap Rate" in pricing summary.',
+        'cap_rate_proforma': 'Proforma/stabilized cap rate. Often in financial projections section.',
+        'current_gpr': 'Current annual gross potential rent (all units at current rents x 12).',
+        'current_noi': 'Current net operating income. Usually in financial summary or offering highlights.',
+        'current_opex': 'Current total annual operating expenses. Usually in financial summary.',
+        'market': 'MSA or market area name (e.g. "Los Angeles-Long Beach-Anaheim, CA").',
+        'construction_type': 'Construction type (e.g. Wood Frame, Stucco, Concrete, Steel Frame).',
+        'parking_type': 'Primary parking type (e.g. Surface, Covered, Garage, Subterranean, Carport, Tuck-under).',
+        'rentable_sf': 'Net rentable SF (NRSF). If document shows conflicting values on different pages, extract the value and note the conflict in source_quote.',
+        'lot_size_sf': 'Land area in square feet. Look for "Site Size", "Lot Size", or "Land Area".',
+        'avg_unit_sf': 'Average unit square footage. Often in property summary or unit mix.',
+        'total_units': 'Total residential unit count. Check property summary and unit mix table.',
+        'year_built': 'Original construction year. Often in property details or physical description.',
+        'stories': 'Number of stories/floors. Look for "Stories" or number of floors in building description.',
+        'apn_primary': 'Assessor Parcel Number. Look for APN in property details, legal description, or tax info.',
+        'opex_management_fee': 'DOLLAR AMOUNT (not percentage). If doc shows "4.0% $50,919", extract 50919. Never return a percentage like 0.04 or 4.0.',
+    }
+
     def _build_batch_prompt(
         self,
         doc_content: str,
@@ -2477,17 +2577,19 @@ class BatchedExtractionService:
             label = f.label
             data_type = f.field_type
             scope = f.scope
+            hint = self.FIELD_HINTS.get(field_key, '')
+            hint_suffix = f' — {hint}' if hint else ''
 
-            field_list.append(f"- **{field_key}** ({data_type}, scope={scope}): {label}")
+            field_list.append(f"- **{field_key}** ({data_type}, scope={scope}): {label}{hint_suffix}")
 
         field_block = "\n".join(field_list)
 
-        # Check if batch includes array scopes
-        array_scopes = {'unit', 'unit_type', 'sales_comp', 'rent_comp'}
-        has_array = any(s in array_scopes for s in scopes)
+        # Check if batch includes scopes that need special extraction instructions
+        special_scopes = {'unit', 'unit_type', 'sales_comp', 'rent_comp', 'opex', 'income'}
+        has_special = any(s in special_scopes for s in scopes)
 
         array_instructions = ""
-        if has_array:
+        if has_special:
             array_instructions = self._get_array_instructions(scopes, fields)
 
         # Truncate content if needed
@@ -2563,7 +2665,7 @@ Extract ALL units from rent roll tables. Return array under "unit_number":
 {{
   "unit_number": {{
     "value": [
-      {{"unit_number": "100", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "market_rent": 1650, "occupancy_status": "Occupied"}},
+      {{"unit_number": "100", "unit_type": "1BR/1BA", "bedrooms": 1, "current_rent": 1595, "occupancy_status": "Occupied"}},
       {{"unit_number": "101", "unit_type": "2BR/2BA", "bedrooms": 2, "current_rent": 2150}}
     ],
     "confidence": "high",
@@ -2571,26 +2673,46 @@ Extract ALL units from rent roll tables. Return array under "unit_number":
   }}
 }}
 ```
-IMPORTANT: Extract ALL units, not just a sample.""")
+IMPORTANT:
+- Extract ALL units, not just a sample.
+- **current_rent**: The ACTUAL in-place monthly rent the tenant is paying. Extract from columns labeled "Actual Rent", "Current Rent", "In-Place Rent", "Monthly Rent", or "Rent Amount". Do NOT use "Market Rent" or "Stabilized Rent" columns for this field.
+- **market_rent**: ONLY include this field if the document has a separate column explicitly labeled "Market Rent", "Asking Rent", "Stabilized Rent", or "Proforma Rent". Do NOT infer or compute market rent from other columns. If there is only one rent column, map it to current_rent and omit market_rent entirely.""")
 
         if 'unit_type' in scopes:
             ut_field_keys = [f.field_key for f in fields if f.scope == 'unit_type'][:6]
             instructions.append(f"""
-### Unit Types (scope=unit_type)
+### Unit Types — Floor Plan Summary (scope=unit_type)
 Fields: {', '.join(ut_field_keys)}...
 
-Extract unit type summary as array under "market_rent":
+CRITICAL: These fields are ARRAY-SCOPED. Do NOT return them as individual scalar values.
+Find the UNIT MIX SUMMARY table (floor plan types with unit counts) and return ALL unit_type
+fields together as a SINGLE ARRAY under the key "unit_count".
+
+Each array element represents one floor plan / unit type with ALL its attributes bundled together.
+Do NOT return avg_square_feet, unit_count, total_units_by_type, bedrooms, etc. as separate top-level keys.
+
+Return format — one key "unit_count" containing an array:
 ```json
 {{
-  "market_rent": {{
+  "unit_count": {{
     "value": [
-      {{"unit_type_name": "1BR/1BA", "unit_count": 24, "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "value": 1650}},
-      {{"unit_type_name": "2BR/2BA", "unit_count": 48, "bedrooms": 2, "bathrooms": 2, "avg_square_feet": 950, "value": 2150}}
+      {{"unit_type_name": "1BR/1BA", "unit_count": 5, "bedrooms": 1, "bathrooms": 1, "avg_square_feet": 650, "current_rent_avg": 1550}},
+      {{"unit_type_name": "2BR/2BA", "unit_count": 21, "bedrooms": 2, "bathrooms": 2, "avg_square_feet": 950, "current_rent_avg": 1950}}
     ],
     "confidence": "high",
-    "source_quote": "Unit Mix Summary"
+    "source_quote": "Unit Mix Summary table"
   }}
 }}
+```
+IMPORTANT:
+- **market_rent**: Stabilized / proforma / asking rent per unit type. ONLY include if the document has a separate column or table explicitly showing market/asking/stabilized/proforma rents distinct from current/in-place rents. Do NOT infer market_rent from current rents. If the document shows only one rent figure, omit market_rent.
+- **current_rent_avg**: In-place / current average rent per unit type. Compute this as: (total monthly rent for this unit type) / (number of occupied units of this type). Do NOT copy the stabilized/market rent into this field. If the document only shows one rent column labeled "Market Rent" or "Stabilized Rent", leave current_rent_avg empty.
+- Include BOTH if the document clearly shows two separate rent columns (e.g., "Current" and "Market" or "In-Place" and "Proforma").
+- If the document does NOT contain a unit mix summary table, do NOT synthesize one from rent roll data — skip the unit_type scope entirely.
+
+WRONG (do NOT do this):
+```json
+{{"avg_square_feet": {{"value": 1028}}, "total_units_by_type": {{"value": 43}}}}
 ```""")
 
         if 'sales_comp' in scopes:
@@ -2632,6 +2754,81 @@ Extract ALL rent comps as array under "rent_comp_name":
   }}
 }}
 ```""")
+
+        if 'opex' in scopes:
+            instructions.append("""
+### Operating Expenses (scope=opex)
+
+Extract EACH operating expense as its own field_key entry.
+Each opex field maps to a specific expense category. Return each one found as a separate top-level key.
+
+Documents may use GL account codes (e.g. "6320: Insurance $45,000") or plain labels.
+Map them to the closest opex_* field_key.
+
+Common mappings:
+- Property Tax / Real Estate Tax / "Buyers New Taxes" → opex_real_estate_taxes
+- Insurance (any code like 6320) → opex_property_insurance
+- Repairs / Maintenance / Cleaning (6200) → opex_repairs_maintenance
+- Management Fee / Management Fees (6300) → opex_management_fee
+- Outside Services / Contract Services (6310) → opex_contract_services
+- Workers Comp (6324) → opex_workers_comp
+- Utilities (6400) → opex_utilities_electric (or split if broken out)
+- Payroll / Payroll Expenses (6560) → opex_payroll
+- Office Supplies (6800) → opex_office_supplies
+- Telephone / Other (6900) → opex_telephone
+- Miscellaneous (7100) → opex_miscellaneous
+- Legal (7200) → opex_professional_fees
+- Computer Software (7470) → opex_computer_software
+- Security Services → opex_security
+- Bank Charges (7500) → opex_bank_charges
+- Management Off-Site → opex_management_offsite
+
+Return format — each as a separate key with annual DOLLAR amount:
+```json
+{
+  "opex_real_estate_taxes": {"value": 177045, "confidence": "high", "source_quote": "Buyers New Taxes (1.221%) $177,045"},
+  "opex_property_insurance": {"value": 45000, "confidence": "high", "source_quote": "Insurance (6320) $45,000"},
+  "opex_repairs_maintenance": {"value": 70684, "confidence": "high", "source_quote": "Maint/Cleaning/Other (6200) $70,684"},
+  "opex_management_fee": {"value": 50919, "confidence": "high", "source_quote": "Management Fees (6300) $50,919"}
+}
+```
+
+CRITICAL RULES:
+- ALL values must be annual DOLLAR amounts (integers), NOT percentages.
+- **opex_management_fee**: Extract the DOLLAR amount, not the percentage. Documents often show "Management Fee 4.0% $50,919" — extract 50919, not 0.04 or 4.0. If only a percentage is shown, compute: percentage × EGI (or GPR if EGI unavailable). If you cannot compute the dollar amount, skip this field rather than returning a percentage.
+- If amounts shown are for a partial year (e.g. "Jan-Sep"), annualize them (multiply by 12/9).
+- If the document shows both actual partial-year and annualized amounts, prefer the annualized figure.
+- Extract ALL expense line items, not just the major ones.""")
+
+        if 'income' in scopes:
+            instructions.append("""
+### Other Income (scope=income)
+
+Extract each non-rent income source as its own field_key entry.
+Each income field maps to a specific income category.
+
+Common mappings:
+- Parking / Reserved Parking → income_parking
+- Laundry / Vending / WASH lease → income_laundry
+- Pet Fees / Pet Rent → income_pet_fees
+- Storage → income_storage
+- Utility Reimbursements / RUBS → income_utility_reimbursement
+- Late Fees → income_late_fees
+- Application Fees → income_application_fees
+- Cable / Telecom / Internet → income_cable_telecom
+- Commercial / Retail → income_commercial
+- Amenity Fees → income_amenity_fees
+
+Return format — each as a separate key:
+```json
+{
+  "income_parking": {"value": 2225, "confidence": "high", "source_quote": "Parking Income: $2,225/mo"},
+  "income_laundry": {"value": 350, "confidence": "high", "source_quote": "Laundry Income: $350/mo"}
+}
+```
+
+NOTE: Return monthly amounts if shown monthly, annual if shown annual.
+Include a note in source_quote indicating whether value is monthly or annual.""")
 
         return "\n".join(instructions)
 
@@ -2727,6 +2924,22 @@ Extract ALL rent comps as array under "rent_comp_name":
                 pass
             return None
 
+    @staticmethod
+    def _clean_extracted_value(value):
+        """Strip wrapping double-quotes from string values returned by the LLM.
+
+        The AI sometimes returns string values like '"CA"' or '"Torrance"' —
+        a Python string whose first and last characters are literal quote marks.
+        If we json.dumps() such a value the jsonb column ends up with escaped
+        inner quotes (e.g. "\\"CA\\"") and the UI shows quotes in the cell.
+
+        This strips the outermost pair of double-quotes from strings that have
+        them, leaving numeric strings and other types untouched.
+        """
+        if isinstance(value, str) and len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+            return value[1:-1]
+        return value
+
     def _stage_batch_extractions(
         self,
         doc_id: int,
@@ -2760,7 +2973,7 @@ Extract ALL rent comps as array under "rent_comp_name":
                     # Check if this is an array-scope field
                     for f in fields:
                         if f.scope in array_scopes and field_key in [
-                            'unit_number', 'market_rent', 'sales_comp_name', 'rent_comp_name'
+                            'unit_number', 'unit_count', 'market_rent', 'sales_comp_name', 'rent_comp_name'
                         ]:
                             field = f
                             break
@@ -2863,11 +3076,12 @@ Extract ALL rent comps as array under "rent_comp_name":
                     extraction_type = doc_info.get('doc_type', 'unknown')
 
                     # Check for conflict with existing accepted value
-                    json_value = json.dumps(value) if not isinstance(value, (str, int, float, bool)) else json.dumps(value)
+                    cleaned = self._clean_extracted_value(value)
+                    json_value = json.dumps(cleaned)
                     conflict = check_for_conflict(
                         project_id=self.project_id,
                         field_key=field_key,
-                        new_value=value,
+                        new_value=cleaned,
                         new_doc_id=doc_id,
                         new_confidence=conf_score,
                         scope_label=None,
@@ -2969,13 +3183,16 @@ RENT_ROLL_CONFIG = {
         'bathrooms',
         'square_feet',
         'current_rent',
-        'market_rent',
         'occupancy_status',
         'lease_start',
         'lease_end',
         'tenant_name',
         'move_in_date',
         'rent_effective_date',
+    ],
+    # Optional fields — only included if detected in document column headers
+    'optional_fields': [
+        'market_rent',
     ],
 }
 
@@ -3255,7 +3472,18 @@ CRITICAL: For tenant_name, extract the EXACT name from the source. NEVER use pla
     ) -> str:
         """Build prompt for extracting a specific chunk of units."""
 
-        fields = RENT_ROLL_CONFIG['fields_per_unit']
+        fields = list(RENT_ROLL_CONFIG['fields_per_unit'])
+
+        # Include optional fields only if their keywords appear in the document
+        doc_lower = doc_content[:5000].lower()  # Check header area only
+        optional_keywords = {
+            'market_rent': ['market rent', 'asking rent', 'mkt rent', 'pro forma rent', 'stabilized rent', 'proforma rent'],
+        }
+        for opt_field in RENT_ROLL_CONFIG.get('optional_fields', []):
+            keywords = optional_keywords.get(opt_field, [opt_field.replace('_', ' ')])
+            if any(kw in doc_lower for kw in keywords):
+                fields.append(opt_field)
+
         field_list = "\n".join([f"- {f}" for f in fields])
 
         # Truncate content if very long
@@ -3305,7 +3533,6 @@ Return a JSON array of unit objects:
     "bathrooms": 1,
     "square_feet": 650,
     "current_rent": 1595,
-    "market_rent": 1650,
     "occupancy_status": "Occupied",
     "lease_start": "2024-01-15",
     "lease_end": "2025-01-14",
@@ -3320,7 +3547,6 @@ Return a JSON array of unit objects:
     "bathrooms": 2,
     "square_feet": 950,
     "current_rent": 2150,
-    "market_rent": 2250,
     "occupancy_status": "Vacant"
   }}
 ]
@@ -3328,6 +3554,7 @@ Return a JSON array of unit objects:
 
 RULES:
 - Extract ONLY units in the requested range for this chunk
+- Extract ONLY fields listed in FIELDS TO EXTRACT above — do NOT add fields not listed
 - Numeric fields: numbers only (1595 not "$1,595")
 - Dates: ISO format "YYYY-MM-DD"
 - Include all available fields; omit if not found
@@ -3595,3 +3822,224 @@ def extract_rent_roll_chunked(
     """Convenience function for chunked rent roll extraction."""
     extractor = ChunkedRentRollExtractor(project_id, property_type)
     return extractor.extract_rent_roll_chunked(doc_id, user_id)
+
+
+# =============================================================================
+# MSA Lookup
+# =============================================================================
+
+# County → MSA mapping for common US metropolitan areas
+COUNTY_TO_MSA = {
+    # California
+    'los angeles': 'Los Angeles-Long Beach-Anaheim, CA',
+    'orange': 'Los Angeles-Long Beach-Anaheim, CA',
+    'san bernardino': 'Riverside-San Bernardino-Ontario, CA',
+    'riverside': 'Riverside-San Bernardino-Ontario, CA',
+    'san diego': 'San Diego-Chula Vista-Carlsbad, CA',
+    'san francisco': 'San Francisco-Oakland-Berkeley, CA',
+    'alameda': 'San Francisco-Oakland-Berkeley, CA',
+    'contra costa': 'San Francisco-Oakland-Berkeley, CA',
+    'san mateo': 'San Francisco-Oakland-Berkeley, CA',
+    'marin': 'San Francisco-Oakland-Berkeley, CA',
+    'santa clara': 'San Jose-Sunnyvale-Santa Clara, CA',
+    'sacramento': 'Sacramento-Roseville-Folsom, CA',
+    'placer': 'Sacramento-Roseville-Folsom, CA',
+    'el dorado': 'Sacramento-Roseville-Folsom, CA',
+    'fresno': 'Fresno, CA',
+    'kern': 'Bakersfield, CA',
+    'ventura': 'Oxnard-Thousand Oaks-Ventura, CA',
+    'santa barbara': 'Santa Maria-Santa Barbara, CA',
+    'san joaquin': 'Stockton, CA',
+    'stanislaus': 'Modesto, CA',
+    # Arizona
+    'maricopa': 'Phoenix-Mesa-Chandler, AZ',
+    'pinal': 'Phoenix-Mesa-Chandler, AZ',
+    'pima': 'Tucson, AZ',
+    # Texas
+    'harris': 'Houston-The Woodlands-Sugar Land, TX',
+    'fort bend': 'Houston-The Woodlands-Sugar Land, TX',
+    'montgomery': 'Houston-The Woodlands-Sugar Land, TX',
+    'dallas': 'Dallas-Fort Worth-Arlington, TX',
+    'tarrant': 'Dallas-Fort Worth-Arlington, TX',
+    'collin': 'Dallas-Fort Worth-Arlington, TX',
+    'denton': 'Dallas-Fort Worth-Arlington, TX',
+    'bexar': 'San Antonio-New Braunfels, TX',
+    'travis': 'Austin-Round Rock-Georgetown, TX',
+    'williamson': 'Austin-Round Rock-Georgetown, TX',
+    # Florida
+    'miami-dade': 'Miami-Fort Lauderdale-Pompano Beach, FL',
+    'broward': 'Miami-Fort Lauderdale-Pompano Beach, FL',
+    'palm beach': 'Miami-Fort Lauderdale-Pompano Beach, FL',
+    'hillsborough': 'Tampa-St. Petersburg-Clearwater, FL',
+    'pinellas': 'Tampa-St. Petersburg-Clearwater, FL',
+    'orange': 'Orlando-Kissimmee-Sanford, FL',
+    'duval': 'Jacksonville, FL',
+    # Georgia
+    'fulton': 'Atlanta-Sandy Springs-Alpharetta, GA',
+    'dekalb': 'Atlanta-Sandy Springs-Alpharetta, GA',
+    'cobb': 'Atlanta-Sandy Springs-Alpharetta, GA',
+    'gwinnett': 'Atlanta-Sandy Springs-Alpharetta, GA',
+    # Nevada
+    'clark': 'Las Vegas-Henderson-Paradise, NV',
+    # Colorado
+    'denver': 'Denver-Aurora-Lakewood, CO',
+    'arapahoe': 'Denver-Aurora-Lakewood, CO',
+    'adams': 'Denver-Aurora-Lakewood, CO',
+    'jefferson': 'Denver-Aurora-Lakewood, CO',
+    'douglas': 'Denver-Aurora-Lakewood, CO',
+    # Washington
+    'king': 'Seattle-Tacoma-Bellevue, WA',
+    'pierce': 'Seattle-Tacoma-Bellevue, WA',
+    'snohomish': 'Seattle-Tacoma-Bellevue, WA',
+    # Oregon
+    'multnomah': 'Portland-Vancouver-Hillsboro, OR-WA',
+    'washington': 'Portland-Vancouver-Hillsboro, OR-WA',
+    'clackamas': 'Portland-Vancouver-Hillsboro, OR-WA',
+    # Illinois
+    'cook': 'Chicago-Naperville-Elgin, IL-IN-WI',
+    'dupage': 'Chicago-Naperville-Elgin, IL-IN-WI',
+    'kane': 'Chicago-Naperville-Elgin, IL-IN-WI',
+    'lake': 'Chicago-Naperville-Elgin, IL-IN-WI',
+    'will': 'Chicago-Naperville-Elgin, IL-IN-WI',
+    # New York
+    'new york': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'kings': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'queens': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'bronx': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'richmond': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'westchester': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'nassau': 'New York-Newark-Jersey City, NY-NJ-PA',
+    'suffolk': 'New York-Newark-Jersey City, NY-NJ-PA',
+    # North Carolina
+    'mecklenburg': 'Charlotte-Concord-Gastonia, NC-SC',
+    'wake': 'Raleigh-Cary, NC',
+    'durham': 'Durham-Chapel Hill, NC',
+    # Tennessee
+    'davidson': 'Nashville-Davidson--Murfreesboro--Franklin, TN',
+    'shelby': 'Memphis, TN-MS-AR',
+    # Massachusetts
+    'suffolk': 'Boston-Cambridge-Newton, MA-NH',
+    'middlesex': 'Boston-Cambridge-Newton, MA-NH',
+    'norfolk': 'Boston-Cambridge-Newton, MA-NH',
+    # Minnesota
+    'hennepin': 'Minneapolis-St. Paul-Bloomington, MN-WI',
+    'ramsey': 'Minneapolis-St. Paul-Bloomington, MN-WI',
+    # Ohio
+    'franklin': 'Columbus, OH',
+    'cuyahoga': 'Cleveland-Elyria, OH',
+    'hamilton': 'Cincinnati, OH-KY-IN',
+    # Michigan
+    'wayne': 'Detroit-Warren-Dearborn, MI',
+    'oakland': 'Detroit-Warren-Dearborn, MI',
+    'macomb': 'Detroit-Warren-Dearborn, MI',
+    # Pennsylvania
+    'philadelphia': 'Philadelphia-Camden-Wilmington, PA-NJ-DE-MD',
+    'allegheny': 'Pittsburgh, PA',
+    # Maryland / DC
+    'prince georges': "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+    'montgomery': "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+    # Utah
+    'salt lake': 'Salt Lake City, UT',
+    'utah': 'Provo-Orem, UT',
+    # Indiana
+    'marion': 'Indianapolis-Carmel-Anderson, IN',
+    # Missouri
+    'st. louis': 'St. Louis, MO-IL',
+    'jackson': 'Kansas City, MO-KS',
+}
+
+# State-based disambiguation for county names that appear in multiple states
+# Key: (county_lower, state_upper) → MSA
+COUNTY_STATE_MSA = {
+    ('orange', 'CA'): 'Los Angeles-Long Beach-Anaheim, CA',
+    ('orange', 'FL'): 'Orlando-Kissimmee-Sanford, FL',
+    ('montgomery', 'TX'): 'Houston-The Woodlands-Sugar Land, TX',
+    ('montgomery', 'MD'): 'Washington-Arlington-Alexandria, DC-VA-MD-WV',
+    ('washington', 'OR'): 'Portland-Vancouver-Hillsboro, OR-WA',
+    ('suffolk', 'NY'): 'New York-Newark-Jersey City, NY-NJ-PA',
+    ('suffolk', 'MA'): 'Boston-Cambridge-Newton, MA-NH',
+    ('jefferson', 'CO'): 'Denver-Aurora-Lakewood, CO',
+    ('lake', 'IL'): 'Chicago-Naperville-Elgin, IL-IN-WI',
+    ('oakland', 'MI'): 'Detroit-Warren-Dearborn, MI',
+    ('norfolk', 'MA'): 'Boston-Cambridge-Newton, MA-NH',
+    ('jackson', 'MO'): 'Kansas City, MO-KS',
+    ('douglas', 'CO'): 'Denver-Aurora-Lakewood, CO',
+    ('marion', 'IN'): 'Indianapolis-Carmel-Anderson, IN',
+    ('franklin', 'OH'): 'Columbus, OH',
+    ('hamilton', 'OH'): 'Cincinnati, OH-KY-IN',
+    ('richmond', 'NY'): 'New York-Newark-Jersey City, NY-NJ-PA',
+}
+
+
+def lookup_msa(county: str, state: str = None) -> Optional[str]:
+    """
+    Look up MSA name from county (and optionally state).
+
+    Args:
+        county: County name (e.g. "Los Angeles", "Los Angeles County")
+        state: State abbreviation (e.g. "CA")
+
+    Returns:
+        MSA name or None if not found
+    """
+    if not county:
+        return None
+
+    # Normalize: strip "County" suffix, lowercase
+    county_clean = county.strip().lower()
+    for suffix in (' county', ' parish', ' borough'):
+        if county_clean.endswith(suffix):
+            county_clean = county_clean[:-len(suffix)].strip()
+
+    # Try state-specific lookup first (handles ambiguous county names)
+    if state:
+        state_upper = state.strip().upper()
+        result = COUNTY_STATE_MSA.get((county_clean, state_upper))
+        if result:
+            return result
+
+    # Fallback to county-only lookup
+    return COUNTY_TO_MSA.get(county_clean)
+
+
+def auto_populate_msa(project_id: int) -> Optional[str]:
+    """
+    Auto-populate MSA field on tbl_project from county + state.
+
+    Only sets MSA if:
+    1. County and/or state are populated
+    2. MSA (market) is currently empty
+    3. A match is found in the lookup table
+
+    Returns: MSA name if set, None otherwise
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT county, state, market
+            FROM landscape.tbl_project
+            WHERE project_id = %s
+        """, [project_id])
+        row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    county, state, current_market = row
+
+    # Don't overwrite existing MSA
+    if current_market and current_market.strip():
+        return None
+
+    msa = lookup_msa(county, state)
+    if not msa:
+        return None
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            UPDATE landscape.tbl_project
+            SET market = %s, updated_at = NOW()
+            WHERE project_id = %s
+        """, [msa, project_id])
+
+    logger.info(f"Auto-populated MSA for project {project_id}: {msa}")
+    return msa

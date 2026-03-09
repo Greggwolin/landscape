@@ -520,7 +520,7 @@ class Migration(migrations.Migration):
                 ("updated_at", models.DateTimeField(auto_now=True)),
             ],
             options={
-                "db_table": "tbl_rent_comparable",
+                "db_table": "tbl_rental_comparable",
                 "ordering": ["project", "distance_miles", "unit_type"],
                 "managed": False,
             },

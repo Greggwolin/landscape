@@ -1,0 +1,607 @@
+/* ============================================================
+   Land Use Picker — 3-column taxonomy palette
+   Uses CoreUI CSS variables only; no hardcoded hex.
+   ============================================================ */
+
+/* ─── Root container ───────────────────────────────── */
+.land-use-picker {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ─── Header ───────────────────────────────────────── */
+.land-use-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.land-use-picker-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--cui-body-color);
+}
+
+.land-use-picker-subtitle {
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+  margin-top: 2px;
+  display: block;
+}
+
+.land-use-edit-link {
+  font-size: 13px;
+  color: var(--cui-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.land-use-edit-link:hover {
+  text-decoration: underline;
+}
+
+/* ─── Banner ───────────────────────────────────────── */
+.land-use-banner {
+  padding: 10px 20px;
+  font-size: 13px;
+  background-color: var(--cui-tertiary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  color: var(--cui-secondary-color);
+}
+
+/* ─── Three-column layout ──────────────────────────── */
+.land-use-picker-columns {
+  display: flex;
+  min-height: 420px;
+  max-height: 600px;
+}
+
+/* ─── Generic column ───────────────────────────────── */
+.lup-col {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--cui-border-color);
+  overflow: hidden;
+}
+
+.lup-col:last-child {
+  border-right: none;
+}
+
+.lup-col-family { width: 220px; flex-shrink: 0; }
+.lup-col-type   { width: 300px; flex-shrink: 0; }
+.lup-col-detail { flex: 1; min-width: 0; }
+
+.lup-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background-color: var(--cui-tertiary-bg);
+}
+
+.lup-col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.lup-col-count {
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  background-color: var(--cui-body-bg);
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--cui-border-color);
+}
+
+.lup-col-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.lup-col-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+}
+
+.lup-col-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+}
+
+/* ─── Family Column Items ──────────────────────────── */
+.lup-family-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: var(--cui-body-color);
+  transition: all 0.15s;
+}
+
+.lup-family-item:hover {
+  background-color: var(--cui-tertiary-bg);
+  border-color: var(--cui-border-color);
+}
+
+.lup-family-item.active {
+  background-color: var(--cui-primary);
+  color: white;
+  border-color: var(--cui-primary);
+}
+
+.lup-family-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.lup-family-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lup-family-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+
+.lup-family-code {
+  font-size: 11px;
+  opacity: 0.7;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.lup-family-badge {
+  flex-shrink: 0;
+}
+
+.lup-badge-active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 600;
+  background-color: var(--cui-success);
+  color: white;
+}
+
+.lup-family-item.active .lup-badge-active {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.lup-badge-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  background-color: var(--cui-body-bg);
+  border: 1px solid var(--cui-border-color);
+}
+
+.lup-family-item.active .lup-badge-empty {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ─── Type Column Items ────────────────────────────── */
+.lup-type-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background-color: var(--cui-body-bg);
+}
+
+.lup-type-item:hover {
+  border-color: var(--cui-primary);
+  background-color: var(--cui-tertiary-bg);
+}
+
+.lup-type-item.selected {
+  border-color: var(--cui-primary);
+  background-color: var(--cui-primary-bg, rgba(49, 102, 255, 0.06));
+}
+
+.lup-type-item.active {
+  border-left: 3px solid var(--cui-success);
+}
+
+.lup-type-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lup-type-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lup-type-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--cui-body-color);
+}
+
+.lup-type-code-badge {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.lup-type-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.lup-type-products,
+.lup-type-parcels {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
+}
+
+.lup-type-parcels {
+  background-color: var(--cui-tertiary-bg);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* ─── Toggle Switch ────────────────────────────────── */
+.lup-toggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  background-color: var(--cui-border-color);
+  transition: background-color 0.2s;
+}
+
+.lup-toggle.on {
+  background-color: var(--cui-success);
+}
+
+.lup-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: white;
+  transition: transform 0.2s;
+  pointer-events: none;
+}
+
+.lup-toggle.on .lup-toggle-thumb {
+  transform: translateX(14px);
+}
+
+/* ─── Detail Column ────────────────────────────────── */
+.lup-detail-badge {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.lup-detail-section {
+  padding: 14px;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.lup-detail-section:last-child {
+  border-bottom: none;
+}
+
+.lup-detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lup-detail-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cui-secondary-color);
+  background-color: var(--cui-body-bg);
+  padding: 0 6px;
+  border-radius: 10px;
+  border: 1px solid var(--cui-border-color);
+}
+
+/* ─── Spec Grid ────────────────────────────────────── */
+.lup-spec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.lup-spec-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--cui-border-color);
+  font-size: 12px;
+}
+
+.lup-spec-row:nth-child(odd) {
+  background-color: var(--cui-tertiary-bg);
+}
+
+.lup-spec-label {
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+}
+
+.lup-spec-value {
+  color: var(--cui-body-color);
+  font-weight: 600;
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 11px;
+}
+
+.lup-spec-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+}
+
+/* ─── Product Chips ────────────────────────────────── */
+.lup-products-notice {
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--cui-warning-text, #92400e);
+  background-color: var(--cui-warning-bg, #fef3c7);
+  border-radius: 4px;
+}
+
+.lup-product-columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lup-width-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lup-width-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  text-align: center;
+  padding: 3px 8px;
+  background-color: var(--cui-tertiary-bg);
+  border: 1px solid rgb(200, 200, 200);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+.lup-product-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  background-color: var(--cui-body-bg);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 12px;
+  color: var(--cui-body-color);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.lup-product-chip:hover:not(:disabled) {
+  border-color: var(--cui-primary);
+  background-color: var(--cui-tertiary-bg);
+}
+
+.lup-product-chip.active {
+  border-color: var(--cui-success);
+  background-color: var(--cui-success);
+  color: white;
+}
+
+.lup-product-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lup-chip-code {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.lup-chip-dims {
+  color: inherit;
+  opacity: 0.8;
+}
+
+.lup-chip-area {
+  color: inherit;
+  opacity: 0.7;
+  font-size: 11px;
+}
+
+.lup-product-chip.active .lup-chip-dims,
+.lup-product-chip.active .lup-chip-area {
+  opacity: 0.9;
+}
+
+/* ─── Summary Bar ──────────────────────────────────── */
+.lup-summary {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 12px 20px;
+  background-color: var(--cui-tertiary-bg);
+}
+
+.lup-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lup-summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cui-body-color);
+}
+
+.lup-summary-total {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--cui-secondary-color);
+}
+
+.lup-summary-label {
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+}
+
+.lup-summary-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--cui-border-color);
+  margin: 0 20px;
+}
+
+/* ─── Selected Products List ──────────────────────── */
+.lup-summary-section {
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lup-selected-products {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--cui-border-color);
+}
+
+.lup-selected-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lup-selected-type-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cui-secondary-color);
+  min-width: 120px;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+
+.lup-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.lup-selected-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--cui-success);
+  border-radius: 4px;
+  color: var(--cui-success);
+  background-color: var(--cui-body-bg);
+}
+
+.lup-selected-pill-area {
+  font-weight: 400;
+  opacity: 0.7;
+}

@@ -7,6 +7,8 @@ import { AdminModal } from '@/components/admin';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
 
+
+
 // Auth routes that should not show navigation
 const AUTH_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password'];
 
@@ -34,6 +36,7 @@ export default function NavigationLayout({
   const pathname = usePathname();
   const { isOpen: isHelpOpen } = useHelpLandscaper();
 
+
   // Auto-hide navigation on auth routes
   const isAuthRoute = AUTH_ROUTES.some(route => pathname?.startsWith(route));
 
@@ -44,6 +47,7 @@ export default function NavigationLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <TopNavigationBar onSettingsClick={() => setAdminModalOpen(true)} />
+
       <main
         className={`flex-1 app-shell ${isHelpOpen ? 'help-content-compressed' : 'help-content-normal'}`}
       >

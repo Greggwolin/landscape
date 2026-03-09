@@ -33,6 +33,9 @@ export const SystemZ = z.object({
   parent_doc_id: z.number().int().positive().optional(),
 
   uploaded_by: z.number().int().positive().optional(),
+
+  /** Post-upload routing intent. Controls which extraction pipeline runs. */
+  intent: z.enum(['structured_ingestion', 'global_intelligence', 'dms_only']).optional(),
 });
 
 /**

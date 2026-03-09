@@ -32,8 +32,8 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        // Store the attempted URL for redirect after login
-        sessionStorage.setItem('redirectAfterLogin', pathname);
+        // Middleware handles the redirect to /login with ?redirect= param.
+        // ProtectedRoute just ensures navigation happens client-side too.
         router.push('/login');
       } else if (requireAdmin && user && !user.is_staff) {
         // User is authenticated but not admin, redirect to dashboard

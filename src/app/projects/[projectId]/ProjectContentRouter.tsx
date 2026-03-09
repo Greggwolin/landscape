@@ -21,6 +21,8 @@ import React, { memo, Suspense } from 'react';
 import ProjectTab from './components/tabs/ProjectTab';
 import PropertyTab from './components/tabs/PropertyTab';
 import PlanningTab from './components/tabs/PlanningTab';
+import ParcelsTab from './components/tabs/ParcelsTab';
+import LandUseTab from './components/tabs/LandUseTab';
 import MarketTab from './components/tabs/MarketTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import OperationsTab from './components/tabs/OperationsTab';
@@ -31,8 +33,7 @@ import ReportsTab from './components/tabs/ReportsTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import CapitalizationTab from './components/tabs/CapitalizationTab';
 import AcquisitionSubTab from './components/tabs/AcquisitionSubTab';
-// RenovationSubTab: removed from Property sub-tabs, will be integrated into Operations (layout TBD)
-// import RenovationSubTab from './components/tabs/RenovationSubTab';
+import RenovationSubTab from './components/tabs/RenovationSubTab';
 import LocationSubTab from './components/tabs/LocationSubTab';
 import MarketSupplySubTab from './components/tabs/MarketSupplySubTab';
 import { MapTab } from '@/components/map-tab';
@@ -152,6 +153,9 @@ function ProjectContentRouter({
           // Rent Roll - income properties
           case 'rent-roll':
             return <PropertyTab project={project} activeTab="rent-roll" />;
+          // Renovation sub-tab - value-add projects
+          case 'renovation':
+            return <RenovationSubTab project={project} />;
           // Acquisition sub-tab - ALL project types
           case 'acquisition':
             return <AcquisitionSubTab project={project} />;
@@ -160,13 +164,13 @@ function ProjectContentRouter({
             return <MarketTab project={project} />;
           // Land development subtabs
           case 'land-use':
-            return <PlanningTab project={project} />;
+            return <LandUseTab project={project} />;
           case 'parcels':
-            return <ComingSoon folder="property" tab="parcels" icon="🗺️" />;
+            return <ParcelsTab project={project} />;
           default:
             // Default based on project type
             if (!isIncome) {
-              return <PlanningTab project={project} />;
+              return <LandUseTab project={project} />;
             }
             return <LocationSubTab project={project} />;
         }

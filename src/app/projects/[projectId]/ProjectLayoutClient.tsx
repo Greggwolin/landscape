@@ -16,6 +16,7 @@
 'use client';
 
 import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { CCard, CCardHeader, CCardBody, CToast, CToastBody, CToaster } from '@coreui/react';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
@@ -31,7 +32,13 @@ import { useResizablePanel } from '@/hooks/useResizablePanel';
 import { FileDropProvider, useFileDrop } from '@/contexts/FileDropContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { DropZoneWrapper } from '@/components/ui/DropZoneWrapper';
+import { useExtractionStagingCount } from '@/hooks/useExtractionStagingCount';
+import { useProjectCreation } from '@/hooks/useProjectCreation';
+import IngestionWorkbenchPanel from './components/IngestionWorkbenchPanel';
+import { WorkbenchProvider, useWorkbench } from '@/contexts/WorkbenchContext';
+import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
+import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/folder-tabs.css';
 import '@/styles/resizable-panel.css';
 
@@ -57,11 +64,13 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // Fallback: if project isn't in the SWR list (e.g. created_by mismatch, stale cache),
   // fetch it directly so the layout renders correct tabs for its property type.
   const [fallbackProject, setFallbackProject] = useState<ProjectSummary | null>(null);
+  const [projectNotFound, setProjectNotFound] = useState(false);
   const fallbackAttempted = useRef(false);
 
   useEffect(() => {
     // Reset when projectId changes
     setFallbackProject(null);
+    setProjectNotFound(false);
     fallbackAttempted.current = false;
   }, [projectId]);
 
@@ -75,7 +84,10 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         return res.json();
       })
       .then((data: ProjectSummary) => setFallbackProject(data))
-      .catch(() => { /* silently fail — page.tsx handles error display */ });
+      .catch(() => {
+        // Project doesn't exist or user doesn't have access — mark as not found
+        setProjectNotFound(true);
+      });
   }, [projectFromCache, isLoading, projectId]);
 
   const currentProject = projectFromCache ?? fallbackProject;
@@ -154,6 +166,13 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     collapsedWidth: COLLAPSED_WIDTH,
   });
 
+  // Extraction staging indicator + floating workbench panel
+  const { state: workbenchState, openWorkbench, closeWorkbench, pendingIntakeDocs, clearPendingIntakeDocs } = useWorkbench();
+  const [localWorkbenchOpen, setLocalWorkbenchOpen] = useState(false);
+  const workbenchOpen = workbenchState.isOpen || localWorkbenchOpen;
+  const queryClient = useQueryClient();
+  const { pendingCount: stagingPendingCount } = useExtractionStagingCount(projectId);
+
   // File drop notification state
   const [dropToast, setDropToast] = useState<string | null>(null);
   const { pendingFiles } = useFileDrop();
@@ -179,8 +198,38 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     return () => clearTimeout(timer);
   }, [dropToast]);
 
-  // Handle folder/tab navigation
+  // Prevent browser close / tab close during active ingestion session
+  useEffect(() => {
+    if (!workbenchOpen) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers show a generic message; returnValue is required for legacy
+      e.returnValue = 'You have an active ingestion session. Changes will be lost.';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [workbenchOpen]);
+
+  // Auto-dismiss "Creating..." banner when user lands on the created project page
+  const { jobs: creationJobs, dismissJob } = useProjectCreation();
+  useEffect(() => {
+    for (const job of creationJobs) {
+      if (job.projectId === projectId && job.status === 'complete') {
+        dismissJob(job.clientId);
+      }
+    }
+  }, [creationJobs, projectId, dismissJob]);
+
+  // Navigation guard state — when workbench is open, intercept navigation
+  const [pendingNavigation, setPendingNavigation] = useState<{ folder: string; tab: string } | null>(null);
+
+  // Handle folder/tab navigation — guarded when workbench is open
   const handleNavigate = (folder: string, tab: string) => {
+    if (workbenchOpen) {
+      // Show confirmation dialog instead of navigating
+      setPendingNavigation({ folder, tab });
+      return;
+    }
     setFolderTab(folder, tab);
   };
 
@@ -218,6 +267,45 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   );
   const landscaperContextColor = activeFolderConfig?.color || 'var(--cui-tertiary-bg)';
 
+  // Guard: project doesn't exist or user doesn't have access — redirect to dashboard
+  if (projectNotFound) {
+    // Clear stale localStorage to prevent re-landing here
+    if (typeof window !== 'undefined') {
+      const storedId = localStorage.getItem('activeProjectId');
+      if (storedId === String(projectId)) {
+        localStorage.removeItem('activeProjectId');
+        localStorage.removeItem('activeProjectTimestamp');
+      }
+    }
+    return (
+      <div className="project-layout-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '400px', gap: '1rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+          <h3 style={{ color: 'var(--cui-body-color)', margin: '0 0 8px', fontSize: '18px', fontWeight: 600 }}>
+            Project Not Found
+          </h3>
+          <p style={{ color: 'var(--cui-secondary-color)', fontSize: '14px', margin: '0 0 20px', lineHeight: 1.5 }}>
+            Project {projectId} doesn&apos;t exist or you don&apos;t have access to it.
+          </p>
+          <a
+            href="/dashboard"
+            style={{
+              display: 'inline-block',
+              padding: '8px 20px',
+              borderRadius: '6px',
+              background: 'var(--cui-primary)',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Go to Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // Guard: show loading skeleton until project data is resolved.
   // Without this, effectivePropertyType is undefined → getProjectCategory(undefined)
   // defaults to 'land_development' → wrong tabs render for income property types (MF, OFF, etc.).
@@ -246,6 +334,190 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         currentFolder={currentFolder}
         onFolderNavigate={handleNavigate}
       />
+
+      {/* Extraction staging indicator — fixed in top nav bar area */}
+      {stagingPendingCount > 0 && (
+        <button
+          className={`extraction-indicator extraction-indicator--pending${workbenchOpen ? ' extraction-indicator--active' : ''}`}
+          onClick={() => {
+            if (workbenchState.isOpen) {
+              closeWorkbench();
+            } else {
+              setLocalWorkbenchOpen(prev => !prev);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            top: 14,
+            right: 340,
+            zIndex: 51,
+          }}
+          title={`${stagingPendingCount} fields pending review`}
+        >
+          <span className="ei-badge">{stagingPendingCount}</span>
+          fields pending review
+        </button>
+      )}
+
+      {/* Floating Workbench Panel */}
+      {workbenchOpen && (
+        <IngestionWorkbenchPanel
+          projectId={projectId}
+          project={currentProject as { project_id: number; project_name: string }}
+          folders={folderConfig.folders}
+          isLandDev={!isIncomeProperty(effectivePropertyType ?? undefined)}
+          docId={workbenchState.docId}
+          intakeUuid={workbenchState.intakeUuid}
+          docName={workbenchState.docName}
+          docType={workbenchState.docType}
+          onClose={async () => {
+            // Close the UI immediately so it feels responsive
+            closeWorkbench();
+            setLocalWorkbenchOpen(false);
+
+            // Full cleanup: hard-delete staging rows + doc text + core_doc,
+            // delete UploadThing cloud file, mark intake session abandoned
+            if (workbenchState.docId || workbenchState.intakeUuid) {
+              const djangoApi = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+              // 1. Hard-delete staging rows, doc text, core_doc record + mark session abandoned
+              //    MUST await so the DB is clean before we refetch badge counts
+              try {
+                await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    doc_id: workbenchState.docId,
+                    intake_uuid: workbenchState.intakeUuid,
+                  }),
+                });
+              } catch (err) {
+                console.warn('[Workbench] abandon failed:', err);
+              }
+
+              // 2. Delete backing file from UploadThing cloud storage (fire-and-forget OK)
+              if (workbenchState.docId) {
+                fetch(`/api/dms/documents/${workbenchState.docId}/delete`, {
+                  method: 'DELETE',
+                }).catch((err) => console.warn('[Workbench] UT delete failed:', err));
+              }
+
+              // 3. Now that DB rows are deleted, refetch badge counts to clear the pill
+              queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
+            }
+          }}
+          onDone={() => {
+            // Successful commit — just close the modal, no abandon/cleanup.
+            // The document and staging rows are already committed to production.
+            closeWorkbench();
+            setLocalWorkbenchOpen(false);
+            // Refresh DMS + staging queries so the committed doc appears
+            queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
+            queryClient.invalidateQueries({ queryKey: ['dms', projectId] });
+            queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+          }}
+        />
+      )}
+
+      {/* IntakeChoiceModal — mounted at layout level so it's accessible from any tab */}
+      <IntakeChoiceModal
+        visible={pendingIntakeDocs.length > 0}
+        projectId={projectId}
+        docs={pendingIntakeDocs}
+        onClose={clearPendingIntakeDocs}
+      />
+
+      {/* Navigation guard dialog — shown when user tries to navigate while workbench is open */}
+      {pendingNavigation && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1060,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--cui-body-bg, #1e1e2e)',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: '10px',
+              padding: '28px 32px',
+              maxWidth: '400px',
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            }}
+          >
+            <p style={{ fontSize: '16px', fontWeight: 700, color: 'var(--cui-body-color)', margin: '0 0 8px' }}>
+              Active ingestion session
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--cui-secondary-color)', margin: '0 0 20px', lineHeight: 1.4 }}>
+              You have an active ingestion session. Navigating away will cancel it and discard all pending extractions.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setPendingNavigation(null)}
+                style={{
+                  padding: '8px 18px',
+                  border: '1px solid var(--cui-border-color)',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  color: 'var(--cui-body-color)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Stay
+              </button>
+              <button
+                onClick={async () => {
+                  const nav = pendingNavigation;
+                  setPendingNavigation(null);
+                  // Close workbench (triggers abandon + cleanup)
+                  closeWorkbench();
+                  setLocalWorkbenchOpen(false);
+                  // Run abandon in background, then navigate
+                  if (workbenchState.docId || workbenchState.intakeUuid) {
+                    const djangoApi = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+                    try {
+                      await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          doc_id: workbenchState.docId,
+                          intake_uuid: workbenchState.intakeUuid,
+                        }),
+                      });
+                    } catch { /* best-effort */ }
+                    if (workbenchState.docId) {
+                      fetch(`/api/dms/documents/${workbenchState.docId}/delete`, { method: 'DELETE' }).catch(() => {});
+                    }
+                    queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
+                  }
+                  setFolderTab(nav.folder, nav.tab);
+                }}
+                style={{
+                  padding: '8px 18px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: 'var(--cui-danger)',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Leave &amp; Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Two-column split below the project bar */}
       <div
@@ -410,6 +682,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClientProps) {
   return (
     <FileDropProvider>
+    <WorkbenchProvider>
     <LandscaperCollisionProvider>
     <Suspense
       fallback={
@@ -468,6 +741,7 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
       </ProjectLayoutClientInner>
     </Suspense>
     </LandscaperCollisionProvider>
+    </WorkbenchProvider>
     </FileDropProvider>
   );
 }

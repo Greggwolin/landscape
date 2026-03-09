@@ -9,6 +9,7 @@
  */
 
 import { NextRequest } from 'next/server'
+import { sql } from '@/lib/db'
 
 export interface RequestUser {
   userId: number
@@ -62,4 +63,30 @@ export function getUserFromRequest(request: NextRequest): RequestUser | null {
     // Malformed token — not fatal, just means unauthenticated
     return null
   }
+}
+
+/**
+ * Verify that a user owns (or is admin of) a given project.
+ *
+ * Returns true if:
+ * - The user is staff/admin (created_by_id IS NULL is legacy data — allow)
+ * - The project's created_by_id matches the user's ID
+ * - The project has no created_by_id (legacy/unowned project)
+ */
+export async function userOwnsProject(
+  userId: number,
+  projectId: number
+): Promise<boolean> {
+  const rows = await sql`
+    SELECT created_by_id
+    FROM landscape.tbl_project
+    WHERE project_id = ${projectId}
+    LIMIT 1
+  `
+  if (rows.length === 0) return false
+
+  const ownerId = rows[0].created_by_id
+  // Legacy projects with no owner are accessible to any authenticated user
+  if (ownerId === null || ownerId === undefined) return true
+  return ownerId === userId
 }

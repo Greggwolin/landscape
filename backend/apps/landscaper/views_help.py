@@ -3,6 +3,9 @@ Help Landscaper API Views
 
 Provides the global Help chat endpoint that does NOT require a project ID.
 This is architecturally separate from the project Landscaper.
+
+Help conversations are summarized and posted to Discord by the `help_digest`
+management command (runs hourly via cron), NOT per-message.
 """
 
 import logging
@@ -16,6 +19,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .help_handler import get_help_response
+from .feedback_utils import detect_feedback_tag, strip_feedback_tag, capture_feedback
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,20 @@ class HelpChatView(APIView):
                     'success': False,
                     'error': 'Message is required',
                 }, status=status.HTTP_400_BAD_REQUEST)
+
+            # #FB detection — capture to Discord and strip before AI sees it
+            has_feedback = detect_feedback_tag(message)
+            if has_feedback:
+                user_email = getattr(request.user, 'email', None) if request.user.is_authenticated else None
+                capture_feedback(
+                    user_message=message,
+                    user_email=user_email,
+                    user_id=request.user.id if request.user.is_authenticated else None,
+                    project_id=None,
+                    project_name=None,
+                    page_context=f"Help > {current_page or 'general'}",
+                )
+                message = strip_feedback_tag(message)
 
             # Get or create conversation
             user_id = request.user.id if request.user.is_authenticated else None
@@ -159,3 +177,4 @@ class HelpChatView(APIView):
                 SET updated_at = NOW()
                 WHERE id = %s
             """, [conv_db_id])
+

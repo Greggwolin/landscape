@@ -12,6 +12,11 @@ import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { type DynamicColumnDataType } from '@/hooks/useDynamicColumns';
 import { usePendingRentRollChanges } from '@/hooks/usePendingRentRollChanges';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
 interface Project {
@@ -67,6 +72,10 @@ interface Unit {
   isSection8?: boolean;
   section8ContractDate?: string | null;
   section8ContractRent?: number | null;
+  parkingRent?: number;
+  petRent?: number;
+  pastDueAmount?: number;
+  depositAmount?: number;
 }
 
 interface ColumnConfig {
@@ -139,6 +148,14 @@ const getUnitValueForColumn = (
       return unit.section8ContractDate;
     case 'section8ContractRent':
       return unit.section8ContractRent;
+    case 'parkingRent':
+      return unit.parkingRent;
+    case 'petRent':
+      return unit.petRent;
+    case 'pastDueAmount':
+      return unit.pastDueAmount;
+    case 'depositAmount':
+      return unit.depositAmount;
     default:
       // Dynamic column lookup: columnId is the column_key, unit.id is the row_id
       if (dynamicValues) {
@@ -569,7 +586,70 @@ const COLUMN_TO_BACKEND_FIELD: Record<string, string> = {
   deposit: 'security_deposit',
   unitNumber: 'unit_number',
   floorPlan: 'unit_type',
+  parkingRent: 'parking_rent',
+  petRent: 'pet_rent',
+  pastDueAmount: 'past_due_amount',
+  depositAmount: 'deposit_amount',
 };
+
+// ─── Sortable header cell for drag-to-reorder ───
+interface SortableHeaderCellProps {
+  col: ColumnConfig;
+  alignClass: string;
+  sortColumn: string | null;
+  sortDirection: 'asc' | 'desc';
+  onSortClick: (colId: string) => void;
+  onResizeStart: (colId: string, e: React.MouseEvent) => void;
+  width?: number;
+}
+
+function SortableHeaderCell({ col, alignClass, sortColumn, sortDirection, onSortClick, onResizeStart, width }: SortableHeaderCellProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col.id });
+  const style: React.CSSProperties = {
+    color: 'var(--cui-secondary-color)',
+    position: 'relative',
+    cursor: 'grab',
+    userSelect: 'none',
+    ...(width ? { width } : {}),
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <th
+      ref={setNodeRef}
+      className={`px-3 py-2 font-medium ${alignClass}`}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => onSortClick(col.id)}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        {col.label}
+        {sortColumn === col.id && (
+          <span style={{ fontSize: '0.65rem', opacity: 0.8, lineHeight: 1 }}>
+            {sortDirection === 'asc' ? '▲' : '▼'}
+          </span>
+        )}
+      </span>
+      <div
+        onMouseDown={(e) => { e.stopPropagation(); onResizeStart(col.id, e); }}
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: '20%',
+          bottom: '20%',
+          width: 5,
+          cursor: 'col-resize',
+          userSelect: 'none',
+          borderRight: '1px solid var(--cui-border-color)',
+        }}
+      />
+    </th>
+  );
+}
 
 // Column configuration - defines all available columns
 const defaultColumns: ColumnConfig[] = [
@@ -597,6 +677,11 @@ const defaultColumns: ColumnConfig[] = [
   { id: 'isSection8', label: 'Sec 8', category: 'tenant', visible: false, type: 'input', description: 'Unit has Section 8 voucher tenant' },
   { id: 'section8ContractDate', label: 'S8 Contract Date', category: 'tenant', visible: false, type: 'input', description: 'HAP contract effective date' },
   { id: 'section8ContractRent', label: 'S8 Contract Rent', category: 'financial', visible: false, type: 'input', description: 'Section 8 contract rent amount' },
+  // Ancillary income / charges
+  { id: 'parkingRent', label: 'Parking', category: 'financial', visible: false, type: 'input', description: 'Monthly parking rent' },
+  { id: 'petRent', label: 'Pet Rent', category: 'financial', visible: false, type: 'input', description: 'Monthly pet rent' },
+  { id: 'pastDueAmount', label: 'Past Due', category: 'financial', visible: false, type: 'input', description: 'Past due / delinquent balance' },
+  { id: 'depositAmount', label: 'Deposit Amt', category: 'financial', visible: false, type: 'input', description: 'Security deposit amount' },
   // Other
   { id: 'notes', label: 'Notes', category: 'unit', visible: false, type: 'input', description: 'Free-form notes for this unit' },
 ];
@@ -636,11 +721,25 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Dynamic EAV columns disabled for alpha — base columns cover all active fields.
-  // Re-enable when EAV value population is implemented.
+  // Authentication context (for grid preference persistence)
+  const { user, tokens } = useAuth();
+
+  // Grid preference persistence — column order + visibility saved per user per project
+  const gridPrefsLoadedRef = useRef(false);
+  const gridPrefsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [savedColumnOrder, setSavedColumnOrder] = useState<string[] | null>(null);
+  const [savedColumnVisibility, setSavedColumnVisibility] = useState<Record<string, boolean> | null>(null);
+
+  // DnD sensors — small activation distance to distinguish click from drag
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  // Shared backend URL
+  const backendUrl = useMemo(() => process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000', []);
+
+  // Dynamic EAV columns — fetched from Django for multifamily projects
   const [dynamicColumnDefs, setDynamicColumnDefs] = useState<any[]>([]);
-  const dynamicValues: Record<string, Record<string, unknown>> = {};
-  const refreshDynamicColumns = () => {};
 
   // Pending rent roll extraction changes (delta highlighting)
   const {
@@ -660,13 +759,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // These are DynamicColumnDefinition rows created during extraction via confirm_column_mapping
   const [activeDynCols, setActiveDynCols] = useState<ColumnConfig[]>([]);
   const [activeDynValues, setActiveDynValues] = useState<Record<string, Record<string, unknown>>>({});
-  useEffect(() => {
+
+  const fetchDynamicColumns = useCallback(() => {
     if (!isMultifamily) {
       setActiveDynCols([]);
       setActiveDynValues({});
       return;
     }
-    const backendUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
     // Fetch column definitions
     fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`)
       .then(res => res.ok ? res.json() : [])
@@ -703,7 +802,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         }
       })
       .catch(() => { setActiveDynCols([]); setActiveDynValues({}); });
-  }, [isMultifamily, projectId]);
+  }, [isMultifamily, projectId, backendUrl]);
+
+  useEffect(() => {
+    fetchDynamicColumns();
+  }, [fetchDynamicColumns]);
 
   // Derive additional columns from pending changes that aren't in base columns
   const pendingExtraColumns = useMemo(() => {
@@ -730,7 +833,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     }));
   }, [hasPending, pendingChanges]);
 
-  // NOTE: Dynamic column merge disabled — see stub above. Left intact for re-enablement.
+  // Dynamic column merge: syncs dynamicColumnDefs into the columns state via fingerprinting
   const staticLabels = useMemo(
     () => new Set(defaultColumns.map(c => c.label.toLowerCase())),
     []
@@ -783,6 +886,101 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       return [...staticCols, ...dynCols];
     });
   }, [dynColFingerprint, dynamicColumnDefs, staticLabels]);
+
+  // ─── Grid Preferences: load saved column order + visibility ───
+  const saveGridPreferences = useCallback((cols: ColumnConfig[]) => {
+    if (!tokens?.access || !projectId) return;
+    if (gridPrefsSaveTimerRef.current) clearTimeout(gridPrefsSaveTimerRef.current);
+    gridPrefsSaveTimerRef.current = setTimeout(() => {
+      const order = cols.map(c => c.id);
+      const visibility: Record<string, boolean> = {};
+      cols.forEach(c => { visibility[c.id] = c.visible; });
+      fetch(`${backendUrl}/api/users/grid-preferences/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens.access}` },
+        body: JSON.stringify({ project_id: projectId, grid_id: 'rent_roll', column_order: order, column_visibility: visibility }),
+      }).catch(() => { /* silent — best effort */ });
+    }, 500);
+  }, [tokens?.access, projectId, backendUrl]);
+
+  // Load grid preferences once on mount
+  useEffect(() => {
+    if (!isMultifamily || !tokens?.access || gridPrefsLoadedRef.current) return;
+    gridPrefsLoadedRef.current = true;
+    fetch(`${backendUrl}/api/users/grid-preferences/?project_id=${projectId}&grid_id=rent_roll`, {
+      headers: { Authorization: `Bearer ${tokens.access}` },
+    })
+      .then(r => r.ok ? r.json() : {})
+      .then(data => {
+        if (data.column_order && Array.isArray(data.column_order) && data.column_order.length > 0) {
+          setSavedColumnOrder(data.column_order);
+        }
+        if (data.column_visibility && typeof data.column_visibility === 'object' && Object.keys(data.column_visibility).length > 0) {
+          setSavedColumnVisibility(data.column_visibility);
+          setHasCustomizedColumns(true);
+        }
+      })
+      .catch(() => { /* no saved prefs — use defaults */ });
+  }, [isMultifamily, tokens?.access, projectId, backendUrl]);
+
+  // Apply saved preferences once dynamic columns have loaded
+  const prefsAppliedRef = useRef(false);
+  useEffect(() => {
+    if (prefsAppliedRef.current) return;
+    if (!savedColumnOrder && !savedColumnVisibility) return;
+    // Wait until dynamic columns are merged in (if any exist on this project)
+    // We know they're ready once dynColFingerprint has been processed at least once
+    const hasDynCols = columns.some(c => c.category === 'dynamic');
+    const dynDefsExist = dynamicColumnDefs.length > 0;
+    if (dynDefsExist && !hasDynCols) return; // Still waiting for merge
+
+    prefsAppliedRef.current = true;
+    setColumns(prev => {
+      let result = [...prev];
+
+      // Apply visibility
+      if (savedColumnVisibility) {
+        result = result.map(c => {
+          if (c.id in savedColumnVisibility) {
+            return { ...c, visible: savedColumnVisibility[c.id] };
+          }
+          // New column not in saved prefs — dynamic columns with data default visible
+          if (c.category === 'dynamic') return { ...c, visible: true };
+          return c;
+        });
+      }
+
+      // Apply order
+      if (savedColumnOrder) {
+        const orderIndex = new Map(savedColumnOrder.map((id, i) => [id, i]));
+        // Sort known columns by saved order; unknown columns go to the end
+        result.sort((a, b) => {
+          const ai = orderIndex.get(a.id);
+          const bi = orderIndex.get(b.id);
+          if (ai !== undefined && bi !== undefined) return ai - bi;
+          if (ai !== undefined) return -1;
+          if (bi !== undefined) return 1;
+          return 0; // Both unknown — keep relative order
+        });
+      }
+
+      return result;
+    });
+  }, [savedColumnOrder, savedColumnVisibility, columns, dynamicColumnDefs]);
+
+  // Handle DnD column reorder
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setColumns(prev => {
+      const oldIndex = prev.findIndex(c => c.id === String(active.id));
+      const newIndex = prev.findIndex(c => c.id === String(over.id));
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      saveGridPreferences(reordered);
+      return reordered;
+    });
+  }, [saveGridPreferences]);
 
   // Calculate AI market rent estimates from comparable data
   // Groups comparables by bed/bath and by bedroom only (for fuzzy matching)
@@ -1042,22 +1240,25 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         }
       });
 
-      // Only include unit types that have actual units assigned in the units table
+      // Count actual units per type from individual unit records (if any)
       const actualUnitCountByType = new Map<string, number>();
       unitsData.forEach(u => {
         actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
       });
 
+      // Show unit types that either have individual units OR have unit_count from extraction
       const transformedFloorPlans: FloorPlan[] = unitTypesData
-        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0)
+        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0
+          || (ut.unit_count && ut.unit_count > 0)
+          || (ut.total_units && ut.total_units > 0))
         .map(ut => {
           const leaseRents = rentsByUnitType.get(ut.unit_type_code);
           const avgLeaseRent = leaseRents && leaseRents.length > 0
             ? Math.round(leaseRents.reduce((a, b) => a + b, 0) / leaseRents.length)
             : 0;
-          // Use actual lease rent if available, otherwise fall back to market rent
-          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_market_rent || 0);
-          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.total_units;
+          // Use actual lease rent if available, otherwise fall back to market rent or current_rent_avg
+          const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_rent_avg || ut.current_market_rent || 0);
+          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.unit_count || ut.total_units;
 
           return {
             id: ut.unit_type_id.toString(),
@@ -1101,13 +1302,17 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           proformaRent: Math.round(marketRent * 1.05),
           leaseStart: lease?.lease_start_date || u.current_lease?.lease_start_date || u.lease_start_date || '',
           leaseEnd: lease?.lease_end_date || u.current_lease?.lease_end_date || u.lease_end_date || '',
-          tenantName: lease?.resident_name || '',
+          tenantName: lease?.resident_name || u.tenant_name || '',
           status: unitStatus !== 'Unknown' ? unitStatus : leaseStatus,
           deposit: Math.round(lease?.security_deposit || 0),
           monthlyIncome: baseRent,
           rentPerSF: u.square_feet > 0 && baseRent ? baseRent / u.square_feet : 0,
           proformaRentPerSF: u.square_feet > 0 && marketRent ? marketRent / u.square_feet : 0,
-          notes: u.other_features || ''
+          notes: u.other_features || '',
+          parkingRent: Math.round(u.parking_rent || 0),
+          petRent: Math.round(u.pet_rent || 0),
+          pastDueAmount: Math.round(u.past_due_amount || 0),
+          depositAmount: Math.round(u.deposit_amount || 0),
         };
       });
 
@@ -1143,14 +1348,22 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // Auto-refresh when Landscaper mutates units, leases, or unit types
   const refreshAll = useCallback(() => {
     loadData();
-    refreshDynamicColumns();
+    fetchDynamicColumns();
     refreshPending();
-  }, [loadData, refreshDynamicColumns, refreshPending]);
+  }, [loadData, fetchDynamicColumns, refreshPending]);
   useLandscaperRefresh(
     projectId,
     ['units', 'leases', 'unit_types', 'project', 'dynamic_columns'],
     refreshAll
   );
+
+  // Auto-refresh when workbench commits (signals via lastCommitTimestamp)
+  const { lastCommitTimestamp } = useWorkbench();
+  useEffect(() => {
+    if (lastCommitTimestamp > 0) {
+      refreshAll();
+    }
+  }, [lastCommitTimestamp, refreshAll]);
 
   // Auto-hide columns that have no data — runs once when units load, not on every render.
   // Uses a ref to track whether we've already auto-hidden for the current unit set.
@@ -1211,8 +1424,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   const sortedUnits = useMemo(() => {
     if (!sortColumn) return units;
     return [...units].sort((a, b) => {
-      const aVal = getUnitValueForColumn(a, sortColumn, dynamicValues);
-      const bVal = getUnitValueForColumn(b, sortColumn, dynamicValues);
+      const aVal = getUnitValueForColumn(a, sortColumn, activeDynValues);
+      const bVal = getUnitValueForColumn(b, sortColumn, activeDynValues);
       // Nulls/empty last
       const aEmpty = aVal === null || aVal === undefined || aVal === '';
       const bEmpty = bVal === null || bVal === undefined || bVal === '';
@@ -1231,7 +1444,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       const cmp = aStr.localeCompare(bStr);
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [units, sortColumn, sortDirection, dynamicValues]);
+  }, [units, sortColumn, sortDirection, activeDynValues]);
 
   const handleSortClick = useCallback((columnId: string) => {
     setSortColumn(prev => {
@@ -1265,7 +1478,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           const newDisplay = change.newValue != null ? String(change.newValue) : '—';
 
           // Format values for display (currency, numeric, or plain)
-          const isCurrency = ['currentRent', 'marketRent', 'proformaRent', 'deposit', 'monthlyIncome'].includes(columnId);
+          const isCurrency = ['currentRent', 'marketRent', 'proformaRent', 'deposit', 'monthlyIncome',
+                              'parkingRent', 'petRent', 'pastDueAmount', 'depositAmount'].includes(columnId);
           const isNumeric = !isNaN(Number(change.currentValue)) || !isNaN(Number(change.newValue));
           const fmtCurrent = isCurrency && change.currentValue != null
             ? `$${Number(change.currentValue).toLocaleString()}`
@@ -1443,6 +1657,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         ) : (
           <span className="text-xs" style={{ color: 'var(--cui-tertiary-color)' }}>{unit.notes || '—'}</span>
         );
+      case 'parkingRent':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.parkingRent ? formatCurrency(unit.parkingRent) : '—'}</span>;
+      case 'petRent':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.petRent ? formatCurrency(unit.petRent) : '—'}</span>;
+      case 'pastDueAmount':
+        return <span style={{ color: unit.pastDueAmount && unit.pastDueAmount > 0 ? 'var(--cui-danger)' : 'var(--cui-secondary-color)' }}>{unit.pastDueAmount ? formatCurrency(unit.pastDueAmount) : '—'}</span>;
+      case 'depositAmount':
+        return <span style={{ color: 'var(--cui-secondary-color)' }}>{unit.depositAmount ? formatCurrency(unit.depositAmount) : '—'}</span>;
       default: {
         // Pending extra column: show new value from pending changes
         if (columnId.startsWith('pending_')) {
@@ -1464,6 +1686,14 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
           const colKey = columnId.replace(/^dyn_/, '');
           const rawValue = activeDynValues[unit.id]?.[colKey];
           if (rawValue === null || rawValue === undefined) return <span style={{ color: 'var(--cui-tertiary-color)' }}>—</span>;
+          // Format numeric values: strip decimals, add commas
+          const str = String(rawValue).replace(/,/g, '');
+          const num = Number(str);
+          if (Number.isFinite(num)) {
+            const colConfig = columns.find(c => c.id === columnId);
+            const isCurrency = colConfig?.dataType === 'currency';
+            return <span style={{ color: 'var(--cui-secondary-color)' }}>{isCurrency ? formatCurrency(num) : formatNumber(Math.round(num))}</span>;
+          }
           return <span style={{ color: 'var(--cui-secondary-color)' }}>{String(rawValue)}</span>;
         }
         return null;
@@ -1473,14 +1703,26 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
 
   // Get column alignment class
   const getColumnAlign = (columnId: string): string => {
-    const centerAlign = ['bedrooms', 'bathrooms', 'sqft', 'currentRent', 'marketRent', 'proformaRent',
-                         'status', 'leaseEnd', 'deposit', 'monthlyIncome', 'rentPerSF', 'proformaRentPerSF'];
+    // Currency columns → right-aligned (anything representing money)
+    const rightAlign = [
+      'currentRent', 'marketRent', 'proformaRent', 'deposit',
+      'monthlyIncome', 'rentPerSF', 'proformaRentPerSF',
+      'section8ContractRent',
+      'parkingRent', 'petRent', 'pastDueAmount', 'depositAmount',
+    ];
+    // Small numeric counts → center-aligned
+    const centerAlign = ['bedrooms', 'bathrooms'];
+
+    if (rightAlign.includes(columnId)) return 'text-right';
     if (centerAlign.includes(columnId)) return 'text-center';
-    // Dynamic columns: center-align numeric types
+
+    // Dynamic columns: currency → right, boolean → center, everything else → left
     const colConfig = columns.find(c => c.id === columnId);
-    if (colConfig?.category === 'dynamic' && colConfig.dataType && ['number', 'currency', 'percent', 'boolean'].includes(colConfig.dataType)) {
-      return 'text-center';
+    if (colConfig?.category === 'dynamic' && colConfig.dataType) {
+      if (colConfig.dataType === 'currency') return 'text-right';
+      if (colConfig.dataType === 'boolean') return 'text-center';
     }
+    // Everything else left-aligned (text, dates, sqft, floor, status, non-currency numbers)
     return 'text-left';
   };
 
@@ -1522,6 +1764,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     if (occupied.length === 0) return 0;
     const totalRent = occupied.reduce((sum, u) => sum + u.currentRent, 0);
     const totalSF = occupied.reduce((sum, u) => sum + u.sqft, 0);
+    if (totalSF <= 0) return '0.00';
     return (totalRent / totalSF).toFixed(2);
   }, [units]);
 
@@ -1669,39 +1912,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
   // vs. single-asset types (retail, industrial, hotel) that don't use unit/floorPlan data
   const isUnitBased = projectType === 'MF' || projectType === 'OFF';
 
-  // Show empty state only for unit-based property types with no data yet.
-  // Single-asset types (retail, industrial, hotel) always render PhysicalDescription.
-  if (isUnitBased && units.length === 0 && floorPlans.length === 0) {
-    return (
-      <div className="flex items-center justify-center" style={{ padding: 'var(--component-gap)', minHeight: '400px' }}>
-        <div className="shadow-lg p-12 text-center max-w-2xl" style={{ backgroundColor: 'var(--cui-card-bg)', border: '1px solid var(--cui-border-color)' }}>
-          <div className="mb-6">
-            <svg className="w-24 h-24 mx-auto" style={{ color: 'var(--cui-secondary-color)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <h2 className="text-2xl font-semibold mb-3" style={{ color: 'var(--cui-body-color)' }}>
-            No Property Data Yet
-          </h2>
-          <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
-            This project doesn&apos;t have any unit or floorplan data yet. Upload a rent roll or manually add unit information to get started.
-          </p>
-          <div className="rounded-lg p-4 text-left" style={{ backgroundColor: 'var(--cui-info-bg)', border: '1px solid var(--cui-info)' }}>
-            <p className="text-sm mb-2" style={{ color: 'var(--cui-info)' }}>
-              <strong>To add data:</strong>
-            </p>
-            <ul className="text-sm space-y-1 ml-4 list-disc" style={{ color: 'var(--cui-secondary-color)' }}>
-              <li>Navigate to the Rent Roll page to upload a rent roll spreadsheet</li>
-              <li>Use the Django admin panel to manually add unit types and units</li>
-              <li>Import data via the API endpoints</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Does this project have unit-level data (floor plans, rent roll)?
+  // PhysicalDescription always renders — the empty state below only applies
+  // to the Floor Plan Matrix section when no unit/floorPlan data exists.
   const hasUnitData = floorPlans.length > 0 || units.length > 0;
 
   // Render content based on activeTab (controlled by folder tabs)
@@ -1753,7 +1966,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                     Floor Plan Matrix
                   </h3>
                   <span className="studio-badge-info">
-                    Aggregates from Units
+                    {units.length > 0 ? 'Aggregates from Units' : 'From Extraction'}
                   </span>
                 </div>
                 <div className="flex items-center gap-4 text-xs">
@@ -2393,45 +2606,24 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+          <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
             <thead style={{ backgroundColor: 'var(--cui-dark-bg)' }}>
               <tr style={{ borderBottom: '1px solid var(--cui-border-color)' }}>
-                {visibleColumns.map(col => (
-                  <th
-                    key={col.id}
-                    className={`px-3 py-2 font-medium ${getColumnAlign(col.id)}`}
-                    style={{
-                      color: 'var(--cui-secondary-color)',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      ...(columnWidths[col.id] ? { width: columnWidths[col.id] } : {}),
-                    }}
-                    onClick={() => handleSortClick(col.id)}
-                  >
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      {col.label}
-                      {sortColumn === col.id && (
-                        <span style={{ fontSize: '0.65rem', opacity: 0.8, lineHeight: 1 }}>
-                          {sortDirection === 'asc' ? '▲' : '▼'}
-                        </span>
-                      )}
-                    </span>
-                    <div
-                      onMouseDown={(e) => handleResizeStart(col.id, e)}
-                      style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: '20%',
-                        bottom: '20%',
-                        width: 5,
-                        cursor: 'col-resize',
-                        userSelect: 'none',
-                        borderRight: '1px solid var(--cui-border-color)',
-                      }}
+                <SortableContext items={visibleColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+                  {visibleColumns.map(col => (
+                    <SortableHeaderCell
+                      key={col.id}
+                      col={col}
+                      alignClass={getColumnAlign(col.id)}
+                      sortColumn={sortColumn}
+                      sortDirection={sortDirection}
+                      onSortClick={handleSortClick}
+                      onResizeStart={handleResizeStart}
+                      width={columnWidths[col.id]}
                     />
-                  </th>
-                ))}
+                  ))}
+                </SortableContext>
                 <th className="text-center px-3 py-2 font-medium" style={{ color: 'var(--cui-secondary-color)', width: 80 }}>Actions</th>
               </tr>
             </thead>
@@ -2501,6 +2693,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               ))}
             </tbody>
           </table>
+          </DndContext>
         </div>
       </div>
 
@@ -2588,9 +2781,13 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                           checked={col.visible}
                           onChange={(e) => {
                             setHasCustomizedColumns(true);
-                            setColumns(prev => prev.map(c =>
-                              c.id === col.id ? { ...c, visible: e.target.checked } : c
-                            ));
+                            setColumns(prev => {
+                              const updated = prev.map(c =>
+                                c.id === col.id ? { ...c, visible: e.target.checked } : c
+                              );
+                              saveGridPreferences(updated);
+                              return updated;
+                            });
                           }}
                           className="rounded flex-shrink-0"
                           style={{ accentColor: 'var(--cui-primary)' }}
@@ -2627,7 +2824,9 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                   // Reset static columns to defaults, keep dynamic columns with data visible
                   setColumns(prev => {
                     const dynCols = prev.filter(c => c.category === 'dynamic').map(c => ({ ...c, visible: true }));
-                    return [...defaultColumns, ...dynCols];
+                    const reset = [...defaultColumns, ...dynCols];
+                    saveGridPreferences(reset);
+                    return reset;
                   });
                 }}
                 className="px-3 py-1.5 text-xs rounded transition-colors"

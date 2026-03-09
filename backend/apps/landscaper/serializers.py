@@ -392,6 +392,7 @@ class IntakeSessionStartSerializer(serializers.Serializer):
         choices=['global_intelligence', 'dms_only', 'structured_ingestion'],
         default='structured_ingestion'
     )
+    document_type = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
 
 
 class IntakeCommitActionSerializer(serializers.Serializer):

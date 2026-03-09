@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperat
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
-import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThreads';
+import { useLandscaperThreads, ThreadMessage, type SendMessageOptions } from '@/hooks/useLandscaperThreads';
+import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 import { ThreadList } from './ThreadList';
@@ -36,7 +37,7 @@ const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
 
   // Comps
   tbl_rental_comp: ['rental_comps'],
-  tbl_rent_comparable: ['rental_comps'],
+  tbl_rental_comparable: ['rental_comps'],
   tbl_sales_comp: ['sales_comps'],
   tbl_sales_comparables: ['sales_comps'],
 
@@ -46,7 +47,7 @@ const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
 };
 
 export interface LandscaperChatHandle {
-  sendMessage: (msg: string) => Promise<void>;
+  sendMessage: (msg: string, options?: SendMessageOptions) => Promise<void>;
 }
 
 interface LandscaperChatThreadedProps {
@@ -258,6 +259,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     subtabContext,
     onToolResult,
   });
+
+  // Sync project landscaper loading state to global context (drives HelpIcon propeller)
+  const { setIsThinking } = useLandscaperThinking();
+  useEffect(() => { setIsThinking(isLoading); }, [isLoading, setIsThinking]);
 
   // Expose sendMessage to parent via imperative handle (for programmatic chat injection)
   useImperativeHandle(ref, () => ({ sendMessage }), [sendMessage]);
@@ -659,7 +664,9 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
             )}
           </div>
         ) : (
-          messages.map((msg: ThreadMessage) => (
+          messages
+            .filter((msg: ThreadMessage) => !msg.metadata?.hidden)
+            .map((msg: ThreadMessage) => (
             <ChatMessageBubble
               key={msg.messageId}
               message={msg}

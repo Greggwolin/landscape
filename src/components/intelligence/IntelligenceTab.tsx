@@ -5,11 +5,13 @@
  *
  * Replaces the "intelligence" subtab in Documents folder.
  * Shows active/recent intake sessions and their status,
- * with drill-down into MappingScreen and ValueValidationScreen.
+ * with drill-down into ValueValidationScreen for committed sessions.
+ *
+ * NOTE: MappingScreen removed — structured ingestion now routes through
+ * the Ingestion Workbench panel (WorkbenchContext → IngestionWorkbenchPanel).
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import {
   CCard,
   CCardBody,
@@ -24,7 +26,6 @@ import {
   CTableHeaderCell,
   CTableDataCell,
 } from '@coreui/react';
-import MappingScreen from './MappingScreen';
 import ValueValidationScreen from './ValueValidationScreen';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -62,7 +63,7 @@ interface IntelligenceTabProps {
   };
 }
 
-type ActiveView = 'list' | 'mapping' | 'validation';
+type ActiveView = 'list' | 'validation';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'warning',
@@ -89,21 +90,11 @@ async function triggerReExtract(intakeUuid: string): Promise<{ intakeUuid: strin
 }
 
 export default function IntelligenceTab({ project }: IntelligenceTabProps) {
-  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<IntakeSession[]>([]);
   const [overrides, setOverrides] = useState<OverrideInfo>({ overriddenFieldKeys: [], count: 0, overrides: [] });
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<ActiveView>('list');
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
-
-  // Auto-open MappingScreen when intakeUuid is in the URL (from IntakeChoiceModal navigation)
-  useEffect(() => {
-    const intakeUuid = searchParams.get('intakeUuid');
-    if (intakeUuid && activeView === 'list') {
-      setSelectedSession(intakeUuid);
-      setActiveView('mapping');
-    }
-  }, [searchParams, activeView]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -148,13 +139,10 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
 
   const handleSessionClick = (session: IntakeSession) => {
     setSelectedSession(session.intakeUuid);
-    if (session.status === 'draft') {
-      setActiveView('mapping');
-    } else if (session.status === 'mapping_complete' || session.status === 'values_complete') {
+    if (session.status === 'mapping_complete' || session.status === 'values_complete') {
       setActiveView('validation');
-    } else {
-      setActiveView('list');
     }
+    // Draft sessions are handled by the Ingestion Workbench panel now
   };
 
   const handleBackToList = () => {
@@ -163,27 +151,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
     fetchSessions();
   };
 
-  const handleMappingComplete = () => {
-    setActiveView('validation');
-    fetchSessions();
-  };
-
   // Drill-in views
-  if (activeView === 'mapping' && selectedSession) {
-    return (
-      <div>
-        <CButton color="link" className="mb-3 ps-0" onClick={handleBackToList}>
-          &larr; Back to Intelligence
-        </CButton>
-        <MappingScreen
-          intakeUuid={selectedSession}
-          projectId={project.project_id}
-          onComplete={handleMappingComplete}
-        />
-      </div>
-    );
-  }
-
   if (activeView === 'validation' && selectedSession) {
     return (
       <div>
@@ -323,9 +291,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
                     </CTableDataCell>
                     <CTableDataCell>
                       {s.status === 'draft' && (
-                        <CButton size="sm" color="primary" variant="outline">
-                          Map Fields
-                        </CButton>
+                        <CBadge color="warning">In Progress</CBadge>
                       )}
                       {(s.status === 'mapping_complete' || s.status === 'values_complete') && (
                         <CButton size="sm" color="success" variant="outline">

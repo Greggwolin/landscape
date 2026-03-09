@@ -1,11 +1,25 @@
 #!/bin/bash
 
 # Comprehensive Git Push Script
-# Purpose: Stage all changes, create/update session notes, commit, and push to git
-# Usage: ./scripts/git-push.sh [commit message]
+# Purpose: Stage all changes, optionally sync scoped data, create/update session notes, commit, and push to git
+# Usage: ./scripts/git-push.sh [--with-data users,project_owners] [--data-dry-run] [commit message]
 #        If no message provided, will prompt for one
 
 set -e  # Exit on error
+
+print_usage() {
+    cat <<'EOF'
+Usage:
+  ./scripts/git-push.sh [options] [commit message]
+
+Options:
+  --with-data <csv>   Run scoped production data sync before git push.
+                      Supported values: users,project_owners
+                      Example: --with-data users,project_owners
+  --data-dry-run      Preview data sync changes without modifying production.
+  -h, --help          Show this help.
+EOF
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -19,6 +33,38 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 SESSION_NOTES_DIR="$PROJECT_ROOT/docs/session-notes"
+DATA_SYNC_SCRIPT="$SCRIPT_DIR/sync-production-data.sh"
+
+# Parse args
+WITH_DATA_COMPONENTS=""
+DATA_SYNC_DRY_RUN=false
+POSITIONAL_ARGS=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --with-data)
+            if [ -z "${2:-}" ]; then
+                echo -e "${RED}Error: --with-data requires a comma-separated value${NC}"
+                print_usage
+                exit 1
+            fi
+            WITH_DATA_COMPONENTS="$2"
+            shift 2
+            ;;
+        --data-dry-run)
+            DATA_SYNC_DRY_RUN=true
+            shift
+            ;;
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            POSITIONAL_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Git Push - Landscape Project${NC}"
@@ -34,9 +80,29 @@ fi
 CURRENT_BRANCH=$(git branch --show-current)
 echo -e "${BLUE}Current Branch:${NC} ${GREEN}$CURRENT_BRANCH${NC}\n"
 
+# Optional scoped data sync
+if [ -n "$WITH_DATA_COMPONENTS" ]; then
+    if [ ! -x "$DATA_SYNC_SCRIPT" ]; then
+        echo -e "${RED}Error: Data sync script not found or not executable: $DATA_SYNC_SCRIPT${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Running scoped data sync:${NC} ${GREEN}$WITH_DATA_COMPONENTS${NC}"
+    DATA_SYNC_CMD=("$DATA_SYNC_SCRIPT" --components "$WITH_DATA_COMPONENTS")
+    if [ "$DATA_SYNC_DRY_RUN" = true ]; then
+        DATA_SYNC_CMD+=(--dry-run)
+    fi
+    "${DATA_SYNC_CMD[@]}"
+    echo ""
+fi
+
 # Check for changes
 if git diff-index --quiet HEAD -- && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-    echo -e "${YELLOW}No changes to commit${NC}"
+    if [ -n "$WITH_DATA_COMPONENTS" ]; then
+        echo -e "${YELLOW}Data sync complete. No git changes to commit.${NC}"
+    else
+        echo -e "${YELLOW}No changes to commit${NC}"
+    fi
     exit 0
 fi
 
@@ -68,8 +134,8 @@ if [ -n "$UNTRACKED" ]; then
 fi
 
 # Get commit message
-if [ -n "$1" ]; then
-    COMMIT_MSG="$1"
+if [ ${#POSITIONAL_ARGS[@]} -gt 0 ]; then
+    COMMIT_MSG="${POSITIONAL_ARGS[*]}"
 else
     echo -e "${BLUE}Enter commit message (or press Enter for auto-generated):${NC}"
     read -r COMMIT_MSG

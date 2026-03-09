@@ -1,0 +1,14 @@
+{
+  "lastRun": null,
+  "totalViolationsBefore": 5800,
+  "totalFiles": 340,
+  "filesCompleted": [],
+  "filesFailed": [],
+  "filesSkipped": [],
+  "nextBatch": [
+    "src/app/components/layout/shared/ModeDropdown.tsx",
+    "src/app/components/layout/shared/UserDropdown.tsx",
+    "src/app/components/layout/vertical/NavbarContent.tsx"
+  ],
+  "notes": "Starting with Priority 1: MUI removal from active navigation components (renders on every page)"
+}

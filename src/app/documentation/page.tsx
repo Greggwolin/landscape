@@ -23,6 +23,14 @@ const DocumentationIndex: React.FC = () => {
   const documents: DocItem[] = [
     // Status Reports
     {
+      title: 'Ingestion Workbench & Alpha Prep Sprint (Mar 7, 2026)',
+      path: '/docs/09-session-notes/2026-03-07-ingestion-workbench-commit-organization.md',
+      category: 'AI',
+      description: 'Ingestion Workbench (split-panel chat + field table), extraction pipeline overhaul, 5 new Landscaper ingestion tools (217 total), source citation integrity, commit organization (7 logical groups, 90 files)',
+      icon: <Code className="w-5 h-5" />,
+      lastModified: '2026-03-07'
+    },
+    {
       title: 'DMS, Extraction & Doc Tags (Feb 14, 2026)',
       path: '/docs/09-session-notes/2026-02-14-dms-extraction-doctype-tags.md',
       category: 'AI',
@@ -410,9 +418,9 @@ const DocumentationIndex: React.FC = () => {
       title: 'Financial Engine Status',
       path: '/docs/00_overview/IMPLEMENTATION_STATUS.md',
       category: 'Status',
-      description: 'Complete financial engine implementation status — DMS/Extraction/Tags (Feb 14), Knowledge Library (Feb 13), Folder-Tabs UI Overhaul (Feb 8), Debt UI Consolidation, and all prior phases',
+      description: 'Complete financial engine implementation status — Ingestion Workbench & Alpha Prep Sprint (Mar 7), CoreUI Theme/Reconciliation/MapCanvas (Feb 21), DMS/Tags (Feb 14), and all prior phases',
       icon: <DollarSign className="w-5 h-5" />,
-      lastModified: '2026-02-14'
+      lastModified: '2026-03-07'
     },
     {
       title: 'CRE Implementation Summary',

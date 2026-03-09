@@ -8,6 +8,7 @@ import { useLandscaperThreads, ThreadMessage } from '@/hooks/useLandscaperThread
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
+import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -63,6 +64,10 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     projectId: projectId.toString(),
     pageContext: activeTab,
   });
+
+  // Sync local isLoading → global thinking context so HelpIcon propeller spins
+  const { setIsThinking } = useLandscaperThinking();
+  useEffect(() => { setIsThinking(isLoading); }, [isLoading, setIsThinking]);
 
   // Mutation handlers for Level 2 autonomy
   const handleConfirmMutation = useCallback(async (mutationId: string) => {

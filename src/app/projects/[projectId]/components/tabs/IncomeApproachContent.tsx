@@ -186,6 +186,7 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
               propertySummary={data.property_summary}
               rentRollItems={data.rent_roll.items}
               opexItems={data.operating_expenses.items}
+              opexGroups={data.operating_expenses.groups}
               sensitivityMatrix={data.sensitivity_matrix}
               keyMetrics={data.key_metrics}
               selectedBasis={selectedBasis}

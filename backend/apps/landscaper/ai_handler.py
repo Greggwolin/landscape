@@ -20,6 +20,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '.en
 
 import anthropic
 from django.conf import settings
+from django.db import connection
 
 
 def _sanitize_for_json(obj):
@@ -767,11 +768,11 @@ def _needs_user_knowledge(message: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Model to use for responses
-CLAUDE_MODEL = "claude-opus-4-20250514"
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
 ANTHROPIC_TIMEOUT_SECONDS = 120
 
 # Maximum tokens for response
-MAX_TOKENS = 16384
+MAX_TOKENS = 4096  # Lowered from 16384 — forces concise responses; tool calls still fit
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -809,10 +810,15 @@ def get_tools_for_context(
         analysis_purpose=analysis_purpose,
         subtab_context=None,
     )
-    tool_names = get_tools_for_page(effective_context)
+    tool_names = get_tools_for_page(
+        effective_context,
+        project_type_code=project_type_code,
+        project_type=project_type,
+    )
+    _allowed = set(tool_names)
     filtered_tools = [
         tool for tool in LANDSCAPER_TOOLS
-        if tool.get("name") in tool_names
+        if tool.get("name") in _allowed
     ]
 
     logger.info(
@@ -975,6 +981,27 @@ RESPONSE FORMAT — BE CONCISE:
 - Do not add editorial commentary ("this is typical for...", "this means...") unless asked.
 - Use labels from the data (GBA, Site SF, NRA) not verbose descriptions.
 
+DATA INTEGRITY — ALWAYS QUERY THE DATABASE (CRITICAL):
+When the user asks about the CURRENT STATE of project data — unit values, field populations,
+counts, averages, totals, or any question about what IS in the database — you MUST call the
+appropriate read tool (get_units, get_leases, etc.) BEFORE answering. NEVER answer data-state
+questions from conversation history or from what you previously claimed to set.
+
+Previous tool calls may have silently failed. Your conversation memory of "I updated X" is
+NOT proof that the value exists in the database. The ONLY source of truth is a fresh read
+from the database.
+
+Examples of questions that REQUIRE a fresh DB read:
+- "Which units don't have market rents?"
+- "What's the average rent?"
+- "Show me all vacant units"
+- "Did the update work?"
+- "What are the current values?"
+- "How many units have [field] populated?"
+
+If you answer any of these from memory without calling a read tool, you are likely giving
+the user incorrect information.
+
 DATA LOOKUP PRIORITY (CRITICAL):
 When the user asks about property data (site coverage, FAR, building specs, unit mix, rents,
 expenses, or any factual question about the property):
@@ -1102,10 +1129,27 @@ PARTIAL UPDATES with update_units:
 - The system will automatically preserve existing values for fields you don't include
 - If you want to CLEAR a field (set to null), explicitly include it with null value
 
-POST-MUTATION VERIFICATION:
-- After calling update_units, call get_units to verify at least 2-3 units received the correct values
+BULK UPDATES BY FILTER (PREFERRED for type-wide changes):
+When updating the SAME field to the SAME value for all units of a given type, use bulk_updates
+instead of records. This is faster and guaranteed to hit every matching unit.
+- Example: update_units({"bulk_updates": [
+    {"filter": {"unit_type": "1BR/1BA"}, "set": {"market_rent": 3200}},
+    {"filter": {"unit_type": "2BR/2BA"}, "set": {"market_rent": 3750}}
+  ], "reason": "Set market rents by plan type"})
+- Supported filter fields: unit_type, building_name, occupancy_status, bedrooms, bathrooms
+- Supported set fields: market_rent, current_rent, occupancy_status, unit_type, square_feet,
+  parking_rent, pet_rent, past_due_amount, deposit_amount, tenant_name, building_name
+- ALWAYS prefer bulk_updates when the user says "set X for all units of type Y"
+- The response includes per-filter update counts so you can verify all units were hit
+
+POST-MUTATION VERIFICATION (CRITICAL):
+After calling update_units, create_units, update_leases, or any mutation tool:
+- ALWAYS call the corresponding read tool (get_units, get_leases) to verify values actually persisted
+- Do NOT tell the user "Done, values updated" without verification from a fresh DB read
 - If verification shows values didn't change, report the issue to the user — do NOT claim success
 - Include the verified values in your response: "Verified: Unit 101 market_rent is now $1,200"
+- When the tool response includes "not_found" entries or "skipped_fields", explicitly tell
+  the user which units or fields failed — do not summarize as "all updated successfully"
 - update_operating_expenses returns a 'verification' object with db_total and db_expenses showing
   what's actually in the database AFTER the write. ALWAYS check this against your source data.
   If db_total doesn't match the target, tell the user — do NOT claim success.
@@ -1453,9 +1497,158 @@ BAD response:
 ### REMEMBER:
 - You have LIMITED tools in Alpha Assistant context
 - Don't pretend to diagnose things you can't see
-- Acknowledge → Offer feedback → Move on
-- Use the log_alpha_feedback tool when users confirm they want to submit feedback
+- Acknowledge the issue → Move on
+- Do NOT proactively log feedback or call feedback tools — the platform handles feedback capture separately
 """
+
+
+# =============================================================================
+# INGESTION WORKBENCH CONTEXT
+# =============================================================================
+
+INGESTION_PROMPT_ADDITION = """
+
+## INGESTION WORKBENCH CONTEXT
+
+You are currently embedded in the Ingestion Workbench — a split-panel UI where the user
+is reviewing AI-extracted field values from a document before committing them to the project.
+
+### YOUR ROLE:
+1. **Help the user understand** what was extracted and why
+2. **Explain low-confidence or conflicting fields** with source citations
+3. **Correct values** when the user asks you to update them
+4. **Approve/reject fields** on behalf of the user when asked
+5. **Answer questions** about the document content using source references
+
+### AVAILABLE TOOLS:
+- `get_ingestion_staging` — read the current extraction state (fields, values, confidence, status)
+- `update_staging_field` — correct/override an extracted value
+- `approve_staging_field` — accept fields (mark as 'accepted')
+- `reject_staging_field` — reject fields (mark as 'rejected')
+- `explain_extraction` — explain why a value was extracted with source text citation
+- `get_document_content` — read the full document text
+- `get_document_page` — read a specific page from the document
+
+### BEHAVIOR RULES:
+1. **Be proactive** — when the user opens the workbench, review the extraction state and
+   flag any low-confidence fields or conflicts that need attention
+2. **Cite sources** — always reference page numbers and source text when explaining extractions
+3. **Batch operations** — when the user says "approve all pending" or "reject low confidence ones",
+   use the batch approve/reject tools
+4. **Stay focused** — you're in document review mode, not general project analysis
+5. **Use field_key names** the user can recognize (e.g., "monthly rent" not "base_rent_monthly")
+"""
+
+
+def _get_ingestion_context(project_id: int, subtab_context: str = None) -> str:
+    """
+    Build a live extraction state summary for the ingestion system prompt.
+
+    Queries ai_extraction_staging for the current document's extraction status
+    and returns a formatted context block for injection into the system prompt.
+
+    Args:
+        project_id: The project ID
+        subtab_context: The intake UUID (used as subtab_context in the chat)
+    """
+    try:
+        with connection.cursor() as cursor:
+            # Get the doc_id from the intake session if we have an intake UUID
+            doc_id = None
+            if subtab_context:
+                cursor.execute("""
+                    SELECT doc_id FROM landscape.tbl_intake_session
+                    WHERE intake_uuid = %s AND project_id = %s
+                    LIMIT 1
+                """, [subtab_context, project_id])
+                row = cursor.fetchone()
+                if row:
+                    doc_id = row[0]
+
+            if not doc_id:
+                # Fallback: get the most recent staging doc for this project
+                cursor.execute("""
+                    SELECT DISTINCT doc_id
+                    FROM landscape.ai_extraction_staging
+                    WHERE project_id = %s
+                    ORDER BY doc_id DESC
+                    LIMIT 1
+                """, [project_id])
+                row = cursor.fetchone()
+                if row:
+                    doc_id = row[0]
+
+            if not doc_id:
+                return ""
+
+            # Get doc info
+            cursor.execute("""
+                SELECT doc_name, doc_type, mime_type
+                FROM landscape.core_doc
+                WHERE doc_id = %s
+            """, [doc_id])
+            doc_row = cursor.fetchone()
+            doc_name = doc_row[0] if doc_row else 'Unknown'
+            doc_type = doc_row[1] if doc_row else 'unknown'
+
+            # Get status summary
+            cursor.execute("""
+                SELECT status, COUNT(*) as cnt
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s AND doc_id = %s
+                GROUP BY status
+            """, [project_id, doc_id])
+            status_rows = cursor.fetchall()
+            status_counts = {r[0]: r[1] for r in status_rows}
+            total = sum(status_counts.values())
+
+            # Get low-confidence fields (< 0.7)
+            cursor.execute("""
+                SELECT field_key, confidence_score, extracted_value
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s AND doc_id = %s
+                  AND confidence_score < 0.7
+                  AND status NOT IN ('rejected', 'accepted')
+                ORDER BY confidence_score ASC
+                LIMIT 5
+            """, [project_id, doc_id])
+            low_conf_rows = cursor.fetchall()
+
+            # Get conflict fields
+            cursor.execute("""
+                SELECT field_key, extracted_value, conflict_with_extraction_id
+                FROM landscape.ai_extraction_staging
+                WHERE project_id = %s AND doc_id = %s
+                  AND status = 'conflict'
+                ORDER BY field_key
+                LIMIT 5
+            """, [project_id, doc_id])
+            conflict_rows = cursor.fetchall()
+
+        # Build context block
+        ctx = f"\n\n<ingestion_state>\n"
+        ctx += f"DOCUMENT: {doc_name} (doc_id={doc_id}, type={doc_type})\n"
+        ctx += f"TOTAL FIELDS: {total}\n"
+        ctx += "STATUS BREAKDOWN: " + ", ".join(
+            f"{s}={c}" for s, c in sorted(status_counts.items())
+        ) + "\n"
+
+        if low_conf_rows:
+            ctx += "\nLOW CONFIDENCE FIELDS (need attention):\n"
+            for fk, conf, val in low_conf_rows:
+                ctx += f"  - {fk}: confidence={float(conf):.0%}, value={val}\n"
+
+        if conflict_rows:
+            ctx += "\nCONFLICT FIELDS (multiple sources disagree):\n"
+            for fk, val, conflict_id in conflict_rows:
+                ctx += f"  - {fk}: value={val}, conflicts with extraction_id={conflict_id}\n"
+
+        ctx += "</ingestion_state>"
+        return ctx
+
+    except Exception as e:
+        logger.warning(f"Failed to build ingestion context: {e}")
+        return ""
 
 
 SYSTEM_PROMPTS = {
@@ -1815,9 +2008,11 @@ def get_system_prompt(project_type: str) -> str:
     """Get the appropriate system prompt based on project type."""
     type_lower = (project_type or '').lower()
 
-    # Map project type codes to categories
+    # Map project type codes and display names to prompt categories
     type_map = {
         'land': 'land_development',
+        'land development': 'land_development',
+        'land_development': 'land_development',
         'mf': 'multifamily',
         'multifamily': 'multifamily',
         'off': 'office',
@@ -1826,6 +2021,11 @@ def get_system_prompt(project_type: str) -> str:
         'retail': 'retail',
         'ind': 'industrial',
         'industrial': 'industrial',
+        'htl': 'default',
+        'hotel': 'default',
+        'mxu': 'default',
+        'mixed use': 'default',
+        'mixed_use': 'default',
     }
 
     category = type_map.get(type_lower, 'default')
@@ -1886,12 +2086,51 @@ def _build_project_context_message(project_context: Dict[str, Any]) -> str:
         if budget_summary.get('total_actual'):
             context_parts.append(f"Total Actual: ${budget_summary['total_actual']:,.0f}")
 
+    # Add analysis taxonomy if available
+    analysis_perspective = project_context.get('analysis_perspective')
+    analysis_purpose = project_context.get('analysis_purpose')
+    if analysis_perspective:
+        context_parts.append(f"Analysis Perspective: {analysis_perspective}")
+    if analysis_purpose:
+        context_parts.append(f"Analysis Purpose: {analysis_purpose}")
+
     # Add market data if available
     if market_data:
         if market_data.get('absorption_rate'):
             context_parts.append(f"Absorption Rate: {market_data['absorption_rate']} lots/month")
         if market_data.get('avg_lot_price'):
             context_parts.append(f"Avg Lot Price: ${market_data['avg_lot_price']:,.0f}")
+
+    # Build list of known fields so the AI skips questions about them
+    known_fields = []
+    if project_type:
+        known_fields.append('property type')
+    if project_context.get('project_name') and project_context['project_name'] != 'Unknown Project':
+        known_fields.append('project name')
+    if project_details:
+        if project_details.get('address'):
+            known_fields.append('address')
+        if project_details.get('city'):
+            known_fields.append('location/city')
+        if project_details.get('state'):
+            known_fields.append('state')
+        if project_details.get('county'):
+            known_fields.append('county')
+        if project_details.get('total_acres'):
+            known_fields.append('total acres')
+        if project_details.get('total_lots'):
+            known_fields.append('total lots/units')
+    if analysis_perspective:
+        known_fields.append('analysis perspective')
+    if analysis_purpose:
+        known_fields.append('analysis purpose')
+
+    if known_fields:
+        context_parts.append(
+            f"\nALREADY KNOWN (do NOT ask about these): {', '.join(known_fields)}. "
+            "These fields are already set on this project. Treat them as given facts. "
+            "Start your gap-fill questions from the first field that is NOT listed above."
+        )
 
     return "\n".join(context_parts)
 
@@ -2141,6 +2380,16 @@ def get_landscaper_response(
         full_system += ALPHA_ASSISTANT_PROMPT_ADDITION
         logger.info("Alpha Assistant behavioral guidance added to system prompt")
 
+    # Add Ingestion Workbench context when reviewing document extractions
+    if page_context and page_context.lower() == "ingestion":
+        full_system += INGESTION_PROMPT_ADDITION
+        # Inject live extraction state summary
+        subtab = project_context.get('subtab_context')
+        ingestion_ctx = _get_ingestion_context(project_id, subtab_context=subtab)
+        if ingestion_ctx:
+            full_system += ingestion_ctx
+        logger.info("Ingestion Workbench context added to system prompt")
+
     # Inject active what-if shadow state if present
     thread_id = project_context.get('thread_id')
     if thread_id:
@@ -2304,10 +2553,13 @@ def get_landscaper_response(
                 include_extraction=include_extraction,
                 is_admin=is_admin,
                 project_id=_pid,
+                project_type_code=project_context.get('project_type_code'),
+                project_type=project_context.get('project_type'),
             )
+            _allowed = set(available_tool_names)
             filtered_tools = [
                 tool for tool in LANDSCAPER_TOOLS
-                if tool.get('name') in available_tool_names
+                if tool.get('name') in _allowed
             ]
             api_kwargs['tools'] = filtered_tools
             # DIAGNOSTIC: Log which tools are sent to Claude

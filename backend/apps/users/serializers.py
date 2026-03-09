@@ -5,7 +5,7 @@ Serializers for user-facing Landscaper onboarding data.
 from rest_framework import serializers
 from django.core.validators import MaxLengthValidator
 
-from .models import UserLandscaperProfile
+from .models import UserGridPreference, UserLandscaperProfile
 
 
 ROLE_OPTIONS = {
@@ -89,3 +89,21 @@ class UserLandscaperProfileSerializer(serializers.ModelSerializer):
         if value and len(value.strip()) == 0:
             raise serializers.ValidationError("markets_text cannot be empty if provided")
         return value
+
+
+class UserGridPreferenceSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+
+    class Meta:
+        model = UserGridPreference
+        fields = [
+            'id',
+            'user_id',
+            'project_id',
+            'grid_id',
+            'column_order',
+            'column_visibility',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'user_id', 'created_at', 'updated_at']

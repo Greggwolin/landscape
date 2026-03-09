@@ -26,11 +26,17 @@ class MultifamilyUnitType(models.Model):
         related_name='unit_types'
     )
     unit_type_code = models.CharField(max_length=50)
+    unit_type_name = models.CharField(max_length=100, null=True, blank=True)
     bedrooms = models.DecimalField(max_digits=3, decimal_places=1)
     bathrooms = models.DecimalField(max_digits=3, decimal_places=1)
     avg_square_feet = models.IntegerField()
     current_market_rent = models.DecimalField(max_digits=10, decimal_places=2)
     total_units = models.IntegerField()
+    unit_count = models.IntegerField(null=True, blank=True)
+    market_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    current_rent_avg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    concessions_avg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    value_source = models.CharField(max_length=50, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     other_features = models.TextField(null=True, blank=True)
     floorplan_doc_id = models.BigIntegerField(null=True, blank=True)
@@ -68,6 +74,60 @@ def derive_unit_type(bedrooms, bathrooms):
     if br == 0:
         return f'Studio/{ba}BA'
     return f'{br}BR/{ba}BA'
+
+
+def normalize_unit_type_code(raw: str) -> str:
+    """
+    Normalize a free-text unit type string to canonical code format.
+
+    Handles common extraction variants:
+      "1 Bedroom / 1 Bathroom"  → "1BR/1BA"
+      "2 Bed / 2 Bath"          → "2BR/2BA"
+      "1x1"                     → "1BR/1BA"
+      "Studio"                  → "Studio/1BA"
+      "1BR/1BA"                 → "1BR/1BA" (already canonical)
+
+    Returns the input unchanged if no pattern matches.
+    """
+    import re
+    if not raw or not raw.strip():
+        return raw or ''
+
+    s = raw.strip()
+
+    # Already canonical: "1BR/1BA", "Studio/1BA"
+    if re.match(r'^(Studio|\d+BR)/\d+BA$', s):
+        return s
+
+    # Pattern: "NxN" (e.g. "1x1", "2x2")
+    m = re.match(r'^(\d+)\s*x\s*(\d+)$', s, re.IGNORECASE)
+    if m:
+        return derive_unit_type(int(m.group(1)), int(m.group(2)))
+
+    # Pattern: "N Bedroom / N Bathroom" (with many variations)
+    m = re.match(
+        r'(\d+|studio)\s*(?:bed(?:room)?s?)\s*[/,&]\s*(\d+(?:\.\d+)?)\s*(?:bath(?:room)?s?)',
+        s, re.IGNORECASE
+    )
+    if m:
+        br = 0 if m.group(1).lower() == 'studio' else int(m.group(1))
+        ba = int(float(m.group(2)))
+        return derive_unit_type(br, ba)
+
+    # Pattern: "N Bed / N Bath" (shorter variant, no "room")
+    m = re.match(
+        r'(\d+)\s*(?:br|bed)\s*[/,&]\s*(\d+(?:\.\d+)?)\s*(?:ba|bath)',
+        s, re.IGNORECASE
+    )
+    if m:
+        return derive_unit_type(int(m.group(1)), int(float(m.group(2))))
+
+    # Pattern: standalone "Studio"
+    if s.lower() == 'studio':
+        return 'Studio/1BA'
+
+    # No match — return as-is
+    return s
 
 
 def parse_unit_category(raw_type):
@@ -174,6 +234,11 @@ class MultifamilyUnit(models.Model):
     is_section8 = models.BooleanField(default=False)
     section8_contract_date = models.DateField(null=True, blank=True)
     section8_contract_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    parking_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    pet_rent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    past_due_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    deposit_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    tenant_name = models.CharField(max_length=255, null=True, blank=True)
     extra_data = models.JSONField(
         null=True,
         blank=True,

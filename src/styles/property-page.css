@@ -142,6 +142,20 @@
   background: var(--cui-tertiary-bg);
 }
 
+/* Size columns to widest cell content; headers wrap to fit */
+.rent-roll table {
+  table-layout: auto;
+}
+
+.rent-roll table th {
+  white-space: normal;
+  min-width: 50px;
+}
+
+.rent-roll table td {
+  white-space: nowrap;
+}
+
 /* Sort indicators */
 .rent-roll th[style*="cursor: pointer"]:hover {
   background: rgba(var(--cui-primary-rgb), 0.08);

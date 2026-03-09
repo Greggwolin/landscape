@@ -18,7 +18,7 @@ import operator
 import os
 from contextlib import contextmanager
 from functools import wraps
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 from decimal import Decimal, InvalidOperation
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
@@ -258,6 +258,66 @@ ALLOWED_UPDATES = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Unit Field Name Normalization — convert camelCase/flat-lowercase to snake_case
+# Applied in handle_update_units before alias resolution
+# ─────────────────────────────────────────────────────────────────────────────
+# Flat-lowercase → snake_case (catches AI sending "marketrent" instead of "market_rent")
+_FLAT_TO_SNAKE = {
+    'marketrent': 'market_rent',
+    'currentrent': 'current_rent',
+    'parkingrent': 'parking_rent',
+    'petrent': 'pet_rent',
+    'pastdueamount': 'past_due_amount',
+    'depositamount': 'deposit_amount',
+    'tenantname': 'tenant_name',
+    'unitnumber': 'unit_number',
+    'unittype': 'unit_type',
+    'squarefeet': 'square_feet',
+    'occupancystatus': 'occupancy_status',
+    'leasestartdate': 'lease_start_date',
+    'leaseenddate': 'lease_end_date',
+    'buildingname': 'building_name',
+    'floornumber': 'floor_number',
+    'renovationstatus': 'renovation_status',
+    'renovationdate': 'renovation_date',
+    'renovationcost': 'renovation_cost',
+    'issection8': 'is_section8',
+    'section8contractdate': 'section8_contract_date',
+    'section8contractrent': 'section8_contract_rent',
+    'hasbalcony': 'has_balcony',
+    'haspatio': 'has_patio',
+    'balconysf': 'balcony_sf',
+    'ceilingheightft': 'ceiling_height_ft',
+    'viewtype': 'view_type',
+    'ismanager': 'is_manager',
+    'unitcategory': 'unit_category',
+    'unitdesignation': 'unit_designation',
+    'otherfeatures': 'other_features',
+    'extradata': 'extra_data',
+    'proformarent': 'proforma_rent',
+    'leasetermmonths': 'lease_term_months',
+}
+
+
+def normalize_field_name(name: str) -> str:
+    """Convert camelCase, flat-lowercase, or mixed-case field names to snake_case DB column names.
+
+    Examples:
+        marketRent   → market_rent
+        marketrent   → market_rent
+        market_rent  → market_rent  (no change)
+        MarketRent   → market_rent
+    """
+    import re
+    # Step 1: camelCase → snake_case (e.g. marketRent → market_rent)
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    snake = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+    # Step 2: check flat-lowercase lookup (e.g. marketrent → market_rent)
+    return _FLAT_TO_SNAKE.get(snake, snake)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Unit Field Aliases — map common tool input names to actual model field names
 # Applied in handle_update_units before passing records to MutationService
 # ─────────────────────────────────────────────────────────────────────────────
@@ -281,9 +341,12 @@ VALID_UNIT_FIELDS = {
     'current_rent', 'market_rent', 'occupancy_status',
     'renovation_status', 'renovation_cost', 'renovation_date',
     'turns', 'other_features', 'extra_data',
-    # Lease fields passed through to lease creation (not on unit model, but handled downstream)
-    'lease_start_date', 'lease_end_date', 'lease_term_months',
-    'tenant_name',
+    # Financial fields (added with rent roll grid fixes)
+    'parking_rent', 'pet_rent', 'past_due_amount', 'deposit_amount',
+    # Section 8 fields
+    'is_section8', 'section8_contract_date', 'section8_contract_rent',
+    # Tenant / lease fields passed through to lease creation
+    'tenant_name', 'lease_start_date', 'lease_end_date', 'lease_term_months',
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,36 +369,53 @@ OCCUPANCY_STATUS_MAP = {
 }
 
 
-def normalize_unit_record(rec: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_unit_record(rec: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     """Normalize a single unit record: resolve field aliases and normalize values.
 
     Applied before records reach MutationService to ensure consistent field names
     and canonical occupancy status values.
+
+    Returns:
+        (normalized_record, skipped_fields) — skipped_fields lists field names
+        that were not recognized and will be ignored.
     """
     normalized = {}
+    skipped_fields = []
     for key, value in rec.items():
-        # Check if this field is an alias
+        # Step 1: Normalize field name (camelCase/flat → snake_case)
+        original_key = key
+        key = normalize_field_name(key)
+
+        # Step 2: Check if this field is an alias
         if key in UNIT_FIELD_ALIASES:
             actual = UNIT_FIELD_ALIASES[key]
             if actual is None:
                 # Field belongs to a related model — log warning and skip
                 logger.warning(
-                    f"[update_units] Field '{key}' belongs to a related model (lease), "
+                    f"[update_units] Field '{original_key}' belongs to a related model (lease), "
                     f"not MultifamilyUnit. Value '{value}' will be skipped. "
                     f"Use update_leases for lease fields."
                 )
+                skipped_fields.append(original_key)
                 continue
-            logger.debug(f"[update_units] Aliased field '{key}' → '{actual}'")
+            if key != original_key:
+                logger.debug(f"[update_units] Normalized '{original_key}' → '{key}' → alias '{actual}'")
+            else:
+                logger.debug(f"[update_units] Aliased field '{key}' → '{actual}'")
             key = actual
-        normalized[key] = value
+        elif key != original_key:
+            logger.debug(f"[update_units] Normalized field name '{original_key}' → '{key}'")
 
-    # Warn about unrecognized fields (but still pass them through for flexibility)
-    for key in normalized:
+        # Step 3: Validate against known fields
         if key not in VALID_UNIT_FIELDS:
             logger.warning(
-                f"[update_units] Unrecognized field '{key}' — not in MultifamilyUnit model. "
-                f"Value will be passed through but may be ignored by the database."
+                f"[update_units] Unrecognized field '{original_key}' (normalized: '{key}') "
+                f"— not in MultifamilyUnit model. Value will be dropped."
             )
+            skipped_fields.append(original_key)
+            continue
+
+        normalized[key] = value
 
     # Normalize occupancy_status values
     status = normalized.get('occupancy_status')
@@ -353,7 +433,7 @@ def normalize_unit_record(rec: Dict[str, Any]) -> Dict[str, Any]:
                 f"Keeping raw value. Known values: {list(OCCUPANCY_STATUS_MAP.keys())}"
             )
 
-    return normalized
+    return normalized, skipped_fields
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4075,8 +4155,10 @@ def handle_get_units(
         query = """
             SELECT unit_id, unit_number, building_name, unit_type, bedrooms, bathrooms,
                    square_feet, market_rent, current_rent, current_rent_psf, market_rent_psf,
-                   occupancy_status, lease_start_date, lease_end_date, renovation_status,
-                   renovation_cost, renovation_date, is_section8, is_manager,
+                   occupancy_status, tenant_name, lease_start_date, lease_end_date,
+                   parking_rent, pet_rent, past_due_amount, deposit_amount,
+                   renovation_status, renovation_cost, renovation_date,
+                   is_section8, is_manager,
                    has_balcony, has_patio, view_type, floor_number, other_features
             FROM landscape.tbl_multifamily_unit
             WHERE project_id = %s
@@ -4124,6 +4206,93 @@ def handle_get_units(
         return {'success': False, 'error': str(e), 'count': 0, 'records': []}
 
 
+def _handle_bulk_unit_updates(
+    bulk_updates: list,
+    project_id: int,
+    reason: str,
+) -> Dict[str, Any]:
+    """Bulk update units by filter (e.g., set market_rent for all units of a given unit_type).
+
+    Each entry in bulk_updates: {"filter": {"unit_type": "1BR/1BA"}, "set": {"market_rent": 3200}}
+    Supported filter fields: unit_type, building_name, occupancy_status
+    Supported set fields: market_rent, current_rent, occupancy_status, unit_type, square_feet,
+                          parking_rent, pet_rent, past_due_amount, deposit_amount, tenant_name, building_name
+    """
+    ALLOWED_FILTER_FIELDS = {'unit_type', 'building_name', 'occupancy_status', 'bedrooms', 'bathrooms'}
+    ALLOWED_SET_FIELDS = {
+        'market_rent', 'current_rent', 'occupancy_status', 'unit_type', 'square_feet',
+        'parking_rent', 'pet_rent', 'past_due_amount', 'deposit_amount', 'tenant_name', 'building_name',
+    }
+
+    from django.db import connection
+
+    total_updated = 0
+    results = []
+
+    for entry in bulk_updates:
+        filter_dict = entry.get('filter', {})
+        set_dict = entry.get('set', {})
+
+        if not filter_dict or not set_dict:
+            results.append({'error': 'Each bulk_update needs both "filter" and "set"', 'entry': entry})
+            continue
+
+        # Validate filter fields
+        bad_filters = set(filter_dict.keys()) - ALLOWED_FILTER_FIELDS
+        if bad_filters:
+            results.append({'error': f'Invalid filter fields: {bad_filters}', 'entry': entry})
+            continue
+
+        # Validate set fields
+        bad_sets = set(set_dict.keys()) - ALLOWED_SET_FIELDS
+        if bad_sets:
+            results.append({'error': f'Invalid set fields: {bad_sets}', 'entry': entry})
+            continue
+
+        # Build SET clause
+        set_parts = []
+        set_params = []
+        for field, value in set_dict.items():
+            set_parts.append(f"{field} = %s")
+            set_params.append(value)
+        set_parts.append("updated_at = NOW()")
+
+        # Build WHERE clause
+        where_parts = ["project_id = %s"]
+        where_params = [project_id]
+        for field, value in filter_dict.items():
+            where_parts.append(f"{field} = %s")
+            where_params.append(value)
+
+        sql = f"""
+            UPDATE landscape.tbl_multifamily_unit
+            SET {', '.join(set_parts)}
+            WHERE {' AND '.join(where_parts)}
+        """
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, set_params + where_params)
+                count = cursor.rowcount
+                total_updated += count
+                results.append({
+                    'filter': filter_dict,
+                    'set': set_dict,
+                    'updated': count,
+                })
+                logger.info(f"[bulk_update_units] Updated {count} units: filter={filter_dict}, set={set_dict}")
+        except Exception as e:
+            logger.error(f"[bulk_update_units] Error: {e}", exc_info=True)
+            results.append({'error': str(e), 'filter': filter_dict, 'set': set_dict})
+
+    return {
+        'success': total_updated > 0,
+        'total_updated': total_updated,
+        'details': results,
+        'reason': reason,
+    }
+
+
 @register_tool('update_units', is_mutation=True)
 def handle_update_units(
     tool_input: Dict[str, Any],
@@ -4134,23 +4303,46 @@ def handle_update_units(
 ) -> Dict[str, Any]:
     """Add or update individual units for a multifamily property.
 
+    Supports two modes:
+    1. Per-unit records: {"records": [{"unit_number": "101", "market_rent": 1200}, ...]}
+    2. Bulk filter: {"bulk_updates": [{"filter": {"unit_type": "1BR/1BA"}, "set": {"market_rent": 3200}}, ...]}
+       Updates ALL units matching the filter in one SQL statement. Much more efficient
+       for "set market_rent for all units of type X" style requests.
+
     When auto-executed (propose_only=False), uses MutationService._execute_mutation
     which creates units, leases, AND unit types in one atomic operation.
+
+    Returns accurate counts including not_found unit numbers and skipped fields
+    so the AI can report failures to the user instead of hallucinating success.
     """
+    # ── Bulk filter path: UPDATE ... WHERE unit_type = X ──
+    bulk_updates = tool_input.get('bulk_updates', [])
+    if bulk_updates:
+        return _handle_bulk_unit_updates(bulk_updates, project_id, tool_input.get('reason', 'Bulk update units'))
+
     raw_records = tool_input.get('records', [])
     reason = tool_input.get('reason', 'Update units')
 
     if not raw_records:
         return {'success': False, 'error': 'No records provided'}
 
-    # Normalize all records: resolve field aliases (status→occupancy_status, etc.)
-    # and normalize values (e.g., "Current"→"occupied", "Vacant-Unrented"→"vacant")
-    records = [normalize_unit_record(rec) for rec in raw_records]
+    # Normalize all records: resolve field aliases (status→occupancy_status, etc.),
+    # normalize camelCase/flat-lowercase field names, and normalize values
+    all_skipped_fields = set()
+    records = []
+    for rec in raw_records:
+        normalized, skipped = normalize_unit_record(rec)
+        if skipped:
+            all_skipped_fields.update(skipped)
+        records.append(normalized)
+
+    if all_skipped_fields:
+        logger.warning(f"[update_units] Skipped fields across all records: {sorted(all_skipped_fields)}")
 
     from .services.mutation_service import MutationService
 
     if propose_only:
-        return MutationService.create_proposal(
+        result = MutationService.create_proposal(
             project_id=project_id,
             mutation_type='rent_roll_batch',
             table_name='tbl_multifamily_unit',
@@ -4160,6 +4352,9 @@ def handle_update_units(
             reason=reason,
             source_message_id=source_message_id,
         )
+        if all_skipped_fields:
+            result['skipped_fields'] = sorted(all_skipped_fields)
+        return result
 
     # Direct execution - use MutationService to get full functionality
     # (creates units, leases, AND unit types in one operation)
@@ -4173,8 +4368,26 @@ def handle_update_units(
         proposed_value={'records': records, 'count': len(records)},
     )
 
+
+    # Enrich result with skipped_fields info
+    if all_skipped_fields:
+        result['skipped_fields'] = sorted(all_skipped_fields)
+
+    # Add warning when units were found but nothing actually updated
+    matched = result.get('created', 0) + result.get('updated', 0)
+    not_found = result.get('not_found', [])
+    if matched > 0 and result.get('updated', 0) == 0 and result.get('created', 0) == 0:
+        result['warning'] = (
+            "Units were found but no fields were actually updated. "
+            "Check that field names match allowed fields."
+        )
+    elif matched == 0 and not not_found and result.get('success'):
+        result['warning'] = (
+            "No units were matched or updated. Verify unit_number values exist in this project."
+        )
+
     # Log the activity
-    if result.get('success'):
+    if result.get('success') and (result.get('created', 0) > 0 or result.get('updated', 0) > 0):
         _log_rent_roll_activity(
             project_id, 'tbl_multifamily_unit', 'batch_upsert',
             result.get('created', 0), result.get('updated', 0), reason
@@ -5545,7 +5758,7 @@ RENTAL_COMP_COLUMNS = [
     'property_name', 'address', 'distance_miles', 'year_built', 'total_units',
     'unit_type', 'bedrooms', 'bathrooms', 'avg_sqft', 'asking_rent',
     'effective_rent', 'concessions', 'amenities', 'notes', 'data_source',
-    'as_of_date', 'is_active'
+    'as_of_date', 'is_active', 'latitude', 'longitude'
 ]
 
 
@@ -5566,8 +5779,9 @@ def handle_get_rental_comparables(
                 SELECT comparable_id, property_name, address, distance_miles,
                        year_built, total_units, unit_type, bedrooms, bathrooms,
                        avg_sqft, asking_rent, effective_rent, concessions,
-                       amenities, notes, data_source, as_of_date, is_active
-                FROM landscape.tbl_rent_comparable
+                       amenities, notes, data_source, as_of_date, is_active,
+                       latitude, longitude
+                FROM landscape.tbl_rental_comparable
                 WHERE project_id = %s
             """
             params = [project_id]
@@ -5631,7 +5845,7 @@ def handle_update_rental_comparable(
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='comparable_upsert',
-            table_name='tbl_rent_comparable',
+            table_name='tbl_rental_comparable',
             field_name=None,
             record_id=str(comparable_id) if comparable_id else None,
             proposed_value={k: v for k, v in tool_input.items() if k in RENTAL_COMP_COLUMNS},
@@ -5646,19 +5860,19 @@ def handle_update_rental_comparable(
             existing = None
             if comparable_id:
                 cursor.execute("""
-                    SELECT comparable_id FROM landscape.tbl_rent_comparable
+                    SELECT comparable_id FROM landscape.tbl_rental_comparable
                     WHERE comparable_id = %s AND project_id = %s
                 """, [comparable_id, project_id])
                 existing = cursor.fetchone()
             elif property_name and unit_type:
                 cursor.execute("""
-                    SELECT comparable_id FROM landscape.tbl_rent_comparable
+                    SELECT comparable_id FROM landscape.tbl_rental_comparable
                     WHERE project_id = %s AND property_name = %s AND unit_type = %s
                 """, [project_id, property_name, unit_type])
                 existing = cursor.fetchone()
             elif property_name:
                 cursor.execute("""
-                    SELECT comparable_id FROM landscape.tbl_rent_comparable
+                    SELECT comparable_id FROM landscape.tbl_rental_comparable
                     WHERE project_id = %s AND property_name = %s
                     LIMIT 1
                 """, [project_id, property_name])
@@ -5675,12 +5889,12 @@ def handle_update_rental_comparable(
                     set_clauses = ', '.join([f"{col} = %s" for col in updates.keys()])
                     values = list(updates.values()) + [existing_id]
                     cursor.execute(f"""
-                        UPDATE landscape.tbl_rent_comparable
+                        UPDATE landscape.tbl_rental_comparable
                         SET {set_clauses}, updated_at = NOW()
                         WHERE comparable_id = %s
                     """, values)
 
-                _log_comparables_activity(project_id, 'tbl_rent_comparable', 'update', 1, reason)
+                _log_comparables_activity(project_id, 'tbl_rental_comparable', 'update', 1, reason)
                 return {
                     'success': True,
                     'action': 'updated',
@@ -5698,13 +5912,13 @@ def handle_update_rental_comparable(
                 values = [project_id] + list(updates.values())
 
                 cursor.execute(f"""
-                    INSERT INTO landscape.tbl_rent_comparable ({', '.join(col_names)})
+                    INSERT INTO landscape.tbl_rental_comparable ({', '.join(col_names)})
                     VALUES ({placeholders})
                     RETURNING comparable_id
                 """, values)
                 new_id = cursor.fetchone()[0]
 
-                _log_comparables_activity(project_id, 'tbl_rent_comparable', 'create', 1, reason)
+                _log_comparables_activity(project_id, 'tbl_rental_comparable', 'create', 1, reason)
                 return {
                     'success': True,
                     'action': 'created',
@@ -5737,7 +5951,7 @@ def handle_delete_rental_comparable(
         return MutationService.create_proposal(
             project_id=project_id,
             mutation_type='comparable_delete',
-            table_name='tbl_rent_comparable',
+            table_name='tbl_rental_comparable',
             field_name=None,
             record_id=str(comparable_id),
             proposed_value={'delete': True, 'comparable_id': comparable_id},
@@ -5750,7 +5964,7 @@ def handle_delete_rental_comparable(
         with connection.cursor() as cursor:
             # Get property name for logging
             cursor.execute("""
-                SELECT property_name FROM landscape.tbl_rent_comparable
+                SELECT property_name FROM landscape.tbl_rental_comparable
                 WHERE comparable_id = %s AND project_id = %s
             """, [comparable_id, project_id])
             row = cursor.fetchone()
@@ -5761,11 +5975,11 @@ def handle_delete_rental_comparable(
             property_name = row[0]
 
             cursor.execute("""
-                DELETE FROM landscape.tbl_rent_comparable
+                DELETE FROM landscape.tbl_rental_comparable
                 WHERE comparable_id = %s AND project_id = %s
             """, [comparable_id, project_id])
 
-            _log_comparables_activity(project_id, 'tbl_rent_comparable', 'delete', 1, reason)
+            _log_comparables_activity(project_id, 'tbl_rental_comparable', 'delete', 1, reason)
             return {
                 'success': True,
                 'action': 'deleted',
@@ -12560,7 +12774,6 @@ def handle_analyze_rent_roll_columns(
     """Analyze columns in a structured rent roll file, check existing data, and propose mappings."""
     document_id = tool_input.get('document_id')
 
-    # DIAGNOSTIC LOGGING — remove after diagnosis
     logger.info(f"=== RENT ROLL ANALYZE TOOL CALLED === doc_id={document_id}, project_id={project_id}")
     print(f"=== RENT ROLL ANALYZE TOOL CALLED === doc_id={document_id}, project_id={project_id}")
 
@@ -17160,3 +17373,4 @@ from .tools import scenario_ops_tools  # noqa: E402, F401
 from .tools import kpi_tools  # noqa: E402, F401
 from .tools import ic_tools  # noqa: E402, F401
 from .tools import landdev_tools  # noqa: E402, F401
+from .tools import ingestion_tools  # noqa: E402, F401

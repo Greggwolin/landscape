@@ -25,6 +25,7 @@ import {
   type StagingRoute,
   type CollisionInfo,
 } from '@/components/dms/staging/classifyFile';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 // ============================================
 // CONTEXT VALUE
@@ -37,6 +38,7 @@ export interface StageFilesOptions {
 export interface PendingIntakeDoc {
   docId: number;
   docName: string;
+  docType: string | null;
 }
 
 interface UploadStagingContextValue {
@@ -262,6 +264,7 @@ export function UploadStagingProvider({
             `/api/projects/${projectId}/dms/docs/${staged.collision.existingDoc.doc_id}/version`,
             {
               method: 'POST',
+              headers: { ...getAuthHeaders() },
               body: formData,
             }
           );
@@ -272,6 +275,19 @@ export function UploadStagingProvider({
           }
 
           dispatch({ type: 'UPDATE_FILE', id, updates: { status: 'complete' } });
+
+          // If file was routed for extraction, still surface the intake choice
+          // modal so the user can choose structured ingestion on the existing doc.
+          if (effectiveRoute === 'extract') {
+            setPendingIntakeDocs(prev => [
+              ...prev,
+              {
+                docId: staged.collision!.existingDoc.doc_id,
+                docName: staged.file.name,
+                docType: effectiveDocType,
+              },
+            ]);
+          }
           return;
         } catch (error) {
           console.error(`[STAGING] Version upload error for ${staged.file.name}:`, error);
@@ -306,6 +322,11 @@ export function UploadStagingProvider({
           | undefined;
 
         // 2. Create document record
+        // When route is 'extract', signal structured_ingestion intent so the
+        // backend skips the legacy dms_extract_queue insert — the Workbench
+        // triggers the knowledge extraction service separately.
+        const intent = effectiveRoute === 'extract' ? 'structured_ingestion' : undefined;
+
         const payload = {
           system: {
             project_id: (serverData?.project_id as number) ?? projectId,
@@ -318,6 +339,7 @@ export function UploadStagingProvider({
             file_size_bytes: (serverData?.file_size_bytes as number) ?? staged.file.size,
             mime_type: (serverData?.mime_type as string) ?? staged.file.type,
             version_no: 1,
+            ...(intent && { intent }),
           },
           profile: {},
           ai: { source: 'staging-tray' },
@@ -325,7 +347,7 @@ export function UploadStagingProvider({
 
         const response = await fetch('/api/dms/docs', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify(payload),
         });
 
@@ -342,7 +364,11 @@ export function UploadStagingProvider({
         if (effectiveRoute === 'extract' && docResult.doc?.doc_id) {
           setPendingIntakeDocs(prev => [
             ...prev,
-            { docId: docResult.doc.doc_id, docName: staged.file.name },
+            {
+              docId: docResult.doc.doc_id,
+              docName: staged.file.name,
+              docType: effectiveDocType,
+            },
           ]);
         }
 

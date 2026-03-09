@@ -567,12 +567,13 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "update_units",
-        "description": "Create or update individual units.",
+        "description": "Create or update units. Two modes: (1) per-unit 'records' with unit_number, (2) 'bulk_updates' to set fields on ALL units matching a filter (preferred for type-wide changes like setting market_rent by plan). Provide records OR bulk_updates, not both.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "records": {
                     "type": "array",
+                    "description": "Per-unit updates. Each record must have unit_number.",
                     "items": {
                         "type": "object",
                         "properties": {
@@ -600,9 +601,20 @@ LANDSCAPER_TOOLS = [
                         "required": ["unit_number"],
                     },
                 },
+                "bulk_updates": {
+                    "type": "array",
+                    "description": "Bulk updates by filter. PREFERRED when setting the same value for all units of a type. Each entry: {filter: {unit_type: '1BR/1BA'}, set: {market_rent: 3200}}. Filter fields: unit_type, building_name, occupancy_status, bedrooms, bathrooms.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "filter": {"type": "object", "description": "Fields to match (unit_type, building_name, etc.)"},
+                            "set": {"type": "object", "description": "Fields to update (market_rent, current_rent, etc.)"},
+                        },
+                        "required": ["filter", "set"],
+                    },
+                },
                 "reason": {"type": "string"},
             },
-            "required": ["records"],
         },
     },
     {
@@ -2958,23 +2970,12 @@ LANDSCAPER_TOOLS = [
             },
         },
     },
-    {
-        "name": "log_alpha_feedback",
-        "description": "Log user feedback (bug, suggestion, question).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "feedback_type": {
-                    "type": "string",
-                    "enum": ["bug", "suggestion", "question", "confusion"],
-                },
-                "summary": {"type": "string"},
-                "user_quote": {"type": "string"},
-                "page_context": {"type": "string"},
-            },
-            "required": ["feedback_type", "summary"],
-        },
-    },
+    # log_alpha_feedback REMOVED from Claude's tool list.
+    # Claude was proactively calling this on normal user messages (interpreting
+    # suggestions as feedback). Feedback now captured via:
+    #   - #FB hashtag detection in ThreadMessageViewSet.create()
+    #   - Automatic help panel logging via HelpChatView
+    # The handler in tool_executor.py is retained for backward compat.
     {
         "name": "create_analysis_draft",
         "description": "Create a new analysis draft for conversational underwriting.",
@@ -3799,6 +3800,75 @@ LANDSCAPER_TOOLS = [
                 },
             },
             "required": ["tier"],
+        },
+    },
+    # ── Ingestion Workbench tools ──────────────────────────────────────────────
+    {
+        "name": "get_ingestion_staging",
+        "description": "Get extracted field values from the ingestion workbench for the current document. Returns field_key, extracted_value, confidence, status (pending/accepted/rejected/conflict), source page/snippet for each field. Use this to understand what was extracted and help the user review values.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to get staging rows for"},
+                "status_filter": {"type": "string", "enum": ["pending", "accepted", "rejected", "conflict", "all"], "description": "Filter by status. Default: all"},
+                "field_key_filter": {"type": "string", "description": "Filter by field_key (exact match or partial)"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "update_staging_field",
+        "description": "Update the extracted value of a staging field. Use when the user wants to correct or override an extracted value before accepting it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_id": {"type": "integer", "description": "The extraction_id of the staging row to update"},
+                "new_value": {"description": "The corrected value to set (string, number, or object)"},
+                "reason": {"type": "string", "description": "Why the value was changed"},
+            },
+            "required": ["extraction_id", "new_value", "reason"],
+        },
+    },
+    {
+        "name": "approve_staging_field",
+        "description": "Accept/approve an extracted field value, marking it ready for commit. Can approve a single field or multiple fields at once.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "List of extraction_id values to approve",
+                },
+            },
+            "required": ["extraction_ids"],
+        },
+    },
+    {
+        "name": "reject_staging_field",
+        "description": "Reject an extracted field value. Use when the extraction is wrong and should not be committed.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "List of extraction_id values to reject",
+                },
+                "reason": {"type": "string", "description": "Why the fields are being rejected"},
+            },
+            "required": ["extraction_ids", "reason"],
+        },
+    },
+    {
+        "name": "explain_extraction",
+        "description": "Explain why a specific field was extracted with its current value. Returns the source snippet evidence, confidence score, extraction method, and document context. Use when the user asks 'why did you extract this value?' or wants to understand where a value came from.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "extraction_id": {"type": "integer", "description": "The extraction_id to explain"},
+            },
+            "required": ["extraction_id"],
         },
     },
     {

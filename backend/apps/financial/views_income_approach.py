@@ -139,21 +139,22 @@ def _get_income_approach_data(project_id: int) -> dict:
         t12_gpr = decimal_or_zero(rent_row[0]) if rent_row else Decimal('0')
         forward_gpr = decimal_or_zero(rent_row[1]) if rent_row else Decimal('0')
 
-        # If no units, try unit types table
+        # If no units, try unit types table (floor plan matrix)
         if t12_gpr == 0 and forward_gpr == 0:
             cursor.execute("""
                 SELECT
-                    COALESCE(SUM(unit_count * current_market_rent), 0) * 12 as forward_gpr,
+                    COALESCE(SUM(unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0)), 0) * 12 as t12_gpr,
+                    COALESCE(SUM(unit_count * COALESCE(market_rent, current_market_rent, current_rent_avg, 0)), 0) * 12 as forward_gpr,
                     COALESCE(SUM(unit_count), 0) as unit_count
                 FROM landscape.tbl_multifamily_unit_type
                 WHERE project_id = %s
             """, [project_id])
             ut_rent_row = cursor.fetchone()
             if ut_rent_row:
-                forward_gpr = decimal_or_zero(ut_rent_row[0])
-                t12_gpr = forward_gpr
-                if ut_rent_row[1] and unit_count == 0:
-                    unit_count = int(ut_rent_row[1])
+                t12_gpr = decimal_or_zero(ut_rent_row[0])
+                forward_gpr = decimal_or_zero(ut_rent_row[1])
+                if ut_rent_row[2] and unit_count == 0:
+                    unit_count = int(ut_rent_row[2])
 
         # Get rent roll line items for display
         cursor.execute("""
@@ -162,8 +163,10 @@ def _get_income_approach_data(project_id: int) -> dict:
                 unit_type_name as label,
                 unit_count,
                 avg_square_feet,
-                current_market_rent as market_rent,
-                (unit_count * current_market_rent * 12) as annual_total
+                COALESCE(current_rent_avg, current_market_rent, market_rent, 0) as current_rent,
+                COALESCE(market_rent, current_market_rent, current_rent_avg, 0) as market_rent,
+                (unit_count * COALESCE(current_rent_avg, current_market_rent, market_rent, 0) * 12) as current_annual,
+                (unit_count * COALESCE(market_rent, current_market_rent, current_rent_avg, 0) * 12) as market_annual
             FROM landscape.tbl_multifamily_unit_type
             WHERE project_id = %s
             ORDER BY unit_type_code
@@ -178,7 +181,9 @@ def _get_income_approach_data(project_id: int) -> dict:
                 'unit_count': int(row[2]) if row[2] else 0,
                 'avg_sf': float(row[3]) if row[3] else 0,
                 'monthly_rent': float(row[4]) if row[4] else 0,
-                'annual_total': float(row[5]) if row[5] else 0,
+                'market_rent': float(row[5]) if row[5] else 0,
+                'annual_total': float(row[6]) if row[6] else 0,
+                'market_annual': float(row[7]) if row[7] else 0,
             })
 
         # =====================================================================
@@ -188,26 +193,87 @@ def _get_income_approach_data(project_id: int) -> dict:
             SELECT
                 oe.expense_category,
                 oe.expense_type,
-                COALESCE(SUM(oe.annual_amount), 0) as annual_amount
+                COALESCE(SUM(oe.annual_amount), 0) as annual_amount,
+                COALESCE(oe.parent_category, 'unclassified') as parent_category
             FROM landscape.tbl_operating_expenses oe
             WHERE oe.project_id = %s
-            GROUP BY oe.expense_category, oe.expense_type
-            ORDER BY oe.expense_category, oe.expense_type
+            GROUP BY oe.expense_category, oe.expense_type, oe.parent_category
+            ORDER BY oe.parent_category, oe.expense_category
         """, [project_id])
         opex_rows = cursor.fetchall()
 
+        # Label formatting: snake_case → Title Case
+        def format_label(raw: str) -> str:
+            return raw.replace('_', ' ').title() if raw else 'Other'
+
+        # Parent category labels matching Operations page
+        PARENT_CATEGORY_LABELS = {
+            'taxes_insurance': 'Taxes & Insurance',
+            'utilities': 'Utilities',
+            'repairs_maintenance': 'Repairs & Maintenance',
+            'payroll_personnel': 'Payroll & Personnel',
+            'administrative': 'Administrative',
+            'management': 'Management',
+            'other': 'Other Expenses',
+            'unclassified': 'Unclassified',
+        }
+        CATEGORY_ORDER = [
+            'taxes_insurance', 'utilities', 'repairs_maintenance',
+            'payroll_personnel', 'administrative', 'management',
+            'other', 'unclassified',
+        ]
+
         opex_items = []
         total_opex = Decimal('0')
+        extracted_mgmt_fee = Decimal('0')
+        total_mgmt_category = Decimal('0')  # All management-category expenses
+        # Group by parent_category for hierarchical display
+        grouped_opex: dict = {}
         for row in opex_rows:
             amount = decimal_or_zero(row[2])
+            cat = row[0] or ''
+            parent_cat = row[3] or 'unclassified'
+            # Track management_fee separately so we don't double-count
+            is_mgmt = cat.lower() in ('management_fee', 'management fee') or parent_cat == 'management'
+            if cat.lower() in ('management_fee', 'management fee'):
+                extracted_mgmt_fee = amount
+            if is_mgmt:
+                total_mgmt_category += amount
             total_opex += amount
-            opex_items.append({
-                'category': row[0],
+
+            # Skip management-category items from grouped display
+            # (management fee is rendered as its own calculated line)
+            if is_mgmt:
+                continue
+
+            item = {
+                'category': cat,
+                'label': format_label(cat),
                 'expense_type': row[1],
                 'annual_amount': float(amount),
                 'per_unit': float(amount / unit_count) if unit_count > 0 else 0,
                 'per_sf': float(amount / Decimal(str(total_sf))) if total_sf > 0 else 0,
-            })
+            }
+            opex_items.append(item)
+
+            if parent_cat not in grouped_opex:
+                grouped_opex[parent_cat] = []
+            grouped_opex[parent_cat].append(item)
+
+        # Build ordered groups for frontend
+        opex_groups = []
+        for pc in CATEGORY_ORDER:
+            children = grouped_opex.get(pc, [])
+            if children:
+                group_total = sum(c['annual_amount'] for c in children)
+                opex_groups.append({
+                    'parent_category': pc,
+                    'label': PARENT_CATEGORY_LABELS.get(pc, pc),
+                    'annual_amount': group_total,
+                    'per_unit': group_total / unit_count if unit_count > 0 else 0,
+                    'per_sf': group_total / total_sf if total_sf > 0 else 0,
+                    'items': children,
+                })
 
         # If no opex data, try the hierarchical chart of accounts
         # Gracefully handle missing tables
@@ -259,15 +325,26 @@ def _get_income_approach_data(project_id: int) -> dict:
     replacement_reserves = decimal_or_zero(assumptions['replacement_reserves_per_unit']) * unit_count
     selected_cap_rate = decimal_or_zero(assumptions['selected_cap_rate'])
 
-    def calculate_noi(gpr: Decimal, vac_rate: Decimal) -> Dict:
+    # Remove ALL management-category expenses from base_opex.
+    # Management fee is shown as its own calculated line in the P&L.
+    base_opex_excl_mgmt = total_opex - total_mgmt_category
+
+    def calculate_noi(gpr: Decimal, vac_rate: Decimal, use_market_mgmt: bool = False) -> Dict:
         """Calculate NOI components for a given GPR and vacancy rate."""
         vacancy_loss = gpr * vac_rate
         credit_loss = gpr * credit_loss_rate
         egi = gpr - vacancy_loss - credit_loss + other_income
 
-        # Operating expenses (excluding management and reserves)
-        base_opex = total_opex
-        mgmt_fee = egi * management_fee_pct
+        # Management fee: use extracted dollar amount for F-12 Current,
+        # calculated % for Market/Stabilized (proforma)
+        if extracted_mgmt_fee > 0 and not use_market_mgmt:
+            mgmt_fee = extracted_mgmt_fee
+            mgmt_fee_display_pct = float(extracted_mgmt_fee / egi) if egi > 0 else 0
+        else:
+            mgmt_fee = egi * management_fee_pct
+            mgmt_fee_display_pct = float(management_fee_pct)
+
+        base_opex = base_opex_excl_mgmt
         total_expenses = base_opex + mgmt_fee + replacement_reserves
 
         noi = egi - total_expenses
@@ -282,23 +359,24 @@ def _get_income_approach_data(project_id: int) -> dict:
             'egi': float(egi),
             'base_opex': float(base_opex),
             'management_fee': float(mgmt_fee),
-            'management_fee_pct': float(management_fee_pct),
+            'management_fee_pct': mgmt_fee_display_pct,
+            'management_fee_is_extracted': bool(extracted_mgmt_fee > 0 and not use_market_mgmt),
             'replacement_reserves': float(replacement_reserves),
             'total_opex': float(total_expenses),
             'noi': float(noi),
             'expense_ratio': float(total_expenses / egi) if egi > 0 else 0,
         }
 
-    # F-12 Current (uses current_rent / in-place rents)
-    f12_current_calc = calculate_noi(t12_gpr, vacancy_rate)
+    # F-12 Current (uses current_rent / in-place rents, extracted mgmt fee)
+    f12_current_calc = calculate_noi(t12_gpr, vacancy_rate, use_market_mgmt=False)
     f12_current_value = calculate_direct_cap_value(Decimal(str(f12_current_calc['noi'])), selected_cap_rate)
 
-    # F-12 Market (uses market_rent)
-    f12_market_calc = calculate_noi(forward_gpr, vacancy_rate)
+    # F-12 Market (uses market_rent, proforma mgmt fee %)
+    f12_market_calc = calculate_noi(forward_gpr, vacancy_rate, use_market_mgmt=True)
     f12_market_value = calculate_direct_cap_value(Decimal(str(f12_market_calc['noi'])), selected_cap_rate)
 
-    # Stabilized (uses market_rent with market-standard vacancy)
-    stab_calc = calculate_noi(forward_gpr, stabilized_vacancy_rate)
+    # Stabilized (uses market_rent with market-standard vacancy, proforma mgmt fee %)
+    stab_calc = calculate_noi(forward_gpr, stabilized_vacancy_rate, use_market_mgmt=True)
     stab_value = calculate_direct_cap_value(Decimal(str(stab_calc['noi'])), selected_cap_rate)
 
     # =========================================================================
@@ -421,6 +499,7 @@ def _get_income_approach_data(project_id: int) -> dict:
         'operating_expenses': {
             'total': float(total_opex),
             'items': opex_items,
+            'groups': opex_groups,
         },
 
         'assumptions': assumptions,

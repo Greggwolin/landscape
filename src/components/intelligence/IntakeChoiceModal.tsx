@@ -7,11 +7,10 @@
  *   1. Cancel — dismiss without doing anything
  *   2. Global Intelligence — fire-and-forget intake/start with intent=global_intelligence
  *   3. DMS Only — no further action, document stays in DMS
- *   4. Structured Ingestion — calls intake/start, navigates to MappingScreen with intake_uuid
+ *   4. Structured Ingestion — calls intake/start, opens Ingestion Workbench panel
  */
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   CModal,
   CModalHeader,
@@ -21,12 +20,15 @@ import {
   CButton,
   CSpinner,
 } from '@coreui/react';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
+import '@/styles/ingestion-workbench.css';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export interface PendingIntakeDoc {
   docId: number;
   docName: string;
+  docType: string | null;
 }
 
 interface IntakeChoiceModalProps {
@@ -44,7 +46,7 @@ export default function IntakeChoiceModal({
   docs,
   onClose,
 }: IntakeChoiceModalProps) {
-  const router = useRouter();
+  const { openWorkbench } = useWorkbench();
   const [submitting, setSubmitting] = useState(false);
 
   const handleChoice = async (intent: IntakeIntent) => {
@@ -57,40 +59,46 @@ export default function IntakeChoiceModal({
     setSubmitting(true);
     try {
       if (intent === 'structured_ingestion') {
-        // Structured ingestion: call intake/start for each doc, navigate to MappingScreen
-        // with the first returned intake_uuid.
-        const results = await Promise.all(
-          docs.map(async (doc) => {
-            try {
-              const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  project_id: projectId,
-                  doc_id: doc.docId,
-                  intent,
-                }),
-              });
-              if (res.status === 201) {
-                const data = await res.json();
-                return data.intakeUuid as string;
-              }
-              return null;
-            } catch (err) {
-              console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err);
-              return null;
-            }
-          })
-        );
+        // Structured ingestion: call intake/start for the first doc, then open the workbench.
+        const doc = docs[0];
+        try {
+          const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: projectId,
+              doc_id: doc.docId,
+              intent,
+              document_type: doc.docType,
+            }),
+          });
+          const data = await res.json();
+          console.log(`[IntakeChoice] Response ${res.status}:`, data);
 
-        const firstUuid = results.find((u) => u != null);
-        onClose();
-        if (firstUuid) {
-          // Navigate to Intelligence tab with the intake_uuid to open MappingScreen
-          router.push(
-            `/projects/${projectId}?folder=documents&tab=intelligence&intakeUuid=${firstUuid}`
-          );
+          if (res.status === 201 && data.intakeUuid) {
+            // Open workbench panel for structured field review
+            openWorkbench({
+              docId: doc.docId,
+              docName: doc.docName,
+              docType: doc.docType,
+              intakeUuid: data.intakeUuid,
+            });
+
+            // Fire-and-forget extraction trigger
+            fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.docId}/extract-batched/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project_id: projectId }),
+            }).catch(err =>
+              console.warn('[IntakeChoice] Extraction trigger failed:', err)
+            );
+          } else {
+            console.error(`[IntakeChoice] Unexpected status ${res.status} for doc ${doc.docId}:`, data);
+          }
+        } catch (err) {
+          console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err);
         }
+        onClose();
         return;
       }
 
@@ -104,6 +112,7 @@ export default function IntakeChoiceModal({
               project_id: projectId,
               doc_id: doc.docId,
               intent,
+              document_type: doc.docType,
             }),
           }).catch((err) =>
             console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err)
@@ -124,11 +133,30 @@ export default function IntakeChoiceModal({
       : `${docs.length} documents`;
 
   return (
-    <CModal visible={visible} onClose={onClose} alignment="center" size="lg">
+    <CModal
+      visible={visible}
+      onClose={onClose}
+      alignment="center"
+      size="lg"
+      className="intake-choice-modal"
+    >
       <CModalHeader closeButton>
         <CModalTitle>What would you like to do with {docLabel}?</CModalTitle>
       </CModalHeader>
       <CModalBody>
+        {/* Show detected document type(s) */}
+        {docs.some(d => d.docType) && (
+          <div className="mb-3 p-2 rounded" style={{ background: 'var(--cui-tertiary-bg)' }}>
+            <small className="text-body-secondary d-block mb-1">Detected as:</small>
+            <div className="d-flex flex-wrap gap-2">
+              {docs.map((d, i) => (
+                <span key={i} className="badge bg-primary">
+                  {d.docType || 'Unknown'}{docs.length > 1 ? `: ${d.docName}` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <p className="text-body-secondary mb-4">
           Choose how Landscape should process {docs.length === 1 ? 'this document' : 'these documents'}:
         </p>

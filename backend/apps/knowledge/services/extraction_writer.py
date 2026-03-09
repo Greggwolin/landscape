@@ -19,6 +19,7 @@ from .field_registry import get_registry, FieldMapping
 from apps.landscaper.opex_mapping import OPEX_ACCOUNT_MAPPING
 from apps.projects.primary_measure import sync_primary_measure_on_legacy_update
 from .opex_utils import upsert_opex_entry, resolve_opex_category
+from apps.multifamily.models import normalize_unit_type_code
 
 logger = logging.getLogger(__name__)
 
@@ -373,13 +374,13 @@ class ExtractionWriter:
             if 'unit_type' in target_table:
                 return self._write_unit_type_upsert(mapping, value, scope_id)
             elif 'unit' in target_table:
-                print(f"=== UNIT UPSERT DISPATCHED ===", flush=True)
-                print(f"VALUE TYPE: {type(value)}, VALUE: {value}", flush=True)
                 return self._write_unit_upsert(mapping, value, scope_id)
             elif 'operating_expense' in target_table:
                 return self._write_opex(mapping, value, selector)
             elif 'revenue_other' in target_table:
                 return self._write_income_upsert(mapping, value)
+            elif 'assumption' in target_table:
+                return self._write_assumption(mapping, value, mapping.selector_json or {})
             return False, f"Unknown upsert target table: {target_table}"
 
         # ── Land Development write types ─────────────────────────────────────
@@ -907,6 +908,15 @@ class ExtractionWriter:
         """
         table = 'tbl_multifamily_unit_type'
 
+        # If value is a JSON string from staging, parse it to dict
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    value = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # Not JSON — fall through to single-column update
+
         # If value is a dict (full unit type data from array extraction)
         if isinstance(value, dict):
             return self._insert_full_unit_type(value)
@@ -951,14 +961,21 @@ class ExtractionWriter:
             """, [self.project_id, unit_type_name, unit_type_name])
             row = cursor.fetchone()
 
-        # Map extracted field names to column names
+        # Map extracted field names to actual DB column names on tbl_multifamily_unit_type
         field_mapping = {
             'bedrooms': 'bedrooms', 'beds': 'bedrooms',
             'bathrooms': 'bathrooms', 'baths': 'bathrooms',
             'unit_count': 'unit_count', 'count': 'unit_count',
-            'avg_sqft': 'avg_sqft', 'square_feet': 'avg_sqft', 'sf': 'avg_sqft',
-            'market_rent': 'market_rent', 'rent': 'market_rent',
-            'current_rent': 'current_rent', 'in_place_rent': 'current_rent',
+            'total_units': 'total_units', 'total_units_by_type': 'total_units',
+            'avg_sqft': 'avg_square_feet', 'sf_avg': 'avg_square_feet',
+            'square_feet': 'avg_square_feet', 'sf': 'avg_square_feet',
+            'avg_square_feet': 'avg_square_feet',
+            'market_rent': 'market_rent', 'rent_market': 'market_rent',
+            'rent': 'market_rent',
+            'current_market_rent': 'current_market_rent',
+            'current_rent_avg': 'current_rent_avg',
+            'in_place_rent': 'current_rent_avg',
+            'concessions_avg': 'concessions_avg',
         }
 
         # Build update dict
@@ -966,6 +983,18 @@ class ExtractionWriter:
         for key, col in field_mapping.items():
             if key in data and data[key] is not None:
                 columns[col] = data[key]
+
+        # If a rent roll exists, don't overwrite avg_square_feet — it's
+        # calculated from individual unit records and is more accurate.
+        if 'avg_square_feet' in columns:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM landscape.tbl_multifamily_unit
+                    WHERE project_id = %s AND square_feet IS NOT NULL
+                    LIMIT 1
+                """, [self.project_id])
+                if cursor.fetchone():
+                    del columns['avg_square_feet']
 
         if row:
             # Update existing
@@ -983,15 +1012,27 @@ class ExtractionWriter:
         else:
             # Insert new
             columns['unit_type_name'] = unit_type_name
+            # Derive unit_type_code: use explicit code if provided,
+            # otherwise normalize the display name to canonical format
+            unit_type_code = data.get('unit_type_code')
+            if unit_type_code:
+                unit_type_code = normalize_unit_type_code(unit_type_code)
+            else:
+                unit_type_code = normalize_unit_type_code(unit_type_name)
+            columns['unit_type_code'] = unit_type_code
             col_names = ', '.join(columns.keys())
             placeholders = ', '.join(['%s'] * len(columns))
-            values = list(columns.values()) + [self.project_id]
 
             with connection.cursor() as cursor:
                 cursor.execute(f"""
                     INSERT INTO landscape.tbl_multifamily_unit_type
                     (project_id, {col_names}, created_at, updated_at)
                     VALUES (%s, {placeholders}, NOW(), NOW())
+                    ON CONFLICT (project_id, unit_type_code)
+                    DO UPDATE SET
+                        unit_type_name = EXCLUDED.unit_type_name,
+                        {', '.join([f"{k} = EXCLUDED.{k}" for k in columns.keys() if k not in ('unit_type_name', 'unit_type_code')])},
+                        updated_at = NOW()
                 """, [self.project_id] + list(columns.values()))
             return True, f"Inserted unit_type: {unit_type_name}"
 
@@ -1007,15 +1048,19 @@ class ExtractionWriter:
         For array extractions from chunked rent roll, value is a dict with all unit fields.
         We match on unit_number for upsert.
         """
-        print(f"=== _WRITE_UNIT_UPSERT CALLED ===", flush=True)
-        print(f"PROJECT: {self.project_id}, VALUE TYPE: {type(value)}, SCOPE_ID: {scope_id}", flush=True)
-        print(f"VALUE: {value}", flush=True)
-
         table = 'tbl_multifamily_unit'
+
+        # If value is a JSON string from staging, parse it to dict
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    value = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # Not JSON — fall through to single-column update
 
         # If value is a dict (full unit data from chunked extraction)
         if isinstance(value, dict):
-            print(f"=== CALLING _insert_full_unit ===")
             return self._insert_full_unit(value)
 
         # Single column update - need scope_id (unit_id)
@@ -1035,10 +1080,6 @@ class ExtractionWriter:
 
     def _insert_full_unit(self, data: Dict[str, Any]) -> Tuple[bool, str]:
         """Insert or update a rent roll unit row from extracted dict."""
-        print(f"=== _INSERT_FULL_UNIT CALLED ===", flush=True)
-        print(f"DATA KEYS: {list(data.keys())}", flush=True)
-        print(f"UNIT NUMBER: {data.get('unit_number')}, RENT: {data.get('current_rent')}, STATUS: {data.get('occupancy_status')}", flush=True)
-        print(f"FULL DATA: {data}", flush=True)
 
         # Extract unit number for matching
         unit_number = data.get('unit_number')
@@ -1075,8 +1116,8 @@ class ExtractionWriter:
             'unit_lease_end': 'lease_end_date',  # Prefixed version
             'occupancy_status': 'occupancy_status',
             'unit_occupancy_status': 'occupancy_status',  # Prefixed version
-            'tenant_name': None,  # Not in table
-            'unit_tenant_name': None,  # Not in table
+            'tenant_name': 'tenant_name',
+            'unit_tenant_name': 'tenant_name',
             'move_in_date': None,  # Not in table
             'unit_move_in_date': None,  # Not in table
             'rent_effective_date': None,  # Not in table
@@ -1162,7 +1203,7 @@ class ExtractionWriter:
         For array extractions, value will be a dict with all comp fields.
         We insert a new row for each comparable.
         """
-        table = 'tbl_sales_comparables' if comp_type == 'sales' else 'tbl_rent_comparable'
+        table = 'tbl_sales_comparables' if comp_type == 'sales' else 'tbl_rental_comparable'
 
         # If value is a dict (full comp data), extract all fields
         if isinstance(value, dict):
@@ -1329,9 +1370,6 @@ class ExtractionWriter:
 
         Uses unit_number as the match key for upsert.
         """
-        print(f"=== UNIT UPSERT TRACE ===")
-        print(f"WRITING UNIT: {data.get('unit_number')}, rent={data.get('current_rent')}, status={data.get('occupancy_status')}")
-        print(f"FULL UNIT DATA: {data}")
 
         unit_number = data.get('unit_number')
         if not unit_number:
@@ -1424,8 +1462,6 @@ class ExtractionWriter:
 
         Returns summary of successes and failures.
         """
-        print(f"=== WRITE_UNIT_ARRAY CALLED ===")
-        print(f"PROJECT: {self.project_id}, NUM UNITS: {len(units)}, SOURCE_DOC: {source_doc_id}")
 
         results = {'success': 0, 'failed': 0, 'errors': []}
 
@@ -1454,7 +1490,7 @@ class ExtractionWriter:
 
         Returns summary of successes and failures.
         """
-        table = 'tbl_sales_comparables' if comp_type == 'sales' else 'tbl_rent_comparable'
+        table = 'tbl_sales_comparables' if comp_type == 'sales' else 'tbl_rental_comparable'
         results = {'success': 0, 'failed': 0, 'errors': []}
 
         for comp in comps:
@@ -1592,8 +1628,6 @@ def aggregate_unit_types(project_id: int) -> Dict[str, Any]:
     Returns:
         Dict with 'created', 'updated', and 'unit_types' counts
     """
-    print("=== AGGREGATE_UNIT_TYPES CALLED ===")
-    print(f"=== Project ID: {project_id} ===")
     logger.info(f"[aggregate_unit_types] Starting aggregation for project {project_id}")
 
     results = {
@@ -1629,11 +1663,12 @@ def aggregate_unit_types(project_id: int) -> Dict[str, Any]:
             for row in aggregates:
                 bedrooms, bathrooms, unit_count, avg_rent, avg_market_rent, avg_sf = row
 
-                # Generate unit type code (e.g., "1BR/1BA", "2BR/2BA")
+                # Generate unit type code (e.g., "1BR/1BA", "Studio/1BA")
+                from apps.multifamily.models import derive_unit_type
                 br_int = int(bedrooms) if bedrooms else 0
                 ba_int = int(bathrooms) if bathrooms else 1
-                unit_type_code = f"{br_int}BR/{ba_int}BA"
-                unit_type_name = f"{br_int} Bedroom / {ba_int} Bath"
+                unit_type_code = derive_unit_type(br_int, ba_int)
+                unit_type_name = f"{br_int} Bedroom / {ba_int} Bath" if br_int > 0 else f"Studio / {ba_int} Bath"
 
                 # Use avg_rent for market rent if market_rent not available
                 market_rent_value = avg_market_rent if avg_market_rent else avg_rent or 0

@@ -27,6 +27,11 @@ export interface UnitType {
   avg_square_feet: number;
   current_market_rent: number;
   total_units: number;
+  unit_count?: number | null;
+  market_rent?: number | null;
+  current_rent_avg?: number | null;
+  concessions_avg?: number | null;
+  value_source?: string | null;
   notes?: string | null;
   other_features?: string | null;
   floorplan_doc_id?: number | null;
@@ -46,6 +51,7 @@ export interface Unit {
   current_rent?: number | null;
   market_rent: number;
   occupancy_status?: string | null;
+  tenant_name?: string | null;
   renovation_status: string;
   renovation_date?: string | null;
   renovation_cost?: number | null;

@@ -17,7 +17,7 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 
 ✅ **Standardized Project Types** - 7 official project type codes (Migration 013 - Nov 2025)
 ✅ **Universal Container System** - Production-ready flexible hierarchy (Area/Phase/Parcel OR Property/Building/Unit)
-✅ **Comprehensive Data Layer** - 183 tables + 26 views in PostgreSQL
+✅ **Comprehensive Data Layer** - 324 tables + 42 views in PostgreSQL
 ✅ **Unit-Level Multifamily** - Lease tracking, turn analysis, occupancy reporting
 ✅ **Lease Management** - Escalations, recoveries, percentage rent, rollover analysis
 ✅ **Dependency Engine** - Automated timeline calculation with circular detection
@@ -124,7 +124,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 ### Backend
 - **Django 5.0.1** with Django REST Framework 3.14.0 ⭐ NEW (Oct 22, 2025)
 - **Neon PostgreSQL** (serverless)
-- **183 tables + 26 views** in `landscape` schema
+- **324 tables + 42 views** in `landscape` schema
 - **Direct `pg` 8.13.1** + `@neondatabase/serverless` connections
 - **Next.js App Router** API routes (legacy, being replaced)
 - **Django Admin Panel** with smart dropdown fields
@@ -180,7 +180,7 @@ landscape/
 ## 🗄 Database Architecture
 
 ### Schemas
-- **`landscape`** (ACTIVE) - 143 tables, 19 views - All application data
+- **`landscape`** (ACTIVE) - 324 tables, 42 views - All application data
 - **`land_v2`** (LEGACY) - 2 tables - Zoning glossary only (unused)
 
 ### Recent Additions (Migration 008 - Oct 14, 2025)
@@ -252,7 +252,7 @@ DATABASE_URL=postgres://... npm run schema:md
 **Database Info**:
 - Host: `ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech`
 - Database: `land_v2`
-- Active Schema: `landscape` (143 tables, 19 views)
+- Active Schema: `landscape` (324 tables, 42 views)
 - Legacy Schema: `land_v2` (2 tables - unused)
 
 **Connection Methods**:

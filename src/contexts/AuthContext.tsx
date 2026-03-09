@@ -269,9 +269,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTokens(null);
     localStorage.removeItem('auth_tokens');
+    // Clear stale project state so the next login starts clean
+    localStorage.removeItem('activeProjectId');
+    localStorage.removeItem('activeProjectTimestamp');
     // Clear auth cookie for middleware - use multiple methods to ensure it's cleared
     document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
     document.cookie = 'auth_token_exists=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+    // Clear redirect artifacts
+    sessionStorage.removeItem('redirectAfterLogin');
     // Force navigation to login
     window.location.href = '/login';
   }, [tokens, authFetch]);

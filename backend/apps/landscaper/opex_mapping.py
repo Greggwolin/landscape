@@ -73,13 +73,16 @@ OPEX_ACCOUNT_MAPPING = {
     'administrative': 56,               # 5400 - Administrative (parent; now under Other Operating Expenses)
     'admin': 56,
     'g&a': 56,
-    'management fee': 73,               # 5410 - Property Management (renamed)
-    'management': 73,
-    'property management': 73,
+    'management fee': 310,              # 4411 - Management Fee
+    'management fees': 310,
+    'management': 310,
+    'property management': 73,           # 4410 - Property Management (general)
     'on-site management': 90,            # 5551 - On-Site Manager Salary
     'onsite management': 90,
-    'off-site management': 73,           # 5410 - Property Management (off-site = PM fee)
-    'offsite management': 73,
+    'off-site management': 311,          # 4412 - Off-Site Management Fee
+    'offsite management': 311,
+    'management offsite': 311,
+    'management off-site': 311,
     'professional services': 74,        # 5420 - Professional Services
     'professional fees': 74,
     'legal': 74,
@@ -156,12 +159,12 @@ OPEX_ACCOUNT_MAPPING = {
     'work comp': 94,
 
     # --- BANK & FINANCIAL FEES ---
-    'bank charges': 85,                 # Map to Telephone/Admin expense
-    'bank fees': 85,
-    'merchant fees': 85,
-    'credit card fees': 85,
-    'processing fees': 85,
-    'payment processing': 85,
+    'bank charges': 313,                # Bank/Processing Fees (distinct from telephone)
+    'bank fees': 313,
+    'merchant fees': 313,
+    'credit card fees': 313,
+    'processing fees': 313,
+    'payment processing': 313,
 
     # --- SECURITY SERVICES ---
     'security services': 86,            # 5423 - Security/Fire/Alarm
@@ -171,16 +174,16 @@ OPEX_ACCOUNT_MAPPING = {
     'night patrol': 86,
 
     # --- TECHNOLOGY / SOFTWARE ---
-    'computer software': 85,            # Map to admin
-    'software': 85,
-    'computer': 85,
-    'computers': 85,
-    'appfolio': 85,
-    'yardi': 85,
-    'rent manager': 85,
-    'property software': 85,
-    'it services': 85,
-    'technology': 85,
+    'computer software': 312,           # Computer/Software (distinct from telephone)
+    'software': 312,
+    'computer': 312,
+    'computers': 312,
+    'appfolio': 312,
+    'yardi': 312,
+    'rent manager': 312,
+    'property software': 312,
+    'it services': 312,
+    'technology': 312,
 
     # --- OUTSIDE / CONTRACT SERVICES ---
     'outside services': 73,             # Map to Property Management

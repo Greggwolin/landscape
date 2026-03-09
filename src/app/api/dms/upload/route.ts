@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UTApi } from 'uploadthing/server';
 import { sql } from '@/lib/db';
+import { getUserFromRequest, userOwnsProject } from '@/lib/auth';
 
 // Allow up to 60 seconds for large file uploads (up to 32MB)
 export const maxDuration = 60;
@@ -60,6 +61,17 @@ export async function POST(req: NextRequest) {
     }
 
     const workspaceId = workspaceIdStr ? parseInt(workspaceIdStr, 10) : 1;
+
+    // Auth: identify uploader and verify project ownership
+    const requestUser = getUserFromRequest(req);
+    if (!requestUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const ownsProject = await userOwnsProject(requestUser.userId, projectId);
+    if (!ownsProject) {
+      return NextResponse.json({ error: 'You do not have access to this project' }, { status: 403 });
+    }
 
     // Validate file type
     const allowedTypes = [
@@ -112,8 +124,7 @@ export async function POST(req: NextRequest) {
     const storageUri = uploadResponse.data.url;
     console.log(`✅ Uploaded to UploadThing: ${storageUri}`);
 
-    // Create core_doc record
-    // Note: created_by/updated_by are bigint (user IDs) - use NULL for system operations
+    // Create core_doc record with uploader identity
     const inserted = await sql`
       INSERT INTO landscape.core_doc (
         project_id,
@@ -126,7 +137,9 @@ export async function POST(req: NextRequest) {
         sha256_hash,
         mime_type,
         file_size_bytes,
-        profile_json
+        profile_json,
+        created_by,
+        updated_by
       ) VALUES (
         ${projectId},
         ${workspaceId},
@@ -138,7 +151,9 @@ export async function POST(req: NextRequest) {
         ${sha256},
         ${file.type},
         ${file.size},
-        ${'{}'}::jsonb
+        ${'{}'}::jsonb,
+        ${requestUser.userId},
+        ${requestUser.userId}
       )
       RETURNING doc_id, version_no, doc_name, doc_type, status, created_at
     `;
@@ -244,7 +259,7 @@ export async function POST(req: NextRequest) {
               body: JSON.stringify({
                 project_id: projectId,
                 property_type: 'multifamily',
-                batches: ['core_property', 'financials', 'deal_market', 'rent_roll', 'opex'],
+                batches: ['core_property', 'financials', 'deal_market', 'opex', 'unit_types', 'comparables'],
               }),
             }
           );
