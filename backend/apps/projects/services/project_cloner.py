@@ -112,6 +112,9 @@ class ProjectCloner:
         self._clone_project_config(source_project_id, new_project.project_id)
         self._clone_project_settings(source_project_id, new_project.project_id)
 
+        # 8. Clone DMS doc-type folders so they persist in the new project
+        self._clone_doc_types(source_project_id, new_project.project_id)
+
         logger.info(f"Successfully cloned project {source_project_id} -> {new_project.project_id}")
         return new_project
 
@@ -562,6 +565,16 @@ class ProjectCloner:
             source_project_id,
             new_project_id
         )
+
+    def _clone_doc_types(self, source_project_id: int, new_project_id: int):
+        """Clone dms_project_doc_types so DMS folders appear in the new project."""
+        count = self._clone_simple_table(
+            'dms_project_doc_types',
+            'id',
+            source_project_id,
+            new_project_id
+        )
+        logger.info(f"Cloned {count} doc type folders")
 
     def _clone_1to1_table(
         self,
