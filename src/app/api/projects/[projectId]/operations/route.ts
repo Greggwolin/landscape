@@ -60,7 +60,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           'concessions_pct',
           'management_fee_pct',
           'replacement_reserve_pct',
-          'vacancy_override_pct'
+          'vacancy_override_pct',
+          'management_fee_source'
         )
     `;
 
@@ -73,7 +74,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       replacement_reserve_pct: 300   // Default $300/unit
     };
 
+    let managementFeeSourceOverride: string | null = null;
     assumptionsResult.forEach(row => {
+      if (row.assumption_key === 'management_fee_source') {
+        managementFeeSourceOverride = row.assumption_value;
+        return;
+      }
       const value = parseFloat(row.assumption_value);
       if (!isNaN(value)) {
         assumptions[row.assumption_key] = value;
@@ -897,21 +903,38 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     let managementFeeTooltip: string | undefined;
 
-    if (extractedMgmtFee > 0) {
+    // Derive the management fee percentage from ingested data or use assumption default
+    let derivedManagementFeePct: number | null = null;
+    let managementFeeSource: string | undefined;
+    const userOverrodeMgmtFee = managementFeeSourceOverride === 'user_modified';
+
+    if (extractedMgmtFee > 0 && !userOverrodeMgmtFee) {
       // Use the document-extracted value as the current/as-is amount
       managementFeeAsIs = extractedMgmtFee;
-      const impliedPct = effectiveGrossIncome > 0 ? extractedMgmtFee / effectiveGrossIncome : 0;
+      derivedManagementFeePct = effectiveGrossIncome > 0 ? extractedMgmtFee / effectiveGrossIncome : 0;
       managementFeeLabel = 'Management Fee';
-      managementFeeTooltip = `Extracted: $${Math.round(extractedMgmtFee).toLocaleString()} — ${(impliedPct * 100).toFixed(1)}% of EGI`;
+      managementFeeTooltip = `Extracted: $${Math.round(extractedMgmtFee).toLocaleString()} — ${(derivedManagementFeePct * 100).toFixed(1)}% of EGI`;
       managementFeeIsReadonly = false;
+      managementFeeSource = extractedMgmtFeeRows[0].source || 'ingestion';
+    } else if (extractedMgmtFee > 0 && userOverrodeMgmtFee) {
+      // Extracted data exists but user overrode — use the stored assumption pct
+      derivedManagementFeePct = effectiveGrossIncome > 0 ? extractedMgmtFee / effectiveGrossIncome : 0;
+      managementFeeAsIs = effectiveGrossIncome * managementFeePct;
+      managementFeeLabel = 'Management Fee';
+      managementFeeTooltip = `User override: ${(managementFeePct * 100).toFixed(1)}% of EGI (was ${(derivedManagementFeePct * 100).toFixed(1)}% extracted)`;
+      managementFeeIsReadonly = false;
+      managementFeeSource = 'user_modified';
     } else {
       managementFeeAsIs = effectiveGrossIncome * managementFeePct;
       managementFeeLabel = 'Management Fee';
       managementFeeTooltip = `Calculated: ${(managementFeePct * 100).toFixed(1)}% of EGI`;
       managementFeeIsReadonly = true;
+      managementFeeSource = 'user';
     }
+    // Post-reno uses effective pct: user override → assumption pct; ingested → derived pct; no extraction → assumption pct
+    const effectiveMgmtFeePct = userOverrodeMgmtFee ? managementFeePct : (derivedManagementFeePct ?? managementFeePct);
     const managementFeeMarket = effectiveGrossIncomeMarket * managementFeePct;
-    const managementFeePostReno = postRenoEGI * managementFeePct;
+    const managementFeePostReno = postRenoEGI * effectiveMgmtFeePct;
 
     // Calculate Replacement Reserves (reserves_per_unit × unit_count)
     const reservesPerUnit = assumptions.replacement_reserve_pct;
@@ -928,15 +951,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         level: 1,
         is_calculated: false,
         is_readonly: managementFeeIsReadonly,
-        is_percentage: extractedMgmtFee <= 0,
+        is_percentage: true,
+        is_management_fee: true,
         parent_category: 'management_reserves',
-        calculation_base: extractedMgmtFee > 0 ? 'fixed' : 'egi',
+        calculation_base: 'egi',
+        source: managementFeeSource,
+        management_fee_pct: effectiveMgmtFeePct,
+        derived_management_fee_pct: derivedManagementFeePct,
         as_is: {
-          rate: extractedMgmtFee > 0 ? (unitCount > 0 ? managementFeeAsIs / unitCount : 0) : managementFeePct,
+          rate: (managementFeeSource === 'ingestion')
+            ? (unitCount > 0 ? managementFeeAsIs / unitCount : 0)
+            : (userOverrodeMgmtFee ? managementFeePct : managementFeePct),
           total: managementFeeAsIs
         },
         post_reno: {
-          rate: managementFeePct,
+          rate: effectiveMgmtFeePct,
           total: managementFeePostReno
         },
         evidence: extractedMgmtFee > 0 ? { source: extractedMgmtFeeRows[0].source || 'extraction' } : {},
@@ -1124,13 +1153,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const coaCalculatedExpenseRows = [
       {
         line_item_key: 'calculated_management_fee',
-        label: `Management Fee (${(coaManagementFeePct * 100).toFixed(1)}%)`,
+        label: 'Management Fee',
         level: 1,
         is_calculated: false,
         is_readonly: true,
         is_percentage: true,
+        is_management_fee: true,
         parent_category: 'management_reserves',
         calculation_base: 'egi',
+        source: 'user',
+        management_fee_pct: coaManagementFeePct,
+        derived_management_fee_pct: null,
         as_is: {
           rate: coaManagementFeePct,
           total: coaManagementFeeAsIs

@@ -199,3 +199,135 @@ class MarketMacroData(models.Model):
 
     def __str__(self):
         return f"Macro Data for {self.project.project_name} ({self.data_year})"
+
+
+# =============================================================================
+# Market Intelligence Time Series Models (added 2026-03-10)
+# Three-table normalized design for multi-source, multi-geography market data
+# =============================================================================
+
+class MarketGeography(models.Model):
+    """
+    Hierarchical geography dimension for market intelligence.
+    Supports national → state → MSA → county → city → zip → submarket.
+    Maps to landscape.tbl_market_geography
+    """
+
+    GEO_LEVEL_CHOICES = [
+        ('national', 'National'),
+        ('state', 'State'),
+        ('msa', 'MSA'),
+        ('county', 'County'),
+        ('city', 'City'),
+        ('zip', 'ZIP Code'),
+        ('submarket', 'Submarket'),
+        ('custom', 'Custom'),
+    ]
+
+    geography_id = models.AutoField(primary_key=True)
+    parent_geography = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='parent_geography_id',
+        related_name='children'
+    )
+    geo_level = models.CharField(max_length=20, choices=GEO_LEVEL_CHOICES)
+    geo_name = models.CharField(max_length=200)
+    geo_code = models.CharField(max_length=50, null=True, blank=True)
+    state_code = models.CharField(max_length=2, null=True, blank=True)
+    cbsa_code = models.CharField(max_length=10, null=True, blank=True)
+    fips_code = models.CharField(max_length=10, null=True, blank=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_market_geography'
+        ordering = ['geo_level', 'geo_name']
+
+    def __str__(self):
+        return f"{self.geo_name} ({self.geo_level})"
+
+
+class MarketSeries(models.Model):
+    """
+    Registry of tracked market data series.
+    Each row = one metric from one source for one geography.
+    Decoupled from individual projects — this is market-level data.
+    Maps to landscape.tbl_market_series
+    """
+
+    FREQUENCY_CHOICES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('annual', 'Annual'),
+    ]
+
+    series_id = models.AutoField(primary_key=True)
+    series_code = models.CharField(max_length=100)
+    source = models.CharField(max_length=50)  # FRED, RDC, HBACA, CROMFORD, CENSUS
+    geography = models.ForeignKey(
+        MarketGeography,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='geography_id',
+        related_name='series'
+    )
+    property_type = models.CharField(max_length=20, null=True, blank=True)  # RES, MF, OFF, RET, IND, LAND
+    category = models.CharField(max_length=50, null=True, blank=True)  # mortgage_rates, home_prices, permits, inventory
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='monthly')
+    unit = models.CharField(max_length=50, null=True, blank=True)  # percent, dollars, units, index
+    display_name = models.CharField(max_length=200)
+    description = models.TextField(null=True, blank=True)
+    source_series_id = models.CharField(max_length=100, null=True, blank=True)  # External ID at source
+    source_url = models.TextField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    last_observation_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_market_series'
+        ordering = ['source', 'category', 'series_code']
+
+    def __str__(self):
+        return f"{self.display_name} ({self.source})"
+
+
+class MarketObservation(models.Model):
+    """
+    Time series data points. One row per series per observation date.
+    This is the fact table — will grow large over time.
+    Maps to landscape.tbl_market_observation
+    """
+
+    observation_id = models.BigAutoField(primary_key=True)
+    series = models.ForeignKey(
+        MarketSeries,
+        on_delete=models.CASCADE,
+        db_column='series_id',
+        related_name='observations'
+    )
+    obs_date = models.DateField()
+    value = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    value_text = models.CharField(max_length=100, null=True, blank=True)
+    revision_of = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_market_observation'
+        ordering = ['series', '-obs_date']
+        unique_together = [['series', 'obs_date']]
+
+    def __str__(self):
+        return f"{self.series.series_code} @ {self.obs_date}: {self.value}"

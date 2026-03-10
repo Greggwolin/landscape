@@ -167,6 +167,7 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
 
           // Update the specific field
           const updatedRow = { ...row };
+          const isMgmtFee = updatedRow.is_management_fee === true;
 
           if (field.startsWith('as_is_')) {
             const asIsField = field.replace('as_is_', '');
@@ -176,13 +177,21 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
             };
             // Recalculate total if rate changed
             if (asIsField === 'rate') {
-              // For rental rows, count is per-unit-type; for opex, use project unit_count
-              const count = updatedRow.as_is.count || unitCount;
-              if (count > 0) {
-                // For percentage rows (vacancy etc.), total = rate × base (handled elsewhere)
-                // For opex/income rows, rate is annual $/unit, total = rate × count
-                if (!updatedRow.is_percentage) {
-                  updatedRow.as_is.total = (value || 0) * count;
+              if (isMgmtFee) {
+                // Management fee: total = pct × EGI
+                const egi = prev.totals?.effective_gross_income || 0;
+                const pct = value || 0;
+                updatedRow.as_is.total = pct * egi;
+                updatedRow.management_fee_pct = pct;
+              } else {
+                // For rental rows, count is per-unit-type; for opex, use project unit_count
+                const count = updatedRow.as_is.count || unitCount;
+                if (count > 0) {
+                  // For percentage rows (vacancy etc.), total = rate × base (handled elsewhere)
+                  // For opex/income rows, rate is annual $/unit, total = rate × count
+                  if (!updatedRow.is_percentage) {
+                    updatedRow.as_is.total = (value || 0) * count;
+                  }
                 }
               }
             }
@@ -195,12 +204,29 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
             };
             // Recalculate total if rate changed
             if (postRenoField === 'rate') {
-              const count = updatedRow.as_is?.count || unitCount;
-              if (count > 0 && !updatedRow.is_percentage) {
+              if (isMgmtFee) {
+                // Management fee post-reno: total = pct × post-reno EGI
+                const postRenoEgi = prev.totals?.post_reno_noi != null
+                  ? (prev.totals.effective_gross_income || 0) // Use as-is EGI as approximation for post-reno EGI
+                  : 0;
+                // Compute post-reno EGI from rental/vacancy/other sections
+                const prGpr = prev.rental_income?.section_total?.post_reno || 0;
+                const prVac = prev.vacancy_deductions?.section_total?.post_reno || 0;
+                const prOther = prev.other_income?.section_total?.post_reno || 0;
+                const computedPostRenoEgi = prGpr + prVac + prOther;
+                const pct = value || 0;
                 updatedRow.post_reno = {
                   ...updatedRow.post_reno,
-                  total: (value || 0) * count
+                  total: pct * (computedPostRenoEgi || prev.totals?.effective_gross_income || 0)
                 };
+              } else {
+                const count = updatedRow.as_is?.count || unitCount;
+                if (count > 0 && !updatedRow.is_percentage) {
+                  updatedRow.post_reno = {
+                    ...updatedRow.post_reno,
+                    total: (value || 0) * count
+                  };
+                }
               }
             }
           }
