@@ -11,6 +11,11 @@ import {
  CDropdownToggle,
  CDropdownMenu,
  CDropdownItem,
+ CModal,
+ CModalHeader,
+ CModalTitle,
+ CModalBody,
+ CModalFooter,
 } from '@coreui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
@@ -46,13 +51,6 @@ interface Classification {
  code: string;
  name: string;
  badge_color: string;
-}
-
-interface DiscardReason {
- item_id: number;
- code: string;
- label: string;
- sort_order: number;
 }
 
 interface DocMediaResponse {
@@ -93,12 +91,7 @@ interface ProjectMediaGalleryProps {
  projectName?: string;
 }
 
-interface EditorPanelLayout {
- top: number;
- left: number;
- width: number;
- minHeight: number;
-}
+// EditorPanelLayout removed — replaced by CModal-based tag editor
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Filter categories
@@ -188,17 +181,12 @@ export default function ProjectMediaGallery({
  const [filter, setFilter] = useState<FilterKey>('all');
  const [scanning, setScanning] = useState(false);
  const [scanProgress, setScanProgress] = useState('');
- const [activeEditorMediaId, setActiveEditorMediaId] = useState<number | null>(null);
  const [savingMediaId, setSavingMediaId] = useState<number | null>(null);
- const [editorPanelLayout, setEditorPanelLayout] = useState<EditorPanelLayout | null>(null);
- const [editorStateByMediaId, setEditorStateByMediaId] = useState<
- Record<number, {
- classificationId: number | null;
- discardReasonCode: string | null;
- otherReason: string;
- }>
- >({});
- const tileRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+ // Tag-edit modal state
+ const [editModalItem, setEditModalItem] = useState<MediaItem | null>(null);
+ const [editModalTags, setEditModalTags] = useState<number[]>([]);
+ const [editModalSaving, setEditModalSaving] = useState(false);
 
  // ── Data fetching ──────────────────────────────────────────────────────
 
@@ -229,14 +217,6 @@ export default function ProjectMediaGallery({
  }, [docsData]);
 
  const totalPDFs = allPDFs.length;
-
- const docsById = useMemo(() => {
- const map = new Map<string, DocListItem>();
- for (const doc of docsData || []) {
- map.set(String(doc.doc_id), doc);
- }
- return map;
- }, [docsData]);
 
  // PDFs with media states that can contribute visible gallery items
  const scannedDocIds = useMemo(() => {
@@ -362,20 +342,6 @@ export default function ProjectMediaGallery({
  },
  enabled: scannedDocIds.length > 0,
  refetchInterval: isPipelineBusy ? 5000 : false,
- });
-
- // Fetch discard reasons for inline discard controls
- const { data: discardReasons = [] } = useQuery<DiscardReason[]>({
- queryKey: ['discard-reasons', djangoBaseUrl],
- queryFn: async () => {
- const res = await fetch(
- `${djangoBaseUrl}/api/lookups/media_discard_reason/items/`
- );
- if (!res.ok) return [];
- const data = await res.json();
- return data.items || [];
- },
- staleTime: Infinity,
  });
 
  // Filter out discarded / rejected items
@@ -739,253 +705,65 @@ export default function ProjectMediaGallery({
  );
  }, []);
 
- const getCompactHint = useCallback((hint: string | null | undefined): string | null => {
- if (!hint) return null;
- const compact = hint
- .replace(/^this\s+(image|photo)\s+(shows|is)\s*/i, '')
- .replace(/^likely\s*/i, '')
- .replace(/\s+/g, ' ')
- .trim();
- if (!compact) return null;
- if (compact.length > 90) return `${compact.slice(0, 90).trim()}...`;
- return compact;
- }, []);
+ // ── Tag-edit modal helpers ──────────────────────────────────────────
 
- const getDisplayHint = useCallback(
- (item: MediaItem, compactHint: string | null): string => {
- if (compactHint) return compactHint;
- if (item.source_doc_name && item.source_page) {
- return `${item.source_doc_name} · pg ${item.source_page}`;
- }
- if (item.classification?.name) {
- return item.classification.name;
- }
- return `Page ${item.source_page}`;
- },
- []
- );
-
- const computeEditorPanelLayout = useCallback((tileEl: HTMLDivElement): EditorPanelLayout => {
- const rect = tileEl.getBoundingClientRect();
- const viewportPadding = 12;
- const gutter = 10;
- const rightSpace = window.innerWidth - rect.right - gutter - viewportPadding;
- const leftSpace = rect.left - gutter - viewportPadding;
- const preferRight = rightSpace >= leftSpace;
- const availableSide = Math.max(preferRight ? rightSpace : leftSpace, 220);
- const desiredWidth = Math.round(rect.width * 1.25);
- const panelWidth = Math.max(220, Math.min(desiredWidth, availableSide));
- const desiredMinHeight = Math.max(430, Math.round(rect.height * 1.5));
- const maxHeightInViewport = Math.max(320, window.innerHeight - viewportPadding * 2);
- const panelMinHeight = Math.min(desiredMinHeight, maxHeightInViewport);
-
- let left = preferRight
- ? rect.right + gutter
- : rect.left - gutter - panelWidth;
- left = Math.max(
- viewportPadding,
- Math.min(left, window.innerWidth - panelWidth - viewportPadding)
- );
-
- const top = Math.max(
- viewportPadding,
- Math.min(rect.top, window.innerHeight - panelMinHeight - viewportPadding)
- );
-
- return {
- top,
- left,
- width: panelWidth,
- minHeight: panelMinHeight,
- };
- }, []);
-
- const openEditorForItem = useCallback(
- (mediaId: number, item: MediaItem) => {
- const tileEl = tileRefs.current[mediaId];
- setActiveEditorMediaId(mediaId);
- if (tileEl) {
- setEditorPanelLayout(computeEditorPanelLayout(tileEl));
- } else {
- setEditorPanelLayout(null);
- }
- setEditorStateByMediaId((prev) => ({
- ...prev,
- [mediaId]: {
- classificationId: getClassificationIdForItem(item),
- discardReasonCode: null,
- otherReason: '',
- },
- }));
- },
- [computeEditorPanelLayout, getClassificationIdForItem]
- );
-
- const closeEditor = useCallback((mediaId?: number) => {
- setEditorPanelLayout(null);
- setActiveEditorMediaId((current) => {
- if (typeof mediaId === 'number') {
- return current === mediaId ? null : current;
- }
- return null;
- });
- if (typeof mediaId === 'number') {
- setEditorStateByMediaId((prev) => {
- const next = { ...prev };
- delete next[mediaId];
- return next;
- });
- }
- }, []);
-
- useEffect(() => {
- if (activeEditorMediaId == null) return;
- const syncPanelLayout = () => {
- const tileEl = tileRefs.current[activeEditorMediaId];
- if (!tileEl) return;
- setEditorPanelLayout(computeEditorPanelLayout(tileEl));
- };
- syncPanelLayout();
- window.addEventListener('resize', syncPanelLayout);
- window.addEventListener('scroll', syncPanelLayout, true);
- return () => {
- window.removeEventListener('resize', syncPanelLayout);
- window.removeEventListener('scroll', syncPanelLayout, true);
- };
- }, [activeEditorMediaId, computeEditorPanelLayout]);
-
- useEffect(() => {
- if (activeEditorMediaId == null) return;
- const onKeyDown = (event: KeyboardEvent) => {
- if (event.key === 'Escape') {
- event.preventDefault();
- closeEditor(activeEditorMediaId);
- }
- };
- document.addEventListener('keydown', onKeyDown);
- return () => document.removeEventListener('keydown', onKeyDown);
- }, [activeEditorMediaId, closeEditor]);
-
- const setEditorClassification = useCallback((mediaId: number, classificationId: number) => {
- setEditorStateByMediaId((prev) => ({
- ...prev,
- [mediaId]: {
- classificationId,
- discardReasonCode: null,
- otherReason: '',
- },
- }));
- }, []);
-
- const toggleDiscardReason = useCallback((mediaId: number, reasonCode: string) => {
- setEditorStateByMediaId((prev) => {
- const existing = prev[mediaId] ?? {
- classificationId: null,
- discardReasonCode: null,
- otherReason: '',
- };
- const requestedReason = reasonCode === 'keep' ? null : reasonCode;
- const nextReason = existing.discardReasonCode === requestedReason ? null : requestedReason;
- return {
- ...prev,
- [mediaId]: {
- ...existing,
- discardReasonCode: nextReason,
- otherReason: nextReason === 'other' ? existing.otherReason : '',
- },
- };
- });
- }, []);
-
- const setEditorOtherReason = useCallback((mediaId: number, value: string) => {
- setEditorStateByMediaId((prev) => {
- const existing = prev[mediaId] ?? {
- classificationId: null,
- discardReasonCode: 'other',
- otherReason: '',
- };
- return {
- ...prev,
- [mediaId]: {
- ...existing,
- discardReasonCode: 'other',
- otherReason: value,
- },
- };
- });
- }, []);
-
- const handleApplyTileUpdate = useCallback(
- async (item: MediaItem) => {
- const mediaId = item.media_id;
- const state = editorStateByMediaId[mediaId];
- if (!state || savingMediaId === mediaId) return;
-
- setSavingMediaId(mediaId);
- try {
- const discardReasonCode = state.discardReasonCode;
- if (discardReasonCode) {
- if (discardReasonCode === 'other' && !state.otherReason.trim()) {
- return;
- }
- const discarded = await handleDiscard(
- mediaId,
- discardReasonCode,
- discardReasonCode === 'other' ? state.otherReason.trim() : undefined
- );
- if (discarded) {
- closeEditor(mediaId);
- }
- return;
- }
-
+ const openTagModal = useCallback(
+ (item: MediaItem) => {
  const currentId = getClassificationIdForItem(item);
- const nextId = state.classificationId;
- if (!nextId || nextId === currentId) {
- closeEditor(mediaId);
- return;
- }
+ setEditModalTags(currentId ? [currentId] : []);
+ setEditModalItem(item);
+ },
+ [getClassificationIdForItem]
+ );
 
+ const closeTagModal = useCallback(() => {
+ setEditModalItem(null);
+ setEditModalTags([]);
+ setEditModalSaving(false);
+ }, []);
+
+ const toggleModalTag = useCallback((classificationId: number) => {
+ setEditModalTags((prev) =>
+ prev.includes(classificationId)
+ ? prev.filter((id) => id !== classificationId)
+ : [...prev, classificationId]
+ );
+ }, []);
+
+ const handleSaveModalTags = useCallback(async () => {
+ if (!editModalItem || editModalTags.length === 0) return;
+ setEditModalSaving(true);
+ try {
+ // Use the first selected tag as the primary classification
+ const primaryTagId = editModalTags[0];
  const classInfo = ALL_CLASSIFICATIONS.find(
- (cls) => cls.classification_id === nextId
+ (cls) => cls.classification_id === primaryTagId
  );
  if (!classInfo) return;
-
- const reclassified = await handleSingleReclassify(mediaId, nextId, classInfo);
- if (reclassified) {
- closeEditor(mediaId);
- }
- } finally {
- setSavingMediaId((prev) => (prev === mediaId ? null : prev));
- }
- },
- [
- closeEditor,
- editorStateByMediaId,
- getClassificationIdForItem,
- handleDiscard,
- handleSingleReclassify,
- savingMediaId,
- ]
+ const success = await handleSingleReclassify(
+ editModalItem.media_id,
+ primaryTagId,
+ classInfo
  );
-
- // ── Helpers ────────────────────────────────────────────────────────────
-
- const buildSourcePdfHref = useCallback(
- (storageUri: string | null | undefined, sourcePage?: number): string => {
- if (!storageUri) return '';
- if (!sourcePage || sourcePage <= 0) return storageUri;
-
- if (storageUri.includes('#')) {
- if (storageUri.includes('page=')) {
- return storageUri.replace(/page=\d+/i, `page=${sourcePage}`);
+ if (success) closeTagModal();
+ } finally {
+ setEditModalSaving(false);
  }
- return `${storageUri}&page=${sourcePage}`;
- }
+ }, [editModalItem, editModalTags, handleSingleReclassify, closeTagModal]);
 
- return `${storageUri}#page=${sourcePage}`;
+ // ── Quick delete (bypasses tagging) ────────────────────────────────
+
+ const handleQuickDelete = useCallback(
+ async (item: MediaItem) => {
+ if (savingMediaId === item.media_id) return;
+ setSavingMediaId(item.media_id);
+ try {
+ await handleDiscard(item.media_id, 'not_relevant');
+ } finally {
+ setSavingMediaId((prev) => (prev === item.media_id ? null : prev));
+ }
  },
- []
+ [handleDiscard, savingMediaId]
  );
 
  // ── Render ─────────────────────────────────────────────────────────────
@@ -1294,33 +1072,11 @@ export default function ProjectMediaGallery({
  >
  {filteredItems.map((item) => {
  const thumbSrc = resolveMediaUrl(item.storage_uri || item.thumbnail_uri);
- const shouldAvoidUpscale =
- item.width_px < TILE_MAX_WIDTH || item.height_px < TILE_HEIGHT;
- const sourceDoc = docsById.get(String(item.doc_id));
- const sourcePdfHref = buildSourcePdfHref(
- sourceDoc?.storage_uri,
- item.source_page
- );
- const currentClassificationId = getClassificationIdForItem(item);
- const draft = editorStateByMediaId[item.media_id] ?? {
- classificationId: currentClassificationId,
- discardReasonCode: null,
- otherReason: '',
- };
- const compactHint = getCompactHint(item.ai_description);
- const displayHint = getDisplayHint(item, compactHint);
- const isEditorOpen = activeEditorMediaId === item.media_id;
- const panelIsVisible = isEditorOpen && !!editorPanelLayout;
- const saveDisabled =
- savingMediaId === item.media_id ||
- (draft.discardReasonCode === 'other' && !draft.otherReason.trim());
+ const isDeleting = savingMediaId === item.media_id;
 
  return (
  <div
  key={item.media_id}
- ref={(node) => {
- tileRefs.current[item.media_id] = node;
- }}
  style={{
  cursor: 'default',
  borderRadius: '4px',
@@ -1328,8 +1084,7 @@ export default function ProjectMediaGallery({
  border: '1px solid var(--cui-border-color)',
  backgroundColor: 'var(--cui-card-bg)',
  transition: 'box-shadow 0.15s',
- position: 'relative',
- zIndex: isEditorOpen ? 10 : 1,
+ opacity: isDeleting ? 0.5 : 1,
  }}
  onMouseEnter={(e) => {
  (e.currentTarget as HTMLDivElement).style.boxShadow =
@@ -1340,28 +1095,19 @@ export default function ProjectMediaGallery({
  'none';
  }}
  >
- {/* Thumbnail + slideout editor */}
+ {/* Thumbnail — click opens tag modal */}
  <div
  style={{
  width: '100%',
  height: `${TILE_HEIGHT}px`,
- overflow: 'visible',
- backgroundColor: 'var(--cui-tertiary-bg)',
- position: 'relative',
- }}
- >
- <div
- style={{
- position: 'absolute',
- inset: 0,
  overflow: 'hidden',
+ backgroundColor: 'var(--cui-tertiary-bg)',
  cursor: 'pointer',
  display: 'flex',
  alignItems: 'center',
  justifyContent: 'center',
- backgroundColor: 'var(--cui-tertiary-bg)',
  }}
- onClick={() => openEditorForItem(item.media_id, item)}
+ onClick={() => openTagModal(item)}
  >
  {thumbSrc ? (
  <img
@@ -1369,11 +1115,9 @@ export default function ProjectMediaGallery({
  alt={item.classification?.name ?? 'Media'}
  loading="lazy"
  style={{
- width: shouldAvoidUpscale ? 'auto' : '100%',
- height: shouldAvoidUpscale ? 'auto' : '100%',
- maxWidth: '100%',
- maxHeight: '100%',
- objectFit: shouldAvoidUpscale ? 'contain' : 'cover',
+ width: '100%',
+ height: '100%',
+ objectFit: 'cover',
  }}
  />
  ) : (
@@ -1381,211 +1125,16 @@ export default function ProjectMediaGallery({
  )}
  </div>
 
- <div
- onClick={(e) => e.stopPropagation()}
- style={{
- position: 'fixed',
- top:
- panelIsVisible && editorPanelLayout
- ? `${editorPanelLayout.top}px`
- : '-9999px',
- left:
- panelIsVisible && editorPanelLayout
- ? `${editorPanelLayout.left}px`
- : '-9999px',
- width:
- panelIsVisible && editorPanelLayout
- ? `${editorPanelLayout.width}px`
- : '0px',
- minHeight:
- panelIsVisible && editorPanelLayout
- ? `${editorPanelLayout.minHeight}px`
- : '0px',
- transform: panelIsVisible ? 'translateX(0)' : 'translateX(12px)',
- opacity: panelIsVisible ? 1 : 0,
- transition: 'transform 0.2s ease, opacity 0.2s ease',
- backgroundColor: 'var(--cui-body-bg)',
- border: '1px solid var(--cui-border-color)',
- boxShadow: '0 8px 18px rgba(0,0,0,0.14)',
- borderRadius: '4px',
- padding: '0.55rem',
- display: 'flex',
- flexDirection: 'column',
- gap: '0.45rem',
- pointerEvents: panelIsVisible ? 'auto' : 'none',
- zIndex: 1000,
- }}
- >
- <div className="d-flex align-items-start justify-content-between gap-2">
- <div
- style={{
- fontSize: '0.72rem',
- lineHeight: 1.3,
- color: 'var(--cui-body-color)',
- }}
- >
- Hint: {displayHint}
- </div>
- <button
- type="button"
- className="border-0 bg-transparent"
- onClick={() => closeEditor(item.media_id)}
- style={{
- fontSize: '0.9rem',
- lineHeight: 1,
- color: 'var(--cui-secondary-color)',
- cursor: 'pointer',
- padding: 0,
- flexShrink: 0,
- }}
- >
- &#10005;
- </button>
- </div>
-
- <div>
- <div
- style={{
- fontSize: '0.66rem',
- color: 'var(--cui-secondary-color)',
- marginBottom: '0.2rem',
- }}
- >
- Tags
- </div>
- <div className="d-flex flex-wrap gap-1">
- {ALL_CLASSIFICATIONS.map((classification) => {
- const isActive = draft.classificationId === classification.classification_id;
- return (
- <button
- key={classification.classification_id}
- type="button"
- onClick={() =>
- setEditorClassification(
- item.media_id,
- classification.classification_id
- )
- }
- className="border rounded-pill px-2 py-1"
- style={{
- fontSize: '0.66rem',
- lineHeight: 1.2,
- cursor: 'pointer',
- borderColor: isActive
- ? 'var(--cui-primary)'
- : 'var(--cui-border-color)',
- backgroundColor: isActive
- ? 'var(--cui-primary)'
- : 'transparent',
- color: isActive ? '#fff' : 'var(--cui-body-color)',
- }}
- >
- {classification.name}
- </button>
- );
- })}
- </div>
- </div>
-
- <div>
- <div
- style={{
- fontSize: '0.66rem',
- color: 'var(--cui-secondary-color)',
- marginBottom: '0.2rem',
- }}
- >
- Discard
- </div>
- <div className="d-flex flex-wrap gap-1">
- <button
- type="button"
- onClick={() => toggleDiscardReason(item.media_id, 'keep')}
- className="border rounded-pill px-2 py-1"
- style={{
- fontSize: '0.66rem',
- lineHeight: 1.2,
- cursor: 'pointer',
- borderColor: !draft.discardReasonCode
- ? 'var(--cui-success)'
- : 'var(--cui-border-color)',
- backgroundColor: !draft.discardReasonCode
- ? 'var(--cui-success)'
- : 'transparent',
- color: !draft.discardReasonCode ? '#fff' : 'var(--cui-body-color)',
- }}
- >
- Keep
- </button>
- {discardReasons.map((reason) => {
- const isActive = draft.discardReasonCode === reason.code;
- return (
- <button
- key={reason.item_id}
- type="button"
- onClick={() => toggleDiscardReason(item.media_id, reason.code)}
- className="border rounded-pill px-2 py-1"
- style={{
- fontSize: '0.66rem',
- lineHeight: 1.2,
- cursor: 'pointer',
- borderColor: isActive
- ? 'var(--cui-danger)'
- : 'var(--cui-border-color)',
- backgroundColor: isActive
- ? 'var(--cui-danger)'
- : 'transparent',
- color: isActive ? '#fff' : 'var(--cui-body-color)',
- }}
- >
- {reason.label}
- </button>
- );
- })}
- </div>
- </div>
-
- {draft.discardReasonCode === 'other' && (
- <input
- type="text"
- value={draft.otherReason}
- onChange={(e) =>
- setEditorOtherReason(item.media_id, e.target.value)
- }
- placeholder="Discard reason"
- className="form-control form-control-sm"
- style={{ fontSize: '0.72rem' }}
- />
- )}
-
- <button
- type="button"
- className={`btn btn-sm ${
- draft.discardReasonCode ? 'btn-danger' : 'btn-primary'
- }`}
- disabled={saveDisabled}
- onClick={() => {
- void handleApplyTileUpdate(item);
- }}
- style={{ marginTop: 'auto', fontSize: '0.74rem' }}
- >
- {savingMediaId === item.media_id
- ? 'Saving...'
- : draft.discardReasonCode
- ? 'Save Discard'
- : 'Save / Update'}
- </button>
- </div>
- </div>
-
- {/* Info row */}
- <div style={{ padding: '0.6rem 0.7rem 0.7rem' }}>
+ {/* Info row + edit/delete buttons */}
+ <div style={{ padding: '0.5rem 0.7rem 0.55rem' }}>
+ <div className="d-flex align-items-start justify-content-between">
+ <div style={{ minWidth: 0, flex: 1 }}>
  {item.classification && (
  <CBadge
  color={item.classification.badge_color || 'secondary'}
  style={{
  fontSize: '0.7rem',
- marginBottom: '0.25rem',
+ marginBottom: '0.2rem',
  }}
  >
  {item.classification.name}
@@ -1613,22 +1162,53 @@ export default function ProjectMediaGallery({
  {item.source_doc_name}
  </div>
  )}
- {sourcePdfHref && (
- <a
- href={sourcePdfHref}
- target="_blank"
- rel="noopener noreferrer"
+ </div>
+
+ {/* Edit / Delete buttons */}
+ <div className="d-flex gap-1" style={{ flexShrink: 0, marginTop: '0.15rem' }}>
+ <button
+ type="button"
+ title="Edit tags"
+ onClick={(e) => {
+ e.stopPropagation();
+ openTagModal(item);
+ }}
  style={{
+ background: 'transparent',
+ border: '1px solid var(--cui-border-color)',
+ borderRadius: '4px',
+ padding: '0.2rem 0.35rem',
+ cursor: 'pointer',
  fontSize: '0.72rem',
- color: 'var(--cui-primary)',
- textDecoration: 'none',
- display: 'inline-block',
- marginTop: '0.25rem',
+ lineHeight: 1,
+ color: 'var(--cui-secondary-color)',
  }}
  >
- Open source PDF (pg {item.source_page})
- </a>
- )}
+ &#9998;
+ </button>
+ <button
+ type="button"
+ title="Delete"
+ disabled={isDeleting}
+ onClick={(e) => {
+ e.stopPropagation();
+ void handleQuickDelete(item);
+ }}
+ style={{
+ background: 'transparent',
+ border: '1px solid var(--cui-border-color)',
+ borderRadius: '4px',
+ padding: '0.2rem 0.35rem',
+ cursor: isDeleting ? 'not-allowed' : 'pointer',
+ fontSize: '0.72rem',
+ lineHeight: 1,
+ color: 'var(--cui-danger)',
+ }}
+ >
+ &#128465;
+ </button>
+ </div>
+ </div>
  </div>
  </div>
  );
@@ -1636,6 +1216,130 @@ export default function ProjectMediaGallery({
  </div>
  </>
  )}
+
+ {/* ── Tag-edit modal ── */}
+ <CModal
+ visible={!!editModalItem}
+ onClose={closeTagModal}
+ alignment="center"
+ size="lg"
+ >
+ <CModalHeader closeButton>
+ <CModalTitle style={{ fontSize: '0.95rem' }}>
+ Edit Tags
+ </CModalTitle>
+ </CModalHeader>
+ <CModalBody>
+ {editModalItem && (
+ <div className="d-flex gap-3" style={{ minHeight: '220px' }}>
+ {/* Preview */}
+ <div
+ style={{
+ width: '200px',
+ flexShrink: 0,
+ borderRadius: '4px',
+ overflow: 'hidden',
+ backgroundColor: 'var(--cui-tertiary-bg)',
+ display: 'flex',
+ alignItems: 'center',
+ justifyContent: 'center',
+ }}
+ >
+ {resolveMediaUrl(editModalItem.storage_uri || editModalItem.thumbnail_uri) ? (
+ <img
+ src={resolveMediaUrl(editModalItem.storage_uri || editModalItem.thumbnail_uri)}
+ alt={editModalItem.classification?.name ?? 'Media'}
+ style={{
+ maxWidth: '100%',
+ maxHeight: '220px',
+ objectFit: 'contain',
+ }}
+ />
+ ) : (
+ <span style={{ fontSize: '2rem', opacity: 0.4 }}>{'\u{1F5BC}'}</span>
+ )}
+ </div>
+
+ {/* Tag selection — multi-select */}
+ <div style={{ flex: 1 }}>
+ <div
+ style={{
+ fontSize: '0.78rem',
+ color: 'var(--cui-secondary-color)',
+ marginBottom: '0.5rem',
+ }}
+ >
+ Select one or more tags (first selected = primary):
+ </div>
+ <div className="d-flex flex-wrap gap-1">
+ {ALL_CLASSIFICATIONS.map((cls) => {
+ const isSelected = editModalTags.includes(cls.classification_id);
+ const isPrimary = editModalTags[0] === cls.classification_id;
+ return (
+ <button
+ key={cls.classification_id}
+ type="button"
+ onClick={() => toggleModalTag(cls.classification_id)}
+ className="border rounded-pill px-2 py-1"
+ style={{
+ fontSize: '0.74rem',
+ lineHeight: 1.3,
+ cursor: 'pointer',
+ borderColor: isSelected
+ ? isPrimary
+ ? 'var(--cui-primary)'
+ : `var(--cui-${cls.badge_color || 'secondary'})`
+ : 'var(--cui-border-color)',
+ backgroundColor: isSelected
+ ? isPrimary
+ ? 'var(--cui-primary)'
+ : `var(--cui-${cls.badge_color || 'secondary'})`
+ : 'transparent',
+ color: isSelected ? '#fff' : 'var(--cui-body-color)',
+ }}
+ >
+ {cls.name}
+ </button>
+ );
+ })}
+ </div>
+
+ {editModalTags.length > 1 && (
+ <div
+ style={{
+ fontSize: '0.72rem',
+ color: 'var(--cui-secondary-color)',
+ marginTop: '0.6rem',
+ }}
+ >
+ Primary tag: <strong>
+ {ALL_CLASSIFICATIONS.find((c) => c.classification_id === editModalTags[0])?.name}
+ </strong>
+ {' '}(saved to database). Additional tags are visual only for now.
+ </div>
+ )}
+ </div>
+ </div>
+ )}
+ </CModalBody>
+ <CModalFooter>
+ <button
+ type="button"
+ className="btn btn-sm btn-ghost-secondary"
+ onClick={closeTagModal}
+ >
+ Cancel
+ </button>
+ <button
+ type="button"
+ className="btn btn-sm btn-primary"
+ disabled={editModalSaving || editModalTags.length === 0}
+ onClick={() => void handleSaveModalTags()}
+ >
+ {editModalSaving ? 'Saving...' : 'Save Tags'}
+ </button>
+ </CModalFooter>
+ </CModal>
  </CCardBody>
  )}
  </CCard>

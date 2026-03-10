@@ -22,12 +22,10 @@ export default function DocumentsTab({ project }: DocumentsTabProps) {
         projectName={project.project_name}
         projectType={project.project_type ?? null}
       />
-      <div className="px-3 lg:px-4 pb-4 lg:pb-6" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-        <ProjectMediaGallery
-          projectId={project.project_id}
-          projectName={project.project_name}
-        />
-      </div>
+      <ProjectMediaGallery
+        projectId={project.project_id}
+        projectName={project.project_name}
+      />
     </div>
   );
 }

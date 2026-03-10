@@ -323,7 +323,12 @@ CREATE TEMP TABLE tmp_local_project_owner_map (
 );
 \\copy tmp_local_project_owner_map FROM '$local_owner_stage' WITH (FORMAT csv, HEADER true, DELIMITER E'\t')
 
-CREATE TEMP TABLE tmp_updated_projects AS
+CREATE TEMP TABLE tmp_updated_projects (
+  project_id integer,
+  project_name text,
+  prod_user_id integer
+);
+
 WITH mapped AS (
   SELECT
     p.project_id,
@@ -332,14 +337,17 @@ WITH mapped AS (
   JOIN tmp_local_project_owner_map l ON l.project_id = p.project_id
   JOIN landscape.auth_user pu ON pu.username = l.username
   WHERE p.created_by_id IS NULL
+),
+updated AS (
+  UPDATE landscape.tbl_project p
+  SET created_by_id = m.prod_user_id,
+      updated_at = NOW()
+  FROM mapped m
+  WHERE p.project_id = m.project_id
+    AND p.created_by_id IS NULL
+  RETURNING p.project_id, p.project_name, m.prod_user_id
 )
-UPDATE landscape.tbl_project p
-SET created_by_id = m.prod_user_id,
-    updated_at = NOW()
-FROM mapped m
-WHERE p.project_id = m.project_id
-  AND p.created_by_id IS NULL
-RETURNING p.project_id, p.project_name, m.prod_user_id;
+INSERT INTO tmp_updated_projects SELECT * FROM updated;
 
 COMMIT;
 

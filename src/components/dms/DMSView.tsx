@@ -819,11 +819,11 @@ function DMSViewInner({
   }, [saveToTemplatePrompt]);
 
   return (
-    <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
+    <div className="h-full flex flex-col">
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-        <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
-          <div className="px-3 lg:px-4 py-4 lg:py-6">
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full flex flex-col">
+          <div>
             <CCard className="mb-3 shadow-sm">
               <CCardHeader
                 onClick={() => setPanelExpanded((prev) => !prev)}
@@ -1246,7 +1246,7 @@ function DMSViewInner({
                           role="presentation"
                         />
                         <div
-                          className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[480px]"
+                          className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l shadow-xl lg:static lg:z-auto lg:max-w-none lg:w-[384px]"
                           style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
                         >
                           <DocumentPreviewPanel

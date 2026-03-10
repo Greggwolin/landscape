@@ -5,7 +5,6 @@ import '@/styles/coreui-theme.css';
 import '@/styles/budget-color-audit.css';
 import '@/styles/navigation.css';
 import '@/styles/sales-transactions.css';
-import { IssueReporterProvider } from "@/components/IssueReporter";
 import { CoreUIThemeProvider } from "@/app/components/CoreUIThemeProvider";
 import { ProjectProvider } from "@/app/components/ProjectProvider";
 import { QueryProvider } from "@/app/components/QueryProvider";
@@ -35,15 +34,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <CoreUIThemeProvider>
               <ToastProvider>
                 <ProjectProvider>
-                  <IssueReporterProvider>
-                    <LandscaperThinkingProvider>
-                      <HelpLandscaperProvider>
-                        <NavigationLayout>
-                          {children}
-                        </NavigationLayout>
-                      </HelpLandscaperProvider>
-                    </LandscaperThinkingProvider>
-                  </IssueReporterProvider>
+                  <LandscaperThinkingProvider>
+                    <HelpLandscaperProvider>
+                      <NavigationLayout>
+                        {children}
+                      </NavigationLayout>
+                    </HelpLandscaperProvider>
+                  </LandscaperThinkingProvider>
                 </ProjectProvider>
               </ToastProvider>
             </CoreUIThemeProvider>

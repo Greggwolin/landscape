@@ -5,12 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
-import { useIssueReporter } from '@/components/IssueReporter';
-import { useAuth } from '@/contexts/AuthContext';
 import { GLOBAL_NAV_LINKS } from './navigation/constants';
 import UserMenuDropdown from './navigation/UserMenuDropdown';
 import CIcon from '@coreui/icons-react';
-import { cilBug, cilSettings, cilMoon, cilSun } from '@coreui/icons';
+import { cilSettings, cilMoon, cilSun } from '@coreui/icons';
 import { useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
 import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { HelpIcon } from '@/components/icons/HelpIcon';
@@ -37,12 +35,9 @@ interface TopNavigationBarProps {
 export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
-  const { openReporterWithLatestTarget, hasTargetContext, lastTargetLabel } = useIssueReporter();
   const { isOpen: isHelpOpen, toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { isThinking: isProjectLandscaperThinking } = useLandscaperThinking();
   const isLandscaperThinking = isProjectLandscaperThinking || isHelpLoading;
-  const [showBugHint, setShowBugHint] = React.useState(false);
   const logoSrc = '/logo-invert.png';
 
   const navHoverHandlers = (isActive = false) => ({
@@ -57,14 +52,6 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
         : 'transparent';
     },
   });
-
-  const handleBugButtonClick = () => {
-    const opened = openReporterWithLatestTarget({ issueType: 'bug' });
-    if (!opened) {
-      setShowBugHint(true);
-      window.setTimeout(() => setShowBugHint(false), 2500);
-    }
-  };
 
   return (
     <>
@@ -130,40 +117,6 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
               <CIcon icon={theme === 'light' ? cilMoon : cilSun} size="sm" />
               {theme === 'light' ? 'Dark' : 'Light'}
             </button>
-
-            {/* Bug/Issues Icon Button - Admin Only */}
-            {user?.is_staff && (
-              <div className="relative flex flex-col items-end">
-                <button
-                  type="button"
-                  data-issue-reporter-ignore="true"
-                  onClick={handleBugButtonClick}
-                  className="rounded-full p-2 transition-colors"
-                  style={{ color: hasTargetContext ? 'var(--nav-text)' : 'var(--nav-border)' }}
-                  {...navHoverHandlers()}
-                  aria-label={
-                    hasTargetContext
-                      ? `Report a bug for ${lastTargetLabel ?? 'the selected element'}`
-                      : 'Click any UI element first, then tap the bug icon'
-                  }
-                  title={
-                    hasTargetContext
-                      ? 'Report a bug for the last element you interacted with'
-                      : 'Click the target element first, then tap this icon'
-                  }
-                >
-                  <CIcon icon={cilBug} size="lg" />
-                </button>
-                {!hasTargetContext && showBugHint && (
-                  <div
-                    data-issue-reporter-ignore="true"
-                    className="absolute right-0 top-full mt-2 rounded-md bg-slate-800 px-3 py-1 text-xs font-medium text-white shadow-lg"
-                  >
-                    Click a UI element first, then tap the bug icon.
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Help Landscaper Button */}
             <button
