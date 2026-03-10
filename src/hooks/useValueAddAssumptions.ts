@@ -187,12 +187,28 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
   ) => {
     setState(prev => {
       const nextState = { ...prev, [key]: value };
+
+      // When switching cost basis, convert the cost value so the
+      // dollar amount the user sees stays consistent.
+      // e.g. $25/SF  → switch to /Unit → $25 * avgSf = $20,000/Unit
+      // e.g. $20K/Unit → switch to /SF → $20,000 / avgSf = $25/SF
+      if (key === 'renoCostBasis' && value !== prev.renoCostBasis && prev.renoCost !== null) {
+        const avgSf = stats.avgUnitSf || 1;
+        if (value === 'unit') {
+          // Was $/SF, now $/Unit → multiply
+          nextState.renoCost = Math.round(prev.renoCost * avgSf);
+        } else {
+          // Was $/Unit, now $/SF → divide
+          nextState.renoCost = Math.round((prev.renoCost / avgSf) * 100) / 100;
+        }
+      }
+
       if (!options?.skipSave) {
         scheduleSave(nextState);
       }
       return nextState;
     });
-  }, [scheduleSave]);
+  }, [scheduleSave, stats.avgUnitSf]);
 
   // Fetch once on mount (projectId only)
   useEffect(() => {

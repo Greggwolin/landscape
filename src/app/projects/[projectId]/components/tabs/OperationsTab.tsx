@@ -294,6 +294,39 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       return;
     }
 
+    // Special handling for management fee provenance toggle
+    if (lineItemKey === 'calculated_management_fee') {
+      if (currentSource === 'ingestion') {
+        // Lock clicked → switch to user_modified so it becomes an editable % input
+        // Find the derived percentage to seed the assumption
+        const mgmtRow = opexRows.flatMap(r => r.children || []).find(
+          r => r.line_item_key === 'calculated_management_fee'
+        );
+        const derivedPct = mgmtRow?.derived_management_fee_pct ?? mgmtRow?.management_fee_pct ?? 0.03;
+
+        fetch(`/api/projects/${project.project_id}/operations/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            management_fee_pct: derivedPct,
+            management_fee_source: 'user_modified'
+          })
+        }).then(() => reload());
+      } else if (currentSource === 'user_modified') {
+        // Revert to extracted value
+        if (window.confirm('Revert management fee to the extracted value?')) {
+          fetch(`/api/projects/${project.project_id}/operations/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              management_fee_source: 'ingestion'
+            })
+          }).then(() => reload());
+        }
+      }
+      return;
+    }
+
     // OpEx row provenance toggle
     const findOpexId = (rows: LineItemRow[]): number | undefined => {
       for (const row of rows) {
@@ -587,8 +620,11 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       </CCardBody>
     </CCard>
 
-      {/* Right: Treemap Charts — flexible with min/max to prevent blowout */}
-      <div style={{ flex: '0 1 380px', minWidth: '360px', maxWidth: '420px' }} className="d-flex flex-column gap-3">
+      {/* Resizable Splitter */}
+      <OpsChartSplitter />
+
+      {/* Right: Treemap Charts — width driven by splitter */}
+      <div style={{ flex: '0 0 auto', width: 'var(--ops-chart-width, 380px)', minWidth: '280px', maxWidth: '520px' }} className="d-flex flex-column gap-3">
         <IncomeTreemap
           rentalRows={rentalRows}
           grossPotentialRent={grossPotentialRent}
@@ -598,6 +634,66 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
           totalOperatingExpenses={totals?.total_operating_expenses || 0}
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * OpsChartSplitter — lightweight drag handle between the operating statement
+ * CCard and the treeview charts. Sets a CSS custom property on its parent
+ * flex container so the chart panel width is driven by drag position.
+ */
+function OpsChartSplitter() {
+  const handleRef = useRef<HTMLDivElement>(null);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const container = handleRef.current?.parentElement;
+    if (!container) return;
+
+    const onMove = (ev: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const chartWidth = Math.max(280, Math.min(520, rect.right - ev.clientX));
+      container.style.setProperty('--ops-chart-width', `${chartWidth}px`);
+    };
+
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, []);
+
+  return (
+    <div
+      ref={handleRef}
+      onPointerDown={onPointerDown}
+      style={{
+        width: '8px',
+        cursor: 'col-resize',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        borderRadius: '4px',
+        transition: 'background-color 0.15s',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--cui-tertiary-bg)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+    >
+      <div style={{
+        width: '2px',
+        height: '48px',
+        borderRadius: '1px',
+        backgroundColor: 'var(--cui-border-color)',
+        transition: 'height 0.15s, background-color 0.15s',
+      }} />
     </div>
   );
 }
