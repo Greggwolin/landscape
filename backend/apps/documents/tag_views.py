@@ -277,6 +277,31 @@ def project_doc_types(request, project_id):
     """
     if request.method == 'GET':
         with connection.cursor() as cursor:
+            # Auto-register any doc_types that exist on actual documents but are
+            # not yet in dms_project_doc_types.  This makes ad-hoc doc_type folders
+            # permanent so they survive even when all their documents are deleted.
+            cursor.execute("""
+                INSERT INTO landscape.dms_project_doc_types
+                    (project_id, doc_type_name, display_order, is_from_template)
+                SELECT
+                    %s,
+                    d.doc_type,
+                    COALESCE((SELECT MAX(display_order) FROM landscape.dms_project_doc_types WHERE project_id = %s), 0) + ROW_NUMBER() OVER (ORDER BY d.doc_type),
+                    FALSE
+                FROM (
+                    SELECT DISTINCT COALESCE(doc_type, 'general') AS doc_type
+                    FROM landscape.core_doc
+                    WHERE project_id = %s
+                      AND deleted_at IS NULL
+                      AND status NOT IN ('deleted', 'archived')
+                ) d
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM landscape.dms_project_doc_types p
+                    WHERE p.project_id = %s
+                      AND LOWER(p.doc_type_name) = LOWER(d.doc_type)
+                )
+            """, [project_id, project_id, project_id, project_id])
+
             # Read directly from project-owned doc types (seeded at project creation)
             cursor.execute("""
                 SELECT id, doc_type_name, display_order, is_from_template

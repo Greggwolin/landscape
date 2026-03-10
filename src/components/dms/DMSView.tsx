@@ -262,17 +262,9 @@ function DMSViewInner({
           is_from_template: true, // treat as template since it came from actual docs
         }));
 
-      // Preserve filters that existed before this refresh but now have 0 docs
-      // (e.g., user trashed all docs in a folder — keep the empty folder visible)
-      const merged = [...typeFilters, ...extraFilters];
-      const mergedSet = new Set(merged.map(f => f.doc_type.toLowerCase()));
-      const preserved = allFilters
-        .filter(f => !mergedSet.has(f.doc_type.toLowerCase()) && f.count > 0)
-        .map(f => ({ ...f, count: 0, documents: [], is_expanded: false }));
-
-      setAllFilters([...merged, ...preserved]);
+      setAllFilters([...typeFilters, ...extraFilters]);
       // Keep current expanded filter open if it still exists
-      if (expandedFilter && ![...merged, ...preserved].some(f => f.doc_type === expandedFilter)) {
+      if (expandedFilter && ![...typeFilters, ...extraFilters].some(f => f.doc_type === expandedFilter)) {
         setExpandedFilter(null);
       }
     } catch (error) {
