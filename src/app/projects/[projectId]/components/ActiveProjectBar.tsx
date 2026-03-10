@@ -239,7 +239,7 @@ export function ActiveProjectBar({
       }}
     >
       {/* Left block: Selector + Pills — fixed width, independent of panel state */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0, width: 296, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flexShrink: 0, width: 320, overflow: 'hidden' }}>
         {/* Project selector dropdown */}
         <select
           value={project?.project_id || ''}

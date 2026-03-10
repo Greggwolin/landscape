@@ -277,24 +277,9 @@ export default function DocumentPreviewPanel({
         style={{ borderColor: 'var(--cui-card-border-color)', backgroundColor: 'var(--cui-card-header-bg)' }}
       >
         <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ minWidth: 0 }}>
-          <span className="flex-shrink-0" style={{ fontSize: '1rem', color: 'var(--cui-danger)' }}>📄</span>
-          <span className="fw-semibold text-truncate" style={{ color: 'var(--cui-body-color)' }}>
-            {doc.doc_name}
+          <span className="fw-semibold" style={{ color: 'var(--cui-body-color)' }}>
+            Document Details
           </span>
-          <button
-            type="button"
-            onClick={() => setShowVersionHistory((prev) => !prev)}
-            className="badge rounded-pill flex-shrink-0"
-            style={{
-              backgroundColor: 'var(--cui-primary-bg-subtle)',
-              color: 'var(--cui-primary)',
-              border: '1px solid var(--cui-primary-border-subtle)'
-            }}
-            aria-label="Toggle version history"
-            title="View version history"
-          >
-            V{doc.version_no || 1}
-          </button>
         </div>
         <div className="d-flex align-items-center gap-2 flex-shrink-0">
           <button
@@ -331,6 +316,29 @@ export default function DocumentPreviewPanel({
         {/* Document Metadata - 2-column layout */}
         <table className="w-100 small">
           <tbody>
+            {/* Title */}
+            <tr style={rowBorderStyle}>
+              <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Title</td>
+              <td className="py-2 fw-semibold" style={valueCellStyle}>
+                <div className="d-flex align-items-center gap-2">
+                  <span>{doc.doc_name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVersionHistory((prev) => !prev)}
+                    className="badge rounded-pill flex-shrink-0"
+                    style={{
+                      backgroundColor: 'var(--cui-primary-bg-subtle)',
+                      color: 'var(--cui-primary)',
+                      border: '1px solid var(--cui-primary-border-subtle)'
+                    }}
+                    aria-label="Toggle version history"
+                    title="View version history"
+                  >
+                    V{doc.version_no || 1}
+                  </button>
+                </div>
+              </td>
+            </tr>
             {/* Core Fields */}
             <tr style={rowBorderStyle}>
               <td className="py-2 pe-3 fw-semibold text-nowrap" style={labelCellStyle}>Type</td>

@@ -1,0 +1,64 @@
+{
+  "report": "Landscape Platform Health Check",
+  "timestamp": "2026-03-10T15:00:23Z",
+  "mode": "all",
+  "branch": "feature/alpha-prep",
+  "results": [
+    {
+  "agent": "coreui-compliance-auditor",
+  "timestamp": "2026-03-10T15:00:04Z",
+  "status": "FAIL",
+  "total_violations": 6320,
+  "breakdown": {
+    "mui_imports": 139,
+    "hardcoded_hex_css": 781,
+    "forbidden_tailwind": 845,
+    "dark_variants": 80,
+    "inline_styles": 4475
+  }
+}
+,
+    {
+  "agent": "django-api-route-enforcer",
+  "timestamp": "2026-03-10T15:00:07Z",
+  "status": "PASS",
+  "new_nextjs_violations": 0,
+  "violation_files": [],
+  "context": {
+    "total_nextjs_routes": 416,
+    "total_django_viewsets": 22
+  }
+}
+,
+    {
+  "agent": "claudemd-sync-checker",
+  "timestamp": "2026-03-10T15:00:08Z",
+  "status": "PASS",
+  "stale_file_count": 0,
+  "stale_files": []
+}
+,
+    {"agent":"extraction-queue-monitor","status":"SKIP","message":"Extraction table not found"}
+,
+    {
+  "agent": "dead-tool-detector",
+  "timestamp": "2026-03-10T15:00:23.080376+00:00",
+  "status": "PASS",
+  "tools_scanned": 8,
+  "dead_table_refs": 0,
+  "dead_column_refs": 0,
+  "dead_tables": [],
+  "dead_columns": []
+}
+,
+    {
+  "agent": "allowed-updates-auditor",
+  "timestamp": "2026-03-10T15:00:23.139372+00:00",
+  "status": "PASS",
+  "tools_checked": 0,
+  "critical_mismatches": 0,
+  "details": []
+}
+
+  ]
+}
