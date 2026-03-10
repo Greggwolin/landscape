@@ -292,8 +292,6 @@ def project_doc_types(request, project_id):
                     SELECT DISTINCT COALESCE(doc_type, 'general') AS doc_type
                     FROM landscape.core_doc
                     WHERE project_id = %s
-                      AND deleted_at IS NULL
-                      AND status NOT IN ('deleted', 'archived')
                 ) d
                 WHERE NOT EXISTS (
                     SELECT 1 FROM landscape.dms_project_doc_types p
