@@ -50,9 +50,18 @@ export async function DELETE(
     fileKey = storageUri;
   }
 
-  // 3. Delete from UploadThing
+  // 3. Check if other core_doc rows share the same file (cloned projects).
+  //    Only delete from UploadThing when this is the LAST reference.
+  const refCount = await sql`
+    SELECT COUNT(*)::int AS cnt FROM landscape.core_doc
+    WHERE storage_uri = ${storageUri}
+      AND deleted_at IS NULL
+      AND doc_id != ${docId}
+  `;
+  const otherRefs = refCount[0]?.cnt ?? 0;
+
   let utDeleted = false;
-  if (fileKey) {
+  if (fileKey && otherRefs === 0) {
     try {
       await utapi.deleteFiles([fileKey]);
       utDeleted = true;
@@ -60,6 +69,8 @@ export async function DELETE(
       console.warn(`[DMS] UploadThing delete failed for key ${fileKey}:`, err);
       // Continue — still soft-delete the DB record even if UT fails
     }
+  } else if (otherRefs > 0) {
+    console.info(`[DMS] Skipping UploadThing delete for doc ${docId} — ${otherRefs} other doc(s) share the same file`);
   }
 
   // 4. Soft-delete the core_doc record
@@ -73,6 +84,7 @@ export async function DELETE(
     success: true,
     doc_id: docId,
     ut_deleted: utDeleted,
+    ut_skipped_shared: otherRefs > 0,
     file_key: fileKey,
   });
 }

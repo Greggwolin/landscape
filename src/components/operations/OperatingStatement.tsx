@@ -130,6 +130,7 @@ interface SelectableExpenseRowProps {
   unitCount: number;
   totalSF: number;
   valueAddEnabled: boolean;
+  effectiveGrossIncome: number;
   isSelected: boolean;
   isEditingName: boolean;
   onSelect: (opexId: number, event: React.MouseEvent) => void;
@@ -145,6 +146,7 @@ function SelectableExpenseRow({
   unitCount,
   totalSF,
   valueAddEnabled,
+  effectiveGrossIncome,
   isSelected,
   isEditingName,
   onSelect,
@@ -156,6 +158,8 @@ function SelectableExpenseRow({
 }: SelectableExpenseRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const isDraggable = row.is_draggable;
+
+  const isMgmtFee = row.is_management_fee === true;
 
   const isPercentageBased = (r: LineItemRow) => {
     return r.is_percentage || r.calculation_base === 'egi';
@@ -261,7 +265,29 @@ function SelectableExpenseRow({
         )}
       </div>
       <div className="ops-cell ops-input-cell">
-        {isPercent ? (
+        {isMgmtFee ? (
+          // Management Fee special rendering for as-is column
+          row.source === 'ingestion' ? (
+            // Ingested: show read-only $/unit with derived % badge
+            <span className="ops-mgmt-fee-ingested">
+              <span>{renderCurrency(rowPerUnit)}</span>
+              {row.derived_management_fee_pct != null && (
+                <span className="ops-mgmt-fee-pct-badge">
+                  {(row.derived_management_fee_pct * 100).toFixed(1)}%
+                </span>
+              )}
+            </span>
+          ) : (
+            // No ingestion: percentage input
+            <InputCell
+              value={row.management_fee_pct ?? row.as_is.rate}
+              variant="as-is"
+              format="percent"
+              className="ops-input-compact"
+              onChange={(val) => onUpdateRow(row.line_item_key, 'as_is_rate', val)}
+            />
+          )
+        ) : isPercent ? (
           <InputCell
             value={row.as_is.rate}
             variant="as-is"
@@ -286,10 +312,21 @@ function SelectableExpenseRow({
       <div className="ops-cell num ops-calc">
         {isPercent ? '' : renderPerSF(rowPerSF)}
       </div>
-      <div className="ops-cell num ops-col-ltl"></div>
+      <div className="ops-cell num ops-col-ltl">
+        {isMgmtFee ? <span className="ops-calc" style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>% of EGI</span> : null}
+      </div>
       <div className="ops-cell num ops-col-post">
         {valueAddEnabled ? (
-          isPercent ? (
+          isMgmtFee ? (
+            // Management Fee post-reno: always percentage input
+            <InputCell
+              value={row.post_reno?.rate}
+              variant="post-reno"
+              format="percent"
+              className="ops-input-compact"
+              onChange={(val) => onUpdateRow(row.line_item_key, 'post_reno_rate', val)}
+            />
+          ) : isPercent ? (
             <InputCell
               value={row.post_reno?.rate}
               variant="post-reno"
@@ -1255,6 +1292,7 @@ export function OperatingStatement({
                 unitCount={unitCount}
                 totalSF={totalSF}
                 valueAddEnabled={valueAddEnabled}
+                effectiveGrossIncome={effectiveGrossIncome}
                 isSelected={row.opex_id ? selectedRows.has(row.opex_id) : false}
                 isEditingName={row.opex_id === editingItemNameOpexId}
                 onSelect={(opexId, event) => handleRowSelect(opexId, parentCategory, event)}

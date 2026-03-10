@@ -415,12 +415,22 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
             # Capture feedback if #FB was detected
             if has_feedback:
                 user_email = None
+                user_name = None
+                logger.info(f"[FEEDBACK_DEBUG] has_user={hasattr(request, 'user')}, is_auth={request.user.is_authenticated if hasattr(request, 'user') else False}, project_id={project.project_id}, project_name={project.project_name}")
                 if hasattr(request, 'user') and request.user.is_authenticated:
                     user_email = getattr(request.user, 'email', None)
+                    # Try to get a display name
+                    user_name = (
+                        getattr(request.user, 'username', None) or
+                        f"{getattr(request.user, 'first_name', '')} {getattr(request.user, 'last_name', '')}".strip() or
+                        None
+                    )
+                    logger.info(f"[FEEDBACK_DEBUG] user_email={user_email}, user_name={user_name}, username={getattr(request.user, 'username', None)}")
                 
                 capture_feedback(
                     user_message=original_content,
                     user_email=user_email,
+                    user_name=user_name,
                     user_id=request.data.get('user'),
                     project_id=project.project_id,
                     project_name=project.project_name,
@@ -1594,16 +1604,30 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             has_feedback = detect_feedback_tag(original_content)
             if has_feedback:
                 logger.info("[FEEDBACK] #FB detected in thread message for project %s", thread.project_id)
-                user_email = getattr(request.user, 'email', None) if hasattr(request, 'user') else None
+                user_email = None
+                user_name = None
+                user_id = None
+                
+                if hasattr(request, 'user') and request.user.is_authenticated:
+                    user_email = getattr(request.user, 'email', None)
+                    user_id = request.user.id
+                    user_name = (
+                        getattr(request.user, 'username', None) or
+                        f"{getattr(request.user, 'first_name', '')} {getattr(request.user, 'last_name', '')}".strip() or
+                        None
+                    )
+                
                 try:
                     project_obj = Project.objects.filter(project_id=thread.project_id).first()
                     project_name = project_obj.project_name if project_obj else None
                 except Exception:
                     project_name = None
+                
                 capture_feedback(
                     user_message=original_content,
                     user_email=user_email,
-                    user_id=getattr(request.user, 'id', None),
+                    user_name=user_name,
+                    user_id=user_id,
                     project_id=thread.project_id,
                     project_name=project_name,
                     page_context=page_context,

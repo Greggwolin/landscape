@@ -710,6 +710,22 @@
   color: var(--cui-warning, #f9b115);
 }
 
+/* Management Fee — ingested value with derived % badge */
+.ops-mgmt-fee-ingested {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.ops-mgmt-fee-pct-badge {
+  font-size: 0.6875rem;
+  color: var(--cui-secondary-color, #9da5b1);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
 /* Column visibility — hide cells when columns are toggled off */
 .ops-hide-ltl .ops-col-ltl {
   display: none;

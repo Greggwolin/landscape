@@ -57,6 +57,7 @@ def strip_feedback_tag(content: str) -> str:
 def capture_feedback(
     user_message: str,
     user_email: Optional[str] = None,
+    user_name: Optional[str] = None,
     user_id: Optional[int] = None,
     project_id: Optional[int] = None,
     project_name: Optional[str] = None,
@@ -85,9 +86,16 @@ def capture_feedback(
         return False
     
     try:
+        # Debug logging
+        logger.info(f"[FEEDBACK_CAPTURE] user_name={user_name}, user_email={user_email}, user_id={user_id}, project_id={project_id}, project_name={project_name}")
+        
         # Build compact Discord embed
         # Title: "username: Page > Tab"
-        username = user_email.split('@')[0] if user_email else f"user_{user_id or '?'}"
+        username = (
+            user_name or 
+            (user_email.split('@')[0] if user_email else None) or
+            f"user_{user_id}" if user_id else "unknown"
+        )
         page_label = page_context or "unknown"
         title = f"{username}: {page_label}"
 

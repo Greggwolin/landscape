@@ -512,6 +512,90 @@ Two distinct failure modes — treat separately:
 
 ---
 
+## Deployment (Alpha)
+
+### Architecture
+
+```
+┌──────────────────────────────┐     ┌──────────────────────────────┐
+│  Vercel                      │     │  Railway                     │
+│  Next.js 15.5 frontend       │────▶│  Django REST backend         │
+│  + legacy API routes         │     │  Gunicorn + WhiteNoise       │
+│  (src/app/api/*)             │     │  (backend/)                  │
+└──────────┬───────────────────┘     └──────────┬───────────────────┘
+           │                                     │
+           └──────────┬──────────────────────────┘
+                      ▼
+           ┌───────────────────────┐
+           │  Neon PostgreSQL      │
+           │  Database: land_v2    │
+           │  (shared by both)     │
+           └───────────────────────┘
+```
+
+### Vercel (Frontend + Legacy API)
+
+- **What runs:** Next.js app (pages, components, API routes under `src/app/api/`)
+- **Config files:** `vercel.json` (cron only), `nixpacks.toml` (libgl1 for server-side image processing)
+- **Build:** `npm run build` (Turbopack)
+- **Key env vars required on Vercel:**
+  - `DATABASE_URL` — Neon PostgreSQL connection string
+  - `NEXT_PUBLIC_DJANGO_API_URL` — Railway Django URL (e.g., `https://landscape-backend-production.up.railway.app`)
+  - `DJANGO_API_URL` — Same as above (server-side variant)
+  - `OPENAI_API_KEY` — Used by knowledge/extraction services
+  - `ANTHROPIC_API_KEY` — Used by Landscaper
+  - `UPLOADTHING_SECRET` — File upload service
+- **CORS note:** The Vercel production URL must be added to Django's `CORS_ALLOWED_ORIGINS` env var on Railway
+
+### Railway (Django Backend)
+
+- **What runs:** Django REST API (all `/api/` endpoints under `backend/apps/`)
+- **Config files:** `backend/railway.json`, `backend/Procfile`
+- **Build:** Nixpacks auto-detects Python, installs `backend/requirements.txt`
+- **Start command:** `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT`
+- **Release command:** `python manage.py migrate` (runs automatically on deploy via Procfile)
+- **Static files:** WhiteNoise serves Django static files (admin, API docs)
+- **Key env vars required on Railway:**
+  - `DATABASE_URL` — Same Neon PostgreSQL connection string
+  - `ALLOWED_HOSTS` — `.railway.app,localhost,127.0.0.1` (default includes `.railway.app`)
+  - `CORS_ALLOWED_ORIGINS` — Must include the Vercel production URL
+  - `OPENAI_API_KEY` — Used by extraction/knowledge services
+  - `ANTHROPIC_API_KEY` — Used by Landscaper AI
+  - `SECRET_KEY` — Django secret key (generate unique for production)
+  - `DEBUG` — Set to `False` for production
+
+### What Runs Where
+
+| Component | Vercel | Railway | Notes |
+|-----------|--------|---------|-------|
+| Frontend (React pages) | ✅ | — | All UI rendering |
+| Legacy API routes (`src/app/api/dms/`, etc.) | ✅ | — | Direct Neon DB queries |
+| Django REST API (`/api/projects/`, `/api/containers/`, etc.) | — | ✅ | Primary API target |
+| Landscaper chat | — | ✅ | 217 tools, Claude AI |
+| Knowledge/extraction pipeline | — | ✅ | Document processing |
+| Ingestion Workbench API | — | ✅ | `workbench_views.py` |
+| Financial engine (IRR/NPV/DSCR) | — | ✅ | Python calculations |
+| Cron jobs (`/api/cron/*`) | ✅ | — | Vercel Cron |
+| Static files (Django admin, Swagger) | — | ✅ | WhiteNoise |
+
+### Deployment Checklist
+
+1. [ ] Set all env vars on Vercel (especially `NEXT_PUBLIC_DJANGO_API_URL` pointing to Railway)
+2. [ ] Set all env vars on Railway (especially `CORS_ALLOWED_ORIGINS` including Vercel URL)
+3. [ ] Verify Railway deploy succeeds (check `python manage.py migrate` in release logs)
+4. [ ] Verify Vercel build succeeds (`npm run build`)
+5. [ ] Test DMS upload flow end-to-end (hits both Vercel API route + Railway extraction)
+6. [ ] Test Landscaper chat (hits Railway Django exclusively)
+7. [ ] Confirm `/api/docs/` Swagger UI accessible on Railway URL
+
+### Known Alpha Deployment Limitations
+
+- **Scanned PDF/OCR:** Not implemented. Extraction returns empty on scanned documents. Documented for testers.
+- **`source_page` field:** Never populated by extraction pipeline. Deferred to post-alpha.
+- **DMS API split:** Some DMS routes on Vercel (legacy Next.js), others on Railway (Django). Functional but architecturally inconsistent — migration deferred to post-alpha.
+
+---
+
 ## Environment Variables
 
 Required in `.env.local`:

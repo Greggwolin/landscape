@@ -6,7 +6,7 @@ import CIcon from '@coreui/icons-react';
 import { cilLayers, cilTrash, cilActionRedo, cilPlus } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
-import DmsLandscaperPanel, { type DmsPendingVersionLink } from '@/components/dms/panels/DmsLandscaperPanel';
+import { type DmsPendingVersionLink } from '@/components/dms/panels/DmsLandscaperPanel';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
@@ -112,8 +112,7 @@ function DMSViewInner({
 
   const [panelExpanded, setPanelExpanded] = useState(true);
   const [pendingVersionLink, setPendingVersionLink] = useState<DmsPendingVersionLink | null>(null);
-  const [isLandscaperFiltering, setIsLandscaperFiltering] = useState(false);
-  const [landscaperNotice, setLandscaperNotice] = useState<string | null>(null);
+  const [isLinkingVersion, setIsLinkingVersion] = useState(false);
   const selectAllTrashRef = useRef<HTMLInputElement>(null);
 
   // Media preview modal state
@@ -263,7 +262,10 @@ function DMSViewInner({
         }));
 
       setAllFilters([...typeFilters, ...extraFilters]);
-      setExpandedFilter(null);
+      // Keep current expanded filter open if it still exists
+      if (expandedFilter && ![...typeFilters, ...extraFilters].some(f => f.doc_type === expandedFilter)) {
+        setExpandedFilter(null);
+      }
     } catch (error) {
       console.error('Error loading filters:', error);
       setAllFilters([]);
@@ -374,35 +376,6 @@ function DMSViewInner({
     }
     setSelectedDocument(null);
   };
-
-  const handleLandscaperQuery = useCallback(
-    async (query: string) => {
-      setIsLandscaperFiltering(true);
-      try {
-        const response = await fetch(
-          `/api/dms/search?q=${encodeURIComponent(query)}&project_id=${projectId}&limit=50`
-        );
-        if (!response.ok) {
-          throw new Error('Search failed');
-        }
-        const data = await parseJsonSafely<{ totalHits?: number; pagination?: { limit?: number } }>(
-          response,
-          'dms/search from landscaper'
-        );
-        return {
-          count: data.totalHits || 0,
-          limit: data.pagination?.limit ?? null,
-        };
-      } finally {
-        setIsLandscaperFiltering(false);
-      }
-    },
-    [projectId]
-  );
-
-  const handleLandscaperClear = useCallback(() => {
-    setLandscaperNotice(null);
-  }, []);
 
   // Load trashed documents
   const loadTrashedDocuments = async () => {
@@ -991,23 +964,44 @@ function DMSViewInner({
                     </div>
                   </div>
 
-                  {/* DMS Landscaper Panel */}
-                  <div
-                    className="px-4 py-3 border-b"
-                    style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-body-bg)' }}
-                  >
-                    <DmsLandscaperPanel
-                      onDropFiles={() => {}}
-                      onQuerySubmit={handleLandscaperQuery}
-                      onClearQuery={handleLandscaperClear}
-                      activeDocType={expandedFilter}
-                      isFiltering={isLandscaperFiltering}
-                      notice={landscaperNotice}
-                      pendingLink={pendingVersionLink}
-                      onResolveLink={handleResolveVersionLink}
-                      onDocumentsUpdated={handleDocumentChange}
-                    />
-                  </div>
+                  {/* Inline version-link confirmation bar */}
+                  {pendingVersionLink && (
+                    <div
+                      className="px-4 py-3 border-b flex items-center justify-between gap-3"
+                      style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-tertiary-bg)' }}
+                    >
+                      <span className="text-sm" style={{ color: 'var(--cui-body-color)' }}>
+                        Link &ldquo;{pendingVersionLink.sourceDocName}&rdquo; as a new version of &ldquo;{pendingVersionLink.targetDocName}&rdquo;?
+                      </span>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={isLinkingVersion}
+                          onClick={async () => {
+                            setIsLinkingVersion(true);
+                            try {
+                              await handleResolveVersionLink('confirm', pendingVersionLink);
+                            } catch {
+                              console.error('[DMS] Version link failed');
+                            } finally {
+                              setIsLinkingVersion(false);
+                            }
+                          }}
+                          className="btn btn-primary btn-sm"
+                        >
+                          {isLinkingVersion ? 'Linking…' : 'Link as Version'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLinkingVersion}
+                          onClick={() => handleResolveVersionLink('cancel', pendingVersionLink)}
+                          className="btn btn-ghost-secondary btn-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex-1 relative flex flex-col lg:flex-row overflow-hidden" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                     <div className={`flex-1 overflow-y-auto ${selectedDocument ? 'lg:flex-1' : 'w-full'}`}>

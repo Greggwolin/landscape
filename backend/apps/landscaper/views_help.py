@@ -67,11 +67,22 @@ class HelpChatView(APIView):
             # #FB detection — capture to Discord and strip before AI sees it
             has_feedback = detect_feedback_tag(message)
             if has_feedback:
-                user_email = getattr(request.user, 'email', None) if request.user.is_authenticated else None
+                # Extract user info from request.data (sent by frontend)
+                user_id = request.data.get('user_id')
+                user_name = request.data.get('user_name')
+                user_email = request.data.get('user_email')
+
+                # Fallback: check authenticated user (in case auth is added later)
+                if not user_id and hasattr(request, 'user') and request.user.is_authenticated:
+                    user_id = request.user.id
+                    user_name = getattr(request.user, 'username', None)
+                    user_email = getattr(request.user, 'email', None)
+
                 capture_feedback(
                     user_message=message,
                     user_email=user_email,
-                    user_id=request.user.id if request.user.is_authenticated else None,
+                    user_name=user_name,
+                    user_id=user_id,
                     project_id=None,
                     project_name=None,
                     page_context=f"Help > {current_page or 'general'}",

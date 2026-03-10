@@ -61,7 +61,10 @@ export interface LineItemRow {
   is_calculated: boolean; // true for parent rollup rows
   is_percentage?: boolean; // true for vacancy %, management fee %
   is_readonly?: boolean; // true for read-only fields (from rent roll, calculated vacancy)
+  is_management_fee?: boolean; // true for management fee row (special rendering)
   calculation_base?: string; // 'gpr', 'egi', 'nri' for % calculations
+  management_fee_pct?: number; // effective management fee percentage (decimal)
+  derived_management_fee_pct?: number | null; // back-calculated from ingested $ ÷ EGI
 
   // User inputs (editable)
   as_is: AsIsInputs;

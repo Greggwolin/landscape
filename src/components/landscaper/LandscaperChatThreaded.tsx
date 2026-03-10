@@ -239,8 +239,6 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     if (baseHint.toLowerCase() === subtabLabel.toLowerCase()) return subtabLabel;
     return `${baseHint} · ${subtabLabel}`;
   })();
-  const isDmsContext = pageContext === 'documents';
-
   const {
     threads,
     activeThread,
@@ -357,7 +355,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   // Handle document collision - send message to Landscaper
   useEffect(() => {
-    if (pendingCollision && !isDmsContext) {
+    if (pendingCollision) {
       const message = buildCollisionMessage(
         pendingCollision.file,
         pendingCollision.matchType,
@@ -372,16 +370,11 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
         console.error('Failed to send collision message:', err);
       });
     }
-  }, [pendingCollision, sendMessage, isDmsContext]);
+  }, [pendingCollision, sendMessage]);
 
   // Set up collision resolution handler
   // This will be called when user responds (detected via message parsing)
   useEffect(() => {
-    if (isDmsContext) {
-      return () => {
-        setOnCollisionResolved(null);
-      };
-    }
     const handleCollisionResponse = async (action: CollisionAction, collision: PendingCollision) => {
       const { file, existingDoc, projectId: collisionProjectId } = collision;
 
@@ -425,7 +418,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     return () => {
       setOnCollisionResolved(null);
     };
-  }, [sendMessage, setOnCollisionResolved, isDmsContext]);
+  }, [sendMessage, setOnCollisionResolved]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {

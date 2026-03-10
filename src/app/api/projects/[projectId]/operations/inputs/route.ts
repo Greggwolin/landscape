@@ -45,6 +45,29 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     // Process each update with upsert
     for (const update of updates) {
+      // Special handling: management fee percentage changes also update the assumption
+      if (update.line_item_key === 'calculated_management_fee') {
+        if (update.as_is_rate != null) {
+          await sql`
+            INSERT INTO tbl_project_assumption (project_id, assumption_key, assumption_value)
+            VALUES (${projectIdNum}, 'management_fee_pct', ${String(update.as_is_rate)})
+            ON CONFLICT (project_id, assumption_key)
+            DO UPDATE SET assumption_value = ${String(update.as_is_rate)}, updated_at = NOW()
+          `;
+        }
+        if (update.post_reno_rate != null) {
+          // Post-reno management fee pct also stored in main assumption for now
+          // (both scenarios share the same field unless a separate one is added)
+          await sql`
+            INSERT INTO tbl_project_assumption (project_id, assumption_key, assumption_value)
+            VALUES (${projectIdNum}, 'management_fee_pct', ${String(update.post_reno_rate)})
+            ON CONFLICT (project_id, assumption_key)
+            DO UPDATE SET assumption_value = ${String(update.post_reno_rate)}, updated_at = NOW()
+          `;
+        }
+        continue; // Skip the generic user_inputs upsert for management fee
+      }
+
       await sql`
         INSERT INTO tbl_operations_user_inputs (
           project_id,

@@ -22,7 +22,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   try {
     const body = await request.json();
-    const { value_add_enabled, vacancy_override_pct } = body;
+    const { value_add_enabled, vacancy_override_pct, management_fee_pct, management_fee_source } = body;
 
     // Handle value_add_enabled toggle
     if (typeof value_add_enabled === 'boolean') {
@@ -57,10 +57,42 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // Handle management fee percentage update
+    if (management_fee_pct !== undefined && typeof management_fee_pct === 'number') {
+      await sql`
+        INSERT INTO tbl_project_assumption (project_id, assumption_key, assumption_value)
+        VALUES (${projectIdNum}, 'management_fee_pct', ${String(management_fee_pct)})
+        ON CONFLICT (project_id, assumption_key)
+        DO UPDATE SET assumption_value = ${String(management_fee_pct)}, updated_at = NOW()
+      `;
+    }
+
+    // Handle management fee source toggle (ingestion ↔ user_modified)
+    if (management_fee_source !== undefined) {
+      if (management_fee_source === 'ingestion') {
+        // Revert: remove the user override so the API uses ingested dollar amount
+        await sql`
+          DELETE FROM tbl_project_assumption
+          WHERE project_id = ${projectIdNum}
+            AND assumption_key = 'management_fee_source'
+        `;
+      } else {
+        // Store that user has overridden the management fee
+        await sql`
+          INSERT INTO tbl_project_assumption (project_id, assumption_key, assumption_value)
+          VALUES (${projectIdNum}, 'management_fee_source', ${management_fee_source})
+          ON CONFLICT (project_id, assumption_key)
+          DO UPDATE SET assumption_value = ${management_fee_source}, updated_at = NOW()
+        `;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       ...(typeof value_add_enabled === 'boolean' ? { value_add_enabled } : {}),
-      ...(vacancy_override_pct !== undefined ? { vacancy_override_pct } : {})
+      ...(vacancy_override_pct !== undefined ? { vacancy_override_pct } : {}),
+      ...(management_fee_pct !== undefined ? { management_fee_pct } : {}),
+      ...(management_fee_source !== undefined ? { management_fee_source } : {})
     });
   } catch (error) {
     console.error('Error updating operations settings:', error);

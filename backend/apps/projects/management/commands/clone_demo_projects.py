@@ -104,7 +104,7 @@ class Command(BaseCommand):
                 cloned = cloner.clone_project(
                     project_id,
                     user,
-                    name_suffix=f"(Demo - {username})"
+                    name_suffix=""
                 )
                 cloned_projects.append((name, cloned))
                 self.stdout.write(
