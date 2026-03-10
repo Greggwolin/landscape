@@ -42,6 +42,7 @@ class ProjectCloner:
             'parcel': {},
             'division': {},
             'unit_type': {},
+            'unit': {},
             'document': {},
         }
 
@@ -96,6 +97,8 @@ class ProjectCloner:
         if project_type in ['MF', 'MULTIFAMILY']:
             self._clone_multifamily_property(source_project_id, new_project.project_id)
             self._clone_unit_types(source_project_id, new_project.project_id)
+            self._clone_multifamily_units(source_project_id, new_project.project_id)
+            self._clone_multifamily_leases(source_project_id, new_project.project_id)
             self._clone_rent_roll_units(source_project_id, new_project.project_id)
             self._clone_rent_comparables(source_project_id, new_project.project_id)
             self._clone_value_add_assumptions(source_project_id, new_project.project_id)
@@ -104,6 +107,7 @@ class ProjectCloner:
 
         # 5. Clone valuation data
         self._clone_sales_comparables(source_project_id, new_project.project_id)
+        self._clone_cost_approach(source_project_id, new_project.project_id)
 
         # 6. Clone documents (metadata only)
         self._clone_documents(source_project_id, new_project.project_id)
@@ -139,7 +143,7 @@ class ProjectCloner:
                     pass
 
         # Set the modified fields
-        new_project.project_name = f"{source.project_name} {name_suffix}"
+        new_project.project_name = f"{source.project_name} {name_suffix}".strip()
         new_project.created_by = target_user
         new_project.created_at = timezone.now()
         new_project.updated_at = timezone.now()
@@ -392,6 +396,113 @@ class ProjectCloner:
 
         logger.info(f"Cloned {len(self.id_maps['unit_type'])} unit types")
 
+    def _clone_multifamily_units(self, source_project_id: int, new_project_id: int):
+        """Clone tbl_multifamily_unit records, building unit ID map for lease cloning."""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_multifamily_unit'
+                AND column_name != 'unit_id'
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            select_cols = ', '.join(columns)
+            cursor.execute(f"""
+                SELECT unit_id, {select_cols}
+                FROM landscape.tbl_multifamily_unit
+                WHERE project_id = %s
+                ORDER BY unit_id
+            """, [source_project_id])
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            col_idx = {col: i + 1 for i, col in enumerate(columns)}
+
+            for row in rows:
+                old_id = row[0]
+                values = list(row[1:])
+
+                # Update project_id
+                if 'project_id' in col_idx:
+                    values[col_idx['project_id'] - 1] = new_project_id
+
+                placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_multifamily_unit ({insert_cols})
+                    VALUES ({placeholders})
+                    RETURNING unit_id
+                """, values)
+
+                new_id = cursor.fetchone()[0]
+                self.id_maps['unit'][old_id] = new_id
+
+        logger.info(f"Cloned {len(self.id_maps['unit'])} multifamily units")
+
+    def _clone_multifamily_leases(self, source_project_id: int, new_project_id: int):
+        """Clone tbl_multifamily_lease records, remapping unit_id to new units."""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_multifamily_lease'
+                AND column_name != 'lease_id'
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            col_idx = {col: i for i, col in enumerate(columns)}
+
+            # Leases don't have project_id — join through units to find source leases
+            cursor.execute(f"""
+                SELECT l.lease_id, {', '.join(f'l.{c}' for c in columns)}
+                FROM landscape.tbl_multifamily_lease l
+                JOIN landscape.tbl_multifamily_unit u ON u.unit_id = l.unit_id
+                WHERE u.project_id = %s
+                ORDER BY l.lease_id
+            """, [source_project_id])
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            count = 0
+            for row in rows:
+                values = list(row[1:])
+
+                # Remap unit_id to new unit
+                if 'unit_id' in col_idx and values[col_idx['unit_id']]:
+                    old_unit_id = values[col_idx['unit_id']]
+                    new_unit_id = self.id_maps['unit'].get(old_unit_id)
+                    if new_unit_id is None:
+                        logger.warning(f"No unit mapping for lease unit_id {old_unit_id}, skipping")
+                        continue
+                    values[col_idx['unit_id']] = new_unit_id
+
+                placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_multifamily_lease ({insert_cols})
+                    VALUES ({placeholders})
+                """, values)
+                count += 1
+
+        logger.info(f"Cloned {count} multifamily leases")
+
     def _clone_rent_roll_units(self, source_project_id: int, new_project_id: int):
         """Clone tbl_rent_roll_unit records, updating unit_type_id references."""
         with connection.cursor() as cursor:
@@ -459,6 +570,16 @@ class ProjectCloner:
         self._clone_simple_table(
             'tbl_sales_comparables',
             'comparable_id',
+            source_project_id,
+            new_project_id,
+            'project_id'
+        )
+
+    def _clone_cost_approach(self, source_project_id: int, new_project_id: int):
+        """Clone tbl_cost_approach record."""
+        self._clone_simple_table(
+            'tbl_cost_approach',
+            'cost_approach_id',
             source_project_id,
             new_project_id,
             'project_id'
@@ -721,7 +842,7 @@ class ProjectCloner:
                 cloned = self.clone_project(
                     chadron_id,
                     user,
-                    name_suffix=f"(Demo - {user.username})"
+                    name_suffix=""
                 )
                 cloned_projects.append(cloned)
                 logger.info(f"Cloned Chadron -> {cloned.project_id} for user {user.username}")
@@ -732,7 +853,7 @@ class ProjectCloner:
                 cloned = self.clone_project(
                     peoria_id,
                     user,
-                    name_suffix=f"(Demo - {user.username})"
+                    name_suffix=""
                 )
                 cloned_projects.append(cloned)
                 logger.info(f"Cloned Peoria Lakes -> {cloned.project_id} for user {user.username}")

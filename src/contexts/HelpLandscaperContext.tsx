@@ -12,6 +12,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -121,6 +122,7 @@ const HELP_DISMISSED_KEY = 'landscape_help_dismissed';
 function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
 
   // Expose raw folder/tab from URL for tab-aware consumers
   const activeFolder = searchParams?.get('folder') ?? null;
@@ -213,6 +215,11 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
           conversation_id: conversationId,
           current_page: currentPage,
           property_type_context: propertyTypeContext,
+          ...(user && {
+            user_id: user.id,
+            user_name: user.username,
+            user_email: user.email,
+          }),
         }),
       });
 
@@ -247,7 +254,7 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, currentPage, conversationId]);
+  }, [isLoading, currentPage, conversationId, user]);
 
   return (
     <HelpLandscaperContext.Provider

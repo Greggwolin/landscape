@@ -1169,7 +1169,7 @@ export default function ProjectMediaGallery({
  style={{ minHeight: '160px' }}
  >
  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
- {'{1F5BC}'}
+ {'\u{1F5BC}'}
  </div>
  <div
  className="fw-semibold mb-1"
@@ -1377,7 +1377,7 @@ export default function ProjectMediaGallery({
  }}
  />
  ) : (
- <span style={{ fontSize: '2rem', opacity: 0.4 }}>{'{1F5BC}'}</span>
+ <span style={{ fontSize: '2rem', opacity: 0.4 }}>{'\u{1F5BC}'}</span>
  )}
  </div>
 

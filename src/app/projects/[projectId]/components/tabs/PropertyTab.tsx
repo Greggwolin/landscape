@@ -1246,11 +1246,18 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         actualUnitCountByType.set(u.unit_type, (actualUnitCountByType.get(u.unit_type) || 0) + 1);
       });
 
-      // Show unit types that either have individual units OR have unit_count from extraction
+      // Show unit types that have matching individual units, OR (when no actual units exist
+      // at all) have unit_count from extraction. This prevents double-counting when actual
+      // units use coarse type codes (e.g. "2BR/2BA") but unit_type table has fine variants
+      // (e.g. "2BR/2BA Tower") whose unit_count would otherwise inflate the total.
+      const hasActualUnitRecords = unitsData.length > 0;
       const transformedFloorPlans: FloorPlan[] = unitTypesData
-        .filter(ut => (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0
-          || (ut.unit_count && ut.unit_count > 0)
-          || (ut.total_units && ut.total_units > 0))
+        .filter(ut => {
+          const hasMatchingUnits = (actualUnitCountByType.get(ut.unit_type_code) || 0) > 0;
+          if (hasActualUnitRecords) return hasMatchingUnits;
+          // No actual unit records yet — fall back to extraction counts
+          return (ut.unit_count && ut.unit_count > 0) || (ut.total_units && ut.total_units > 0);
+        })
         .map(ut => {
           const leaseRents = rentsByUnitType.get(ut.unit_type_code);
           const avgLeaseRent = leaseRents && leaseRents.length > 0
@@ -1258,7 +1265,11 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
             : 0;
           // Use actual lease rent if available, otherwise fall back to market rent or current_rent_avg
           const currentRent = avgLeaseRent > 0 ? avgLeaseRent : Math.round(ut.current_rent_avg || ut.current_market_rent || 0);
-          const actualCount = actualUnitCountByType.get(ut.unit_type_code) || ut.unit_count || ut.total_units;
+          // When actual unit records exist, only use their count; don't fall back to unit_count
+          // which may represent stale extraction data that double-counts with actual records
+          const actualCount = hasActualUnitRecords
+            ? (actualUnitCountByType.get(ut.unit_type_code) || 0)
+            : (ut.unit_count || ut.total_units);
 
           return {
             id: ut.unit_type_id.toString(),

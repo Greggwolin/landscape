@@ -391,7 +391,7 @@ export function createFolderConfig(
       label: 'Documents',
       color: TILE_COLORS.documents,
       subTabs: [
-        { id: 'all', label: 'All Documents' },
+        { id: 'all', label: 'Documents' },
         { id: 'intelligence', label: 'Intelligence' },
       ],
     },

@@ -176,14 +176,16 @@ export default function Queue({ items, onRetry, onRemove }: QueueProps) {
  Retry
  </button>
  )}
+ {/* TODO: Re-enable "View Document" button once detail panel navigation is wired up
  {item.status === 'completed' && item.doc_id && (
  <button
- onClick={() => {/* TODO: Open document details */}}
+ onClick={() => { Open document details }}
  className="text-xs text-green-600 hover:text-green-700"
  >
  View Document
  </button>
  )}
+ */}
  {(item.status === 'pending' || item.status === 'failed' || item.status === 'completed') && (
  <button
  onClick={() => onRemove?.(item.id)}

@@ -33,55 +33,58 @@ const PAGE_LABELS: Record<string, string> = {
   // Home
   home: 'Project Home',
 
-  // Property folder (MF)
+  // Property folder (Income properties)
   property: 'Property',
-  property_details: 'Property Details',
-  'property_rent-roll': 'Rent Roll',
-  property_market: 'Market',
-  property_renovation: 'Renovation',
+  property_location: 'Property > Location',
+  'property_market-supply': 'Property > Market',
+  'property_property-details': 'Property > Details',
+  'property_rent-roll': 'Property > Rent Roll',
+  property_renovation: 'Property > Renovation',
+  property_acquisition: 'Property > Acquisition',
 
   // Property folder (Land Dev)
-  property_acquisition: 'Acquisition',
-  'property_land-use': 'Land Use',
-  property_parcels: 'Parcels',
+  property_market: 'Property > Market',
+  'property_land-use': 'Property > Land Use',
+  property_parcels: 'Property > Parcels',
 
-  // Operations
+  // Operations (Income - no subtabs)
   operations: 'Operations',
 
-  // Valuation (MF)
+  // Budget / Development Sales (Land Dev)
+  budget: 'Development Sales',
+  budget_budget: 'Development > Budget',
+  budget_sales: 'Development > Sales',
+
+  // Valuation (Income)
   valuation: 'Valuation',
-  'valuation_sales-comparison': 'Sales Comparison',
-  'valuation_cost-approach': 'Cost Approach',
-  valuation_income: 'Income Approach',
+  'valuation_sales-comparison': 'Valuation > Sales Comparison',
+  valuation_cost: 'Valuation > Cost Approach',
+  valuation_income: 'Valuation > Income Approach',
+  'valuation_cash-flow': 'Valuation > Cash Flow',
+  'valuation_comparable-sales': 'Valuation > Comparable Sales',
+  'valuation_market-comps': 'Valuation > Market Comps',
+  valuation_reconciliation: 'Valuation > Reconciliation',
 
-  // Valuation (Land Dev)
-  valuation_feasibility: 'Feasibility',
-  'valuation_cash-flow': 'Cash Flow',
-  valuation_returns: 'Returns',
-  valuation_sensitivity: 'Sensitivity',
-
-  // Budget (Land Dev)
-  budget: 'Budget',
-  budget_schedule: 'Schedule',
-  budget_sales: 'Sales',
-  budget_draws: 'Draws',
+  // Feasibility (Land Dev)
+  feasibility: 'Feasibility',
+  feasibility_cashflow: 'Feasibility > Cash Flow',
+  feasibility_returns: 'Feasibility > Returns',
+  feasibility_sensitivity: 'Feasibility > Sensitivity',
 
   // Capital
-  capitalization: 'Capitalization',
-  capitalization_equity: 'Equity',
-  capitalization_debt: 'Debt',
+  capital: 'Capitalization',
+  capital_equity: 'Capitalization > Equity',
+  capital_debt: 'Capitalization > Debt',
 
-  // Reports
+  // Reports (no subtabs)
   reports: 'Reports',
-  reports_summary: 'Report Summary',
-  reports_export: 'Report Export',
 
   // Documents
   documents: 'Documents',
-  documents_all: 'All Documents',
-  documents_intelligence: 'Intelligence',
+  documents_all: 'Documents',
+  documents_intelligence: 'Documents > Intelligence',
 
-  // Map
+  // Map (no subtabs)
   map: 'Map',
 };
 
