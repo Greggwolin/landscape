@@ -359,15 +359,15 @@ export function createFolderConfig(
 
     // ========================================
     // Position 5: Capitalization
-    // Subtabs: equity, debt
+    // Subtabs: debt, equity
     // ========================================
     {
       id: 'capital',
       label: 'Capitalization',
       color: TILE_COLORS.capital,
       subTabs: [
-        { id: 'equity', label: 'Equity' },
         { id: 'debt', label: 'Debt' },
+        { id: 'equity', label: 'Equity' },
       ],
     },
 

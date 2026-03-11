@@ -475,13 +475,14 @@
 }
 
 [data-coreui-theme='dark'] .btn-danger {
-  background-color: rgba(220, 53, 69, 0.2) !important;
-  border-color: #dc3545 !important;
+  background-color: var(--cui-danger) !important;
+  border-color: var(--cui-danger) !important;
   color: #ffffff !important;
 }
 
 [data-coreui-theme='dark'] .btn-danger:hover {
-  background-color: rgba(220, 53, 69, 0.3) !important;
+  background-color: var(--cui-danger-ramp-04) !important;
+  border-color: var(--cui-danger-ramp-04) !important;
   color: #ffffff !important;
 }
 

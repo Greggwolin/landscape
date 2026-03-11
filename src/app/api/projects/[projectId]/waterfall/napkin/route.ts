@@ -60,15 +60,13 @@ export async function POST(
     }
 
     const totalEquity = Number(lpCapital) + Number(gpCapital);
-    if (totalEquity <= 0) {
-      return NextResponse.json(
-        { error: 'Total equity must be greater than zero' },
-        { status: 400 }
-      );
-    }
+    // Note: totalEquity may be 0 for non-LAND projects where peakEquity is not
+    // auto-derived from cash flows. The waterfall calc engine fetches its own
+    // cash flows independently, so saving tier config is always valid.
+    // When equity dollars are zero, default to 90/10 LP/GP ownership split.
 
-    const lpPct = totalEquity > 0 ? Number(lpCapital) / totalEquity : 0;
-    const gpPct = totalEquity > 0 ? Number(gpCapital) / totalEquity : 0;
+    const lpPct = totalEquity > 0 ? Number(lpCapital) / totalEquity : 0.9;
+    const gpPct = totalEquity > 0 ? Number(gpCapital) / totalEquity : 0.1;
 
     // Use explicit split percentages if provided, otherwise calculate from ownership + promote
     const tier1LpSplit = prefLpPct !== undefined ? Number(prefLpPct) : lpPct * 100;

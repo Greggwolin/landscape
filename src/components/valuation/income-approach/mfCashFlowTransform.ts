@@ -291,16 +291,12 @@ export function transformMFDcfToGrid(
     },
   ];
 
-  // Total Operating Expenses — EXCLUDES renovation capex & relocation costs
-  // (those are shown below the NOI line in the Cap-X Value-Add section)
+  // Total Operating Expenses — use raw DCF total_opex (already excludes reno_capex
+  // and relocation_cost which are shown in the Cap-X Value-Add section below NOI)
   expenseRows.push({
     id: 'total_opex',
     label: 'Total Operating Expenses',
-    values: isValueAdd
-      ? buildComputedRowValues(data.projections, (p) =>
-          toNumber(p.total_opex) - toNumber(p.reno_capex) - toNumber(p.relocation_cost)
-        )
-      : buildRowValues(data.projections, 'total_opex'),
+    values: buildRowValues(data.projections, 'total_opex'),
     isSubtotal: true,
   });
 
@@ -310,8 +306,8 @@ export function transformMFDcfToGrid(
     rows: expenseRows,
   };
 
-  // NOI Section — when value-add is active, NOI excludes renovation capex
-  // & relocation costs (they appear in the Cap-X Value-Add section below)
+  // NOI Section — use raw DCF NOI for both standard and value-add projects
+  // (reno costs appear in the Cap-X Value-Add section below, not inflated into NOI)
   const noiSection: CashFlowSection = {
     id: 'noi',
     label: 'Net Operating Income',
@@ -319,11 +315,7 @@ export function transformMFDcfToGrid(
       {
         id: 'noi',
         label: 'NOI',
-        values: isValueAdd
-          ? buildComputedRowValues(data.projections, (p) =>
-              toNumber(p.noi) + toNumber(p.reno_capex) + toNumber(p.relocation_cost)
-            )
-          : buildRowValues(data.projections, 'noi'),
+        values: buildRowValues(data.projections, 'noi'),
         isTotal: true,
       },
     ],

@@ -10,7 +10,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { CTable } from '@coreui/react';
+import { CTable, CCard, CCardBody } from '@coreui/react';
 import type { AggregatedSchedule } from '@/lib/financial-engine/cashflow/aggregation';
 
 interface Props {
@@ -108,9 +108,8 @@ function DataRow({
             textAlign: 'right',
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 600,
-            backgroundColor: 'var(--cui-light-bg-subtle)',
             borderLeft: '2px solid var(--cui-border-color)',
-            color: total < 0 ? 'var(--cui-danger)' : undefined,
+            color: total < 0 ? 'var(--cui-danger)' : 'var(--cui-body-color)',
             textDecoration,
           }}
         >
@@ -261,15 +260,11 @@ export default function CashFlowTable({ schedule }: Props) {
 
   if (!sections || sections.length === 0) {
     return (
-      <div
-        className="p-8 text-center rounded-lg border"
-        style={{
-          backgroundColor: 'var(--cui-tertiary-bg)',
-          borderColor: 'var(--cui-border-color)',
-        }}
-      >
-        <p style={{ color: 'var(--cui-secondary-color)' }}>No cash flow data available</p>
-      </div>
+      <CCard>
+        <CCardBody className="text-center py-4">
+          <p className="mb-0" style={{ color: 'var(--cui-secondary-color)' }}>No cash flow data available</p>
+        </CCardBody>
+      </CCard>
     );
   }
 
@@ -281,7 +276,8 @@ export default function CashFlowTable({ schedule }: Props) {
   };
 
   const headerStyle: React.CSSProperties = {
-    backgroundColor: 'var(--cui-dark-bg-subtle)',
+    backgroundColor: 'var(--cui-secondary-bg)',
+    color: 'var(--cui-body-color)',
     fontWeight: 600,
     textAlign: 'center',
     whiteSpace: 'nowrap',

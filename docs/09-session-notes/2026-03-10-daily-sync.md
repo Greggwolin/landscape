@@ -1,109 +1,163 @@
 # Daily Sync — March 10, 2026
 
-**Date**: Tuesday, March 10, 2026  
-**Generated**: Nightly automated sync  
+**Date**: Tuesday, March 10, 2026
+**Generated**: Nightly automated sync
 
 ---
 
 ## Work Completed Today
 
-No commits landed today. Active WIP (328 insertions across 8 files, unstaged):
+### Features Added / Progressed
 
-### Features In Progress
+**Operations Tab Enhancements** (`72f62a1`)
+- Management fee ingestion override system — `management_fee_source` tracks origin (ingestion/user_modified/user)
+- Ingested fees display as read-only $/unit with derived-% badge; user fees show percentage input
+- `effectiveMgmtFeePct` ensures post-reno uses correct rate
+- Operations API routes expanded (inputs, settings endpoints)
+- New operations CSS tokens
 
-**Management Fee Ingestion Override System** (Operations Tab)  
-The most substantial change — a complete overhaul of how management fees are rendered and computed when sourced from document extraction vs. user input.
+**Market Intel Django Models** (`72f62a1`)
+- `MarketGeography` model — hierarchical geo dimension (national → state → MSA → county → city → ZIP → submarket → custom)
+- Self-referencing parent FK, CBSA/FIPS codes, lat/lng
+- Part of three-table normalized market data design
 
-- `management_fee_source` assumption key now tracks the fee's origin (`ingestion`, `user_modified`, or `user`)
-- New `userOverrodeMgmtFee` flag: when a user edits over ingested data, source flips to `user_modified`
-- `OperatingStatement.tsx`: new `isMgmtFee` rendering path — ingested fees display as read-only $/unit with a derived-% badge; no-ingestion fees show the standard percentage input
-- Operations route: `effectiveMgmtFeePct` ensures post-reno uses the correct rate (user override → assumption pct; ingested → derived pct)
-- `useOperationsData.ts`: management fee update path now correctly computes `total = pct × EGI` instead of treating it like a per-unit opex row
-- LTL column shows "% of EGI" label for management fee rows
+**Help Panel & Landscaper Improvements** (`36d6b32`)
+- `HelpLandscaperPanel.tsx` overhauled (+71 lines)
+- Landscaper chat threaded component updated
+- Help context refinements
+- `alpha_views.py` significant rewrite (647 lines changed)
+- Landscaper feedback utils and view updates
 
-**Market Geography Django Model** (`backend/apps/market_intel/models.py`)  
-132-line new model added for the market intelligence time-series schema:
+**Production Data Sync** (`30425fb`)
+- `scripts/sync-production-data.sh` updated for alpha prep
+- DMS Change Audit PDF generated
+- UX health report generated
 
-- `MarketGeography` — hierarchical geo dimension: national → state → MSA → county → city → ZIP → submarket → custom
-- Self-referencing `parent_geography` FK, CBSA/FIPS codes, lat/lng
-- `managed = False`, maps to `tbl_market_geography`
-- Part of the three-table normalized market data design added with the Mar 10 alpha-prep session
+**Project Cloner Enhancements** (`d93c0ee`, `36d6b32`)
+- Clone now includes `dms_project_doc_types`
+- Project cloner service expanded (+127 lines)
 
-**Operations API Routes** (legacy Next.js, still not migrated)  
-- `inputs/route.ts`: +23 lines — likely management fee source persistence on save
-- `settings/route.ts`: +36 lines — settings endpoint additions
+### Bugs Fixed
 
-**UX Health Report**  
-- `docs/UX/health-reports/health-2026-03-10_0800.json` — automated daily health check generated
+**DMS Doc Type Folder Persistence** (`cfde365`, `9cb5b7f`, `7ec6eff`)
+- Fixed: DMS filter folders disappeared after bulk document deletion
+- Fix: Auto-register doc_types from DB via `tag_views.py` instead of deriving from active documents only
+- Includes soft-deleted documents in registration (prevents folder loss)
+
+**PropertyTab Floor Plan Double-Counting** (`36d6b32`)
+- PropertyTab.tsx updated (+21 lines) — verify "Units: 113 / 178" no longer appears
+
+### Technical Debt Addressed
+
+**Massive .bak File Cleanup** (`36d6b32`)
+- **~12,000 lines deleted** — removed 22 `.bak` files from `src/components/dms/`
+- Components cleaned: DMSView, ProjectMediaGallery, AccordionFilters, DocTypeFilters, ProjectSelector, ColumnChooser, DocumentAccordion, DocumentTable, PlatformKnowledgeAccordion, PlatformKnowledgeTable, DeleteConfirmModal, DocumentChatModal, MediaCard, MediaPreviewModal, PlatformKnowledgeChatModal, PlatformKnowledgeModal, UploadCollisionModal, DmsLandscaperPanel, PlatformKnowledgeProfileForm, ProfileForm, TagInput, Facets, ResultsTable, SearchBox, DMSLayout, StagingRow, StagingTray, Dropzone, Queue, DocumentPreviewPanel, DocumentVersionHistory
+- DMS codebase now clean of backup artifacts
+
+**UI Cleanup** (`30425fb`)
+- TopNavigationBar updated (+49/-lines)
+- Layout.tsx streamlined
+- ActiveProjectBar minor fix
+- ProjectMediaGallery refactored (720 lines → significantly leaner)
+- DocumentPreviewPanel updated
+- CSS token fix
+
+### Documentation Updated
+
+- `CLAUDE.md` updated with project cloner and help panel context (+84 lines)
+- Session note created (this file, initial version from earlier sync)
+- DMS Change Audit PDF generated
 
 ---
 
-## Files Modified (Uncommitted)
+## Files Modified
+
+### Committed (7 commits, 12 files + 22 .bak deletions)
 
 ```
-backend/apps/market_intel/models.py                | 132 +++++++++++++++++++++
-src/app/api/projects/[projectId]/operations/inputs/route.ts |  23 ++++
-src/app/api/projects/[projectId]/operations/route.ts        |  53 +++++++--
-src/app/api/projects/[projectId]/operations/settings/route.ts |  36 +++++-
-src/components/operations/OperatingStatement.tsx            |  44 ++++++-
-src/components/operations/types.ts                          |   3 +
-src/hooks/useOperationsData.ts                              |  46 +++++--
-src/styles/operations-tab.css                               |  16 +++
-8 files changed, 328 insertions(+), 25 deletions(-)
+30425fb — 12 files changed, 560 insertions(+), 604 deletions(-)
+36d6b32 — 48 files changed, 863 insertions(+), 12052 deletions(-)
+7ec6eff — 1 file changed, 2 deletions(-)
+d93c0ee — 1 file changed, 13 insertions(+)
+72f62a1 — 8 files changed, 328 insertions(+), 25 deletions(-)
+9cb5b7f — 2 files changed, 27 insertions(+), 10 deletions(-)
+cfde365 — 2 files changed, 122 insertions(+), 2 deletions(-)
+```
+
+### Uncommitted (12 files, +742 / -64)
+
+```
+backend/apps/projects/serializers.py               |  10 +-
+backend/apps/projects/services/project_cloner.py   | 243 ++++++++++-
+backend/apps/projects/views.py                     |   6 +-
+src/app/api/parcels/[id]/route.ts                  |  12 +
+src/app/api/projects/[projectId]/waterfall/napkin/route.ts |  14 +-
+src/app/api/projects/route.ts                      |   1 +
+src/app/components/Planning/PlanningContent.tsx     | 444 +++++++++++++++++-
+src/app/components/ProjectProvider.tsx              |   1 +
+src/app/dashboard/page.tsx                         |  11 +
+src/app/projects/[projectId]/capitalization/equity/page.tsx |  39 +-
+src/app/projects/[projectId]/components/ActiveProjectBar.tsx |   5 +-
+src/hooks/useLandscaperThreads.ts                  |  20 +-
 ```
 
 Untracked:
 ```
-docs/UX/health-reports/health-2026-03-10_0800.json
+src/components/capitalization/WaterfallConfigForm.tsx
 ```
 
 ---
 
 ## Git Commits
 
-No commits on March 10. Most recent commits (for context):
-
-- `485f80c` — fix: renovation cost basis toggle + ops chart splitter + shared file deletion guard *(16h ago)*
-- `8ab3f58` — alpha-prep: full working state commit before main merge *(18h ago)*
-- `c3b6e2c` — docs: update documentation center and status pages for Mar 7, 2026 *(3 days ago)*
+```
+30425fb feat: alpha prep — sync script fix, help panel, DMS cleanup, production data sync (4h ago)
+36d6b32 feat: alpha prep — help panel, landscaper, DMS cleanup, project cloner updates (7h ago)
+7ec6eff fix: auto-register doc_types from all docs including soft-deleted (9h ago)
+d93c0ee fix: clone dms_project_doc_types in ProjectCloner (10h ago)
+72f62a1 feat: operations tab enhancements + market intel models (10h ago)
+9cb5b7f fix: make DMS doc_type folders permanent via DB auto-registration (10h ago)
+cfde365 fix: preserve DMS filter folders after bulk document deletion (10h ago)
+```
 
 ---
 
 ## Active To-Do / Carry-Forward
 
-- **Commit today's ops/market_intel work** — 8 files ready, needs commit message
-- **Operations save migration (Alpha Blocker #2)** — today's work added more logic to legacy Next.js routes (`src/app/api/projects/[projectId]/operations/`). These should eventually migrate to Django. Not urgent to block alpha but the technical debt grows with each session.
-- **Management fee user-override persistence** — `management_fee_source` assumption key needs a save path wired through `inputs/route.ts`; verify the round-trip (save → reload shows correct source state)
-- **MarketGeography model** — no migration file yet. Will need `migrations/NNN_add_market_geography.sql` before it can be used
-- **Market time-series models** — only `MarketGeography` is visible; the companion `MarketSeries` and `MarketDataPoint` models referenced in the comment ("Three-table normalized design") may be in the same diff but below the 60-line read limit
+- [ ] **Commit uncommitted work** — 12 modified files (+742 lines) including significant project cloner expansion (+243), PlanningContent overhaul (+444), WaterfallConfigForm (new), and equity page updates
+- [ ] **Re-run demo project clones on host** — `cd backend && ./venv/bin/python manage.py clone_demo_projects` — cloner now includes MF units, leases, cost approach, AND dms_project_doc_types but existing clones (projects 125, 126) were created before these fixes. Need to delete and re-clone.
+- [ ] **PropertyTab floor plan double-counting** — commit `36d6b32` includes PropertyTab.tsx fix. Verify "Units: 113 / 178" no longer appears on Chadron Terrace Rent Roll.
+- [ ] **MarketGeography migration** — model added in `72f62a1` but no SQL migration file created yet
+- [ ] **Management fee round-trip** — verify `management_fee_source` saves correctly via `inputs/route.ts` and reloading ops tab restores correct state
+- [ ] **Operations save migration (Alpha Blocker #2)** — more logic added to legacy Next.js routes today; migration debt growing
 
 ---
 
 ## Alpha Readiness Impact
 
-No movement on alpha blockers today. Status unchanged from CLAUDE.md:
+Today was primarily a quality/cleanup day. No alpha blockers formally closed, but substantial progress:
 
-| Blocker | Status |
-|---------|--------|
-| #1 Reconciliation frontend | ✅ Done (Feb 21) |
-| #2 Operations save migration | 🔴 Still on legacy Next.js — worsened by today's additions |
-| #3 Reports project scoping | 🔴 No movement |
-| #4 Waterfall calculate endpoint | 🔴 No movement |
-| #5 OCR pipeline | 🔴 No movement |
-| #6 PDF report generation | 🔴 No movement |
+| Blocker | Status | Today's Impact |
+|---------|--------|---------------|
+| #1 Reconciliation frontend | ✅ Done (Feb 21) | — |
+| #2 Operations save migration | 🔴 Still legacy | More ops logic added today (mgmt fee override) |
+| #3 Reports project scoping | 🔴 No movement | — |
+| #4 Waterfall calculate endpoint | 🟡 WIP | WaterfallConfigForm.tsx created (uncommitted) |
+| #5 OCR pipeline | 🔴 No movement | — |
+| #6 PDF report generation | 🔴 No movement | — |
 
-Overall alpha readiness: ~70% (unchanged). Today's operations work improves extraction fidelity but doesn't close any blockers.
+**Net effect:** ~12K lines of dead .bak code removed, DMS stability improved (doc_type persistence), project cloner more complete, operations tab more capable. Alpha readiness stays ~70% but the codebase is cleaner.
 
 ---
 
 ## Notes for Next Session
 
-1. **Commit today's work first** — the 8 modified files are coherent and ready. Suggested message: `feat: management fee ingestion override + market geography model`
+1. **Commit the uncommitted work** — 12 files ready. Especially notable: PlanningContent.tsx (+444 lines), project_cloner.py (+243 lines), WaterfallConfigForm.tsx (new). These are substantial and should be committed with a descriptive message.
 
-2. **Verify management fee round-trip** — the `management_fee_source` assumption key is new; confirm it saves correctly via `inputs/route.ts` and that reloading the ops tab restores the correct state (ingestion badge vs. percentage input).
+2. **WaterfallConfigForm** — new untracked file suggests waterfall endpoint work is actively progressing (Alpha Blocker #4). Check its state and wire to the financial engine if ready.
 
-3. **Check MarketGeography migration** — model is in place but there's no corresponding SQL migration. Run `manage.py makemigrations` or create a manual migration before deploying.
+3. **PlanningContent.tsx** — 444 new lines is a major expansion. Review what was added and ensure it aligns with the progressive complexity approach.
 
-4. **MarketSeries / MarketDataPoint** — the models.py diff was truncated; confirm the companion tables in the three-table design are also present in the file.
+4. **Delete and re-clone demo projects** — the cloner was fixed twice today (doc_types + general expansion). Existing demo clones are stale.
 
-5. **Operations save migration (Blocker #2)** — consider a dedicated session to migrate the operations family of routes to Django. The legacy Next.js routes (`operations/route.ts`, `operations/inputs/route.ts`, `operations/settings/route.ts`) grow every session and will be harder to migrate the longer they're left.
+5. **DMS doc_type auto-registration pattern** — new pattern: `tag_views.py` auto-registers doc_types from all documents (including soft-deleted). This replaces the fragile client-side derivation. Other similar patterns (status filters, etc.) might benefit from the same approach.

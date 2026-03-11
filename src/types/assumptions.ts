@@ -316,6 +316,15 @@ export interface Loan {
   notes: string | null;
   created_at: string;
   updated_at: string;
+
+  // Container assignments (populated by detail endpoint)
+  containers?: Array<{
+    loan_container_id: number;
+    loan_id: number;
+    division_id: number;
+    allocation_pct: number | null;
+    collateral_type: string | null;
+  }>;
 }
 
 export interface LoanSummary {

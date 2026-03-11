@@ -86,15 +86,15 @@ class LandDevCashFlowService:
 
         # Step 2b: Extend periods to cover loan terms when financing is included
         if include_financing:
-            # Debt-tab schedules should align to the DCF sale horizon.
-            # Ensure we have at least the hold window, then prevent extending past it.
-            if hold_period_months:
-                required_periods = max(required_periods, hold_period_months)
+            # The data-driven period count (budget items + parcel sales) is
+            # the authoritative horizon for land dev. Loans may need more
+            # periods but should never shrink the timeline below the data.
+            data_driven_periods = required_periods
             required_periods = self._extend_periods_for_loans(
                 required_periods, project_config['start_date'], container_ids
             )
-            if hold_period_months:
-                required_periods = min(required_periods, hold_period_months)
+            # Ensure we never drop below the data-driven horizon
+            required_periods = max(required_periods, data_driven_periods)
 
         # Step 3: Generate monthly periods
         periods = self._generate_periods(

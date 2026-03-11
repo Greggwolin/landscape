@@ -67,14 +67,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         # Admin users see all projects
         if getattr(user, 'role', None) == 'admin' or user.is_staff:
-            return Project.objects.all()
+            return Project.objects.select_related('created_by').all()
 
         # Alpha testers see only their own projects
         if getattr(user, 'role', None) == 'alpha_tester':
-            return Project.objects.filter(created_by=user)
+            return Project.objects.select_related('created_by').filter(created_by=user)
 
         # Default: own projects only
-        return Project.objects.filter(created_by=user)
+        return Project.objects.select_related('created_by').filter(created_by=user)
 
     def get_serializer_class(self):
         """Use lightweight serializer for list, full serializer for detail."""

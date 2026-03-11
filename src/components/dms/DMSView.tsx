@@ -365,7 +365,13 @@ function DMSViewInner({
 
   // Handle document changes (refresh filters)
   const handleDocumentChange = (options?: DocumentChangeOptions) => {
-    void loadFilters();
+    const currentExpanded = expandedFilter;
+    void loadFilters().then(() => {
+      // Re-fetch documents for the currently expanded accordion
+      if (currentExpanded) {
+        void refreshExpandedDocuments(currentExpanded);
+      }
+    });
     if (viewingTrash) {
       void loadTrashedDocuments();
     }
@@ -375,6 +381,26 @@ function DMSViewInner({
       return;
     }
     setSelectedDocument(null);
+  };
+
+  // Re-fetch documents for an expanded accordion without collapsing it
+  const refreshExpandedDocuments = async (docType: string) => {
+    try {
+      const response = await fetch(
+        `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
+      );
+      if (!response.ok) return;
+      const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
+      setAllFilters((prev) =>
+        prev.map((f) =>
+          f.doc_type === docType
+            ? { ...f, is_expanded: true, documents: data.results || [] }
+            : f
+        )
+      );
+    } catch (error) {
+      console.error('Error refreshing expanded documents:', error);
+    }
   };
 
   // Load trashed documents
@@ -641,6 +667,52 @@ function DMSViewInner({
     setSelectedDocIds(new Set());
     void loadFilters();
   };
+
+  // Handle drag-to-reclassify: update doc_type for one or more documents
+  const handleDocumentReclassify = useCallback(async (docIds: string[], targetDocType: string) => {
+    const errors: string[] = [];
+    for (const docId of docIds) {
+      try {
+        const response = await fetch(`/api/dms/documents/${docId}/profile`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profile: { doc_type: targetDocType } }),
+        });
+        if (!response.ok) {
+          if (response.status === 404) {
+            errors.push(`Document ${docId}: not found (may have been deleted)`);
+          } else if (response.status === 409) {
+            errors.push(`Document ${docId}: conflict`);
+          } else {
+            errors.push(`Document ${docId}: update failed (${response.status})`);
+          }
+        }
+      } catch (error) {
+        errors.push(`Document ${docId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.error('Reclassify errors:', errors);
+      showToast({
+        title: 'Reclassify Error',
+        message: `${errors.length} document(s) failed to move`,
+        type: 'error',
+      });
+    } else {
+      const label = targetDocType.charAt(0).toUpperCase() + targetDocType.slice(1);
+      showToast({
+        title: 'Document Moved',
+        message: docIds.length === 1
+          ? `Moved to ${label}`
+          : `${docIds.length} documents moved to ${label}`,
+        type: 'success',
+      });
+    }
+
+    setSelectedDocIds(new Set());
+    void loadFilters();
+  }, [showToast]);
 
   // Toggle document selection
   const handleToggleDocSelection = (docId: string) => {
@@ -1106,6 +1178,7 @@ function DMSViewInner({
                                     onReviewMedia={handleReviewMedia}
                                     onDeleteFilter={handleDeleteFilter}
                                     onLinkVersion={handleLinkVersionRequest}
+                                    onDocumentDrop={handleDocumentReclassify}
                                   />
                                 </div>
 
@@ -1121,6 +1194,7 @@ function DMSViewInner({
                                     onReviewMedia={handleReviewMedia}
                                     onDeleteFilter={handleDeleteFilter}
                                     onLinkVersion={handleLinkVersionRequest}
+                                    onDocumentDrop={handleDocumentReclassify}
                                   />
                                 </div>
                               </div>

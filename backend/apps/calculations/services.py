@@ -119,25 +119,25 @@ class CalculationService:
             if not periods:
                 return []
 
-            # Parse the sections to get per-period costs and revenue
-            # Cost sections: Development Costs, Planning & Engineering, Land Acquisition
-            # Revenue section: NET REVENUE (to avoid double-counting gross + deductions)
-            # Note: Django service returns uppercase section names (e.g., 'DEVELOPMENT COSTS')
-            cost_section_names = {'development costs', 'planning & engineering', 'land acquisition'}
-            revenue_section_names = {'net revenue'}
-            financing_section_names = {'financing'}
-
+            # Parse the sections to get per-period costs, revenue, lotbank, and financing
+            # Use sectionId prefix matching instead of hardcoded names:
+            #   cost-*    → development costs (dynamic categories from budget)
+            #   lotbank-* → lotbank items (option deposits, credits, fees, etc.)
+            #   revenue-net → net revenue (avoids double-counting gross + deductions)
+            #   financing → debt service
             period_costs = defaultdict(float)
             period_revenue = defaultdict(float)
             period_financing = defaultdict(float)
+            period_lotbank = defaultdict(float)
 
             for section in sections:
-                sname = section.get('sectionName', '').lower()
-                is_cost = sname in cost_section_names
-                is_revenue = sname in revenue_section_names
-                is_financing = sname in financing_section_names
+                sid = section.get('sectionId', '')
+                is_cost = sid.startswith('cost-')
+                is_lotbank = sid.startswith('lotbank-')
+                is_revenue = sid == 'revenue-net'
+                is_financing = sid == 'financing'
 
-                if is_cost or is_revenue or is_financing:
+                if is_cost or is_revenue or is_financing or is_lotbank:
                     for line_item in section.get('lineItems', []):
                         for period_data in line_item.get('periods', []):
                             ps = period_data.get('periodSequence')
@@ -148,9 +148,12 @@ class CalculationService:
                             if is_cost:
                                 # Store as positive for aggregation, will negate later
                                 period_costs[ps] += abs(amt)
-                            if is_revenue:
+                            elif is_lotbank:
+                                # Lotbank items can be positive or negative
+                                period_lotbank[ps] += amt
+                            elif is_revenue:
                                 period_revenue[ps] += abs(amt)
-                            if is_financing:
+                            elif is_financing:
                                 period_financing[ps] += amt
 
             # Get period dates from response
@@ -164,7 +167,7 @@ class CalculationService:
                     except ValueError:
                         pass
 
-            # Build output: net_cf = revenue - costs (negative = contribution, positive = distribution)
+            # Build output: net_cf = revenue - costs + lotbank + financing
             if not period_costs and not period_revenue:
                 return []
 
@@ -172,6 +175,7 @@ class CalculationService:
                 max(period_costs.keys()) if period_costs else 0,
                 max(period_revenue.keys()) if period_revenue else 0,
                 max(period_financing.keys()) if period_financing else 0,
+                max(period_lotbank.keys()) if period_lotbank else 0,
                 len(periods)
             )
 
@@ -180,7 +184,8 @@ class CalculationService:
                 costs = period_costs.get(period_seq, 0)
                 revenue = period_revenue.get(period_seq, 0)
                 financing = period_financing.get(period_seq, 0)
-                net_cf = revenue - costs + financing  # negative when costs > revenue (contribution)
+                lotbank = period_lotbank.get(period_seq, 0)
+                net_cf = revenue - costs + lotbank + financing  # negative when costs > revenue (contribution)
 
                 # Get date
                 if period_seq in period_dates:

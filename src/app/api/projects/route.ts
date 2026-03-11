@@ -44,6 +44,7 @@ type RawProjectRow = {
   primary_area?: number | null
   primary_area_type?: string | null
   updated_at?: string | null
+  created_by_username?: string | null
 }
 
 type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>

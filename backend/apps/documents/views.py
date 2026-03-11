@@ -1128,7 +1128,7 @@ def upload_new_version(request, project_id, doc_id):
                 workspace_id=existing_doc.workspace_id,
                 phase_id=existing_doc.phase_id,
                 parcel_id=existing_doc.parcel_id,
-                doc_name=root_doc.doc_name,
+                doc_name=uploaded_file.name,
                 doc_type=root_doc.doc_type,
                 discipline=root_doc.discipline,
                 mime_type=uploaded_file.content_type or 'application/octet-stream',
@@ -1248,6 +1248,9 @@ def list_document_versions(request, project_id, doc_id):
                 "doc_id": version_doc.doc_id,
                 "version_no": version_doc.version_no,
                 "doc_name": version_doc.doc_name,
+                "storage_uri": version_doc.storage_uri or None,
+                "mime_type": version_doc.mime_type or None,
+                "file_size_bytes": version_doc.file_size_bytes or None,
                 "uploaded_at": version_doc.created_at.isoformat() if version_doc.created_at else None,
                 "uploaded_by": version_doc.created_by or "System",
                 "notes": notes,
@@ -1320,7 +1323,7 @@ def link_document_version(request, project_id, doc_id):
 
         source_doc.parent_doc_id = root_doc_id
         source_doc.version_no = new_version_no
-        source_doc.doc_name = f"{root_doc.doc_name} (V{new_version_no})"
+        # Keep the source doc's original filename — don't rename to root's name
         source_doc.updated_at = timezone.now()
         source_doc.profile_json = profile_json
         source_doc.save()

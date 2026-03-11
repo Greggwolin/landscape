@@ -195,10 +195,11 @@ export function useLandscaperThreads({
   // AbortController for cancelling in-flight requests on unmount / context change
   const abortControllerRef = useRef<AbortController>(new AbortController());
 
-  // Abort all in-flight requests on unmount
+  // Abort all in-flight requests on unmount, then reset for potential re-mount
   useEffect(() => {
     return () => {
       abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
     };
   }, []);
 
@@ -208,7 +209,8 @@ export function useLandscaperThreads({
     const parentSignal = abortControllerRef.current.signal;
     if (parentSignal.aborted) {
       controller.abort();
-      throw new DOMException('signal is aborted without reason', 'AbortError');
+      // Throw AbortError that callers already catch and suppress
+      throw new DOMException('The operation was aborted due to unmount', 'AbortError');
     }
     const onAbort = () => controller.abort();
     parentSignal.addEventListener('abort', onAbort);
@@ -280,6 +282,7 @@ export function useLandscaperThreads({
       }
       return [];
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return [];
       console.error('[LandscaperThreads] Failed to load threads:', err);
       return [];
     }
@@ -302,6 +305,7 @@ export function useLandscaperThreads({
         setMessages(data.messages);
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('[LandscaperThreads] Failed to load messages:', err);
     }
   }, [fetchWithTimeout, getAuthHeaders]);
@@ -403,6 +407,7 @@ export function useLandscaperThreads({
         await loadThreads();
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('[LandscaperThreads] Failed to start new thread:', err);
       setError('Failed to start new thread');
     } finally {
@@ -435,6 +440,7 @@ export function useLandscaperThreads({
         }
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('[LandscaperThreads] Failed to update title:', err);
     }
   }, [activeThread, fetchWithTimeout, getAuthHeaders]);
@@ -564,12 +570,14 @@ export function useLandscaperThreads({
         if (!isHidden) {
           setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
         }
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         if (err instanceof DOMException && err.name === 'AbortError') {
-          setError('Request timed out — the operation may still be processing. If you were updating many records, the changes may have been saved. Please refresh and try again.');
-        } else {
-          setError(errorMessage);
+          // Could be unmount or genuine timeout — only show error if component is still mounted
+          // (setError is a no-op after unmount in React 18+, but avoid noisy re-throws)
+          setError('Request timed out — the operation may still be processing. Please refresh and try again.');
+          return undefined;
         }
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
         throw err;
       } finally {
         setIsLoading(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilLayers } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
@@ -32,6 +32,7 @@ interface AccordionFiltersProps {
   onReviewMedia?: (docId: number, docName: string) => void;
   onDeleteFilter?: (customId: number, docTypeName: string) => void;
   onLinkVersion?: (sourceDocId: string, targetDoc: DMSDocument) => void;
+  onDocumentDrop?: (docIds: string[], targetDocType: string) => void;
 }
 
 const acceptedFileTypes = {
@@ -57,6 +58,7 @@ interface FilterDropRowProps {
   onReviewMedia?: (docId: number, docName: string) => void;
   onDeleteFilter?: (customId: number, docTypeName: string) => void;
   onLinkVersion?: (sourceDocId: string, targetDoc: DMSDocument) => void;
+  onDocumentDrop?: (docIds: string[], targetDocType: string) => void;
 }
 
 function FilterDropRow({
@@ -68,10 +70,14 @@ function FilterDropRow({
   onToggleDocSelection,
   onReviewMedia,
   onDeleteFilter,
-  onLinkVersion
+  onLinkVersion,
+  onDocumentDrop
 }: FilterDropRowProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dropTargetDocId, setDropTargetDocId] = useState<string | null>(null);
+  const [isReclassifyDropTarget, setIsReclassifyDropTarget] = useState(false);
+  const [isDropSuccess, setIsDropSuccess] = useState(false);
+  const dropSuccessTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { stageFiles } = useUploadStaging();
 
@@ -116,18 +122,110 @@ function FilterDropRow({
     ? (isDragReject ? styles.filterRowReject : styles.filterRowActive)
     : '';
 
+  // Reclassify drop target class
+  const reclassifyClass = isDropSuccess
+    ? styles.filterRowDropSuccess
+    : isReclassifyDropTarget
+      ? styles.filterRowReclassifyTarget
+      : '';
+
+  // Handle native drag events for reclassify (layered on top of react-dropzone)
+  const handleHeaderDragOver = useCallback((e: React.DragEvent) => {
+    // Only handle our custom doc drags, not file drops
+    if (!e.dataTransfer.types.includes('application/x-dms-reclassify')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if dragged doc is from a different category
+    const currentType = e.dataTransfer.types.includes('application/x-dms-current-type')
+      ? '' // Can't read data during dragover, just allow the drop
+      : '';
+    void currentType;
+    e.dataTransfer.dropEffect = 'move';
+    setIsReclassifyDropTarget(true);
+  }, []);
+
+  const handleHeaderDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/x-dms-reclassify')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsReclassifyDropTarget(true);
+  }, []);
+
+  const handleHeaderDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/x-dms-reclassify')) return;
+    // Only clear if leaving the header (not entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    const currentTarget = e.currentTarget as HTMLElement;
+    if (relatedTarget && currentTarget.contains(relatedTarget)) return;
+    setIsReclassifyDropTarget(false);
+  }, []);
+
+  const handleHeaderDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('application/x-dms-reclassify')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsReclassifyDropTarget(false);
+
+    const docIdsRaw = e.dataTransfer.getData('application/x-dms-reclassify');
+    const currentType = e.dataTransfer.getData('application/x-dms-current-type');
+
+    if (!docIdsRaw) return;
+
+    // No-op if dropping on same category
+    if (currentType === filter.doc_type) return;
+
+    const docIds = docIdsRaw.split(',').filter(Boolean);
+    if (docIds.length === 0) return;
+
+    // Flash success
+    if (dropSuccessTimerRef.current) clearTimeout(dropSuccessTimerRef.current);
+    setIsDropSuccess(true);
+    dropSuccessTimerRef.current = setTimeout(() => setIsDropSuccess(false), 300);
+
+    onDocumentDrop?.(docIds, filter.doc_type);
+  }, [filter.doc_type, onDocumentDrop]);
+
+  const rootProps = getRootProps();
+
   return (
     <div key={filter.doc_type} style={{ backgroundColor: 'var(--cui-body-bg)' }}>
       <div
-        {...getRootProps()}
-        className={`group flex items-center gap-1.5 px-3 py-1.25 transition-colors ${styles.filterRow} ${dropStateClass}`}
+        {...rootProps}
+        onDragOver={(e) => {
+          handleHeaderDragOver(e);
+          rootProps.onDragOver?.(e as unknown as React.DragEvent<HTMLElement>);
+        }}
+        onDragEnter={(e) => {
+          handleHeaderDragEnter(e);
+          rootProps.onDragEnter?.(e as unknown as React.DragEvent<HTMLElement>);
+        }}
+        onDragLeave={(e) => {
+          handleHeaderDragLeave(e);
+          rootProps.onDragLeave?.(e as unknown as React.DragEvent<HTMLElement>);
+        }}
+        onDrop={(e) => {
+          if (e.dataTransfer.types.includes('application/x-dms-reclassify')) {
+            handleHeaderDrop(e);
+          } else {
+            rootProps.onDrop?.(e as unknown as React.DragEvent<HTMLElement>);
+          }
+        }}
+        className={`group flex items-center gap-1.5 px-3 py-1.25 transition-colors ${styles.filterRow} ${dropStateClass} ${reclassifyClass}`}
         style={{
           ...headerDynamicStyle,
           borderBottomWidth: '1px',
           borderBottomStyle: 'solid',
-          borderBottomColor: headerDynamicStyle.borderBottomColor ?? 'var(--cui-border-color)'
+          borderBottomColor: headerDynamicStyle.borderBottomColor ?? 'var(--cui-border-color)',
+          ...(isReclassifyDropTarget ? {
+            borderLeft: '2px solid var(--cui-primary)',
+            backgroundColor: 'var(--cui-primary-bg-subtle, rgba(var(--cui-primary-rgb), 0.08))',
+          } : {}),
+          ...(isDropSuccess ? {
+            backgroundColor: 'var(--cui-success-bg-subtle, rgba(var(--cui-success-rgb), 0.1))',
+          } : {}),
         }}
         data-doc-type={filter.doc_type}
+        aria-dropeffect={isReclassifyDropTarget ? 'move' : undefined}
       >
         <button
           onClick={() => onExpand(filter.doc_type)}
@@ -256,11 +354,36 @@ function FilterDropRow({
                   borderColor: 'var(--cui-border-color)'
                 }}
                 onClick={() => onDocumentSelect(doc)}
-                draggable={!!onLinkVersion}
+                draggable={!!onLinkVersion || !!onDocumentDrop}
                 onDragStart={(event) => {
-                  if (!onLinkVersion) return;
-                  event.dataTransfer.setData('application/x-dms-doc', doc.doc_id);
+                  // Version-link data (existing)
+                  if (onLinkVersion) {
+                    event.dataTransfer.setData('application/x-dms-doc', doc.doc_id);
+                  }
+                  // Reclassify data — if this doc is selected in a multi-select, drag all selected
+                  if (onDocumentDrop) {
+                    const isSelected = selectedDocIds?.has(doc.doc_id);
+                    const docIds = isSelected && selectedDocIds && selectedDocIds.size > 1
+                      ? Array.from(selectedDocIds)
+                      : [doc.doc_id];
+                    event.dataTransfer.setData('application/x-dms-reclassify', docIds.join(','));
+                    event.dataTransfer.setData('application/x-dms-current-type', doc.doc_type || '');
+                    // Set drag image badge for multi-select
+                    if (docIds.length > 1) {
+                      const badge = document.createElement('div');
+                      badge.textContent = `${docIds.length} documents`;
+                      badge.style.cssText = 'padding:4px 10px;background:var(--cui-primary);color:var(--cui-white, white);border-radius:4px;font-size:12px;position:absolute;top:-9999px;';
+                      document.body.appendChild(badge);
+                      event.dataTransfer.setDragImage(badge, 0, 0);
+                      setTimeout(() => document.body.removeChild(badge), 0);
+                    }
+                  }
                   event.dataTransfer.effectAllowed = 'move';
+                  // Visual cue: reduce opacity
+                  (event.currentTarget as HTMLElement).style.opacity = '0.5';
+                }}
+                onDragEnd={(event) => {
+                  (event.currentTarget as HTMLElement).style.opacity = '1';
                 }}
                 onDragOver={(event) => {
                   if (!onLinkVersion) return;
@@ -341,7 +464,8 @@ export default function AccordionFilters({
   onToggleDocSelection,
   onReviewMedia,
   onDeleteFilter,
-  onLinkVersion
+  onLinkVersion,
+  onDocumentDrop
 }: AccordionFiltersProps) {
   const renderedFilters = useMemo(() => filters, [filters]);
 
@@ -359,6 +483,7 @@ export default function AccordionFilters({
           onReviewMedia={onReviewMedia}
           onDeleteFilter={onDeleteFilter}
           onLinkVersion={onLinkVersion}
+          onDocumentDrop={onDocumentDrop}
         />
       ))}
     </div>

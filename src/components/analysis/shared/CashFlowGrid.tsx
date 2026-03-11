@@ -194,7 +194,7 @@ export function CashFlowGrid({
   };
 
   const headerCellStyle: React.CSSProperties = {
-    backgroundColor: 'var(--cui-dark-bg-subtle)',
+    backgroundColor: 'var(--cui-secondary-bg)',
     fontWeight: 600,
     textAlign: 'center',
     whiteSpace: 'nowrap',
@@ -371,11 +371,7 @@ function DataRow({ row, periods, formatValue, hideTotalColumn, isBeforeTotal }: 
       : Object.values(row.values).reduce((sum, val) => sum + (val || 0), 0);
 
   // Row background for totals
-  const rowBg = row.isTotal
-    ? 'var(--cui-light-bg-subtle)'
-    : row.isSubtotal
-      ? undefined
-      : undefined;
+  const rowBg = undefined;
 
   // Border top for total rows
   const borderTop = row.isTotal ? '2px solid var(--cui-border-color)' : undefined;
@@ -444,9 +440,8 @@ function DataRow({ row, periods, formatValue, hideTotalColumn, isBeforeTotal }: 
             textAlign: 'right',
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 600,
-            backgroundColor: 'var(--cui-light-bg-subtle)',
             borderLeft: '2px solid var(--cui-border-color)',
-            color: rowTotal < 0 ? 'var(--cui-danger)' : undefined,
+            color: rowTotal < 0 ? 'var(--cui-danger)' : 'var(--cui-body-color)',
             borderTop,
           }}
         >
@@ -470,7 +465,6 @@ function DataRow({ row, periods, formatValue, hideTotalColumn, isBeforeTotal }: 
       {!hideTotalColumn && row.hideTotal && (
         <td
           style={{
-            backgroundColor: 'var(--cui-light-bg-subtle)',
             borderLeft: '2px solid var(--cui-border-color)',
             borderTop,
           }}

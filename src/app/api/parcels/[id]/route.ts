@@ -97,6 +97,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       hasUpdates = true
     }
 
+    // Handle area_id change (move parcel to different area)
+    if (body.area_id !== undefined && body.area_id !== null) {
+      await sql`UPDATE landscape.tbl_parcel SET area_id = ${body.area_id}::bigint WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
+    // Handle phase_id change (move parcel to different phase)
+    if (body.phase_id !== undefined && body.phase_id !== null) {
+      await sql`UPDATE landscape.tbl_parcel SET phase_id = ${body.phase_id}::bigint WHERE parcel_id = ${id}::bigint`
+      hasUpdates = true
+    }
+
     // Handle sale_period (allow null to clear the field)
     if (body.sale_period !== undefined) {
       const salePeriod = body.sale_period === null || body.sale_period === '' ? null : body.sale_period
