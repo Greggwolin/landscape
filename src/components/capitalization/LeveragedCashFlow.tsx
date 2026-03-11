@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody } from '@coreui/react';
+import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody, CButtonGroup, CButton, CTable } from '@coreui/react';
 import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
 import PendingRenoOffsetModal from '@/components/capitalization/PendingRenoOffsetModal';
 import CostGranularityToggle from '@/components/analysis/cashflow/CostGranularityToggle';
@@ -127,16 +127,21 @@ interface LeveragedCashFlowProps {
 
 /* ---------- Helpers ---------- */
 
+// Column widths matching CashFlowTable
+const LCF_LABEL_WIDTH = 200;
+const LCF_DATA_WIDTH = 120;
+
+// Indentation matching CashFlowTable
+const LCF_INDENT = {
+  SECTION_HEADER: 12,
+  LINE_ITEM: 24,
+};
+
 function formatLCFCurrency(value: number): string {
-  if (value === 0) return '$0';
-  const abs = Math.abs(value);
-  const opts: Intl.NumberFormatOptions = {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: abs >= 100000 ? 0 : 2,
-    maximumFractionDigits: abs >= 100000 ? 0 : 2,
-  };
-  const formatted = new Intl.NumberFormat('en-US', opts).format(abs);
+  const absValue = Math.abs(value);
+  const rounded = Math.round(absValue);
+  if (rounded === 0) return '-';
+  const formatted = `$${rounded.toLocaleString()}`;
   if (value < 0) return `(${formatted})`;
   return formatted;
 }
@@ -361,48 +366,53 @@ export default function LeveragedCashFlow({
       });
 
       if (revenueSection) {
+        const grossRevValues = zeroes.map((_, i) => {
+          const sub = revenueSection.subtotals.find((s) => s.periodIndex === i);
+          return sub ? sub.amount : 0;
+        });
+
         displayRows.push({
           label: 'Revenue',
           rowType: 'section-header',
           values: zeroesAgg,
         });
 
-        // Show revenue line items
-        for (const item of revenueSection.lineItems) {
-          const itemValues = zeroes.map((_, i) => {
-            const pv = item.periods.find((p) => p.periodIndex === i);
-            return pv ? pv.amount : 0;
-          });
+        if (costGranularity !== 'summary') {
+          // Show revenue line items (phases) only when not in summary mode
+          for (const item of revenueSection.lineItems) {
+            const itemValues = zeroes.map((_, i) => {
+              const pv = item.periods.find((p) => p.periodIndex === i);
+              return pv ? pv.amount : 0;
+            });
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(itemValues, periodView),
+            });
+          }
+
           displayRows.push({
-            label: item.description,
-            rowType: 'indent',
-            values: aggregatePeriods(itemValues, periodView),
+            label: 'Gross Revenue',
+            rowType: 'subtotal',
+            values: aggregatePeriods(grossRevValues, periodView),
           });
         }
-
-        const grossRevValues = zeroes.map((_, i) => {
-          const sub = revenueSection.subtotals.find((s) => s.periodIndex === i);
-          return sub ? sub.amount : 0;
-        });
-        displayRows.push({
-          label: 'Gross Revenue',
-          rowType: 'subtotal',
-          values: aggregatePeriods(grossRevValues, periodView),
-        });
       }
 
       // Revenue deductions
       if (deductionsSection) {
-        for (const item of deductionsSection.lineItems) {
-          const itemValues = zeroes.map((_, i) => {
-            const pv = item.periods.find((p) => p.periodIndex === i);
-            return pv ? pv.amount : 0;
-          });
-          displayRows.push({
-            label: item.description,
-            rowType: 'indent',
-            values: aggregatePeriods(itemValues, periodView),
-          });
+        if (costGranularity !== 'summary') {
+          for (const item of deductionsSection.lineItems) {
+            const itemValues = zeroes.map((_, i) => {
+              const pv = item.periods.find((p) => p.periodIndex === i);
+              return pv ? pv.amount : 0;
+            });
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(itemValues, periodView),
+            });
+          }
         }
       }
 
@@ -485,23 +495,33 @@ export default function LeveragedCashFlow({
       // --- Lotbank Sections ---
       const allLotbankPeriodTotals = zeroes.map(() => 0);
       if (lotbankSections.length > 0) {
-        displayRows.push({
-          label: 'Lotbank',
-          rowType: 'section-header',
-          values: zeroesAgg,
-        });
-
+        // Always accumulate totals
         for (const lbSection of lotbankSections) {
           const lbSubtotals = zeroes.map((_, i) => {
             const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
             return sub ? sub.amount : 0;
           });
           lbSubtotals.forEach((v, i) => { allLotbankPeriodTotals[i] += v; });
-          displayRows.push({
-            label: lbSection.sectionName,
-            rowType: 'indent',
-            values: aggregatePeriods(lbSubtotals, periodView),
-          });
+        }
+
+        displayRows.push({
+          label: 'Lotbank',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        if (costGranularity !== 'summary') {
+          for (const lbSection of lotbankSections) {
+            const lbSubtotals = zeroes.map((_, i) => {
+              const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
+              return sub ? sub.amount : 0;
+            });
+            displayRows.push({
+              label: lbSection.sectionName,
+              rowType: 'indent',
+              values: aggregatePeriods(lbSubtotals, periodView),
+            });
+          }
         }
 
         displayRows.push({
@@ -1024,18 +1044,18 @@ export default function LeveragedCashFlow({
             <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
               Time:
             </span>
-            <div className="btn-group btn-group-sm" role="group" aria-label="Period view">
+            <CButtonGroup size="sm" role="group" aria-label="Period view">
               {(['monthly', 'quarterly', 'annual'] as PeriodView[]).map((view) => (
-                <button
+                <CButton
                   key={view}
-                  type="button"
-                  className={`btn ${periodView === view ? 'btn-primary' : 'btn-ghost-secondary'}`}
+                  color={periodView === view ? 'primary' : 'secondary'}
+                  variant={periodView === view ? undefined : 'outline'}
                   onClick={() => setPeriodView(view)}
                 >
                   {view.charAt(0).toUpperCase() + view.slice(1)}
-                </button>
+                </CButton>
               ))}
-            </div>
+            </CButtonGroup>
           </div>
 
           {/* Cost granularity - land dev only */}
@@ -1051,14 +1071,77 @@ export default function LeveragedCashFlow({
       </div>
 
       {/* Grid */}
-      <div className="leveraged-cf-container">
-        <table className="leveraged-cf-grid">
+      <div style={{ maxHeight: '80vh', overflowX: 'auto', overflowY: 'auto' }}>
+        <CTable
+          small
+          bordered
+          hover
+          style={{
+            fontSize: '0.8125rem',
+            marginBottom: 0,
+            tableLayout: 'fixed',
+            width: 'auto',
+          }}
+        >
+          <colgroup>
+            <col style={{ width: `${LCF_LABEL_WIDTH}px` }} />
+            <col style={{ width: `${LCF_DATA_WIDTH}px` }} />
+            {headers.map((_, i) => (
+              <col key={i} style={{ width: `${LCF_DATA_WIDTH}px` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
-              <th>Line Item</th>
-              <th>Time 0</th>
+              <th
+                style={{
+                  backgroundColor: 'var(--cui-secondary-bg)',
+                  color: 'var(--cui-body-color)',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  whiteSpace: 'nowrap',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  borderBottom: '3px solid var(--cui-border-color)',
+                  borderRight: '2px solid var(--cui-border-color)',
+                  paddingLeft: `${LCF_INDENT.SECTION_HEADER}px`,
+                }}
+              >
+                Line Item
+              </th>
+              <th
+                style={{
+                  backgroundColor: 'var(--cui-secondary-bg)',
+                  color: 'var(--cui-body-color)',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  borderBottom: '3px solid var(--cui-border-color)',
+                  borderLeft: '2px solid var(--cui-border-color)',
+                }}
+              >
+                Time 0
+              </th>
               {headers.map((h, i) => (
-                <th key={i}>{h}</th>
+                <th
+                  key={i}
+                  style={{
+                    backgroundColor: 'var(--cui-secondary-bg)',
+                    color: 'var(--cui-body-color)',
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 10,
+                    borderBottom: '3px solid var(--cui-border-color)',
+                  }}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -1067,8 +1150,11 @@ export default function LeveragedCashFlow({
               /* Divider row */
               if (row.rowType === 'divider') {
                 return (
-                  <tr key={rowIdx} className="divider">
-                    <td colSpan={headers.length + 2} />
+                  <tr key={rowIdx}>
+                    <td
+                      colSpan={headers.length + 2}
+                      style={{ height: '4px', padding: 0, borderBottom: '1px solid var(--cui-border-color)' }}
+                    />
                   </tr>
                 );
               }
@@ -1076,18 +1162,50 @@ export default function LeveragedCashFlow({
               /* Info row (no debt scenario) */
               if (row.rowType === 'info') {
                 return (
-                  <tr key={rowIdx} className="section-header">
-                    <td>{row.label}</td>
+                  <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + 1}
+                      colSpan={headers.length + 2}
                       style={{
-                        textAlign: 'center',
-                        color: 'var(--cui-text-muted)',
-                        fontWeight: 400,
-                        fontStyle: 'italic',
+                        fontWeight: 700,
+                        fontSize: '0.8125rem',
+                        paddingLeft: `${LCF_INDENT.SECTION_HEADER}px`,
+                        paddingTop: '12px',
+                        paddingBottom: '4px',
+                        borderBottom: 'none',
                       }}
                     >
-                      None — Net Cash Flow equals NOI
+                      {row.label}
+                      <span
+                        style={{
+                          fontWeight: 400,
+                          fontStyle: 'italic',
+                          color: 'var(--cui-text-muted)',
+                          marginLeft: '12px',
+                        }}
+                      >
+                        None — Net Cash Flow equals NOI
+                      </span>
+                    </td>
+                  </tr>
+                );
+              }
+
+              /* Section header — full-width label like SectionLabel */
+              if (row.rowType === 'section-header') {
+                return (
+                  <tr key={rowIdx}>
+                    <td
+                      colSpan={headers.length + 2}
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.8125rem',
+                        paddingLeft: `${LCF_INDENT.SECTION_HEADER}px`,
+                        paddingTop: '12px',
+                        paddingBottom: '4px',
+                        borderBottom: 'none',
+                      }}
+                    >
+                      {row.label}
                     </td>
                   </tr>
                 );
@@ -1096,8 +1214,17 @@ export default function LeveragedCashFlow({
               /* NOI row with no income data placeholder */
               if (row.rowType === 'noi' && row.values.length === 0) {
                 return (
-                  <tr key={rowIdx} className="noi-row">
-                    <td>{row.label}</td>
+                  <tr key={rowIdx}>
+                    <td
+                      style={{
+                        paddingLeft: `${LCF_INDENT.SECTION_HEADER}px`,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        borderRight: '2px solid var(--cui-border-color)',
+                      }}
+                    >
+                      {row.label}
+                    </td>
                     <td
                       colSpan={headers.length + 1}
                       style={{
@@ -1112,19 +1239,6 @@ export default function LeveragedCashFlow({
                 );
               }
 
-              /* Section header with no values */
-              if (row.rowType === 'section-header' && row.values.length === 0) {
-                return (
-                  <tr key={rowIdx} className="section-header">
-                    <td>{row.label}</td>
-                    <td />
-                    {headers.map((_, i) => (
-                      <td key={i} />
-                    ))}
-                  </tr>
-                );
-              }
-
               /* Reversion row — value only in last period, clickable */
               if (row.rowType === 'reversion') {
                 const isPendingOffset = row.label.includes('Pending Reno Offset');
@@ -1133,17 +1247,66 @@ export default function LeveragedCashFlow({
                   : () => setShowReversionModal(true);
 
                 return (
-                  <tr key={rowIdx} className="reversion-row">
-                    <td>{row.label}</td>
-                    <td>{row.time0Value ? formatLCFCurrency(row.time0Value) : '—'}</td>
+                  <tr key={rowIdx}>
+                    <td
+                      style={{
+                        paddingLeft: `${LCF_INDENT.SECTION_HEADER}px`,
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                        borderRight: '2px solid var(--cui-border-color)',
+                        paddingTop: '6px',
+                        borderTop: '1px solid var(--cui-border-color)',
+                      }}
+                    >
+                      {row.label}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        fontWeight: 700,
+                        borderLeft: '2px solid var(--cui-border-color)',
+                        paddingTop: '6px',
+                        borderTop: '1px solid var(--cui-border-color)',
+                        color: row.time0Value && row.time0Value < 0 ? 'var(--cui-danger)' : undefined,
+                      }}
+                    >
+                      {row.time0Value ? formatLCFCurrency(row.time0Value) : '-'}
+                    </td>
                     {row.values.map((val, colIdx) => {
                       if (row.showDashForZero && val === 0) {
-                        return <td key={colIdx}>—</td>;
+                        return (
+                          <td
+                            key={colIdx}
+                            style={{
+                              textAlign: 'right',
+                              fontVariantNumeric: 'tabular-nums',
+                              fontWeight: 700,
+                              paddingTop: '6px',
+                              borderTop: '1px solid var(--cui-border-color)',
+                            }}
+                          >
+                            -
+                          </td>
+                        );
                       }
                       return (
-                        <td key={colIdx}>
+                        <td
+                          key={colIdx}
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                            fontWeight: 700,
+                            paddingTop: '6px',
+                            borderTop: '1px solid var(--cui-border-color)',
+                          }}
+                        >
                           <span
-                            className="reversion-value"
+                            style={{
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              color: 'var(--cui-link-color)',
+                            }}
                             onClick={handleClick}
                             role="button"
                             tabIndex={0}
@@ -1160,77 +1323,123 @@ export default function LeveragedCashFlow({
                 );
               }
 
+              /* Loan proceeds row — Time 0 value with clickable loan link */
               if (row.rowType === 'loan-proceeds') {
                 return (
-                  <tr key={rowIdx} className="time0-row">
-                    <td>{row.label}</td>
-                    <td className={row.time0Value && row.time0Value > 0 ? 'positive' : ''}>
+                  <tr key={rowIdx}>
+                    <td
+                      style={{
+                        paddingLeft: `${LCF_INDENT.LINE_ITEM}px`,
+                        fontWeight: 400,
+                        whiteSpace: 'nowrap',
+                        borderRight: '2px solid var(--cui-border-color)',
+                      }}
+                    >
+                      {row.label}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        fontWeight: 400,
+                        borderLeft: '2px solid var(--cui-border-color)',
+                        color: row.time0Value && row.time0Value > 0 ? 'var(--cui-success)' : undefined,
+                      }}
+                    >
                       {row.loanId ? (
                         <button
                           type="button"
                           className="btn btn-link btn-sm p-0"
+                          style={{ fontSize: 'inherit' }}
                           onClick={() =>
                             setBudgetModalLoan({ loanId: row.loanId as number, loanName: row.loanName })
                           }
                         >
-                          {row.time0Value != null ? formatLCFCurrency(row.time0Value) : '—'}
+                          {row.time0Value != null ? formatLCFCurrency(row.time0Value) : '-'}
                         </button>
                       ) : (
-                        row.time0Value != null ? formatLCFCurrency(row.time0Value) : '—'
+                        row.time0Value != null ? formatLCFCurrency(row.time0Value) : '-'
                       )}
                     </td>
                     {headers.map((_, i) => (
-                      <td key={i}>—</td>
+                      <td
+                        key={i}
+                        style={{
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        -
+                      </td>
                     ))}
                   </tr>
                 );
               }
 
-              /* Standard data rows */
-              const rowClass = row.rowType === 'noi'
-                ? 'noi-row'
-                : row.rowType === 'net-cf'
-                  ? 'net-cf-row'
-                  : row.rowType === 'grand-total'
-                    ? 'grand-total'
-                    : row.rowType === 'subtotal'
-                      ? 'subtotal'
-                      : row.rowType === 'section-header'
-                        ? 'section-header'
-                        : row.rowType === 'indent'
-                          ? 'indent'
-                          : '';
+              /* Standard data rows: indent, subtotal, noi, net-cf, grand-total */
+              const isIndent = row.rowType === 'indent';
+              const isBold = ['subtotal', 'noi', 'net-cf', 'grand-total'].includes(row.rowType);
+              const isNoi = row.rowType === 'noi';
+              const isGrandTotal = row.rowType === 'grand-total';
+              const isSubtotal = row.rowType === 'subtotal';
+              const isNetCf = row.rowType === 'net-cf';
+              const bottomBorder = isSubtotal; // accounting-style underline before totals
 
               return (
-                <tr key={rowIdx} className={rowClass}>
-                  <td>{row.label}</td>
+                <tr key={rowIdx}>
                   <td
-                    className={
-                      row.showSign && row.time0Value && row.time0Value !== 0
-                        ? row.time0Value > 0
-                          ? 'positive'
-                          : 'negative'
-                        : ''
-                    }
+                    style={{
+                      paddingLeft: isIndent ? `${LCF_INDENT.LINE_ITEM}px` : `${LCF_INDENT.SECTION_HEADER}px`,
+                      fontWeight: isBold ? 600 : 400,
+                      whiteSpace: 'nowrap',
+                      borderRight: '2px solid var(--cui-border-color)',
+                      borderTop: (isNoi || isGrandTotal) ? '2px solid var(--cui-border-color)' : isSubtotal ? '1px solid var(--cui-border-color)' : undefined,
+                      fontSize: isGrandTotal ? '0.875rem' : undefined,
+                      backgroundColor: isNoi ? 'rgba(var(--cui-primary-rgb), 0.04)' : undefined,
+                    }}
                   >
-                    {row.time0Value && row.time0Value !== 0 ? formatLCFCurrency(row.time0Value) : '—'}
+                    {row.label}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: 'right',
+                      fontVariantNumeric: 'tabular-nums',
+                      fontWeight: isBold ? 600 : 400,
+                      borderLeft: '2px solid var(--cui-border-color)',
+                      borderTop: (isNoi || isGrandTotal) ? '2px solid var(--cui-border-color)' : isSubtotal ? '1px solid var(--cui-border-color)' : undefined,
+                      color: row.time0Value && row.time0Value < 0 ? 'var(--cui-danger)' : undefined,
+                      textDecoration: bottomBorder ? 'underline' : undefined,
+                      fontSize: isGrandTotal ? '0.875rem' : undefined,
+                      backgroundColor: isNoi ? 'rgba(var(--cui-primary-rgb), 0.04)' : undefined,
+                    }}
+                  >
+                    {row.time0Value && row.time0Value !== 0 ? formatLCFCurrency(row.time0Value) : '-'}
                   </td>
                   {row.values.map((val, colIdx) => {
-                    const signClass =
-                      row.showSign && val !== 0
-                        ? val > 0
-                          ? 'positive'
-                          : 'negative'
-                        : '';
+                    const displayValue =
+                      val === 0 && isNetCf && !hasAnyIncomeData
+                        ? '-'
+                        : row.showDashForZero && val === 0
+                          ? '-'
+                          : row.valueFormat === 'percent'
+                            ? formatLCFPercent(val)
+                            : formatLCFCurrency(val);
+
                     return (
-                      <td key={colIdx} className={signClass}>
-                        {val === 0 && row.rowType === 'net-cf' && !hasAnyIncomeData
-                          ? '—'
-                          : row.showDashForZero && val === 0
-                            ? '—'
-                            : row.valueFormat === 'percent'
-                              ? formatLCFPercent(val)
-                              : formatLCFCurrency(val)}
+                      <td
+                        key={colIdx}
+                        style={{
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: isBold ? 600 : 400,
+                          color: val < 0 ? 'var(--cui-danger)' : undefined,
+                          textDecoration: bottomBorder ? 'underline' : undefined,
+                          borderTop: (isNoi || isGrandTotal) ? '2px solid var(--cui-border-color)' : isSubtotal ? '1px solid var(--cui-border-color)' : undefined,
+                          fontSize: isGrandTotal ? '0.875rem' : undefined,
+                          backgroundColor: isNoi ? 'rgba(var(--cui-primary-rgb), 0.04)' : undefined,
+                        }}
+                      >
+                        {displayValue}
                       </td>
                     );
                   })}
@@ -1238,7 +1447,7 @@ export default function LeveragedCashFlow({
               );
             })}
           </tbody>
-        </table>
+        </CTable>
       </div>
 
       {/* Info message for missing income data */}
