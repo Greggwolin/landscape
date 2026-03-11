@@ -14,6 +14,7 @@ import {
 import LoanScheduleGrid from '@/components/capitalization/LoanScheduleGrid';
 import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
 import { useToast } from '@/components/ui/toast';
+import { useContainers } from '@/hooks/useContainers';
 
 type PeriodView = 'monthly' | 'quarterly' | 'annual';
 type NumericFormat = 'currency' | 'percent' | 'integer' | 'decimal';
@@ -384,14 +385,20 @@ export default function LoanCard({
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleView, setScheduleView] = useState<PeriodView>('annual');
   const [formData, setFormData] = useState<Partial<Loan>>(normalizeLoan(loan));
+  const [containerIds, setContainerIds] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [reserveRecommendation, setReserveRecommendation] = useState<InterestReserveRecommendation | null>(null);
 
+  const { areas, phases } = useContainers({ projectId: Number(projectId) });
+
   useEffect(() => {
     setFormData(normalizeLoan(loan));
+    setContainerIds(
+      loan?.containers?.map((c) => c.division_id) ?? []
+    );
     setErrors({});
     setIsEditing(Boolean(defaultExpanded || !loan));
     setShowSchedule(false);
@@ -456,12 +463,12 @@ export default function LoanCard({
       }
     };
 
-  const buildLoanPayload = (sourceData: Partial<Loan>): Partial<Loan> => {
-    const filtered: Partial<Loan> = {};
+  const buildLoanPayload = (sourceData: Partial<Loan>): Record<string, unknown> => {
+    const filtered: Record<string, unknown> = {};
     editableLoanFields.forEach((field) => {
       const value = sourceData[field];
       if (value !== undefined) {
-        (filtered as Record<string, unknown>)[field] = value;
+        filtered[field] = value;
       }
     });
 
@@ -471,6 +478,9 @@ export default function LoanCard({
       filtered.commitment_amount = preview.commitment;
       filtered.loan_amount = preview.commitment;
     }
+
+    // Empty array = project-level (no container scoping)
+    filtered.container_ids = containerIds;
 
     return filtered;
   };
@@ -483,6 +493,9 @@ export default function LoanCard({
       if (!response.ok) throw new Error('Failed to load loan details');
       const detail = (await response.json()) as Loan;
       setFormData(normalizeLoan(detail));
+      setContainerIds(
+        detail.containers?.map((c) => c.division_id) ?? []
+      );
     } catch {
       showToast('Failed to load full loan details', 'error');
     } finally {
@@ -497,7 +510,7 @@ export default function LoanCard({
   ) => {
     setSaving(true);
     setErrors({});
-    const payload = buildLoanPayload(sourceData);
+    const payload = buildLoanPayload(sourceData) as Partial<Loan>;
 
     try {
       if (existingLoan?.loan_id) {
@@ -653,6 +666,13 @@ export default function LoanCard({
               </button>
             )}
             <span className="text-muted">{summaryLoan.lender}</span>
+            {containerIds.length > 0 && (
+              <span className="badge bg-info bg-opacity-25 text-info-emphasis" style={{ fontSize: '0.6875rem' }}>
+                {containerIds.length === 1
+                  ? [...areas, ...phases].find((c) => c.division_id === containerIds[0])?.name ?? 'Scoped'
+                  : `${containerIds.length} containers`}
+              </span>
+            )}
             <span className="ms-auto text-muted">Maturity: {summaryLoan.maturity}</span>
           </div>
         )}
@@ -750,6 +770,69 @@ export default function LoanCard({
                   </AssumptionRow>
                 </div>
               </div>
+
+              {(areas.length > 0 || phases.length > 0) && (
+                <div className="loan-assumption-section">
+                  <div className="loan-assumption-header">Loan Scope</div>
+                  <div className="loan-assumption-body">
+                    <div className="loan-scope-picker">
+                      <label className="loan-scope-option">
+                        <input
+                          type="radio"
+                          name={`scope-${existingLoan?.loan_id ?? 'new'}`}
+                          checked={containerIds.length === 0}
+                          onChange={() => setContainerIds([])}
+                        />
+                        <span>Entire Project</span>
+                      </label>
+                      {areas.map((area) => {
+                        const areaPhases = phases.filter((p) => p.parent_id === area.division_id);
+                        const areaChecked = containerIds.includes(area.division_id);
+                        const somePhaseChecked = areaPhases.some((p) => containerIds.includes(p.division_id));
+                        return (
+                          <div key={area.division_id} className="loan-scope-group">
+                            <label className="loan-scope-option">
+                              <input
+                                type="checkbox"
+                                checked={areaChecked || somePhaseChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setContainerIds((prev) => [...prev.filter((id) => id !== area.division_id), area.division_id]);
+                                  } else {
+                                    const phaseIds = areaPhases.map((p) => p.division_id);
+                                    setContainerIds((prev) => prev.filter((id) => id !== area.division_id && !phaseIds.includes(id)));
+                                  }
+                                }}
+                              />
+                              <span>{area.name}</span>
+                            </label>
+                            {areaChecked && areaPhases.length > 0 && (
+                              <div className="loan-scope-phases">
+                                {areaPhases.map((phase) => (
+                                  <label key={phase.division_id} className="loan-scope-option loan-scope-phase">
+                                    <input
+                                      type="checkbox"
+                                      checked={containerIds.includes(phase.division_id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setContainerIds((prev) => [...prev, phase.division_id]);
+                                        } else {
+                                          setContainerIds((prev) => prev.filter((id) => id !== phase.division_id));
+                                        }
+                                      }}
+                                    />
+                                    <span>{phase.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="loan-assumptions-column">
@@ -1264,6 +1347,50 @@ export default function LoanCard({
         .loan-schedule-toggle {
           cursor: pointer;
           border-top: 1px solid var(--cui-border-color);
+        }
+
+        /* Loan Scope Picker */
+        .loan-scope-picker {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 4px 0;
+        }
+
+        .loan-scope-option {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.8125rem;
+          color: var(--cui-body-color);
+          cursor: pointer;
+        }
+
+        .loan-scope-option input[type="radio"],
+        .loan-scope-option input[type="checkbox"] {
+          width: 14px;
+          height: 14px;
+          margin: 0;
+          accent-color: var(--cui-primary);
+          cursor: pointer;
+        }
+
+        .loan-scope-group {
+          margin-left: 4px;
+        }
+
+        .loan-scope-phases {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin: 4px 0 2px 22px;
+          padding-left: 8px;
+          border-left: 2px solid var(--cui-border-color-translucent);
+        }
+
+        .loan-scope-phase {
+          font-size: 0.75rem;
+          color: var(--cui-secondary-color);
         }
       `}</style>
     </CCard>

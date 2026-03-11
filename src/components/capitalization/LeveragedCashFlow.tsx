@@ -4,6 +4,8 @@ import React, { useMemo, useState } from 'react';
 import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody } from '@coreui/react';
 import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
 import PendingRenoOffsetModal from '@/components/capitalization/PendingRenoOffsetModal';
+import CostGranularityToggle from '@/components/analysis/cashflow/CostGranularityToggle';
+import type { CostGranularity } from '@/lib/financial-engine/cashflow/aggregation';
 import {
   useIncomeApproachMonthlyDCF,
   useLeveragedCashFlow,
@@ -223,6 +225,7 @@ export default function LeveragedCashFlow({
   const [periodView, setPeriodView] = useState<PeriodView>('annual');
   const [budgetModalLoan, setBudgetModalLoan] = useState<{ loanId: number; loanName?: string } | null>(null);
   const [showPendingRenoModal, setShowPendingRenoModal] = useState(false);
+  const [costGranularity, setCostGranularity] = useState<CostGranularity>('summary');
 
   const { data: cfResponse, isLoading: cfLoading, error: cfError } = useLeveragedCashFlow(projectId);
   const { data: incomeApproachMonthly } = useIncomeApproachMonthlyDCF(projectId, Boolean(projectId));
@@ -242,6 +245,11 @@ export default function LeveragedCashFlow({
   const opexSection = sections.find((s) => s.sectionId === 'income-opex');
   const netRevenueSection = sections.find((s) => s.sectionId === 'revenue-net');
   const financingSection = sections.find((s) => s.sectionId === 'financing');
+
+  /* Land dev detection: cost-* sections only exist for LAND projects */
+  const costSections = sections.filter((s) => s.sectionId.startsWith('cost-'));
+  const lotbankSections = sections.filter((s) => s.sectionId.startsWith('lotbank-'));
+  const isLandDev = costSections.length > 0;
 
   const hasIncomeData =
     (revenueSection && revenueSection.sectionTotal !== 0) ||
@@ -342,8 +350,181 @@ export default function LeveragedCashFlow({
       });
     }
 
-    /* ---- NOI Section ---- */
-    if (hasSectionIncomeData) {
+    /* ---- Land Dev vs Income Property Display ---- */
+    if (isLandDev && hasSectionIncomeData) {
+      // LAND DEV: Revenue → Costs → Lotbank → Net CF Before Debt
+
+      // --- Revenue Section ---
+      const netRevValues = zeroes.map((_, i) => {
+        const sub = netRevenueSection?.subtotals.find((s) => s.periodIndex === i);
+        return sub ? sub.amount : 0;
+      });
+
+      if (revenueSection) {
+        displayRows.push({
+          label: 'Revenue',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        // Show revenue line items
+        for (const item of revenueSection.lineItems) {
+          const itemValues = zeroes.map((_, i) => {
+            const pv = item.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: item.description,
+            rowType: 'indent',
+            values: aggregatePeriods(itemValues, periodView),
+          });
+        }
+
+        const grossRevValues = zeroes.map((_, i) => {
+          const sub = revenueSection.subtotals.find((s) => s.periodIndex === i);
+          return sub ? sub.amount : 0;
+        });
+        displayRows.push({
+          label: 'Gross Revenue',
+          rowType: 'subtotal',
+          values: aggregatePeriods(grossRevValues, periodView),
+        });
+      }
+
+      // Revenue deductions
+      if (deductionsSection) {
+        for (const item of deductionsSection.lineItems) {
+          const itemValues = zeroes.map((_, i) => {
+            const pv = item.periods.find((p) => p.periodIndex === i);
+            return pv ? pv.amount : 0;
+          });
+          displayRows.push({
+            label: item.description,
+            rowType: 'indent',
+            values: aggregatePeriods(itemValues, periodView),
+          });
+        }
+      }
+
+      // Net Revenue subtotal
+      displayRows.push({
+        label: 'Net Revenue',
+        rowType: 'subtotal',
+        values: aggregatePeriods(netRevValues, periodView),
+      });
+
+      // --- Cost Sections (controlled by costGranularity) ---
+      const allCostPeriodTotals = zeroes.map(() => 0);
+
+      if (costSections.length > 0) {
+        // Accumulate totals regardless of display granularity
+        for (const costSection of costSections) {
+          const catSubtotals = zeroes.map((_, i) => {
+            const sub = costSection.subtotals.find((s) => s.periodIndex === i);
+            return sub ? sub.amount : 0;
+          });
+          catSubtotals.forEach((v, i) => { allCostPeriodTotals[i] += v; });
+        }
+
+        displayRows.push({
+          label: 'Development Costs',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        if (costGranularity === 'summary') {
+          // Summary: just the total line
+        } else if (costGranularity === 'by_stage') {
+          // By Stage: show each cost section subtotal (hard costs, soft costs, etc.)
+          for (const costSection of costSections) {
+            const catSubtotals = zeroes.map((_, i) => {
+              const sub = costSection.subtotals.find((s) => s.periodIndex === i);
+              return sub ? sub.amount : 0;
+            });
+            displayRows.push({
+              label: costSection.sectionName,
+              rowType: 'indent',
+              values: aggregatePeriods(catSubtotals, periodView),
+            });
+          }
+        } else {
+          // by_category / by_phase: show line items within each section
+          for (const costSection of costSections) {
+            for (const item of costSection.lineItems) {
+              const itemValues = zeroes.map((_, i) => {
+                const pv = item.periods.find((p) => p.periodIndex === i);
+                return pv ? pv.amount : 0;
+              });
+              displayRows.push({
+                label: item.description,
+                rowType: 'indent',
+                values: aggregatePeriods(itemValues, periodView),
+              });
+            }
+
+            const catSubtotals = zeroes.map((_, i) => {
+              const sub = costSection.subtotals.find((s) => s.periodIndex === i);
+              return sub ? sub.amount : 0;
+            });
+            displayRows.push({
+              label: costSection.sectionName,
+              rowType: 'subtotal',
+              values: aggregatePeriods(catSubtotals, periodView),
+            });
+          }
+        }
+
+        // Total Development Costs (always shown)
+        displayRows.push({
+          label: 'Total Development Costs',
+          rowType: 'subtotal',
+          values: aggregatePeriods([...allCostPeriodTotals], periodView),
+        });
+      }
+
+      // --- Lotbank Sections ---
+      const allLotbankPeriodTotals = zeroes.map(() => 0);
+      if (lotbankSections.length > 0) {
+        displayRows.push({
+          label: 'Lotbank',
+          rowType: 'section-header',
+          values: zeroesAgg,
+        });
+
+        for (const lbSection of lotbankSections) {
+          const lbSubtotals = zeroes.map((_, i) => {
+            const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
+            return sub ? sub.amount : 0;
+          });
+          lbSubtotals.forEach((v, i) => { allLotbankPeriodTotals[i] += v; });
+          displayRows.push({
+            label: lbSection.sectionName,
+            rowType: 'indent',
+            values: aggregatePeriods(lbSubtotals, periodView),
+          });
+        }
+
+        displayRows.push({
+          label: 'Total Lotbank',
+          rowType: 'subtotal',
+          values: aggregatePeriods([...allLotbankPeriodTotals], periodView),
+        });
+      }
+
+      // --- Net Cash Flow Before Debt (NOI equivalent for land dev) ---
+      // = Net Revenue + Total Costs (costs are negative) + Total Lotbank
+      const landDevNetBeforeDebt = zeroes.map((_, i) =>
+        netRevValues[i] + allCostPeriodTotals[i] + allLotbankPeriodTotals[i]
+      );
+      displayRows.push({
+        label: 'Net Cash Flow Before Debt',
+        rowType: 'noi',
+        values: aggregatePeriods(landDevNetBeforeDebt, periodView),
+      });
+
+    } else if (hasSectionIncomeData) {
+      // INCOME PROPERTY: Standard GPI → Vacancy → EGI → OpEx → NOI
+
       // Check if this is a value-add project with split GPR
       const hasGprExisting = revenueSection?.lineItems?.some((item) => item.lineId === 'gpr-existing');
       const hasGprRenovated = revenueSection?.lineItems?.some((item) => item.lineId === 'gpr-renovated');
@@ -779,6 +960,10 @@ export default function LeveragedCashFlow({
     opexSection,
     netRevenueSection,
     financingSection,
+    costSections,
+    lotbankSections,
+    isLandDev,
+    costGranularity,
     loans,
     acquisitionSummary,
   ]);
@@ -833,17 +1018,35 @@ export default function LeveragedCashFlow({
           Leveraged Cash Flow
         </span>
 
-        <div className="btn-group btn-group-sm" role="group" aria-label="Period view">
-          {(['monthly', 'quarterly', 'annual'] as PeriodView[]).map((view) => (
-            <button
-              key={view}
-              type="button"
-              className={`btn ${periodView === view ? 'btn-primary' : 'btn-ghost-secondary'}`}
-              onClick={() => setPeriodView(view)}
-            >
-              {view.charAt(0).toUpperCase() + view.slice(1)}
-            </button>
-          ))}
+        <div className="d-flex align-items-center gap-3">
+          {/* Time scale */}
+          <div className="d-flex align-items-center gap-2">
+            <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
+              Time:
+            </span>
+            <div className="btn-group btn-group-sm" role="group" aria-label="Period view">
+              {(['monthly', 'quarterly', 'annual'] as PeriodView[]).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  className={`btn ${periodView === view ? 'btn-primary' : 'btn-ghost-secondary'}`}
+                  onClick={() => setPeriodView(view)}
+                >
+                  {view.charAt(0).toUpperCase() + view.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cost granularity - land dev only */}
+          {isLandDev && (
+            <div className="d-flex align-items-center gap-2">
+              <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
+                Costs:
+              </span>
+              <CostGranularityToggle value={costGranularity} onChange={setCostGranularity} />
+            </div>
+          )}
         </div>
       </div>
 

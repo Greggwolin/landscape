@@ -183,14 +183,21 @@ export function useCalculateInterestReserve(projectId: string, loanId: number | 
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-export function useLeveragedCashFlow(projectId: string, enabled: boolean = true) {
+export function useLeveragedCashFlow(
+  projectId: string,
+  enabled: boolean = true,
+  containerIds?: number[]
+) {
   return useQuery({
-    queryKey: ['leveraged-cash-flow', projectId],
+    queryKey: ['leveraged-cash-flow', projectId, containerIds ?? 'all'],
     queryFn: () =>
       fetch(`${DJANGO_API_URL}/api/projects/${projectId}/cash-flow/calculate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ includeFinancing: true }),
+        body: JSON.stringify({
+          includeFinancing: true,
+          ...(containerIds && containerIds.length > 0 ? { containerIds } : {}),
+        }),
       }).then((r) => r.json()),
     enabled: !!projectId && enabled,
   });

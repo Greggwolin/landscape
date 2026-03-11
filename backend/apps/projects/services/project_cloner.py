@@ -44,6 +44,8 @@ class ProjectCloner:
             'unit_type': {},
             'unit': {},
             'document': {},
+            'comparable': {},
+            'cost_approach': {},
         }
 
     @transaction.atomic
@@ -105,8 +107,10 @@ class ProjectCloner:
             self._clone_income_approach(source_project_id, new_project.project_id)
             self._clone_operations_user_inputs(source_project_id, new_project.project_id)
 
-        # 5. Clone valuation data
+        # 5. Clone valuation data (parent tables first, then child tables)
         self._clone_sales_comparables(source_project_id, new_project.project_id)
+        self._clone_sales_comp_adjustments(source_project_id, new_project.project_id)
+        self._clone_sales_comp_land(source_project_id, new_project.project_id)
         self._clone_cost_approach(source_project_id, new_project.project_id)
 
         # 6. Clone documents (metadata only)
@@ -566,24 +570,229 @@ class ProjectCloner:
         )
 
     def _clone_sales_comparables(self, source_project_id: int, new_project_id: int):
-        """Clone tbl_sales_comparables records."""
-        self._clone_simple_table(
-            'tbl_sales_comparables',
-            'comparable_id',
-            source_project_id,
-            new_project_id,
-            'project_id'
-        )
+        """Clone tbl_sales_comparables records, building comparable ID map for child tables."""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_sales_comparables'
+                AND column_name NOT IN ('comparable_id', 'created_at', 'updated_at')
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            select_cols = ', '.join(columns)
+            cursor.execute(f"""
+                SELECT comparable_id, {select_cols}
+                FROM landscape.tbl_sales_comparables
+                WHERE project_id = %s
+                ORDER BY comparable_id
+            """, [source_project_id])
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            col_idx = {col: i + 1 for i, col in enumerate(columns)}
+
+            for row in rows:
+                old_id = row[0]
+                values = list(row[1:])
+
+                if 'project_id' in col_idx:
+                    values[col_idx['project_id'] - 1] = new_project_id
+
+                placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_sales_comparables ({insert_cols})
+                    VALUES ({placeholders})
+                    RETURNING comparable_id
+                """, values)
+
+                new_id = cursor.fetchone()[0]
+                self.id_maps['comparable'][old_id] = new_id
+
+        logger.info(f"Cloned {len(self.id_maps['comparable'])} sales comparables")
+
+    def _clone_sales_comp_adjustments(self, source_project_id: int, new_project_id: int):
+        """Clone tbl_sales_comp_adjustments records, remapping comparable_id."""
+        if not self.id_maps['comparable']:
+            return
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_sales_comp_adjustments'
+                AND column_name NOT IN ('adjustment_id', 'created_at')
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            col_idx = {col: i for i, col in enumerate(columns)}
+            old_comp_ids = list(self.id_maps['comparable'].keys())
+
+            # Fetch adjustments for all source comparables
+            placeholders_in = ', '.join(['%s'] * len(old_comp_ids))
+            cursor.execute(f"""
+                SELECT adjustment_id, {', '.join(columns)}
+                FROM landscape.tbl_sales_comp_adjustments
+                WHERE comparable_id IN ({placeholders_in})
+                ORDER BY adjustment_id
+            """, old_comp_ids)
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            count = 0
+            for row in rows:
+                values = list(row[1:])
+
+                # Remap comparable_id
+                if 'comparable_id' in col_idx and values[col_idx['comparable_id']]:
+                    old_comp_id = values[col_idx['comparable_id']]
+                    new_comp_id = self.id_maps['comparable'].get(old_comp_id)
+                    if new_comp_id is None:
+                        logger.warning(f"No comparable mapping for adjustment comparable_id {old_comp_id}, skipping")
+                        continue
+                    values[col_idx['comparable_id']] = new_comp_id
+
+                insert_placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                try:
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_sales_comp_adjustments ({insert_cols})
+                        VALUES ({insert_placeholders})
+                    """, values)
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to clone sales comp adjustment: {e}")
+
+        logger.info(f"Cloned {count} sales comp adjustments")
+
+    def _clone_sales_comp_land(self, source_project_id: int, new_project_id: int):
+        """Clone tbl_sales_comp_land records (1:1 with sales comparables), remapping comparable_id."""
+        if not self.id_maps['comparable']:
+            return
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_sales_comp_land'
+                AND column_name NOT IN ('land_id', 'created_at', 'updated_at')
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            col_idx = {col: i for i, col in enumerate(columns)}
+            old_comp_ids = list(self.id_maps['comparable'].keys())
+
+            placeholders_in = ', '.join(['%s'] * len(old_comp_ids))
+            cursor.execute(f"""
+                SELECT land_id, {', '.join(columns)}
+                FROM landscape.tbl_sales_comp_land
+                WHERE comparable_id IN ({placeholders_in})
+                ORDER BY land_id
+            """, old_comp_ids)
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            count = 0
+            for row in rows:
+                values = list(row[1:])
+
+                # Remap comparable_id
+                if 'comparable_id' in col_idx and values[col_idx['comparable_id']]:
+                    old_comp_id = values[col_idx['comparable_id']]
+                    new_comp_id = self.id_maps['comparable'].get(old_comp_id)
+                    if new_comp_id is None:
+                        logger.warning(f"No comparable mapping for land comp comparable_id {old_comp_id}, skipping")
+                        continue
+                    values[col_idx['comparable_id']] = new_comp_id
+
+                insert_placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                try:
+                    cursor.execute(f"""
+                        INSERT INTO landscape.tbl_sales_comp_land ({insert_cols})
+                        VALUES ({insert_placeholders})
+                    """, values)
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to clone sales comp land: {e}")
+
+        logger.info(f"Cloned {count} sales comp land records")
 
     def _clone_cost_approach(self, source_project_id: int, new_project_id: int):
-        """Clone tbl_cost_approach record."""
-        self._clone_simple_table(
-            'tbl_cost_approach',
-            'cost_approach_id',
-            source_project_id,
-            new_project_id,
-            'project_id'
-        )
+        """Clone tbl_cost_approach record, building cost_approach ID map."""
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'landscape'
+                AND table_name = 'tbl_cost_approach'
+                AND column_name NOT IN ('cost_approach_id', 'created_at', 'updated_at')
+                ORDER BY ordinal_position
+            """)
+            columns = [row[0] for row in cursor.fetchall()]
+
+            if not columns:
+                return
+
+            select_cols = ', '.join(columns)
+            cursor.execute(f"""
+                SELECT cost_approach_id, {select_cols}
+                FROM landscape.tbl_cost_approach
+                WHERE project_id = %s
+                ORDER BY cost_approach_id
+            """, [source_project_id])
+
+            rows = cursor.fetchall()
+            if not rows:
+                return
+
+            col_idx = {col: i + 1 for i, col in enumerate(columns)}
+
+            for row in rows:
+                old_id = row[0]
+                values = list(row[1:])
+
+                if 'project_id' in col_idx:
+                    values[col_idx['project_id'] - 1] = new_project_id
+
+                placeholders = ', '.join(['%s'] * len(columns))
+                insert_cols = ', '.join(columns)
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_cost_approach ({insert_cols})
+                    VALUES ({placeholders})
+                    RETURNING cost_approach_id
+                """, values)
+
+                new_id = cursor.fetchone()[0]
+                self.id_maps['cost_approach'][old_id] = new_id
+
+        logger.info(f"Cloned {len(self.id_maps['cost_approach'])} cost approach records")
 
     def _clone_value_add_assumptions(self, source_project_id: int, new_project_id: int):
         """Clone tbl_value_add_assumptions record."""

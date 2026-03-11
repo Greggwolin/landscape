@@ -540,7 +540,7 @@ Two distinct failure modes — treat separately:
 - **Build:** `npm run build` (Turbopack)
 - **Key env vars required on Vercel:**
   - `DATABASE_URL` — Neon PostgreSQL connection string
-  - `NEXT_PUBLIC_DJANGO_API_URL` — Railway Django URL (e.g., `https://landscape-backend-production.up.railway.app`)
+  - `NEXT_PUBLIC_DJANGO_API_URL` — Railway Django URL (e.g., `https://landscape-production.up.railway.app`)
   - `DJANGO_API_URL` — Same as above (server-side variant)
   - `OPENAI_API_KEY` — Used by knowledge/extraction services
   - `ANTHROPIC_API_KEY` — Used by Landscaper
@@ -716,9 +716,33 @@ DO ask clarifying questions when:
 - Required information (table names, component locations, etc.) is missing
 - The scope is ambiguous (e.g., "fix the budget" - which aspect?)
 
+### ⚠️ Mandatory: Downstream Impact Analysis (Before ANY Code Change)
+
+**This is non-negotiable.** Before modifying any file, function, API endpoint, database query, type definition, or component, you MUST trace downstream dependencies and flag potential breakage. This app has deep interdependencies — "simple" changes routinely cascade into broken features elsewhere.
+
+**Before writing or modifying code:**
+
+1. **Trace consumers** — Identify every file/component/endpoint that imports, calls, or depends on what you're changing. Use grep/search, not assumptions.
+2. **Trace data flow** — If changing a query, API response shape, type definition, or DB column: find every consumer of that data downstream (components, hooks, other APIs, Landscaper tools, financial engine inputs).
+3. **Flag risk explicitly** — Before executing, state: "This change touches X. Downstream consumers include: [list]. Risk areas: [list]. I will verify [specific things] after the change."
+4. **Test the chain, not just the change** — After modifying code, verify that downstream features still work. A 200 response from the changed endpoint is not sufficient — check that the UI components consuming it still render correctly and that calculated values (IRR, NPV, cash flows, budgets) are still correct.
+5. **Watch for silent failures** — Many parts of this app fail silently (empty renders, missing data, stale cache). Actively check for these, don't wait for errors.
+
+**High-risk zones that break easily (non-exhaustive):**
+
+- `core_fin_fact_budget` / `core_fin_fact_actual` — Changes ripple into budget grid, variance analysis, cash flow, waterfall, and financial engine calcs
+- Container hierarchy (`tbl_container`) — Affects rollups, budget aggregation, sales absorption, and Landscaper context
+- API response shapes — Frontend hooks (SWR/React Query) and Landscaper tools both consume these; shape changes break both
+- Type definitions (`src/types/`) — Changing types without updating all consumers causes silent TypeScript build failures or runtime undefined access
+- Financial engine inputs — IRR/NPV/DSCR/cash flow calculations depend on specific data shapes; upstream changes produce wrong numbers without errors
+- Landscaper tool field mappings (`ALLOWED_UPDATES`) — Must match actual DB columns exactly or writes silently fail
+- SQL queries with JOINs — Adding/removing columns or changing WHERE clauses can break aggregation logic in rollup endpoints
+
+**If you're unsure about downstream impact:** Ask before proceeding. A 5-second question is cheaper than a multi-hour debugging session to fix cascading breakage.
+
 ---
 
-*Last updated: 2026-03-08*
+*Last updated: 2026-03-11*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 217*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

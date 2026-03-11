@@ -118,6 +118,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     Excludes related data for performance.
     """
+    created_by_username = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -146,8 +147,15 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'analysis_mode',
             'created_at',
             'updated_at',
+            'created_by_username',
         ]
-        read_only_fields = ['project_id', 'created_at', 'updated_at']
+        read_only_fields = ['project_id', 'created_at', 'updated_at', 'created_by_username']
+
+    def get_created_by_username(self, obj):
+        """Return the username of the project creator, if available."""
+        if obj.created_by:
+            return obj.created_by.username
+        return None
 
 
 class UserPreferenceSerializer(serializers.ModelSerializer):

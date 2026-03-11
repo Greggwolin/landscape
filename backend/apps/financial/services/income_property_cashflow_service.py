@@ -126,24 +126,20 @@ class IncomePropertyCashFlowService:
         }
 
         # Step 6: Build exit analysis for frontend
-        # For value-add projects, use the value-add reversion methodology
-        if value_add:
-            exit_analysis_response = self._calculate_value_add_reversion(
-                period_count, dcf_assumptions, loan_payoff
-            )
-        else:
-            net_reversion = exit_analysis.get('net_reversion', 0)
-            exit_analysis_response = {
-                'terminalNOI': round(exit_analysis.get('terminal_noi', 0), 2),
-                'exitCapRate': dcf_assumptions.get('terminal_cap_rate', 0),
-                'grossReversionPrice': round(exit_analysis.get('exit_value', 0), 2),
-                'sellingCosts': round(exit_analysis.get('selling_costs', 0), 2),
-                'sellingCostsPct': dcf_assumptions.get('selling_costs_pct', 0),
-                'netReversion': round(net_reversion, 2),
-                'loanPayoff': round(loan_payoff, 2),
-                'netReversionAfterDebt': round(net_reversion - loan_payoff, 2),
-                'holdPeriodMonths': period_count,
-            }
+        # Reversion is ALWAYS based on unlevered F12 NOI following sale date,
+        # regardless of value-add status. Debt has no impact on reversion calc.
+        net_reversion = exit_analysis.get('net_reversion', 0)
+        exit_analysis_response = {
+            'terminalNOI': round(exit_analysis.get('terminal_noi', 0), 2),
+            'exitCapRate': dcf_assumptions.get('terminal_cap_rate', 0),
+            'grossReversionPrice': round(exit_analysis.get('exit_value', 0), 2),
+            'sellingCosts': round(exit_analysis.get('selling_costs', 0), 2),
+            'sellingCostsPct': dcf_assumptions.get('selling_costs_pct', 0),
+            'netReversion': round(net_reversion, 2),
+            'loanPayoff': round(loan_payoff, 2),
+            'netReversionAfterDebt': round(net_reversion - loan_payoff, 2),
+            'holdPeriodMonths': period_count,
+        }
 
         return {
             'projectId': self.project_id,

@@ -48,6 +48,7 @@ interface ProjectSummary {
   primary_area?: number | null
   primary_area_type?: string | null
   updated_at?: string | null
+  created_by_username?: string | null
 }
 
 interface ProjectContextValue {

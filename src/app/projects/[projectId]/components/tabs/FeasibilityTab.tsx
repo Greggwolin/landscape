@@ -16,6 +16,7 @@
 'use client';
 
 import { memo, useState, useCallback } from 'react';
+import { CAlert, CCard, CCardBody, CContainer } from '@coreui/react';
 import { ExportButton } from '@/components/admin';
 import { CashFlowAnalysisTab } from '@/components/analysis/cashflow';
 import { UnifiedAssumptionsPanel } from '@/components/valuation/UnifiedAssumptionsPanel';
@@ -65,57 +66,33 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
     };
 
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="max-w-2xl mx-auto text-center p-8">
-          <div
-            className="rounded-lg border p-12"
-            style={{
-              backgroundColor: 'var(--cui-card-bg)',
-              borderColor: 'var(--cui-border-color)'
-            }}
-          >
-            <div className="text-6xl mb-6">🏗️</div>
-            <h2
-              className="text-2xl font-semibold mb-3"
-              style={{ color: 'var(--cui-body-color)' }}
-            >
-              {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Feasibility Tab Not Available
-            </h2>
-            <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
-              This project is a <strong>{projectTypeLabels[project.project_type_code || ''] || project.project_type_code}</strong> asset type.
-            </p>
-            <p className="mb-6" style={{ color: 'var(--cui-secondary-color)' }}>
-              The Feasibility tab is specifically designed for <strong>Land Development</strong> projects only.
-              It includes Sales Comparison, Residual Land Value, and Cash Flow (DCF) analysis for raw land and finished lots.
-            </p>
-            <div
-              className="p-4 rounded text-left"
-              style={{
-                backgroundColor: 'var(--cui-info-bg)',
-                borderLeft: '4px solid var(--cui-info)'
-              }}
-            >
-              <p
-                className="text-sm mb-2"
-                style={{ color: 'var(--cui-info)' }}
-              >
-                <strong>For {projectTypeLabels[project.project_type_code || '']?.toLowerCase() || 'this asset type'} properties, use:</strong>
+      <CContainer className="py-5 d-flex justify-content-center">
+        <div style={{ maxWidth: '640px', width: '100%' }}>
+          <CCard>
+            <CCardBody className="text-center p-5">
+              <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>🏗️</div>
+              <h4 className="mb-3">
+                {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Feasibility Tab Not Available
+              </h4>
+              <p className="mb-2">
+                This project is a <strong>{projectTypeLabels[project.project_type_code || ''] || project.project_type_code}</strong> asset type.
               </p>
-              <ul
-                className="text-sm ml-4"
-                style={{
-                  color: 'var(--cui-body-color)',
-                  listStyleType: 'disc'
-                }}
-              >
-                <li>Valuation tab for property appraisal</li>
-                <li>Budget tab for development cost planning</li>
-                <li>Financial Analysis for cash flow modeling</li>
-              </ul>
-            </div>
-          </div>
+              <p className="mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
+                The Feasibility tab is specifically designed for <strong>Land Development</strong> projects only.
+                It includes Sales Comparison, Residual Land Value, and Cash Flow (DCF) analysis for raw land and finished lots.
+              </p>
+              <CAlert color="info" className="text-start mb-0">
+                <strong>For {projectTypeLabels[project.project_type_code || '']?.toLowerCase() || 'this asset type'} properties, use:</strong>
+                <ul className="mb-0 mt-2 ps-3">
+                  <li>Valuation tab for property appraisal</li>
+                  <li>Budget tab for development cost planning</li>
+                  <li>Financial Analysis for cash flow modeling</li>
+                </ul>
+              </CAlert>
+            </CCardBody>
+          </CCard>
         </div>
-      </div>
+      </CContainer>
     );
   }
 
@@ -148,36 +125,21 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
         return (
           <div>
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="mb-0">Returns Analysis</h2>
+              <h4 className="mb-0">Returns Analysis</h4>
               <ExportButton tabName="Feasibility-Returns" projectId={projectId.toString()} />
             </div>
-            <div
-              className="text-center py-20 rounded-lg border"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)'
-              }}
-            >
-              <div className="text-6xl mb-4">📈</div>
-              <h3
-                className="text-xl font-bold mb-2"
-                style={{ color: 'var(--cui-body-color)' }}
-              >
-                Returns Analysis
-              </h3>
-              <p
-                className="text-sm mb-2"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                IRR, NPV, and equity multiple calculations
-              </p>
-              <p
-                className="text-xs"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                Coming Soon
-              </p>
-            </div>
+            <CCard>
+              <CCardBody className="text-center py-5">
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📈</div>
+                <h5 className="mb-2">Returns Analysis</h5>
+                <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
+                  IRR, NPV, and equity multiple calculations
+                </p>
+                <p className="mb-0" style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                  Coming Soon
+                </p>
+              </CCardBody>
+            </CCard>
           </div>
         );
 
@@ -185,36 +147,21 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
         return (
           <div>
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h2 className="mb-0">Sensitivity Analysis</h2>
+              <h4 className="mb-0">Sensitivity Analysis</h4>
               <ExportButton tabName="Feasibility-Sensitivity" projectId={projectId.toString()} />
             </div>
-            <div
-              className="text-center py-20 rounded-lg border"
-              style={{
-                backgroundColor: 'var(--cui-card-bg)',
-                borderColor: 'var(--cui-border-color)'
-              }}
-            >
-              <div className="text-6xl mb-4">📐</div>
-              <h3
-                className="text-xl font-bold mb-2"
-                style={{ color: 'var(--cui-body-color)' }}
-              >
-                Sensitivity Analysis
-              </h3>
-              <p
-                className="text-sm mb-2"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                Analyze how changes in key assumptions affect project returns
-              </p>
-              <p
-                className="text-xs"
-                style={{ color: 'var(--cui-secondary-color)' }}
-              >
-                Coming Soon
-              </p>
-            </div>
+            <CCard>
+              <CCardBody className="text-center py-5">
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📐</div>
+                <h5 className="mb-2">Sensitivity Analysis</h5>
+                <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
+                  Analyze how changes in key assumptions affect project returns
+                </p>
+                <p className="mb-0" style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+                  Coming Soon
+                </p>
+              </CCardBody>
+            </CCard>
           </div>
         );
 

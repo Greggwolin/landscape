@@ -21,6 +21,7 @@ import {
   resolveCanonicalPropertyTypeCode,
 } from '@/config/propertyTypeTokens';
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { useAuth } from '@/contexts/AuthContext';
 
 type PropertyFilterKey = 'ALL' | 'LAND' | 'MF' | 'COMMERCIAL' | 'RET' | 'OFF' | 'IND';
 
@@ -138,6 +139,7 @@ function ProjectAccordion({
   onDeleteProject,
   isLandscaperCollapsed,
   onToggleLandscaper,
+  isAdmin,
 }: {
   projects: ProjectSummary[];
   selectedProjectId: number | null;
@@ -146,6 +148,7 @@ function ProjectAccordion({
   onDeleteProject: (project: ProjectSummary) => void;
   isLandscaperCollapsed: boolean;
   onToggleLandscaper: () => void;
+  isAdmin: boolean;
 }) {
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -221,6 +224,11 @@ function ProjectAccordion({
                       <span style={{ color: 'var(--cui-secondary-color)' }}>
                         {formatLocation(project)}
                       </span>
+                      {isAdmin && project.created_by_username && (
+                        <span style={{ color: 'var(--cui-info)', fontSize: '0.75rem', fontStyle: 'italic' }}>
+                          {project.created_by_username}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="d-flex align-items-start gap-2">
@@ -340,6 +348,8 @@ function ProjectCountTiles({
 
 export default function DashboardPage() {
   const { projects, selectProject, refreshProjects } = useProjectContext();
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff === true;
   const router = useRouter();
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
@@ -594,6 +604,7 @@ export default function DashboardPage() {
             onDeleteProject={handleDeleteProject}
             isLandscaperCollapsed={isLandscaperCollapsed}
             onToggleLandscaper={toggleLandscaperCollapsed}
+            isAdmin={isAdmin}
           />
         </div>
 

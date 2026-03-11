@@ -21,6 +21,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CBadge } from '@coreui/react';
 import { useSWRConfig } from 'swr';
 import { useProjectContext } from '@/app/components/ProjectProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import { getProjectSwitchUrl, isTwoLineLabel } from '@/lib/utils/folderTabConfig';
 import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import { VersionBadge } from '@/components/changelog';
@@ -86,6 +87,8 @@ export function ActiveProjectBar({
   onFolderNavigate,
 }: ActiveProjectBarProps) {
   const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
+  const { user } = useAuth();
+  const isAdmin = user?.is_staff === true;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -258,7 +261,7 @@ export function ActiveProjectBar({
         >
           {projects.map((proj) => (
             <option key={proj.project_id} value={proj.project_id}>
-              {proj.project_id} - {proj.project_name}
+              {proj.project_id} - {proj.project_name}{isAdmin && proj.created_by_username ? ` (${proj.created_by_username})` : ''}
             </option>
           ))}
         </select>

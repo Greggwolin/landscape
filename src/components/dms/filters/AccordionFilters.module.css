@@ -48,6 +48,17 @@
   box-shadow: inset 0 0 0 2px rgba(var(--cui-danger-rgb), 0.45);
 }
 
+.filterRowReclassifyTarget {
+  border-left: 2px solid var(--cui-primary);
+  background-color: rgba(var(--cui-primary-rgb), 0.08);
+  transition: background-color 0.15s ease, border-left 0.15s ease;
+}
+
+.filterRowDropSuccess {
+  background-color: rgba(var(--cui-success-rgb), 0.1);
+  transition: background-color 0.2s ease;
+}
+
 .filterDeleteButton {
   opacity: 0;
   transition: opacity 0.15s ease;
