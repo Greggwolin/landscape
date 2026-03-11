@@ -112,7 +112,8 @@ export default function LoginForm() {
         return;
       }
       const profile = await fetchLandscaperProfile();
-      const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
+      // TEMP: Skip onboarding interview for alpha testing — revert before sending invites
+      const target = '/dashboard'; // was: profile.survey_completed_at ? '/dashboard' : '/onboarding';
       setRedirecting(true);
       router.push(target);
 
