@@ -3902,4 +3902,41 @@ LANDSCAPER_TOOLS = [
             "required": ["tier"],
         },
     },
+    {
+        "name": "create_project",
+        "description": "Create a new project. Use from dashboard or any page. Returns project_id and navigation URL.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_name": {"type": "string", "description": "Name for the new project"},
+                "project_type_code": {
+                    "type": "string",
+                    "description": "Property type: LAND, MF, OFF, RET, IND, HTL, or MXU",
+                    "enum": ["LAND", "MF", "OFF", "RET", "IND", "HTL", "MXU"],
+                },
+                "analysis_perspective": {
+                    "type": "string",
+                    "description": "INVESTMENT or DEVELOPMENT (default: INVESTMENT)",
+                    "enum": ["INVESTMENT", "DEVELOPMENT"],
+                },
+                "analysis_purpose": {
+                    "type": "string",
+                    "description": "VALUATION or UNDERWRITING (default: UNDERWRITING)",
+                    "enum": ["VALUATION", "UNDERWRITING"],
+                },
+                "description": {"type": "string", "description": "Project description"},
+                "project_address": {"type": "string", "description": "Full address"},
+                "city": {"type": "string"},
+                "state": {"type": "string"},
+                "zip_code": {"type": "string"},
+                "acres_gross": {"type": "number", "description": "Gross acreage"},
+                "total_units": {"type": "integer", "description": "Total unit count"},
+                "gross_sf": {"type": "number", "description": "Gross square footage"},
+                "property_subtype": {"type": "string"},
+                "property_class": {"type": "string"},
+                "value_add_enabled": {"type": "boolean", "description": "Enable value-add analysis"},
+            },
+            "required": ["project_name", "project_type_code"],
+        },
+    },
 ]
