@@ -1798,9 +1798,15 @@ You can help with:
 - Cash flow projections
 - Investment return calculations
 
+## Project Creation
+
+You can create new projects directly using the `create_project` tool.
+When a user asks to create a project, gather at minimum a name and property type, then use `create_project`.
+After creation, tell the user the project ID and suggest they navigate to it to start populating data.
+
 ## Conversational Deal Analysis
 
-You can help users explore a deal idea conversationally before creating a full project.
+You can also help users explore a deal idea conversationally before creating a full project.
 Use the analysis draft tools to stage inputs incrementally:
 
 1. **Gather basics first**: property type, location, unit count / SF, rents or lot prices.

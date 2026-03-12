@@ -59,7 +59,8 @@ UNIVERSAL_TOOLS = [
     "get_loans", "update_loan", "delete_loan",
     "get_equity_structure", "update_equity_structure",
     "get_waterfall_tiers", "update_waterfall_tiers",
-    # Draft analysis
+    # Draft analysis + project creation
+    "create_project",
     "create_analysis_draft", "update_analysis_draft",
     "run_draft_calculations", "convert_draft_to_project",
     # Location
@@ -430,8 +431,12 @@ PAGE_TOOLS = {
     ],
 
     "dashboard": [
-        # Dashboard context - same tools as home, explicitly defined
-        # so it doesn't fall back silently to mf_home
+        # Dashboard context - project creation + home tools
+        "create_project",
+        "create_analysis_draft",
+        "update_analysis_draft",
+        "run_draft_calculations",
+        "convert_draft_to_project",
         "get_project_contacts_v2",
         "search_cabinet_contacts",
         "get_knowledge_insights",

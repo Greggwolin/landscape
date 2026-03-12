@@ -17217,6 +17217,131 @@ def handle_convert_draft_to_project(tool_input, project_id, user_id=None, propos
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Direct Project Creation Tool
+# Added 2026-03-12 — enables Landscaper to create projects from dashboard
+# ─────────────────────────────────────────────────────────────────────────────
+
+VALID_PROJECT_TYPES = {'LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'}
+VALID_PERSPECTIVES = {'INVESTMENT', 'DEVELOPMENT'}
+VALID_PURPOSES = {'VALUATION', 'UNDERWRITING'}
+
+
+@register_tool('create_project', is_mutation=True)
+def handle_create_project(tool_input, project_id, user_id=None, propose_only=True, **kwargs):
+    """
+    Create a new project directly. Works from dashboard (global context) or
+    any page. Returns the new project_id so the user can navigate to it.
+
+    Required: project_name, project_type_code
+    Optional: analysis_perspective, analysis_purpose, address fields, sizing, etc.
+    """
+    # Extract inputs
+    project_name = tool_input.get('project_name')
+    project_type_code = (tool_input.get('project_type_code') or '').upper()
+    perspective = (tool_input.get('analysis_perspective') or 'INVESTMENT').upper()
+    purpose = (tool_input.get('analysis_purpose') or 'UNDERWRITING').upper()
+
+    # Validate required
+    if not project_name:
+        return {'success': False, 'error': 'project_name is required.'}
+    if not project_type_code:
+        return {'success': False, 'error': 'project_type_code is required (LAND, MF, OFF, RET, IND, HTL, MXU).'}
+    if project_type_code not in VALID_PROJECT_TYPES:
+        return {
+            'success': False,
+            'error': f"Invalid project_type_code '{project_type_code}'. Must be one of: {', '.join(sorted(VALID_PROJECT_TYPES))}",
+        }
+    if perspective not in VALID_PERSPECTIVES:
+        perspective = 'INVESTMENT'
+    if purpose not in VALID_PURPOSES:
+        purpose = 'UNDERWRITING'
+
+    # Build summary for proposal
+    location_parts = []
+    if tool_input.get('city'):
+        location_parts.append(tool_input['city'])
+    if tool_input.get('state'):
+        location_parts.append(tool_input['state'])
+    location_str = ', '.join(location_parts) if location_parts else 'No location specified'
+
+    if propose_only:
+        return {
+            'success': True,
+            'proposal': True,
+            'action': 'create_project',
+            'summary': f"Create project: **{project_name}** ({project_type_code})",
+            'description': (
+                f"Create a new {project_type_code} project named '{project_name}'. "
+                f"Perspective: {perspective}, Purpose: {purpose}. "
+                f"Location: {location_str}."
+            ),
+            'params': tool_input,
+        }
+
+    # Execute creation
+    try:
+        from apps.projects.models import Project
+
+        create_kwargs = {
+            'project_name': project_name,
+            'project_type_code': project_type_code,
+            'analysis_perspective': perspective,
+            'analysis_purpose': purpose,
+            'is_active': True,
+        }
+
+        # Optional fields — only set if provided
+        optional_fields = {
+            'description': 'description',
+            'project_address': 'project_address',
+            'street_address': 'street_address',
+            'city': 'jurisdiction_city',
+            'state': 'jurisdiction_state',
+            'zip_code': 'zip_code',
+            'jurisdiction_county': 'jurisdiction_county',
+            'acres_gross': 'acres_gross',
+            'total_units': 'total_units',
+            'gross_sf': 'gross_sf',
+            'building_count': 'building_count',
+            'property_subtype': 'property_subtype',
+            'property_class': 'property_class',
+            'ownership_type': 'ownership_type',
+            'location_lat': 'location_lat',
+            'location_lon': 'location_lon',
+            'value_add_enabled': 'value_add_enabled',
+        }
+
+        for input_key, model_field in optional_fields.items():
+            val = tool_input.get(input_key)
+            if val is not None:
+                create_kwargs[model_field] = val
+
+        # Set created_by if user is authenticated
+        if user_id:
+            create_kwargs['created_by_id'] = user_id
+
+        project = Project.objects.create(**create_kwargs)
+
+        # Build navigation URL
+        nav_url = f"/projects/{project.project_id}"
+
+        return {
+            'success': True,
+            'project_id': project.project_id,
+            'project_name': project.project_name,
+            'project_type_code': project.project_type_code,
+            'nav_url': nav_url,
+            'message': (
+                f"Project '{project.project_name}' created (ID {project.project_id}). "
+                f"Navigate to {nav_url} to start working on it."
+            ),
+        }
+    except Exception as e:
+        logger.error(f"[CREATE_PROJECT] Failed to create project: {e}", exc_info=True)
+        return {'success': False, 'error': f"Failed to create project: {str(e)}"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Location Analysis Narrative Tools (tbl_narrative_version)
 # Added 2026-03-01
 # ─────────────────────────────────────────────────────────────────────────────
