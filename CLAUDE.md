@@ -630,6 +630,30 @@ Before committing changes:
 
 ## Common Tasks
 
+### Documenting a Session ("Document" Command)
+
+When the user says **"Document"** (standalone or as part of a message), **prepend** an entry to the top of `docs/daily-context/session-log.md` (newest first). Follow this exact format:
+
+```markdown
+## [Task Name] — YYYY-MM-DD
+
+**What was discussed:**
+- (2-4 bullet summary of topics covered, decisions made, code written)
+
+**Open items:**
+- (anything unfinished, blocked, or explicitly deferred — or "None" if clean)
+
+---
+```
+
+**Rules:**
+1. **Task Name** — Ask the user for a short name (e.g., "Loan Scope UI", "Cash Flow Stacking"). This is what they'll scan for in the log.
+2. **Date** — Use today's date.
+3. **Discussed** — Concise. Focus on what changed (files touched, features added, bugs fixed, decisions made). No filler.
+4. **Open items** — Anything the user said they'd come back to, anything that broke and wasn't fixed, or next steps that were discussed but not started.
+5. **Prepend only** — Never overwrite or edit prior entries. New entries go at the top (newest first).
+6. **Keep it tight** — Each entry should be scannable in 10 seconds.
+
 ### Adding a New Django Endpoint
 
 1. Create/update model in `backend/apps/{app}/models.py`
