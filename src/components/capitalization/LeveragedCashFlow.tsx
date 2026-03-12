@@ -5,7 +5,13 @@ import { CSpinner, CModal, CModalHeader, CModalTitle, CModalBody, CButtonGroup, 
 import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
 import PendingRenoOffsetModal from '@/components/capitalization/PendingRenoOffsetModal';
 import CostGranularityToggle from '@/components/analysis/cashflow/CostGranularityToggle';
-import type { CostGranularity } from '@/lib/financial-engine/cashflow/aggregation';
+import {
+  groupByGranularity,
+  type CostGranularity,
+  type AggregatedSchedule,
+  type AggregatedSection,
+  type AggregatedPeriod,
+} from '@/lib/financial-engine/cashflow/aggregation';
 import {
   useIncomeApproachMonthlyDCF,
   useLeveragedCashFlow,
@@ -42,6 +48,8 @@ interface CashFlowLineItem {
   periods: CashFlowSubtotal[];
   total: number;
   sourceType: string;
+  containerId?: number;
+  containerLabel?: string;
 }
 
 interface CashFlowSubtotal {
@@ -221,6 +229,62 @@ function buildPeriodHeaders(
   return headers;
 }
 
+/**
+ * Convert raw CashFlowSubtotal[] (objects with periodIndex/amount) to number[]
+ * This bridges the type gap between the API response and the aggregation module
+ */
+function convertSubtotalsToArray(subtotals: CashFlowSubtotal[], totalPeriods: number): number[] {
+  const result = new Array(totalPeriods).fill(0);
+  subtotals.forEach((s) => {
+    if (s.periodIndex >= 0 && s.periodIndex < totalPeriods) {
+      result[s.periodIndex] = s.amount;
+    }
+  });
+  return result;
+}
+
+/**
+ * Adapt raw API CashFlowSection[] into an AggregatedSchedule
+ * so we can reuse the shared groupByGranularity logic
+ */
+function adaptSectionsToSchedule(
+  rawSections: CashFlowSection[],
+  totalPeriods: number
+): AggregatedSchedule {
+  const periods: AggregatedPeriod[] = Array.from({ length: totalPeriods }, (_, i) => ({
+    periodIndex: i,
+    label: `Period ${i + 1}`,
+    startDate: new Date(),
+    endDate: new Date(),
+    sourceIndices: [i],
+  }));
+
+  const sections: AggregatedSection[] = rawSections.map((s) => ({
+    sectionId: s.sectionId,
+    sectionName: s.sectionName,
+    lineItems: s.lineItems.map((item) => ({
+      lineId: item.lineId,
+      category: item.category,
+      subcategory: item.subcategory,
+      description: item.description,
+      values: convertSubtotalsToArray(item.periods, totalPeriods),
+      total: item.total,
+      containerId: item.containerId,
+      containerLabel: item.containerLabel,
+    })),
+    subtotals: convertSubtotalsToArray(s.subtotals, totalPeriods),
+    sectionTotal: s.sectionTotal,
+    sortOrder: s.sortOrder,
+  }));
+
+  return {
+    timeScale: 'monthly',
+    periods,
+    sections,
+    summary: {} as any, // Not used by groupByGranularity
+  };
+}
+
 /* ---------- Component ---------- */
 
 export default function LeveragedCashFlow({
@@ -358,170 +422,213 @@ export default function LeveragedCashFlow({
     /* ---- Land Dev vs Income Property Display ---- */
     if (isLandDev && hasSectionIncomeData) {
       // LAND DEV: Revenue → Costs → Lotbank → Net CF Before Debt
+      // Uses shared groupByGranularity() to match feasibility CashFlowTable exactly
 
-      // --- Revenue Section ---
+      // 1. Calculate raw period totals BEFORE grouping (for Net CF Before Debt)
       const netRevValues = zeroes.map((_, i) => {
         const sub = netRevenueSection?.subtotals.find((s) => s.periodIndex === i);
         return sub ? sub.amount : 0;
       });
 
-      if (revenueSection) {
-        const grossRevValues = zeroes.map((_, i) => {
-          const sub = revenueSection.subtotals.find((s) => s.periodIndex === i);
-          return sub ? sub.amount : 0;
+      const allCostPeriodTotals = zeroes.map(() => 0);
+      for (const costSection of costSections) {
+        zeroes.forEach((_, i) => {
+          const sub = costSection.subtotals.find((s) => s.periodIndex === i);
+          if (sub) allCostPeriodTotals[i] += sub.amount;
         });
+      }
 
+      const allLotbankPeriodTotals = zeroes.map(() => 0);
+      for (const lbSection of lotbankSections) {
+        zeroes.forEach((_, i) => {
+          const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
+          if (sub) allLotbankPeriodTotals[i] += sub.amount;
+        });
+      }
+
+      // 2. Adapt raw API sections → AggregatedSchedule → groupByGranularity
+      // Only revenue + cost sections go through grouping (NOT lotbank)
+      const sectionsForGrouping = [
+        ...(revenueSection ? [revenueSection] : []),
+        ...(deductionsSection ? [deductionsSection] : []),
+        ...(netRevenueSection ? [netRevenueSection] : []),
+        ...costSections,
+      ];
+      const adaptedSchedule = adaptSectionsToSchedule(sectionsForGrouping, totalPeriods);
+      const grouped = groupByGranularity(adaptedSchedule, costGranularity);
+
+      // 3. Detect by_phase mode (same pattern as CashFlowTable)
+      const isByPhaseMode = grouped.sections.some(
+        (s) => s.sectionId.startsWith('phase-revenue-') || s.sectionId === 'phase-costs'
+      );
+
+      if (isByPhaseMode) {
+        // --- BY PHASE MODE: flat sections with phase-suffixed labels ---
+        const phaseGrossRev = grouped.sections.find((s) => s.sectionId === 'phase-revenue-gross');
+        const phaseDeductions = grouped.sections.find((s) => s.sectionId === 'phase-revenue-deductions');
+        const phaseNetRev = grouped.sections.find((s) => s.sectionId === 'phase-revenue-net');
+        const phaseCosts = grouped.sections.find((s) => s.sectionId === 'phase-costs');
+
+        // GROSS REVENUE
+        if (phaseGrossRev && phaseGrossRev.lineItems.length > 0) {
+          displayRows.push({
+            label: 'GROSS REVENUE',
+            rowType: 'section-header',
+            values: zeroesAgg,
+          });
+          for (const item of phaseGrossRev.lineItems) {
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(item.values, periodView),
+            });
+          }
+        }
+
+        // REVENUE DEDUCTIONS
+        if (phaseDeductions && phaseDeductions.lineItems.length > 0) {
+          displayRows.push({
+            label: 'REVENUE DEDUCTIONS',
+            rowType: 'section-header',
+            values: zeroesAgg,
+          });
+          for (const item of phaseDeductions.lineItems) {
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(item.values, periodView),
+            });
+          }
+        }
+
+        // NET REVENUE
+        if (phaseNetRev && phaseNetRev.lineItems.length > 0) {
+          displayRows.push({
+            label: 'NET REVENUE',
+            rowType: 'section-header',
+            values: zeroesAgg,
+          });
+          for (const item of phaseNetRev.lineItems) {
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(item.values, periodView),
+            });
+          }
+          displayRows.push({
+            label: 'Total Net Revenue',
+            rowType: 'subtotal',
+            values: aggregatePeriods(phaseNetRev.subtotals, periodView),
+          });
+        }
+
+        // PROJECT COSTS
+        if (phaseCosts && phaseCosts.lineItems.length > 0) {
+          displayRows.push({
+            label: 'PROJECT COSTS',
+            rowType: 'section-header',
+            values: zeroesAgg,
+          });
+          for (const item of phaseCosts.lineItems) {
+            displayRows.push({
+              label: item.description,
+              rowType: 'indent',
+              values: aggregatePeriods(item.values, periodView),
+            });
+          }
+          displayRows.push({
+            label: 'Total Project Costs',
+            rowType: 'subtotal',
+            values: aggregatePeriods(phaseCosts.subtotals, periodView),
+          });
+        }
+      } else {
+        // --- STANDARD MODE (summary / by_stage / by_category) ---
+        // Parse grouped sections same way CashFlowTable does
+        const gGrossRev = grouped.sections.find((s) => s.sectionId === 'revenue-gross');
+        const gDeductions = grouped.sections.find((s) => s.sectionId === 'revenue-deductions');
+        const gNetRev = grouped.sections.find((s) => s.sectionId === 'revenue-net');
+        const gCostSections = grouped.sections.filter(
+          (s) => !s.sectionName.toLowerCase().includes('revenue') && !s.sectionId.startsWith('phase-')
+        );
+
+        // REVENUE section
         displayRows.push({
-          label: 'Revenue',
+          label: 'REVENUE',
           rowType: 'section-header',
           values: zeroesAgg,
         });
 
-        if (costGranularity !== 'summary') {
-          // Show revenue line items (phases) only when not in summary mode
-          for (const item of revenueSection.lineItems) {
-            const itemValues = zeroes.map((_, i) => {
-              const pv = item.periods.find((p) => p.periodIndex === i);
-              return pv ? pv.amount : 0;
-            });
-            displayRows.push({
-              label: item.description,
-              rowType: 'indent',
-              values: aggregatePeriods(itemValues, periodView),
-            });
-          }
-
+        // Gross Revenue as indent row
+        if (gGrossRev) {
           displayRows.push({
             label: 'Gross Revenue',
-            rowType: 'subtotal',
-            values: aggregatePeriods(grossRevValues, periodView),
+            rowType: 'indent',
+            values: aggregatePeriods(gGrossRev.subtotals, periodView),
           });
         }
-      }
 
-      // Revenue deductions
-      if (deductionsSection) {
-        if (costGranularity !== 'summary') {
-          for (const item of deductionsSection.lineItems) {
-            const itemValues = zeroes.map((_, i) => {
-              const pv = item.periods.find((p) => p.periodIndex === i);
-              return pv ? pv.amount : 0;
-            });
+        // Revenue deduction line items (Commissions, Transaction Costs, Subdivision Costs)
+        if (gDeductions) {
+          for (const item of gDeductions.lineItems) {
             displayRows.push({
-              label: item.description,
+              label: `Less: ${item.description}`,
               rowType: 'indent',
-              values: aggregatePeriods(itemValues, periodView),
+              values: aggregatePeriods(item.values, periodView),
             });
           }
         }
-      }
 
-      // Net Revenue subtotal
-      displayRows.push({
-        label: 'Net Revenue',
-        rowType: 'subtotal',
-        values: aggregatePeriods(netRevValues, periodView),
-      });
-
-      // --- Cost Sections (controlled by costGranularity) ---
-      const allCostPeriodTotals = zeroes.map(() => 0);
-
-      if (costSections.length > 0) {
-        // Accumulate totals regardless of display granularity
-        for (const costSection of costSections) {
-          const catSubtotals = zeroes.map((_, i) => {
-            const sub = costSection.subtotals.find((s) => s.periodIndex === i);
-            return sub ? sub.amount : 0;
-          });
-          catSubtotals.forEach((v, i) => { allCostPeriodTotals[i] += v; });
-        }
-
+        // Net Revenue subtotal (bold)
         displayRows.push({
-          label: 'Development Costs',
-          rowType: 'section-header',
-          values: zeroesAgg,
-        });
-
-        if (costGranularity === 'summary') {
-          // Summary: just the total line
-        } else if (costGranularity === 'by_stage') {
-          // By Stage: show each cost section subtotal (hard costs, soft costs, etc.)
-          for (const costSection of costSections) {
-            const catSubtotals = zeroes.map((_, i) => {
-              const sub = costSection.subtotals.find((s) => s.periodIndex === i);
-              return sub ? sub.amount : 0;
-            });
-            displayRows.push({
-              label: costSection.sectionName,
-              rowType: 'indent',
-              values: aggregatePeriods(catSubtotals, periodView),
-            });
-          }
-        } else {
-          // by_category / by_phase: show line items within each section
-          for (const costSection of costSections) {
-            for (const item of costSection.lineItems) {
-              const itemValues = zeroes.map((_, i) => {
-                const pv = item.periods.find((p) => p.periodIndex === i);
-                return pv ? pv.amount : 0;
-              });
-              displayRows.push({
-                label: item.description,
-                rowType: 'indent',
-                values: aggregatePeriods(itemValues, periodView),
-              });
-            }
-
-            const catSubtotals = zeroes.map((_, i) => {
-              const sub = costSection.subtotals.find((s) => s.periodIndex === i);
-              return sub ? sub.amount : 0;
-            });
-            displayRows.push({
-              label: costSection.sectionName,
-              rowType: 'subtotal',
-              values: aggregatePeriods(catSubtotals, periodView),
-            });
-          }
-        }
-
-        // Total Development Costs (always shown)
-        displayRows.push({
-          label: 'Total Development Costs',
+          label: 'Net Revenue',
           rowType: 'subtotal',
-          values: aggregatePeriods([...allCostPeriodTotals], periodView),
+          values: aggregatePeriods(netRevValues, periodView),
         });
+
+        // PROJECT COSTS section — each grouped section as indent row
+        if (gCostSections.length > 0) {
+          displayRows.push({
+            label: 'PROJECT COSTS',
+            rowType: 'section-header',
+            values: zeroesAgg,
+          });
+
+          for (const section of gCostSections) {
+            displayRows.push({
+              label: section.sectionName,
+              rowType: 'indent',
+              values: aggregatePeriods(section.subtotals, periodView),
+            });
+          }
+
+          // Total Development Costs
+          displayRows.push({
+            label: 'Total Development Costs',
+            rowType: 'subtotal',
+            values: aggregatePeriods([...allCostPeriodTotals], periodView),
+          });
+        }
       }
 
-      // --- Lotbank Sections ---
-      const allLotbankPeriodTotals = zeroes.map(() => 0);
+      // --- Lotbank Sections (LeveragedCashFlow-specific, NOT grouped) ---
       if (lotbankSections.length > 0) {
-        // Always accumulate totals
-        for (const lbSection of lotbankSections) {
-          const lbSubtotals = zeroes.map((_, i) => {
-            const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
-            return sub ? sub.amount : 0;
-          });
-          lbSubtotals.forEach((v, i) => { allLotbankPeriodTotals[i] += v; });
-        }
-
         displayRows.push({
           label: 'Lotbank',
           rowType: 'section-header',
           values: zeroesAgg,
         });
 
-        if (costGranularity !== 'summary') {
-          for (const lbSection of lotbankSections) {
-            const lbSubtotals = zeroes.map((_, i) => {
-              const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
-              return sub ? sub.amount : 0;
-            });
-            displayRows.push({
-              label: lbSection.sectionName,
-              rowType: 'indent',
-              values: aggregatePeriods(lbSubtotals, periodView),
-            });
-          }
+        for (const lbSection of lotbankSections) {
+          const lbSubtotals = zeroes.map((_, i) => {
+            const sub = lbSection.subtotals.find((s) => s.periodIndex === i);
+            return sub ? sub.amount : 0;
+          });
+          displayRows.push({
+            label: lbSection.sectionName,
+            rowType: 'indent',
+            values: aggregatePeriods(lbSubtotals, periodView),
+          });
         }
 
         displayRows.push({
@@ -1026,48 +1133,44 @@ export default function LeveragedCashFlow({
 
   return (
     <div>
-      {/* Header controls */}
+      {/* Header controls - left-aligned to match CashFlowAnalysisTab */}
       <div
-        className="d-flex justify-content-between align-items-center flex-wrap gap-2"
+        className="d-flex flex-wrap align-items-center gap-4"
         style={{ marginBottom: '12px' }}
       >
-        <span
-          className="fw-semibold"
-          style={{ fontSize: '0.875rem', color: 'var(--cui-body-color)' }}
-        >
-          Leveraged Cash Flow
-        </span>
-
-        <div className="d-flex align-items-center gap-3">
-          {/* Time scale */}
-          <div className="d-flex align-items-center gap-2">
-            <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
-              Time:
-            </span>
-            <CButtonGroup size="sm" role="group" aria-label="Period view">
-              {(['monthly', 'quarterly', 'annual'] as PeriodView[]).map((view) => (
-                <CButton
-                  key={view}
-                  color={periodView === view ? 'primary' : 'secondary'}
-                  variant={periodView === view ? undefined : 'outline'}
-                  onClick={() => setPeriodView(view)}
-                >
-                  {view.charAt(0).toUpperCase() + view.slice(1)}
-                </CButton>
-              ))}
-            </CButtonGroup>
-          </div>
-
-          {/* Cost granularity - land dev only */}
-          {isLandDev && (
-            <div className="d-flex align-items-center gap-2">
-              <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
-                Costs:
-              </span>
-              <CostGranularityToggle value={costGranularity} onChange={setCostGranularity} />
-            </div>
-          )}
+        <div className="d-flex align-items-center gap-2">
+          <span
+            className="fw-medium"
+            style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}
+          >
+            Time:
+          </span>
+          <CButtonGroup size="sm" role="group" aria-label="Period view">
+            {(['monthly', 'quarterly', 'annual'] as PeriodView[]).map((view) => (
+              <CButton
+                key={view}
+                color={periodView === view ? 'primary' : 'secondary'}
+                variant={periodView === view ? undefined : 'outline'}
+                onClick={() => setPeriodView(view)}
+              >
+                {view.charAt(0).toUpperCase() + view.slice(1)}
+              </CButton>
+            ))}
+          </CButtonGroup>
         </div>
+
+        {/* Cost granularity - land dev only */}
+        {isLandDev && (
+          <div className="d-flex align-items-center gap-2">
+            <span
+              className="fw-medium"
+              style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}
+            >
+              Costs:
+            </span>
+            <CostGranularityToggle value={costGranularity} onChange={setCostGranularity} />
+          </div>
+        )}
       </div>
 
       {/* Grid */}

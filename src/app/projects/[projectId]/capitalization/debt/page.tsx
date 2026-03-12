@@ -234,7 +234,7 @@ export default function DebtPage() {
 
       <CCard className="mb-4">
         <CCardHeader>
-          <h5 className="mb-0">Cash Flow</h5>
+          <h5 className="mb-0">Cash Flow - Leveraged</h5>
         </CCardHeader>
         <CCardBody>
           <LeveragedCashFlow projectId={projectId} loans={loans} />
