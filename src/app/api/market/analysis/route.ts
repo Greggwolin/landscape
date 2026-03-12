@@ -165,8 +165,10 @@ function buildAnalysisPrompt(req: AnalysisRequest): { system: string; user: stri
     .map((g) => `  ${g.geo_level}: ${g.geo_name} (${g.geo_id})`)
     .join('\n');
 
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
   const system = `You are a senior MAI-designated real estate appraiser writing the economic analysis
-section of a commercial appraisal report. Follow the analytical framework from
+section of a commercial appraisal report as of ${today}. Follow the analytical framework from
 The Appraisal of Real Estate (14th Edition, Appraisal Institute).
 
 Writing style:
@@ -178,6 +180,7 @@ Writing style:
 - Do NOT use bullet points or lists — write in flowing analytical prose
 - Do NOT include headers or markdown formatting in the content text — just paragraphs
 - The summary should be 2-3 paragraphs providing an executive overview
+- Reference the analysis date provided — do NOT reference older dates or time periods unless discussing historical trends
 
 You MUST respond with valid JSON matching this exact structure:
 {
@@ -197,6 +200,8 @@ Location: ${req.project.city}, ${req.project.state}
 
 Geographic Hierarchy:
 ${geoLines}
+
+Analysis Date: ${today}
 
 Market Data (latest values with year-over-year change):
 ${dataLines.join('\n') || '  No quantitative data available — provide qualitative analysis.'}

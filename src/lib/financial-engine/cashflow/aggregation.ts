@@ -498,7 +498,8 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
     const isNet = section.sectionId === 'revenue-net';
 
     section.lineItems.forEach((item, itemIdx) => {
-      const phaseName = item.containerLabel || 'Project Level';
+      const rawPhaseName = item.containerLabel || 'Project Level';
+      const phaseName = rawPhaseName.replace(/^Phase\s*/i, '');
       const labelSuffix = item.containerId ? `: ${phaseName}` : '';
       // Use original lineId + container to ensure uniqueness
       const uniqueSuffix = `${item.containerId ?? 'project'}-${item.lineId || itemIdx}`;
@@ -583,7 +584,7 @@ export function groupCostsByPhase(schedule: AggregatedSchedule): AggregatedSched
       } else {
         // Phase-level cost
         const phaseKey = String(item.containerId);
-        const phaseName = item.containerLabel || `Phase ${item.containerId}`;
+        const phaseName = (item.containerLabel || `${item.containerId}`).replace(/^Phase\s*/i, '');
 
         if (!stageData.phaseItems.has(phaseKey)) {
           stageData.phaseItems.set(phaseKey, {
