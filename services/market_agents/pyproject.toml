@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "market-ingest"
+name = "market-agents"
 version = "0.1.0"
-description = "Landscape Market Analysis Engine (v1)"
+description = "Landscape Overnight Market Intelligence Agents"
 authors = ["Landscape AI <engineering@landscape.ai>"]
 readme = "README.md"
-packages = [{ include = "market_ingest" }]
+packages = [{ include = "market_agents" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -14,13 +14,15 @@ psycopg2-binary = "^2.9.10"
 tenacity = "^8.3.0"
 pydantic = "^2.9.2"
 loguru = "^0.7.2"
-pandas = { version = "^2.2.3", optional = true }
+apscheduler = "^3.10.4"
 
-[tool.poetry.extras]
-pandas = ["pandas"]
+# Sibling package for reuse
+market-ingest = { path = "../market_ingest_py", develop = true }
 
 [tool.poetry.scripts]
-market-ingest = "market_ingest.runner:main"
+market-agents = "market_agents.orchestrator:main"
+fred-agent = "market_agents.agents.fred_agent:run_standalone"
+test-discord = "market_agents.discord:test_send"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]
