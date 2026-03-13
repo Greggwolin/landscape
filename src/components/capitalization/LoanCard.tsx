@@ -50,6 +50,7 @@ const defaultLoan: Partial<Loan> = {
   loan_to_cost_pct: null,
   interest_type: 'Fixed',
   interest_index: 'SOFR',
+  index_rate_pct: null,
   interest_spread_bps: null,
   interest_rate_pct: null,
   loan_term_months: null,
@@ -97,6 +98,7 @@ const editableLoanFields: (keyof Loan)[] = [
   'interest_rate_pct',
   'interest_type',
   'interest_index',
+  'index_rate_pct',
   'interest_spread_bps',
   'loan_term_months',
   'loan_term_years',
@@ -478,6 +480,10 @@ export default function LoanCard({
       filtered.commitment_amount = preview.commitment;
       filtered.loan_amount = preview.commitment;
     }
+    // Ensure commitment_amount is never null — Django requires a numeric value
+    if (filtered.commitment_amount == null) {
+      filtered.commitment_amount = 0;
+    }
 
     // Empty array = project-level (no container scoping)
     filtered.container_ids = containerIds;
@@ -856,11 +862,35 @@ export default function LoanCard({
                       <option value="FIXED">Fixed</option>
                     </select>
                   </AssumptionRow>
+                  <AssumptionRow label="Index Rate %" error={errors.index_rate_pct} className="input-narrow">
+                    <NumberDisplayInput
+                      format="percent"
+                      decimals={3}
+                      value={formData.index_rate_pct}
+                      onChange={(value) => {
+                        setNumberField('index_rate_pct', value);
+                        // Auto-calc all-in = index rate + spread
+                        if (isFloating && value != null) {
+                          const spreadPct = (coerceNumeric(formData.interest_spread_bps) || 0) / 100;
+                          setNumberField('interest_rate_pct', Math.round((value + spreadPct) * 1000) / 1000);
+                        }
+                      }}
+                      disabled={!isFloating}
+                    />
+                  </AssumptionRow>
                   <AssumptionRow label="Spread (bps)" error={errors.interest_spread_bps} className="input-narrow">
                     <NumberDisplayInput
                       format="integer"
                       value={formData.interest_spread_bps}
-                      onChange={(value) => setNumberField('interest_spread_bps', value)}
+                      onChange={(value) => {
+                        setNumberField('interest_spread_bps', value);
+                        // Auto-calc all-in = index rate + spread
+                        if (isFloating) {
+                          const indexRate = coerceNumeric(formData.index_rate_pct) || 0;
+                          const spreadPct = (value || 0) / 100;
+                          setNumberField('interest_rate_pct', Math.round((indexRate + spreadPct) * 1000) / 1000);
+                        }
+                      }}
                       disabled={!isFloating}
                     />
                   </AssumptionRow>
@@ -874,7 +904,7 @@ export default function LoanCard({
                   </AssumptionRow>
                   <div className="loan-interest-note">
                     {isFloating
-                      ? `All-In = ${(formData.interest_index || 'Index').toUpperCase()} + ${(((coerceNumeric(formData.interest_spread_bps) || 0) / 100)).toFixed(3)}%`
+                      ? `All-In = ${(formData.interest_index || 'Index').toUpperCase()} ${coerceNumeric(formData.index_rate_pct) != null ? `(${coerceNumeric(formData.index_rate_pct)}%)` : ''} + ${(((coerceNumeric(formData.interest_spread_bps) || 0) / 100)).toFixed(3)}%`
                       : 'All-In is the stated fixed coupon rate.'}
                   </div>
                 </div>
@@ -1131,15 +1161,15 @@ export default function LoanCard({
         .loan-assumptions-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 12px;
-          padding: 12px;
+          gap: 8px;
+          padding: 8px;
           border-top: 1px solid var(--cui-border-color);
         }
 
         .loan-assumptions-column {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
         }
 
         .loan-assumption-section {
@@ -1154,8 +1184,10 @@ export default function LoanCard({
           font-weight: 600;
           color: var(--cui-body-color);
           border-bottom: 1px solid var(--cui-border-color);
-          padding: 8px 12px;
+          padding: 6px 12px;
           background: var(--cui-tertiary-bg);
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
         }
 
         .loan-assumption-body {
@@ -1175,8 +1207,8 @@ export default function LoanCard({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
-          padding: 8px 12px 8px 16px;
+          gap: 8px;
+          padding: 4px 10px 4px 12px;
           border-bottom: 1px solid var(--cui-border-color-translucent);
         }
 

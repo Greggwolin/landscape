@@ -49,7 +49,8 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
 ┌─────────────────┐    ┌─────────────────────┐
 │ Python Services │    │ Python Fin Engine   │
 │ market_ingest   │    │ IRR, NPV, DSCR      │
-│ financial_engine│    │ numpy-financial     │
+│ market_agents   │    │ numpy-financial     │
+│ financial_engine│    │                     │
 └─────────────────┘    └─────────────────────┘
 ```
 
@@ -119,7 +120,8 @@ landscape/
 │
 ├── services/                 # Python microservices
 │   ├── financial_engine_py/  # numpy-financial calculations
-│   └── market_ingest_py/     # Market data ingestion
+│   ├── market_ingest_py/     # Market data ingestion
+│   └── market_agents/        # AI market research agents (FRED, orchestrator, Discord)
 │
 ├── migrations/               # Database migrations (36+ files)
 ├── scripts/                  # Node.js/bash utilities (77 files)
@@ -766,7 +768,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-12*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 217*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

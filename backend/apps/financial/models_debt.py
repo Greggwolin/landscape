@@ -29,7 +29,7 @@ class Loan(models.Model):
     status = models.CharField(max_length=20, null=True, blank=True, default='active')
 
     # Sizing
-    commitment_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    commitment_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, default=0)
     loan_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
     loan_to_cost_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     loan_to_value_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
@@ -45,6 +45,8 @@ class Loan(models.Model):
     interest_rate_decimal = models.DecimalField(max_digits=6, decimal_places=5, null=True, blank=True)
     interest_type = models.CharField(max_length=50, null=True, blank=True, default='Fixed')
     interest_index = models.CharField(max_length=50, null=True, blank=True)
+    index_rate_pct = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True,
+                                         help_text='Current index rate (e.g., SOFR rate) as a percentage')
     interest_spread_bps = models.IntegerField(null=True, blank=True)
     rate_floor_pct = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True)
     rate_cap_pct = models.DecimalField(max_digits=6, decimal_places=3, null=True, blank=True)
