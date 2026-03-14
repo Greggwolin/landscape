@@ -196,33 +196,35 @@ export default function DebtPage() {
         </div>
       </div>
 
-      {loans.map((loan) => (
-        <LoanCard
-          key={loan.loan_id}
-          loan={loan}
-          projectId={projectId}
-          onSave={() => {
-            void refetchLoans();
-          }}
-          onDelete={() => {
-            void refetchLoans();
-          }}
-        />
-      ))}
+      <div className="loan-cards-row">
+        {loans.map((loan) => (
+          <LoanCard
+            key={loan.loan_id}
+            loan={loan}
+            projectId={projectId}
+            onSave={() => {
+              void refetchLoans();
+            }}
+            onDelete={() => {
+              void refetchLoans();
+            }}
+          />
+        ))}
 
-      {newLoanMode && (
-        <LoanCard
-          loan={null}
-          projectId={projectId}
-          onSave={() => {
-            setNewLoanMode(false);
-            void refetchLoans();
-          }}
-          onDelete={() => {}}
-          onCancel={() => setNewLoanMode(false)}
-          defaultExpanded
-        />
-      )}
+        {newLoanMode && (
+          <LoanCard
+            loan={null}
+            projectId={projectId}
+            onSave={() => {
+              setNewLoanMode(false);
+              void refetchLoans();
+            }}
+            onDelete={() => {}}
+            onCancel={() => setNewLoanMode(false)}
+            defaultExpanded
+          />
+        )}
+      </div>
 
       {(!loans || loans.length === 0) && !newLoanMode && (
         <CCard className="mb-3">
@@ -240,6 +242,19 @@ export default function DebtPage() {
           <LeveragedCashFlow projectId={projectId} loans={loans} />
         </CCardBody>
       </CCard>
+      <style jsx global>{`
+        .loan-cards-row {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .loan-cards-row > .loan-card {
+          flex: 1 1 340px;
+          max-width: 100%;
+          margin-bottom: 0;
+        }
+      `}</style>
     </div>
   );
 }

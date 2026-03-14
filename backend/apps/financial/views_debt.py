@@ -62,11 +62,23 @@ class LoanViewSet(viewsets.ModelViewSet):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, project_id=project_id)
         loan = serializer.save(project=project, created_at=timezone.now(), updated_at=timezone.now())
-        self._apply_sizing(loan, project)
+        try:
+            self._apply_sizing(loan, project)
+        except Exception as e:
+            logger.exception(
+                "Sizing failed for new loan %s (project %s): %s",
+                loan.loan_id, project_id, e
+            )
 
     def perform_update(self, serializer):
         loan = serializer.save(updated_at=timezone.now())
-        self._apply_sizing(loan, loan.project)
+        try:
+            self._apply_sizing(loan, loan.project)
+        except Exception as e:
+            logger.exception(
+                "Sizing failed for loan %s (project %s): %s",
+                loan.loan_id, loan.project_id, e
+            )
 
     @staticmethod
     def _apply_sizing(loan: Loan, project: Project) -> None:

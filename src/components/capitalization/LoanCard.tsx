@@ -465,13 +465,33 @@ export default function LoanCard({
       }
     };
 
+  // Fields that are integers in the Django model — empty strings must become null
+  const integerFields = new Set<string>([
+    'seniority', 'interest_spread_bps', 'loan_term_months', 'loan_term_years',
+    'amortization_months', 'amortization_years', 'interest_only_months',
+  ]);
+  // Fields that are decimals in the Django model — empty strings must become null
+  const decimalFields = new Set<string>([
+    'commitment_amount', 'loan_amount', 'loan_to_cost_pct', 'loan_to_value_pct',
+    'interest_rate_pct', 'index_rate_pct', 'origination_fee_pct', 'exit_fee_pct',
+    'unused_fee_pct', 'interest_reserve_amount', 'interest_reserve_inflator',
+    'repayment_acceleration', 'closing_costs_appraisal', 'closing_costs_legal',
+    'closing_costs_other',
+  ]);
+
   const buildLoanPayload = (sourceData: Partial<Loan>): Record<string, unknown> => {
     const filtered: Record<string, unknown> = {};
     editableLoanFields.forEach((field) => {
-      const value = sourceData[field];
-      if (value !== undefined) {
-        filtered[field] = value;
+      let value = sourceData[field];
+      if (value === undefined) return;
+
+      // Sanitize empty strings for numeric fields — DRF rejects "" for int/decimal
+      if (value === '' || value === null) {
+        if (integerFields.has(field) || decimalFields.has(field)) {
+          value = null as never;
+        }
       }
+      filtered[field] = value;
     });
 
     filtered.structure_type = getFacilityStructure(sourceData);
@@ -531,9 +551,19 @@ export default function LoanCard({
       }
       onSave();
     } catch (error) {
+      // Log full error for debugging
+      if (error instanceof Response) {
+        const cloned = error.clone();
+        const errBody = await cloned.text().catch(() => 'no body');
+        console.error('[LoanCard] Save failed:', error.status, errBody);
+      } else {
+        console.error('[LoanCard] Save failed (non-Response):', error);
+      }
+      console.error('[LoanCard] Payload was:', JSON.stringify(payload, null, 2));
       const fieldErrors = await parseErrorResponse(error);
       if (Object.keys(fieldErrors).length > 0) {
         setErrors(fieldErrors);
+        console.error('[LoanCard] Field errors:', fieldErrors);
       }
       showToast('Failed to save loan', 'error');
     } finally {
@@ -687,6 +717,34 @@ export default function LoanCard({
           <div className="loan-assumptions-grid">
             <div className="loan-assumptions-column">
               <div className="loan-assumption-section">
+                <div className="loan-assumption-header">General</div>
+                <div className="loan-assumption-body">
+                  <AssumptionRow label="Loan Name" error={errors.loan_name} className="input-name">
+                    <input type="text" value={formData.loan_name || ''} onChange={handleTextChange('loan_name')} />
+                  </AssumptionRow>
+                  <AssumptionRow label="Lender" error={errors.lender_name} className="input-name">
+                    <input type="text" value={formData.lender_name || ''} onChange={handleTextChange('lender_name')} />
+                  </AssumptionRow>
+                  <AssumptionRow label="Structure" error={errors.facility_structure} className="input-structure">
+                    <select value={facilityStructure} onChange={handleSelectChange('facility_structure')}>
+                      <option value="TERM">TERM</option>
+                      <option value="REVOLVER">REVOLVER</option>
+                    </select>
+                  </AssumptionRow>
+                  <AssumptionRow label="Type" error={errors.loan_type} className="input-type">
+                    <select value={formData.loan_type || 'CONSTRUCTION'} onChange={handleSelectChange('loan_type')}>
+                      <option value="CONSTRUCTION">Construction</option>
+                      <option value="PERMANENT">Permanent</option>
+                      <option value="BRIDGE">Bridge</option>
+                      <option value="MEZZANINE">Mezzanine</option>
+                    </select>
+                  </AssumptionRow>
+                </div>
+              </div>
+            </div>
+
+            <div className="loan-assumptions-column">
+              <div className="loan-assumption-section">
                 <div className="loan-assumption-header">Loan Sizing</div>
                 <div className="loan-assumption-body">
                   <AssumptionRow label="LTV %" error={errors.loan_to_value_pct} className="input-narrow">
@@ -747,32 +805,6 @@ export default function LoanCard({
                     >
                       {formatCurrency(sizingPreview.netProceeds)}
                     </button>
-                  </AssumptionRow>
-                </div>
-              </div>
-
-              <div className="loan-assumption-section">
-                <div className="loan-assumption-header">General</div>
-                <div className="loan-assumption-body">
-                  <AssumptionRow label="Loan Name" error={errors.loan_name} className="input-name">
-                    <input type="text" value={formData.loan_name || ''} onChange={handleTextChange('loan_name')} />
-                  </AssumptionRow>
-                  <AssumptionRow label="Lender" error={errors.lender_name} className="input-name">
-                    <input type="text" value={formData.lender_name || ''} onChange={handleTextChange('lender_name')} />
-                  </AssumptionRow>
-                  <AssumptionRow label="Structure" error={errors.facility_structure} className="input-structure">
-                    <select value={facilityStructure} onChange={handleSelectChange('facility_structure')}>
-                      <option value="TERM">TERM</option>
-                      <option value="REVOLVER">REVOLVER</option>
-                    </select>
-                  </AssumptionRow>
-                  <AssumptionRow label="Type" error={errors.loan_type} className="input-type">
-                    <select value={formData.loan_type || 'CONSTRUCTION'} onChange={handleSelectChange('loan_type')}>
-                      <option value="CONSTRUCTION">Construction</option>
-                      <option value="PERMANENT">Permanent</option>
-                      <option value="BRIDGE">Bridge</option>
-                      <option value="MEZZANINE">Mezzanine</option>
-                    </select>
                   </AssumptionRow>
                 </div>
               </div>
@@ -851,62 +883,59 @@ export default function LoanCard({
                       <option value="Floating">Floating</option>
                     </select>
                   </AssumptionRow>
-                  <AssumptionRow label="Index" error={errors.interest_index} className="input-rate-type">
-                    <select
-                      value={formData.interest_index || 'SOFR'}
-                      onChange={handleSelectChange('interest_index')}
-                      disabled={!isFloating}
-                    >
-                      <option value="SOFR">SOFR</option>
-                      <option value="PRIME">Prime</option>
-                      <option value="FIXED">Fixed</option>
-                    </select>
-                  </AssumptionRow>
-                  <AssumptionRow label="Index Rate %" error={errors.index_rate_pct} className="input-narrow">
-                    <NumberDisplayInput
-                      format="percent"
-                      decimals={3}
-                      value={formData.index_rate_pct}
-                      onChange={(value) => {
-                        setNumberField('index_rate_pct', value);
-                        // Auto-calc all-in = index rate + spread
-                        if (isFloating && value != null) {
-                          const spreadPct = (coerceNumeric(formData.interest_spread_bps) || 0) / 100;
-                          setNumberField('interest_rate_pct', Math.round((value + spreadPct) * 1000) / 1000);
-                        }
-                      }}
-                      disabled={!isFloating}
-                    />
-                  </AssumptionRow>
-                  <AssumptionRow label="Spread (bps)" error={errors.interest_spread_bps} className="input-narrow">
-                    <NumberDisplayInput
-                      format="integer"
-                      value={formData.interest_spread_bps}
-                      onChange={(value) => {
-                        setNumberField('interest_spread_bps', value);
-                        // Auto-calc all-in = index rate + spread
-                        if (isFloating) {
-                          const indexRate = coerceNumeric(formData.index_rate_pct) || 0;
-                          const spreadPct = (value || 0) / 100;
-                          setNumberField('interest_rate_pct', Math.round((indexRate + spreadPct) * 1000) / 1000);
-                        }
-                      }}
-                      disabled={!isFloating}
-                    />
-                  </AssumptionRow>
-                  <AssumptionRow label="All-In Rate %" error={errors.interest_rate_pct} className="input-narrow">
+                  {isFloating && (
+                    <>
+                      <AssumptionRow label="Index" error={errors.interest_index} className="input-rate-type">
+                        <select
+                          value={formData.interest_index || 'SOFR'}
+                          onChange={handleSelectChange('interest_index')}
+                        >
+                          <option value="SOFR">SOFR</option>
+                          <option value="PRIME">Prime</option>
+                        </select>
+                      </AssumptionRow>
+                      <AssumptionRow label="Index Rate %" error={errors.index_rate_pct} className="input-narrow">
+                        <NumberDisplayInput
+                          format="percent"
+                          decimals={3}
+                          value={formData.index_rate_pct}
+                          onChange={(value) => {
+                            setNumberField('index_rate_pct', value);
+                            if (value != null) {
+                              const spreadPct = (coerceNumeric(formData.interest_spread_bps) || 0) / 100;
+                              setNumberField('interest_rate_pct', Math.round((value + spreadPct) * 1000) / 1000);
+                            }
+                          }}
+                        />
+                      </AssumptionRow>
+                      <AssumptionRow label="Spread (bps)" error={errors.interest_spread_bps} className="input-narrow">
+                        <NumberDisplayInput
+                          format="integer"
+                          value={formData.interest_spread_bps}
+                          onChange={(value) => {
+                            setNumberField('interest_spread_bps', value);
+                            const indexRate = coerceNumeric(formData.index_rate_pct) || 0;
+                            const spreadPct = (value || 0) / 100;
+                            setNumberField('interest_rate_pct', Math.round((indexRate + spreadPct) * 1000) / 1000);
+                          }}
+                        />
+                      </AssumptionRow>
+                    </>
+                  )}
+                  <AssumptionRow label={isFloating ? 'All-In Rate %' : 'Interest Rate %'} error={errors.interest_rate_pct} className="input-narrow">
                     <NumberDisplayInput
                       format="percent"
                       decimals={3}
                       value={formData.interest_rate_pct}
-                      onChange={(value) => setNumberField('interest_rate_pct', value)}
+                      onChange={isFloating ? () => {} : (value) => setNumberField('interest_rate_pct', value)}
+                      disabled={isFloating}
                     />
                   </AssumptionRow>
-                  <div className="loan-interest-note">
-                    {isFloating
-                      ? `All-In = ${(formData.interest_index || 'Index').toUpperCase()} ${coerceNumeric(formData.index_rate_pct) != null ? `(${coerceNumeric(formData.index_rate_pct)}%)` : ''} + ${(((coerceNumeric(formData.interest_spread_bps) || 0) / 100)).toFixed(3)}%`
-                      : 'All-In is the stated fixed coupon rate.'}
-                  </div>
+                  {isFloating && (
+                    <div className="loan-interest-note">
+                      {`All-In = ${(formData.interest_index || 'Index').toUpperCase()} ${coerceNumeric(formData.index_rate_pct) != null ? `(${coerceNumeric(formData.index_rate_pct)}%)` : ''} + ${(((coerceNumeric(formData.interest_spread_bps) || 0) / 100)).toFixed(3)}%`}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1160,7 +1189,7 @@ export default function LoanCard({
 
         .loan-assumptions-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 8px;
           padding: 8px;
           border-top: 1px solid var(--cui-border-color);
@@ -1185,8 +1214,7 @@ export default function LoanCard({
           color: var(--cui-body-color);
           border-bottom: 1px solid var(--cui-border-color);
           padding: 6px 12px;
-          background: var(--cui-tertiary-bg);
-          text-transform: uppercase;
+          background: var(--cui-secondary-bg);
           letter-spacing: 0.03em;
         }
 
@@ -1207,8 +1235,8 @@ export default function LoanCard({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 8px;
-          padding: 4px 10px 4px 12px;
+          gap: 4px;
+          padding: 2px 8px 2px 8px;
           border-bottom: 1px solid var(--cui-border-color-translucent);
         }
 
@@ -1220,7 +1248,8 @@ export default function LoanCard({
           font-size: 0.75rem;
           color: var(--cui-secondary-color);
           font-weight: 600;
-          padding-left: 4px;
+          padding-left: 0;
+          white-space: nowrap;
         }
 
         .loan-assumption-input-wrap {
@@ -1280,6 +1309,7 @@ export default function LoanCard({
         .loan-assumption-row.input-medium input,
         .loan-assumption-row.input-medium select {
           width: 130px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-wide input,
@@ -1290,40 +1320,47 @@ export default function LoanCard({
         .loan-assumption-row.input-name input,
         .loan-assumption-row.input-name select {
           width: 180px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-structure input,
         .loan-assumption-row.input-structure select {
           width: 120px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-type input,
         .loan-assumption-row.input-type select {
           width: 120px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-rate-type input,
         .loan-assumption-row.input-rate-type select {
           width: 100px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-frequency input,
         .loan-assumption-row.input-frequency select {
           width: 120px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-recourse input,
         .loan-assumption-row.input-recourse select {
           width: 120px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-currency input {
-          width: 132px;
+          width: 110px;
           text-align: right;
         }
 
         .loan-assumption-row.input-date input {
           width: 140px;
+          text-align: right;
         }
 
         .loan-assumption-row.input-fee input {
@@ -1364,13 +1401,7 @@ export default function LoanCard({
           text-decoration: underline;
         }
 
-        @media (max-width: 1400px) {
-          .loan-assumptions-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-
-        @media (max-width: 992px) {
+        @media (max-width: 768px) {
           .loan-assumptions-grid {
             grid-template-columns: 1fr;
           }
