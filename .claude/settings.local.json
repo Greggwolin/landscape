@@ -1,6 +1,23 @@
 {
   "permissions": {
     "allow": [
+      "Bash(git:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash:*)",
+      "Bash(git clean:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm version:*)",
       "Bash(git rm:*)",
       "Bash(python3:*)",
       "Bash(python -m backend.tools.hbaca_ingest.run_hbaca_ingest:*)",
