@@ -9,7 +9,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('financial', '0022_add_vertical_construction_categories'),
+        ('financial', '0023_register_loan_model_state'),
     ]
 
     operations = [
