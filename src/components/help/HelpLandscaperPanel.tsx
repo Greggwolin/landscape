@@ -224,18 +224,14 @@ function PageGuide({ currentPage }: { currentPage: string | undefined }) {
                   </ul>
                 </div>
               )}
-              {content.tips.length > 0 && (
-                <div className="help-guide-section">
-                  <h6 className="help-guide-section-title help-guide-section-title--info">
-                    Tips
-                  </h6>
-                  <ul className="help-guide-list">
-                    {content.tips.map((item, i) => (
-                      <li key={`tip-${i}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div className="help-guide-section">
+                <h6 className="help-guide-section-title help-guide-section-title--info">
+                  Feedback
+                </h6>
+                <p className="help-guide-feedback">
+                  To send immediate feedback, just include the text &quot;#FB&quot; in any prompt (ex. &quot;#FB the map controls are clunky on this page&quot;).
+                </p>
+              </div>
             </>
           )}
           {!loading && !hasContent && (
@@ -308,7 +304,7 @@ export default function HelpLandscaperPanel() {
       <div className="help-panel-header">
         <div className="help-panel-header-title">
           <CIcon icon={cilLifeRing} size="sm" />
-          <span className="help-panel-header-text">Help</span>
+          <span className="help-panel-header-text">Help &amp; Feedback</span>
         </div>
         <div className="help-panel-header-actions">
           {messages.length > 0 && (

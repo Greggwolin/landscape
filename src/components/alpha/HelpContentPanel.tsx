@@ -37,7 +37,7 @@ export function HelpContentPanel({ content, loading }: HelpContentPanelProps) {
 
   return (
     <div className="help-content">
-      <h5 className="mb-3">{content.page_title || content.page_name} Help</h5>
+      <h5 className="mb-3">{content.page_title || content.page_name} Help &amp; Feedback</h5>
 
       {content.what_you_can_do?.length > 0 && (
         <div className="mb-3">
@@ -61,16 +61,12 @@ export function HelpContentPanel({ content, loading }: HelpContentPanelProps) {
         </div>
       )}
 
-      {content.tips?.length > 0 && (
-        <div className="mb-3">
-          <h6 className="text-info">Tips</h6>
-          <ul className="mb-0">
-            {content.tips.map((item, index) => (
-              <li key={`tip-${index}`}>{item}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="mb-3">
+        <h6 className="text-info">Feedback</h6>
+        <p className="mb-0" style={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
+          To send immediate feedback, just include the text &quot;#FB&quot; in any prompt (ex. &quot;#FB the map controls are clunky on this page&quot;).
+        </p>
+      </div>
     </div>
   );
 }
