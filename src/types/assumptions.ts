@@ -282,6 +282,7 @@ export interface Loan {
   interest_rate_pct: number | null;
   interest_type: 'Fixed' | 'Floating' | string | null;
   interest_index?: 'SOFR' | 'PRIME' | 'FIXED' | string | null;
+  index_rate_pct?: number | null;
   interest_spread_bps?: number | null;
   loan_term_months: number | null;
   loan_term_years: number | null;

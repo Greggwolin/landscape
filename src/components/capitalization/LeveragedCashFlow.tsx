@@ -927,33 +927,14 @@ export default function LeveragedCashFlow({
           values: aggregatePeriods(principalValues, periodView),
         });
 
-        // Origination/Fees — period 0 only (from cash flow api: period 0 amount includes draw + origination)
-        // The net financing period 0 = draw - origination fee = 29205203.125
-        // Draw = loan amount = 29662500, so origination = 29662500 - 29205203.125 = 457296.875
-        // Actually let's check: net_financing[0] - (-debt_service[0]) = initial_draw_net
-        // We can compute: origination = loan_amount * origination_fee_pct
-        const originationFees = zeroes.map(() => 0);
-        if (loans.length > 0) {
-          const loan = loans[0];
-          const feePct = loan.origination_fee_pct ?? 0;
-          const feeAmount = (loan.commitment_amount || 0) * (typeof feePct === 'number' ? feePct : parseFloat(String(feePct)) || 0) / 100;
-          if (feeAmount > 0) {
-            originationFees[0] = -feeAmount;
-          }
-        }
-        const hasOrigFees = originationFees.some((v) => v !== 0);
-        if (hasOrigFees) {
-          displayRows.push({
-            label: 'Origination/Fees',
-            rowType: 'indent',
-            values: aggregatePeriods(originationFees, periodView),
-          });
-        }
+        // Origination/Fees — already reflected in Net Loan Proceeds at Time 0
+        // (resolveLoanNetProceeds deducts origination, interest reserve, and closing costs)
+        // Do NOT place in periodic debt service — these are closing costs, not operating expenses.
 
-        // Total Debt Service = interest + principal + fees
+        // Total Debt Service = interest + principal (origination fees are time-0 via net proceeds)
         const totalDebtService = zeroes.map(
           (_, i) =>
-            (interestValues[i] || 0) + (principalValues[i] || 0) + (originationFees[i] || 0)
+            (interestValues[i] || 0) + (principalValues[i] || 0)
         );
         displayRows.push({
           label: 'Total Debt Service',

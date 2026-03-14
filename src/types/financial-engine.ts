@@ -442,6 +442,7 @@ export interface Loan {
   interest_rate_pct: number;
   interest_type?: InterestType;
   interest_index?: InterestIndex;
+  index_rate_pct?: number;
   interest_spread_bps?: number;
 
   // Fees

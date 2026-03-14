@@ -46,9 +46,10 @@ class LoanFinanceStructureSerializer(serializers.ModelSerializer):
 
 class LoanListSerializer(serializers.ModelSerializer):
     # Return numeric values for JS arithmetic (not Decimal strings)
-    commitment_amount = serializers.FloatField()
+    commitment_amount = serializers.FloatField(allow_null=True, default=0)
     loan_amount = serializers.FloatField(allow_null=True)
     interest_rate_pct = serializers.FloatField(allow_null=True)
+    index_rate_pct = serializers.FloatField(allow_null=True)
     calculated_commitment_amount = serializers.FloatField(allow_null=True)
     ltv_basis_amount = serializers.FloatField(allow_null=True)
     ltc_basis_amount = serializers.FloatField(allow_null=True)
@@ -85,6 +86,11 @@ class LoanListSerializer(serializers.ModelSerializer):
             'amortization_months',
             'interest_only_months',
             'interest_type',
+            'interest_index',
+            'index_rate_pct',
+            'interest_spread_bps',
+            'interest_calculation',
+            'interest_payment_method',
             'payment_frequency',
             'origination_fee_pct',
             'interest_reserve_amount',
@@ -138,6 +144,7 @@ class LoanCreateUpdateSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = [
             'loan_id',
+            'project',
             'created_at',
             'updated_at',
             'commitment_sizing_method',
