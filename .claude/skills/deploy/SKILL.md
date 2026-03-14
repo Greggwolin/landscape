@@ -60,7 +60,97 @@ git merge <feature-branch> --no-ff -m "Merge <feature-branch> into main"
 
 If merge conflicts occur, STOP. Show the conflicted files and ask the user how to proceed. Do not auto-resolve.
 
-### Step 3: Push to GitHub
+### Step 3: Version Bump & Changelog
+
+After merging to main but **before pushing**, bump the version and create a changelog entry.
+
+#### 3a. Determine the new version
+
+Read the current version from the Django Changelog table:
+
+```bash
+cd backend
+./venv/bin/python manage.py shell -c "
+from apps.feedback.models import Changelog
+latest = Changelog.objects.order_by('-deployed_at').first()
+print(latest.version if latest else 'v0.1.0')
+"
+```
+
+Parse the version string (format: `v0.1.XX`) and increment by .01:
+- `v0.1.0` → `v0.1.01`
+- `v0.1.01` → `v0.1.02`
+- `v0.1.09` → `v0.1.10`
+- `v0.1.10` → `v0.1.11`
+
+The version format is always `v0.1.XX` where XX is a zero-padded two-digit number (01-99).
+
+#### 3b. Generate changelog notes
+
+Collect all commits being shipped in this deploy:
+
+```bash
+# Get commit messages since the last version tag / last deploy
+git log origin/main..main --pretty=format:"%s" --no-merges
+```
+
+Transform these raw commit messages into **plain English release notes**. Rules:
+- Group related commits into logical changes (don't list every commit)
+- Write from the user's perspective, not the developer's ("Fixed loan card layout" not "Updated CSS grid-template-columns")
+- Use past tense ("Added", "Fixed", "Improved", "Removed")
+- Keep each line to one sentence
+- Skip merge commits and housekeeping (linting, formatting-only changes)
+- If a commit message is already clear, use it as-is
+
+Example output:
+```
+- Fixed loan card layout to show all four sections on one row
+- Moved origination costs from Year 1 to Time 0 in leveraged cash flow
+- Added light grey shading to loan card section headers
+- Improved spacing between labels and input fields
+```
+
+#### 3c. Write the changelog entry to the database
+
+```bash
+cd backend
+./venv/bin/python manage.py shell -c "
+from apps.feedback.models import Changelog
+Changelog.objects.create(
+    version='<NEW_VERSION>',
+    auto_generated_notes='''<RAW_COMMIT_LIST>''',
+    published_notes='''<PLAIN_ENGLISH_NOTES>''',
+    is_published=True,
+)
+print('Changelog entry created: <NEW_VERSION>')
+"
+```
+
+#### 3d. Commit the version bump
+
+No files need to change — the version is stored in the database, not in code. The changelog entry is written directly to the DB. However, update `package.json` version to stay in sync:
+
+```bash
+# Update package.json version field (strip the 'v' prefix)
+npm version <NEW_VERSION_WITHOUT_V> --no-git-tag-version
+git add package.json package-lock.json
+git commit -m "chore: bump version to <NEW_VERSION>"
+```
+
+#### 3e. Show the user what's being published
+
+Present the changelog entry for confirmation before pushing:
+
+```
+Version: v0.1.XX
+Notes:
+  - Fixed loan card layout ...
+  - Moved origination costs ...
+```
+
+Ask: **"Changelog looks good? Ready to push?"**
+
+### Step 4: Push to GitHub
 
 ```bash
 git push origin main
@@ -68,7 +158,7 @@ git push origin main
 
 Confirm the push succeeded. If it fails (e.g., rejected), show the error and ask the user what to do. Never force-push.
 
-### Step 4: Monitor Deployments
+### Step 5: Monitor Deployments
 
 Both Vercel and Railway auto-deploy on push to main. Monitor both:
 
@@ -86,7 +176,7 @@ gh run list --repo Greggwolin/landscape --limit 3
 
 Tell the user deployment is in progress and give updates as states change.
 
-### Step 5: Health Verification
+### Step 6: Health Verification
 
 Once Vercel shows `READY`, verify both endpoints actually respond:
 
@@ -106,14 +196,16 @@ Expected: HTTP 200 (Swagger UI)
 
 Use WebFetch for the Railway endpoint.
 
-### Step 6: Report Results
+### Step 7: Report Results
 
 Present final status:
 
 ```
 Deploy Complete ✓
+  Version: v0.1.XX
   Merged: feature/alpha-prep → main
   Commits: 3
+  Changelog: published (click version badge to view)
   Vercel: ✓ healthy (landscape-hazel.vercel.app)
   Railway: ✓ healthy (/api/docs/ responding)
 ```
@@ -122,13 +214,14 @@ Or if something failed:
 
 ```
 Deploy Issue ✗
+  Version: v0.1.XX (changelog written)
   Merged: ✓
   Pushed: ✓
   Vercel: ✓ healthy
   Railway: ✗ /api/docs/ returned 502 — check Railway logs
 ```
 
-### Step 7: Return to Feature Branch (Optional)
+### Step 8: Return to Feature Branch (Optional)
 
 Ask the user if they want to:
 1. Stay on `main`

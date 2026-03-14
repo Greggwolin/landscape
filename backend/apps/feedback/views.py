@@ -5,7 +5,7 @@ ViewSets and views for tester feedback and changelog.
 import re
 from rest_framework import viewsets, status, views
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
@@ -350,27 +350,31 @@ class ChangelogViewSet(viewsets.ModelViewSet):
     """
     ViewSet for changelog entries.
 
-    - Public users see only published entries
-    - Admin can create/edit all entries
+    - list / retrieve / current-version are public (no auth)
+    - create / update / delete require admin
     """
 
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        """Read actions are public; write actions require admin auth."""
+        if self.action in ('list', 'retrieve', 'current_version'):
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get_queryset(self):
         """Filter based on user role."""
-        if self.request.user.is_admin:
+        if self.request.user and self.request.user.is_authenticated and getattr(self.request.user, 'is_admin', False):
             return Changelog.objects.all()
         return Changelog.objects.filter(is_published=True)
 
     def get_serializer_class(self):
         """Use public serializer for non-admin users."""
-        if self.request.user.is_admin:
+        if self.request.user and self.request.user.is_authenticated and getattr(self.request.user, 'is_admin', False):
             return ChangelogSerializer
         return ChangelogPublicSerializer
 
     def create(self, request, *args, **kwargs):
         """Only admin can create changelog entries."""
-        if not request.user.is_admin:
+        if not getattr(request.user, 'is_admin', False):
             return Response(
                 {'error': 'Only administrators can create changelog entries.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -379,7 +383,7 @@ class ChangelogViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """Only admin can update changelog entries."""
-        if not request.user.is_admin:
+        if not getattr(request.user, 'is_admin', False):
             return Response(
                 {'error': 'Only administrators can update changelog entries.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -388,7 +392,7 @@ class ChangelogViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """Only admin can delete changelog entries."""
-        if not request.user.is_admin:
+        if not getattr(request.user, 'is_admin', False):
             return Response(
                 {'error': 'Only administrators can delete changelog entries.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -401,6 +405,7 @@ class ChangelogViewSet(viewsets.ModelViewSet):
         GET /api/changelog/current-version/
 
         Returns the current (latest published) version string.
+        Public endpoint — no auth required.
         """
         latest = Changelog.objects.filter(is_published=True).first()
 
