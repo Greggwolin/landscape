@@ -115,6 +115,13 @@
   margin-bottom: 0.125rem;
 }
 
+.help-guide-feedback {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--cui-body-color);
+}
+
 /* ------------------------------------------------------------------ */
 /* Header                                                              */
 /* ------------------------------------------------------------------ */
@@ -124,7 +131,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  background: var(--cui-secondary-bg);
+  background: var(--cui-card-cap-bg, var(--cui-secondary-bg));
   border-bottom: 1px solid var(--cui-border-color);
   flex-shrink: 0;
 }
