@@ -119,6 +119,8 @@ class ProjectListSerializer(serializers.ModelSerializer):
     Excludes related data for performance.
     """
     created_by_username = serializers.SerializerMethodField()
+    total_residential_units = serializers.SerializerMethodField()
+    gross_sf = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True, allow_null=True)
 
     class Meta:
         model = Project
@@ -145,6 +147,8 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'location_lon',
             'is_active',
             'analysis_mode',
+            'total_residential_units',
+            'gross_sf',
             'created_at',
             'updated_at',
             'created_by_username',
@@ -155,6 +159,19 @@ class ProjectListSerializer(serializers.ModelSerializer):
         """Return the username of the project creator, if available."""
         if obj.created_by:
             return obj.created_by.username
+        return None
+
+    def get_total_residential_units(self, obj):
+        """
+        Return unit count: total_units from project, else count from
+        tbl_multifamily_unit (annotated as mf_unit_count on the queryset).
+        """
+        if obj.total_units is not None:
+            return obj.total_units
+        # Fall back to annotated MF unit count from queryset
+        mf_count = getattr(obj, 'mf_unit_count', None)
+        if mf_count is not None and mf_count > 0:
+            return mf_count
         return None
 
 

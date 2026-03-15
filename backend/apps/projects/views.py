@@ -8,7 +8,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.db.models import Sum, F, DecimalField
+from django.db.models import Sum, F, DecimalField, Count, Subquery, IntegerField, OuterRef
 from django.db.models.functions import Coalesce
 from django.db import connection
 from decimal import Decimal
@@ -59,22 +59,37 @@ class ProjectViewSet(viewsets.ModelViewSet):
         - alpha_tester role: See only projects they created
         - Default: See only own projects
         """
+        from apps.multifamily.models import MultifamilyUnit
+
         user = self.request.user
 
         # Unauthenticated users see nothing
         if not user.is_authenticated:
             return Project.objects.none()
 
+        # Annotate MF unit count for dashboard display
+        mf_count_subquery = Subquery(
+            MultifamilyUnit.objects.filter(project=OuterRef('pk'))
+            .values('project')
+            .annotate(cnt=Count('unit_id'))
+            .values('cnt')[:1],
+            output_field=IntegerField()
+        )
+
+        base_qs = Project.objects.select_related('created_by').annotate(
+            mf_unit_count=mf_count_subquery
+        )
+
         # Admin users see all projects
         if getattr(user, 'role', None) == 'admin' or user.is_staff:
-            return Project.objects.select_related('created_by').all()
+            return base_qs.all()
 
         # Alpha testers see only their own projects
         if getattr(user, 'role', None) == 'alpha_tester':
-            return Project.objects.select_related('created_by').filter(created_by=user)
+            return base_qs.filter(created_by=user)
 
         # Default: own projects only
-        return Project.objects.select_related('created_by').filter(created_by=user)
+        return base_qs.filter(created_by=user)
 
     def get_serializer_class(self):
         """Use lightweight serializer for list, full serializer for detail."""
