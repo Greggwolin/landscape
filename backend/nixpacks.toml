@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python312"]
+nixPkgs = ["python312Full"]
 
 [phases.install]
 cmds = ["python -m pip install -r requirements.txt"]
