@@ -39,7 +39,7 @@ export default function Header({
             disabled={isEditing}
           >
             <option value="">Select a project</option>
-            {projects.map((project) => (
+            {projects.map((project: any) => (
               <option key={project.project_id} value={project.project_id}>
                 {project.project_name}
               </option>

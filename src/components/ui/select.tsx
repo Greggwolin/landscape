@@ -12,16 +12,17 @@ function walkChildren(node: React.ReactNode, items: SelectItemDef[], meta: { pla
   React.Children.forEach(node, (child) => {
     if (!React.isValidElement(child)) return;
     const typeTag = (child.type as any)?._compatTag;
+    const childElement = child as React.ReactElement<Record<string, unknown>>;
     if (typeTag === ITEM_TAG) {
-      items.push({ value: child.props.value, label: child.props.children });
+      items.push({ value: childElement.props.value, label: childElement.props.children });
       return;
     }
     if (typeTag === VALUE_TAG) {
-      meta.placeholder = child.props.placeholder;
+      meta.placeholder = childElement.props.placeholder as string | undefined;
       return;
     }
-    if (child.props?.children) {
-      walkChildren(child.props.children, items, meta);
+    if (childElement.props?.children) {
+      walkChildren(childElement.props.children, items, meta);
     }
   });
 }

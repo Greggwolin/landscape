@@ -41,7 +41,7 @@ export async function GET(
 
   try {
     const [configRow, settingsRow, projectRow] = await Promise.all([
-      sql<ConfigRow[]>`
+      sql`
         SELECT project_id, asset_type,
                tier_1_label as level1_label,
                tier_2_label as level2_label,
@@ -53,7 +53,7 @@ export async function GET(
         FROM landscape.tbl_project_config
         WHERE project_id = ${id}
       `,
-      sql<SettingsRow[]>`
+      sql`
         SELECT project_id, default_currency, default_period_type, global_inflation_rate,
                analysis_start_date, analysis_end_date, discount_rate,
                created_at, updated_at

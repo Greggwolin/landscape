@@ -1,0 +1,21 @@
+Based on code analysis without npm install:
+
+InlineComment.ts issues:
+- Imports @tiptap/core, @tiptap/pm/state, @tiptap/pm/view (MISSING DEPS)
+- All TipTap-related types would fail: Node, Plugin, PluginKey, NodeView
+- Lines using these: 13-15, 102, 322, 384
+
+TrackChanges.ts issues:
+- Imports @tiptap/core, @tiptap/pm/state, @tiptap/pm/view (MISSING DEPS)
+- All TipTap-related types would fail: Extension, Plugin, PluginKey, Decoration, DecorationSet
+- Lines using these: 13-15, 70, 266
+
+RentRollGrid.tsx issues:
+- Large file (1486 lines), likely has type errors with AG-Grid
+- Uses AgGridReact and types from ag-grid-community
+- Likely TS2339, TS2322, TS2345 errors for missing or incorrectly typed props
+
+TaxonomySelector.tsx issues:
+- Uses types from @/types/landuse (FamilyChoice, DensityChoice, TypeChoice, ProductChoice, TaxonomySelection)
+- Likely has optional/undefined type issues
+- Lines 181, 188, 199, 206, 217, 224, 236, 243 all have nullable chaining that might need fixing

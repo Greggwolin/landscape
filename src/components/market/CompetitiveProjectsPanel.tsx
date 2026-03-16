@@ -68,7 +68,7 @@ export function CompetitiveProjectsPanel({ projectId, radiusMiles }: Competitive
       // Aggregate metrics - prefer units_remaining from products, fallback to total_units
       let remainingUnits = 0;
       if (comp.products && comp.products.length > 0) {
-        remainingUnits = comp.products.reduce((sum, p) => sum + (p.units_remaining || 0), 0);
+        remainingUnits = comp.products.reduce((sum: any, p: any) => sum + (p.units_remaining || 0), 0);
       }
       // Fall back to total_units if no remaining found in products
       if (remainingUnits === 0 && comp.total_units) {

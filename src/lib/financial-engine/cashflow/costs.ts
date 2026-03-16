@@ -154,7 +154,7 @@ export async function fetchBudgetItems(
   let query;
 
   if (containerIds && containerIds.length > 0) {
-    query = sql<BudgetItemRow>`
+    query = sql`
       SELECT
         b.fact_id,
         b.project_id,
@@ -195,7 +195,7 @@ export async function fetchBudgetItems(
       ORDER BY b.activity, b.fact_id
     `;
   } else {
-    query = sql<BudgetItemRow>`
+    query = sql`
       SELECT
         b.fact_id,
         b.project_id,
@@ -250,7 +250,7 @@ export async function fetchBudgetTiming(
   let query;
 
   if (factIds && factIds.length > 0) {
-    query = sql<BudgetTimingRow>`
+    query = sql`
       SELECT
         bt.fact_id,
         bt.period_id,
@@ -264,7 +264,7 @@ export async function fetchBudgetTiming(
       ORDER BY bt.fact_id, cp.period_sequence
     `;
   } else {
-    query = sql<BudgetTimingRow>`
+    query = sql`
       SELECT
         bt.fact_id,
         bt.period_id,
@@ -504,7 +504,7 @@ interface AcquisitionRow {
  * These are separate from budget items and represent land purchase costs
  */
 export async function fetchAcquisitionCosts(projectId: number): Promise<AcquisitionRow[]> {
-  const query = sql<AcquisitionRow>`
+  const query = sql`
     SELECT
       acquisition_id,
       project_id,
@@ -651,7 +651,7 @@ export async function generateCostSchedule(
       if (containerIds && containerIds.length > 0) {
         // Fetch acres for proportion calculation
         // containerIds are division_ids (tier 2 = phases)
-        const acresQuery = await sql<{ total_acres: number; filtered_acres: number }>`
+        const acresQuery = await sql`
           WITH project_acres AS (
             SELECT COALESCE(SUM(acres_gross), 0)::numeric as total_acres
             FROM landscape.tbl_parcel

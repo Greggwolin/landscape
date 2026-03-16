@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const rows = await sql<SearchRow[]>`
+    const rows = await sql`
       WITH filtered AS (
         SELECT fact_id, fact_type
         FROM landscape.core_fin_fact_tags

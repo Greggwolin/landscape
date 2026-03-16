@@ -80,7 +80,7 @@ export async function GET(req: NextRequest, context: Params) {
     const includeImported = searchParams.get('include_imported') === 'true';
 
     // Get project location
-    const projects = await sql<ProjectRow>`
+    const projects = await sql`
       SELECT project_id, location_lat, location_lon
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}::integer
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest, context: Params) {
     const projectLon = Number(project.location_lon);
 
     // Get excluded source_project_ids
-    const exclusions = await sql<ExclusionRow>`
+    const exclusions = await sql`
       SELECT source_project_id
       FROM landscape.market_competitive_project_exclusions
       WHERE project_id = ${projectId}::integer
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest, context: Params) {
     const excludedIds = new Set(exclusions.map(e => e.source_project_id));
 
     // Get already imported source_project_ids
-    const existingCompetitors = await sql<ExistingCompetitor>`
+    const existingCompetitors = await sql`
       SELECT source_project_id
       FROM landscape.market_competitive_projects
       WHERE project_id = ${projectId}::integer
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest, context: Params) {
     const lonDelta = radiusMiles / 55;
 
     // Get Zonda projects within bounding box
-    const zondaProjects = await sql<ZondaProject>`
+    const zondaProjects = await sql`
       SELECT
         record_id,
         source_project_id,

@@ -11,6 +11,9 @@ import {
   fetchUnitTypes,
   leasesAPI,
   unitsAPI,
+  type Lease,
+  type Unit,
+  type UnitType,
 } from '@/lib/api/multifamily'
 import { FloorplanUpdateDialog } from './FloorplanUpdateDialog'
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh'
@@ -25,60 +28,20 @@ import '../rent-roll-grid.css'
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule])
 
-interface Lease {
-  lease_id: number
-  unit_id: number
-  unit_number: string
-  building_name: string | null
-  unit_type: string
-  square_feet: number
-  resident_name: string | null
-  lease_start_date: string
-  lease_end_date: string
-  base_rent_monthly: number
-  lease_status: string
-  bedrooms: number | null
-  bathrooms: number | null
-  market_rent: number | null
-  other_features: string | null
-  is_section8?: boolean
-  section8_contract_date?: string | null
-  section8_contract_rent?: number | null
-}
-
-interface Unit {
-  unit_id: number
-  project_id: number
-  unit_number: string
-  building_name: string | null
-  unit_type: string
-  bedrooms: number
-  bathrooms: number
-  square_feet: number
-  current_rent: number | null
-  market_rent: number
-  occupancy_status: string | null
-  renovation_status: string
-  other_features: string | null
-  is_section8?: boolean
-  section8_contract_date?: string | null
-  section8_contract_rent?: number | null
-}
-
 // Unified row type for grid display - works with either lease or unit data
 interface RentRollRow {
   // Identifiers
   lease_id?: number
-  unit_id: number
-  unit_number: string
-  building_name: string | null
+  unit_id?: number
+  unit_number?: string
+  building_name?: string | null
   // Unit properties
-  unit_type: string
-  bedrooms: number | null
-  bathrooms: number | null
-  square_feet: number
-  market_rent: number | null
-  other_features: string | null
+  unit_type?: string
+  bedrooms?: number | null
+  bathrooms?: number | null
+  square_feet?: number
+  market_rent?: number | null
+  other_features?: string | null
   // Lease/rent properties
   resident_name?: string | null
   lease_start_date?: string
@@ -91,20 +54,6 @@ interface RentRollRow {
   section8_contract_rent?: number | null
   // Source tracking
   _source: 'lease' | 'unit'
-}
-
-interface UnitType {
-  unit_type_id: number
-  project_id: number
-  unit_type_code: string
-  bedrooms: number
-  bathrooms: number
-  avg_square_feet: number
-  current_market_rent: number
-  total_units: number
-  notes: string | null
-  other_features: string | null
-  floorplan_doc_id: number | null
 }
 
 interface LeaseResponse {
@@ -182,8 +131,6 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     message: string
     type: 'success' | 'error'
   } | null>(null)
-  // Detect Section 8 presence once — drives column visibility in columnDefs
-  const hasSection8 = useMemo(() => units.some((u: Unit) => u.is_section8 === true), [units])
   const [floorplanDialogOpen, setFloorplanDialogOpen] = useState(false)
   const [floorplanCheck, setFloorplanCheck] = useState<any>(null)
   const [pendingUpdate, setPendingUpdate] = useState<{
@@ -191,7 +138,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     field: string
     newValue: any
     oldValue: any
-    event: CellValueChangedEvent<Lease>
+    event: CellValueChangedEvent<RentRollRow>
   } | null>(null)
 
   // Show notification helper
@@ -237,13 +184,16 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     { revalidateOnFocus: false }
   )
 
-  const leases = response?.data ?? []
-  const units = unitsResponse?.data ?? []
-  const unitTypes = unitTypesResponse?.data ?? []
+  const leases: Lease[] = response?.data ?? []
+  const units: Unit[] = unitsResponse?.data ?? []
+  const unitTypes: UnitType[] = unitTypesResponse?.data ?? []
+
+  // Detect Section 8 presence once — drives column visibility in columnDefs
+  const hasSection8 = useMemo(() => units.some((u: Unit) => u.is_section8 === true), [units])
 
   // Convert units to RentRollRow format when no leases exist
   const unitsAsRows: RentRollRow[] = useMemo(() => {
-    return units.map((unit: Unit) => ({
+    return units.map((unit: Unit): RentRollRow => ({
       unit_id: unit.unit_id,
       unit_number: unit.unit_number,
       building_name: unit.building_name,
@@ -252,12 +202,12 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
       bathrooms: unit.bathrooms,
       square_feet: unit.square_feet || 0,
       market_rent: unit.market_rent,
-      other_features: unit.other_features,
+      other_features: unit.other_features ?? null,
       base_rent_monthly: Number(unit.current_rent) || 0,
       lease_status: unit.occupancy_status?.toLowerCase() === 'vacant' ? 'VACANT' : 'ACTIVE',
       resident_name: null,
       is_section8: unit.is_section8,
-      section8_contract_date: unit.section8_contract_date,
+      section8_contract_date: unit.section8_contract_date ?? null,
       section8_contract_rent: unit.section8_contract_rent,
       _source: 'unit' as const
     }))
@@ -266,11 +216,30 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   // Use leases if available, otherwise fall back to units
   const gridData: RentRollRow[] = useMemo(() => {
     if (leases.length > 0) {
-      return leases.map((lease: Lease) => ({
-        ...lease,
-        base_rent_monthly: Number(lease.base_rent_monthly) || 0,
-        _source: 'lease' as const
-      }))
+      return leases.map((lease: Lease): RentRollRow => {
+        const row: RentRollRow = {
+          lease_id: lease.lease_id,
+          unit_id: lease.unit_id,
+          unit_number: lease.unit_number,
+          building_name: lease.building_name,
+          unit_type: lease.unit_type,
+          bedrooms: lease.bedrooms,
+          bathrooms: lease.bathrooms,
+          square_feet: lease.square_feet,
+          market_rent: lease.market_rent,
+          other_features: lease.other_features ?? null,
+          resident_name: lease.resident_name,
+          lease_start_date: lease.lease_start_date,
+          lease_end_date: lease.lease_end_date,
+          base_rent_monthly: Number(lease.base_rent_monthly) || 0,
+          lease_status: lease.lease_status,
+          is_section8: (lease as any).is_section8 ?? false,
+          section8_contract_date: (lease as any).section8_contract_date ?? null,
+          section8_contract_rent: Number((lease as any).section8_contract_rent) || 0,
+          _source: 'lease' as const
+        }
+        return row
+      })
     }
     return unitsAsRows
   }, [leases, unitsAsRows])
@@ -313,9 +282,9 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
   // Calculate metrics - works with either leases or units
   const metrics = useMemo(() => {
-    const totalUnits = units.length
+    const totalUnits: number = units.length
     // When showing units only, count occupied from occupancy_status
-    const occupiedUnits = leases.length > 0
+    const occupiedUnits: number = leases.length > 0
       ? leases.filter(l => l.lease_status === 'ACTIVE').length
       : units.filter((u: Unit) => u.occupancy_status?.toLowerCase() === 'occupied').length
     const vacantUnits = totalUnits - occupiedUnits
@@ -575,7 +544,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     )
   }, [pendingByCell, getFieldState])
 
-  const columnDefs = useMemo<ColDef<Lease>[]>(() => [
+  const columnDefs = useMemo<ColDef<RentRollRow>[]>(() => [
     // Row-level checkbox for delta review (only visible when changes are pending)
     ...(hasPending ? [{
       headerName: '',
@@ -783,13 +752,14 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     },
     {
       headerName: 'Loss-to-Lease',
-      field: 'loss_to_lease',
+      field: 'loss_to_lease' as any,
       minWidth: 70,
       type: 'numericColumn',
       headerTooltip: 'Market Rent - Current Rent. Positive = below market (opportunity), Negative = above market (risk). Uses market rent from Floorplans.',
       cellStyle: (params) => {
         const pending = getPendingCellStyle(params)
         if (pending) return pending
+        if (!params.data) return {}
         const unitType = params.data.unit_type
         const hasMarketRent = unitTypeMap.has(unitType)
 
@@ -812,6 +782,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
         return { color: 'rgb(147 197 253)' } // blue-300 (at market)
       },
       valueFormatter: (params) => {
+        if (!params.data) return ''
         const unitType = params.data.unit_type
         const hasMarketRent = unitTypeMap.has(unitType)
 
@@ -914,7 +885,7 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
     },
     {
       headerName: '',
-      field: 'actions',
+      field: 'actions' as any,
       width: 80,
       pinned: 'right',
       sortable: false,
@@ -985,9 +956,11 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
   }, [pendingByCell, acceptChange, rejectChange, showNotification])
 
   // Auto-save on cell change
-  const onCellValueChanged = useCallback(async (event: CellValueChangedEvent<Lease>) => {
+  const onCellValueChanged = useCallback(async (event: CellValueChangedEvent<RentRollRow>) => {
     const updatedLease = event.data
-    const leaseId = updatedLease?.lease_id
+    if (!updatedLease) return
+    
+    const leaseId = updatedLease.lease_id
     const field = event.colDef.field!
     const newValue = event.newValue
     const oldValue = event.oldValue
@@ -1049,20 +1022,24 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
 
         console.log('Saving unit_type and auto-fill to units table:', updates)
 
-        await unitsAPI.update(updatedLease.unit_id, updates)
+        if (updatedLease.unit_id) {
+          await unitsAPI.update(updatedLease.unit_id, updates)
+        }
 
         // Update the underlying data object directly
         // This won't trigger onCellValueChanged events
         const rowData = event.node.data
-        rowData.unit_type = newValue
-        if (updates.bedrooms !== undefined) {
-          rowData.bedrooms = updates.bedrooms
-        }
-        if (updates.bathrooms !== undefined) {
-          rowData.bathrooms = updates.bathrooms
-        }
-        if (updates.square_feet !== undefined) {
-          rowData.square_feet = updates.square_feet
+        if (rowData) {
+          rowData.unit_type = newValue
+          if (updates.bedrooms !== undefined) {
+            rowData.bedrooms = updates.bedrooms
+          }
+          if (updates.bathrooms !== undefined) {
+            rowData.bathrooms = updates.bathrooms
+          }
+          if (updates.square_feet !== undefined) {
+            rowData.square_feet = updates.square_feet
+          }
         }
 
         // Refresh the cells to show the updated values
@@ -1115,14 +1092,20 @@ export default function RentRollGrid({ projectId }: RentRollGridProps) {
           return
         } else {
           // No difference, just update the unit
-          await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
+          if (updatedLease.unit_id) {
+            await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
+          }
         }
       } else if (isUnitField) {
         // Update unit (non-floorplan fields)
-        await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
+        if (updatedLease.unit_id) {
+          await unitsAPI.update(updatedLease.unit_id, { [field]: newValue })
+        }
       } else {
         // Update lease
-        await leasesAPI.update(leaseId, { [field]: newValue })
+        if (leaseId) {
+          await leasesAPI.update(leaseId, { [field]: newValue })
+        }
       }
 
       console.log(`✅ Saved ${field}`)

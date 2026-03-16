@@ -76,7 +76,7 @@ function PrototypesIndexContent() {
 
       {/* Prototypes Grid */}
       <div className="grid gap-4 md:grid-cols-2">
-        {prototypeRegistry.map((prototype) => {
+        {prototypeRegistry.map((prototype: any) => {
           const prototypeNotes = orderedNotes[prototype.id] ?? [];
           const latestNote = prototypeNotes[0];
 
@@ -114,7 +114,7 @@ function PrototypesIndexContent() {
                 ) : null}
                 {prototype.tags && prototype.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2 text-xs text-gray-400">
-                    {prototype.tags.map((tag) => (
+                    {prototype.tags.map((tag: any) => (
                       <span key={tag} className="rounded-full border border-gray-700 px-3 py-1 uppercase">
                         {tag}
                       </span>

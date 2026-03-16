@@ -18,7 +18,7 @@ export async function GET(
   }
 
   try {
-    const periods = await sql<CalculationPeriod[]>`
+    const periods = await sql`
       SELECT
         period_id,
         project_id,

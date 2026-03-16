@@ -178,10 +178,11 @@ UTILITIES
       const dataBuffer = fs.readFileSync(filePath)
       const data = await pdf(dataBuffer)
       return data.text
-    } catch (error) {
-      console.error('PDF extraction error:', error)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('PDF extraction error:', err)
       // Only throw error - no fallback to marketing package since that has different data
-      throw new Error(`Failed to extract text from PDF: ${error.message}`)
+      throw new Error(`Failed to extract text from PDF: ${message}`)
     }
   }
 

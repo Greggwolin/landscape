@@ -533,16 +533,7 @@ async function loadCurveBudgetDetails(factIds: number[]): Promise<Map<number, Cu
     return map;
   }
 
-  const rows = await sql<{
-    factId: number;
-    amount: string | number | null;
-    qty: string | number | null;
-    rate: string | number | null;
-    curveId: number | null;
-    curveSteepness: string | number | null;
-    startDate: string | null;
-    endDate: string | null;
-  }>`
+  const rows = await sql`
     SELECT
       fact_id AS "factId",
       amount,
@@ -652,7 +643,7 @@ async function calculateDurationInPeriods(
     return 0;
   }
 
-  const rows = await sql<{ duration: number }>`
+  const rows = await sql`
     SELECT COUNT(*)::int AS duration
     FROM landscape.tbl_calculation_period
     WHERE project_id = ${projectId}
@@ -670,7 +661,7 @@ async function getStartPeriod(date: Date, projectId: number): Promise<number> {
     return 1;
   }
 
-  const rows = await sql<{ periodSequence: number }>`
+  const rows = await sql`
     SELECT period_sequence AS "periodSequence"
     FROM landscape.tbl_calculation_period
     WHERE project_id = ${projectId}
@@ -683,7 +674,7 @@ async function getStartPeriod(date: Date, projectId: number): Promise<number> {
 }
 
 async function getCurveCode(curveId: number): Promise<string> {
-  const rows = await sql<{ curveCode: string | null }>`
+  const rows = await sql`
     SELECT curve_code AS "curveCode"
     FROM landscape.core_fin_curve_profile
     WHERE curve_id = ${curveId}

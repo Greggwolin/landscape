@@ -89,7 +89,7 @@ export async function GET(
 
   try {
     // Step 1: Get all containers with their direct inventory data
-    const rows = await sql<ContainerRow[]>`
+    const rows = await sql`
       SELECT
         c.division_id,
         c.project_id,
@@ -131,12 +131,7 @@ export async function GET(
     // Step 1.2: Get parcel aggregations for phases (tier=2)
     // Maps division_id -> {units, acres, parcel_count}
     const parcelMap: Map<number, { units: number; acres: number; parcel_count: number }> = new Map()
-    const parcelAggregations = await sql<Array<{
-      division_id: number;
-      units: number;
-      acres: number;
-      parcel_count: number;
-    }>>`
+    const parcelAggregations = await sql`
       SELECT
         d.division_id,
         COALESCE(SUM(p.units_total), 0)::int as units,
@@ -179,7 +174,7 @@ export async function GET(
     // Step 1.5: Get budget costs if requested
     const costMap: Map<number, number> = new Map()
     if (includeCosts) {
-      const costs = await sql<Array<{ division_id: number; total_cost: number }>>`
+      const costs = await sql`
         SELECT
           division_id,
           COALESCE(SUM(amount), 0) as total_cost
@@ -355,14 +350,14 @@ export async function POST(
     // Auto-generate container_code if not provided
     let finalCode = container_code
     if (!finalCode || finalCode.trim().length === 0) {
-      const codeResult = await sql<[{ generate_container_code: string }]>`
+      const codeResult = await sql`
         SELECT landscape.generate_container_code(${id}, ${tier}, ${parent_division_id ?? null})
       `
       finalCode = codeResult[0].generate_container_code
     }
 
     // Check for duplicate container_code
-    const existingCode = await sql<[{ count: number }]>`
+    const existingCode = await sql`
       SELECT COUNT(*)::int as count
       FROM landscape.tbl_container
       WHERE project_id = ${id}
@@ -388,9 +383,7 @@ export async function POST(
 
     // If parent provided, validate it exists and is correct level
     if (parent_division_id != null) {
-      const parentCheck = await sql<
-        [{ project_id: number; tier: number; division_id: number }]
-      >`
+      const parentCheck = await sql`
         SELECT project_id, tier, division_id
         FROM landscape.tbl_container
         WHERE division_id = ${parent_division_id}
@@ -449,7 +442,7 @@ export async function POST(
     }
 
     // Insert container
-    const inserted = await sql<ContainerRow[]>`
+    const inserted = await sql`
       INSERT INTO landscape.tbl_container (
         project_id,
         parent_division_id,

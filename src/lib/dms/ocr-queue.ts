@@ -27,7 +27,7 @@ export async function enqueueForExtraction(
   extractType: 'ocr' | 'metadata' | 'embedding' | 'full' = 'full',
   priority: number = 0
 ): Promise<QueueJob> {
-  const result = await sql<QueueJob[]>`
+  const result = await sql`
     INSERT INTO landscape.dms_extract_queue (
       doc_id,
       extract_type,
@@ -57,7 +57,7 @@ export async function enqueueForExtraction(
  * Get next pending job from queue
  */
 export async function getNextQueueJob(): Promise<QueueJob | null> {
-  const result = await sql<QueueJob[]>`
+  const result = await sql`
     SELECT * FROM landscape.dms_extract_queue
     WHERE status = 'pending'
       AND attempts < max_attempts
@@ -140,7 +140,7 @@ export async function getQueueStats(): Promise<{
   completed: number;
   failed: number;
 }> {
-  const result = await sql<Array<{ status: string; count: string }>>`
+  const result = await sql`
     SELECT status, COUNT(*)::text as count
     FROM landscape.dms_extract_queue
     GROUP BY status

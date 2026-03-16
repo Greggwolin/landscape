@@ -22,11 +22,7 @@ export async function GET(
       );
     }
 
-    const properties = await sql<Array<{
-      cre_property_id: number;
-      property_name: string | null;
-      property_type: string | null;
-    }>>`
+    const properties = await sql`
       SELECT
         cre_property_id,
         property_name,

@@ -27,8 +27,6 @@ import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { isNNNProject } from '@/components/valuation/nnn/nnnDetection';
 import NNNIncomeApproach from '@/components/valuation/nnn/NNNIncomeApproach';
 import NNNReconciliation from '@/components/valuation/nnn/NNNReconciliation';
-import NNNCashFlow from '@/components/valuation/nnn/NNNCashFlow';
-import NNNComparableSales from '@/components/valuation/nnn/NNNComparableSales';
 
 /**
  * NNN Cost Approach empty state — "Not Applicable" for NNN SLB
@@ -70,7 +68,7 @@ interface ValuationTabProps {
  * Normalize tab ID to internal format
  * Maps folder tab IDs to component-expected values
  */
-function normalizeTab(tab?: string): 'sales-comparison' | 'cost' | 'income' | 'reconciliation' | 'cash-flow' | 'comparable-sales' {
+function normalizeTab(tab?: string): 'sales-comparison' | 'cost' | 'income' | 'reconciliation' {
   switch (tab) {
     case 'sales':
     case 'sales-comparison':
@@ -81,10 +79,6 @@ function normalizeTab(tab?: string): 'sales-comparison' | 'cost' | 'income' | 'r
       return 'income';
     case 'reconciliation':
       return 'reconciliation';
-    case 'cash-flow':
-      return 'cash-flow';
-    case 'comparable-sales':
-      return 'comparable-sales';
     default:
       return 'sales-comparison';
   }
@@ -211,7 +205,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
         isNNN ? (
           <NNNIncomeApproach projectId={projectId} project={project} />
         ) : (
-          <IncomeApproachContent projectId={projectId} />
+          <IncomeApproachContent projectId={projectId} projectName={project.project_name} />
         )
       )}
 
@@ -227,22 +221,6 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
         )
       )}
 
-      {normalizedTab === 'cash-flow' && isNNN && (
-        <NNNCashFlow projectId={projectId} project={project} />
-      )}
-
-      {normalizedTab === 'comparable-sales' && (
-        isNNN ? (
-          <NNNComparableSales />
-        ) : (
-          <SalesComparisonApproach
-            projectId={projectId}
-            comparables={valuationData.sales_comparables}
-            reconciliation={valuationData.reconciliation}
-            onRefresh={fetchData}
-          />
-        )
-      )}
     </>
   );
 }

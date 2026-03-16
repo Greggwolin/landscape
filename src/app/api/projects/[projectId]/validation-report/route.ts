@@ -129,7 +129,7 @@ export async function GET(
     }
 
     // 1. Fetch project info
-    const projectRows = await sql<ProjectRow>`
+    const projectRows = await sql`
       SELECT project_id, project_name
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}
@@ -145,7 +145,7 @@ export async function GET(
     const project = projectRows[0];
 
     // 2. Fetch phase stats for SFD lots only (acres, lots, front feet, parcel count)
-    const phaseStats = await sql<PhaseStatsRow>`
+    const phaseStats = await sql`
       SELECT
         ph.phase_id,
         COALESCE(ph.phase_name, 'Unassigned') as phase_name,
@@ -165,7 +165,7 @@ export async function GET(
     // 3. Fetch phase pricing/revenue data for SFD lots only
     // Note: closing costs now come from global benchmarks, not parcel-level data
     // improvement_offset totals are recalculated below using base per-UOM values to respect current inflation settings
-    const phasePricing = await sql<PhasePricingRow>`
+    const phasePricing = await sql`
       SELECT
         p.phase_id,
         CASE
@@ -189,7 +189,7 @@ export async function GET(
 
     // 3a. Fetch transaction cost benchmarks (global or project-specific)
     // Priority: project-specific > global, must be active
-    const transactionBenchmarks = await sql<TransactionCostBenchmark>`
+    const transactionBenchmarks = await sql`
       SELECT DISTINCT ON (benchmark_type)
         benchmark_type,
         rate_pct,
@@ -227,7 +227,7 @@ export async function GET(
       0;
 
     // 3a2. Fetch project cost inflation rate
-    const costInflationRows = await sql<CostInflationRow>`
+    const costInflationRows = await sql`
       SELECT
         CASE
           WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
@@ -242,7 +242,7 @@ export async function GET(
     const costInflationRate = Number(costInflationRows[0]?.current_rate) || 0;
 
     // 3a3. Fetch parcel sale periods for SFD parcels (needed for inflation calculation)
-    const parcelSalePeriods = await sql<ParcelSalePeriodRow>`
+    const parcelSalePeriods = await sql`
       SELECT
         p.parcel_id,
         p.phase_id,
@@ -266,7 +266,7 @@ export async function GET(
 
     // 3a4. Fetch parcel-level improvement offset inputs so subdivision costs can respect current inflation
     // Note: Only include SFD/SFA parcels - other land types have separate improvement offsets tracked elsewhere
-    const parcelSubdivisionCosts = await sql<ParcelSubdivisionCostRow>`
+    const parcelSubdivisionCosts = await sql`
       SELECT
         p.phase_id,
         COALESCE(ph.phase_name, 'Unassigned') AS phase_name,
@@ -293,7 +293,7 @@ export async function GET(
     `;
 
     // 3b. Fetch Other Land parcels (MF, BTR, etc. - non-SFD)
-    const otherLandParcels = await sql<OtherLandRow>`
+    const otherLandParcels = await sql`
       SELECT
         p.phase_id,
         COALESCE(ph.phase_name, 'Unassigned') as phase_name,
@@ -316,7 +316,7 @@ export async function GET(
     `;
 
     // 4. Fetch phase schedule (first/last sale periods)
-    const phaseSchedule = await sql<PhaseScheduleRow>`
+    const phaseSchedule = await sql`
       SELECT
         p.phase_id,
         MIN(p.sale_period)::integer as first_sale_period,
@@ -331,7 +331,7 @@ export async function GET(
     // 5. Fetch phase budget by activity with timing for inflation calculation
     // Note: division.attributes contains {"phase_id": X} which maps to tbl_phase.phase_id
     // We use the midpoint period for inflation calculation (avg of start and end)
-    const phaseBudgets = await sql<PhaseBudgetRow>`
+    const phaseBudgets = await sql`
       SELECT
         (d.attributes->>'phase_id')::integer as phase_id,
         f.activity,
@@ -350,7 +350,7 @@ export async function GET(
     `;
 
     // 5a. Fetch total acquisition cost from tbl_acquisition
-    const acquisitionRows = await sql<AcquisitionRow>`
+    const acquisitionRows = await sql`
       SELECT COALESCE(SUM(amount), 0)::numeric as total_acquisition
       FROM landscape.tbl_acquisition
       WHERE project_id = ${projectId}
@@ -359,7 +359,7 @@ export async function GET(
     const totalAcquisitionCost = Number(acquisitionRows[0]?.total_acquisition) || 0;
 
     // 5b. Fetch total gross acres by phase (for acquisition cost allocation)
-    const phaseAcres = await sql<PhaseAcresRow>`
+    const phaseAcres = await sql`
       SELECT
         ph.phase_id,
         COALESCE(ph.phase_name, 'Unassigned') as phase_name,

@@ -111,7 +111,7 @@ const PhaseCanvas: React.FC<PhaseCanvasProps> = ({
               className="w-full h-96 bg-gray-700 border-2 border-solid border-gray-600 rounded-lg"
             >
               <div className="p-4 grid gap-4 h-full overflow-y-auto" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-                {phase.parcels.map((parcel) => (
+                {phase.parcels.map((parcel: any) => (
                   <ParcelTile
                     key={parcel.id}
                     parcel={parcel}

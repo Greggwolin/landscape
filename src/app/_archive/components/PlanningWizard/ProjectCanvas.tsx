@@ -94,9 +94,9 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
 
   const findParcel = useCallback(
     (areaId: string, phaseId: string, parcelId: string) => {
-      const areaRef = project.areas.find((a) => a.id === areaId)
-      const phaseRef = areaRef?.phases.find((p) => p.id === phaseId)
-      const parcelRef = phaseRef?.parcels.find((p) => p.id === parcelId)
+      const areaRef = project.areas.find((a: any) => a.id === areaId)
+      const phaseRef = areaRef?.phases.find((p: any) => p.id === phaseId)
+      const parcelRef = phaseRef?.parcels.find((p: any) => p.id === parcelId)
       return { areaRef, phaseRef, parcelRef }
     },
     [project.areas],
@@ -246,8 +246,8 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
 
     try {
       // Get the area and phase database IDs
-      const area = project.areas.find(a => a.id === areaId)
-      const phase = area?.phases.find(p => p.id === phaseId)
+      const area = project.areas.find((a: any) => a.id === areaId)
+      const phase = area?.phases.find((p: any) => p.id === phaseId)
 
       if (!area || !phase) {
         alert('Could not find area or phase information.')
@@ -323,7 +323,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
 
           <div className="p-6 h-full">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8">
-              {project.areas.map((area) => (
+              {project.areas.map((area: any) => (
                 <div key={area.id} className="min-h-[520px]">
                   <DropZone accepts={['phase']} onDrop={handlePhaseDrop(area.id)} className="min-h-full">
                     <div
@@ -363,7 +363,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                       ) : (
                         <div className="flex flex-col flex-1">
                           <div className="flex flex-col gap-2">
-                            {area.phases.map((phase) => (
+                            {area.phases.map((phase: any) => (
                               <div
                                 key={phase.id}
                                 onClick={(e) => {
@@ -388,7 +388,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                 </div>
                                 {phase.parcels.length > 0 && (
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '4px' }}>
-                                    {phase.parcels.map((parcel) => {
+                                    {phase.parcels.map((parcel: any) => {
                                       const isEditing =
                                         editing && editing.areaId === area.id && editing.phaseId === phase.id && editing.parcelId === parcel.id
                                       const tileColor = getFamilyColor(parcel.family_name)
@@ -425,7 +425,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                                   type_code: draft.type_code,
                                                   product_code: draft.product_code,
                                                 }}
-                                                onChange={(values) => setDraft((prev) => ({ ...prev, ...values }))}
+                                                onChange={(values: any) => setDraft((prev) => ({ ...prev, ...values }))}
                                               />
                                               <table className="text-xs mt-2">
                                                 <tbody>
@@ -552,7 +552,7 @@ const ProjectCanvas: React.FC<ProjectCanvasProps> = ({
                                             type_code: newParcelDraft.type_code,
                                             product_code: newParcelDraft.product_code,
                                           }}
-                                          onChange={(values) => setNewParcelDraft((prev) => ({ ...prev, ...values }))}
+                                          onChange={(values: any) => setNewParcelDraft((prev) => ({ ...prev, ...values }))}
                                         />
 
                                         <div className="grid grid-cols-2 gap-4">

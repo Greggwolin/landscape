@@ -34,7 +34,7 @@ export async function fetchProjectPeriods(
   let query;
 
   if (startSequence !== undefined && endSequence !== undefined) {
-    query = sql<PeriodRow>`
+    query = sql`
       SELECT
         period_id,
         period_sequence,
@@ -51,7 +51,7 @@ export async function fetchProjectPeriods(
       ORDER BY period_sequence ASC
     `;
   } else {
-    query = sql<PeriodRow>`
+    query = sql`
       SELECT
         period_id,
         period_sequence,
@@ -93,7 +93,7 @@ export async function fetchProjectPeriods(
  * Get period count for a project
  */
 export async function getProjectPeriodCount(projectId: number): Promise<number> {
-  const result = await sql<{ count: number }>`
+  const result = await sql`
     SELECT COUNT(*) as count
     FROM landscape.tbl_calculation_period
     WHERE project_id = ${projectId}
@@ -110,11 +110,7 @@ export async function getProjectDateRange(projectId: number): Promise<{
   endDate: Date;
   periodCount: number;
 }> {
-  const result = await sql<{
-    start_date: string;
-    end_date: string;
-    period_count: number;
-  }>`
+  const result = await sql`
     SELECT
       MIN(period_start_date) as start_date,
       MAX(period_end_date) as end_date,

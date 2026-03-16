@@ -55,9 +55,7 @@ export async function PATCH(
 
     // Check all containers exist and belong to this project
     const divisionIds = updates.map((u) => u.division_id)
-    const existingContainers = await sql<
-      [{ division_id: number; project_id: number; parent_division_id: number | null }]
-    >`
+    const existingContainers = await sql`
       SELECT division_id, project_id, parent_division_id
       FROM landscape.tbl_container
       WHERE division_id = ANY(${divisionIds})
@@ -121,7 +119,7 @@ export async function PATCH(
     }
 
     // Execute updates in transaction
-    await sql.begin(async (txn) => {
+    await sql.begin(async (txn: any) => {
       for (const update of updates) {
         await txn`
           UPDATE landscape.tbl_container
@@ -132,9 +130,7 @@ export async function PATCH(
     })
 
     // Return updated containers
-    const updated = await sql<
-      [{ division_id: number; sort_order: number | null }]
-    >`
+    const updated = await sql`
       SELECT division_id, sort_order
       FROM landscape.tbl_container
       WHERE division_id = ANY(${divisionIds})

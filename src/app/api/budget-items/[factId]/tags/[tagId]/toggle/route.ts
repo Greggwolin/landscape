@@ -20,7 +20,7 @@ export async function PUT(
   }
 
   try {
-    const rows = await sql<BudgetTag[]>`
+    const rows = await sql`
       UPDATE landscape.core_fin_fact_tags
       SET is_compact = NOT COALESCE(is_compact, FALSE)
       WHERE tag_id = ${tagId} AND fact_id = ${factId}

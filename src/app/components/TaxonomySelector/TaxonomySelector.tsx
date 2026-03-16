@@ -1,17 +1,33 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import {
+import type {
   FamilyChoice,
-  DensityChoice,
   TypeChoice,
   ProductChoice,
-  TaxonomySelection
 } from '@/types/landuse'
 
+// DensityChoice interface
+interface DensityChoice {
+  density_id: number
+  density_code: string
+  density_name: string
+  family_id?: number
+}
+
 interface TaxonomySelectorProps {
-  value?: TaxonomySelection
-  onChange: (selection: TaxonomySelection) => void
+  value?: {
+    family?: FamilyChoice
+    density?: DensityChoice
+    type?: TypeChoice
+    product?: ProductChoice
+  }
+  onChange: (selection: {
+    family?: FamilyChoice
+    density?: DensityChoice
+    type?: TypeChoice
+    product?: ProductChoice
+  }) => void
   disabled?: boolean
   showProduct?: boolean
   className?: string
@@ -128,9 +144,9 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
   }, [value?.family, value?.type, showProduct])
 
   const handleFamilyChange = useCallback((familyId: string) => {
-    const family = families.find(f => f.family_id === parseInt(familyId))
+    const family = families.find(f => f.family_id === parseInt(familyId, 10))
     onChange({
-      family,
+      family: family || undefined,
       density: undefined,
       type: undefined,
       product: undefined
@@ -138,29 +154,32 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
   }, [families, onChange])
 
   const handleDensityChange = useCallback((densityId: string) => {
-    const density = densities.find(d => d.density_id === parseInt(densityId))
+    const density = densities.find(d => d.density_id === parseInt(densityId, 10))
     onChange({
-      ...value,
-      density,
+      family: value?.family,
+      density: density || undefined,
       type: undefined,
       product: undefined
     })
   }, [densities, value, onChange])
 
   const handleTypeChange = useCallback((typeId: string) => {
-    const type = types.find(t => t.type_id === parseInt(typeId))
+    const type = types.find(t => t.type_id === parseInt(typeId, 10))
     onChange({
-      ...value,
-      type,
+      family: value?.family,
+      density: value?.density,
+      type: type || undefined,
       product: undefined
     })
   }, [types, value, onChange])
 
   const handleProductChange = useCallback((productId: string) => {
-    const product = products.find(p => p.product_id === parseInt(productId))
+    const product = products.find(p => p.product_id === parseInt(productId, 10))
     onChange({
-      ...value,
-      product
+      family: value?.family,
+      density: value?.density,
+      type: value?.type,
+      product: product || undefined
     })
   }, [products, value, onChange])
 
@@ -178,14 +197,14 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       <div className={compact ? '' : 'space-y-1'}>
         {!compact && <label className="block text-sm font-medium text-gray-700">Family</label>}
         <select
-          value={value?.family?.family_id || ''}
+          value={value?.family?.family_id?.toString() || ''}
           onChange={(e) => handleFamilyChange(e.target.value)}
           disabled={disabled || loading}
           className={selectClass}
         >
           <option value="">Select Family</option>
           {families.map(family => (
-            <option key={family.family_id} value={family.family_id}>
+            <option key={family.family_id} value={family.family_id.toString()}>
               {compact ? family.family_code : `${family.family_code} - ${family.family_name}`}
             </option>
           ))}
@@ -196,14 +215,14 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       <div className={compact ? '' : 'space-y-1'}>
         {!compact && <label className="block text-sm font-medium text-gray-700">Density</label>}
         <select
-          value={value?.density?.density_id || ''}
+          value={value?.density?.density_id?.toString() || ''}
           onChange={(e) => handleDensityChange(e.target.value)}
           disabled={disabled || loading || !value?.family}
           className={selectClass}
         >
           <option value="">Select Density</option>
           {densities.map(density => (
-            <option key={density.density_id} value={density.density_id}>
+            <option key={density.density_id} value={density.density_id.toString()}>
               {compact ? density.density_code : `${density.density_code} - ${density.density_name}`}
             </option>
           ))}
@@ -214,14 +233,14 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       <div className={compact ? '' : 'space-y-1'}>
         {!compact && <label className="block text-sm font-medium text-gray-700">Type</label>}
         <select
-          value={value?.type?.type_id || ''}
+          value={value?.type?.type_id?.toString() || ''}
           onChange={(e) => handleTypeChange(e.target.value)}
           disabled={disabled || loading || !value?.density}
           className={selectClass}
         >
           <option value="">Select Type</option>
           {types.map(type => (
-            <option key={type.type_id} value={type.type_id}>
+            <option key={type.type_id} value={type.type_id.toString()}>
               {compact ? type.type_code : `${type.type_code} - ${type.type_name}`}
             </option>
           ))}
@@ -233,15 +252,15 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
         <div className={compact ? '' : 'space-y-1'}>
           {!compact && <label className="block text-sm font-medium text-gray-700">Product</label>}
           <select
-            value={value?.product?.product_id || ''}
+            value={value?.product?.product_id?.toString() || ''}
             onChange={(e) => handleProductChange(e.target.value)}
             disabled={disabled || loading || !value?.type}
             className={selectClass}
           >
             <option value="">Select Product</option>
             {products.map(product => (
-              <option key={product.product_id} value={product.product_id}>
-                {compact ? product.product_code : product.product_name}
+              <option key={product.product_id} value={product.product_id.toString()}>
+                {compact ? product.code : product.product_name}
               </option>
             ))}
           </select>

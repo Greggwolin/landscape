@@ -98,7 +98,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
 
   if (categoryId && projectTypeCode) {
     // Both filters
-    result = await sql<TemplateRow>`
+    result = await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -113,7 +113,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
     `;
   } else if (categoryId) {
     // Only category filter
-    result = await sql<TemplateRow>`
+    result = await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -127,7 +127,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
     `;
   } else if (projectTypeCode) {
     // Only project type filter
-    result = await sql<TemplateRow>`
+    result = await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -141,7 +141,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
     `;
   } else {
     // No filters - return all active items
-    result = await sql<TemplateRow>`
+    result = await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,

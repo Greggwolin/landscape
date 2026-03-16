@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, context: Params) {
     const tolerance = parseFloat(searchParams.get('tolerance') || String(BAND_TOLERANCE));
 
     // Get all product-level pricing from competitors for this project
-    const products = await sql<ProductPricingRow>`
+    const products = await sql`
       SELECT
         p.competitive_project_id,
         c.comp_name,

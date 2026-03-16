@@ -18,14 +18,7 @@ export async function GET(request: NextRequest) {
       request.nextUrl.searchParams.get('includeInactive')
     );
 
-    const rows = await sql<{
-      curveId: number;
-      curveName: string;
-      curveCode: string;
-      description: string | null;
-      deciles: (string | number)[];
-      isSystem: boolean | null;
-    }>`
+    const rows = await sql`
       SELECT
         curve_id AS "curveId",
         curve_name AS "curveName",
@@ -52,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     const labels = ['10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', '100%'];
     const profiles = rows.map(row => {
-      const deciles = row.deciles.map(value => Number(value));
+      const deciles = row.deciles.map((value: any) => Number(value));
       return {
         ...row,
         curveCode: row.curveCode?.toUpperCase() ?? 'S',

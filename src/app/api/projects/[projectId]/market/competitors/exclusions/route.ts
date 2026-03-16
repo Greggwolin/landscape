@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, context: Params) {
       return NextResponse.json({ error: 'project id required' }, { status: 400 });
     }
 
-    const exclusions = await sql<ExclusionRow>`
+    const exclusions = await sql`
       SELECT id, project_id, source_project_id, excluded_at::text, excluded_reason
       FROM landscape.market_competitive_project_exclusions
       WHERE project_id = ${projectId}::integer
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, context: Params) {
     }
 
     // Add exclusion
-    const rows = await sql<ExclusionRow>`
+    const rows = await sql`
       INSERT INTO landscape.market_competitive_project_exclusions (
         project_id, source_project_id, excluded_reason
       ) VALUES (

@@ -62,7 +62,8 @@ const PAGE_LABELS: Record<string, string> = {
   valuation_income: 'Valuation > Income Approach',
   'valuation_cash-flow': 'Valuation > Cash Flow',
   'valuation_comparable-sales': 'Valuation > Comparable Sales',
-  'valuation_market-comps': 'Valuation > Market Comps',
+  'valuation_rent-comps': 'Valuation > Income Approach > Rent Comps',
+  'valuation_expense-comps': 'Valuation > Income Approach > Expense Comps',
   valuation_reconciliation: 'Valuation > Reconciliation',
 
   // Feasibility (Land Dev)

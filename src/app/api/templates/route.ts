@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get specific template with columns
     if (templateId) {
-      const templates = await sql<Template[]>`
+      const templates = await sql`
         SELECT
           template_id,
           template_name,
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         )
       }
 
-      const columns = await sql<TemplateColumn[]>`
+      const columns = await sql`
         SELECT
           template_column_id,
           column_name,
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     let templates: Template[]
 
     if (propertyType) {
-      templates = await sql<Template[]>`
+      templates = await sql`
         SELECT
           t.template_id,
           t.template_name,
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
         ORDER BY t.template_name
       `
     } else {
-      templates = await sql<Template[]>`
+      templates = await sql`
         SELECT
           t.template_id,
           t.template_name,
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     if (includeColumns && templates.length > 0) {
       const templateIds = templates.map(t => t.template_id)
 
-      const allColumns = await sql<TemplateColumn & { template_id: number }[]>`
+      const allColumns = await sql`
         SELECT
           template_id,
           template_column_id,

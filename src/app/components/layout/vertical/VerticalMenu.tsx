@@ -47,18 +47,18 @@ const VerticalMenu = ({ scrollMenu }: { scrollMenu: (container: ScrollContainer,
       {...(isBreakpointReached
         ? {
             className: 'bs-full overflow-y-auto overflow-x-hidden',
-            onScroll: container => scrollMenu(container, false)
+            onScroll: (container: any) => scrollMenu(container, false)
           }
         : {
             options: { wheelPropagation: false, suppressScrollX: true },
-            onScrollY: container => scrollMenu(container, true)
+            onScrollY: (container: any) => scrollMenu(container, true)
           })}
     >
       {/* Incase you also want to scroll NavHeader to scroll with Vertical Menu, remove NavHeader from above and paste it below this comment */}
       {/* Vertical Menu */}
       <Menu
         menuItemStyles={menuItemStyles(theme)}
-        renderExpandIcon={({ open }) => <RenderExpandIcon open={open} transitionDuration={transitionDuration} />}
+        renderExpandIcon={({ open }: any) => <RenderExpandIcon open={open} transitionDuration={transitionDuration} />}
         renderExpandedMenuItemIcon={{ icon: <i className='ri-circle-line' /> }}
         menuSectionStyles={menuSectionStyles(theme)}
       >

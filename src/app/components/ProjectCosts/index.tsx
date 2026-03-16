@@ -65,7 +65,7 @@ const ProjectCosts: React.FC<Props> = ({ projectCosts, updateProjectCost, embedd
                 value={item.unit}
                 onChange={(e) => updateProjectCost(sectionKey, item.id, 'unit', e.target.value)}
               >
-                {uomOptions?.all?.map((option, index) => {
+                {uomOptions?.all?.map((option: any, index: any) => {
                   if ('isDivider' in option) {
                     return (
                       <option key={`divider-${index}`} disabled style={{

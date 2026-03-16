@@ -120,7 +120,7 @@ export async function GET(request: Request) {
     }
 
     // Try to fetch project-specific growth rate assumptions
-    const rows = await sql<Assumptionrule>`
+    const rows = await sql`
       SELECT rule_id, rule_category, rule_key, rule_value
       FROM landscape.tbl_assumptionrule
       WHERE rule_category IN ('DEVELOPMENT_COSTS', 'PRICE_APPRECIATION', 'SALES_ABSORPTION', 'GROWTH_RATES')
@@ -205,7 +205,7 @@ export async function PUT(request: Request) {
     }
 
     // First, get the existing assumption to understand its category
-    const existingRows = await sql<Assumptionrule>`
+    const existingRows = await sql`
       SELECT rule_id, rule_category, rule_key, rule_value
       FROM landscape.tbl_assumptionrule
       WHERE rule_id = ${id}
@@ -240,7 +240,7 @@ export async function PUT(request: Request) {
       ruleKey = ruleKey?.replace('_GLOBAL', `_PROJECT_${projectId}`) || `${existing.ruleCategory}_PROJECT_${projectId}`
     }
 
-    const updatedRows = await sql<Assumptionrule>`
+    const updatedRows = await sql`
       UPDATE landscape.tbl_assumptionrule
       SET rule_value = ${JSON.stringify(updatedValue)}
       WHERE rule_id = ${id}
@@ -330,7 +330,7 @@ export async function POST(request: Request) {
       ]
     }
 
-    const rows = await sql<Assumptionrule>`
+    const rows = await sql`
       INSERT INTO landscape.tbl_assumptionrule (rule_category, rule_key, rule_value)
       VALUES (${category}, ${ruleKey}, ${JSON.stringify(ruleValue)})
       RETURNING rule_id, rule_category, rule_key, rule_value
@@ -382,7 +382,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Assumption ID required' }, { status: 400 })
     }
 
-    const deletedRows = await sql<Assumptionrule>`
+    const deletedRows = await sql`
       DELETE FROM landscape.tbl_assumptionrule
       WHERE rule_id = ${parseInt(id)}
       RETURNING rule_id

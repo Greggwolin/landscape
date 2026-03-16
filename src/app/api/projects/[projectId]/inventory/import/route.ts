@@ -63,7 +63,7 @@ export async function POST(
     }
 
     // Get existing columns to determine hierarchy vs data
-    const existingColumns = await sql<any[]>`
+    const existingColumns = await sql`
       SELECT column_name, column_type, tier
       FROM landscape.tbl_project_inventory_columns
       WHERE project_id = ${id}
@@ -119,7 +119,7 @@ export async function POST(
                          `ITEM-${rowIndex + 1}`
 
         // Insert inventory item
-        const result = await sql<any[]>`
+        const result = await sql`
           INSERT INTO landscape.tbl_inventory_item (
             project_id,
             property_type,
@@ -149,7 +149,7 @@ export async function POST(
 
         // Count containers created at each level (trigger auto-creates them)
         if (result[0].division_id) {
-          const tier = await sql<[{ tier: number }]>`
+          const tier = await sql`
             SELECT tier
             FROM landscape.tbl_container
             WHERE division_id = ${result[0].division_id}
@@ -172,7 +172,7 @@ export async function POST(
     }
 
     // Get unique container counts (since trigger may reuse existing)
-    const containerCounts = await sql<any[]>`
+    const containerCounts = await sql`
       SELECT
         tier,
         COUNT(DISTINCT division_id) as count

@@ -544,7 +544,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
 
   const familyDistribution = useMemo(() => {
     return Object.entries(familyTotals)
-      .map(([family, totals]) => ({
+      .map(([family, totals]: [string, { acres: number; units: number }]) => ({
         family,
         acres: Number(totals.acres ?? 0),
         units: Number(totals.units ?? 0)

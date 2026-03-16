@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      categories = await sql<CategoryRow>`
+      categories = await sql`
         SELECT
           c.category_id,
           c.parent_id,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       `;
     } else if (includeAll) {
       // Return all OpEx categories (account numbers starting with 5)
-      categories = await sql<CategoryRow>`
+      categories = await sql`
         SELECT
           c.category_id,
           c.parent_id,
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       `;
     } else {
       // Return top-level OpEx categories with Operations lifecycle stage
-      categories = await sql<CategoryRow>`
+      categories = await sql`
         SELECT DISTINCT
           c.category_id,
           c.parent_id,

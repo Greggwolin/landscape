@@ -32,7 +32,7 @@ export async function PUT(
     const searchParams = request.nextUrl.searchParams;
     const overrideDiscriminator = searchParams.get('statement_discriminator') || body.statement_discriminator;
 
-    const activeResult = await sql<{ active_opex_discriminator: string }[]>`
+    const activeResult = await sql`
       SELECT active_opex_discriminator
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}
@@ -107,7 +107,7 @@ export async function PUT(
 
     // Validate that this account is editable (not calculated)
     // After migration 042, categories are in core_unit_cost_category
-    const accountCheck = await sql<{ is_calculated: boolean }[]>`
+    const accountCheck = await sql`
       SELECT COALESCE(is_calculated, false) as is_calculated
       FROM landscape.core_unit_cost_category
       WHERE category_id = ${accountId}
@@ -127,17 +127,7 @@ export async function PUT(
       );
     }
 
-    const expenseResult = await sql<{
-      opex_id: number;
-      annual_amount: number | null;
-      calculation_basis: string | null;
-      unit_amount: number | null;
-      is_auto_calculated: boolean | null;
-      escalation_rate: number | null;
-      start_period: number | null;
-      payment_frequency: string | null;
-      notes: string | null;
-    }[]>`
+    const expenseResult = await sql`
       SELECT
         opex_id,
         annual_amount,
@@ -181,7 +171,7 @@ export async function PUT(
 
     if (shouldRecalculate) {
       nextUnitAmount = nextUnitAmount ?? 0;
-      const calculatedAmount = await sql<{ amount: number | null }[]>`
+      const calculatedAmount = await sql`
         SELECT landscape.calculate_land_dev_opex(${projectId}, ${nextCalculationBasis}, ${nextUnitAmount}) AS amount
       `;
       nextAnnualAmount = Number(calculatedAmount[0]?.amount ?? 0);
@@ -238,7 +228,7 @@ export async function PUT(
         notes
     `;
 
-    const projectResult = await sql<{ project_type_code: string }[]>`
+    const projectResult = await sql`
       SELECT project_type_code
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}

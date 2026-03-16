@@ -247,7 +247,7 @@ export function AddCompetitorModal({ projectId, isOpen, onClose }: AddCompetitor
                           </div>
                         )}
 
-                        {zondaSearch.data?.results.map((project) => (
+                        {zondaSearch.data?.results.map((project: any) => (
                           <button
                             key={project.record_id}
                             className="dropdown-item"

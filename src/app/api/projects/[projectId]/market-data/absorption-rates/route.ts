@@ -17,7 +17,7 @@ export async function GET(
   }
 
   try {
-    const comparables = await sql<any[]>`
+    const comparables = await sql`
       SELECT
         comp_id AS id,
         project_name,

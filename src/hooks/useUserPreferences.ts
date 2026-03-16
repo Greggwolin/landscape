@@ -266,11 +266,11 @@ export function useBudgetGroupingPersistence(projectId: number) {
   });
 
   const setIsGrouped = useCallback((isGrouped: boolean) => {
-    setGroupingState(prev => ({ ...prev, isGrouped }));
+    setGroupingState((prev: any) => ({ ...prev, isGrouped }));
   }, [setGroupingState]);
 
   const setExpandedCategories = useCallback((expandedCategories: string[]) => {
-    setGroupingState(prev => ({ ...prev, expandedCategories }));
+    setGroupingState((prev: any) => ({ ...prev, expandedCategories }));
   }, [setGroupingState]);
 
   return {

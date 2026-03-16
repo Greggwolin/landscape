@@ -29,7 +29,7 @@ export async function GET(
       );
     }
 
-    const stats = await sql<InventoryStats[]>`
+    const stats = await sql`
       WITH parcel_status AS (
         SELECT
           p.parcel_id,

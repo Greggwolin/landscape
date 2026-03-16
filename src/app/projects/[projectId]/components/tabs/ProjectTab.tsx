@@ -102,14 +102,14 @@ export default function ProjectTab({
   showProjectSelectorInLocationHeader = false
 }: ProjectTabProps) {
   const { projects, selectProject, activeProjectId } = useProjectContext();
-  const normalizeMarketValue = (proj: Project) => {
+  const normalizeMarketValue = (proj: Project): string | undefined => {
     if (!proj.market) return proj.market;
     const marketLower = proj.market.trim().toLowerCase();
     const stateCandidates = [proj.state, proj.jurisdiction_state].filter(Boolean).map(v => String(v).trim().toLowerCase());
-    return stateCandidates.includes(marketLower) ? null : proj.market;
+    return stateCandidates.includes(marketLower) ? undefined : proj.market;
   };
 
-  const normalizeProject = (proj: Project) => ({
+  const normalizeProject = (proj: Project): Project => ({
     ...proj,
     market: normalizeMarketValue(proj)
   });
@@ -1204,17 +1204,17 @@ export default function ProjectTab({
                 <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-primary-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   {loadingMarketData ? (
                     <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
-                  ) : (
+                  ) : marketStats ? (
                     <>
                       <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-primary)' }}>
-                        {marketStats?.inflation.value !== null
+                        {marketStats.inflation.value !== null
                           ? `${marketStats.inflation.value.toFixed(1)}`
                           : 'N/A'}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
                         Inflation (CPI)
                       </div>
-                      {marketStats?.inflation.yoy !== null && (
+                      {marketStats.inflation.yoy !== null && (
                         <div
                           style={{
                             fontSize: '0.65rem',
@@ -1227,9 +1227,11 @@ export default function ProjectTab({
                         </div>
                       )}
                       <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
-                        {marketStats?.inflation.updatedDate}
+                        {marketStats.inflation.updatedDate}
                       </div>
                     </>
+                  ) : (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>No data</div>
                   )}
                 </div>
               </CCol>
@@ -1239,17 +1241,17 @@ export default function ProjectTab({
                 <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-success-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   {loadingMarketData ? (
                     <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
-                  ) : (
+                  ) : marketStats ? (
                     <>
                       <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-success)' }}>
-                        {marketStats?.treasury10y.value !== null
+                        {marketStats.treasury10y.value !== null
                           ? `${marketStats.treasury10y.value.toFixed(2)}%`
                           : 'N/A'}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
                         10-Year Treasury
                       </div>
-                      {marketStats?.treasury10y.yoy !== null && (
+                      {marketStats.treasury10y.yoy !== null && (
                         <div
                           style={{
                             fontSize: '0.65rem',
@@ -1262,9 +1264,11 @@ export default function ProjectTab({
                         </div>
                       )}
                       <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
-                        {marketStats?.treasury10y.updatedDate}
+                        {marketStats.treasury10y.updatedDate}
                       </div>
                     </>
+                  ) : (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>No data</div>
                   )}
                 </div>
               </CCol>
@@ -1274,17 +1278,17 @@ export default function ProjectTab({
                 <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-warning-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   {loadingMarketData ? (
                     <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
-                  ) : (
+                  ) : marketStats ? (
                     <>
                       <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-warning)' }}>
-                        {marketStats?.primeRate.value !== null
+                        {marketStats.primeRate.value !== null
                           ? `${marketStats.primeRate.value.toFixed(2)}%`
                           : 'N/A'}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
                         Prime Rate
                       </div>
-                      {marketStats?.primeRate.yoy !== null && (
+                      {marketStats.primeRate.yoy !== null && (
                         <div
                           style={{
                             fontSize: '0.65rem',
@@ -1297,9 +1301,11 @@ export default function ProjectTab({
                         </div>
                       )}
                       <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
-                        {marketStats?.primeRate.updatedDate}
+                        {marketStats.primeRate.updatedDate}
                       </div>
                     </>
+                  ) : (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>No data</div>
                   )}
                 </div>
               </CCol>
@@ -1309,17 +1315,17 @@ export default function ProjectTab({
                 <div className="text-center p-2" style={{ backgroundColor: 'var(--cui-info-bg)', borderRadius: '8px', border: '1px solid var(--tile-border)' }}>
                   {loadingMarketData ? (
                     <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>Loading...</div>
-                  ) : (
+                  ) : marketStats ? (
                     <>
                       <div className="font-bold" style={{ fontSize: '1.25rem', color: 'var(--cui-info)' }}>
-                        {marketStats?.sofr90day.value !== null
+                        {marketStats.sofr90day.value !== null
                           ? `${marketStats.sofr90day.value.toFixed(2)}%`
                           : 'N/A'}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--cui-body-color)' }}>
                         SOFR (90-day)
                       </div>
-                      {marketStats?.sofr90day.yoy !== null && (
+                      {marketStats.sofr90day.yoy !== null && (
                         <div
                           style={{
                             fontSize: '0.65rem',
@@ -1332,9 +1338,11 @@ export default function ProjectTab({
                         </div>
                       )}
                       <div style={{ fontSize: '0.6rem', marginTop: '1px', color: 'var(--cui-secondary-color)' }}>
-                        {marketStats?.sofr90day.updatedDate}
+                        {marketStats.sofr90day.updatedDate}
                       </div>
                     </>
+                  ) : (
+                    <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.8rem' }}>No data</div>
                   )}
                 </div>
               </CCol>

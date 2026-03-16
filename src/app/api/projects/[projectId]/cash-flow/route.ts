@@ -24,7 +24,7 @@ export async function GET(
   }
 
   try {
-    const rows = await sql<CashFlowRow[]>`
+    const rows = await sql`
       SELECT
         p.period_id,
         p.period_sequence,

@@ -29,7 +29,7 @@ export async function GET(
     const format = searchParams.get('format') || 'full'; // 'full' | 'chunks' | 'summary'
 
     // First verify the document belongs to this project
-    const docCheck = await sql<{ doc_id: number; doc_name: string; doc_type: string }[]>`
+    const docCheck = await sql`
       SELECT doc_id, doc_name, doc_type
       FROM landscape.core_doc
       WHERE doc_id = ${docId}::bigint
@@ -46,7 +46,7 @@ export async function GET(
     const doc = docCheck[0];
 
     // Fetch all content chunks for this document from embeddings
-    const chunks = await sql<ContentChunk[]>`
+    const chunks = await sql`
       SELECT
         embedding_id,
         content_text,

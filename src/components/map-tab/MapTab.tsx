@@ -553,7 +553,7 @@ export function MapTab({ project }: MapTabProps) {
           return;
         }
 
-        const enriched = features.map((feature, index) => {
+        const enriched = features.map((feature: any, index: any) => {
           const props = (feature.properties ?? {}) as Record<string, unknown>;
           return {
             ...feature,

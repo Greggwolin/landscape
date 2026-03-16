@@ -183,7 +183,7 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
               size="sm"
               intent="tertiary-action"
               variant="ghost"
-              onClick={(e) => {
+              onClick={(e: any) => {
                 e.stopPropagation();
                 onEdit();
               }}
@@ -195,7 +195,7 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
               size="sm"
               intent="tertiary-action"
               variant="ghost"
-              onClick={(e) => {
+              onClick={(e: any) => {
                 e.stopPropagation();
                 onEdit();
               }}
@@ -207,7 +207,7 @@ const UOMRow = forwardRef<HTMLTableRowElement, UOMRowProps>(({
               size="sm"
               intent="destructive-action"
               variant="ghost"
-              onClick={(e) => {
+              onClick={(e: any) => {
                 e.stopPropagation();
                 onDelete();
               }}

@@ -321,7 +321,7 @@ const ParcelForm: React.FC<ParcelFormProps> = ({
               <h3 className="text-lg font-medium text-gray-300 mb-3">Land Use Classification</h3>
               <TaxonomySelector
                 value={taxonomySelection}
-                onChange={(taxonomy) => {
+                onChange={(taxonomy: any) => {
                   // Only update if the values actually changed to prevent loops
                   const hasChanged = (
                     taxonomy.family_name !== taxonomySelection.family_name ||

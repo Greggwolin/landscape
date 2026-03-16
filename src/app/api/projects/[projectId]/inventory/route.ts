@@ -71,7 +71,7 @@ export async function GET(
 
   try {
     // Get project to determine property type
-    const projectResult = await sql<[{ project_type: string }]>`
+    const projectResult = await sql`
       SELECT project_type
       FROM landscape.tbl_project
       WHERE project_id = ${id}
@@ -84,7 +84,7 @@ export async function GET(
     const propertyType = projectResult[0].project_type || 'mpc'
 
     // Get property type configuration
-    const configResult = await sql<PropertyTypeConfig[]>`
+    const configResult = await sql`
       SELECT *
       FROM landscape.tbl_property_type_config
       WHERE property_type = ${propertyType}
@@ -93,7 +93,7 @@ export async function GET(
     const typeConfig = configResult[0] || null
 
     // Get project-specific column configuration
-    const columnsResult = await sql<ColumnConfig[]>`
+    const columnsResult = await sql`
       SELECT *
       FROM landscape.tbl_project_inventory_columns
       WHERE project_id = ${id}
@@ -101,7 +101,7 @@ export async function GET(
     `
 
     // Get inventory items with land use labels
-    const itemsResult = await sql<InventoryItem[]>`
+    const itemsResult = await sql`
       SELECT
         i.*,
         f.name as family_label,
@@ -187,7 +187,7 @@ export async function POST(
     }
 
     // Check for duplicate item_code
-    const duplicateCheck = await sql<[{ count: number }]>`
+    const duplicateCheck = await sql`
       SELECT COUNT(*)::int as count
       FROM landscape.tbl_inventory_item
       WHERE project_id = ${id}
@@ -209,7 +209,7 @@ export async function POST(
     }
 
     // Insert inventory item
-    const result = await sql<InventoryItem[]>`
+    const result = await sql`
       INSERT INTO landscape.tbl_inventory_item (
         project_id,
         property_type,

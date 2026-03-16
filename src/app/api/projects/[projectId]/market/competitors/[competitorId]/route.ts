@@ -40,7 +40,7 @@ export async function GET(_req: NextRequest, context: Params) {
       return NextResponse.json({ error: 'project id and competitor id required' }, { status: 400 });
     }
 
-    const competitors = await sql<CompetitorRow>`
+    const competitors = await sql`
       SELECT
         id, project_id, master_plan_name, comp_name, builder_name,
         comp_address, latitude, longitude, city, zip_code,

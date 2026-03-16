@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Group contacts by role
-    const grouped = rows.reduce((acc, contact) => {
+    const grouped = rows.reduce((acc: any, contact: any) => {
       const role = contact.contact_role;
       if (!acc[role]) {
         acc[role] = {

@@ -105,7 +105,7 @@ export const dmsDb = {
    * Get default workspace
    */
   async getDefaultWorkspace(): Promise<DMSWorkspace | null> {
-    const result = await sql<DMSWorkspace[]>`
+    const result = await sql`
       SELECT * FROM landscape.dms_workspaces 
       WHERE is_default = true 
       LIMIT 1
@@ -117,7 +117,7 @@ export const dmsDb = {
    * Get workspace by code
    */
   async getWorkspaceByCode(code: string): Promise<DMSWorkspace | null> {
-    const result = await sql<DMSWorkspace[]>`
+    const result = await sql`
       SELECT * FROM landscape.dms_workspaces 
       WHERE workspace_code = ${code}
     `;
@@ -128,7 +128,7 @@ export const dmsDb = {
    * Get attributes for template
    */
   async getTemplateAttributes(templateId: number): Promise<(DMSAttribute & { is_required: boolean; display_order: number })[]> {
-    return await sql<(DMSAttribute & { is_required: boolean; display_order: number })[]>`
+    return await sql`
       SELECT a.*, ta.is_required, ta.display_order
       FROM landscape.dms_attributes a
       JOIN landscape.dms_template_attributes ta ON a.attr_id = ta.attr_id
@@ -141,7 +141,7 @@ export const dmsDb = {
    * Get default template for workspace/project
    */
   async getDefaultTemplate(workspaceId: number, projectId?: number, docType?: string): Promise<DMSTemplate | null> {
-    const result = await sql<DMSTemplate[]>`
+    const result = await sql`
       SELECT * FROM landscape.dms_templates
       WHERE workspace_id = ${workspaceId}
         AND (project_id IS NULL OR project_id = ${projectId || null})
@@ -159,7 +159,7 @@ export const dmsDb = {
    * Create document with profile validation
    */
   async createDocument(doc: Omit<CoreDoc, 'doc_id' | 'created_at' | 'updated_at'>): Promise<CoreDoc> {
-    const result = await sql<CoreDoc[]>`
+    const result = await sql`
       INSERT INTO landscape.core_doc (
         project_id, workspace_id, phase_id, parcel_id, parcel_id_int, doc_name, doc_type,
         discipline, mime_type, file_size_bytes, sha256_hash, storage_uri,
@@ -187,7 +187,7 @@ export const dmsDb = {
     changeReason?: string
   ): Promise<CoreDoc> {
     // Get current document
-    const currentDoc = await sql<CoreDoc[]>`
+    const currentDoc = await sql`
       SELECT * FROM landscape.core_doc WHERE doc_id = ${docId}
     `;
     
@@ -211,7 +211,7 @@ export const dmsDb = {
       : null;
 
     const updatedDoc = newDocType
-      ? await sql<CoreDoc[]>`
+      ? await sql`
           UPDATE landscape.core_doc
           SET profile_json = ${JSON.stringify(newProfile)},
               doc_type = ${newDocType},
@@ -220,7 +220,7 @@ export const dmsDb = {
           WHERE doc_id = ${docId}
           RETURNING *
         `
-      : await sql<CoreDoc[]>`
+      : await sql`
           UPDATE landscape.core_doc
           SET profile_json = ${JSON.stringify(newProfile)},
               updated_by = ${changedBy || null},

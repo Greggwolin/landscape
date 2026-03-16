@@ -370,7 +370,7 @@ export function getColumnsByMode(
           size="sm"
           variant="ghost"
           className="p-1"
-          onClick={(event) => {
+          onClick={(event: any) => {
             event.stopPropagation();
             handlers.onRowAdd?.(row.original);
           }}
@@ -383,7 +383,7 @@ export function getColumnsByMode(
           size="sm"
           variant="ghost"
           className="p-1"
-          onClick={(event) => {
+          onClick={(event: any) => {
             event.stopPropagation();
             handlers.onRowDelete?.(row.original);
           }}

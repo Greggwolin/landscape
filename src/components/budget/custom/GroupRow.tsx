@@ -195,7 +195,7 @@ export default function GroupRow({
               size="sm"
               variant="ghost"
               className="text-nowrap"
-              onClick={(event) => {
+              onClick={(event: any) => {
                 event.stopPropagation();
                 onAddItem();
               }}

@@ -22,7 +22,7 @@ function verifyCronAuth(req: NextRequest): boolean {
 }
 
 async function fetchSeriesRate(seriesCode: string): Promise<{ rate: number; asOf: string } | null> {
-  const rows = await sql<RateRow>`
+  const rows = await sql`
     WITH target_series AS (
       SELECT ms.series_id
       FROM public.market_series ms
@@ -65,7 +65,7 @@ async function fetchSeriesRate(seriesCode: string): Promise<{ rate: number; asOf
 }
 
 async function runSync() {
-  const seriesRows = await sql<ProjectSettingsRow>`
+  const seriesRows = await sql`
     SELECT DISTINCT cpi_series_id
     FROM landscape.tbl_project_settings
     WHERE use_auto_cpi = true
@@ -108,7 +108,7 @@ async function runSync() {
         continue;
       }
 
-      const updateRows = await sql<{ project_id: number }>`
+      const updateRows = await sql`
         UPDATE landscape.tbl_project_settings
         SET
           global_inflation_rate = ${rateInfo.rate},
@@ -149,7 +149,7 @@ export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get('mode');
 
   if (mode === 'status') {
-    const autoProjects = await sql<{ count: number }>`
+    const autoProjects = await sql`
       SELECT COUNT(*)::int AS count
       FROM landscape.tbl_project_settings
       WHERE use_auto_cpi = true

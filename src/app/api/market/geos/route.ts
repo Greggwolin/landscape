@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     let notice: string | null = null;
 
     const findCity = async (cityName: string, stateCode: string) => {
-      const rows = await sql<GeoRow>`
+      const rows = await sql`
         SELECT geo_id, geo_level, geo_name, hierarchy, usps_city, usps_state
         FROM public.geo_xwalk
         WHERE geo_level = 'CITY'
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     };
 
     const findState = async (stateCode: string) => {
-      const rows = await sql<GeoRow>`
+      const rows = await sql`
         SELECT geo_id, geo_level, geo_name, hierarchy, usps_city, usps_state
         FROM public.geo_xwalk
         WHERE geo_level = 'STATE'
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     };
 
     if (geoId) {
-      const rows = await sql<GeoRow>`
+      const rows = await sql`
         SELECT geo_id, geo_level, geo_name, hierarchy, usps_city, usps_state
         FROM public.geo_xwalk
         WHERE geo_id = ${geoId}
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     const uniqueIds = Array.from(new Set(ids));
 
-    const related = await sql<GeoRow>`
+    const related = await sql`
       SELECT geo_id, geo_level, geo_name, hierarchy, usps_city, usps_state
       FROM public.geo_xwalk
       WHERE geo_id = ANY(${uniqueIds})
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       byId.set(row.geo_id, row);
     }
 
-    const dataCounts = await sql<{ geo_id: string; observations: string }>`
+    const dataCounts = await sql`
       SELECT md.geo_id, COUNT(*)::text AS observations
       FROM public.market_data md
       WHERE md.geo_id = ANY(${uniqueIds})

@@ -28,7 +28,7 @@ const PrototypeMeta = ({ prototype }: { prototype: PrototypeMetadata }) => {
           Branch: {prototype.branch}
         </Link>
       ) : null}
-      {prototype.tags?.map((tag) => (
+      {prototype.tags?.map((tag: any) => (
         <span key={tag} className="rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1 uppercase">
           {tag}
         </span>

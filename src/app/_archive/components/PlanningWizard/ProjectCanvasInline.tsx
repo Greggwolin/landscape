@@ -139,7 +139,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
 
   const dropHandlers = useMemo(() => {
     const map = new Map<string, (item: { type: string }) => void>()
-    project.areas.forEach(area => {
+    project.areas.forEach((area: any) => {
       map.set(area.id, (item: { type: string }) => {
         if (item.type === 'phase') {
           onAddPhase(area.id)
@@ -189,7 +189,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {project.areas.map(area => {
+        {project.areas.map((area: any) => {
           const isEditing = editingArea === area.id
           const values = areaValues[area.id] ?? { name: area.name, description: (area as any).description ?? '' }
           const dropHandler = dropHandlers.get(area.id) ?? (() => {})
@@ -242,7 +242,7 @@ const ProjectCanvasInline: React.FC<ProjectCanvasInlineProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                  {area.phases.map(phase => {
+                  {area.phases.map((phase: any) => {
                     const phaseEditing = editingPhase === phase.id
                     const phaseVals = phaseValues[phase.id] ?? {
                       areaId: area.id,

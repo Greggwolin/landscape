@@ -167,7 +167,7 @@ function getConfigKey(
 
 async function queryAnalysisTypeConfigs(): Promise<Map<string, AnalysisTypeTileConfig>> {
   try {
-    const rows = await sql<AnalysisTypeConfigRow[]>`
+    const rows = await sql`
       SELECT
         analysis_type,
         analysis_perspective,
@@ -222,7 +222,7 @@ function attachTileConfigToProjects(
 
 async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]> {
   try {
-    return await sql<RawProjectRow[]>`
+    return await sql`
       SELECT
         project_id,
         project_name,
@@ -266,7 +266,7 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
     const pgError = error as PostgresError
     if (pgError?.code !== '42703') throw error
 
-    const fallbackRows = await sql<FallbackProjectRow[]>`
+    const fallbackRows = await sql`
       SELECT 
         project_id, 
         project_name, 
@@ -466,7 +466,7 @@ export async function POST(request: NextRequest) {
     console.log('Creating project:', body)
 
     // 1. Create the project
-    const projectRows = await sql<{ project_id: number }[]>`
+    const projectRows = await sql`
       INSERT INTO landscape.tbl_project (
         project_name,
         project_type_code,
@@ -507,7 +507,7 @@ export async function POST(request: NextRequest) {
     console.log('Created project with ID:', projectId)
 
     // 2. Get template column configurations
-    const templateColumns = await sql<TemplateColumnConfig[]>`
+    const templateColumns = await sql`
       SELECT
         template_column_id,
         column_name,
@@ -616,7 +616,7 @@ export async function POST(request: NextRequest) {
     console.log('Created project config')
 
     // Return the created project
-    const createdProject = await sql<RawProjectRow[]>`
+    const createdProject = await sql`
       SELECT
         project_id,
         project_name,

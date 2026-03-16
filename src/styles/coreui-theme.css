@@ -179,6 +179,9 @@
   --cui-primary-text: #ffffff;
   --cui-danger-text: #ffffff;
   --cui-card-bg: var(--surface-card);
+  /* Expense Comps column highlights */
+  --cui-expense-subject-bg: #E6F1FB;
+  --cui-expense-platform-bg: #E1F5EE;
 }
 
 [data-coreui-theme='dark'] {
@@ -190,6 +193,9 @@
   --cui-card-bg: var(--surface-card);
   --filter-icon-color: #ffffff;
   --validation-unit-price-color: #07FF8A;
+  /* Expense Comps column highlights (dark mode) */
+  --cui-expense-subject-bg: #042C53;
+  --cui-expense-platform-bg: #04342C;
   /* Tiles & Navigation - Landscaper Icon Fill */
   --landscaper-icon-color: #FFFFFF;
   --landscaper-panel-icon-size: 1.5rem;

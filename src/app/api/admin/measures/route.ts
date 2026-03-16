@@ -63,7 +63,7 @@ export async function GET() {
   try {
     const hasUsageContextsColumn = await (async () => {
       try {
-        const result = await sql<{ exists: boolean }[]>`
+        const result = await sql`
           SELECT EXISTS (
             SELECT 1
             FROM information_schema.columns
@@ -78,9 +78,7 @@ export async function GET() {
       }
     })();
 
-    const rows = await sql<
-      (UnitOfMeasure & { created_by: number | null })[]
-    >`
+    const rows = await sql`
       SELECT
         measure_code,
         measure_name,
@@ -131,15 +129,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const nextOrderRow = await sql<{ next_order: number }[]>`
+    const nextOrderRow = await sql`
       SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order
       FROM landscape.tbl_measures;
     `;
     const nextSort = nextOrderRow[0]?.next_order ?? 1;
 
-    const inserted = await sql<
-      (UnitOfMeasure & { created_by: number | null })[]
-    >`
+    const inserted = await sql`
       INSERT INTO landscape.tbl_measures (
         measure_code,
         measure_name,
