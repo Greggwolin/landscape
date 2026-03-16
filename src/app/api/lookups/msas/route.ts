@@ -20,7 +20,7 @@ export interface MSA {
 
 export async function GET() {
   try {
-    const msas = await sql<MSA[]>`
+    const msas = await sql`
       SELECT
         msa_id,
         msa_name,

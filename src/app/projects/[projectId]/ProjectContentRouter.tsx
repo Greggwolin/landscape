@@ -215,11 +215,6 @@ function ProjectContentRouter({
       // ValuationTab has internal tab navigation for the 3 valuation approaches
       // ========================================
       case 'valuation':
-        // Market Comps relocated from Property → Valuation/Income Approach
-        if (currentTab === 'market-comps') {
-          return <PropertyTab project={project} activeTab="market" />;
-        }
-        // All other subtabs route to ValuationTab - it has internal tab navigation
         return <ValuationTab project={project} activeTab={currentTab} />;
 
       // ========================================

@@ -1124,7 +1124,7 @@ function extractProductTypeTables(text: string, info: any) {
       };
 
       // Avoid duplicates
-      if (!info.productTypes.some(existing => existing.name === productType.name)) {
+      if (!info.productTypes.some((existing: any) => existing.name === productType.name)) {
         info.productTypes.push(productType);
         console.log(`Found product type from table: ${productType.name} - ${productType.lotSize} - ${productType.units} units`);
       }
@@ -1141,7 +1141,7 @@ function extractProductTypeTables(text: string, info: any) {
       units: parseInt(match[3].replace(/,/g, ''))
     };
 
-    if (!info.productTypes.some(existing => existing.name === productType.name)) {
+    if (!info.productTypes.some((existing: any) => existing.name === productType.name)) {
       info.productTypes.push(productType);
       console.log(`Found product type from list: ${productType.name} - ${productType.lotSize} - ${productType.units} units`);
     }
@@ -1166,13 +1166,13 @@ function extractParcelTables(text: string, info: any) {
     // Add product types from lot sizes
     const lotSizeMap = new Map<string, number>();
 
-    structuredParcelData.parcels.forEach(parcel => {
-      parcel.lot_sizes.forEach(lotSize => {
+    structuredParcelData.parcels.forEach((parcel: any) => {
+      parcel.lot_sizes.forEach((lotSize: any) => {
         lotSizeMap.set(lotSize, (lotSizeMap.get(lotSize) || 0) + 1);
       });
     });
 
-    lotSizeMap.forEach((count, lotSize) => {
+    lotSizeMap.forEach((count: any, lotSize: any) => {
       info.productTypes.push({
         name: `${lotSize} Lot`,
         lotSize: lotSize,
@@ -1237,7 +1237,7 @@ function extractParcelTables(text: string, info: any) {
         units: parcelInfo.units
       };
 
-      if (!info.productTypes.some(existing => existing.name === productType.name)) {
+      if (!info.productTypes.some((existing: any) => existing.name === productType.name)) {
         info.productTypes.push(productType);
         console.log(`Found parcel from table: ${parcelInfo.parcel_id} - ${parcelInfo.type} - ${parcelInfo.units} units`);
       }
@@ -1490,7 +1490,7 @@ function extractPhaseInformation(text: string, info: any) {
       units: parseInt(match[2].replace(/,/g, ''))
     };
 
-    if (!info.phases.some(existing => existing.name === phase.name)) {
+    if (!info.phases.some((existing: any) => existing.name === phase.name)) {
       info.phases.push(phase);
       console.log(`Found phase: ${phase.name} - ${phase.units} units`);
     }
@@ -1511,7 +1511,7 @@ function extractPhaseInformation(text: string, info: any) {
         units: parseInt(rowMatch[2].replace(/,/g, ''))
       };
 
-      if (!info.phases.some(existing => existing.name === phase.name)) {
+      if (!info.phases.some((existing: any) => existing.name === phase.name)) {
         info.phases.push(phase);
         console.log(`Found phase from summary: ${phase.name} - ${phase.units} units`);
       }

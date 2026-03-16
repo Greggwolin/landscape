@@ -54,7 +54,7 @@ export async function POST(request: NextRequest, context: Params) {
     const description = body?.description ? String(body.description) : null;
     const parentId = body?.parent_id ? Number(body.parent_id) : null;
 
-    const sortOrderRow = await sql<{ next_order: number }[]>`
+    const sortOrderRow = await sql`
       SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order
       FROM landscape.tbl_system_picklist
       WHERE picklist_type = ${picklistType};

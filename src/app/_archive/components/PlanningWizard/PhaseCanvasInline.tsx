@@ -163,7 +163,7 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
   const handleSaveParcel = async (parcelId: string) => {
     try {
       // Find the parcel to get the database ID
-      const parcel = phase.parcels.find(p => p.id === parcelId)
+      const parcel = phase.parcels.find((p: any) => p.id === parcelId)
       if (!parcel?.dbId) {
         console.error('No database ID found for parcel')
         return
@@ -368,7 +368,7 @@ const PhaseCanvasInline: React.FC<PhaseCanvasInlineProps> = ({
                 overflowY: 'auto',
                 width: '100%'
               }}>
-                {phase.parcels.map((parcel) => {
+                {phase.parcels.map((parcel: any) => {
                   console.log('🔴 RENDERING FROM PhaseCanvasInline.tsx - Parcel:', parcel.name)
                   const isEditing = editingParcel === parcel.id
                   const bgColor = parcel.landUse === 'C' ? '#ea580c' : '#16a34a'

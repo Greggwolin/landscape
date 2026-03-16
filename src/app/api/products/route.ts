@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
   try {
     const rows = await queryProducts(searchParams);
     const efficiency = await fetchPlanningEfficiency();
-    const items = rows.map(mapProductRow).map((product) => ({
+    const items = rows.map(mapProductRow).map((product: any) => ({
       ...product,
       density_per_acre: computeDensity(product, efficiency)
     }));

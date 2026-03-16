@@ -117,7 +117,7 @@ export const NarrativeEditor = forwardRef<NarrativeEditorRef, NarrativeEditorPro
         deletionClass: 'track-change-deletion',
       }),
       InlineComment.configure({
-        onCommentClick: (commentId, attrs) => {
+        onCommentClick: (commentId: any, attrs: any) => {
           const updated = prompt('Edit comment:', attrs.text);
           if (updated !== null && updated.trim().length > 0) {
             editor?.commands.updateComment(commentId, {
@@ -136,7 +136,7 @@ export const NarrativeEditor = forwardRef<NarrativeEditorRef, NarrativeEditorPro
         style: `min-height: ${minHeight}`,
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor }: any) => {
       if (onContentChange) {
         const json = editor.getJSON();
         const html = editor.getHTML();

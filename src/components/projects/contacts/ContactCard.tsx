@@ -2,13 +2,20 @@
 
 import { useState } from 'react';
 import { Mail, Phone, Building2, User, StickyNote, Edit2, Trash2 } from 'lucide-react';
-import { ProjectContact } from '@/types/contacts';
+import { ProjectContact, ProjectContactFormData } from '@/types/contacts';
 
 interface ContactCardProps {
   contact: ProjectContact;
   projectId: number;
   onUpdated: () => void;
   onDeleted: () => void;
+}
+
+interface EditFormData extends ProjectContactFormData {
+  contact_name?: string;
+  company_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
 }
 
 const contactFieldClass =
@@ -21,7 +28,17 @@ export default function ContactCard({
   onDeleted
 }: ContactCardProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(contact);
+  const [formData, setFormData] = useState<EditFormData>({
+    contact_id: contact.contact_id,
+    role_id: contact.role_id,
+    is_primary: contact.is_primary,
+    is_billing_contact: contact.is_billing_contact,
+    notes: contact.notes,
+    contact_name: contact.contact_name,
+    company_name: contact.company_name,
+    contact_email: contact.contact_email,
+    contact_phone: contact.contact_phone,
+  });
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -65,7 +82,17 @@ export default function ContactCard({
   };
 
   const handleCancel = () => {
-    setFormData(contact);
+    setFormData({
+      contact_id: contact.contact_id,
+      role_id: contact.role_id,
+      is_primary: contact.is_primary,
+      is_billing_contact: contact.is_billing_contact,
+      notes: contact.notes,
+      contact_name: contact.contact_name,
+      company_name: contact.company_name,
+      contact_email: contact.contact_email,
+      contact_phone: contact.contact_phone,
+    });
     setIsEditing(false);
   };
 
@@ -76,48 +103,40 @@ export default function ContactCard({
           <input
             type="text"
             placeholder="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            value={formData.contact_name || ''}
+            onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
             className={contactFieldClass}
+            disabled
           />
           <input
             type="text"
-            placeholder="Title"
-            value={formData.title || ''}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            placeholder="Role"
+            value={contact.role_label || ''}
             className={contactFieldClass}
+            disabled
           />
         </div>
         <input
           type="text"
           placeholder="Company"
-          value={formData.company || ''}
-          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+          value={formData.company_name || ''}
+          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
           className={contactFieldClass}
         />
         <input
           type="email"
           placeholder="Email"
-          value={formData.email || ''}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          value={formData.contact_email || ''}
+          onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
           className={contactFieldClass}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            type="text"
-            placeholder="Direct Phone"
-            value={formData.phone_direct || ''}
-            onChange={(e) => setFormData({ ...formData, phone_direct: e.target.value })}
-            className={contactFieldClass}
-          />
-          <input
-            type="text"
-            placeholder="Mobile Phone"
-            value={formData.phone_mobile || ''}
-            onChange={(e) => setFormData({ ...formData, phone_mobile: e.target.value })}
-            className={contactFieldClass}
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="Phone"
+          value={formData.contact_phone || ''}
+          onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+          className={contactFieldClass}
+        />
         <textarea
           placeholder="Notes"
           value={formData.notes || ''}
@@ -146,14 +165,14 @@ export default function ContactCard({
 
   return (
     <div className="contacts-card p-4 space-y-2">
-      {/* Name and Title */}
+      {/* Name and Role */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 contacts-card-icon" />
-            <span className="font-medium contacts-card-name">{contact.name}</span>
-            {contact.title && (
-              <span className="text-sm contacts-card-title">- {contact.title}</span>
+            <span className="font-medium contacts-card-name">{contact.contact_name}</span>
+            {contact.role_label && (
+              <span className="text-sm contacts-card-title">- {contact.role_label}</span>
             )}
           </div>
         </div>
@@ -176,38 +195,31 @@ export default function ContactCard({
       </div>
 
       {/* Company */}
-      {contact.company && (
+      {contact.company_name && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Building2 className="w-4 h-4 contacts-card-icon" />
-          <span>{contact.company}</span>
+          <span>{contact.company_name}</span>
         </div>
       )}
 
       {/* Email */}
-      {contact.email && (
+      {contact.contact_email && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Mail className="w-4 h-4 contacts-card-icon" />
           <a
-            href={`mailto:${contact.email}`}
+            href={`mailto:${contact.contact_email}`}
             className="contacts-card-link hover:underline"
           >
-            {contact.email}
+            {contact.contact_email}
           </a>
         </div>
       )}
 
-      {/* Phones */}
-      {(contact.phone_direct || contact.phone_mobile) && (
+      {/* Phone */}
+      {contact.contact_phone && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Phone className="w-4 h-4 contacts-card-icon" />
-          <div className="flex gap-3">
-            {contact.phone_direct && (
-              <span>D: {contact.phone_direct}</span>
-            )}
-            {contact.phone_mobile && (
-              <span>M: {contact.phone_mobile}</span>
-            )}
-          </div>
+          <span>{contact.contact_phone}</span>
         </div>
       )}
 

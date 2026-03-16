@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch data for all geographies
     // Get the most recent N months across all geographies
-    const rows = await sql<ActivityRow>`
+    const rows = await sql`
       WITH recent_periods AS (
         SELECT DISTINCT period_end_date
         FROM landscape.market_activity

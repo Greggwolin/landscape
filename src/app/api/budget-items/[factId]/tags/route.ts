@@ -28,7 +28,7 @@ export async function GET(
   }
 
   try {
-    const tags = await sql<TagRow[]>`
+    const tags = await sql`
       SELECT tag_id, fact_id, fact_type, tag_name, tag_color, tag_category, is_compact, created_by, created_at
       FROM landscape.core_fin_fact_tags
       WHERE fact_id = ${factId}
@@ -74,7 +74,7 @@ export async function POST(
 
   try {
     if (action === 'remove') {
-      const deleted = await sql<TagRow[]>`
+      const deleted = await sql`
         DELETE FROM landscape.core_fin_fact_tags
         WHERE fact_id = ${factId}
           AND fact_type = ${factType}
@@ -84,7 +84,7 @@ export async function POST(
       return NextResponse.json({ removed: deleted.length > 0, tag: deleted[0] ?? null })
     }
 
-    const rows = await sql<TagRow[]>`
+    const rows = await sql`
       INSERT INTO landscape.core_fin_fact_tags (
         fact_id, fact_type, tag_name, tag_color, tag_category, is_compact
       ) VALUES (

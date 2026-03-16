@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     const contacts = await sql.unsafe(query, params);
 
     return NextResponse.json({
-      contacts: contacts.map(contact => ({
+      contacts: contacts.map((contact: any) => ({
         contact_id: contact.contact_id,
         company_name: contact.company_name,
         contact_person: contact.contact_person,

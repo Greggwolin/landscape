@@ -27,7 +27,7 @@ export interface PhaseMeasurements {
 export async function getPhaseMeasurements(
   projectId: number
 ): Promise<Map<number, PhaseMeasurements>> {
-  const rows = await sql<PhaseMeasurements[]>`
+  const rows = await sql`
     SELECT
       d.division_id::int as division_id,
       d.display_name as phase_name,
@@ -55,7 +55,7 @@ export async function getPhaseMeasurements(
  * Used to conditionally show the Frt Ft column.
  */
 export async function projectHasFrontFeet(projectId: number): Promise<boolean> {
-  const result = await sql<[{ has_ff: boolean }]>`
+  const result = await sql`
     SELECT EXISTS (
       SELECT 1
       FROM landscape.tbl_division d

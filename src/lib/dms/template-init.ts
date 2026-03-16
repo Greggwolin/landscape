@@ -26,7 +26,7 @@ export async function findDmsTemplate(
   const normalizedProjectType = normalize(projectType);
 
   if (projectId) {
-    const projectTemplate = await sql<TemplateMatch[]>`
+    const projectTemplate = await sql`
       SELECT template_id, template_name, doc_type_options
       FROM landscape.dms_templates
       WHERE project_id = ${projectId}
@@ -37,7 +37,7 @@ export async function findDmsTemplate(
   }
 
   if (normalizedProjectType) {
-    const typeTemplate = await sql<TemplateMatch[]>`
+    const typeTemplate = await sql`
       SELECT template_id, template_name, doc_type_options
       FROM landscape.dms_templates
       WHERE LOWER(template_name) = ${normalizedProjectType}
@@ -48,7 +48,7 @@ export async function findDmsTemplate(
   }
 
   if (workspaceId) {
-    const workspaceTemplate = await sql<TemplateMatch[]>`
+    const workspaceTemplate = await sql`
       SELECT template_id, template_name, doc_type_options
       FROM landscape.dms_templates
       WHERE workspace_id = ${workspaceId}
@@ -58,7 +58,7 @@ export async function findDmsTemplate(
     if (workspaceTemplate[0]) return workspaceTemplate[0];
   }
 
-  const defaultTemplate = await sql<TemplateMatch[]>`
+  const defaultTemplate = await sql`
     SELECT template_id, template_name, doc_type_options
     FROM landscape.dms_templates
     WHERE is_default = true
@@ -76,7 +76,7 @@ export async function initProjectFilters(
   projectId: number,
   templateId: number
 ): Promise<void> {
-  const template = await sql<{ doc_type_options: string[] | null }[]>`
+  const template = await sql`
     SELECT doc_type_options
     FROM landscape.dms_templates
     WHERE template_id = ${templateId}

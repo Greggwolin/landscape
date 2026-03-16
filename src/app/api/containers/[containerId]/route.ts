@@ -33,7 +33,7 @@ export async function PATCH(
     const { container_code, display_name, sort_order, attributes, is_active } = body
 
     // Check container exists
-    const existingCheck = await sql<ContainerRow[]>`
+    const existingCheck = await sql`
       SELECT * FROM landscape.tbl_container
       WHERE division_id = ${id}
     `
@@ -55,7 +55,7 @@ export async function PATCH(
 
     // If updating container_code, check for duplicates
     if (container_code && container_code !== existing.container_code) {
-      const duplicateCheck = await sql<[{ count: number }]>`
+      const duplicateCheck = await sql`
         SELECT COUNT(*)::int as count
         FROM landscape.tbl_container
         WHERE project_id = ${existing.project_id}
@@ -117,7 +117,7 @@ export async function PATCH(
 
     // Execute update with conditional field updates using COALESCE
     // This allows partial updates - only provided fields are changed
-    const updated = await sql<ContainerRow[]>`
+    const updated = await sql`
       UPDATE landscape.tbl_container
       SET
         container_code = COALESCE(${container_code ?? null}, container_code),
@@ -192,17 +192,7 @@ export async function DELETE(
 
   try {
     // Check if container can be safely deleted
-    const canDeleteCheck = await sql<
-      [
-        {
-          can_delete: boolean
-          reason: string
-          child_count: number
-          budget_count: number
-          actual_count: number
-        }
-      ]
-    >`
+    const canDeleteCheck = await sql`
       SELECT * FROM landscape.can_delete_container(${id})
     `
 
@@ -251,7 +241,7 @@ export async function DELETE(
     }
 
     // Safe to delete - use soft delete (set is_active = false)
-    const deleted = await sql<ContainerRow[]>`
+    const deleted = await sql`
       UPDATE landscape.tbl_container
       SET is_active = false, updated_at = CURRENT_TIMESTAMP
       WHERE division_id = ${id}

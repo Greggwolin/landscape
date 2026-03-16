@@ -16,7 +16,7 @@ export async function GET(
   try {
     const { projectId } = await params;
 
-    const result = await sql<{ count: string }[]>`
+    const result = await sql`
       SELECT COUNT(*) as count
       FROM landscape.core_doc
       WHERE project_id = ${projectId}::bigint

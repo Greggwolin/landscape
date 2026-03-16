@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, context: Params) {
     const updateExisting = body.update_existing || false;
 
     // Get project location
-    const projects = await sql<ProjectRow>`
+    const projects = await sql`
       SELECT project_id, location_lat, location_lon
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}::integer
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest, context: Params) {
     const projectLon = Number(project.location_lon);
 
     // Get excluded source_project_ids
-    const exclusions = await sql<ExclusionRow>`
+    const exclusions = await sql`
       SELECT source_project_id
       FROM landscape.market_competitive_project_exclusions
       WHERE project_id = ${projectId}::integer
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest, context: Params) {
     const lonDelta = radiusMiles / 55;
 
     // Get Zonda projects within bounding box
-    const zondaProjects = await sql<ZondaProject>`
+    const zondaProjects = await sql`
       SELECT
         record_id,
         source_project_id,
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest, context: Params) {
     });
 
     // Get existing Zonda-sourced competitors for this project
-    const existingCompetitors = await sql<{ id: number; source_project_id: string }>`
+    const existingCompetitors = await sql`
       SELECT id, source_project_id
       FROM landscape.market_competitive_projects
       WHERE project_id = ${projectId}::integer
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest, context: Params) {
         });
       } else {
         // Create new competitor
-        const rows = await sql<{ id: number }>`
+        const rows = await sql`
           INSERT INTO landscape.market_competitive_projects (
             project_id, comp_name, master_plan_name, builder_name,
             comp_address, latitude, longitude, city, zip_code,

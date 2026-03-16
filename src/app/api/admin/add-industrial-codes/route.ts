@@ -27,9 +27,10 @@ export async function POST() {
         `
         results.push({ code: landuse.code, status: 'success', data: result[0] })
         console.log(`✅ Added/Updated: ${landuse.code} - ${landuse.name}`)
-      } catch (error) {
-        results.push({ code: landuse.code, status: 'error', error: error.message })
-        console.error(`❌ Failed to add ${landuse.code}:`, error.message)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        results.push({ code: landuse.code, status: 'error', error: message })
+        console.error(`❌ Failed to add ${landuse.code}:`, message)
       }
     }
 
@@ -38,11 +39,12 @@ export async function POST() {
       results
     })
 
-  } catch (error) {
-    console.error('❌ API failed:', error)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('❌ API failed:', message)
     return NextResponse.json({
       error: 'Failed to add Industrial codes',
-      details: error.message
+      details: message
     }, { status: 500 })
   }
 }

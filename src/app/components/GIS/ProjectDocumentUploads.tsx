@@ -221,7 +221,7 @@ const InlineFieldControl: React.FC<InlineFieldControlProps> = ({
  // Confirmation
  else if (lowerMessage.includes('yes') || lowerMessage.includes('correct') || lowerMessage.includes('confirm') || lowerMessage.includes('right') || lowerMessage.includes('that works')) {
  // User confirming a proposed value
- const lastProposal = chatMessages.findLast(msg => msg.role === 'assistant' && msg.proposedValue)
+ const lastProposal = chatMessages.findLast((msg: any) => msg.role === 'assistant' && msg.proposedValue)
  if (lastProposal?.proposedValue) {
  setCurrentAIValue(lastProposal.proposedValue)
  aiResponse = `Perfect! I've updated ${fieldName} to"${lastProposal.proposedValue}". The value is now ready to save. Feel free to ask any other questions about this field.`

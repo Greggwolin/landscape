@@ -49,18 +49,20 @@ const recursiveClone = (children: ReactNode, id?: string, updateId?: boolean): R
     }
 
     const _id = id ? (updateId ? `${id}.${index}` : `${id}`) : `${index}`
+    
+    const childElement = child as React.ReactElement<Record<string, unknown>>
 
-    if (child.props.children) {
-      const type = child.type as { displayName?: string }
+    if (childElement.props.children) {
+      const type = childElement.type as { displayName?: string }
       const shouldUpdateId = type.displayName !== 'CNavItem'
 
-      return React.cloneElement(child, {
+      return React.cloneElement(childElement, {
         idx: _id,
-        children: recursiveClone(child.props.children, _id, shouldUpdateId),
+        children: recursiveClone(childElement.props.children, _id, shouldUpdateId),
       })
     }
 
-    return React.cloneElement(child, {
+    return React.cloneElement(childElement, {
       idx: _id,
     })
   })

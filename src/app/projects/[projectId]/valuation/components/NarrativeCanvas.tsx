@@ -249,7 +249,7 @@ export function NarrativeCanvas({ projectId, collapsed, onToggle, onReviewFlyout
       is_question: boolean;
     }[] = [];
 
-    editor.state.doc.descendants((node, pos) => {
+    editor.state.doc.descendants((node: any, pos: any) => {
       if (node.type.name === 'inlineComment') {
         comments.push({
           text: node.attrs.text || '',
@@ -301,10 +301,10 @@ export function NarrativeCanvas({ projectId, collapsed, onToggle, onReviewFlyout
       position_end: number;
     }[] = [];
 
-    editor.state.doc.descendants((node, pos, parent) => {
+    editor.state.doc.descendants((node: any, pos: any, parent: any) => {
       if (!node.isText) return;
       const trackMark = node.marks.find(
-        (mark) => mark.type.name === 'textStyle' && mark.attrs['data-track-change']
+        (mark: any) => mark.type.name === 'textStyle' && mark.attrs['data-track-change']
       );
       if (!trackMark) return;
 

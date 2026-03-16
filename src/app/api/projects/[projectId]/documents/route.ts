@@ -37,7 +37,7 @@ export async function GET(
     const includeContent = searchParams.get('include_content') === 'true';
 
     // Query documents with embedding counts via subquery
-    const docs = await sql<DocumentWithStatus[]>`
+    const docs = await sql`
       SELECT
         d.doc_id,
         d.doc_name,
@@ -65,7 +65,7 @@ export async function GET(
     `;
 
     // Get total count for pagination
-    const countResult = await sql<{ total: string }[]>`
+    const countResult = await sql`
       SELECT COUNT(*) as total
       FROM landscape.core_doc
       WHERE project_id = ${projectId}::bigint
@@ -83,7 +83,7 @@ export async function GET(
             return { ...doc, content_preview: null };
           }
 
-          const preview = await sql<{ content_text: string }[]>`
+          const preview = await sql`
             SELECT content_text
             FROM landscape.knowledge_embeddings
             WHERE source_type = 'document_chunk'

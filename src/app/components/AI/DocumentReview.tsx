@@ -384,7 +384,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
         let message = `🤖 ${result.message}`
         if (result.additional_fields && result.additional_fields.length > 0) {
-          message += `\n\n📊 Analysis Details:\n• Document: ${result.analysis_details?.document_analyzed}\n• Tables Found: ${result.analysis_details?.tables_found}\n• Rows Analyzed: ${result.analysis_details?.total_rows_analyzed}\n\n✨ Discovered ${result.additional_fields.length} new fields: ${result.additional_fields.map(f => f.field_label).join(', ')}`
+          message += `\n\n📊 Analysis Details:\n• Document: ${result.analysis_details?.document_analyzed}\n• Tables Found: ${result.analysis_details?.tables_found}\n• Rows Analyzed: ${result.analysis_details?.total_rows_analyzed}\n\n✨ Discovered ${result.additional_fields.length} new fields: ${result.additional_fields.map((f: any) => f.field_label).join(', ')}`
         }
 
         setReanalysisMessage(message)

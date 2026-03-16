@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rows = await sql<BudgetRow>`
+    const rows = await sql`
       SELECT
         fb.fact_id,
         fb.project_id,

@@ -41,7 +41,7 @@ export async function derivePeriodRangeFromDates(
     return null;
   }
 
-  const rows = await sql<{ periodSequence: number }>`
+  const rows = await sql`
     SELECT period_sequence AS "periodSequence"
     FROM landscape.tbl_calculation_period
     WHERE project_id = ${projectId}
@@ -79,7 +79,7 @@ export async function fetchPeriodsBySequences(
   }
 
   const uniqueSequences = Array.from(new Set(sequences)).sort((a, b) => a - b);
-  const rows = await sql<PeriodRow>`
+  const rows = await sql`
     SELECT
       period_id AS "periodId",
       period_sequence AS "periodSequence",
@@ -105,7 +105,7 @@ export async function fetchPeriodRangeMetadata(
   }
 
   const endPeriod = startPeriod + duration - 1;
-  const rows = await sql<PeriodRow>`
+  const rows = await sql`
     SELECT
       period_id AS "periodId",
       period_sequence AS "periodSequence",

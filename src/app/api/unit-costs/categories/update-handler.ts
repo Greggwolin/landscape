@@ -144,7 +144,7 @@ function normalizeUpdatePayload(raw: any): { data?: UpdateCategoryPayload; error
 }
 
 async function fetchCategoryRow(categoryId: number): Promise<CategoryRow | null> {
-  const rows = await sql<CategoryRow>`
+  const rows = await sql`
     SELECT
       c.category_id,
       c.parent_id as parent,

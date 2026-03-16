@@ -26,7 +26,7 @@ export async function GET(
     }
 
     // Read from project-owned doc types (seeded at project creation from template)
-    let docTypes = await sql<{ doc_type_name: string }[]>`
+    let docTypes = await sql`
       SELECT doc_type_name
       FROM landscape.dms_project_doc_types
       WHERE project_id = ${projectId}
@@ -35,7 +35,7 @@ export async function GET(
 
     // Backfill any doc_types already in use on documents but missing from the project list
     const existingSet = new Set(docTypes.map(row => row.doc_type_name.toLowerCase()));
-    const docTypeRows = await sql<{ doc_type: string | null }[]>`
+    const docTypeRows = await sql`
       SELECT DISTINCT doc_type
       FROM landscape.core_doc
       WHERE project_id = ${projectId}
@@ -60,7 +60,7 @@ export async function GET(
           ON CONFLICT (project_id, doc_type_name) DO NOTHING
         `;
       }
-      docTypes = await sql<{ doc_type_name: string }[]>`
+      docTypes = await sql`
         SELECT doc_type_name
         FROM landscape.dms_project_doc_types
         WHERE project_id = ${projectId}

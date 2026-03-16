@@ -23,7 +23,7 @@ export async function GET(
   }
 
   try {
-    const scenarios = await sql<any[]>`
+    const scenarios = await sql`
       SELECT
         scenario_id AS id,
         scenario_name AS name,

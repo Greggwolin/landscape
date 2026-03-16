@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Validate doc_type against project-owned doc types (dms_project_doc_types).
     // If missing, auto-insert as a custom project doc type to prevent drift.
     const docType = system.doc_type ?? 'general';
-    const projectDocTypes = await sql<{ doc_type_name: string }[]>`
+    const projectDocTypes = await sql`
       SELECT doc_type_name
       FROM landscape.dms_project_doc_types
       WHERE project_id = ${system.project_id}
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       let factsExtracted = 0;
       let embeddings = 0;
       try {
-        const [factsRow] = await sql<{ count: number }[]>`
+        const [factsRow] = await sql`
           SELECT COUNT(*)::int as count
           FROM landscape.doc_extracted_facts
           WHERE doc_id = ${matchedDoc.doc_id}
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const [embeddingsRow] = await sql<{ count: number }[]>`
+        const [embeddingsRow] = await sql`
           SELECT COUNT(*)::int as count
           FROM landscape.knowledge_embeddings
           WHERE source_type IN ('document', 'document_chunk')

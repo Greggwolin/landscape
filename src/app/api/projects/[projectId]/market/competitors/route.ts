@@ -70,7 +70,7 @@ export async function GET(_req: NextRequest, context: Params) {
     }
 
     // Get all competitors for this project
-    const competitors = await sql<CompetitorRow>`
+    const competitors = await sql`
       SELECT
         id, project_id, master_plan_name, comp_name, builder_name,
         comp_address, latitude, longitude, city, zip_code,
@@ -87,7 +87,7 @@ export async function GET(_req: NextRequest, context: Params) {
     let products: ProductRow[] = [];
 
     if (competitorIds.length > 0) {
-      products = await sql<ProductRow>`
+      products = await sql`
         SELECT
           id,
           competitive_project_id,
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest, context: Params) {
       );
     }
 
-    const rows = await sql<CompetitorRow>`
+    const rows = await sql`
       INSERT INTO landscape.market_competitive_projects (
         project_id, comp_name, master_plan_name, builder_name,
         comp_address, latitude, longitude, city, zip_code,

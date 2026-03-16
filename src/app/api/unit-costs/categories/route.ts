@@ -86,7 +86,7 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
       ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
       : sql``;
 
-    result = await sql<CategoryRow>`
+    result = await sql`
       SELECT
         c.category_id,
         c.parent_id as parent,
@@ -117,7 +117,7 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
       ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
       : sql``;
 
-    result = await sql<CategoryRow>`
+    result = await sql`
       SELECT
         c.category_id,
         c.parent_id as parent,
@@ -275,14 +275,14 @@ function normalizeCreatePayload(raw: any): { data?: CreateCategoryPayload; error
 
   const activitys = Array.isArray(raw.activitys)
     ? raw.activitys
-        .map((value) => (typeof value === 'string' ? value.trim() : ''))
-        .map((value) => {
+        .map((value: any) => (typeof value === 'string' ? value.trim() : ''))
+        .map((value: any) => {
           const key = value.toLowerCase();
           return VALID_LIFECYCLE_STAGES.has(value)
             ? value
             : LIFECYCLE_STAGE_ALIASES[key] ?? '';
         })
-        .filter((stage) => stage && VALID_LIFECYCLE_STAGES.has(stage))
+        .filter((stage: any) => stage && VALID_LIFECYCLE_STAGES.has(stage))
     : [];
 
   if (activitys.length === 0) {
@@ -375,21 +375,14 @@ async function createCategoryDirect(payload: CreateCategoryPayload) {
   try {
     let resolvedSortOrder = payload.sort_order;
     if (resolvedSortOrder === null) {
-      const [row] = await sql<{ next_sort: number }>`
+      const [row] = await sql`
         SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort
         FROM landscape.core_unit_cost_category
       `;
       resolvedSortOrder = Number(row?.next_sort ?? 0);
     }
 
-    const [inserted] = await sql<{
-      category_id: number;
-      parent: number | null;
-      category_name: string;
-      tags: string[];
-      sort_order: number;
-      is_active: boolean;
-    }>`
+    const [inserted] = await sql`
       INSERT INTO landscape.core_unit_cost_category (
         parent_id,
         category_name,
@@ -455,7 +448,7 @@ async function createCategoryDirect(payload: CreateCategoryPayload) {
       }
     }
 
-    const [complete] = await sql<CategoryRow>`
+    const [complete] = await sql`
       SELECT
         c.category_id,
         c.parent_id as parent,

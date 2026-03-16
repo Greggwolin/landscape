@@ -17,8 +17,7 @@ import clsx from 'clsx';
 import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import type {
   UnitCostCategoryReference,
-  UnitCostTemplateSummary,
-  UnitCostType
+  UnitCostTemplateSummary
 } from '@/types/benchmarks';
 import { SemanticCategoryChip } from '@/components/ui/landscape';
 import type { CategoryIntent } from '@/components/ui/landscape';
@@ -151,6 +150,8 @@ function getCategoryIntent(category: UnitCostCategoryReference): CategoryIntent 
   }
   return 'other';
 }
+
+type UnitCostType = 'hard' | 'soft' | 'deposit' | 'other';
 
 const COST_TYPE_TABS: Array<{ key: UnitCostType; label: string }> = [
   { key: 'hard', label: 'Hard' },
@@ -431,7 +432,7 @@ function mapServerRow(template: UnitCostTemplateSummary | Record<string, any>, f
 
   return {
     ...source,
-    template_id: Number(templateId ?? -1),
+    item_id: Number(templateId ?? -1),
     category_id: Number(categoryId ?? -1),
     category_name: categoryName,
     item_name: source.item_name ?? source.name ?? '',
@@ -460,7 +461,7 @@ function mapServerRow(template: UnitCostTemplateSummary | Record<string, any>, f
     savingFields: [],
     fieldErrors: {},
     rowError: null
-  };
+  } as TemplateRowState;
 }
 
 function createDraftRow(category: UnitCostCategoryReference, projectType: string): TemplateRowState {
@@ -470,7 +471,7 @@ function createDraftRow(category: UnitCostCategoryReference, projectType: string
       : `draft-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   return {
-    template_id: -Math.floor(Math.random() * 1_000_000) - 1,
+    item_id: -Math.floor(Math.random() * 1_000_000) - 1,
     category_id: category.category_id,
     category_name: category.category_name,
     item_name: '',
@@ -679,7 +680,7 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
             if (typeof value === 'object') {
               visited.add(value);
               if (looksLikeTemplate(value)) {
-                results.push(value as UnitCostTemplateSummary);
+                results.push(value as unknown as UnitCostTemplateSummary);
               }
               for (const child of Object.values(value)) {
                 queue.push(child);
@@ -751,7 +752,7 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
       const confirmed = window.confirm(`Archive unit cost "${row.item_name}"?`);
       if (!confirmed) return;
       try {
-        await fetchJSON(`/api/unit-costs/templates/${row.template_id}`, { method: 'DELETE' });
+        await fetchJSON(`/api/unit-costs/templates/${row.item_id}`, { method: 'DELETE' });
         setCategoryRows(categoryId, (rows) => rows.filter((entry) => entry.rowKey !== row.rowKey));
         void loadCategoriesData();
       } catch (err) {
@@ -902,8 +903,9 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
 
       if (!updatedRowSnapshot) return;
 
-      if (updatedRowSnapshot.status === 'draft') {
-        if (!hasRequiredFields(updatedRowSnapshot)) {
+      const rowSnapshot = updatedRowSnapshot as TemplateRowState;
+      if (rowSnapshot.status === 'draft') {
+        if (!hasRequiredFields(rowSnapshot)) {
           setCategoryRows(categoryId, (entries) =>
             entries.map((entry) =>
               entry.rowKey === rowKey
@@ -915,13 +917,13 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
         }
 
         try {
-          const payload = buildCreatePayload(updatedRowSnapshot);
+          const payload = buildCreatePayload(rowSnapshot);
           const created = await fetchJSON<UnitCostTemplateSummary>('/api/unit-costs/templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          const normalizedRow = mapServerRow(created, updatedRowSnapshot.category_name);
+          const normalizedRow = mapServerRow(created, rowSnapshot.category_name);
           setCategoryRows(categoryId, (entries) =>
             entries.map((entry) => (entry.rowKey === rowKey ? normalizedRow : entry))
           );
@@ -956,7 +958,7 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
       try {
         const payload = buildPatchPayload(field, normalizedValue);
         const updated = await fetchJSON<UnitCostTemplateSummary>(
-          `/api/unit-costs/templates/${previousRow.template_id}`,
+          `/api/unit-costs/templates/${previousRow.item_id}`,
           {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -967,7 +969,7 @@ export default function UnitCostsPanel({ projectTypeFilter }: UnitCostsPanelProp
           void loadTemplates(categoryId, true);
           void loadTemplates(nextCategoryId, true);
         } else {
-          const normalizedRow = mapServerRow(updated, nextCategoryName ?? updatedRowSnapshot.category_name);
+          const normalizedRow = mapServerRow(updated, nextCategoryName ?? rowSnapshot.category_name);
           setCategoryRows(categoryId, (entries) =>
             entries.map((entry) => (entry.rowKey === rowKey ? normalizedRow : entry))
           );
@@ -1229,7 +1231,7 @@ function UnifiedUnitCostTable({
       field: EditableField,
       header: string,
       size: number,
-      type: 'text' | 'select' | 'number' | 'currency' | 'date',
+      type: 'text' | 'number' | 'currency' | 'date',
       align: 'left' | 'center' | 'right' = 'left',
       meta?: Record<string, unknown>
     ): ColumnDef<TemplateRowState & { category_name: string }, unknown> => ({
@@ -1249,7 +1251,7 @@ function UnifiedUnitCostTable({
       )
     });
 
-    const allColumns: ColumnDef<TemplateRowState & { category_name: string }, unknown>[] = [
+    const allColumns: (ColumnDef<TemplateRowState & { category_name: string }, unknown> | ReturnType<typeof configureEditable>)[] = [
       {
         accessorKey: 'category_id',
         header: () => <div className="text-left">Category</div>,
@@ -1269,7 +1271,7 @@ function UnifiedUnitCostTable({
       {
         ...configureEditable('item_name', 'Item Name / Description', 350, 'text', 'left', { maxLength: 200, required: true }),
         header: () => <div className="text-left">Item Name / Description</div>
-      },
+      } as ColumnDef<TemplateRowState & { category_name: string }, unknown>,
       {
         accessorKey: 'default_uom_code',
         header: () => <div className="text-center">UOM</div>,
@@ -1279,33 +1281,33 @@ function UnifiedUnitCostTable({
         cell: (context) => (
           <EditableSelectCell context={context as CellContext<TemplateRowState, unknown>} field="default_uom_code" options={uomOptions} required />
         )
-      },
+      } as ColumnDef<TemplateRowState & { category_name: string }, unknown>,
       ...(visibleColumns.quantity
         ? [{
             ...configureEditable('quantity', 'Qty', 70, 'number', 'right'),
             header: () => <div className="text-right">Qty</div>
-          }]
+          } as ColumnDef<TemplateRowState & { category_name: string }, unknown>]
         : []),
       {
         ...configureEditable('typical_mid_value', 'Price', 90, 'currency', 'right'),
         header: () => <div className="text-right">Price</div>
-      },
+      } as ColumnDef<TemplateRowState & { category_name: string }, unknown>,
       ...(visibleColumns.location
         ? [{
             ...configureEditable('market_geography', 'Location', 140, 'text', 'left', { placeholder: DEFAULT_LOCATION }),
             header: () => <div className="text-left">Location</div>
-          }]
+          } as ColumnDef<TemplateRowState & { category_name: string }, unknown>]
         : []),
       ...(visibleColumns.source
         ? [{
             ...configureEditable('source', 'Source', 140, 'text', 'left', { placeholder: DEFAULT_SOURCE }),
             header: () => <div className="text-left">Source</div>
-          }]
+          } as ColumnDef<TemplateRowState & { category_name: string }, unknown>]
         : []),
       {
         ...configureEditable('as_of_date', 'As of Date', 80, 'date', 'center'),
         header: () => <div className="text-center">As of Date</div>
-      },
+      } as ColumnDef<TemplateRowState & { category_name: string }, unknown>,
       {
         id: 'actions',
         header: '',
@@ -1346,7 +1348,7 @@ function UnifiedUnitCostTable({
             </div>
           );
         }
-      }
+      } as ColumnDef<TemplateRowState & { category_name: string }, unknown>
     ];
 
     return allColumns;
@@ -1523,7 +1525,7 @@ function UnitCostCategoryTable({
       field: EditableField,
       header: string,
       size: number,
-      type: 'text' | 'select' | 'number' | 'currency' | 'date',
+      type: 'text' | 'number' | 'currency' | 'date',
       align: 'left' | 'center' | 'right' = 'left',
       meta?: Record<string, unknown>
     ): ColumnDef<TemplateRowState, unknown> => ({
@@ -1559,22 +1561,22 @@ function UnitCostCategoryTable({
         ? [{
             ...configureEditable('quantity', 'Qty', 70, 'number', 'right'),
             header: () => <div className="text-right">Qty</div>
-          }]
+          } as ColumnDef<TemplateRowState, unknown>]
         : []),
       {
         ...configureEditable('typical_mid_value', 'Value', 90, 'currency', 'right'),
         header: () => <div className="text-right">Value</div>
-      },
+      } as ColumnDef<TemplateRowState, unknown>,
       ...(visibleColumns.location
-        ? [configureEditable('market_geography', 'Location', 140, 'text', 'left', { placeholder: DEFAULT_LOCATION })]
+        ? [configureEditable('market_geography', 'Location', 140, 'text', 'left', { placeholder: DEFAULT_LOCATION }) as ColumnDef<TemplateRowState, unknown>]
         : []),
       ...(visibleColumns.source
-        ? [configureEditable('source', 'Source', 140, 'text', 'left', { placeholder: DEFAULT_SOURCE })]
+        ? [configureEditable('source', 'Source', 140, 'text', 'left', { placeholder: DEFAULT_SOURCE }) as ColumnDef<TemplateRowState, unknown>]
         : []),
       {
         ...configureEditable('as_of_date', 'As of Date', 80, 'date', 'center'),
         header: () => <div className="text-center">As of Date</div>
-      },
+      } as ColumnDef<TemplateRowState, unknown>,
       {
         id: 'actions',
         header: '',

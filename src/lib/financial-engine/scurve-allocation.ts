@@ -78,13 +78,7 @@ async function getCurveProfile(opts: {
   if (process.env.DATABASE_URL) {
     try {
       if (opts.curveId) {
-        rows = await sql<{
-          curveId: number;
-          curveName: string;
-          curveCode: string;
-          description: string | null;
-          deciles: (string | number)[];
-        }>`
+        rows = await sql`
           SELECT
             curve_id AS "curveId",
             curve_name AS "curveName",
@@ -101,13 +95,7 @@ async function getCurveProfile(opts: {
         `;
       } else {
         const codeToUse = effectiveCode ?? DEFAULT_CURVE_CODE;
-        rows = await sql<{
-          curveId: number;
-          curveName: string;
-          curveCode: string;
-          description: string | null;
-          deciles: (string | number)[];
-        }>`
+        rows = await sql`
           SELECT
             curve_id AS "curveId",
             curve_name AS "curveName",

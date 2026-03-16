@@ -4,15 +4,16 @@
  * IncomeApproachContent Component
  *
  * Wrapper component that uses the useIncomeApproach hook and renders
- * the Income Approach UI components. Separated from ValuationTab to
- * allow proper hook usage (hooks can't be called conditionally).
+ * the Income Approach UI components with internal pill navigation:
+ *   Rent Comps | Expense Comps | Pro Forma / Cash Flow
  *
- * Now supports both Direct Cap and DCF valuation methods.
+ * Each pill view has its own contextual sidebar content.
  *
  * @created 2026-01-25
- * @updated DCF Implementation
+ * @updated 2026-03-15 — QV17: Pill navigation + Expense Comps + Rent Comps
  */
 
+import { useState } from 'react';
 import { CCard, CCardBody } from '@coreui/react';
 import { useIncomeApproach } from '@/hooks/useIncomeApproach';
 import {
@@ -20,12 +21,33 @@ import {
   DirectCapView,
 } from '@/components/valuation/income-approach';
 import { DCFView } from '@/components/valuation/income-approach/DCFView';
+import { RentCompsView } from '@/components/valuation/income-approach/RentCompsView';
+import { ExpenseCompsView } from '@/components/valuation/income-approach/ExpenseCompsView';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+type IncomePill = 'rent-comps' | 'expense-comps' | 'pro-forma';
 
 interface IncomeApproachContentProps {
   projectId: number;
+  projectName?: string;
 }
 
-export function IncomeApproachContent({ projectId }: IncomeApproachContentProps) {
+const PILLS: { id: IncomePill; label: string }[] = [
+  { id: 'rent-comps', label: 'Rent Comps' },
+  { id: 'expense-comps', label: 'Expense Comps' },
+  { id: 'pro-forma', label: 'Pro Forma / Cash Flow' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function IncomeApproachContent({ projectId, projectName }: IncomeApproachContentProps) {
+  const [activePill, setActivePill] = useState<IncomePill>('rent-comps');
+
   const {
     data,
     isLoading,
@@ -35,26 +57,21 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     setSelectedBasis,
     updateAssumption,
     reload,
-    // DCF
     dcfData,
     isDCFLoading,
     activeMethod,
     setActiveMethod,
     fetchDCF,
-    // Monthly DCF (for CashFlowGrid with time scale toggle)
     monthlyDcfData,
     isMonthlyDCFLoading,
   } = useIncomeApproach(projectId);
 
-  // Get selected tile's calculation
   const selectedTile = data?.value_tiles.find((t) => t.id === selectedBasis);
 
-  // Loading state
+  // ── Loading state ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div
-        style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--cui-secondary-color)' }}
-      >
+      <div style={{ textAlign: 'center', padding: '5rem 0', color: 'var(--cui-secondary-color)' }}>
         <div
           style={{
             display: 'inline-block',
@@ -71,7 +88,7 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     );
   }
 
-  // Error state
+  // ── Error state ────────────────────────────────────────────────────────
   if (error) {
     return (
       <CCard style={{ borderColor: 'var(--cui-danger)' }}>
@@ -79,9 +96,7 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
           style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
         >
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-          <h3
-            style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}
-          >
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
             Error Loading Income Approach Data
           </h3>
           <p style={{ fontSize: '0.9375rem', marginBottom: '1rem' }}>{error}</p>
@@ -105,7 +120,7 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     );
   }
 
-  // No data state
+  // ── No data state ──────────────────────────────────────────────────────
   if (!data) {
     return (
       <div className="folder-content-placeholder">
@@ -116,6 +131,7 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
     );
   }
 
+  // ── Main render ────────────────────────────────────────────────────────
   return (
     <div className="income-approach-content">
       {/* Saving indicator */}
@@ -149,9 +165,26 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
         </div>
       )}
 
-      {/* Two-Panel Layout: 30/70 Split */}
+      {/* ── Sub-tab Navigation (matches folder-tabs-row2 pattern) ─────── */}
+      <div className="folder-tabs-row2" style={{ marginBottom: '1rem' }}>
+        {PILLS.map((pill) => {
+          const isActive = activePill === pill.id;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              className={`sub-tab${isActive ? ' active' : ''}`}
+              onClick={() => setActivePill(pill.id)}
+            >
+              {pill.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Two-Panel Layout: Sidebar + Main ────────────────────────────── */}
       <div className="d-flex" style={{ gap: '1.5rem', minHeight: '600px' }}>
-        {/* Left Panel - Assumptions */}
+        {/* Left Panel — Contextual Sidebar */}
         <div
           style={{
             width: '26%',
@@ -164,49 +197,448 @@ export function IncomeApproachContent({ projectId }: IncomeApproachContentProps)
             border: '1px solid var(--cui-border-color)',
           }}
         >
-          <AssumptionsPanel
-            assumptions={data.assumptions}
-            rentRoll={data.rent_roll}
-            operatingExpenses={data.operating_expenses}
-            onAssumptionChange={updateAssumption}
-            isLoading={isLoading}
-            isSaving={isSaving}
-            activeMethod={activeMethod}
-            onMethodChange={setActiveMethod}
-          />
-        </div>
-
-        {/* Right Panel - Results (70%) */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {activeMethod === 'direct_cap' && selectedTile && (
-            <DirectCapView
-              calculation={selectedTile.calculation}
-              value={selectedTile.value}
-              capRate={selectedTile.cap_rate}
-              propertySummary={data.property_summary}
-              rentRollItems={data.rent_roll.items}
-              opexItems={data.operating_expenses.items}
-              opexGroups={data.operating_expenses.groups}
-              sensitivityMatrix={data.sensitivity_matrix}
-              keyMetrics={data.key_metrics}
-              selectedBasis={selectedBasis}
-              allTiles={data.value_tiles}
+          {activePill === 'rent-comps' && (
+            <RentCompsSidebar
+              projectName={projectName || 'Subject'}
+              unitCount={data.property_summary?.unit_count}
+              avgRent={data.rent_roll?.forward_gpr
+                ? Math.round(data.rent_roll.forward_gpr / 12 / (data.property_summary?.unit_count || 1))
+                : undefined}
+            />
+          )}
+          {activePill === 'expense-comps' && (
+            <ExpenseCompsSidebar
+              projectName={projectName || 'Subject'}
+              unitCount={data.property_summary?.unit_count}
+              totalSqft={data.property_summary?.total_sf}
+              totalOpex={data.operating_expenses?.total}
+            />
+          )}
+          {activePill === 'pro-forma' && (
+            <AssumptionsPanel
+              assumptions={data.assumptions}
+              rentRoll={data.rent_roll}
+              operatingExpenses={data.operating_expenses}
+              onAssumptionChange={updateAssumption}
+              isLoading={isLoading}
+              isSaving={isSaving}
+              activeMethod={activeMethod}
               onMethodChange={setActiveMethod}
             />
           )}
-          {activeMethod === 'dcf' && (
-            <DCFView
-              data={dcfData!}
-              propertySummary={data.property_summary}
-              isLoading={isDCFLoading || isMonthlyDCFLoading}
-              onMethodChange={setActiveMethod}
-              monthlyData={monthlyDcfData}
+        </div>
+
+        {/* Right Panel — Main Content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {activePill === 'rent-comps' && (
+            <RentCompsView
+              projectId={projectId}
+              projectName={projectName}
             />
+          )}
+          {activePill === 'expense-comps' && (
+            <ExpenseCompsView
+              projectId={projectId}
+              subjectName={projectName}
+              subjectUnitCount={data.property_summary?.unit_count}
+              subjectTotalSqft={data.property_summary?.total_sf}
+            />
+          )}
+          {activePill === 'pro-forma' && (
+            <>
+              {activeMethod === 'direct_cap' && selectedTile && (
+                <DirectCapView
+                  calculation={selectedTile.calculation}
+                  value={selectedTile.value}
+                  capRate={selectedTile.cap_rate}
+                  propertySummary={data.property_summary}
+                  rentRollItems={data.rent_roll.items}
+                  opexItems={data.operating_expenses.items}
+                  opexGroups={data.operating_expenses.groups}
+                  sensitivityMatrix={data.sensitivity_matrix}
+                  keyMetrics={data.key_metrics}
+                  selectedBasis={selectedBasis}
+                  allTiles={data.value_tiles}
+                  onMethodChange={setActiveMethod}
+                />
+              )}
+              {activeMethod === 'dcf' && (
+                <DCFView
+                  data={dcfData!}
+                  propertySummary={data.property_summary}
+                  isLoading={isDCFLoading || isMonthlyDCFLoading}
+                  onMethodChange={setActiveMethod}
+                  monthlyData={monthlyDcfData}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar: Rent Comps
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RentCompsSidebar({
+  projectName,
+  unitCount,
+  avgRent,
+}: {
+  projectName: string;
+  unitCount?: number;
+  avgRent?: number;
+}) {
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: 'var(--cui-card-bg)' }}>
+      {/* Header */}
+      <div
+        style={{
+          padding: '0.375rem 1rem',
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderBottom: '1px solid var(--cui-border-color)',
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+          Rent Comps
+        </h2>
+      </div>
+
+      <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Subject Rent Summary */}
+        <div>
+          <div style={sidebarSectionLabel}>Subject Property</div>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: '0.25rem' }}>
+            {projectName}
+          </div>
+          {unitCount != null && (
+            <div style={sidebarDetailRow}>
+              <span>Units</span>
+              <span style={{ fontWeight: 500 }}>{unitCount}</span>
+            </div>
+          )}
+          {avgRent != null && (
+            <div style={sidebarDetailRow}>
+              <span>Avg Rent/Unit</span>
+              <span style={{ fontWeight: 500 }}>${avgRent.toLocaleString()}/mo</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Comp Search Parameters (Coming Soon) ────────────────────── */}
+        <div>
+          <div className="d-flex align-items-center" style={{ gap: '0.5rem', marginBottom: '0.375rem' }}>
+            <span style={sidebarSectionLabel}>Comp Search</span>
+            <span style={comingSoonBadge}>Coming Soon</span>
+          </div>
+          <p style={{ fontSize: '0.6875rem', color: 'var(--cui-tertiary-color)', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
+            Available after connecting a rental comp database or external data source via Landscaper.
+          </p>
+
+          {/* Search Radius */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={disabledLabel}>Search Radius (mi)</label>
+            <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+              <input
+                type="range"
+                min={1}
+                max={10}
+                defaultValue={3}
+                disabled
+                style={{ flex: 1, opacity: 0.4, cursor: 'not-allowed' }}
+              />
+              <span style={{ ...disabledInputStyle, width: '3rem', textAlign: 'center', padding: '0.25rem' }}>3</span>
+            </div>
+          </div>
+
+          {/* Year Built Range */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={disabledLabel}>Year Built</label>
+            <div className="d-flex" style={{ gap: '0.375rem' }}>
+              <input
+                type="text"
+                placeholder="From"
+                disabled
+                style={{ ...disabledInputStyle, flex: 1 }}
+              />
+              <span style={{ color: 'var(--cui-tertiary-color)', fontSize: '0.75rem', alignSelf: 'center' }}>–</span>
+              <input
+                type="text"
+                placeholder="To"
+                disabled
+                style={{ ...disabledInputStyle, flex: 1 }}
+              />
+            </div>
+          </div>
+
+          {/* Unit Count Range */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={disabledLabel}>Unit Count</label>
+            <div className="d-flex" style={{ gap: '0.375rem' }}>
+              <input
+                type="text"
+                placeholder="Min"
+                disabled
+                style={{ ...disabledInputStyle, flex: 1 }}
+              />
+              <span style={{ color: 'var(--cui-tertiary-color)', fontSize: '0.75rem', alignSelf: 'center' }}>–</span>
+              <input
+                type="text"
+                placeholder="Max"
+                disabled
+                style={{ ...disabledInputStyle, flex: 1 }}
+              />
+            </div>
+          </div>
+
+          {/* Property Class */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={disabledLabel}>Property Class</label>
+            <select disabled style={{ ...disabledInputStyle, width: '100%' }}>
+              <option>All Classes</option>
+            </select>
+          </div>
+
+          {/* Amenities */}
+          <div style={{ marginBottom: '0.5rem' }}>
+            <label style={disabledLabel}>Amenities</label>
+            <div className="d-flex" style={{ gap: '0.25rem', flexWrap: 'wrap' }}>
+              {['Pool', 'Fitness', 'Garage', 'W/D'].map((tag) => (
+                <span key={tag} style={disabledChip}>{tag}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Bedroom Filter */}
+          <div>
+            <label style={disabledLabel}>Bedrooms</label>
+            <div className="d-flex" style={{ gap: '0.25rem' }}>
+              {['All', 'Studio', '1', '2', '3+'].map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  disabled
+                  style={{
+                    flex: 1,
+                    padding: '0.1875rem 0',
+                    fontSize: '0.6875rem',
+                    fontWeight: 500,
+                    borderRadius: '0.25rem',
+                    border: '1px solid var(--cui-border-color)',
+                    backgroundColor: opt === 'All' ? 'var(--cui-tertiary-bg)' : 'transparent',
+                    color: 'var(--cui-tertiary-color)',
+                    cursor: 'not-allowed',
+                    opacity: 0.5,
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Data Source ─────────────────────────────────────────────── */}
+        <div style={{ borderTop: '1px solid var(--cui-border-color)', paddingTop: '0.75rem' }}>
+          <div className="d-flex align-items-center" style={{ gap: '0.5rem', marginBottom: '0.375rem' }}>
+            <span style={sidebarSectionLabel}>Data Source</span>
+            <span style={comingSoonBadge}>Coming Soon</span>
+          </div>
+          <p style={{ fontSize: '0.6875rem', color: 'var(--cui-tertiary-color)', margin: 0, lineHeight: 1.4 }}>
+            Connect a rental comp database (CoStar, Yardi Matrix, RealPage) or upload a comp export
+            to enable live search and auto-refresh.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sidebar: Expense Comps
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ExpenseCompsSidebar({
+  projectName,
+  unitCount,
+  totalSqft,
+  totalOpex,
+}: {
+  projectName: string;
+  unitCount?: number;
+  totalSqft?: number;
+  totalOpex?: number;
+}) {
+  const [localDisplayMode, setLocalDisplayMode] = useState<'per_unit' | 'per_sf' | 'total'>('per_unit');
+
+  const modes = [
+    { id: 'per_unit' as const, label: '$/unit' },
+    { id: 'per_sf' as const, label: '$/SF' },
+    { id: 'total' as const, label: 'Total' },
+  ];
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', backgroundColor: 'var(--cui-card-bg)' }}>
+      {/* Header */}
+      <div
+        style={{
+          padding: '0.375rem 1rem',
+          backgroundColor: 'var(--cui-card-header-bg)',
+          borderBottom: '1px solid var(--cui-border-color)',
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+          Expense Comps
+        </h2>
+      </div>
+
+      <div style={{ padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Subject Section */}
+        <div>
+          <div style={sidebarSectionLabel}>Subject Property</div>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: '0.25rem' }}>
+            {projectName}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+            {unitCount != null && (
+              <div style={sidebarDetailRow}>
+                <span>Units</span>
+                <span style={{ fontWeight: 500 }}>{unitCount}</span>
+              </div>
+            )}
+            {totalSqft != null && (
+              <div style={sidebarDetailRow}>
+                <span>Total SF</span>
+                <span style={{ fontWeight: 500 }}>{totalSqft.toLocaleString()}</span>
+              </div>
+            )}
+            {totalOpex != null && (
+              <div style={sidebarDetailRow}>
+                <span>F-12 OpEx</span>
+                <span style={{ fontWeight: 500 }}>${Math.round(totalOpex).toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Display Toggle */}
+        <div>
+          <div style={sidebarSectionLabel}>Display</div>
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {modes.map((mode) => {
+              const isActive = localDisplayMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setLocalDisplayMode(mode.id)}
+                  style={{
+                    flex: 1,
+                    padding: '0.25rem 0.375rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    borderRadius: '0.25rem',
+                    border: `1px solid ${isActive ? 'var(--cui-primary)' : 'var(--cui-border-color)'}`,
+                    cursor: 'pointer',
+                    backgroundColor: isActive ? 'var(--cui-primary)' : 'transparent',
+                    color: isActive ? 'white' : 'var(--cui-secondary-color)',
+                  }}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Project Comps Section */}
+        <div>
+          <div style={sidebarSectionLabel}>Project Comps</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', lineHeight: 1.5 }}>
+            No comparable projects found. Ask Landscaper to suggest operating statement uploads.
+          </div>
+        </div>
+
+        {/* Platform KB Section */}
+        <div>
+          <div style={sidebarSectionLabel}>Platform Knowledge</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)', lineHeight: 1.5 }}>
+            Source: Landscaper KB synthesis. MSA-level benchmarks from indexed operating statements.
+            Data scope and coverage details will be populated when KB data is available.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared sidebar styles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const comingSoonBadge: React.CSSProperties = {
+  fontSize: '0.5625rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  padding: '0.0625rem 0.375rem',
+  borderRadius: '999px',
+  backgroundColor: 'var(--cui-warning-bg, #FFF3CD)',
+  color: 'var(--cui-warning, #856404)',
+  border: '1px solid var(--cui-warning, #856404)',
+  lineHeight: '1.4',
+  whiteSpace: 'nowrap',
+};
+
+const disabledLabel: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.6875rem',
+  fontWeight: 600,
+  color: 'var(--cui-tertiary-color)',
+  marginBottom: '0.1875rem',
+};
+
+const disabledInputStyle: React.CSSProperties = {
+  fontSize: '0.75rem',
+  padding: '0.25rem 0.5rem',
+  borderRadius: '0.25rem',
+  border: '1px solid var(--cui-border-color)',
+  backgroundColor: 'var(--cui-tertiary-bg)',
+  color: 'var(--cui-tertiary-color)',
+  cursor: 'not-allowed',
+  opacity: 0.5,
+};
+
+const disabledChip: React.CSSProperties = {
+  fontSize: '0.625rem',
+  fontWeight: 500,
+  padding: '0.125rem 0.375rem',
+  borderRadius: '999px',
+  border: '1px solid var(--cui-border-color)',
+  color: 'var(--cui-tertiary-color)',
+  backgroundColor: 'transparent',
+  opacity: 0.5,
+};
+
+const sidebarSectionLabel: React.CSSProperties = {
+  fontSize: '0.6875rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  color: 'var(--cui-secondary-color)',
+  marginBottom: '0.375rem',
+};
+
+const sidebarDetailRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: '0.8125rem',
+  color: 'var(--cui-secondary-color)',
+  padding: '0.0625rem 0',
+};
 
 export default IncomeApproachContent;

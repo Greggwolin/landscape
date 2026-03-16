@@ -95,7 +95,7 @@ export async function syncDocumentsToMeili(filters?: {
     console.log('🔄 Starting Meilisearch document sync...');
 
     // Build query with optional filters (includes folder and fulltext)
-    const docs = await sql<any[]>`
+    const docs = await sql`
       SELECT
         d.doc_id,
         d.project_id,
@@ -193,7 +193,7 @@ export async function syncDocumentsToMeili(filters?: {
  */
 export async function indexSingleDocument(docId: number): Promise<void> {
   try {
-    const docs = await sql<any[]>`
+    const docs = await sql`
       SELECT
         d.doc_id,
         d.project_id,

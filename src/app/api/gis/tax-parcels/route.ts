@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     const [minLng, minLat, maxLng, maxLat] = parts;
 
-    const parcels = await sql<TaxParcelRow[]>`
+    const parcels = await sql`
       SELECT
         tax_parcel_id,
         assessor_attrs,

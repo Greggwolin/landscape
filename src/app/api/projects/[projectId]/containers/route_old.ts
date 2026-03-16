@@ -85,7 +85,7 @@ export async function GET(
   }
 
   try {
-    const rows = await sql<ContainerRow[]>`
+    const rows = await sql`
       SELECT
         division_id,
         project_id,

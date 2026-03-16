@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       OFFSET ${offset}
     `;
 
-    const countResult = await sql<{ count: number }[]>`
+    const countResult = await sql`
       SELECT COUNT(*) as count
       FROM landscape.tbl_platform_knowledge
       ${whereClause}

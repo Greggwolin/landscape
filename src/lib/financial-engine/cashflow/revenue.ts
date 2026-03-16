@@ -90,7 +90,7 @@ export async function fetchProjectParcels(
   if (containerIds && containerIds.length > 0) {
     // containerIds are division_ids from tbl_division (tier 2 = phases)
     // We need to join through tbl_phase to match parcel.phase_id
-    query = sql<ParcelRow>`
+    query = sql`
       SELECT
         p.parcel_id,
         p.parcel_code,
@@ -140,7 +140,7 @@ export async function fetchProjectParcels(
       ORDER BY p.sale_period ASC NULLS LAST, p.parcel_code ASC
     `;
   } else {
-    query = sql<ParcelRow>`
+    query = sql`
       SELECT
         p.parcel_id,
         p.parcel_code,
@@ -203,7 +203,7 @@ export async function lookupParcelPricing(
   // Then fall back to project + type
   // Then fall back to defaults
 
-  const query = sql<PricingRow>`
+  const query = sql`
     SELECT
       project_id,
       lu_type_code,
@@ -263,7 +263,7 @@ export async function fetchSaleBenchmarks(
   onsiteCostPct: number;
 }> {
   // Query hierarchy: product > project > global
-  const query = sql<SaleBenchmarkRow>`
+  const query = sql`
     SELECT
       benchmark_type,
       rate_pct,

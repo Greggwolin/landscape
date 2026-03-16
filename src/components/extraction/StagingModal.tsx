@@ -267,17 +267,19 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.unit_types.map((ut, idx) => (
+                  {data.unit_types.map((ut, idx) => {
+                    const utData = ut.data as unknown as Record<string, unknown>;
+                    return (
                     <TableRow key={idx}>
                       <TableCell>
-                        {ut.data.bedroom_count}BR / {ut.data.bathroom_count}BA
+                        {utData.bedroom_count}BR / {utData.bathroom_count}BA
                       </TableCell>
-                      <TableCell align="right">{ut.data.unit_count}</TableCell>
+                      <TableCell align="right">{utData.unit_count}</TableCell>
                       <TableCell align="right">
-                        {ut.data.typical_sqft ? ut.data.typical_sqft.toLocaleString() : '-'}
+                        {utData.typical_sqft ? String(utData.typical_sqft).toLocaleString() : '-'}
                       </TableCell>
                       <TableCell align="right">
-                        {ut.data.market_rent_monthly ? `$${ut.data.market_rent_monthly.toLocaleString()}` : '-'}
+                        {utData.market_rent_monthly ? `$${String(utData.market_rent_monthly).toLocaleString()}` : '-'}
                       </TableCell>
                       <TableCell align="center">
                         <Chip
@@ -288,7 +290,8 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                         />
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -308,22 +311,24 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.units.slice(0, 50).map((unit, idx) => (
+                  {data.units.slice(0, 50).map((unit, idx) => {
+                    const unitData = unit.data as unknown as Record<string, unknown>;
+                    return (
                     <TableRow key={idx}>
-                      <TableCell>{unit.data.unit_number}</TableCell>
+                      <TableCell>{unitData.unit_number}</TableCell>
                       <TableCell>
-                        {unit.data.bedroom_count && unit.data.bathroom_count
-                          ? `${unit.data.bedroom_count}/${unit.data.bathroom_count}`
-                          : unit.data.is_commercial ? 'Commercial' : '-'}
+                        {unitData.bedroom_count && unitData.bathroom_count
+                          ? `${unitData.bedroom_count}/${unitData.bathroom_count}`
+                          : unitData.is_commercial ? 'Commercial' : '-'}
                       </TableCell>
                       <TableCell align="right">
-                        {unit.data.square_feet || '-'}
+                        {unitData.square_feet || '-'}
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={unit.data.status}
+                          label={String(unitData.status)}
                           size="small"
-                          color={unit.data.status === 'occupied' ? 'success' : 'default'}
+                          color={unitData.status === 'occupied' ? 'success' : 'default'}
                         />
                       </TableCell>
                       <TableCell align="center">
@@ -335,7 +340,8 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                         />
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -357,22 +363,24 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.leases.map((lease, idx) => (
+                  {data.leases.map((lease, idx) => {
+                    const leaseData = lease.data as unknown as Record<string, unknown>;
+                    return (
                     <TableRow key={idx}>
-                      <TableCell>{lease.data.unit_number}</TableCell>
-                      <TableCell>{lease.data.tenant_name || '-'}</TableCell>
+                      <TableCell>{leaseData.unit_number}</TableCell>
+                      <TableCell>{leaseData.tenant_name || '-'}</TableCell>
                       <TableCell align="right">
-                        {lease.data.monthly_rent
-                          ? `$${lease.data.monthly_rent.toLocaleString()}`
+                        {leaseData.monthly_rent
+                          ? `$${String(leaseData.monthly_rent).toLocaleString()}`
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        {lease.data.lease_end_date
-                          ? new Date(lease.data.lease_end_date).toLocaleDateString()
+                        {leaseData.lease_end_date
+                          ? new Date(String(leaseData.lease_end_date)).toLocaleDateString()
                           : 'MTM'}
                       </TableCell>
                       <TableCell>
-                        {lease.data.is_section_8 && (
+                        {leaseData.is_section_8 && (
                           <Chip label="Sec 8" size="small" color="info" />
                         )}
                       </TableCell>
@@ -392,7 +400,8 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                         </Tooltip>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>

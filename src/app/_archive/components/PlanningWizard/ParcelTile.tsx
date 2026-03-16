@@ -247,7 +247,7 @@ const ParcelTile: React.FC<ParcelTileProps> = ({
               type_code: (parcel as any).type_code,
               product_code: (parcel as any).product_code,
             }}
-            onChange={(values) => {
+            onChange={(values: any) => {
               Object.entries(values).forEach(([key, value]) => {
                 if (value !== undefined) {
                   handleFieldChange(key, value);

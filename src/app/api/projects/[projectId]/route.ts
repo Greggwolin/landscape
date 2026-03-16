@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, context: Params) {
 
     let mergedMetadata: Record<string, unknown> | null = null
     if (needsMetadataUpdate) {
-      const existingMetadataRows = await sql<{ gis_metadata: Record<string, unknown> | null }[]>`
+      const existingMetadataRows = await sql`
         SELECT gis_metadata
         FROM landscape.tbl_project
         WHERE project_id = ${projectId}::bigint
@@ -56,12 +56,7 @@ export async function PATCH(req: NextRequest, context: Params) {
 
     // New dimensions are authoritative during transition.
     if (hasPerspective || hasPurpose) {
-      const existingRows = await sql<{
-        analysis_perspective: AnalysisPerspective | null
-        analysis_purpose: AnalysisPurpose | null
-        analysis_type: string | null
-        value_add_enabled: boolean | null
-      }[]>`
+      const existingRows = await sql`
         SELECT
           analysis_perspective,
           analysis_purpose,
@@ -100,9 +95,7 @@ export async function PATCH(req: NextRequest, context: Params) {
         resolvedValueAdd
       )
     } else if (updates.value_add_enabled !== undefined) {
-      const existingRows = await sql<{
-        analysis_perspective: AnalysisPerspective | null
-      }[]>`
+      const existingRows = await sql`
         SELECT analysis_perspective
         FROM landscape.tbl_project
         WHERE project_id = ${projectId}::bigint

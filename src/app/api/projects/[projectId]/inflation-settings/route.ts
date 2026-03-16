@@ -23,7 +23,7 @@ type SettingsRow = {
 async function buildResponse(projectId: number) {
   await ensureInflationColumns();
   const [settingsRow, availableSets] = await Promise.all([
-    sql<SettingsRow[]>`
+    sql`
       SELECT project_id, cost_inflation_set_id, price_inflation_set_id
       FROM landscape.tbl_project_settings
       WHERE project_id = ${projectId}::bigint
@@ -78,7 +78,7 @@ const parseRate = (value: any): number | null => {
 };
 
 async function fetchAvailableSets(): Promise<InflationSelection[]> {
-  const rows = await sql<InflationSelection[]>`
+  const rows = await sql`
     SELECT
       s.set_id,
       s.set_name,
@@ -137,7 +137,7 @@ export async function PUT(request: Request, { params }: Params) {
 
     await ensureInflationColumns();
 
-    const upsertResult = await sql<SettingsRow[]>`
+    const upsertResult = await sql`
       INSERT INTO landscape.tbl_project_settings (
         project_id,
         cost_inflation_set_id,

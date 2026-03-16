@@ -59,7 +59,7 @@ export async function PUT(
     const measureCode = normalizeMeasureCode(code);
     const hasUsageContextsColumn = await (async () => {
       try {
-        const result = await sql<{ exists: boolean }[]>`
+        const result = await sql`
           SELECT EXISTS (
             SELECT 1
             FROM information_schema.columns
@@ -73,7 +73,7 @@ export async function PUT(
         return false;
       }
     })();
-    const existingRows = await sql<UnitOfMeasure[]>`
+    const existingRows = await sql`
       SELECT
         measure_code,
         measure_name,
@@ -103,7 +103,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error }, { status: 400 });
     }
 
-    const updated = await sql<UnitOfMeasure[]>`
+    const updated = await sql`
       UPDATE landscape.tbl_measures
       SET
         measure_name = ${data.measure_name},
@@ -142,7 +142,7 @@ export async function DELETE(
     const measureCode = normalizeMeasureCode(code);
     const hasUsageContextsColumn = await (async () => {
       try {
-        const result = await sql<{ exists: boolean }[]>`
+        const result = await sql`
           SELECT EXISTS (
             SELECT 1
             FROM information_schema.columns
@@ -156,7 +156,7 @@ export async function DELETE(
         return false;
       }
     })();
-    const updated = await sql<UnitOfMeasure[]>`
+    const updated = await sql`
       UPDATE landscape.tbl_measures
       SET is_system = false, updated_at = CURRENT_TIMESTAMP
       WHERE LOWER(measure_code) = LOWER(${measureCode})

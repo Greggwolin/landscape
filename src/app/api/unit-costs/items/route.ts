@@ -88,7 +88,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
 
   // Build query dynamically based on what params we have
   if (!categoryId) {
-    const result = await sql<TemplateRow>`
+    const result = await sql`
       SELECT
         t.item_id as template_id,
         t.category_id,
@@ -120,7 +120,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
   const categoryIdVal = Number(categoryId);
 
   if (projectTypeCode) {
-    const result = await sql<TemplateRow>`
+    const result = await sql`
       SELECT
         t.item_id as template_id,
         t.category_id,
@@ -150,7 +150,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
     return result;
   }
 
-  const result = await sql<TemplateRow>`
+  const result = await sql`
     SELECT
       t.item_id as template_id,
       t.category_id,

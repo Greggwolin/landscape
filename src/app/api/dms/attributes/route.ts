@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // For now, get all attributes since we haven't implemented workspace-specific attributes
     // In a full implementation, you'd filter by workspace_id
-    const attributes = await sql<DMSAttribute[]>`
+    const attributes = await sql`
       SELECT * FROM landscape.dms_attributes
       ORDER BY attr_name
     `;
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Check if attribute with this key already exists
-      const existing = await sql<DMSAttribute[]>`
+      const existing = await sql`
         SELECT attr_id FROM landscape.dms_attributes
         WHERE attr_key = ${attr_key}
       `;
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create the attribute
-      const result = await sql<DMSAttribute[]>`
+      const result = await sql`
         INSERT INTO landscape.dms_attributes (
           attr_key, attr_name, attr_type, attr_description,
           is_required, is_searchable, validation_rules,

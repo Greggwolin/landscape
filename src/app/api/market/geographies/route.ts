@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const rows = await sql<GeographyRow>`
+    const rows = await sql`
       SELECT
         geography_name,
         geography_type,

@@ -46,7 +46,7 @@ export async function GET(
       );
     }
 
-    const projectResult = await sql<{ project_type_code: string }[]>`
+    const projectResult = await sql`
       SELECT project_type_code
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}
@@ -61,13 +61,13 @@ export async function GET(
     }
 
     const projectType = projectResult[0].project_type_code;
-    const activeDiscriminatorResult = await sql<{ active_opex_discriminator: string }[]>`
+    const activeDiscriminatorResult = await sql`
       SELECT active_opex_discriminator
       FROM landscape.tbl_project
       WHERE project_id = ${projectId}
       LIMIT 1
     `;
-    const availableDiscriminators = await sql<{ statement_discriminator: string | null }[]>`
+    const availableDiscriminators = await sql`
       SELECT DISTINCT statement_discriminator
       FROM landscape.tbl_operating_expenses
       WHERE project_id = ${projectId}
@@ -89,7 +89,7 @@ export async function GET(
 
     // Query core_unit_cost_category for Operations activity categories
     // This replaces the old tbl_opex_accounts query after migration 042
-    const accounts = await sql<OpexAccount[]>`
+    const accounts = await sql`
       SELECT
         c.category_id as account_id,
         c.account_number,

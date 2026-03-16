@@ -128,7 +128,7 @@ async function databaseSearch(params: any) {
     `;
 
     // Get total count
-    const countResult = await sql<{ count: number }[]>`
+    const countResult = await sql`
       ${latestDocsCte}
       SELECT COUNT(*) as count
       FROM landscape.mv_doc_search
@@ -140,7 +140,7 @@ async function databaseSearch(params: any) {
     const facetDistribution: any = {};
 
     if (requestedFacets?.includes('doc_type')) {
-      const facetResult = await sql<{ doc_type: string; count: number }[]>`
+      const facetResult = await sql`
         ${latestDocsCte}
         SELECT doc_type, COUNT(*) as count
         FROM landscape.mv_doc_search
@@ -154,7 +154,7 @@ async function databaseSearch(params: any) {
     }
 
     if (requestedFacets?.includes('discipline')) {
-      const facetResult = await sql<{ discipline: string; count: number }[]>`
+      const facetResult = await sql`
         ${latestDocsCte}
         SELECT discipline, COUNT(*) as count
         FROM landscape.mv_doc_search
@@ -168,7 +168,7 @@ async function databaseSearch(params: any) {
     }
 
     if (requestedFacets?.includes('status')) {
-      const facetResult = await sql<{ status: string; count: number }[]>`
+      const facetResult = await sql`
         ${latestDocsCte}
         SELECT status, COUNT(*) as count
         FROM landscape.mv_doc_search
@@ -182,7 +182,7 @@ async function databaseSearch(params: any) {
     }
 
     if (requestedFacets?.includes('project_name')) {
-      const facetResult = await sql<{ project_name: string; count: number }[]>`
+      const facetResult = await sql`
         ${latestDocsCte}
         SELECT project_name, COUNT(*) as count
         FROM landscape.mv_doc_search
@@ -254,7 +254,7 @@ async function searchDeletedDocuments(params: any) {
       OFFSET ${offset}
     `;
 
-    const countResult = await sql<{ count: number }[]>`
+    const countResult = await sql`
       SELECT COUNT(*) as count
       FROM landscape.core_doc
       ${whereClause}

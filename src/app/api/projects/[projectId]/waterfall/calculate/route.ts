@@ -149,7 +149,7 @@ function transformDjangoResponse(data: any, hurdleMethod: string | null) {
     totalDistributed: project_summary.total_distributed || 0,
     equityMultiple: project_summary.project_emx || 0,
     projectIrr: project_summary.project_irr || undefined,
-    tierTotals: tierSummaries.map((t, i) => {
+    tierTotals: tierSummaries.map((t: any, i: any) => {
       const tierDef = tierDefinitions[i] || {};
       return {
         tierNumber: t.tierNumber,

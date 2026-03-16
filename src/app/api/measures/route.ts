@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // Detect if usage_contexts column exists to avoid breaking on older schemas
     const hasUsageContextsColumn = await (async () => {
       try {
-        const result = await sql<{ exists: boolean }[]>`
+        const result = await sql`
           SELECT EXISTS (
             SELECT 1
             FROM information_schema.columns

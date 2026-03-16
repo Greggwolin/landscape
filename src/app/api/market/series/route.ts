@@ -29,20 +29,7 @@ export async function GET(request: NextRequest) {
       : null;
     const normalizedCodes = codes ? codes.map((c) => c.toUpperCase()) : null;
 
-    const result = await sql<{
-      series_code: string;
-      series_name: string;
-      category: string;
-      subcategory: string | null;
-      geo_id: string;
-      geo_level: string;
-      geo_name: string;
-      units: string | null;
-      seasonal: string | null;
-      date: string;
-      value: string | null;
-      coverage_note: string | null;
-    }>`
+    const result = await sql`
       SELECT
         ms.series_code,
         ms.series_name,

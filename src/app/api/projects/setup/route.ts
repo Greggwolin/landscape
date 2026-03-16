@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     if (body.dmsTemplateId && Number.isFinite(body.dmsTemplateId)) {
       dmsTemplateId = body.dmsTemplateId
     } else {
-      const defaultTemplate = await sql<{ template_id: number }[]>`
+      const defaultTemplate = await sql`
         SELECT template_id FROM landscape.dms_templates
         WHERE is_default = true
         ORDER BY template_id ASC
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     // Start transaction
     // 1. Create project
-    const projectResult = await sql<Array<{ project_id: number }>>`
+    const projectResult = await sql`
       INSERT INTO landscape.tbl_project (
         project_name,
         acres_gross,

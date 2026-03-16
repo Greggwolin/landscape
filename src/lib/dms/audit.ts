@@ -73,7 +73,7 @@ export async function logProfileChange(
     };
   }
 
-  const result = await sql<ProfileAudit[]>`
+  const result = await sql`
     INSERT INTO landscape.dms_profile_audit (
       doc_id,
       changed_by,
@@ -109,7 +109,7 @@ export async function getDocumentAuditHistory(
   docId: number,
   limit: number = 50
 ): Promise<ProfileAudit[]> {
-  return await sql<ProfileAudit[]>`
+  return await sql`
     SELECT *
     FROM landscape.dms_profile_audit
     WHERE doc_id = ${docId}
@@ -133,14 +133,7 @@ export async function getRecentAuditActivity(
   >
 > {
   if (projectId) {
-    return await sql<
-      Array<
-        ProfileAudit & {
-          doc_name: string;
-          doc_type: string;
-        }
-      >
-    >`
+    return await sql`
       SELECT a.*, d.doc_name, d.doc_type
       FROM landscape.dms_profile_audit a
       JOIN landscape.core_doc d ON a.doc_id = d.doc_id
@@ -149,14 +142,7 @@ export async function getRecentAuditActivity(
       LIMIT ${limit}
     `;
   } else {
-    return await sql<
-      Array<
-        ProfileAudit & {
-          doc_name: string;
-          doc_type: string;
-        }
-      >
-    >`
+    return await sql`
       SELECT a.*, d.doc_name, d.doc_type
       FROM landscape.dms_profile_audit a
       JOIN landscape.core_doc d ON a.doc_id = d.doc_id
@@ -223,7 +209,7 @@ export async function revertToAuditState(
   reason?: string
 ): Promise<void> {
   // Get the audit record
-  const audit = await sql<ProfileAudit[]>`
+  const audit = await sql`
     SELECT * FROM landscape.dms_profile_audit
     WHERE audit_id = ${auditId} AND doc_id = ${docId}
   `;
@@ -235,7 +221,7 @@ export async function revertToAuditState(
   const targetProfile = audit[0].old_profile_json;
 
   // Get current profile
-  const currentDoc = await sql<Array<{ profile_json: Record<string, any> }>>`
+  const currentDoc = await sql`
     SELECT profile_json FROM landscape.core_doc
     WHERE doc_id = ${docId}
   `;

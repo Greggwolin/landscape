@@ -39,15 +39,7 @@ export async function GET(
     const activities: ActivityItem[] = [];
 
     // Query recent document uploads with embedding counts for confidence
-    const docResults = await sql<{
-      doc_id: number;
-      created_at: Date;
-      doc_name: string;
-      status: string;
-      doc_profile: string | null;
-      profile: string | null;
-      embedding_count: number;
-    }[]>`
+    const docResults = await sql`
       SELECT
         d.doc_id,
         d.created_at,
@@ -95,12 +87,7 @@ export async function GET(
 
     // Query recent budget changes (if table exists)
     try {
-      const budgetResults = await sql<{
-        fact_id: number;
-        updated_at: Date;
-        category_name: string | null;
-        amount: number;
-      }[]>`
+      const budgetResults = await sql`
         SELECT
           b.fact_id,
           b.updated_at,

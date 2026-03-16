@@ -213,7 +213,7 @@ export const addRentPeriod = (period: BaseRent) => {
 export const updateRentPeriod = (periodId: number, update: Partial<BaseRent>) => {
   mockLeaseData = {
     ...mockLeaseData,
-    rentSchedule: mockLeaseData.rentSchedule.map((period) =>
+    rentSchedule: mockLeaseData.rentSchedule.map((period: any) =>
       period.base_rent_id === periodId ? { ...period, ...update } : period
     )
   };
@@ -221,7 +221,7 @@ export const updateRentPeriod = (periodId: number, update: Partial<BaseRent>) =>
 export const deleteRentPeriod = (periodId: number) => {
   mockLeaseData = {
     ...mockLeaseData,
-    rentSchedule: mockLeaseData.rentSchedule.filter((period) => period.base_rent_id !== periodId)
+    rentSchedule: mockLeaseData.rentSchedule.filter((period: any) => period.base_rent_id !== periodId)
   };
 };
 
@@ -235,7 +235,7 @@ export const addEscalation = (escalation: Escalation) => {
 export const updateEscalation = (id: number, update: Partial<Escalation>) => {
   mockLeaseData = {
     ...mockLeaseData,
-    escalations: mockLeaseData.escalations.map((rule) =>
+    escalations: mockLeaseData.escalations.map((rule: any) =>
       rule.escalation_id === id ? { ...rule, ...update } : rule
     )
   };
@@ -243,7 +243,7 @@ export const updateEscalation = (id: number, update: Partial<Escalation>) => {
 export const deleteEscalation = (id: number) => {
   mockLeaseData = {
     ...mockLeaseData,
-    escalations: mockLeaseData.escalations.filter((rule) => rule.escalation_id !== id)
+    escalations: mockLeaseData.escalations.filter((rule: any) => rule.escalation_id !== id)
   };
 };
 

@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     let rows: PropertySubtypeRow[];
 
     if (propertyType) {
-      rows = await sql<PropertySubtypeRow[]>`
+      rows = await sql`
         SELECT *
         FROM landscape.lu_property_subtype
         WHERE property_type_code = ${propertyType.toUpperCase()}
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       `;
     } else {
       // Return all subtypes grouped by property type
-      rows = await sql<PropertySubtypeRow[]>`
+      rows = await sql`
         SELECT *
         FROM landscape.lu_property_subtype
         WHERE is_active = true
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     // Get next sort order if not provided
     let finalSortOrder = sort_order;
     if (finalSortOrder === undefined) {
-      const maxOrderRow = await sql<{ max_order: number }[]>`
+      const maxOrderRow = await sql`
         SELECT COALESCE(MAX(sort_order), 0) + 1 AS max_order
         FROM landscape.lu_property_subtype
         WHERE property_type_code = ${propertyType};

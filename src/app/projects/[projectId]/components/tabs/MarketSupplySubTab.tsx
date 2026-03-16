@@ -791,7 +791,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
                   className="text-center py-4"
                   style={{ color: 'var(--cui-secondary-color)', fontSize: '0.85rem' }}
                 >
-                  {error || 'No rental comparables found. Add comparables from the Market Comps tab in Valuation.'}
+                  {error || 'No rental comparables found. Add comparables from Valuation > Income Approach > Rent Comps.'}
                 </div>
               )}
             </div>

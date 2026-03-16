@@ -61,7 +61,7 @@ export async function PATCH(
     } = body
 
     // Check item exists
-    const existingCheck = await sql<InventoryItem[]>`
+    const existingCheck = await sql`
       SELECT * FROM landscape.tbl_inventory_item
       WHERE item_id = ${itmId} AND project_id = ${projId}
     `
@@ -81,7 +81,7 @@ export async function PATCH(
 
     // If updating item_code, check for duplicates
     if (item_code && item_code !== existingCheck[0].item_code) {
-      const duplicateCheck = await sql<[{ count: number }]>`
+      const duplicateCheck = await sql`
         SELECT COUNT(*)::int as count
         FROM landscape.tbl_inventory_item
         WHERE project_id = ${projId}
@@ -107,11 +107,7 @@ export async function PATCH(
     // If updating product_id, fetch lot dimensions and auto-populate data_values
     let enrichedDataValues = data_values
     if (product_id !== undefined && product_id !== null) {
-      const productDetails = await sql<Array<{
-        lot_w_ft: number | null
-        lot_d_ft: number | null
-        lot_area_sf: number | null
-      }>>`
+      const productDetails = await sql`
         SELECT lot_w_ft, lot_d_ft, lot_area_sf
         FROM landscape.res_lot_product
         WHERE product_id = ${product_id}
@@ -131,7 +127,7 @@ export async function PATCH(
     }
 
     // Update using COALESCE for partial updates
-    const updated = await sql<InventoryItem[]>`
+    const updated = await sql`
       UPDATE landscape.tbl_inventory_item
       SET
         item_code = COALESCE(${item_code ?? null}, item_code),
@@ -203,7 +199,7 @@ export async function DELETE(
 
   try {
     // Soft delete (set is_active = false)
-    const deleted = await sql<InventoryItem[]>`
+    const deleted = await sql`
       UPDATE landscape.tbl_inventory_item
       SET is_active = false,
           updated_at = CURRENT_TIMESTAMP

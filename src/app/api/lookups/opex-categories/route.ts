@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     if (parentId) {
       // Get children of specific parent by ID
       if (includeHasChildren) {
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
           ORDER BY c.account_number
         `;
       } else {
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           SELECT category_id, category_name, account_number, parent_id
           FROM landscape.core_unit_cost_category
           WHERE parent_id = ${parseInt(parentId, 10)}
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
 
       if (parent.length > 0) {
         // Get all leaf categories under this parent (recursively)
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           WITH RECURSIVE category_tree AS (
             -- Direct children of the root
             SELECT
@@ -129,7 +129,7 @@ export async function GET(request: Request) {
         `;
       } else {
         // Fallback: get all categories starting with the prefix
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -148,7 +148,7 @@ export async function GET(request: Request) {
     } else {
       // Get all Operations categories (4xxx range)
       if (includeHasChildren) {
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -166,7 +166,7 @@ export async function GET(request: Request) {
           ORDER BY c.account_number
         `;
       } else {
-        categories = await sql<OpexCategory[]>`
+        categories = await sql`
           SELECT category_id, category_name, account_number, parent_id
           FROM landscape.core_unit_cost_category
           WHERE account_number LIKE '4%'

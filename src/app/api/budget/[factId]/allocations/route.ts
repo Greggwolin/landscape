@@ -70,7 +70,7 @@ export async function GET(
       request.nextUrl.searchParams.get('includeZeroPeriods')
     );
 
-    const budgetRows = await sql<BudgetInfoRow>`
+    const budgetRows = await sql`
       SELECT
         fb.fact_id AS "factId",
         fb.project_id AS "projectId",
@@ -102,7 +102,7 @@ export async function GET(
       );
     }
 
-    const allocationRows = await sql<AllocationRow>`
+    const allocationRows = await sql`
       SELECT
         bt.timing_id AS "timingId",
         bt.amount,

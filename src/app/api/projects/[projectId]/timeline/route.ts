@@ -50,12 +50,7 @@ export async function GET(request: NextRequest, context: Params) {
       }
     }
 
-    const projectRows = await sql<{
-      projectId: number;
-      projectName: string;
-      analysisStartDate: string | null;
-      analysisEndDate: string | null;
-    }>`
+    const projectRows = await sql`
       SELECT
         project_id AS "projectId",
         project_name AS "projectName",
@@ -74,27 +69,7 @@ export async function GET(request: NextRequest, context: Params) {
       );
     }
 
-    const items = await sql<{
-      id: string;
-      type: string;
-      item_id: number;
-      name: string | null;
-      status: string | null;
-      is_critical: boolean | null;
-      baseline_start: string | null;
-      baseline_end: string | null;
-      current_start: string | null;
-      current_end: string | null;
-      actual_start_date: string | null;
-      actual_end_date: string | null;
-      percent_complete: string | number | null;
-      float_days: number | null;
-      amount: string | number | null;
-      timing_method: string | null;
-      created_at: string | null;
-      predecessor_count: number;
-      successor_count: number;
-    }>`
+    const items = await sql`
       WITH budget_items AS (
         SELECT 
           'budget-' || fb.fact_id AS id,

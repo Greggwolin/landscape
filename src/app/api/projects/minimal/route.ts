@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     if (body.dms_template_id && Number.isFinite(body.dms_template_id)) {
       dmsTemplateId = body.dms_template_id
     } else {
-      const defaultTemplate = await sql<{ template_id: number }[]>`
+      const defaultTemplate = await sql`
         SELECT template_id FROM landscape.dms_templates
         WHERE is_default = true
         ORDER BY template_id ASC
@@ -145,15 +145,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const inserted = await sql<{
-      project_id: number
-      project_name: string
-      project_type_code: string | null
-      analysis_mode: string
-      analysis_perspective: AnalysisPerspective
-      analysis_purpose: AnalysisPurpose
-      value_add_enabled: boolean
-    }[]>`
+    const inserted = await sql`
       INSERT INTO landscape.tbl_project (
         project_name,
         project_type_code,

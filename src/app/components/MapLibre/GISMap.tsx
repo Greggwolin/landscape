@@ -511,10 +511,11 @@ const GISMap: React.FC<GISMapProps> = ({
  const selectedDetails: PinalParcel[] = []
 
  if (sourceData && 'features' in sourceData) {
+ const features = sourceData.features as unknown as Array<{ properties?: Record<string, unknown> }>
  Array.from(newSelected).forEach(selectedParcelId => {
  console.log('🔍 LOOKING FOR APN:', selectedParcelId)
 
- const selectedFeature = sourceData.features.find(f =>
+ const selectedFeature = features.find(f =>
  f.properties?.parcelid === selectedParcelId
  )
  console.log('🎯 FOUND FEATURE FOR LOOKUP:', selectedFeature?.properties)

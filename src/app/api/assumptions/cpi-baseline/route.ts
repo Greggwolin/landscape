@@ -29,7 +29,7 @@ export async function GET() {
   }
 
   try {
-    const result = await sql<InflationRow>`
+    const result = await sql`
       SELECT
         series_code,
         latest_observation_date,

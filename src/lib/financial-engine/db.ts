@@ -117,7 +117,7 @@ export async function getLeasesByParcel(parcelId: number): Promise<Lease[]> {
 export async function updateLease(leaseId: number, data: LeaseUpdate): Promise<Lease | null> {
   // Build dynamic update query
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'lease_id') {
@@ -190,7 +190,7 @@ export async function getBaseRentByLease(leaseId: number): Promise<BaseRent[]> {
 
 export async function updateBaseRent(baseRentId: number, data: BaseRentUpdate): Promise<BaseRent | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'base_rent_id') {
@@ -260,7 +260,7 @@ export async function getEscalationsByLease(leaseId: number): Promise<Escalation
 
 export async function updateEscalation(escalationId: number, data: EscalationUpdate): Promise<Escalation | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'escalation_id') {
@@ -330,7 +330,7 @@ export async function getRecoveryByLease(leaseId: number): Promise<Recovery | nu
 
 export async function updateRecovery(recoveryId: number, data: RecoveryUpdate): Promise<Recovery | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'recovery_id') {
@@ -428,7 +428,7 @@ export async function getAdditionalIncomeByLease(leaseId: number): Promise<Addit
 
 export async function updateAdditionalIncome(additionalIncomeId: number, data: AdditionalIncomeUpdate): Promise<AdditionalIncome | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'additional_income_id') {
@@ -489,7 +489,7 @@ export async function getTenantImprovementByLease(leaseId: number): Promise<Tena
 
 export async function updateTenantImprovement(tiId: number, data: TenantImprovementUpdate): Promise<TenantImprovement | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'tenant_improvement_id') {
@@ -546,7 +546,7 @@ export async function getLeasingCommissionByLease(leaseId: number): Promise<Leas
 
 export async function updateLeasingCommission(commissionId: number, data: LeasingCommissionUpdate): Promise<LeasingCommission | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'commission_id') {
@@ -658,7 +658,7 @@ export async function getLotsByParcel(parcelId: number): Promise<Lot[]> {
 
 export async function updateLot(lotId: number, data: LotUpdate): Promise<Lot | null> {
   const updates: string[] = [];
-  const values: any[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'lot_id') {

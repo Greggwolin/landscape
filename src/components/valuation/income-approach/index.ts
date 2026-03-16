@@ -12,3 +12,6 @@ export { AssumptionsPanel } from './AssumptionsPanel';
 export { DirectCapView } from './DirectCapView';
 export { SensitivityMatrix } from './SensitivityMatrix';
 export { DCFView } from './DCFView';
+export { RentCompsView } from './RentCompsView';
+export { ExpenseCompsView } from './ExpenseCompsView';
+export type { PlatformEstimate } from './ExpenseCompsView';

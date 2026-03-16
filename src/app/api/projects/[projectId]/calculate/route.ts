@@ -30,7 +30,7 @@ export async function POST(
   }
 
   try {
-    const [projectExists] = await sql<{ project_id: number }[]>`
+    const [projectExists] = await sql`
       SELECT project_id
       FROM landscape.tbl_project
       WHERE project_id = ${id}
@@ -42,7 +42,7 @@ export async function POST(
     }
 
     const [containerTotals, periodTotals] = await Promise.all([
-      sql<ContainerTotal[]>`
+      sql`
         SELECT
           c.division_id,
           c.tier,
@@ -55,7 +55,7 @@ export async function POST(
         GROUP BY c.division_id, c.tier, c.container_code, c.display_name
         ORDER BY c.tier, c.sort_order NULLS LAST, c.division_id
       `,
-      sql<PeriodTotal[]>`
+      sql`
         SELECT
           p.period_id,
           p.period_sequence,

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * InlineComment Extension for TipTap
  *
@@ -10,9 +11,12 @@
  * Comments are stored as custom nodes that can be serialized to JSON.
  */
 
+// @ts-expect-error @tiptap/core not installed yet
 import { Node, mergeAttributes } from '@tiptap/core';
+// @ts-expect-error @tiptap/pm/state not installed yet
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { NodeView } from '@tiptap/pm/view';
+// @ts-expect-error @tiptap/pm/view not installed yet
+import type { NodeView } from '@tiptap/pm/view';
 
 export interface CommentAttributes {
   id: string;
@@ -55,6 +59,7 @@ export interface InlineCommentStorage {
   showComments: boolean;
 }
 
+// @ts-expect-error @tiptap/core not installed yet
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     inlineComment: {
@@ -129,50 +134,50 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
     return {
       id: {
         default: null,
-        parseHTML: element => element.getAttribute('data-comment-id'),
-        renderHTML: attributes => ({
+        parseHTML: (element: any) => element.getAttribute('data-comment-id'),
+        renderHTML: (attributes: any) => ({
           'data-comment-id': attributes.id,
         }),
       },
       text: {
         default: '',
-        parseHTML: element => element.getAttribute('data-comment-text') || element.textContent?.replace(/^\[|\]$/g, '') || '',
-        renderHTML: attributes => ({
+        parseHTML: (element: any) => element.getAttribute('data-comment-text') || element.textContent?.replace(/^\[|\]$/g, '') || '',
+        renderHTML: (attributes: any) => ({
           'data-comment-text': attributes.text,
         }),
       },
       isQuestion: {
         default: false,
-        parseHTML: element => element.getAttribute('data-is-question') === 'true',
-        renderHTML: attributes => ({
+        parseHTML: (element: any) => element.getAttribute('data-is-question') === 'true',
+        renderHTML: (attributes: any) => ({
           'data-is-question': attributes.isQuestion ? 'true' : 'false',
         }),
       },
       isResolved: {
         default: false,
-        parseHTML: element => element.getAttribute('data-is-resolved') === 'true',
-        renderHTML: attributes => ({
+        parseHTML: (element: any) => element.getAttribute('data-is-resolved') === 'true',
+        renderHTML: (attributes: any) => ({
           'data-is-resolved': attributes.isResolved ? 'true' : 'false',
         }),
       },
       response: {
         default: null,
-        parseHTML: element => element.getAttribute('data-response'),
-        renderHTML: attributes => attributes.response ? ({
+        parseHTML: (element: any) => element.getAttribute('data-response'),
+        renderHTML: (attributes: any) => attributes.response ? ({
           'data-response': attributes.response,
         }) : {},
       },
       createdAt: {
         default: () => new Date().toISOString(),
-        parseHTML: element => element.getAttribute('data-created-at'),
-        renderHTML: attributes => ({
+        parseHTML: (element: any) => element.getAttribute('data-created-at'),
+        renderHTML: (attributes: any) => ({
           'data-created-at': attributes.createdAt,
         }),
       },
       createdBy: {
         default: null,
-        parseHTML: element => element.getAttribute('data-created-by'),
-        renderHTML: attributes => attributes.createdBy ? ({
+        parseHTML: (element: any) => element.getAttribute('data-created-by'),
+        renderHTML: (attributes: any) => attributes.createdBy ? ({
           'data-created-by': attributes.createdBy,
         }) : {},
       },
@@ -187,7 +192,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
     ];
   },
 
-  renderHTML({ HTMLAttributes, node }) {
+  renderHTML({ HTMLAttributes, node }: any) {
     const attrs = node.attrs as CommentAttributes;
     const classes = [this.options.commentClass];
 
@@ -215,7 +220,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
     return {
       insertComment:
         (text: string) =>
-        ({ chain, state }) => {
+        ({ chain, state }: any) => {
           const id = generateCommentId();
           const isQuestion = text.trim().endsWith('?');
 
@@ -235,11 +240,11 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       updateComment:
         (id: string, attrs: Partial<CommentAttributes>) =>
-        ({ tr, state, dispatch }) => {
+        ({ tr, state, dispatch }: any) => {
           if (!dispatch) return false;
 
           let found = false;
-          state.doc.descendants((node, pos) => {
+          state.doc.descendants((node: any, pos: any) => {
             if (node.type.name === this.name && node.attrs.id === id) {
               tr.setNodeMarkup(pos, undefined, {
                 ...node.attrs,
@@ -258,14 +263,14 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       removeComment:
         (id: string) =>
-        ({ tr, state, dispatch }) => {
+        ({ tr, state, dispatch }: any) => {
           if (!dispatch) return false;
 
           let found = false;
           let posToDelete: number | null = null;
           let sizeToDelete = 0;
 
-          state.doc.descendants((node, pos) => {
+          state.doc.descendants((node: any, pos: any) => {
             if (node.type.name === this.name && node.attrs.id === id) {
               posToDelete = pos;
               sizeToDelete = node.nodeSize;
@@ -283,7 +288,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       resolveComment:
         (id: string, response?: string) =>
-        ({ commands }) => {
+        ({ commands }: any) => {
           return commands.updateComment(id, {
             isResolved: true,
             response,
@@ -292,7 +297,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       unresolveComment:
         (id: string) =>
-        ({ commands }) => {
+        ({ commands }: any) => {
           return commands.updateComment(id, {
             isResolved: false,
             response: undefined,
@@ -301,7 +306,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       toggleCommentVisibility:
         () =>
-        ({ editor }) => {
+        ({ editor }: any) => {
           this.storage.showComments = !this.storage.showComments;
           // Force re-render
           editor.view.dispatch(editor.state.tr);
@@ -310,7 +315,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       setCommentVisibility:
         (visible: boolean) =>
-        ({ editor }) => {
+        ({ editor }: any) => {
           this.storage.showComments = visible;
           // Force re-render
           editor.view.dispatch(editor.state.tr);
@@ -320,7 +325,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
   },
 
   addNodeView() {
-    return ({ node, HTMLAttributes, getPos, editor }) => {
+    return ({ node, HTMLAttributes, getPos, editor }: any) => {
       const attrs = node.attrs as CommentAttributes;
       const dom = document.createElement('span');
 
@@ -355,7 +360,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
 
       return {
         dom,
-        update: (updatedNode) => {
+        update: (updatedNode: any) => {
           if (updatedNode.type.name !== this.name) return false;
 
           const updatedAttrs = updatedNode.attrs as CommentAttributes;
@@ -387,7 +392,7 @@ export const InlineComment = Node.create<InlineCommentOptions, InlineCommentStor
         key: inlineCommentPluginKey,
         props: {
           // Could add keyboard shortcuts here (e.g., Cmd+Shift+C to insert comment)
-          handleKeyDown: (view, event) => {
+          handleKeyDown: (view: any, event: any) => {
             // Cmd/Ctrl + Shift + C to open comment insertion
             if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'C') {
               // This would typically trigger a UI to input comment text

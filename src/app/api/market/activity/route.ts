@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch data for the geography
-    const rows = await sql<ActivityRow>`
+    const rows = await sql`
       SELECT
         period_end_date::text,
         value,
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
     // Peak (all-time from fetched data)
     // Need to query all data for peak
-    const peakRows = await sql<{ period_end_date: string; value: number }>`
+    const peakRows = await sql`
       SELECT period_end_date::text, value
       FROM landscape.market_activity
       WHERE msa_code = ${msa}

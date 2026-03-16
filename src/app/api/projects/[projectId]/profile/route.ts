@@ -63,7 +63,7 @@ export async function GET(
   try {
     const { projectId } = await params;
 
-    const profiles = await sql<ProjectProfile[]>`
+    const profiles = await sql`
       SELECT
         p.project_id,
         p.project_name,
@@ -153,12 +153,7 @@ export async function PATCH(
     const hasValueAdd = body.value_add_enabled !== undefined
 
     if (hasPerspective || hasPurpose || hasValueAdd) {
-      const existingRows = await sql<{
-        analysis_type: string | null
-        analysis_perspective: AnalysisPerspective | null
-        analysis_purpose: AnalysisPurpose | null
-        value_add_enabled: boolean | null
-      }[]>`
+      const existingRows = await sql`
         SELECT
           analysis_type,
           analysis_perspective,
@@ -253,16 +248,7 @@ export async function PATCH(
       body.zip_code !== undefined
     ) {
       // Fetch current values to build complete address
-      const current = await sql<{
-        street_address: string | null;
-        city: string | null;
-        county: string | null;
-        state: string | null;
-        zip_code: string | null;
-        jurisdiction_city: string | null;
-        jurisdiction_county: string | null;
-        jurisdiction_state: string | null;
-      }[]>`
+      const current = await sql`
         SELECT street_address, city, county, state, zip_code, jurisdiction_city, jurisdiction_county, jurisdiction_state
         FROM landscape.tbl_project
         WHERE project_id = ${projectId}::bigint
@@ -323,7 +309,7 @@ export async function PATCH(
     );
 
     // Return updated profile
-    const updatedProfiles = await sql<ProjectProfile[]>`
+    const updatedProfiles = await sql`
       SELECT
         p.project_id,
         p.project_name,

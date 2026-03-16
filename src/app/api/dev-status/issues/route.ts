@@ -119,9 +119,7 @@ async function insertIssueRow(params: {
 
   const metadataJson = serializeMetadataPayload(metadataPayload)
 
-  const [result] = await sql<
-    { issue_id: number; created_at: string }
-  >`INSERT INTO public.dev_issue_log (
+  const [result] = await sql`INSERT INTO public.dev_issue_log (
         issue_type,
         title,
         description,
@@ -257,23 +255,7 @@ export async function GET(request: NextRequest) {
   const { pagePath, pageSize } = parsed.data
 
   const rows = pagePath
-    ? await sql<
-        {
-          issue_id: number
-          issue_type: string
-          title: string | null
-          description: string
-          page_path: string | null
-          component_path: string | null
-          branch: string | null
-          commit_sha: string | null
-          reporter_name: string | null
-          reporter_email: string | null
-          metadata: Record<string, unknown> | null
-          created_at: string
-          resolved_at: string | null
-        }[]
-      >`
+    ? await sql`
         SELECT issue_id, issue_type, title, description, page_path, component_path,
                branch, commit_sha, reporter_name, reporter_email, metadata,
                created_at, resolved_at
@@ -282,23 +264,7 @@ export async function GET(request: NextRequest) {
         ORDER BY created_at DESC
         LIMIT ${pageSize}
       `
-    : await sql<
-        {
-          issue_id: number
-          issue_type: string
-          title: string | null
-          description: string
-          page_path: string | null
-          component_path: string | null
-          branch: string | null
-          commit_sha: string | null
-          reporter_name: string | null
-          reporter_email: string | null
-          metadata: Record<string, unknown> | null
-          created_at: string
-          resolved_at: string | null
-        }[]
-      >`
+    : await sql`
         SELECT issue_id, issue_type, title, description, page_path, component_path,
                branch, commit_sha, reporter_name, reporter_email, metadata,
                created_at, resolved_at

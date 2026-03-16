@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     if (!listCode) {
       // Return all configs grouped by list_code
-      const rows = await sql<DisplayConfigRow[]>`
+      const rows = await sql`
         SELECT *
         FROM landscape.lu_picklist_display_config
         ORDER BY list_code, context;
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Return configs for specific list_code
-    const rows = await sql<DisplayConfigRow[]>`
+    const rows = await sql`
       SELECT *
       FROM landscape.lu_picklist_display_config
       WHERE list_code = ${listCode}

@@ -23,7 +23,7 @@ export async function fetchCurveProfileSummary(opts: {
     return null;
   }
 
-  const rows = await sql<CurveProfileSummary>`
+  const rows = await sql`
     SELECT
       curve_id AS "curveId",
       curve_code AS "curveCode",

@@ -105,11 +105,7 @@ interface ProjectConfig {
  * Fetch project configuration from database
  */
 async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
-  const result = await sql<{
-    project_id: number;
-    project_name: string;
-    analysis_start_date: string | null;
-  }>`
+  const result = await sql`
     SELECT
       p.project_id,
       p.project_name,
@@ -180,9 +176,7 @@ async function fetchProjectConfig(projectId: number): Promise<ProjectConfig> {
   // PRIORITY 2: Fallback to tbl_project_settings if DCF doesn't have cost inflation
   if (costInflationRate === undefined) {
     try {
-      const inflationResult = await sql<{
-        current_rate: number | null;
-      }>`
+      const inflationResult = await sql`
         SELECT
           CASE
             WHEN COUNT(st.step_id) = 1 THEN MAX(st.rate)
@@ -227,13 +221,13 @@ async function determineRequiredPeriods(
 ): Promise<number> {
   // Get max period from budget items
   const budgetQuery = containerIds && containerIds.length > 0
-    ? sql<{ max_period: number | null }>`
+    ? sql`
         SELECT MAX(COALESCE(end_period, start_period + COALESCE(periods_to_complete, 1) - 1)) as max_period
         FROM landscape.core_fin_fact_budget
         WHERE project_id = ${projectId}
           AND division_id = ANY(${containerIds})
       `
-    : sql<{ max_period: number | null }>`
+    : sql`
         SELECT MAX(COALESCE(end_period, start_period + COALESCE(periods_to_complete, 1) - 1)) as max_period
         FROM landscape.core_fin_fact_budget
         WHERE project_id = ${projectId}
@@ -245,7 +239,7 @@ async function determineRequiredPeriods(
   // Get max period from parcel sales
   // containerIds are division_ids (tier 2 = phases) - need to join through tbl_phase to match
   const parcelQuery = containerIds && containerIds.length > 0
-    ? sql<{ max_period: number | null }>`
+    ? sql`
         SELECT MAX(p.sale_period) as max_period
         FROM landscape.tbl_parcel p
         LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
@@ -257,7 +251,7 @@ async function determineRequiredPeriods(
           AND d_phase.division_id = ANY(${containerIds})
           AND p.sale_period IS NOT NULL
       `
-    : sql<{ max_period: number | null }>`
+    : sql`
         SELECT MAX(sale_period) as max_period
         FROM landscape.tbl_parcel
         WHERE project_id = ${projectId}
@@ -444,7 +438,7 @@ export async function generateCashFlow(
   // Fetch container labels (phase names)
   const containerIds_list = Array.from(revenueByContainer.keys()).filter((id): id is number => id !== undefined);
   if (containerIds_list.length > 0) {
-    const containerLabels = await sql<{ phase_id: number; phase_name: string }>`
+    const containerLabels = await sql`
       SELECT phase_id, phase_name
       FROM landscape.tbl_phase
       WHERE phase_id = ANY(${containerIds_list})

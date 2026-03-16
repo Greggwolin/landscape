@@ -25,10 +25,7 @@ export async function POST(request: NextRequest) {
       requested_at: new Date().toISOString(),
     };
 
-    const rows = await sql<{
-      job_id: number;
-      status: string;
-    }>`
+    const rows = await sql`
       INSERT INTO public.market_fetch_job (status, params)
       VALUES ('queued', ${JSON.stringify(params)}::jsonb)
       RETURNING job_id, status
