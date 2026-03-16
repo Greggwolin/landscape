@@ -43,6 +43,7 @@ export interface AggregatedSection {
   subtotals: number[]; // Value per aggregated period
   sectionTotal: number;
   sortOrder: number;
+  isTime0?: boolean;
 }
 
 export interface AggregatedLineItem {

@@ -9,8 +9,10 @@ import {
   cilArrowRight,
   cilChevronBottom,
   cilChevronTop,
+  cilBook,
 } from '@coreui/icons';
 import { useHelpLandscaper, HelpMessage } from '@/contexts/HelpLandscaperContext';
+// User Guide opens in a separate OS window via window.open()
 import './help-landscaper-panel.css';
 
 /* ------------------------------------------------------------------ */
@@ -260,7 +262,6 @@ export default function HelpLandscaperPanel() {
     sendMessage,
     clearConversation,
   } = useHelpLandscaper();
-
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -321,6 +322,47 @@ export default function HelpLandscaperPanel() {
           <CCloseButton onClick={closeHelp} />
         </div>
       </div>
+
+      {/* User Guide — opens in a separate OS window */}
+      <button
+        type="button"
+        onClick={() => {
+          closeHelp();
+          const w = 960;
+          const h = 720;
+          const left = window.screenX + window.outerWidth - w - 40;
+          const top = window.screenY + 60;
+          window.open(
+            '/guide',
+            'landscape-guide',
+            `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+          );
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          width: 'calc(100% - 1.5rem)',
+          margin: '0.5rem 0.75rem',
+          padding: '0.5rem 0.75rem',
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          color: 'var(--cui-primary)',
+          backgroundColor: 'var(--cui-tertiary-bg)',
+          border: '1px solid var(--cui-border-color)',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          transition: 'background-color 0.15s',
+        }}
+      >
+        <CIcon icon={cilBook} size="sm" />
+        User Guide
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', opacity: 0.5 }}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </button>
 
       {/* Page Guide - tab-aware structured content */}
       <PageGuide currentPage={currentPage} />
