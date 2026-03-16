@@ -178,7 +178,7 @@ export default function CashFlowTable({ schedule }: Props) {
   );
 
   const costSections = useMemo(() =>
-    sections.filter(s => !s.sectionName.toLowerCase().includes('revenue') && !s.sectionId.startsWith('phase-')),
+    sections.filter(s => !s.sectionName.toLowerCase().includes('revenue') && !s.sectionId.startsWith('phase-') && !s.isTime0),
     [sections]
   );
 

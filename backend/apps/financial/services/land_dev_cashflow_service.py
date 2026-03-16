@@ -1117,14 +1117,22 @@ class LandDevCashFlowService:
             # Calculate section subtotals
             subtotals = self._calculate_subtotals(line_items, period_count)
 
-            sections.append({
+            section_data = {
                 'sectionId': f"cost-{category.lower().replace(' ', '-').replace('&', 'and')}",
                 'sectionName': category.upper(),
                 'lineItems': line_items,
                 'subtotals': subtotals,
                 'sectionTotal': -cat_data['total'],
                 'sortOrder': sort_order,
-            })
+            }
+
+            # Land Acquisition is handled as Time 0 in the frontend via
+            # the separate acquisition-price-summary endpoint.
+            # Tag it so the frontend excludes it from periodic columns.
+            if category == 'Land Acquisition':
+                section_data['isTime0'] = True
+
+            sections.append(section_data)
             sort_order += 1
 
         # Revenue sections

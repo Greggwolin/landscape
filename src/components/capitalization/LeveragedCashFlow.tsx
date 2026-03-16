@@ -38,6 +38,7 @@ interface CashFlowSection {
   subtotals: CashFlowSubtotal[];
   sectionTotal: number;
   sortOrder: number;
+  isTime0?: boolean;
 }
 
 interface CashFlowLineItem {
@@ -316,7 +317,10 @@ export default function LeveragedCashFlow({
   const financingSection = sections.find((s) => s.sectionId === 'financing');
 
   /* Land dev detection: cost-* sections only exist for LAND projects */
-  const costSections = sections.filter((s) => s.sectionId.startsWith('cost-'));
+  /* Exclude isTime0 sections (e.g. Land Acquisition) — shown in Time 0 column instead */
+  const costSections = sections.filter(
+    (s) => s.sectionId.startsWith('cost-') && !s.isTime0
+  );
   const lotbankSections = sections.filter((s) => s.sectionId.startsWith('lotbank-'));
   const isLandDev = costSections.length > 0;
 
