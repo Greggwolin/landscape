@@ -1,0 +1,109 @@
+/**
+ * Guide Print Stylesheet
+ *
+ * Applied via @media print to format the User Guide for PDF export.
+ * Hides navigation and sidebar, renders content full-width.
+ * Uses explicit color values (not CSS variables) for print reliability.
+ */
+
+@media print {
+  /* Hide everything except guide content */
+  .guide-sidebar,
+  .guide-print-btn,
+  nav,
+  header,
+  .top-navigation-bar,
+  .app-shell > nav,
+  .help-landscaper-panel,
+  [class*="TopNav"],
+  [class*="topnav"] {
+    display: none !important;
+  }
+
+  /* Make guide shell full width */
+  .guide-shell {
+    display: block !important;
+  }
+
+  .guide-content-pane {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  .guide-content-article {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Page setup */
+  @page {
+    size: letter;
+    margin: 1in;
+  }
+
+  /* Chapter page breaks */
+  .guide-content-article h1 {
+    break-before: page;
+  }
+
+  /* First chapter shouldn't have a break before it */
+  .guide-content-article:first-of-type h1 {
+    break-before: auto;
+  }
+
+  /* Prevent orphaned headings */
+  h1, h2, h3, h4 {
+    break-after: avoid;
+  }
+
+  /* Keep figures together */
+  figure {
+    break-inside: avoid;
+  }
+
+  /* Print-safe colors */
+  body {
+    color: #1a1a1a !important;
+    background: white !important;
+  }
+
+  h1, h2, h3, h4 {
+    color: #1a1a1a !important;
+  }
+
+  /* Callout boxes */
+  .guide-content-article div[style*="border-left"] {
+    border-left-color: #333 !important;
+    background-color: #f5f5f5 !important;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    color: #1a1a1a !important;
+  }
+
+  td, th {
+    border: 1px solid #ccc !important;
+    color: #1a1a1a !important;
+  }
+
+  /* Screenshot placeholders — show alt text in print */
+  figure img {
+    max-width: 100%;
+    border: 1px solid #ccc;
+  }
+
+  /* Links — show URL in print */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+}
