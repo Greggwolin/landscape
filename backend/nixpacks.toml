@@ -8,5 +8,8 @@ cmds = [
   "/opt/venv/bin/pip install -r requirements.txt"
 ]
 
+[phases.build]
+cmds = ["echo 'skipping build phase'"]
+
 [start]
 cmd = "/opt/venv/bin/python manage.py migrate && /opt/venv/bin/python manage.py collectstatic --noinput && /opt/venv/bin/gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
