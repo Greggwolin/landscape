@@ -13,6 +13,7 @@ import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import StagingTray from '@/components/dms/staging/StagingTray';
 import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
 import { UploadStagingProvider, useUploadStaging } from '@/contexts/UploadStagingContext';
+import { useFileDrop } from '@/contexts/FileDropContext';
 import type { DMSDocument } from '@/types/dms';
 import { useToast } from '@/hooks/use-toast';
 
@@ -59,6 +60,7 @@ function DMSViewInner({
   const { showToast } = useToast();
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const { stageFiles, setDocTypes, stagedFiles, pendingIntakeDocs, clearPendingIntakeDocs } = useUploadStaging();
+  const { addFiles } = useFileDrop();
   const prevHadStagedRef = useRef(false);
 
   // "+ Add Type" modal state
@@ -917,7 +919,7 @@ function DMSViewInner({
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.xlsm,.csv,.jpg,.jpeg,.png,.gif,.txt"
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
-                      if (files.length > 0) stageFiles(files);
+                      if (files.length > 0) addFiles(files);
                       e.target.value = '';
                     }}
                     style={{ display: 'none' }}
@@ -1143,7 +1145,7 @@ function DMSViewInner({
                                         {doc.doc_name}
                                       </div>
                                       <div className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>
-                                        {doc.doc_type || 'Unknown type'} • Deleted {doc.deleted_at ? new Date(doc.deleted_at).toLocaleDateString() : 'recently'}
+                                        {doc.doc_type || 'Unknown type'} • Deleted {doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : 'recently'}
                                       </div>
                                     </div>
                                   </div>

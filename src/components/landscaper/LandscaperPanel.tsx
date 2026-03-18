@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
 import { CCard, CAlert, CButton, CSpinner } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilCheckCircle, cilWarning, cilX } from '@coreui/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { LandscaperChatThreaded, type LandscaperChatHandle } from './LandscaperChatThreaded';
 import { ActivityFeed } from './ActivityFeed';
-import { useUploadThing } from '@/lib/uploadthing';
 import { ExtractionReviewModal } from './ExtractionReviewModal';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
@@ -16,9 +14,6 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
-import IntakeChoiceModal, { type PendingIntakeDoc } from '@/components/intelligence/IntakeChoiceModal';
-import { classifyFile } from '@/components/dms/staging/classifyFile';
-import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
   projectId: number;
@@ -28,23 +23,6 @@ interface LandscaperPanelProps {
   contextPillLabel?: string;
   contextPillColor?: string;
   onToggleCollapse?: () => void;
-}
-
-interface UploadResult {
-  url: string;
-  key: string;
-  name: string;
-  size: number;
-  serverData?: {
-    storage_uri: string;
-    sha256: string;
-    doc_name: string;
-    mime_type: string;
-    file_size_bytes: number;
-    project_id: number;
-    workspace_id: number;
-    doc_type: string;
-  };
 }
 
 interface ExtractionResult {
@@ -94,10 +72,6 @@ export function LandscaperPanel({
   const splitRatioRef = useRef(splitRatio);
   const expandedSplitRef = useRef(expandedSplitRatio);
   const collapsedSplitRef = useRef(collapsedSplitRatio);
-  const [dropNotice, setDropNotice] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadMessage, setUploadMessage] = useState('');
   const [showExtractionModal, setShowExtractionModal] = useState(false);
   const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
   const [, setPendingFile] = useState<File | null>(null);
@@ -111,186 +85,14 @@ export function LandscaperPanel({
   const [mediaPreviewDocId, setMediaPreviewDocId] = useState<number | null>(null);
   const [mediaPreviewDocName, setMediaPreviewDocName] = useState<string>('');
 
-  // Intake choice modal state (post-upload)
-  const [landscaperIntakeDocs, setLandscaperIntakeDocs] = useState<PendingIntakeDoc[]>([]);
-
   // Extraction job status
   const { rentRollJob, cancelJob: cancelExtractionJob } = useExtractionJobStatus(projectId);
   const { pendingCount: rentRollPendingCount, documentId: pendingDocumentId, refresh: refreshPendingExtractions } = usePendingRentRollExtractions(projectId);
   const [extractionBannerDismissed, setExtractionBannerDismissed] = useState(false);
 
-  // Get files dropped anywhere in the project layout
-  const { pendingFiles, consumeFiles } = useFileDrop();
-
   const RESIZER_SIZE = 6;
   const MIN_CHAT_HEIGHT = 180;
   const MIN_ACTIVITY_HEIGHT = 160;
-
-  // Default workspace ID (should match dms_workspaces.is_default = true)
-  const defaultWorkspaceId = 1;
-
-  // UploadThing hook for file uploads
-  // Note: 'Property Data' is the default doc_type for Landscaper uploads
-  const { startUpload, isUploading: uploadThingIsUploading } = useUploadThing('documentUploader', {
-    headers: {
-      'x-project-id': projectId.toString(),
-      'x-workspace-id': defaultWorkspaceId.toString(),
-      'x-doc-type': 'Property Data',
-    },
-    onClientUploadComplete: (res) => {
-      console.log('Landscaper upload complete:', res);
-    },
-    onUploadError: (error) => {
-      console.error('Landscaper upload error:', error);
-      // Provide more helpful error message for common UploadThing issues
-      const errorMsg = error.message.includes('parse response')
-        ? 'Upload service unavailable. Please restart the dev server or try again later.'
-        : error.message;
-      setDropNotice(`Upload failed: ${errorMsg}`);
-      setIsUploading(false);
-      setUploadProgress(0);
-      setUploadMessage('');
-    },
-  });
-
-  // Generate a SHA256 hash for a file (client-side fallback)
-  const generateSha256 = async (file: File, url: string): Promise<string> => {
-    // Use SubtleCrypto to hash file content + metadata
-    const encoder = new TextEncoder();
-    const data = encoder.encode(url + file.name + file.size + Date.now());
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-
-  // Upload files and create document records
-  const uploadFiles = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-    setUploadMessage('Preparing upload...');
-    const previewNames = files.slice(0, 3).map(f => f.name).join(', ');
-    const extraCount = files.length > 3 ? ` (+${files.length - 3} more)` : '';
-    setDropNotice(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}: ${previewNames}${extraCount}...`);
-
-    try {
-      // Phase 1: Upload files (0-50%)
-      setUploadMessage('Uploading files...');
-      setUploadProgress(10);
-      const results = await startUpload(files) as UploadResult[] | undefined;
-
-      if (!results || results.length === 0) {
-        throw new Error('Upload service did not return results. Please restart the dev server and try again.');
-      }
-
-      setUploadProgress(50);
-      console.log('UploadThing results:', results);
-
-      // Phase 2: Create document records (50-100%)
-      setUploadMessage('Creating records...');
-      const createdDocs: number[] = [];
-      const totalFiles = results.length;
-
-      for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        const file = files[i];
-        const serverData = result.serverData;
-
-        // Update progress for each file processed
-        const fileProgress = 50 + ((i + 1) / totalFiles) * 50;
-        setUploadProgress(fileProgress);
-        setUploadMessage(`Processing ${i + 1}/${totalFiles}...`);
-
-        // Generate fallback SHA256 if serverData doesn't have one
-        const sha256 = serverData?.sha256 || await generateSha256(file, result.url);
-
-        const payload = {
-          system: {
-            project_id: serverData?.project_id ?? projectId,
-            workspace_id: serverData?.workspace_id ?? defaultWorkspaceId,
-            doc_name: serverData?.doc_name ?? file.name,
-            doc_type: serverData?.doc_type ?? 'Property Data',
-            status: 'draft',
-            storage_uri: serverData?.storage_uri ?? result.url,
-            sha256: sha256,
-            file_size_bytes: serverData?.file_size_bytes ?? file.size,
-            mime_type: serverData?.mime_type ?? file.type,
-            version_no: 1,
-          },
-          profile: {},
-          ai: { source: 'landscaper' },
-        };
-
-        console.log(`Creating document record for: ${file.name}`, payload);
-
-        try {
-          const response = await fetch('/api/dms/docs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-
-          if (response.ok) {
-            const docResult = await response.json();
-            // Handle both new doc and collision (existing doc) responses
-            const docId = docResult.doc?.doc_id || docResult.existing_doc?.doc_id;
-            console.log(`Document record: doc_id=${docId}`, docResult.collision ? '(collision — reusing existing)' : '(new)');
-            if (docId) {
-              createdDocs.push(docId);
-            }
-          } else {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            console.error(`Failed to create document for ${file.name}:`, errorData);
-            // Show error to user if it's a validation error
-            if (errorData.error === 'Invalid doc_type' && errorData.valid_doc_types) {
-              setDropNotice(`Invalid doc type. Valid options: ${errorData.valid_doc_types.join(', ')}`);
-            }
-          }
-        } catch (docError) {
-          console.error(`Error creating document for ${file.name}:`, docError);
-        }
-      }
-
-      if (createdDocs.length > 0) {
-        setDropNotice(`Uploaded ${createdDocs.length} document${createdDocs.length > 1 ? 's' : ''} to project.`);
-
-        // Surface intake choice modal — user decides what to do with the uploaded docs.
-        // Extraction is deferred to the intake pipeline (IntakeChoiceModal → intake/start → Workbench).
-        // This replaces the old auto-extract behavior that bypassed classification and user confirmation.
-        setLandscaperIntakeDocs(
-          createdDocs.map((docId, i) => {
-            const file = files[i];
-            const classification = file ? classifyFile(file) : null;
-            return {
-              docId,
-              docName: file?.name || `Document ${docId}`,
-              docType: classification?.docType || null,
-            };
-          })
-        );
-      } else {
-        setDropNotice('Files uploaded but document records could not be created.');
-      }
-    } catch (error) {
-      console.error('Upload failed:', error);
-      setDropNotice(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      setUploadMessage('');
-    }
-  }, [startUpload, projectId, defaultWorkspaceId]);
-
-  // Process files dropped anywhere in the project layout (via FileDropContext)
-  useEffect(() => {
-    if (pendingFiles.length > 0 && !isUploading && !uploadThingIsUploading) {
-      const files = consumeFiles();
-      if (files.length > 0) {
-        uploadFiles(files);
-      }
-    }
-  }, [pendingFiles, consumeFiles, uploadFiles, isUploading, uploadThingIsUploading]);
 
   // Restore state from localStorage on mount
   useEffect(() => {
@@ -332,17 +134,6 @@ export function LandscaperPanel({
     setSplitRatio(newValue ? expandedSplitRatio : collapsedSplitRatio);
   };
 
-  // Handle dropped files via react-dropzone
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0 && !isUploading && !uploadThingIsUploading) {
-      uploadFiles(acceptedFiles);
-    } else if (isUploading || uploadThingIsUploading) {
-      setDropNotice('Upload in progress, please wait...');
-    } else {
-      setDropNotice('No files detected in drop.');
-    }
-  }, [uploadFiles, isUploading, uploadThingIsUploading]);
-
   // Handle field mapping completion
   const handleFieldMappingComplete = useCallback(
     async (result: { jobId: number; unitsExtracted: number }) => {
@@ -356,13 +147,7 @@ export function LandscaperPanel({
       // Refresh pending extractions to pick up any staged data
       refreshPendingExtractions();
 
-      // If there are pending changes, open the rent roll review modal
-      if (result.unitsExtracted > 0 && pendingDocumentId) {
-        setDropNotice(`Extraction complete! ${result.unitsExtracted} units ready for review.`);
-        // The review banner will appear automatically via the pending extractions hook
-      } else {
-        setDropNotice(`Extraction complete. ${result.unitsExtracted} units processed.`);
-      }
+      // The extraction banner and pending count will appear automatically via the pending extractions hook
     },
     [refreshPendingExtractions, pendingDocumentId]
   );
@@ -376,35 +161,9 @@ export function LandscaperPanel({
 
   // Use react-dropzone for more reliable drag and drop
   // Supports multiple files for OM packages (rent roll + T-12 + OM together)
-  const {
-    getRootProps,
-    getInputProps,
-    isDragActive,
-    isDragAccept,
-    isDragReject,
-  } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-    },
-    maxSize: 50 * 1024 * 1024, // 50MB per file
-    multiple: true, // Allow multiple files (OM packages: rent roll + T-12 + OM)
-    disabled: isUploading || uploadThingIsUploading,
-    noClick: true, // Don't open file dialog on click - we want the whole panel as drop zone
-    noKeyboard: true,
-  });
 
-  useEffect(() => {
-    if (!dropNotice) return;
-    const timer = setTimeout(() => setDropNotice(null), 8000);
-    return () => clearTimeout(timer);
-  }, [dropNotice]);
+
+
 
   useEffect(() => {
     const container = splitContainerRef.current;
@@ -495,51 +254,12 @@ export function LandscaperPanel({
 
   return (
     <div
-      {...getRootProps()}
       className="flex flex-col h-full gap-1 relative"
       style={{
         borderRadius: 'var(--cui-card-border-radius)',
-        border: isDragActive ? '2px dashed var(--cui-primary)' : '1px dashed transparent',
-        backgroundColor: isDragActive ? 'var(--cui-tertiary-bg)' : 'transparent',
         transition: 'border-color 0.15s ease, background-color 0.15s ease'
       }}
     >
-      {/* Hidden file input for react-dropzone */}
-      <input {...getInputProps()} />
-
-      {isDragActive && (
-        <div
-          className="absolute inset-0 d-flex flex-column align-items-center justify-content-center text-center z-50"
-          style={{
-            borderRadius: 'var(--cui-card-border-radius)',
-            backgroundColor: isDragAccept ? 'rgba(34, 197, 94, 0.1)' : isDragReject ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-            color: 'var(--cui-body-color)',
-            pointerEvents: 'none'
-          }}
-        >
-          <div className="fw-semibold">
-            {isDragReject ? 'File type not supported' : 'Drop documents for Landscaper'}
-          </div>
-          <div className="text-sm mt-1" style={{ color: 'var(--cui-secondary-color)' }}>
-            {isDragReject
-              ? 'Use PDF, Word, Excel, or image files'
-              : 'Drop multiple files at once (OM + Rent Roll + T-12)'}
-          </div>
-        </div>
-      )}
-
-      {dropNotice && (
-        <div
-          className="mb-2 rounded-lg px-3 py-2 text-sm"
-          style={{
-            backgroundColor: 'var(--cui-tertiary-bg)',
-            border: `1px solid var(--cui-border-color)`,
-            color: 'var(--cui-body-color)'
-          }}
-        >
-          {dropNotice}
-        </div>
-      )}
       <div
         ref={splitContainerRef}
         className="flex flex-col flex-1 min-h-0"
@@ -560,9 +280,9 @@ export function LandscaperPanel({
             subtabContext={subtabContext}
             contextPillLabel={contextPillLabel}
             contextPillColor={contextPillColor}
-            isIngesting={isUploading || uploadThingIsUploading}
-            ingestionProgress={uploadProgress}
-            ingestionMessage={uploadMessage}
+            isIngesting={false}
+            ingestionProgress={0}
+            ingestionMessage=""
             isExpanded={!isActivityExpanded}
             onToggleExpand={handleActivityToggle}
             onCollapsePanel={onToggleCollapse}
@@ -699,7 +419,6 @@ export function LandscaperPanel({
             setShowExtractionModal(false);
             setExtractionResult(null);
             setPendingFile(null);
-            setDropNotice('Extraction data committed successfully.');
           }}
         />
       )}
@@ -736,18 +455,9 @@ export function LandscaperPanel({
             setShowMediaPreview(false);
             setMediaPreviewDocId(null);
             setMediaPreviewDocName('');
-            setDropNotice('Media review completed. Actions applied successfully.');
           }}
         />
       )}
-
-      {/* Intake Choice Modal — post-upload routing decision */}
-      <IntakeChoiceModal
-        visible={landscaperIntakeDocs.length > 0}
-        projectId={projectId}
-        docs={landscaperIntakeDocs}
-        onClose={() => setLandscaperIntakeDocs([])}
-      />
     </div>
   );
 }

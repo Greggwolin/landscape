@@ -35,8 +35,6 @@ export default function ProjectDMSPage() {
           projectId={project.project_id}
           projectName={project.project_name}
           projectType={project.project_type ?? null}
-          hideHeader={false}
-          defaultTab="documents"
         />
       </div>
     </>

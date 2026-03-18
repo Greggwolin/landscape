@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 
 interface PendingFile {
   file: File;
@@ -16,36 +16,51 @@ interface PendingFile {
 
 interface FileDropContextValue {
   pendingFiles: PendingFile[];
+  pendingIntakeFiles: PendingFile[];
   addFiles: (files: File[]) => void;
   clearFiles: () => void;
   consumeFiles: () => File[];
+  consumeIntakeFiles: () => File[];
 }
 
 const FileDropContext = createContext<FileDropContextValue | null>(null);
 
 export function FileDropProvider({ children }: { children: ReactNode }) {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [pendingIntakeFiles, setPendingIntakeFiles] = useState<PendingFile[]>([]);
+  const pendingFilesRef = useRef<PendingFile[]>([]);
+  const pendingIntakeRef = useRef<PendingFile[]>([]);
+
+  // Keep refs in sync
+  pendingFilesRef.current = pendingFiles;
+  pendingIntakeRef.current = pendingIntakeFiles;
 
   const addFiles = useCallback((files: File[]) => {
     const timestamp = Date.now();
-    setPendingFiles(prev => [
-      ...prev,
-      ...files.map(file => ({ file, timestamp })),
-    ]);
+    const newFiles = files.map(file => ({ file, timestamp }));
+    setPendingFiles(prev => [...prev, ...newFiles]);
+    setPendingIntakeFiles(prev => [...prev, ...newFiles]);
   }, []);
 
   const clearFiles = useCallback(() => {
     setPendingFiles([]);
   }, []);
 
+  // Stable refs avoid stale closure in useEffect consumers
   const consumeFiles = useCallback((): File[] => {
-    const files = pendingFiles.map(pf => pf.file);
+    const files = pendingFilesRef.current.map(pf => pf.file);
     setPendingFiles([]);
     return files;
-  }, [pendingFiles]);
+  }, []);
+
+  const consumeIntakeFiles = useCallback((): File[] => {
+    const files = pendingIntakeRef.current.map(pf => pf.file);
+    setPendingIntakeFiles([]);
+    return files;
+  }, []);
 
   return (
-    <FileDropContext.Provider value={{ pendingFiles, addFiles, clearFiles, consumeFiles }}>
+    <FileDropContext.Provider value={{ pendingFiles, pendingIntakeFiles, addFiles, clearFiles, consumeFiles, consumeIntakeFiles }}>
       {children}
     </FileDropContext.Provider>
   );

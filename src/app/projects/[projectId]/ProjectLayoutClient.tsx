@@ -37,6 +37,9 @@ import { useProjectCreation } from '@/hooks/useProjectCreation';
 import IngestionWorkbenchPanel from './components/IngestionWorkbenchPanel';
 import { WorkbenchProvider, useWorkbench } from '@/contexts/WorkbenchContext';
 import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
+import { UnifiedIntakeModal } from '@/components/intake/UnifiedIntakeModal';
+import ProjectKnowledgeModal from '@/components/intake/ProjectKnowledgeModal';
+import PlatformKnowledgeModal from '@/components/intake/PlatformKnowledgeModal';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/folder-tabs.css';
@@ -223,6 +226,14 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // Navigation guard state — when workbench is open, intercept navigation
   const [pendingNavigation, setPendingNavigation] = useState<{ folder: string; tab: string } | null>(null);
 
+  // Unified Intake Modal state
+  const [intakeVisible, setIntakeVisible] = useState(false);
+  const [intakeFiles, setIntakeFiles] = useState<File[]>([]);
+  const [projectKnowledgeDoc, setProjectKnowledgeDoc] = useState<{ docId: number; docName: string; docType: string } | null>(null);
+  const [platformKnowledgeDoc, setPlatformKnowledgeDoc] = useState<{ docId: number; docName: string; docType: string } | null>(null);
+  const [projectKnowledgeQueue, setProjectKnowledgeQueue] = useState<{ docId: number; docName: string; docType: string }[]>([]);
+  const [platformKnowledgeQueue, setPlatformKnowledgeQueue] = useState<{ docId: number; docName: string; docType: string }[]>([]);
+
   // Handle folder/tab navigation — guarded when workbench is open
   const handleNavigate = (folder: string, tab: string) => {
     if (workbenchOpen) {
@@ -232,6 +243,16 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     }
     setFolderTab(folder, tab);
   };
+
+  // Watch FileDropContext's pendingIntakeFiles and open UnifiedIntakeModal
+  const { pendingIntakeFiles, consumeIntakeFiles } = useFileDrop();
+  useEffect(() => {
+    if (pendingIntakeFiles.length > 0) {
+      const files = consumeIntakeFiles();
+      setIntakeFiles(files);
+      setIntakeVisible(true);
+    }
+  }, [pendingIntakeFiles, consumeIntakeFiles]);
 
   // Handle rent roll badge click - navigate to rent roll tab (pending changes shown inline in grid)
   const handleRentRollBadgeClick = useCallback((): boolean => {
@@ -425,6 +446,53 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         projectId={projectId}
         docs={pendingIntakeDocs}
         onClose={clearPendingIntakeDocs}
+      />
+
+      {/* UnifiedIntakeModal — mounted at layout level for file drop intake flow */}
+      <UnifiedIntakeModal
+        visible={intakeVisible}
+        projectId={projectId}
+        projectName={currentProject?.project_name ?? ''}
+        initialFiles={intakeFiles}
+        onClose={() => {
+          setIntakeVisible(false);
+          setIntakeFiles([]);
+        }}
+        onProjectKnowledge={(docs) => {
+          setProjectKnowledgeQueue(docs);
+          if (docs.length > 0) setProjectKnowledgeDoc(docs[0]);
+        }}
+        onPlatformKnowledge={(docs) => {
+          setPlatformKnowledgeQueue(docs);
+          if (docs.length > 0) setPlatformKnowledgeDoc(docs[0]);
+        }}
+      />
+
+      {/* Project Knowledge Metadata Modal */}
+      <ProjectKnowledgeModal
+        visible={!!projectKnowledgeDoc}
+        projectId={projectId}
+        doc={projectKnowledgeDoc}
+        onClose={() => setProjectKnowledgeDoc(null)}
+        onComplete={() => {
+          // Advance to next doc in queue, or close
+          const remaining = projectKnowledgeQueue.slice(1);
+          setProjectKnowledgeQueue(remaining);
+          setProjectKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
+      />
+
+      {/* Platform Knowledge Metadata Modal */}
+      <PlatformKnowledgeModal
+        visible={!!platformKnowledgeDoc}
+        projectId={projectId}
+        doc={platformKnowledgeDoc}
+        onClose={() => setPlatformKnowledgeDoc(null)}
+        onComplete={() => {
+          const remaining = platformKnowledgeQueue.slice(1);
+          setPlatformKnowledgeQueue(remaining);
+          setPlatformKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
       />
 
       {/* Navigation guard dialog — shown when user tries to navigate while workbench is open */}
