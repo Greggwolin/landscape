@@ -84,6 +84,16 @@ class RentComparableViewSet(viewsets.ModelViewSet):
 
         return queryset.order_by('distance_miles', 'asking_rent')
 
+    def perform_create(self, serializer):
+        """Auto-set project from URL kwarg."""
+        project_id = self.kwargs.get('project_pk')
+        serializer.save(project_id=project_id)
+
+    def perform_update(self, serializer):
+        """Ensure project stays bound to URL kwarg."""
+        project_id = self.kwargs.get('project_pk')
+        serializer.save(project_id=project_id)
+
 
 class MarketRateAnalysisViewSet(viewsets.ModelViewSet):
     """

@@ -18,8 +18,9 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { ChevronDown, ChevronRight, MapPin, Calendar, Building2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, MapPin, Calendar, Building2, Plus, Pencil } from 'lucide-react';
 import { CompetitiveMarketCharts, type PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
+import { RentCompDetailModal } from './RentCompDetailModal';
 
 // Dynamic import to avoid SSR issues with MapLibre GL
 const LocationIntelligenceCard = dynamic(
@@ -108,6 +109,9 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [highlightedProperty, setHighlightedProperty] = useState<string | null>(null);
   const [propertyColors, setPropertyColors] = useState<PropertyColorMap>({});
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingCompId, setEditingCompId] = useState<number | undefined>(undefined);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ── Fetch data ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -148,7 +152,7 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
     }
 
     fetchData();
-  }, [projectId]);
+  }, [projectId, refreshKey]);
 
   // ── Group comparables by property ──────────────────────────────────────
   const comparablesByProperty = useMemo<PropertyGroup[]>(() => {
@@ -217,6 +221,25 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
 
   const collapseAll = useCallback(() => {
     setExpandedProperties(new Set());
+  }, []);
+
+  const openAddModal = useCallback(() => {
+    setEditingCompId(undefined);
+    setModalOpen(true);
+  }, []);
+
+  const openEditModal = useCallback((compId: number) => {
+    setEditingCompId(compId);
+    setModalOpen(true);
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setEditingCompId(undefined);
+  }, []);
+
+  const handleModalSaved = useCallback(() => {
+    setRefreshKey((k) => k + 1);
   }, []);
 
   // ── Loading / Error ────────────────────────────────────────────────────
@@ -297,6 +320,24 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
           </div>
           <div className="d-flex align-items-center" style={{ gap: '0.375rem' }}>
             <button
+              onClick={openAddModal}
+              style={{
+                fontSize: '0.6875rem',
+                padding: '0.1875rem 0.5rem',
+                borderRadius: '0.25rem',
+                color: 'var(--cui-white)',
+                backgroundColor: 'var(--cui-primary)',
+                border: '1px solid var(--cui-primary)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+              }}
+            >
+              <Plus size={12} /> Add Comp
+            </button>
+            <button
               onClick={expandAll}
               style={{
                 fontSize: '0.6875rem',
@@ -356,6 +397,13 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
                 <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
                   Ask Landscaper to extract comps from your OM.
                 </p>
+                <button
+                  onClick={openAddModal}
+                  className="btn btn-primary btn-sm"
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  <Plus size={14} style={{ marginRight: '0.25rem' }} /> Add Comparable
+                </button>
               </div>
             ) : (
               comparablesByProperty.map((property) => {
@@ -492,13 +540,14 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
                               <th style={{ ...utTh, textAlign: 'center' }}>SF</th>
                               <th style={{ ...utTh, textAlign: 'right' }}>Rent</th>
                               <th style={{ ...utTh, textAlign: 'right' }}>$/SF</th>
+                              <th style={{ ...utTh, width: '32px' }} />
                             </tr>
                           </thead>
                           <tbody>
                             {unitTypeRows.length === 0 ? (
                               <tr>
                                 <td
-                                  colSpan={6}
+                                  colSpan={7}
                                   style={{
                                     padding: '0.5rem 0.75rem',
                                     textAlign: 'center',
@@ -545,6 +594,28 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
                                     </td>
                                     <td style={{ padding: '0.375rem 0.75rem', textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
                                       {rentPerSf}
+                                    </td>
+                                    <td style={{ padding: '0.375rem 0.25rem', textAlign: 'center' }}>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openEditModal(unit.comparable_id);
+                                        }}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          color: 'var(--cui-secondary-color)',
+                                          padding: '0.125rem',
+                                          borderRadius: '0.25rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}
+                                        title="Edit this comp"
+                                      >
+                                        <Pencil size={12} />
+                                      </button>
                                     </td>
                                   </tr>
                                 );
@@ -596,6 +667,15 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
           </div>
         </div>
       </div>
+
+      {/* ── Rent Comp Modal ──────────────────────────────────────────────── */}
+      <RentCompDetailModal
+        projectId={projectId}
+        comparableId={editingCompId}
+        isOpen={modalOpen}
+        onClose={handleModalClose}
+        onSaved={handleModalSaved}
+      />
 
       {/* ── Landscaper Analysis ──────────────────────────────────────────── */}
       <div
