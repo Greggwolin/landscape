@@ -13,6 +13,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import NavigationLayout from "@/app/components/NavigationLayout";
 import { HelpLandscaperProvider } from "@/contexts/HelpLandscaperContext";
 import { LandscaperThinkingProvider } from "@/contexts/LandscaperThinkingContext";
+// GuideModal removed — guide now opens in a separate browser window via window.open()
 // Theme imports - currently using hybrid theme
 // import ThemeRegistry from "./components/ThemeRegistry";
 // Alternative: import { ThemeProvider } from '@/themes/mui-materio';

@@ -96,7 +96,7 @@
   background: var(--nav-bg);
   border-bottom: 1px solid var(--nav-border);
   height: 58px;
-  padding: 0 var(--app-padding);
+  padding: 0 var(--nav-padding);
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -107,7 +107,7 @@
   background: var(--cui-body-bg);
   border-bottom: 1px solid var(--cui-border-color);
   height: 56px;
-  padding: 0 var(--app-padding);
+  padding: 0 var(--nav-padding);
   position: sticky;
   top: 58px;
   z-index: 999;
@@ -205,7 +205,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem var(--app-padding, 1rem);
+  padding: 0.375rem var(--nav-padding, 0.5rem);
   font-size: 0.8125rem;
   line-height: 1.4;
   border-bottom: 1px solid var(--cui-border-color);

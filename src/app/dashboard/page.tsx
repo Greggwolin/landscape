@@ -14,6 +14,7 @@ import type { ProjectSummary } from '@/app/components/ProjectProvider';
 import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
 import DeleteProjectDialog from '@/components/projects/DeleteProjectDialog';
 import type { DeleteProjectResult } from '@/hooks/useDeleteProject';
+import { VersionBadge } from '@/components/changelog';
 import {
   type CanonicalPropertyTypeCode,
   getPropertyTypeLabel,
@@ -182,6 +183,7 @@ function ProjectAccordion({
               {isLandscaperCollapsed ? '>>' : '<<'}
             </button>
             <span>Projects</span>
+            <VersionBadge />
           </div>
           <LandscapeButton color="primary" size="sm" onClick={onNewProject}>
             + New Project
@@ -517,10 +519,10 @@ export default function DashboardPage() {
     <CContainer
       fluid
       className="d-flex flex-column"
-      style={{ padding: '0.25rem 0.5rem 0.5rem 0.25rem', gap: '0.5rem' }}
+      style={{ padding: 'var(--app-padding)', gap: 'var(--component-gap)' }}
     >
       {/* Three-column layout: Activity+Landscaper | Projects | Map with Filters */}
-      <div className="d-flex flex-grow-1 gap-2" style={{ alignItems: 'flex-start', minHeight: 0 }}>
+      <div className="d-flex flex-grow-1" style={{ alignItems: 'flex-start', minHeight: 0, gap: 'var(--component-gap)' }}>
         {/* Left Column: Activity Feed (top) + Landscaper Chat (bottom) */}
         <div
           className="flex-shrink-0 position-sticky top-0 d-flex flex-column gap-1"

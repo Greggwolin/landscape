@@ -38,6 +38,7 @@ class ThreadService:
     """Service for managing Landscaper chat threads."""
 
     @staticmethod
+    @transaction.atomic
     def get_or_create_active_thread(
         project_id: int,
         page_context: str,
@@ -45,6 +46,9 @@ class ThreadService:
     ) -> ChatThread:
         """
         Get the active thread for a project/page context, or create one if none exists.
+
+        Uses SELECT ... FOR UPDATE to prevent race conditions where concurrent
+        requests both see "no active thread" and both create new ones.
 
         Args:
             project_id: Project ID
@@ -54,7 +58,7 @@ class ThreadService:
         Returns:
             Active ChatThread instance
         """
-        # Try to find existing active thread
+        # Try to find existing active thread with row-level lock
         lookup = {
             'project_id': project_id,
             'page_context': page_context,
@@ -64,12 +68,13 @@ class ThreadService:
             lookup['subtab_context'] = subtab_context
         else:
             lookup['subtab_context__isnull'] = True
-        thread = ChatThread.objects.filter(**lookup).first()
+        thread = ChatThread.objects.select_for_update().filter(**lookup).first()
 
         if thread:
             return thread
 
-        # Create new thread
+        # Create new thread — still inside the atomic block so concurrent
+        # callers will block on the select_for_update until we commit
         thread = ChatThread.objects.create(
             project_id=project_id,
             page_context=page_context,

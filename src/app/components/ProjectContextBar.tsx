@@ -55,7 +55,7 @@ export default function ProjectContextBar({ projectId }: ProjectContextBarProps)
       style={{
         backgroundColor: 'var(--cui-body-bg)',
         borderBottom: '1px solid var(--cui-border-color)',
-        padding: '0.5rem var(--app-padding, 1rem)',
+        padding: '0.5rem var(--nav-padding, 0.5rem)',
       }}
     >
       <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">

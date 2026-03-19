@@ -254,7 +254,7 @@ export function useLandscaperThreads({
   }, []);
 
   /**
-   * Load all threads for the current project/page context.
+   * Load threads for the current project/page context (used for initialization).
    */
   const loadThreads = useCallback(async () => {
     // Guard: skip API call for invalid project IDs
@@ -287,6 +287,39 @@ export function useLandscaperThreads({
       return [];
     }
   }, [projectId, pageContext, subtabContext, fetchWithTimeout, getAuthHeaders]);
+
+  /**
+   * Load ALL threads for the project (across all page contexts).
+   * Used by ThreadList browser so users can see and switch to any thread.
+   */
+  const [allThreads, setAllThreads] = useState<ChatThread[]>([]);
+  const loadAllThreads = useCallback(async () => {
+    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
+      return [];
+    }
+
+    try {
+      const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
+      url.searchParams.set('project_id', projectId);
+      // No page_context filter — get ALL threads for the project
+      url.searchParams.set('include_closed', 'true');
+
+      const response = await fetchWithTimeout(url.toString(), {
+        headers: getAuthHeaders(false),
+      });
+      const data = await response.json();
+
+      if (data.success && data.threads) {
+        setAllThreads(data.threads);
+        return data.threads as ChatThread[];
+      }
+      return [];
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return [];
+      console.error('[LandscaperThreads] Failed to load all threads:', err);
+      return [];
+    }
+  }, [projectId, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Load messages for a specific thread.
@@ -414,6 +447,37 @@ export function useLandscaperThreads({
       setIsThreadLoading(false);
     }
   }, [projectId, pageContext, subtabContext, loadThreads, fetchWithTimeout, getAuthHeaders]);
+
+  /**
+   * Delete a thread. Knowledge is retained in separate tables — this only
+   * removes the conversational transcript.
+   */
+  const deleteThread = useCallback(async (threadId: string) => {
+    try {
+      const response = await fetchWithTimeout(
+        `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`,
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        // Remove from local state
+        setThreads((prev) => prev.filter((t) => t.threadId !== threadId));
+        setAllThreads((prev) => prev.filter((t) => t.threadId !== threadId));
+        // If we deleted the active thread, clear it so recovery kicks in
+        if (activeThread?.threadId === threadId) {
+          setActiveThread(null);
+          setMessages([]);
+        }
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      console.error('[LandscaperThreads] Failed to delete thread:', err);
+    }
+  }, [activeThread, fetchWithTimeout, getAuthHeaders]);
 
   /**
    * Update a thread's title.
@@ -651,6 +715,7 @@ export function useLandscaperThreads({
   return {
     // Thread state
     threads,
+    allThreads,
     activeThread,
     messages,
     isLoading,
@@ -660,10 +725,12 @@ export function useLandscaperThreads({
     selectThread,
     startNewThread,
     updateThreadTitle,
+    deleteThread,
     // Message actions
     sendMessage,
     loadThreadMessages,
     // Utility
     loadThreads,
+    loadAllThreads,
   };
 }

@@ -155,8 +155,9 @@
   --nav-tile-active-border: var(--cui-primary, #3b82f6);
 
   /* Spacing */
+  --nav-padding: 0.5rem;
   --app-padding: 0.5rem;
-  --component-gap: 0.5rem;
+  --component-gap: 0.25rem;
 
   /* Border Radius */
   --radius-card: 0.5rem;

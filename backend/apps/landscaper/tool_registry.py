@@ -285,6 +285,8 @@ PAGE_TOOLS = {
         # Market assumptions
         "get_market_assumptions",
         "update_market_assumptions",
+        # Knowledge / RAG search — needed for finding comps in uploaded docs
+        "query_platform_knowledge",
     ],
 
     "mf_capitalization": [
@@ -382,6 +384,8 @@ PAGE_TOOLS = {
         # Hierarchy (for filtering)
         "get_areas",
         "get_phases",
+        # Knowledge / RAG search
+        "query_platform_knowledge",
     ],
 
     "land_capitalization": [

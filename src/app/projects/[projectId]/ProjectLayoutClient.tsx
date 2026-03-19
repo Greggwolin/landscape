@@ -37,6 +37,9 @@ import { useProjectCreation } from '@/hooks/useProjectCreation';
 import IngestionWorkbenchPanel from './components/IngestionWorkbenchPanel';
 import { WorkbenchProvider, useWorkbench } from '@/contexts/WorkbenchContext';
 import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
+import { UnifiedIntakeModal } from '@/components/intake/UnifiedIntakeModal';
+import ProjectKnowledgeModal from '@/components/intake/ProjectKnowledgeModal';
+import PlatformKnowledgeModal from '@/components/intake/PlatformKnowledgeModal';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/folder-tabs.css';
@@ -223,6 +226,14 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // Navigation guard state — when workbench is open, intercept navigation
   const [pendingNavigation, setPendingNavigation] = useState<{ folder: string; tab: string } | null>(null);
 
+  // Unified Intake Modal state
+  const [intakeVisible, setIntakeVisible] = useState(false);
+  const [intakeFiles, setIntakeFiles] = useState<File[]>([]);
+  const [projectKnowledgeDoc, setProjectKnowledgeDoc] = useState<{ docId: number; docName: string; docType: string } | null>(null);
+  const [platformKnowledgeDoc, setPlatformKnowledgeDoc] = useState<{ docId: number; docName: string; docType: string } | null>(null);
+  const [projectKnowledgeQueue, setProjectKnowledgeQueue] = useState<{ docId: number; docName: string; docType: string }[]>([]);
+  const [platformKnowledgeQueue, setPlatformKnowledgeQueue] = useState<{ docId: number; docName: string; docType: string }[]>([]);
+
   // Handle folder/tab navigation — guarded when workbench is open
   const handleNavigate = (folder: string, tab: string) => {
     if (workbenchOpen) {
@@ -232,6 +243,16 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     }
     setFolderTab(folder, tab);
   };
+
+  // Watch FileDropContext's pendingIntakeFiles and open UnifiedIntakeModal
+  const { pendingIntakeFiles, consumeIntakeFiles } = useFileDrop();
+  useEffect(() => {
+    if (pendingIntakeFiles.length > 0) {
+      const files = consumeIntakeFiles();
+      setIntakeFiles(files);
+      setIntakeVisible(true);
+    }
+  }, [pendingIntakeFiles, consumeIntakeFiles]);
 
   // Handle rent roll badge click - navigate to rent roll tab (pending changes shown inline in grid)
   const handleRentRollBadgeClick = useCallback((): boolean => {
@@ -267,6 +288,52 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   );
   const landscaperContextColor = activeFolderConfig?.color || 'var(--cui-tertiary-bg)';
 
+  // Intake modals — rendered OUTSIDE guards so they persist through loading/revalidation
+  const intakeModals = (
+    <>
+      <UnifiedIntakeModal
+        visible={intakeVisible}
+        projectId={projectId}
+        projectName={currentProject?.project_name ?? ''}
+        initialFiles={intakeFiles}
+        onClose={() => {
+          setIntakeVisible(false);
+          setIntakeFiles([]);
+        }}
+        onProjectKnowledge={(docs) => {
+          setProjectKnowledgeQueue(docs);
+          if (docs.length > 0) setProjectKnowledgeDoc(docs[0]);
+        }}
+        onPlatformKnowledge={(docs) => {
+          setPlatformKnowledgeQueue(docs);
+          if (docs.length > 0) setPlatformKnowledgeDoc(docs[0]);
+        }}
+      />
+      <ProjectKnowledgeModal
+        visible={!!projectKnowledgeDoc}
+        projectId={projectId}
+        doc={projectKnowledgeDoc}
+        onClose={() => setProjectKnowledgeDoc(null)}
+        onComplete={() => {
+          const remaining = projectKnowledgeQueue.slice(1);
+          setProjectKnowledgeQueue(remaining);
+          setProjectKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
+      />
+      <PlatformKnowledgeModal
+        visible={!!platformKnowledgeDoc}
+        projectId={projectId}
+        doc={platformKnowledgeDoc}
+        onClose={() => setPlatformKnowledgeDoc(null)}
+        onComplete={() => {
+          const remaining = platformKnowledgeQueue.slice(1);
+          setPlatformKnowledgeQueue(remaining);
+          setPlatformKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
+      />
+    </>
+  );
+
   // Guard: project doesn't exist or user doesn't have access — redirect to dashboard
   if (projectNotFound) {
     // Clear stale localStorage to prevent re-landing here
@@ -278,6 +345,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       }
     }
     return (
+      <>
+      {intakeModals}
       <div className="project-layout-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '400px', gap: '1rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '400px' }}>
           <h3 style={{ color: 'var(--cui-body-color)', margin: '0 0 8px', fontSize: '18px', fontWeight: 600 }}>
@@ -303,6 +372,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </a>
         </div>
       </div>
+      </>
     );
   }
 
@@ -311,9 +381,11 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // defaults to 'land_development' → wrong tabs render for income property types (MF, OFF, etc.).
   if (isLoading || !currentProject) {
     return (
+      <>
+      {intakeModals}
       <div className="project-layout-container">
         <div className="project-bar-placeholder" style={{ height: '48px', borderBottom: '1px solid var(--cui-border-color)' }} />
-        <div className="project-split-container" style={{ display: 'flex', flex: 1, minHeight: 0, gap: '0.5rem', paddingTop: '0.5rem' }}>
+        <div className="project-split-container" style={{ display: 'flex', flex: 1, minHeight: 0, gap: 'var(--component-gap)', paddingTop: 'var(--app-padding)' }}>
           <div style={{ width: DEFAULT_LANDSCAPER_WIDTH, flexShrink: 0, backgroundColor: 'var(--cui-card-bg)', borderRadius: 'var(--cui-card-border-radius)' }}>
             <p style={{ color: 'var(--cui-secondary-color)', padding: '1rem' }}>Loading...</p>
           </div>
@@ -322,6 +394,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -427,6 +500,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         onClose={clearPendingIntakeDocs}
       />
 
+      {intakeModals}
+
       {/* Navigation guard dialog — shown when user tries to navigate while workbench is open */}
       {pendingNavigation && (
         <div
@@ -529,7 +604,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           flex: 1,
           minHeight: 0,
           width: '100%',
-          paddingTop: '0.5rem',
+          paddingTop: 'var(--app-padding)',
           gap: 0,
         }}
       >
@@ -596,9 +671,9 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             minWidth: '400px',
             display: 'flex',
             flexDirection: 'column',
-            marginLeft: isCollapsed ? '0.5rem' : '0',
+            marginLeft: isCollapsed ? 'var(--app-padding)' : '0',
             transition: isResizing ? 'none' : 'margin-left 0.2s ease',
-            gap: '0.25rem',
+            gap: 'var(--component-gap)',
           }}
         >
           {/* Folder Tabs + Content — CCard wrapper when subtabs exist */}
@@ -675,6 +750,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </CToast>
         )}
       </CToaster>
+
     </div>
   );
 }
@@ -708,8 +784,8 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
               display: 'flex',
               flex: 1,
               minHeight: 0,
-              gap: '0.5rem',
-              paddingTop: '0.5rem',
+              gap: 'var(--component-gap)',
+              paddingTop: 'var(--app-padding)',
             }}
           >
             <div

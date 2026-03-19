@@ -34,7 +34,7 @@
 .folder-tabs-row1 {
   display: flex;
   gap: 4px;
-  padding: 0.5rem 1rem;
+  padding: 0.25rem 0.5rem;
   background: var(--surface-card-header, var(--cui-tertiary-bg));
   border-bottom: 1px solid var(--cui-border-color);
   overflow-x: auto;
@@ -363,7 +363,7 @@
 .folder-tabs-row2 {
   display: flex;
   gap: 0;
-  padding: 0 1rem;
+  padding: 0 0.5rem;
   background: var(--surface-subheader);
   border-bottom: 1px solid var(--cui-border-color);
   box-shadow: inset 0 -1px 0 var(--cui-border-color);
@@ -526,7 +526,7 @@
 .project-folder-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0.75rem;
+  padding: var(--app-padding);
   background-color: transparent;
 }
 
@@ -534,6 +534,14 @@
    zero out the global .card margin-bottom to prevent doubling */
 .project-folder-content .card {
   margin-bottom: 0;
+}
+
+/* Income Approach: zero out parent padding and pull up to eliminate
+   the white/grey line between CCardHeader and pill bar */
+.project-folder-content:has(> .income-approach-content) {
+  padding: 0;
+  margin-top: -1px;
+  background-color: var(--surface-subheader);
 }
 
 /* Sales tab - use white background throughout */

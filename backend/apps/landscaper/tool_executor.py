@@ -4997,6 +4997,16 @@ def handle_update_sales_comparable(
     if not property_name and not comparable_id:
         return {'success': False, 'error': 'property_name or comparable_id required'}
 
+    # Normalize cap_rate: if > 1, assume it's a percentage (e.g. 5.2) and convert to decimal (0.052)
+    cap_rate = tool_input.get('cap_rate')
+    if cap_rate is not None:
+        try:
+            cap_val = float(cap_rate)
+            if cap_val > 1:
+                tool_input['cap_rate'] = str(round(cap_val / 100, 4))
+        except (ValueError, TypeError):
+            pass
+
     if propose_only:
         from .services.mutation_service import MutationService
         return MutationService.create_proposal(
@@ -9790,9 +9800,12 @@ def query_platform_knowledge(
     knowledge_domain = tool_input.get('knowledge_domain')
     max_chunks = tool_input.get('max_chunks', 5)
 
+    formatted_chunks = []
+
+    # Source 1: Platform reference corpus (tbl_platform_knowledge_chunks)
     try:
         retriever = get_platform_knowledge_retriever()
-        chunks = retriever.retrieve(
+        platform_chunks = retriever.retrieve(
             query=query,
             property_type=property_type,
             knowledge_domain=knowledge_domain,
@@ -9800,17 +9813,7 @@ def query_platform_knowledge(
             similarity_threshold=0.65,
         )
 
-        if not chunks:
-            return {
-                'success': True,
-                'chunks': [],
-                'count': 0,
-                'message': 'No relevant content found in platform knowledge base.'
-            }
-
-        # Format results for Claude
-        formatted_chunks = []
-        for chunk in chunks:
+        for chunk in (platform_chunks or []):
             formatted_chunks.append({
                 'content': chunk['content'],
                 'similarity': chunk['similarity'],
@@ -9819,18 +9822,73 @@ def query_platform_knowledge(
                     'publisher': chunk['source'].get('publisher'),
                     'chapter': chunk['source'].get('chapter_title'),
                     'page': chunk['source'].get('page'),
+                    'origin': 'platform_reference',
                 }
             })
+    except Exception as e:
+        logger.warning(f"Platform reference search failed (continuing): {e}")
 
+    # Source 2: User-uploaded knowledge docs (knowledge_embeddings via RAG)
+    # These are docs uploaded via Platform Knowledge or Project Knowledge intents.
+    try:
+        from apps.knowledge.services.embedding_service import generate_embedding
+        from django.db import connection as db_conn
+
+        query_embedding = generate_embedding(query)
+        if query_embedding:
+            embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+            max_distance = 1 - 0.60  # Slightly lower threshold for user docs
+
+            with db_conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        ke.content_text,
+                        d.doc_name,
+                        d.doc_type,
+                        d.project_id,
+                        1 - (ke.embedding <=> %s::vector) AS similarity
+                    FROM landscape.knowledge_embeddings ke
+                    JOIN landscape.core_doc d ON ke.source_id = d.doc_id
+                    WHERE ke.source_type = 'document_chunk'
+                      AND ke.embedding IS NOT NULL
+                      AND (ke.embedding <=> %s::vector) < %s
+                    ORDER BY ke.embedding <=> %s::vector
+                    LIMIT %s
+                """, [embedding_str, embedding_str, max_distance, embedding_str, max_chunks])
+
+                for row in cursor.fetchall():
+                    formatted_chunks.append({
+                        'content': row[0],
+                        'similarity': round(row[4], 4),
+                        'source': {
+                            'document': row[1],
+                            'publisher': f"Uploaded ({row[2] or 'unknown type'})",
+                            'chapter': None,
+                            'page': None,
+                            'origin': 'uploaded_knowledge',
+                            'project_id': row[3],
+                        }
+                    })
+    except Exception as e:
+        logger.warning(f"User knowledge search failed (continuing): {e}")
+
+    # Sort all results by similarity, take top max_chunks
+    formatted_chunks.sort(key=lambda c: c['similarity'], reverse=True)
+    formatted_chunks = formatted_chunks[:max_chunks]
+
+    if not formatted_chunks:
         return {
             'success': True,
-            'chunks': formatted_chunks,
-            'count': len(formatted_chunks)
+            'chunks': [],
+            'count': 0,
+            'message': 'No relevant content found in platform or uploaded knowledge bases.'
         }
 
-    except Exception as e:
-        logger.error(f"Error querying platform knowledge: {e}")
-        return {'success': False, 'error': str(e)}
+    return {
+        'success': True,
+        'chunks': formatted_chunks,
+        'count': len(formatted_chunks)
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

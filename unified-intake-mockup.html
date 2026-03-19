@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified Intake Modal — Mockup v3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #e5e5e5; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { width: 12px; height: 12px; border: 2px solid #444; border-top-color: #888; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  .spinner-upload { border-color: #164e63; border-top-color: #0891b2; }
+  .modal { width: 100%; max-width: 920px; background: #141418; border-radius: 12px; border: 1px solid #2a2a2a; box-shadow: 0 25px 60px rgba(0,0,0,0.5); overflow: hidden; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 0.95rem; font-weight: 600; }
+  .modal-subtitle { font-size: 0.7rem; color: #888; margin-top: 2px; }
+  .close-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #333; background: transparent; color: #888; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+  .batch-bar { padding: 10px 20px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 8px; background: #18181f; flex-wrap: wrap; }
+  .batch-label { font-size: 0.7rem; color: #888; }
+  .batch-btn { font-size: 0.65rem; padding: 6px 12px; border-radius: 6px; border: 1px solid #333; background: transparent; color: #ccc; cursor: pointer; transition: all 0.15s; line-height: 1.3; text-align: center; }
+  .batch-btn:hover { border-color: #555; }
+  .batch-spacer { flex: 1; }
+  .dest-pill { font-size: 0.6rem; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .dest-pill-project { background: rgba(79,70,229,0.1); color: #a78bfa; border: 1px solid rgba(79,70,229,0.25); }
+  .dest-pill-platform { background: rgba(168,85,247,0.1); color: #c084fc; border: 1px solid rgba(168,85,247,0.25); }
+  .col-header { padding: 6px 20px; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 12px; background: #111116; }
+  .col-label { font-size: 0.6rem; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+  .file-list { max-height: 460px; overflow-y: auto; }
+  .file-row { padding: 10px 16px; border-bottom: 1px solid #2a2a2a; transition: background 0.2s; }
+  .file-row-complete { background: rgba(34,197,94,0.04); }
+  .file-row-main { display: flex; align-items: center; gap: 12px; }
+  .file-icon { font-size: 1.2rem; width: 24px; text-align: center; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { font-size: 0.7rem; color: #888; margin-top: 2px; }
+  .doc-type { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: #1e1e2e; color: #ccc; border: 1px solid #333; white-space: nowrap; }
+  .conf-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+  .conf-high { background: rgba(34,197,94,0.12); color: #16a34a; }
+  .conf-med { background: rgba(234,179,8,0.12); color: #ca8a04; }
+  .conf-low { background: rgba(156,163,175,0.12); color: #6b7280; }
+
+  /* Two-line intent buttons */
+  .intent-group { display: flex; gap: 4px; }
+  .intent-btn {
+    font-size: 0.7rem; padding: 6px 11px; border-radius: 6px;
+    border: 1px solid #333; background: transparent; color: #888;
+    cursor: pointer; transition: all 0.15s; text-align: center;
+    line-height: 1.2; min-width: 68px; position: relative;
+  }
+  .intent-btn:hover:not(.active):not(:disabled) { border-color: #555; color: #bbb; }
+  .intent-btn.active { border: none; color: #fff; font-weight: 600; }
+  .intent-btn.active-extract { background: #4f46e5; }
+  .intent-btn.active-project { background: #0891b2; }
+  .intent-btn.active-platform { background: #7c3aed; }
+  .intent-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .intent-btn-label { display: flex; flex-direction: column; align-items: center; gap: 0px; }
+  .intent-btn-line1 { font-weight: 600; font-size: 0.68rem; }
+  .intent-btn-line2 { font-weight: 400; font-size: 0.6rem; opacity: 0.8; }
+
+  /* Tooltip on hover */
+  .intent-btn .intent-tooltip {
+    display: none; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); background: #1e1e2e; color: #ccc;
+    font-size: 0.6rem; font-weight: 400; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid #333; white-space: nowrap; z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none;
+  }
+  .intent-btn .intent-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: #333;
+  }
+  .intent-btn:hover .intent-tooltip { display: block; }
+
+  .cancel-btn { font-size: 0.7rem; padding: 3px 8px; border: 1px solid #444; border-radius: 4px; background: transparent; color: #999; cursor: pointer; }
+  .cancel-btn:hover { border-color: #666; color: #ccc; }
+  .dest-line { margin-top: 5px; margin-left: 36px; display: flex; align-items: center; gap: 5px; }
+  .dest-icon { font-size: 0.7rem; }
+  .dest-label { font-size: 0.6rem; font-weight: 500; }
+  .dest-note { font-size: 0.55rem; color: #555; margin-left: 2px; }
+  .collision-warning { margin-top: 6px; margin-left: 36px; font-size: 0.7rem; color: #ca8a04; }
+  .complete-dest { margin-top: 4px; margin-left: 36px; display: flex; align-items: center; gap: 4px; }
+  .complete-dest span { font-size: 0.6rem; color: #16a34a; }
+  .check { color: #16a34a; font-size: 1rem; }
+  .status-text { font-size: 0.7rem; display: flex; align-items: center; gap: 6px; }
+  .footer { padding: 14px 20px; border-top: 1px solid #2a2a2a; display: flex; align-items: center; justify-content: space-between; background: #18181f; flex-wrap: wrap; gap: 10px; }
+  .legend { display: flex; gap: 16px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.6rem; color: #666; }
+  .legend-icon { font-size: 0.7rem; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+  .actions { display: flex; gap: 8px; }
+  .btn-cancel { font-size: 0.8rem; padding: 8px 16px; border-radius: 6px; border: 1px solid #333; background: transparent; color: #999; cursor: pointer; }
+  .btn-cancel:hover { border-color: #555; color: #ccc; }
+  .btn-upload { font-size: 0.8rem; padding: 8px 20px; border-radius: 6px; border: none; background: #4f46e5; color: #fff; cursor: pointer; font-weight: 600; }
+  .btn-upload:disabled { background: #333; color: #666; cursor: not-allowed; }
+  .btn-done { font-size: 0.8rem; padding: 8px 20px; border-radius: 6px; border: none; background: #16a34a; color: #fff; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="modal" id="modal">
+  <div class="modal-header">
+    <div>
+      <div class="modal-title">Upload Documents to Peoria Lakes MPC</div>
+      <div class="modal-subtitle" id="subtitle">5 files staged</div>
+    </div>
+    <button class="close-btn">×</button>
+  </div>
+
+  <div class="batch-bar" id="batchBar">
+    <span class="batch-label">Set all to:</span>
+    <button class="batch-btn" onclick="setAllIntent('structured_ingestion')">Extract<br>Inputs</button>
+    <button class="batch-btn" onclick="setAllIntent('project_knowledge')">Project<br>Knowledge</button>
+    <button class="batch-btn" onclick="setAllIntent('platform_knowledge')">Platform<br>Knowledge</button>
+    <div class="batch-spacer"></div>
+    <div id="destSummary"></div>
+  </div>
+
+  <div class="col-header">
+    <span style="width:24px"></span>
+    <span class="col-label" style="flex:1">File</span>
+    <span class="col-label" style="width:100px;text-align:center">Type</span>
+    <span class="col-label" style="width:36px;text-align:center">Conf</span>
+    <span class="col-label" style="width:240px;text-align:center">What should Landscape do?</span>
+    <span style="width:80px"></span>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="footer">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#4f46e5"></div> Extract Inputs — pull data into project tables via Workbench</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#0891b2"></div> Project Knowledge — visible in project files, feeds AI</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> Platform Knowledge — AI-searchable, not in project files</div>
+    </div>
+    <div class="actions">
+      <button class="btn-cancel">Cancel</button>
+      <button class="btn-upload" id="uploadBtn" onclick="handleUpload()">Upload 5 Documents</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FILES_DATA = [
+  { name: "Costar_MF_partial.xlsx", size: 12700, docType: "Property Data", confidence: 0.6, defaultIntent: "structured_ingestion" },
+  { name: "Chadron_Appraisal.pdf", size: 2200000, docType: "Appraisal", confidence: 0.8, defaultIntent: "project_knowledge" },
+  { name: "Neighborhood_Crime_Report.pdf", size: 891000, docType: "Location Data", confidence: 0.65, defaultIntent: "project_knowledge" },
+  { name: "Rent_Roll_Q1.xlsx", size: 45200, docType: "Operating Statement", confidence: 0.85, defaultIntent: "structured_ingestion" },
+  { name: "CBRE_Cap_Rate_Survey.pdf", size: 1540000, docType: "Market Research", confidence: 0.7, defaultIntent: "platform_knowledge" },
+  { name: "Budget_Draft_v2.xlsx", size: 28400, docType: "General", confidence: 0.35, defaultIntent: "project_knowledge", collision: { matchType: "filename", existingVersion: 1 } },
+];
+
+const ICONS = { xlsx: "📊", xls: "📊", csv: "📊", pdf: "📄", doc: "📝", docx: "📝", jpg: "🖼️", png: "🖼️" };
+
+const INTENTS = {
+  structured_ingestion: {
+    line1: "Extract",
+    line2: "Inputs",
+    tooltip: "Pull structured data into project tables — opens Workbench for field-by-field review",
+    activeClass: "active-extract",
+    dest: { icon: "📂", label: "Project DMS + Workbench", color: "#a78bfa", note: "Extracts fields for review" }
+  },
+  project_knowledge: {
+    line1: "Project",
+    line2: "Knowledge",
+    tooltip: "Store in project files and feed to AI — informs Landscaper analysis and narratives",
+    activeClass: "active-project",
+    dest: { icon: "📂", label: "Project DMS + Knowledge Base", color: "#22d3ee", note: "Visible in project, feeds AI" }
+  },
+  platform_knowledge: {
+    line1: "Platform",
+    line2: "Knowledge",
+    tooltip: "Feed to platform AI only — not visible in project files, searchable across all projects",
+    activeClass: "active-platform",
+    dest: { icon: "🧠", label: "Platform Knowledge Base", color: "#c084fc", note: "Not in project files" }
+  },
+};
+
+const COLLISIONS = {
+  "Budget_Draft_v2.xlsx": { matchType: "filename", existingVersion: 1 },
+};
+
+let files = FILES_DATA.map((f, i) => ({ ...f, id: i, status: "analyzing", intent: f.defaultIntent }));
+
+function getIcon(name) { const ext = name.split(".").pop().toLowerCase(); return ICONS[ext] || "📎"; }
+function formatSize(b) { if (b < 1024) return b + " B"; if (b < 1048576) return (b/1024).toFixed(1) + " KB"; return (b/1048576).toFixed(1) + " MB"; }
+function confClass(c) { return c >= 0.7 ? "conf-high" : c >= 0.45 ? "conf-med" : "conf-low"; }
+function confText(c) { return c >= 0.7 ? "High" : c >= 0.45 ? "Med" : "Low"; }
+
+files.forEach((f, i) => {
+  setTimeout(() => { f.status = "ready"; render(); }, 600 + i * 350);
+});
+
+function setIntent(id, intent) {
+  const f = files.find(x => x.id === id);
+  if (f && !f.collision && f.status !== "uploading" && f.status !== "complete") { f.intent = intent; render(); }
+}
+
+function setAllIntent(intent) {
+  files.forEach(f => { if (!f.collision && f.status !== "uploading" && f.status !== "complete") f.intent = intent; });
+  render();
+}
+
+function removeFile(id) {
+  files = files.filter(f => f.id !== id);
+  render();
+}
+
+function handleUpload() {
+  const ready = files.filter(f => f.status === "ready");
+  ready.forEach((f, i) => {
+    setTimeout(() => { f.status = "uploading"; render(); }, i * 450);
+    setTimeout(() => { f.status = "complete"; render(); updateButton(); }, i * 450 + 800 + Math.random() * 500);
+  });
+  document.getElementById("uploadBtn").disabled = true;
+  document.getElementById("uploadBtn").textContent = "Uploading...";
+}
+
+function updateButton() {
+  const btn = document.getElementById("uploadBtn");
+  const allDone = files.every(f => f.status === "complete" || f.status === "error");
+  if (allDone) {
+    btn.className = "btn-done";
+    btn.textContent = "Done";
+    btn.disabled = false;
+    document.getElementById("subtitle").textContent = files.length + " files — all complete";
+    document.getElementById("batchBar").style.display = "none";
+  }
+}
+
+function render() {
+  const list = document.getElementById("fileList");
+  list.innerHTML = "";
+
+  // Destination summary
+  let extractCount = 0, projCount = 0, platCount = 0;
+  files.forEach(f => {
+    if (f.intent === "structured_ingestion") extractCount++;
+    else if (f.intent === "project_knowledge") projCount++;
+    else platCount++;
+  });
+  const summary = document.getElementById("destSummary");
+  let pills = "";
+  if (extractCount > 0) pills += `<span class="dest-pill dest-pill-project">📂 ${extractCount} → Extract</span> `;
+  if (projCount > 0) pills += `<span class="dest-pill dest-pill-project">📂 ${projCount} → Project</span> `;
+  if (platCount > 0) pills += `<span class="dest-pill dest-pill-platform">🧠 ${platCount} → Platform</span>`;
+  summary.innerHTML = pills;
+
+  const readyCount = files.filter(f => f.status === "ready").length;
+  const btn = document.getElementById("uploadBtn");
+  if (!files.every(f => f.status === "complete")) {
+    btn.textContent = `Upload ${readyCount} Document${readyCount !== 1 ? "s" : ""}`;
+    btn.disabled = readyCount === 0;
+  }
+
+  files.forEach(f => {
+    const row = document.createElement("div");
+    row.className = "file-row" + (f.status === "complete" ? " file-row-complete" : "");
+
+    const isCollision = !!f.collision;
+    const disabled = isCollision || f.status === "uploading" || f.status === "complete";
+    const intentInfo = INTENTS[f.intent];
+    const d = intentInfo.dest;
+
+    let statusHtml = "";
+    if (f.status === "analyzing") statusHtml = `<span class="status-text" style="color:#888"><span class="spinner"></span> Analyzing...</span>`;
+    else if (f.status === "uploading") statusHtml = `<span class="status-text" style="color:#0891b2"><span class="spinner spinner-upload"></span> Uploading...</span>`;
+    else if (f.status === "complete") statusHtml = `<span class="check">✓</span>`;
+    else if (f.status === "error") statusHtml = `<span style="color:#ef4444;font-size:0.7rem">Failed</span>`;
+
+    let cancelHtml = "";
+    if (f.status === "ready" || f.status === "analyzing") {
+      cancelHtml = `<button class="cancel-btn" onclick="removeFile(${f.id})">Cancel</button>`;
+    }
+
+    const intentKeys = ["structured_ingestion", "project_knowledge", "platform_knowledge"];
+    const intentBtns = intentKeys.map(key => {
+      const info = INTENTS[key];
+      const isActive = f.intent === key;
+      const activeClass = isActive ? ` active ${info.activeClass}` : "";
+      return `<button class="intent-btn${activeClass}" ${disabled ? "disabled" : ""} onclick="setIntent(${f.id},'${key}')">
+        <span class="intent-btn-label">
+          <span class="intent-btn-line1">${info.line1}</span>
+          <span class="intent-btn-line2">${info.line2}</span>
+        </span>
+        <span class="intent-tooltip">${info.tooltip}</span>
+      </button>`;
+    }).join("");
+
+    let destHtml = "";
+    if (f.status !== "complete" && f.status !== "error" && !isCollision) {
+      destHtml = `<div class="dest-line">
+        <span class="dest-icon">${d.icon}</span>
+        <span class="dest-label" style="color:${d.color}">→ ${d.label}</span>
+        <span class="dest-note">— ${d.note}</span>
+      </div>`;
+    }
+
+    let collisionHtml = "";
+    if (isCollision) {
+      const exact = f.collision.matchType === "both" || f.collision.matchType === "content";
+      collisionHtml = `<div class="collision-warning">⚠ V${f.collision.existingVersion} already exists${exact ? " — exact duplicate, no differences detected." : " — saving as new version."}</div>`;
+    }
+
+    let completeDest = "";
+    if (f.status === "complete") {
+      completeDest = `<div class="complete-dest"><span>${d.icon}</span><span>Saved to ${d.label}</span></div>`;
+    }
+
+    row.innerHTML = `
+      <div class="file-row-main">
+        <span class="file-icon">${getIcon(f.name)}</span>
+        <div class="file-info">
+          <div class="file-name">${f.name}</div>
+          <div class="file-size">${formatSize(f.size)}</div>
+        </div>
+        <span class="doc-type">${f.docType}</span>
+        <span class="conf-badge ${confClass(f.confidence)}">${confText(f.confidence)}</span>
+        <div class="intent-group">${intentBtns}</div>
+        ${statusHtml}
+        ${cancelHtml}
+      </div>
+      ${destHtml}
+      ${collisionHtml}
+      ${completeDest}
+    `;
+    list.appendChild(row);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
