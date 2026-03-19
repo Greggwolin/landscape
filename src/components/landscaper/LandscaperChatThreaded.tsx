@@ -69,6 +69,29 @@ interface LandscaperChatThreadedProps {
 /**
  * Get context-aware hint for the current page.
  */
+/**
+ * Normalize page context for thread grouping (must match ThreadList).
+ */
+const CONTEXT_NORMALIZATION: Record<string, string> = {
+  home: 'home', mf_home: 'home', land_home: 'home',
+  property: 'property', mf_property: 'property', land_planning: 'property',
+  operations: 'operations', mf_operations: 'operations',
+  valuation: 'valuation', mf_valuation: 'valuation', land_valuation: 'valuation', feasibility: 'valuation',
+  capitalization: 'capital', capital: 'capital', mf_capitalization: 'capital', land_capitalization: 'capital',
+  budget: 'budget', land_budget: 'budget',
+  schedule: 'schedule', land_schedule: 'schedule',
+  reports: 'reports', documents: 'documents', map: 'map', alpha_assistant: 'alpha_assistant',
+};
+
+function normalizeContext(ctx: string): string {
+  return CONTEXT_NORMALIZATION[ctx.toLowerCase()] || ctx.toLowerCase();
+}
+
+function normalizeSubtab(subtab: string | null | undefined): string | null {
+  if (!subtab) return null;
+  return subtab.toLowerCase().replace(/_/g, '-');
+}
+
 function getPageContextHint(context: string): string {
   const hints: Record<string, string> = {
     home: 'Overview',
@@ -260,6 +283,20 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     subtabContext,
     onToolResult,
   });
+
+  // Home/project pages show all threads; other pages filter by page+subtab
+  const isHomePage = ['home', 'mf_home', 'land_home'].includes(pageContext);
+  const normalizedPage = normalizeContext(pageContext);
+  const normalizedSubtab = normalizeSubtab(subtabContext);
+  const visibleThreadCount = isHomePage
+    ? allThreads.length
+    : allThreads.filter((t) => {
+        if (normalizeContext(t.pageContext) !== normalizedPage) return false;
+        if (normalizedSubtab) {
+          return normalizeSubtab(t.subtabContext) === normalizedSubtab;
+        }
+        return true;
+      }).length;
 
   // Load all project threads on mount so the badge count is available immediately
   useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
@@ -620,7 +657,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           onClick={handleToggleThreadList}
           className="btn btn-sm d-flex align-items-center justify-content-center p-1 position-relative"
           style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
-          title={showThreadList ? 'Hide threads' : `Show threads (${allThreads.length})`}
+          title={showThreadList ? 'Hide threads' : `Show threads (${visibleThreadCount})`}
           {...hoverNeutralBackground}
         >
           <CIcon
@@ -628,7 +665,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
             size="sm"
             style={{ color: showThreadList ? 'var(--cui-primary)' : 'var(--cui-secondary-color)' }}
           />
-          {allThreads.length > 1 && (
+          {visibleThreadCount > 1 && (
             <span
               className="position-absolute badge rounded-pill"
               style={{
@@ -642,7 +679,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
                 minWidth: '14px',
               }}
             >
-              {allThreads.length}
+              {visibleThreadCount}
             </span>
           )}
         </button>
@@ -656,7 +693,8 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           threads={allThreads.length > 0 ? allThreads : threads}
           activeThreadId={activeThread?.threadId}
           currentPageContext={pageContext}
-          showAllPages={true}
+          currentSubtabContext={subtabContext}
+          showAllPages={isHomePage}
           onSelectThread={handleSelectThread}
           onNewThread={handleNewThread}
           onUpdateTitle={updateThreadTitle}

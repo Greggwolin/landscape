@@ -18,6 +18,7 @@ interface ThreadListProps {
   threads: Thread[];
   activeThreadId?: string;
   currentPageContext: string;
+  currentSubtabContext?: string | null;
   showAllPages?: boolean;
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
@@ -93,6 +94,15 @@ function normalizeContext(context: string): string {
   return CONTEXT_NORMALIZATION[key] || key;
 }
 
+/**
+ * Normalize subtab context — collapse variants (e.g. rent_roll → rent-roll).
+ */
+function normalizeSubtab(subtab: string | null | undefined): string | null {
+  if (!subtab) return null;
+  // Normalize underscores to hyphens for consistent matching
+  return subtab.toLowerCase().replace(/_/g, '-');
+}
+
 function getPageContextLabel(context: string): string {
   const normalized = normalizeContext(context);
   return PAGE_CONTEXT_LABELS[normalized] || context;
@@ -107,6 +117,7 @@ export function ThreadList({
   onNewThread,
   onUpdateTitle,
   onDeleteThread,
+  currentSubtabContext,
   isLoading = false,
 }: ThreadListProps) {
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
@@ -163,11 +174,20 @@ export function ThreadList({
     }
   }, [confirmDeleteId, onDeleteThread]);
 
-  // Filter threads to current page context unless showing all
+  // Filter threads: showAllPages → everything, subtab → exact match, page only → page match
   const normalizedCurrentContext = normalizeContext(currentPageContext);
+  const normalizedCurrentSubtab = normalizeSubtab(currentSubtabContext);
   const filteredThreads = showAllPages
     ? threads
-    : threads.filter((t) => normalizeContext(t.pageContext) === normalizedCurrentContext);
+    : threads.filter((t) => {
+        if (normalizeContext(t.pageContext) !== normalizedCurrentContext) return false;
+        // If we have a subtab context, filter to matching subtab
+        if (normalizedCurrentSubtab) {
+          return normalizeSubtab(t.subtabContext) === normalizedCurrentSubtab;
+        }
+        // No subtab specified — show all threads for this page (including those with subtabs)
+        return true;
+      });
 
   return (
     <div

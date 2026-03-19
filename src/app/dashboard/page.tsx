@@ -14,6 +14,7 @@ import type { ProjectSummary } from '@/app/components/ProjectProvider';
 import { CollapsedLandscaperStrip } from '@/components/landscaper/CollapsedLandscaperStrip';
 import DeleteProjectDialog from '@/components/projects/DeleteProjectDialog';
 import type { DeleteProjectResult } from '@/hooks/useDeleteProject';
+import { VersionBadge } from '@/components/changelog';
 import {
   type CanonicalPropertyTypeCode,
   getPropertyTypeLabel,
@@ -182,6 +183,7 @@ function ProjectAccordion({
               {isLandscaperCollapsed ? '>>' : '<<'}
             </button>
             <span>Projects</span>
+            <VersionBadge />
           </div>
           <LandscapeButton color="primary" size="sm" onClick={onNewProject}>
             + New Project
