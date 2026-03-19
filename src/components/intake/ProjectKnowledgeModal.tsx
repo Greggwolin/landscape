@@ -169,8 +169,8 @@ export default function ProjectKnowledgeModal({
   };
 
   return (
-    <CModal visible={visible} onClose={handleCancel} size="lg" alignment="center" backdrop="static" keyboard={false}>
-      <CModalHeader>
+    <CModal visible={visible} size="lg" alignment="center" backdrop="static" keyboard={false} portal={false}>
+      <CModalHeader closeButton={false}>
         <CModalTitle>Project Knowledge Document</CModalTitle>
       </CModalHeader>
       <CModalBody>
@@ -190,7 +190,7 @@ export default function ProjectKnowledgeModal({
              Hidden until then to avoid a perpetual spinner. */}
 
           {/* Form Fields */}
-          <CForm>
+          <CForm onSubmit={(e: React.FormEvent) => e.preventDefault()}>
             {/* Document Type */}
             <div style={{ marginBottom: '1.25rem' }}>
               <CFormLabel htmlFor="doc-type" style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
@@ -232,7 +232,7 @@ export default function ProjectKnowledgeModal({
                     fontSize: '0.9rem',
                   }}
                 />
-                <CButton color="secondary" size="sm" onClick={handleAddTag}>
+                <CButton type="button" color="secondary" size="sm" onClick={handleAddTag}>
                   Add
                 </CButton>
               </div>
@@ -304,25 +304,36 @@ export default function ProjectKnowledgeModal({
           </CAlert>
         </div>
       </CModalBody>
-      <CModalFooter>
-        <CButton color="secondary" onClick={handleCancel}>
-          Cancel
-        </CButton>
+      <CModalFooter className="d-flex justify-content-between">
         <CButton
-          color="info"
-          onClick={handleAddToProject}
-          disabled={isProcessing || !doc}
-          style={{ backgroundColor: '#0891b2', borderColor: '#0891b2' }}
+          color="danger"
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={isProcessing}
+          style={{ fontSize: '0.85rem' }}
         >
-          {isProcessing ? (
-            <>
-              <CSpinner size="sm" style={{ marginRight: '0.5rem' }} />
-              Processing...
-            </>
-          ) : (
-            'Add to Project'
-          )}
+          Start Over
         </CButton>
+        <div className="d-flex gap-2">
+          <CButton type="button" color="secondary" onClick={handleCancel} disabled={isProcessing}>
+            Cancel
+          </CButton>
+          <CButton
+            color="info"
+            onClick={handleAddToProject}
+            disabled={isProcessing || !doc}
+            style={{ backgroundColor: '#0891b2', borderColor: '#0891b2' }}
+          >
+            {isProcessing ? (
+              <>
+                <CSpinner size="sm" style={{ marginRight: '0.5rem' }} />
+                Processing...
+              </>
+            ) : (
+              'Add to Project'
+            )}
+          </CButton>
+        </div>
       </CModalFooter>
     </CModal>
   );

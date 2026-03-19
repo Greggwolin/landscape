@@ -282,7 +282,7 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
                         className="p-1"
                         title="Delete"
                         disabled={acting}
-                        onClick={() => handleDeleteItem(item.queue_id)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteItem(item.queue_id); }}
                       >
                         <CIcon icon={cilTrash} size="sm" />
                       </CButton>

@@ -66,7 +66,7 @@ export default function TopNavigationBar({ onSettingsClick }: TopNavigationBarPr
       >
         <div
           className="flex items-center justify-between"
-          style={{ height: '58px', padding: '0 var(--app-padding)' }}
+          style={{ height: '58px', padding: '0 var(--nav-padding)' }}
         >
           {/* Logo - Left */}
           <Link href="/" className="flex items-center">

@@ -160,13 +160,12 @@ export const UnifiedIntakeModal: React.FC<UnifiedIntakeModalProps> = ({
   return (
     <CModal
       visible={visible}
-      onClose={handleClose}
       alignment="center"
       size="lg"
       backdrop="static"
       keyboard={false}
     >
-      <CModalHeader style={{ borderBottomColor: 'var(--cui-border-color)' }}>
+      <CModalHeader closeButton={false} style={{ borderBottomColor: 'var(--cui-border-color)' }}>
         <CModalTitle>Upload Documents to {projectName}</CModalTitle>
       </CModalHeader>
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import CIcon from '@coreui/icons-react';
-import { cilPlus, cilPencil, cilCheck, cilX, cilCommentSquare } from '@coreui/icons';
+import { cilPlus, cilPencil, cilCheck, cilX, cilCommentSquare, cilTrash } from '@coreui/icons';
 
 export interface Thread {
   threadId: string;
@@ -22,6 +22,7 @@ interface ThreadListProps {
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
   onUpdateTitle: (threadId: string, title: string) => void;
+  onDeleteThread?: (threadId: string) => void;
   isLoading?: boolean;
 }
 
@@ -105,6 +106,7 @@ export function ThreadList({
   onSelectThread,
   onNewThread,
   onUpdateTitle,
+  onDeleteThread,
   isLoading = false,
 }: ThreadListProps) {
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
@@ -145,6 +147,22 @@ export function ThreadList({
     }
   }, [editTitle, onUpdateTitle]);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDeleteClick = useCallback((threadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDeleteId === threadId) {
+      // Second click — confirm delete
+      onDeleteThread?.(threadId);
+      setConfirmDeleteId(null);
+    } else {
+      // First click — arm confirmation
+      setConfirmDeleteId(threadId);
+      // Auto-reset after 3 seconds if not confirmed
+      setTimeout(() => setConfirmDeleteId((prev) => prev === threadId ? null : prev), 3000);
+    }
+  }, [confirmDeleteId, onDeleteThread]);
+
   // Filter threads to current page context unless showing all
   const normalizedCurrentContext = normalizeContext(currentPageContext);
   const filteredThreads = showAllPages
@@ -157,7 +175,7 @@ export function ThreadList({
       style={{
         borderColor: 'var(--cui-border-color)',
         backgroundColor: 'var(--cui-tertiary-bg)',
-        maxHeight: '200px',
+        maxHeight: '280px',
       }}
     >
       {/* Header */}
@@ -266,8 +284,13 @@ export function ThreadList({
                     <div className="d-flex align-items-center gap-1">
                       <span
                         className="small text-truncate d-inline-block"
-                        style={{ color: 'var(--cui-body-color)', fontSize: '0.75rem', maxWidth: '160px' }}
-                        title={displayTitle}
+                        style={{
+                          color: thread.isActive ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)',
+                          fontSize: '0.75rem',
+                          maxWidth: '140px',
+                          fontStyle: thread.isActive ? 'normal' : 'italic',
+                        }}
+                        title={`${displayTitle}${!thread.isActive ? ' (closed)' : ''}`}
                       >
                         {displayTitle}
                       </span>
@@ -284,32 +307,68 @@ export function ThreadList({
                           {getPageContextLabel(thread.pageContext)}
                         </span>
                       )}
-                      {/* Edit button (on hover) */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleStartEdit(thread, e)}
-                        className="btn btn-sm d-flex align-items-center justify-content-center p-1 ms-auto"
-                        style={{ border: 'none', backgroundColor: 'transparent' }}
-                        title="Edit title"
-                      >
-                        <CIcon
-                          icon={cilPencil}
-                          size="sm"
-                          style={{ color: 'var(--cui-secondary-color)' }}
-                        />
-                      </button>
+                      {/* Edit + Delete buttons */}
+                      <div className="d-flex align-items-center ms-auto gap-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleStartEdit(thread, e)}
+                          className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+                          style={{ border: 'none', backgroundColor: 'transparent' }}
+                          title="Edit title"
+                        >
+                          <CIcon
+                            icon={cilPencil}
+                            size="sm"
+                            style={{ color: 'var(--cui-secondary-color)' }}
+                          />
+                        </button>
+                        {onDeleteThread && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteClick(thread.threadId, e)}
+                            className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+                            style={{ border: 'none', backgroundColor: 'transparent' }}
+                            title={confirmDeleteId === thread.threadId ? 'Click again to confirm delete' : 'Delete thread'}
+                          >
+                            <CIcon
+                              icon={cilTrash}
+                              size="sm"
+                              style={{
+                                color: confirmDeleteId === thread.threadId
+                                  ? 'var(--cui-danger)'
+                                  : 'var(--cui-secondary-color)',
+                              }}
+                            />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Timestamp */}
+                {/* Message count + Timestamp */}
                 {!isEditing && (
-                  <span
-                    className="small text-nowrap"
-                    style={{ color: 'var(--cui-secondary-color)', fontSize: '0.625rem' }}
-                  >
-                    {formatRelativeTime(thread.updatedAt)}
-                  </span>
+                  <div className="d-flex align-items-center gap-1 flex-shrink-0">
+                    {thread.messageCount > 0 && (
+                      <span
+                        className="badge rounded-pill"
+                        style={{
+                          backgroundColor: 'var(--cui-secondary-bg)',
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.6rem',
+                          padding: '1px 5px',
+                        }}
+                      >
+                        {thread.messageCount}
+                      </span>
+                    )}
+                    <span
+                      className="small text-nowrap"
+                      style={{ color: 'var(--cui-secondary-color)', fontSize: '0.625rem' }}
+                    >
+                      {formatRelativeTime(thread.updatedAt)}
+                    </span>
+                  </div>
                 )}
               </div>
             );

@@ -159,11 +159,6 @@ export function LandscaperPanel({
     setShowMediaPreview(true);
   }, []);
 
-  // Use react-dropzone for more reliable drag and drop
-  // Supports multiple files for OM packages (rent roll + T-12 + OM together)
-
-
-
 
   useEffect(() => {
     const container = splitContainerRef.current;

@@ -1487,6 +1487,22 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def destroy(self, request, *args, **kwargs):
+        """DELETE a thread and its messages. Knowledge is retained in separate tables."""
+        instance = self.get_object()
+        thread_id = str(instance.id)
+        msg_count = instance.messages.count()
+
+        # Hard delete — CASCADE removes ThreadMessage rows automatically
+        instance.delete()
+        logger.info(f"Deleted thread {thread_id} ({msg_count} messages)")
+
+        return Response({
+            'success': True,
+            'deleted_thread_id': thread_id,
+            'deleted_message_count': msg_count,
+        }, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['post'], url_path='new')
     def start_new(self, request):
         """POST start a new thread (closes existing active thread first)."""

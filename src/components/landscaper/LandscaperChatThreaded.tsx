@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilOptions, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
+import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilCommentSquare, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage, type SendMessageOptions } from '@/hooks/useLandscaperThreads';
 import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -241,6 +241,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   })();
   const {
     threads,
+    allThreads,
     activeThread,
     messages,
     isLoading,
@@ -249,14 +250,19 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     selectThread,
     startNewThread,
     updateThreadTitle,
+    deleteThread,
     sendMessage,
     loadThreads,
+    loadAllThreads,
   } = useLandscaperThreads({
     projectId: projectId.toString(),
     pageContext,
     subtabContext,
     onToolResult,
   });
+
+  // Load all project threads on mount so the badge count is available immediately
+  useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
 
   // Sync project landscaper loading state to global context (drives HelpIcon propeller)
   const { setIsThinking } = useLandscaperThinking();
@@ -464,9 +470,18 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   };
 
   const handleNewThread = () => {
-    startNewThread();
+    startNewThread().then(() => loadAllThreads());
     setShowThreadList(false);
   };
+
+  const handleToggleThreadList = useCallback(() => {
+    const willShow = !showThreadList;
+    setShowThreadList(willShow);
+    if (willShow) {
+      // Load all project threads when opening the list
+      loadAllThreads();
+    }
+  }, [showThreadList, loadAllThreads]);
 
   const hoverNeutralBackground = {
     onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -599,35 +614,53 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           />
         </button>
 
-        {/* Thread list toggle */}
+        {/* Thread list toggle — chat bubble icon with count badge */}
         <button
           type="button"
-          onClick={() => setShowThreadList(!showThreadList)}
-          className="btn btn-sm d-flex align-items-center justify-content-center p-1"
+          onClick={handleToggleThreadList}
+          className="btn btn-sm d-flex align-items-center justify-content-center p-1 position-relative"
           style={{ color: 'var(--cui-secondary-color)', backgroundColor: 'transparent', border: 'none' }}
-          title={showThreadList ? 'Hide threads' : 'Show threads'}
+          title={showThreadList ? 'Hide threads' : `Show threads (${allThreads.length})`}
           {...hoverNeutralBackground}
         >
           <CIcon
-            icon={cilOptions}
+            icon={cilCommentSquare}
             size="sm"
-            style={{ color: 'var(--cui-secondary-color)' }}
+            style={{ color: showThreadList ? 'var(--cui-primary)' : 'var(--cui-secondary-color)' }}
           />
+          {allThreads.length > 1 && (
+            <span
+              className="position-absolute badge rounded-pill"
+              style={{
+                top: '-2px',
+                right: '-4px',
+                fontSize: '0.55rem',
+                padding: '1px 4px',
+                backgroundColor: 'var(--cui-primary)',
+                color: '#fff',
+                lineHeight: 1.2,
+                minWidth: '14px',
+              }}
+            >
+              {allThreads.length}
+            </span>
+          )}
         </button>
 
         {/* Activity feed toggle chevron removed — feed has its own header toggle */}
       </div>
 
-      {/* Thread List (collapsible) */}
+      {/* Thread List (collapsible) — shows ALL project threads across pages */}
       {showThreadList && (
         <ThreadList
-          threads={threads}
+          threads={allThreads.length > 0 ? allThreads : threads}
           activeThreadId={activeThread?.threadId}
           currentPageContext={pageContext}
-          showAllPages={false}
+          showAllPages={true}
           onSelectThread={handleSelectThread}
           onNewThread={handleNewThread}
           onUpdateTitle={updateThreadTitle}
+          onDeleteThread={deleteThread}
           isLoading={isThreadLoading}
         />
       )}

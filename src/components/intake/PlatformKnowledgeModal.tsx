@@ -165,8 +165,8 @@ export default function PlatformKnowledgeModal({
   };
 
   return (
-    <CModal visible={visible} onClose={handleCancel} size="lg" alignment="center" backdrop="static" keyboard={false}>
-      <CModalHeader>
+    <CModal visible={visible} size="lg" alignment="center" backdrop="static" keyboard={false} portal={false}>
+      <CModalHeader closeButton={false}>
         <CModalTitle>Platform Knowledge Document</CModalTitle>
       </CModalHeader>
       <CModalBody>
@@ -186,7 +186,7 @@ export default function PlatformKnowledgeModal({
              Hidden until then to avoid a perpetual spinner. */}
 
           {/* Form Fields */}
-          <CForm>
+          <CForm onSubmit={(e: React.FormEvent) => e.preventDefault()}>
             {/* Knowledge Category */}
             <div style={{ marginBottom: '1.25rem' }}>
               <CFormLabel htmlFor="category" style={{ fontWeight: '600', marginBottom: '0.5rem' }}>
@@ -229,6 +229,7 @@ export default function PlatformKnowledgeModal({
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {PROPERTY_TYPES.map((pt) => (
                   <button
+                    type="button"
                     key={pt.key}
                     onClick={() => handleTogglePropertyType(pt.key)}
                     style={{
@@ -304,7 +305,7 @@ export default function PlatformKnowledgeModal({
                     fontSize: '0.9rem',
                   }}
                 />
-                <CButton color="secondary" size="sm" onClick={handleAddTag}>
+                <CButton type="button" color="secondary" size="sm" onClick={handleAddTag}>
                   Add
                 </CButton>
               </div>
@@ -373,24 +374,35 @@ export default function PlatformKnowledgeModal({
           </CAlert>
         </div>
       </CModalBody>
-      <CModalFooter>
-        <CButton color="secondary" onClick={handleCancel}>
-          Cancel
-        </CButton>
+      <CModalFooter className="d-flex justify-content-between">
         <CButton
-          onClick={handleAddToPlatform}
-          disabled={isProcessing || !doc}
-          style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', color: 'white' }}
+          color="danger"
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={isProcessing}
+          style={{ fontSize: '0.85rem' }}
         >
-          {isProcessing ? (
-            <>
-              <CSpinner size="sm" style={{ marginRight: '0.5rem' }} />
-              Processing...
-            </>
-          ) : (
-            'Add to Platform'
-          )}
+          Start Over
         </CButton>
+        <div className="d-flex gap-2">
+          <CButton type="button" color="secondary" onClick={handleCancel} disabled={isProcessing}>
+            Cancel
+          </CButton>
+          <CButton
+            onClick={handleAddToPlatform}
+            disabled={isProcessing || !doc}
+            style={{ backgroundColor: '#7c3aed', borderColor: '#7c3aed', color: 'white' }}
+          >
+            {isProcessing ? (
+              <>
+                <CSpinner size="sm" style={{ marginRight: '0.5rem' }} />
+                Processing...
+              </>
+            ) : (
+              'Add to Platform'
+            )}
+          </CButton>
+        </div>
       </CModalFooter>
     </CModal>
   );

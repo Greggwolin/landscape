@@ -288,6 +288,52 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   );
   const landscaperContextColor = activeFolderConfig?.color || 'var(--cui-tertiary-bg)';
 
+  // Intake modals — rendered OUTSIDE guards so they persist through loading/revalidation
+  const intakeModals = (
+    <>
+      <UnifiedIntakeModal
+        visible={intakeVisible}
+        projectId={projectId}
+        projectName={currentProject?.project_name ?? ''}
+        initialFiles={intakeFiles}
+        onClose={() => {
+          setIntakeVisible(false);
+          setIntakeFiles([]);
+        }}
+        onProjectKnowledge={(docs) => {
+          setProjectKnowledgeQueue(docs);
+          if (docs.length > 0) setProjectKnowledgeDoc(docs[0]);
+        }}
+        onPlatformKnowledge={(docs) => {
+          setPlatformKnowledgeQueue(docs);
+          if (docs.length > 0) setPlatformKnowledgeDoc(docs[0]);
+        }}
+      />
+      <ProjectKnowledgeModal
+        visible={!!projectKnowledgeDoc}
+        projectId={projectId}
+        doc={projectKnowledgeDoc}
+        onClose={() => setProjectKnowledgeDoc(null)}
+        onComplete={() => {
+          const remaining = projectKnowledgeQueue.slice(1);
+          setProjectKnowledgeQueue(remaining);
+          setProjectKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
+      />
+      <PlatformKnowledgeModal
+        visible={!!platformKnowledgeDoc}
+        projectId={projectId}
+        doc={platformKnowledgeDoc}
+        onClose={() => setPlatformKnowledgeDoc(null)}
+        onComplete={() => {
+          const remaining = platformKnowledgeQueue.slice(1);
+          setPlatformKnowledgeQueue(remaining);
+          setPlatformKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
+        }}
+      />
+    </>
+  );
+
   // Guard: project doesn't exist or user doesn't have access — redirect to dashboard
   if (projectNotFound) {
     // Clear stale localStorage to prevent re-landing here
@@ -299,6 +345,8 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       }
     }
     return (
+      <>
+      {intakeModals}
       <div className="project-layout-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '400px', gap: '1rem' }}>
         <div style={{ textAlign: 'center', maxWidth: '400px' }}>
           <h3 style={{ color: 'var(--cui-body-color)', margin: '0 0 8px', fontSize: '18px', fontWeight: 600 }}>
@@ -324,6 +372,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </a>
         </div>
       </div>
+      </>
     );
   }
 
@@ -332,9 +381,11 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   // defaults to 'land_development' → wrong tabs render for income property types (MF, OFF, etc.).
   if (isLoading || !currentProject) {
     return (
+      <>
+      {intakeModals}
       <div className="project-layout-container">
         <div className="project-bar-placeholder" style={{ height: '48px', borderBottom: '1px solid var(--cui-border-color)' }} />
-        <div className="project-split-container" style={{ display: 'flex', flex: 1, minHeight: 0, gap: '0.5rem', paddingTop: '0.5rem' }}>
+        <div className="project-split-container" style={{ display: 'flex', flex: 1, minHeight: 0, gap: 'var(--component-gap)', paddingTop: 'var(--app-padding)' }}>
           <div style={{ width: DEFAULT_LANDSCAPER_WIDTH, flexShrink: 0, backgroundColor: 'var(--cui-card-bg)', borderRadius: 'var(--cui-card-border-radius)' }}>
             <p style={{ color: 'var(--cui-secondary-color)', padding: '1rem' }}>Loading...</p>
           </div>
@@ -343,6 +394,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -448,52 +500,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         onClose={clearPendingIntakeDocs}
       />
 
-      {/* UnifiedIntakeModal — mounted at layout level for file drop intake flow */}
-      <UnifiedIntakeModal
-        visible={intakeVisible}
-        projectId={projectId}
-        projectName={currentProject?.project_name ?? ''}
-        initialFiles={intakeFiles}
-        onClose={() => {
-          setIntakeVisible(false);
-          setIntakeFiles([]);
-        }}
-        onProjectKnowledge={(docs) => {
-          setProjectKnowledgeQueue(docs);
-          if (docs.length > 0) setProjectKnowledgeDoc(docs[0]);
-        }}
-        onPlatformKnowledge={(docs) => {
-          setPlatformKnowledgeQueue(docs);
-          if (docs.length > 0) setPlatformKnowledgeDoc(docs[0]);
-        }}
-      />
-
-      {/* Project Knowledge Metadata Modal */}
-      <ProjectKnowledgeModal
-        visible={!!projectKnowledgeDoc}
-        projectId={projectId}
-        doc={projectKnowledgeDoc}
-        onClose={() => setProjectKnowledgeDoc(null)}
-        onComplete={() => {
-          // Advance to next doc in queue, or close
-          const remaining = projectKnowledgeQueue.slice(1);
-          setProjectKnowledgeQueue(remaining);
-          setProjectKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
-        }}
-      />
-
-      {/* Platform Knowledge Metadata Modal */}
-      <PlatformKnowledgeModal
-        visible={!!platformKnowledgeDoc}
-        projectId={projectId}
-        doc={platformKnowledgeDoc}
-        onClose={() => setPlatformKnowledgeDoc(null)}
-        onComplete={() => {
-          const remaining = platformKnowledgeQueue.slice(1);
-          setPlatformKnowledgeQueue(remaining);
-          setPlatformKnowledgeDoc(remaining.length > 0 ? remaining[0] : null);
-        }}
-      />
+      {intakeModals}
 
       {/* Navigation guard dialog — shown when user tries to navigate while workbench is open */}
       {pendingNavigation && (
@@ -597,7 +604,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           flex: 1,
           minHeight: 0,
           width: '100%',
-          paddingTop: '0.5rem',
+          paddingTop: 'var(--app-padding)',
           gap: 0,
         }}
       >
@@ -664,9 +671,9 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             minWidth: '400px',
             display: 'flex',
             flexDirection: 'column',
-            marginLeft: isCollapsed ? '0.5rem' : '0',
+            marginLeft: isCollapsed ? 'var(--app-padding)' : '0',
             transition: isResizing ? 'none' : 'margin-left 0.2s ease',
-            gap: '0.25rem',
+            gap: 'var(--component-gap)',
           }}
         >
           {/* Folder Tabs + Content — CCard wrapper when subtabs exist */}
@@ -743,6 +750,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
           </CToast>
         )}
       </CToaster>
+
     </div>
   );
 }
@@ -776,8 +784,8 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
               display: 'flex',
               flex: 1,
               minHeight: 0,
-              gap: '0.5rem',
-              paddingTop: '0.5rem',
+              gap: 'var(--component-gap)',
+              paddingTop: 'var(--app-padding)',
             }}
           >
             <div

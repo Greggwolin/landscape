@@ -272,7 +272,7 @@ export function useIntakeStaging(projectId: number, workspaceId?: number) {
               file_size_bytes: stagedFile.file.size,
               mime_type: stagedFile.file.type,
               version_no: 1,
-              ...(stagedFile.intent === 'structured_ingestion' ? { intent: 'structured_ingestion' } : {}),
+              intent: stagedFile.intent,
             },
             profile: {},
             ai: { source: 'intake_modal' },

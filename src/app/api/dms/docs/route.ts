@@ -17,6 +17,7 @@ const DJANGO_API_URL =
  * Create a new document record with duplicate detection and tag tracking
  */
 export async function POST(req: NextRequest) {
+ try {
   try {
     const body = await req.json();
     console.log('[/api/dms/docs] Received:', JSON.stringify(body, null, 2));
@@ -295,9 +296,12 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      // Skip legacy extract queue for structured_ingestion — Workbench triggers
-      // the knowledge extraction service via IntakeChoiceModal.
-      if (intent !== 'structured_ingestion') {
+      // Skip legacy extract queue for structured_ingestion (Workbench handles it)
+      // and knowledge intents (RAG pipeline handles them — no field extraction needed).
+      const skipQueue = intent === 'structured_ingestion'
+        || intent === 'project_knowledge'
+        || intent === 'platform_knowledge';
+      if (!skipQueue) {
         const extractType = system.doc_type?.toLowerCase().includes('rent') ? 'rent_roll' : 'general';
 
         const queueResult = await sql`
@@ -389,6 +393,17 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+ } catch (outerError) {
+    // Safety net: ensure we NEVER return an empty {} response
+    console.error('❌ Unhandled outer error in POST /api/dms/docs:', outerError);
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        details: outerError instanceof Error ? outerError.message : 'Unexpected failure',
+      },
+      { status: 500 }
+    );
+ }
 }
 
 /**

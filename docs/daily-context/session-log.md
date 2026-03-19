@@ -5,6 +5,47 @@
 
 ---
 
+## Intake Modal Fixes + Knowledge Search + Comp Pipeline — 2026-03-18
+
+**What was discussed:**
+- Diagnosed .xlsx upload failure (`{}` response from `/api/dms/docs` — missing auth headers in old LandscaperPanel.uploadFiles)
+- Discovered previous session had built a full tiered modal system (UnifiedIntakeModal → ProjectKnowledgeModal / PlatformKnowledgeModal) — reverted conflicting UploadStagingProvider lift that would have broken it
+- Fixed intake modals closing during form interaction: buttons defaulting to `type="submit"` inside `<CForm>`, missing `onSubmit` prevention, CModal `onClose` firing unexpectedly, modals unmounting during SWR revalidation (moved modal renders before loading guards in ProjectLayoutClient)
+- Added `closeButton={false}`, removed `onClose` prop, added `backdrop="static"` + `keyboard={false}` to all three intake modals
+- Added Start Over / Cancel buttons to knowledge modals with full upload rollback (DELETE to UploadThing + core_doc soft-delete)
+- Fixed extraction queue trash button opening Workbench (missing `e.stopPropagation()` in ExtractionQueueSection.tsx)
+- Fixed knowledge intents (`project_knowledge`, `platform_knowledge`) creating extraction queue entries — updated Zod schema, useIntakeStaging hook, and route.ts to skip queue for knowledge intents
+- Added `RESPONSE STYLE`, `MANDATORY TOOL USE`, `AVOIDING REDUNDANCY` sections to Landscaper system prompt; updated `DATA LOOKUP PRIORITY` in BASE_INSTRUCTIONS to include `query_platform_knowledge` as step 2
+- Added `query_platform_knowledge` to `mf_valuation` and `land_valuation` in PAGE_TOOLS (though actual filtering uses PROPERTY_TYPE_TOOL_MAP where it was already in UNIVERSAL_TOOLS)
+- Made `query_platform_knowledge` tool search BOTH `tbl_platform_knowledge_chunks` (reference corpus) AND `knowledge_embeddings` (user-uploaded docs), merging results by similarity
+- Fixed cap rate normalization in `update_sales_comparable` tool (values > 1 auto-converted to decimal)
+- Manually approved 3 pending mutation proposals and populated missing comp fields from CoStar xlsx
+- Added outer try-catch safety net to `/api/dms/docs` POST route
+
+**Files modified (frontend):**
+- `src/components/intake/UnifiedIntakeModal.tsx` — closeButton, onClose removal
+- `src/components/intake/ProjectKnowledgeModal.tsx` — closeButton, onClose, onSubmit, type="button", Start Over
+- `src/components/intake/PlatformKnowledgeModal.tsx` — same as above
+- `src/components/landscaper/ExtractionQueueSection.tsx` — stopPropagation on trash button
+- `src/hooks/useIntakeStaging.ts` — send intent for all file types
+- `src/app/api/dms/docs/route.ts` — skip queue for knowledge intents, outer try-catch
+- `src/app/api/dms/docs/schema.ts` — added knowledge intents to Zod enum
+- `src/app/projects/[projectId]/ProjectLayoutClient.tsx` — moved intake modals before loading guards
+- `src/components/landscaper/LandscaperPanel.tsx` — removed dead dropzone comment
+
+**Files modified (backend):**
+- `backend/apps/landscaper/ai_handler.py` — RESPONSE STYLE, MANDATORY TOOL USE, AVOIDING REDUNDANCY, DATA LOOKUP PRIORITY
+- `backend/apps/landscaper/tool_executor.py` — dual-source knowledge search, cap rate normalization
+- `backend/apps/landscaper/tool_registry.py` — query_platform_knowledge added to mf_valuation/land_valuation PAGE_TOOLS
+
+**Open items:**
+- Thread list UI missing from Landscaper panel — no way to browse/switch threads
+- Thread auto-selection race condition on mount — new blank threads created before API returns existing threads, causing comp thread to disappear on refresh
+- Landscaper response vanishing on refresh — related to thread race condition
+- `docs/diagnostics/xlsx-upload-failure-2026-03-18.md` created during diagnostic phase — can be deleted (findings are superseded by this log entry)
+
+---
+
 ## DMS Drag-to-Reclassify — 2026-03-11
 
 **What was discussed:**
