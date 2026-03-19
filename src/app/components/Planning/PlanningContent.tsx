@@ -163,8 +163,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
 
     // Filter out null/undefined area_no to prevent "Plan Area null"
     const distinctAreas = Array.from(new Set(parcels.map(p => p.area_no).filter(areaNo => areaNo != null))).sort((a, b) => a - b)
-    const fallbackList = distinctAreas.length > 0 ? distinctAreas : [1, 2, 3, 4]
-    return fallbackList.map(areaNo => ({
+    if (distinctAreas.length === 0) return []
+    return distinctAreas.map(areaNo => ({
       key: `area-${areaNo}`,
       areaNo,
       title: `${level1Label} ${areaNo}`,

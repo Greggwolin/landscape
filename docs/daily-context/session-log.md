@@ -5,6 +5,81 @@
 
 ---
 
+## Documents Media Gallery — Visibility Fix, Favorites, Classification, Rescan — 2026-03-19
+
+**What was discussed:**
+- User reported Project Media gallery missing from Documents tab — appeared deleted but was actually clipped by CSS overflow
+- Traced layout chain: `DocumentsTab` had `className="h-full"` constraining height, parent `CCardBody` had `overflow: hidden` — gallery rendered in DOM but invisible below the fold
+- Image classification accuracy: real photos being tagged as "Chart/Graph" or "Rendering" — AI prompt too vague on distinguishing photographs from other categories
+- Requested favorite/heart icon to pin images to top of gallery
+- Requested skip-deleted option on rescan so previously removed images don't reappear
+
+**What changed:**
+- `src/.../DocumentsTab.tsx` — Removed `h-full` constraint, replaced with plain `<div>` so both DMSView and ProjectMediaGallery flow naturally within `project-folder-content` scroll container
+- `src/components/dms/ProjectMediaGallery.tsx`:
+  - Tile sizing: `TILE_MAX_WIDTH` 420→320, `TILE_HEIGHT` 270→200 (guarantees 2+ per row)
+  - Favorites: localStorage-persisted heart icon per card, favorites sort to top of grid
+  - Rescan: "Rescan All" now opens confirmation modal with "Skip previously deleted images" checkbox (default: checked) instead of running immediately
+- `backend/.../media_classification_service.py`:
+  - Rewrote `CLASSIFICATION_PROMPT` — added explicit "CRITICAL RULE" prioritizing real photographs, expanded `property_photo` description, tightened `chart`/`rendering` criteria to prevent false positives
+  - Heuristic fallback Rule 4: removed `rendering` as default for large low-bytes-per-pixel images, defaults to `property_photo` instead
+  - Rule 6: bumped confidence 0.35→0.45 for medium images
+- `backend/.../media_views.py` — `reset_document_media` now accepts `{ "skip_deleted": true }` in POST body, preserves `user_action='ignore'` rows when set
+- `backend/.../media_extraction_service.py` — `_create_pending_record` checks for existing discarded records at same doc+page+method before inserting, skips if user previously deleted
+
+**Open items:**
+- Existing misclassified images need "Rescan All PDFs" to re-run through updated classification prompt
+- Django endpoint for doc 118 media was hanging during testing — may be a backend performance issue worth investigating
+- Favorite state is client-side only (localStorage) — if DB persistence is needed later, add `is_favorite` column to `core_doc_media`
+
+---
+
+## Demographics On-Demand Loading + County Selector Fix — 2026-03-19
+
+**What was discussed:**
+- User reported demographic rings not populating for Sun Valley, ID project — traced to Idaho not being in the `STATE_NAMES` whitelist in `load_block_groups.py` (only AZ and CA were supported)
+- After loading Idaho data, rings still empty — stale NULL cache in `ring_demographics` table from before data existed. Cleared cache, PostGIS function returned correct data for all 3 rings.
+- User requested on-demand demographic loading: prompt during project creation + button on map page if data unavailable
+- User reported county parcel selector visible on Idaho project — should only show for Phoenix MSA (Maricopa/Pinal County)
+- Discussed Census ACS data limitations for resort/rural markets (Sun Valley values appear low vs. market reality)
+
+**What changed:**
+- `backend/.../load_block_groups.py` — Expanded `STATE_NAMES` from 4 states to all 50 + DC
+- `backend/.../demographics_service.py` — Added `get_state_coverage()`, `trigger_state_load()` (background thread), `_invalidate_state_project_caches()` (auto-clears stale ring caches when new state data loads), `STATE_ABBREV_TO_FIPS` mapping
+- `backend/.../views.py` — Two new endpoints: `GET .../state-coverage/?state=ID`, `POST .../load-state/`
+- `backend/.../urls.py` — Wired both new endpoints
+- `src/.../LocationIntelligenceCard.tsx` — Added `projectState` prop, `handleLoadDemographics()` with polling, "Load Demographics" banner below map when no ring data
+- `src/.../DemographicsPanel.tsx` — Enhanced empty state with loading/complete/error states + button
+- `src/.../PropertyTab.tsx` — Added `state` to Project interface, passes `project.state` to card
+- `src/.../NewProjectModal.tsx` — Auto-triggers `load-state` on project creation when state is set
+- `src/.../types.ts` — Added `StateCoverage` interface, extended `DemographicsPanelProps`
+- `src/components/map-tab/MapTab.tsx` — Added `isPhoenixMSA` memo, wrapped County Parcels panel so it only renders for AZ projects
+- `CLAUDE.md` — Added "Demographics / Location Intelligence" section with on-demand loading docs, backend endpoints, county selector scope, and Census ACS data limitations for Landscaper context
+
+**Open items:**
+- Only 5-mile ring visible on map UI (1 and 3-mile data exists in backend) — likely frontend rendering/zoom issue, not investigated yet
+- Texas demographic data not yet loaded (command supports it, just needs `load_block_groups --states=48`)
+
+---
+
+## Dropzone Fix — Landscaper Panel + Content Area — 2026-03-19
+
+**What was discussed:**
+- User reported neither the main content dropzone nor the Landscaper panel dropzone triggers the ingestion modal when files are dropped (Property > Parcels tab specifically, but likely all tabs)
+- Traced full drag-and-drop chain: DropZoneWrapper → FileDropContext.addFiles() → pendingIntakeFiles useEffect → UnifiedIntakeModal
+- Found Landscaper panel had ALL dropzone code stripped out — only existed in LandscaperPanel.tsx.bak. The old .bak had a full upload pipeline; the new architecture centralizes uploads in UnifiedIntakeModal
+- Found DropZoneWrapper had `height: 100%` inside a flex-column CCardBody parent — known CSS issue where `height: 100%` doesn't resolve correctly when parent height comes from `flex: 1`
+
+**What changed:**
+- `src/components/landscaper/LandscaperPanel.tsx` — Added react-dropzone + useFileDrop() back. Simplified vs .bak: just forwards files to FileDropContext.addFiles() (no upload pipeline). Added drag overlay with visual feedback (dashed border, green/red states)
+- `src/components/ui/DropZoneWrapper.tsx` — Changed `height: 100%` to `flex: 1; minHeight: 0; display: flex; flexDirection: column` for proper sizing inside flex parent
+
+**Open items:**
+- Needs live testing to confirm both dropzones now trigger UnifiedIntakeModal on all tabs
+- Should verify CollapsedLandscaperStrip auto-expand still works on file drop (code is in ProjectLayoutClient useEffect watching pendingFiles)
+
+---
+
 ## Intake Modal Fixes + Knowledge Search + Comp Pipeline — 2026-03-18
 
 **What was discussed:**

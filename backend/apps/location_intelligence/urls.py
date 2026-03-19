@@ -28,6 +28,18 @@ urlpatterns = [
         name="location-intelligence-project-demographics-delete"
     ),
 
+    # On-demand demographic loading
+    path(
+        "demographics/state-coverage/",
+        views.get_state_coverage,
+        name="location-intelligence-state-coverage"
+    ),
+    path(
+        "demographics/load-state/",
+        views.trigger_state_load,
+        name="location-intelligence-load-state"
+    ),
+
     # Nearby block-group boundaries (GeoJSON)
     path(
         "block-groups/",

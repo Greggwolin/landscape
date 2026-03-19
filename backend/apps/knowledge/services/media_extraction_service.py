@@ -749,7 +749,23 @@ class MediaExtractionService:
                                 width_px: int = None, height_px: int = None,
                                 asset_name: str = None,
                                 source_region: dict = None) -> Optional[int]:
-        """Create a core_doc_media record with status='pending'."""
+        """Create a core_doc_media record with status='pending'.
+        Skips creation if a user-discarded record already exists for the same
+        doc + page + method (prevents re-surfacing images the user deleted)."""
+        # Check for existing discarded record at same position
+        with connection.cursor() as c:
+            c.execute("""
+                SELECT media_id FROM landscape.core_doc_media
+                WHERE doc_id = %s AND source_page = %s
+                  AND extraction_method = %s AND user_action = 'ignore'
+            """, [doc_id, source_page, extraction_method])
+            if c.fetchone():
+                logger.debug(
+                    f"[doc_id={doc_id}] Skipping page {source_page} "
+                    f"({extraction_method}) — previously discarded by user"
+                )
+                return None
+
         with connection.cursor() as c:
             c.execute("""
                 INSERT INTO landscape.core_doc_media

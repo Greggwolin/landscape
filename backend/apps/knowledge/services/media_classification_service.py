@@ -35,28 +35,31 @@ logger = logging.getLogger('landscape.media_extraction')
 # ---------------------------------------------------------------------------
 CLASSIFICATION_PROMPT = """You are classifying an image extracted from a commercial real estate document.
 
+CRITICAL RULE: If the image looks like a REAL PHOTOGRAPH (natural lighting, real textures, camera perspective, people, actual buildings, streetscapes, interiors with furniture), classify it as property_photo or aerial_photo. Do NOT classify real photographs as "chart", "rendering", or "infographic". Photographs are by far the most common image type in these documents.
+
 Classify this image into exactly ONE of these categories:
 
-VISUAL ASSETS (images worth keeping):
-- property_photo: Exterior or interior photograph of a real property
-- aerial_photo: Aerial or drone photograph
-- site_plan: Site plan, plat map, or lot layout drawing
-- floor_plan: Unit or building floor plan
-- rendering: Architectural rendering or conceptual illustration
-- before_after: Before-and-after comparison photo
+PHOTOGRAPHS (most common — default to these when in doubt):
+- property_photo: Any real photograph — exterior, interior, streetscape, amenity, neighborhood, signage, construction progress. This is the most common category. If it looks like a camera took it, it's a property_photo.
+- aerial_photo: Aerial or drone photograph showing real terrain/buildings from above (NOT a satellite map with overlays)
 
-MAPS (images with extractable location data):
-- aerial_map: Annotated aerial/satellite map with overlays (retailer logos, callouts, roads)
-- zoning_map: Zoning designation map with color-coded zones
+DRAWINGS & PLANS:
+- site_plan: Site plan, plat map, or lot layout — typically line drawings with dimensions/labels
+- floor_plan: Unit or building floor plan — schematic layout with room labels
+- rendering: Computer-generated architectural illustration. Must look clearly artificial/CGI — NOT a real photo. Renderings have unnaturally perfect lighting, no grain, and often show proposed (unbuilt) structures.
+
+MAPS (vector/satellite with overlays):
+- aerial_map: Annotated aerial/satellite map with retailer logos, callouts, road labels, or trade area rings
+- zoning_map: Zoning designation map with color-coded zones and legend
 - location_map: General location or submarket context map
 - planning_map: Master planning area map with parcel labels and density data
 
-DATA VISUALIZATIONS (images containing structured data):
-- chart: Financial chart, bar graph, pie chart, line graph, or data table rendered as image
-- infographic: Data-rich visual summary with statistics, icons, and metrics
+DATA VISUALIZATIONS (must contain axes, data points, or numerical labels):
+- chart: Bar graph, pie chart, line graph, or data table rendered as image. Must have visible axes, gridlines, data labels, or numerical values. A photo of a building is NOT a chart.
+- infographic: Data-rich visual summary with statistics, icons, and metrics arranged in a designed layout
 
 OTHER:
-- logo: Company logo, brokerage logo, or branding element
+- logo: Company logo, brokerage logo, or branding element (typically small, graphic, no photography)
 - other: None of the above
 
 Respond with ONLY a JSON object:
@@ -386,9 +389,10 @@ class MediaClassificationService:
                 area = max(width * height, 1)
                 bytes_per_pixel = file_size / area if file_size else 0
                 if bytes_per_pixel > 0.5:
-                    return 'property_photo', 0.55, heuristic_hint
+                    return 'property_photo', 0.65, heuristic_hint
                 else:
-                    return 'rendering', 0.40, heuristic_hint
+                    # Low bytes/pixel could be compressed photo OR graphic — default to photo
+                    return 'property_photo', 0.40, heuristic_hint
 
         # Rule 5: Text-keyword matching from surrounding content
         if nearby_text:
@@ -412,7 +416,7 @@ class MediaClassificationService:
 
         # Rule 6: Medium-sized images with no context — likely property photos
         if width > 300 and height > 200:
-            return 'property_photo', 0.35, heuristic_hint
+            return 'property_photo', 0.45, heuristic_hint
 
         # Rule 7: Fallback
         return 'other', 0.30, heuristic_hint

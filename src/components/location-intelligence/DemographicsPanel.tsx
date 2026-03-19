@@ -126,6 +126,8 @@ export function DemographicsPanel({
   error,
   selectedRadius,
   onRadiusSelect,
+  onLoadDemographics,
+  demographicsLoadStatus = 'idle',
 }: DemographicsPanelProps) {
   if (isLoading) {
     return (
@@ -154,17 +156,58 @@ export function DemographicsPanel({
   }
 
   if (!demographics || !demographics.rings.length) {
+    const isLoadingState = demographicsLoadStatus === 'loading';
     return (
       <div className="demographics-panel empty">
         <div className="demographics-empty">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 12h8" />
-          </svg>
-          <span>No demographics data available</span>
-          <p className="empty-hint">
-            Demographics require block group data to be loaded for this area.
-          </p>
+          {isLoadingState ? (
+            <>
+              <div className="loading-spinner" />
+              <span>Loading Census data for this area...</span>
+              <p className="empty-hint">
+                Downloading block group boundaries and ACS demographics. This may take a few minutes for large states.
+              </p>
+            </>
+          ) : demographicsLoadStatus === 'complete' ? (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cui-success)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12l3 3 5-5" />
+              </svg>
+              <span>Census data loaded — refreshing demographics...</span>
+            </>
+          ) : demographicsLoadStatus === 'error' ? (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--cui-danger)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              <span>Failed to load Census data</span>
+              <p className="empty-hint">Check server logs for details.</p>
+            </>
+          ) : (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8" />
+              </svg>
+              <span>No demographics data available</span>
+              <p className="empty-hint">
+                Census block group data has not been loaded for this area yet.
+              </p>
+              {onLoadDemographics && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={onLoadDemographics}
+                  style={{ marginTop: '8px' }}
+                >
+                  Load Demographics
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     );

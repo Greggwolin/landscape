@@ -81,6 +81,7 @@ const SCOPE_TO_FOLDER: Record<string, string> = {
   market: 'valuation',
   rent_comp: 'valuation',
   sales_comp: 'valuation',
+  land_comp: 'valuation',
 };
 
 // Land dev aliases — same scopes map to different folder IDs
@@ -92,6 +93,7 @@ const SCOPE_TO_FOLDER_LAND: Record<string, string> = {
   market: 'feasibility',
   rent_comp: 'feasibility',
   sales_comp: 'feasibility',
+  land_comp: 'feasibility',
 };
 
 /** Sentinel folder ID for scopes not in the map */

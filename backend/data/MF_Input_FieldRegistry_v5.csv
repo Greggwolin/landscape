@@ -215,24 +215,50 @@ sales_comp_grm,GRM,number,sales_comp,tbl_sales_comparables,grm,insert,"{""array_
 sales_comp_building_sf,Building SF,integer,sales_comp,tbl_sales_comparables,building_sf,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,input,supporting,Total building square footage
 sales_comp_distance,Distance (miles),number,sales_comp,tbl_sales_comparables,distance_from_subject,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,input,supporting,Distance from subject property
 sales_comp_notes,Notes,text,sales_comp,tbl_sales_comparables,notes,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal,validate,input,descriptive,Additional comp notes
+sales_comp_zip,ZIP Code,text,sales_comp,tbl_sales_comparables,zip,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,descriptive,ZIP code
+sales_comp_unit_count,Unit Count,integer,sales_comp,tbl_sales_comparables,unit_count,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,important,Number of units (alternate field)
+sales_comp_building_class,Building Class,text,sales_comp,tbl_sales_comparables,building_class,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Building class (A/B/C)
+sales_comp_submarket,Submarket,text,sales_comp,tbl_sales_comparables,submarket,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Submarket name
+sales_comp_buyer,Buyer,text,sales_comp,tbl_sales_comparables,true_buyer,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Buyer name
+sales_comp_seller,Seller,text,sales_comp,tbl_sales_comparables,true_seller,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Seller name
+sales_comp_property_type,Property Type,text,sales_comp,tbl_sales_comparables,property_type,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Property type classification
+sales_comp_num_floors,Floors,integer,sales_comp,tbl_sales_comparables,num_floors,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Number of floors
+sales_comp_land_area_sf,Land Area SF,number,sales_comp,tbl_sales_comparables,land_area_sf,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,supporting,Land area in square feet
+sales_comp_noi_at_sale,NOI at Sale,currency,sales_comp,tbl_sales_comparables,noi_at_sale,insert,"{""array_scope"": ""sales_comp""}",offering_memorandum|appraisal|costar_export,validate,input,important,Net operating income at time of sale
 # ============================================================
 # SECTION 11: RENT COMPARABLES (15 fields per comp - array extraction)
 # ============================================================
-rent_comp_name,Property Name,text,rent_comp,tbl_rent_comparable,property_name,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Comparable property name
-rent_comp_address,Address,text,rent_comp,tbl_rent_comparable,address,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Comparable property address
-rent_comp_year_built,Year Built,integer,rent_comp,tbl_rent_comparable,year_built,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Construction year
-rent_comp_total_units,Total Units,integer,rent_comp,tbl_rent_comparable,total_units,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Number of units
-rent_comp_unit_type,Unit Type,text,rent_comp,tbl_rent_comparable,unit_type,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Unit type being compared
-rent_comp_bedrooms,Bedrooms,integer,rent_comp,tbl_rent_comparable,bedrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Number of bedrooms
-rent_comp_bathrooms,Bathrooms,number,rent_comp,tbl_rent_comparable,bathrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Number of bathrooms
-rent_comp_avg_sqft,Average SF,integer,rent_comp,tbl_rent_comparable,avg_sqft,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Average unit square footage
-rent_comp_asking_rent,Asking Rent,currency,rent_comp,tbl_rent_comparable,asking_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,critical,Current asking rent
-rent_comp_effective_rent,Effective Rent,currency,rent_comp,tbl_rent_comparable,effective_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Net effective rent after concessions
-rent_comp_concessions,Concessions,text,rent_comp,tbl_rent_comparable,concessions,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Current concession offerings
-rent_comp_amenities,Amenities,text,rent_comp,tbl_rent_comparable,amenities,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Notable amenities
-rent_comp_distance,Distance (miles),number,rent_comp,tbl_rent_comparable,distance_miles,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Distance from subject property
-rent_comp_as_of_date,As Of Date,date,rent_comp,tbl_rent_comparable,as_of_date,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Date rent data was collected
-rent_comp_notes,Notes,text,rent_comp,tbl_rent_comparable,notes,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,descriptive,Additional notes
+rent_comp_name,Property Name,text,rent_comp,tbl_rental_comparable,property_name,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Comparable property name
+rent_comp_address,Address,text,rent_comp,tbl_rental_comparable,address,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Comparable property address
+rent_comp_year_built,Year Built,integer,rent_comp,tbl_rental_comparable,year_built,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Construction year
+rent_comp_total_units,Total Units,integer,rent_comp,tbl_rental_comparable,total_units,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Number of units
+rent_comp_unit_type,Unit Type,text,rent_comp,tbl_rental_comparable,unit_type,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Unit type being compared
+rent_comp_bedrooms,Bedrooms,integer,rent_comp,tbl_rental_comparable,bedrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Number of bedrooms
+rent_comp_bathrooms,Bathrooms,number,rent_comp,tbl_rental_comparable,bathrooms,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Number of bathrooms
+rent_comp_avg_sqft,Average SF,integer,rent_comp,tbl_rental_comparable,avg_sqft,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Average unit square footage
+rent_comp_asking_rent,Asking Rent,currency,rent_comp,tbl_rental_comparable,asking_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,critical,Current asking rent
+rent_comp_effective_rent,Effective Rent,currency,rent_comp,tbl_rental_comparable,effective_rent,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Net effective rent after concessions
+rent_comp_concessions,Concessions,text,rent_comp,tbl_rental_comparable,concessions,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Current concession offerings
+rent_comp_amenities,Amenities,text,rent_comp,tbl_rental_comparable,amenities,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Notable amenities
+rent_comp_distance,Distance (miles),number,rent_comp,tbl_rental_comparable,distance_miles,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,supporting,Distance from subject property
+rent_comp_as_of_date,As Of Date,date,rent_comp,tbl_rental_comparable,as_of_date,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,important,Date rent data was collected
+rent_comp_notes,Notes,text,rent_comp,tbl_rental_comparable,notes,insert,"{""array_scope"": ""rent_comp""}",offering_memorandum|comp_report,validate,input,descriptive,Additional notes
+# ============================================================
+# SECTION 11B: LAND COMPARABLES (12 fields per comp - array extraction)
+# Used in Cost Approach (land value component) across all property types
+# ============================================================
+land_comp_address,Address,text,land_comp,tbl_land_comparables,address,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,important,Land comp address
+land_comp_city,City,text,land_comp,tbl_land_comparables,city,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,supporting,City
+land_comp_state,State,text,land_comp,tbl_land_comparables,state,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,descriptive,State
+land_comp_zip,ZIP Code,text,land_comp,tbl_land_comparables,zip,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,descriptive,ZIP code
+land_comp_sale_date,Sale Date,date,land_comp,tbl_land_comparables,sale_date,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,important,Date of sale
+land_comp_sale_price,Sale Price,currency,land_comp,tbl_land_comparables,sale_price,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,critical,Transaction price
+land_comp_land_area_sf,Land Area (SF),number,land_comp,tbl_land_comparables,land_area_sf,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,important,Land area in square feet
+land_comp_land_area_acres,Land Area (Acres),number,land_comp,tbl_land_comparables,land_area_acres,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,important,Land area in acres
+land_comp_price_per_sf,Price Per SF,currency,land_comp,tbl_land_comparables,price_per_sf,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,critical,Price per square foot of land
+land_comp_price_per_acre,Price Per Acre,currency,land_comp,tbl_land_comparables,price_per_acre,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,critical,Price per acre
+land_comp_zoning,Zoning,text,land_comp,tbl_land_comparables,zoning,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,supporting,Zoning designation
+land_comp_notes,Notes,text,land_comp,tbl_land_comparables,notes,insert,"{""array_scope"": ""land_comp""}",appraisal|market_report|costar_export,validate,input,descriptive,Additional notes
 # ============================================================
 # SECTION 12: ACQUISITION / DEAL TERMS (15 fields)
 # ============================================================

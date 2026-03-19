@@ -50,10 +50,12 @@ class RentComparableSerializer(serializers.ModelSerializer):
             'data_source',
             'as_of_date',
             'is_active',
+            'latitude',
+            'longitude',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['comparable_id', 'created_at', 'updated_at']
+        read_only_fields = ['comparable_id', 'project', 'rent_per_sf', 'created_at', 'updated_at']
 
     def get_rent_per_sf(self, obj):
         """Calculate rent per square foot."""

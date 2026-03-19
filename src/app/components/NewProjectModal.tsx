@@ -352,6 +352,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
       zip: 'zip',
       county: 'county',
       total_units: 'total_units',
+      total_lots_units: 'total_lots_units',
       building_sf: 'building_sf',
       rentable_sf: 'building_sf',
       gross_sf: 'building_sf',
@@ -477,15 +478,28 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
 
     setExtractedFieldKeys(updatedKeys)
 
-    // Re-validate entire form so cross-field errors (e.g. location) clear properly
-    // Individual setValue calls only re-validate their own field, not superRefine checks
-    trigger()
-
-    // Forward geocode address to get coordinates for map zoom
-    // Only if we have address components but no lat/lng
+    // Auto-switch location_mode to match extracted data so validation passes.
+    // Priority: full address > cross_streets > map_pin (coordinates only)
     const hasFullAddress = fields.street_address?.value && fields.city?.value && fields.state?.value
     const hasCityState = fields.city?.value && fields.state?.value
     const hasCoords = fields.latitude?.value && fields.longitude?.value
+
+    if (hasFullAddress) {
+      // Income Property default — full address is best
+      setValue('location_mode', 'address', { shouldDirty: true })
+      console.log('[handleDocumentExtracted] Auto-set location_mode to address')
+    } else if (fields.cross_streets?.value && hasCityState) {
+      setValue('location_mode', 'cross_streets', { shouldDirty: true })
+      console.log('[handleDocumentExtracted] Auto-set location_mode to cross_streets')
+    } else if (hasCoords) {
+      // Coordinates from extraction (e.g., map pin placed by ingestion) — switch to map_pin
+      setValue('location_mode', 'map_pin', { shouldDirty: true })
+      console.log('[handleDocumentExtracted] Auto-set location_mode to map_pin')
+    }
+
+    // Re-validate entire form so cross-field errors (e.g. location) clear properly
+    // Individual setValue calls only re-validate their own field, not superRefine checks
+    trigger()
 
     if (!hasCoords && (hasFullAddress || hasCityState)) {
       // Try forward geocoding with whatever address info we have
@@ -813,10 +827,11 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         files: filesToUpload,
         extractionResultsCache: { ...extractionResultsCache.current },
       })
-    } else {
-      // No files — project is immediately ready
-      refreshProjects()
     }
+
+    // Always refresh project list so the new project appears in the selector
+    // immediately — don't rely on background upload to trigger this later.
+    await refreshProjects()
 
     extractionResultsCache.current = {}
     selectProject(projectId)
@@ -909,6 +924,19 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
       }
 
       const { project } = await response.json() as { project: { project_id: number } }
+
+      // Trigger background demographics loading for the project's state
+      if (data.state) {
+        const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
+        fetch(`${djangoUrl}/api/v1/location-intelligence/demographics/load-state/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: data.state }),
+        }).catch((err) => {
+          console.warn('Background demographics load trigger failed:', err)
+        })
+      }
+
       await handleCreationSuccess(project.project_id)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unexpected error creating project'
