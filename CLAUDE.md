@@ -509,6 +509,25 @@ Two distinct failure modes — treat separately:
 
 **Recommended stack:** OCRmyPDF (add text layer) + Ghostscript (compression). Integration point: `backend/apps/documents/` before `core_doc_text` ingestion step.
 
+### Demographics / Location Intelligence
+
+**Data source:** US Census ACS 5-Year Estimates (vintage 2023) at block group level, with TIGER/Line 2023 block group boundaries. Area-weighted aggregation via PostGIS for 1, 3, and 5-mile radius rings.
+
+**On-demand loading:** Demographics are loaded per-state on first use. When a project is created in a new state, the system automatically triggers background download of TIGER shapefiles + Census API data. The map page also has a "Load Demographics" button if data isn't available. Loading takes ~1 min for small states (ID: ~1,284 block groups) and ~10-15 min for large states (TX: ~15,800 block groups).
+
+**Backend endpoints:**
+- `GET /api/v1/location-intelligence/demographics/state-coverage/?state=ID` — check if state data is loaded
+- `POST /api/v1/location-intelligence/demographics/load-state/` — trigger background load (`{"state": "TX"}`)
+
+**County parcel selector:** Only visible for Arizona projects (Phoenix MSA). Supports Maricopa and Pinal County tax parcel overlays via external ArcGIS tile services.
+
+**Known data limitations (important for Landscaper context):**
+- ACS 5-Year estimates average over 2019-2023. They lag current market conditions by 2-3 years and do not reflect recent appreciation or market shifts.
+- Census block groups in rural and resort areas are geographically large. A single block group may span a high-value resort town AND surrounding rural land, diluting median values significantly.
+- Census median home value caps at approximately $2M and systematically underreports in ultra-high-value markets. Zillow/Redfin listings will show substantially higher values than Census medians.
+- Area-weighted aggregation means block groups with larger land area exert more influence on ring totals, which can further dilute values in mountainous or rural terrain where block groups cover large unpopulated areas.
+- For accurate current market values in resort and luxury markets, Landscaper should recommend supplementing Census demographics with MLS data, Zillow/Redfin estimates, or local appraisal sources.
+
 ### RAG/Knowledge System
 
 - Knowledge entity/fact system (subject-predicate-object triples)
