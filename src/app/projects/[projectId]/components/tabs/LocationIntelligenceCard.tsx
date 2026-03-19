@@ -31,6 +31,7 @@ interface LocationIntelligenceCardProps {
   projectName: string;
   latitude?: number | string | null;
   longitude?: number | string | null;
+  projectState?: string;
   rentalComparables?: RentalComparable[];
   comparableColors?: Record<string, string>;
 }
@@ -115,6 +116,7 @@ export default function LocationIntelligenceCard({
   projectName,
   latitude,
   longitude,
+  projectState,
   rentalComparables = [],
   comparableColors = {},
 }: LocationIntelligenceCardProps) {
@@ -144,12 +146,73 @@ export default function LocationIntelligenceCard({
     return [parsedLon, parsedLat];
   });
 
+  const [demographicsLoadStatus, setDemographicsLoadStatus] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
+
   const { demographics, isLoading, error, refetch } = useDemographics({
     lat: resolvedCenter?.[1] ?? 0,
     lon: resolvedCenter?.[0] ?? 0,
     projectId: String(projectId),
     enabled: isOpen && resolvedCenter !== null,
   });
+
+  const handleLoadDemographics = useCallback(async () => {
+    if (!projectState || demographicsLoadStatus === 'loading') return;
+
+    const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    setDemographicsLoadStatus('loading');
+
+    try {
+      // Trigger background load
+      const response = await fetch(`${djangoUrl}/api/v1/location-intelligence/demographics/load-state/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: projectState }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'already_loaded') {
+        // Data exists — just refetch demographics (cache may have been stale)
+        setDemographicsLoadStatus('complete');
+        await refetch();
+        return;
+      }
+
+      if (result.status === 'started' || result.status === 'already_loading') {
+        // Poll for completion
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusResp = await fetch(
+              `${djangoUrl}/api/v1/location-intelligence/demographics/state-coverage/?state=${projectState}`
+            );
+            const statusData = await statusResp.json();
+
+            if (statusData.status === 'complete') {
+              clearInterval(pollInterval);
+              setDemographicsLoadStatus('complete');
+              // Invalidate project cache and refetch
+              await fetch(
+                `${djangoUrl}/api/v1/location-intelligence/demographics/project/${projectId}/delete/`,
+                { method: 'DELETE' }
+              ).catch(() => {});
+              await refetch();
+            }
+          } catch {
+            // Keep polling
+          }
+        }, 5000);
+
+        // Safety timeout: stop polling after 10 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          setDemographicsLoadStatus((prev) => prev === 'loading' ? 'error' : prev);
+        }, 600000);
+      }
+    } catch (err) {
+      console.error('Failed to trigger demographics load:', err);
+      setDemographicsLoadStatus('error');
+    }
+  }, [projectState, projectId, demographicsLoadStatus, refetch]);
 
   const rentalComparablePoints = useMemo<UserMapPoint[]>(() => {
     // Group comparables by property_name so each property gets one marker
@@ -463,6 +526,53 @@ export default function LocationIntelligenceCard({
                   </CButton>
                 </div>
               </div>
+
+              {/* Demographics load prompt — shown when map renders but no ring data */}
+              {!isLoading && (!demographics || !demographics.rings.length) && (
+                <div
+                  className="rounded p-3 mt-2"
+                  style={{
+                    background: 'var(--cui-secondary-bg)',
+                    border: '1px solid var(--cui-border-color)',
+                  }}
+                >
+                  {demographicsLoadStatus === 'loading' ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="spinner-border spinner-border-sm" role="status" />
+                      <span>Loading Census data for this area... This may take a few minutes.</span>
+                    </div>
+                  ) : demographicsLoadStatus === 'complete' ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <span style={{ color: 'var(--cui-success)' }}>Census data loaded.</span>
+                      <CButton color="primary" size="sm" onClick={() => void handleRefresh()}>
+                        Refresh Demographics
+                      </CButton>
+                    </div>
+                  ) : demographicsLoadStatus === 'error' ? (
+                    <div>
+                      <span style={{ color: 'var(--cui-danger)' }}>Failed to load Census data. Check server logs.</span>
+                    </div>
+                  ) : (
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <div className="fw-semibold" style={{ fontSize: '0.9rem' }}>No demographics available</div>
+                        <div style={{ color: 'var(--cui-secondary-color)', fontSize: '0.85rem' }}>
+                          Census block group data hasn&apos;t been loaded for this state yet.
+                        </div>
+                      </div>
+                      {projectState && (
+                        <CButton
+                          color="primary"
+                          size="sm"
+                          onClick={() => void handleLoadDemographics()}
+                        >
+                          Load Demographics
+                        </CButton>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CCardBody>

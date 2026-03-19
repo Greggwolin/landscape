@@ -76,6 +76,16 @@ export interface LocationMapProps {
   resizeToken?: number;
 }
 
+// State coverage status from load-state endpoint
+export interface StateCoverage {
+  state: string;
+  fips: string;
+  loaded: boolean;
+  block_groups: number;
+  demographics: number;
+  status: 'complete' | 'not_loaded' | 'loading';
+}
+
 // Props for demographics panel
 export interface DemographicsPanelProps {
   demographics: DemographicsResponse | null;
@@ -83,6 +93,8 @@ export interface DemographicsPanelProps {
   error: string | null;
   selectedRadius: number | null;
   onRadiusSelect: (radius: number | null) => void;
+  onLoadDemographics?: () => void;
+  demographicsLoadStatus?: 'idle' | 'loading' | 'complete' | 'error';
 }
 
 // Props for layer toggle

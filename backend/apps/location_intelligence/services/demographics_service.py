@@ -5,10 +5,30 @@ Uses PostGIS spatial queries to calculate area-weighted demographics
 for 1, 3, and 5-mile radius rings around a given point.
 """
 
+import threading
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from django.db import connection
 from loguru import logger
+
+
+# US state abbreviation to FIPS code mapping
+STATE_ABBREV_TO_FIPS = {
+    "AL": "01", "AK": "02", "AZ": "04", "AR": "05", "CA": "06",
+    "CO": "08", "CT": "09", "DE": "10", "DC": "11", "FL": "12",
+    "GA": "13", "HI": "15", "ID": "16", "IL": "17", "IN": "18",
+    "IA": "19", "KS": "20", "KY": "21", "LA": "22", "ME": "23",
+    "MD": "24", "MA": "25", "MI": "26", "MN": "27", "MS": "28",
+    "MO": "29", "MT": "30", "NE": "31", "NV": "32", "NH": "33",
+    "NJ": "34", "NM": "35", "NY": "36", "NC": "37", "ND": "38",
+    "OH": "39", "OK": "40", "OR": "41", "PA": "42", "RI": "44",
+    "SC": "45", "SD": "46", "TN": "47", "TX": "48", "UT": "49",
+    "VT": "50", "VA": "51", "WA": "53", "WV": "54", "WI": "55",
+    "WY": "56",
+}
+
+# Track background loading jobs: {state_fips: "loading"|"complete"|"error"}
+_loading_jobs: Dict[str, str] = {}
 
 
 class DemographicsService:
@@ -263,6 +283,149 @@ class DemographicsService:
         except Exception as e:
             logger.error(f"Error invalidating cache for project {project_id}: {e}")
             return False
+
+    def get_state_coverage(self, state_abbrev: str) -> Dict[str, Any]:
+        """
+        Check if block group + demographics data is loaded for a state.
+
+        Args:
+            state_abbrev: Two-letter state abbreviation (e.g., "ID", "TX")
+
+        Returns:
+            {"state": "ID", "fips": "16", "loaded": True/False,
+             "block_groups": 1284, "demographics": 1284, "status": "complete"|"not_loaded"|"loading"}
+        """
+        abbrev = state_abbrev.upper().strip()
+        fips = STATE_ABBREV_TO_FIPS.get(abbrev)
+        if not fips:
+            return {"error": f"Unknown state abbreviation: {state_abbrev}"}
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT COUNT(*) FROM location_intelligence.block_groups
+                    WHERE state_fips = %s
+                """, [fips])
+                bg_count = cursor.fetchone()[0]
+
+                cursor.execute("""
+                    SELECT COUNT(*) FROM location_intelligence.demographics_cache
+                    WHERE geoid LIKE %s
+                """, [f"{fips}%"])
+                demo_count = cursor.fetchone()[0]
+
+            # Check if a background job is running
+            job_status = _loading_jobs.get(fips, None)
+            if job_status == "loading":
+                status = "loading"
+            elif bg_count > 0 and demo_count > 0:
+                status = "complete"
+            else:
+                status = "not_loaded"
+
+            return {
+                "state": abbrev,
+                "fips": fips,
+                "loaded": bg_count > 0 and demo_count > 0,
+                "block_groups": bg_count,
+                "demographics": demo_count,
+                "status": status,
+            }
+
+        except Exception as e:
+            logger.error(f"Error checking state coverage for {abbrev}: {e}")
+            return {"state": abbrev, "fips": fips, "error": str(e)}
+
+    def trigger_state_load(self, state_abbrev: str) -> Dict[str, Any]:
+        """
+        Trigger background loading of block group + demographics data for a state.
+
+        Args:
+            state_abbrev: Two-letter state abbreviation
+
+        Returns:
+            {"status": "started"|"already_loading"|"already_loaded", ...}
+        """
+        abbrev = state_abbrev.upper().strip()
+        fips = STATE_ABBREV_TO_FIPS.get(abbrev)
+        if not fips:
+            return {"error": f"Unknown state abbreviation: {state_abbrev}"}
+
+        # Check if already loading
+        if _loading_jobs.get(fips) == "loading":
+            return {"status": "already_loading", "state": abbrev, "fips": fips}
+
+        # Check if already loaded
+        coverage = self.get_state_coverage(abbrev)
+        if coverage.get("loaded"):
+            return {"status": "already_loaded", "state": abbrev, "fips": fips,
+                    "block_groups": coverage["block_groups"],
+                    "demographics": coverage["demographics"]}
+
+        # Start background loading thread
+        _loading_jobs[fips] = "loading"
+
+        def _run_load():
+            try:
+                from django.core.management import call_command
+                logger.info(f"Starting background load for {abbrev} (FIPS {fips})")
+                call_command("load_block_groups", states=fips)
+                _loading_jobs[fips] = "complete"
+                logger.info(f"Background load complete for {abbrev} (FIPS {fips})")
+
+                # Invalidate cached ring demographics for projects in this state
+                self._invalidate_state_project_caches(fips)
+
+            except Exception as e:
+                _loading_jobs[fips] = "error"
+                logger.error(f"Background load failed for {abbrev} (FIPS {fips}): {e}")
+
+        thread = threading.Thread(target=_run_load, daemon=True)
+        thread.start()
+
+        return {"status": "started", "state": abbrev, "fips": fips}
+
+    def _invalidate_state_project_caches(self, state_fips: str):
+        """
+        Clear cached ring demographics for all projects in a given state.
+        Called after new block group data is loaded so stale caches don't persist.
+        """
+        try:
+            with connection.cursor() as cursor:
+                # Find projects in this state and clear their ring caches
+                cursor.execute("""
+                    DELETE FROM location_intelligence.ring_demographics
+                    WHERE project_id IN (
+                        SELECT project_id FROM landscape.tbl_project
+                        WHERE state = (
+                            SELECT CASE %s
+                                WHEN '01' THEN 'AL' WHEN '02' THEN 'AK' WHEN '04' THEN 'AZ'
+                                WHEN '05' THEN 'AR' WHEN '06' THEN 'CA' WHEN '08' THEN 'CO'
+                                WHEN '09' THEN 'CT' WHEN '10' THEN 'DE' WHEN '11' THEN 'DC'
+                                WHEN '12' THEN 'FL' WHEN '13' THEN 'GA' WHEN '15' THEN 'HI'
+                                WHEN '16' THEN 'ID' WHEN '17' THEN 'IL' WHEN '18' THEN 'IN'
+                                WHEN '19' THEN 'IA' WHEN '20' THEN 'KS' WHEN '21' THEN 'KY'
+                                WHEN '22' THEN 'LA' WHEN '23' THEN 'ME' WHEN '24' THEN 'MD'
+                                WHEN '25' THEN 'MA' WHEN '26' THEN 'MI' WHEN '27' THEN 'MN'
+                                WHEN '28' THEN 'MS' WHEN '29' THEN 'MO' WHEN '30' THEN 'MT'
+                                WHEN '31' THEN 'NE' WHEN '32' THEN 'NV' WHEN '33' THEN 'NH'
+                                WHEN '34' THEN 'NJ' WHEN '35' THEN 'NM' WHEN '36' THEN 'NY'
+                                WHEN '37' THEN 'NC' WHEN '38' THEN 'ND' WHEN '39' THEN 'OH'
+                                WHEN '40' THEN 'OK' WHEN '41' THEN 'OR' WHEN '42' THEN 'PA'
+                                WHEN '44' THEN 'RI' WHEN '45' THEN 'SC' WHEN '46' THEN 'SD'
+                                WHEN '47' THEN 'TN' WHEN '48' THEN 'TX' WHEN '49' THEN 'UT'
+                                WHEN '50' THEN 'VT' WHEN '51' THEN 'VA' WHEN '53' THEN 'WA'
+                                WHEN '54' THEN 'WV' WHEN '55' THEN 'WI' WHEN '56' THEN 'WY'
+                            END
+                        )
+                    )
+                """, [state_fips])
+                deleted = cursor.rowcount
+                if deleted > 0:
+                    logger.info(f"Invalidated {deleted} cached ring rows for state FIPS {state_fips}")
+
+        except Exception as e:
+            logger.error(f"Error invalidating state project caches for {state_fips}: {e}")
 
     def get_block_group_stats(self) -> Dict[str, Any]:
         """

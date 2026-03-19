@@ -280,6 +280,85 @@ def delete_project_demographics(request, project_id):
 
 
 @extend_schema(
+    summary="Check demographic data coverage for a state",
+    description="Check if block group and demographics data is loaded for a given US state.",
+    parameters=[
+        OpenApiParameter(
+            name="state",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            required=True,
+            description="Two-letter state abbreviation (e.g., ID, TX, AZ)"
+        ),
+    ],
+    tags=["Location Intelligence"]
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_state_coverage(request):
+    """
+    GET /api/v1/location-intelligence/demographics/state-coverage/
+
+    Check if demographics data is loaded for a state.
+    """
+    state = request.query_params.get("state")
+    if not state:
+        return Response(
+            {"error": "state query parameter is required (e.g., ?state=ID)"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    result = demographics_service.get_state_coverage(state)
+
+    if "error" in result and "Unknown" in result.get("error", ""):
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(result)
+
+
+@extend_schema(
+    summary="Trigger on-demand demographic data loading for a state",
+    description="""
+    Triggers background loading of Census block group boundaries and ACS demographics
+    for a given US state. The load runs asynchronously. Poll the state-coverage endpoint
+    to check when it completes.
+    """,
+    request={
+        "application/json": {
+            "type": "object",
+            "properties": {
+                "state": {"type": "string", "description": "Two-letter state abbreviation"}
+            },
+            "required": ["state"]
+        }
+    },
+    tags=["Location Intelligence"]
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def trigger_state_load(request):
+    """
+    POST /api/v1/location-intelligence/demographics/load-state/
+
+    Trigger background loading of demographics for a state.
+    """
+    state = request.data.get("state")
+    if not state:
+        return Response(
+            {"error": "state is required in request body"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    result = demographics_service.trigger_state_load(state)
+
+    if "error" in result:
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+    status_code = status.HTTP_202_ACCEPTED if result.get("status") == "started" else status.HTTP_200_OK
+    return Response(result, status=status_code)
+
+
+@extend_schema(
     summary="Get nearby block group boundaries",
     description="""
     Returns block group boundaries as GeoJSON features near a coordinate.
