@@ -298,6 +298,11 @@ class ExtractionWriter:
             comp_value = value if isinstance(value, dict) else converted_value
             return self._insert_comp_row(mapping, comp_value, 'rent', scope_id, source_doc_id)
 
+        elif mapping.scope == 'land_comp':
+            # Land comparable (Cost Approach) - handled via _insert_comp_row
+            comp_value = value if isinstance(value, dict) else converted_value
+            return self._insert_comp_row(mapping, comp_value, 'land', scope_id, source_doc_id)
+
         elif mapping.scope == 'assumption':
             # Project assumption - upsert with assumption_key selector
             return self._write_assumption_upsert(mapping, converted_value)
@@ -1193,7 +1198,7 @@ class ExtractionWriter:
         self,
         mapping: FieldMapping,
         value: Any,
-        comp_type: str,  # 'sales' or 'rent'
+        comp_type: str,  # 'sales', 'rent', or 'land'
         scope_id: Optional[int] = None,
         source_doc_id: Optional[int] = None,
     ) -> Tuple[bool, str]:
@@ -1203,7 +1208,12 @@ class ExtractionWriter:
         For array extractions, value will be a dict with all comp fields.
         We insert a new row for each comparable.
         """
-        table = 'tbl_sales_comparables' if comp_type == 'sales' else 'tbl_rental_comparable'
+        TABLE_MAP = {
+            'sales': 'tbl_sales_comparables',
+            'rent': 'tbl_rental_comparable',
+            'land': 'tbl_land_comparables',
+        }
+        table = TABLE_MAP.get(comp_type, 'tbl_sales_comparables')
 
         # If value is a dict (full comp data), extract all fields
         if isinstance(value, dict):
@@ -1258,9 +1268,18 @@ class ExtractionWriter:
 
             for ext_key, col in field_map.items():
                 if ext_key in data and data[ext_key] is not None:
+                    val = data[ext_key]
+                    # Normalize cap rate: values > 1 are percentages (5.2 → 0.052)
+                    if col == 'cap_rate':
+                        try:
+                            cap_val = float(val)
+                            if cap_val > 1:
+                                val = str(round(cap_val / 100, 4))
+                        except (ValueError, TypeError):
+                            pass
                     columns.append(col)
                     values.append('%s')
-                    params.append(self._convert_value(data[ext_key], self._infer_type(col)))
+                    params.append(self._convert_value(val, self._infer_type(col)))
 
             if not columns:
                 return False, "No valid fields in comp data"
@@ -1319,6 +1338,53 @@ class ExtractionWriter:
             name = data.get('property_name', 'Unknown')
             self._create_comp_facts(data, comp_type, source_doc_id)
             return True, f"Inserted rent comp: {name}"
+
+        elif comp_type == 'land':
+            columns = []
+            values = []
+            params = [self.project_id]
+
+            field_map = {
+                'address': 'address',
+                'city': 'city',
+                'state': 'state',
+                'zip': 'zip',
+                'sale_date': 'sale_date',
+                'sale_price': 'sale_price',
+                'land_area_sf': 'land_area_sf',
+                'land_area_acres': 'land_area_acres',
+                'price_per_sf': 'price_per_sf',
+                'price_per_acre': 'price_per_acre',
+                'zoning': 'zoning',
+                'notes': 'notes',
+                'source': 'source',
+                'latitude': 'latitude',
+                'longitude': 'longitude',
+            }
+
+            for ext_key, col in field_map.items():
+                if ext_key in data and data[ext_key] is not None:
+                    columns.append(col)
+                    values.append('%s')
+                    params.append(self._convert_value(data[ext_key], self._infer_type(col)))
+
+            if not columns:
+                return False, "No valid fields in land comp data"
+
+            columns_str = ', '.join(['project_id'] + columns + ['created_at', 'updated_at'])
+            values_str = ', '.join(['%s'] + values + ['NOW()', 'NOW()'])
+
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    INSERT INTO landscape.{table} ({columns_str})
+                    VALUES ({values_str})
+                """, params)
+
+            addr = data.get('address', 'Unknown')
+            self._create_comp_facts(data, comp_type, source_doc_id)
+            return True, f"Inserted land comp: {addr}"
+
+        return False, f"Unknown comp type: {comp_type}"
 
     def _create_comp_facts(
         self,

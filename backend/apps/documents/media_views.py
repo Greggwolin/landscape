@@ -1109,11 +1109,18 @@ def reset_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/reset/
 
-    Deletes all core_doc_media records for a document, removes files from
+    Deletes core_doc_media records for a document, removes files from
     configured storage, and resets the document's media scan status.
+
+    Body (optional): { "skip_deleted": true }
+    When skip_deleted=true, preserves media rows where user_action='ignore'
+    (i.e. items the user previously deleted/discarded) so they don't
+    reappear on rescan.
     """
 
     try:
+        skip_deleted = request.data.get('skip_deleted', False) if request.data else False
+
         with connection.cursor() as c:
             c.execute("""
                 SELECT doc_id FROM landscape.core_doc
@@ -1140,12 +1147,17 @@ def reset_document_media(request, doc_id):
                 key = key[len(media_prefix) + 1:]
             return key
 
+        # Build WHERE clause — optionally preserve user-deleted items
+        exclude_clause = ""
+        if skip_deleted:
+            exclude_clause = "AND (user_action IS NULL OR user_action != 'ignore')"
+
         # Delete backing files from storage before deleting DB records.
         with connection.cursor() as c:
-            c.execute("""
+            c.execute(f"""
                 SELECT storage_uri, thumbnail_uri
                 FROM landscape.core_doc_media
-                WHERE doc_id = %s
+                WHERE doc_id = %s {exclude_clause}
             """, [doc_id])
             file_rows = c.fetchall()
 
@@ -1169,13 +1181,23 @@ def reset_document_media(request, doc_id):
                     exc_info=True,
                 )
 
-        # Delete media records
+        # Delete media records (preserving user-deleted if skip_deleted)
         with connection.cursor() as c:
-            c.execute("""
+            c.execute(f"""
                 DELETE FROM landscape.core_doc_media
-                WHERE doc_id = %s
+                WHERE doc_id = %s {exclude_clause}
             """, [doc_id])
             deleted_count = c.rowcount
+
+        # Count preserved items
+        skipped_count = 0
+        if skip_deleted:
+            with connection.cursor() as c:
+                c.execute("""
+                    SELECT COUNT(*) FROM landscape.core_doc_media
+                    WHERE doc_id = %s AND user_action = 'ignore'
+                """, [doc_id])
+                skipped_count = c.fetchone()[0]
 
         # Reset scan status and json
         with connection.cursor() as c:
@@ -1189,7 +1211,7 @@ def reset_document_media(request, doc_id):
 
         logger.info(
             f"[doc_id={doc_id}] Reset complete — deleted {deleted_count} media records, "
-            f"{deleted_files} stored objects"
+            f"{deleted_files} stored objects, skipped {skipped_count} user-deleted"
         )
 
         return Response({
@@ -1197,6 +1219,7 @@ def reset_document_media(request, doc_id):
             'doc_id': doc_id,
             'deleted_count': deleted_count,
             'deleted_files': deleted_files,
+            'skipped_count': skipped_count,
         })
 
     except Exception as e:
