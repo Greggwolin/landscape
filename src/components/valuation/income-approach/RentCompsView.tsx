@@ -5,24 +5,27 @@
  *
  * Renders the Rent Comps pill view within Income Approach.
  * Layout mirrors the former Market Comps tab from PropertyTab:
+ *   - LocationIntelligenceCard (collapsible map with demographics, rings, layers)
  *   - CCard with "Comparable Rentals" header, Expand All / Collapse All
- *   - Left panel: expandable property cards with unit-type detail tables
- *   - Right panel: ProjectTabMap (top) + CompetitiveMarketCharts scatter chart (bottom)
+ *     - Left panel: expandable property cards with unit-type detail tables
+ *     - Right panel: CompetitiveMarketCharts scatter chart
  *   - Landscaper Analysis section below the card
  *
  * Session: QV17 — Income Approach Redesign
  * @created 2026-03-15
- * @updated 2026-03-15 — Matched to Market Comps tab layout
+ * @updated 2026-03-16 — Restored LocationIntelligenceCard, tightened padding
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronDown, ChevronRight, MapPin, Calendar, Building2 } from 'lucide-react';
 import { CompetitiveMarketCharts, type PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
-import type { ComparableColorMap } from '@/components/map/ProjectTabMap';
 
 // Dynamic import to avoid SSR issues with MapLibre GL
-const ProjectTabMap = dynamic(() => import('@/components/map/ProjectTabMap'), { ssr: false });
+const LocationIntelligenceCard = dynamic(
+  () => import('@/app/projects/[projectId]/components/tabs/LocationIntelligenceCard'),
+  { ssr: false }
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -71,27 +74,33 @@ interface PropertyGroup {
 interface RentCompsViewProps {
   projectId: number;
   projectName?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formatCurrency(val: number | undefined | null): string {
-  if (val == null || !Number.isFinite(val)) return '—';
-  return `$${Math.round(val).toLocaleString()}`;
+function formatCurrency(val: number | string | undefined | null): string {
+  if (val == null) return '—';
+  const num = typeof val === 'string' ? Number(val) : val;
+  if (!Number.isFinite(num) || num === 0) return '—';
+  return `$${Math.round(num).toLocaleString()}`;
 }
 
-function formatNumber(val: number | undefined | null): string {
-  if (val == null || !Number.isFinite(Number(val))) return '—';
-  return String(val);
+function formatNumber(val: number | string | undefined | null): string {
+  if (val == null) return '—';
+  const num = typeof val === 'string' ? Number(val) : val;
+  if (!Number.isFinite(num)) return '—';
+  return num.toLocaleString();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
+export function RentCompsView({ projectId, projectName, latitude, longitude }: RentCompsViewProps) {
   const [comparables, setComparables] = useState<RentalComparable[]>([]);
   const [floorPlans, setFloorPlans] = useState<FloorPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,17 +219,6 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
     setExpandedProperties(new Set());
   }, []);
 
-  // Map color conversion
-  const mapColorMap = useMemo<ComparableColorMap>(() => {
-    const result: ComparableColorMap = {};
-    Object.entries(propertyColors).forEach(([name, color]) => {
-      result[name] = color;
-    });
-    return result;
-  }, [propertyColors]);
-
-  const hasGeoData = comparables.some((c) => c.latitude != null && c.longitude != null);
-
   // ── Loading / Error ────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -251,7 +249,17 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
+    <div style={{ display: 'grid', gap: '0.75rem' }}>
+      {/* ── Location Intelligence Map (collapsible, matches Market Comps) ── */}
+      <LocationIntelligenceCard
+        projectId={projectId}
+        projectName={projectName || 'Subject Property'}
+        latitude={latitude}
+        longitude={longitude}
+        rentalComparables={comparables}
+        comparableColors={propertyColors}
+      />
+
       {/* ── Main CCard: Comparable Rentals ──────────────────────────────── */}
       <div
         style={{
@@ -265,19 +273,19 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
         <div
           className="d-flex align-items-center justify-content-between"
           style={{
-            padding: '0.5rem 1rem',
+            padding: '0.375rem 0.75rem',
             backgroundColor: 'var(--surface-card-header)',
             borderBottom: '1px solid var(--cui-border-color)',
           }}
         >
-          <div className="d-flex align-items-center" style={{ gap: '0.75rem' }}>
-            <h3 style={{ color: 'var(--cui-body-color)', fontSize: '1rem', margin: 0, fontWeight: 600 }}>
+          <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+            <h3 style={{ color: 'var(--cui-body-color)', fontSize: '0.9375rem', margin: 0, fontWeight: 600 }}>
               Comparable Rentals
             </h3>
             <span
               style={{
-                fontSize: '0.75rem',
-                padding: '0.125rem 0.5rem',
+                fontSize: '0.6875rem',
+                padding: '0.0625rem 0.375rem',
                 borderRadius: '999px',
                 backgroundColor: 'var(--cui-info-bg)',
                 color: 'var(--cui-info)',
@@ -287,13 +295,13 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
               {comparablesByProperty.length} properties &bull; {comparables.length} unit types
             </span>
           </div>
-          <div className="d-flex align-items-center" style={{ gap: '0.5rem' }}>
+          <div className="d-flex align-items-center" style={{ gap: '0.375rem' }}>
             <button
               onClick={expandAll}
               style={{
-                fontSize: '0.75rem',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
+                fontSize: '0.6875rem',
+                padding: '0.1875rem 0.375rem',
+                borderRadius: '0.25rem',
                 color: 'var(--cui-secondary-color)',
                 backgroundColor: 'transparent',
                 border: '1px solid var(--cui-border-color)',
@@ -306,9 +314,9 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
             <button
               onClick={collapseAll}
               style={{
-                fontSize: '0.75rem',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
+                fontSize: '0.6875rem',
+                padding: '0.1875rem 0.375rem',
+                borderRadius: '0.25rem',
                 color: 'var(--cui-secondary-color)',
                 backgroundColor: 'transparent',
                 border: '1px solid var(--cui-border-color)',
@@ -321,32 +329,8 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
           </div>
         </div>
 
-        {/* Card Body */}
-        <div style={{ backgroundColor: 'var(--cui-card-bg)', padding: '1rem', display: 'grid', gap: '1rem' }}>
-          {/* ── Full-width Map (top) ──────────────────────────────────────── */}
-          {hasGeoData && (
-            <div
-              style={{
-                width: '100%',
-                height: '340px',
-                borderRadius: '0.5rem',
-                overflow: 'hidden',
-                border: '1px solid var(--cui-border-color)',
-              }}
-            >
-              <ProjectTabMap
-                projectId={String(projectId)}
-                styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'hybrid'}
-                tabId="valuation-rent-comps"
-                rentalComparables={comparables}
-                comparableColors={mapColorMap}
-                onMarkerClick={handlePropertyClick}
-              />
-            </div>
-          )}
-
-          {/* ── Left (property cards) + Right (scatter chart) ─────────────── */}
-          <div className="d-flex" style={{ gap: '1rem', alignItems: 'stretch' }}>
+        {/* Card Body — tighter padding */}
+        <div className="d-flex" style={{ backgroundColor: 'var(--cui-card-bg)', gap: '0.75rem', padding: '0.625rem', alignItems: 'stretch' }}>
           {/* ── Left: Collapsible Property Groups ───────────────────────── */}
           <div
             style={{
@@ -581,7 +565,7 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
             <div
               style={{
                 flex: '1 1 100%',
-                minHeight: '500px',
+                minHeight: '450px',
                 backgroundColor: 'var(--cui-tertiary-bg)',
                 border: '1px solid var(--cui-border-color)',
                 borderRadius: '0.5rem',
@@ -610,7 +594,6 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
               )}
             </div>
           </div>
-          </div>
         </div>
       </div>
 
@@ -620,10 +603,10 @@ export function RentCompsView({ projectId, projectName }: RentCompsViewProps) {
           backgroundColor: 'var(--cui-card-bg)',
           border: '1px solid var(--cui-border-color)',
           borderRadius: '0.5rem',
-          padding: '1rem',
+          padding: '0.625rem 0.75rem',
         }}
       >
-        <div className="d-flex align-items-start" style={{ gap: '0.75rem' }}>
+        <div className="d-flex align-items-start" style={{ gap: '0.5rem' }}>
           <div style={{ flexShrink: 0 }}>
             <svg
               style={{ color: 'var(--cui-primary)', width: '1.25rem', height: '1.25rem' }}

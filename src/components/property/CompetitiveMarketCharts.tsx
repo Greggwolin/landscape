@@ -440,7 +440,8 @@ function LineChart({ lines, xLabel, yLabel, isBedroomMode, onPropertyClick, sele
         ))}
 
         {/* Legend - top right */}
-        <g transform={`translate(${padding.left + 10}, ${padding.top + 10})`}>
+        <g transform={`translate(${padding.left + chartWidth - 95}, ${padding.top + 10})`}>
+          <rect x={-16} y={-10} width={110} height={42} rx={4} fill={colors.background} opacity={0.85} stroke={colors.axis} strokeWidth={0.5} />
           <line x1={-10} y1={0} x2={5} y2={0} stroke={colors.axis} strokeWidth="2" opacity={0.7} />
           <circle cx={0} cy={0} r={4} fill={colors.axis} opacity={0.9} />
           <text x={12} y={4} fill={colors.legendText} fontSize="11">Comparables</text>

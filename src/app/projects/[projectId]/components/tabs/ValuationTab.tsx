@@ -205,7 +205,12 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
         isNNN ? (
           <NNNIncomeApproach projectId={projectId} project={project} />
         ) : (
-          <IncomeApproachContent projectId={projectId} projectName={project.project_name} />
+          <IncomeApproachContent
+            projectId={projectId}
+            projectName={project.project_name}
+            latitude={project.location_lat ?? project.latitude}
+            longitude={project.location_lon ?? project.longitude}
+          />
         )
       )}
 

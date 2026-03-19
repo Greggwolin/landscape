@@ -938,7 +938,9 @@ export default function LoanCard({
                   )}
                 </div>
               </div>
+            </div>
 
+            <div className="loan-assumptions-column">
               <div className="loan-assumption-section">
                 <div className="loan-assumption-header">Term &amp; Amortization</div>
                 <div className="loan-assumption-body">
@@ -1189,7 +1191,7 @@ export default function LoanCard({
 
         .loan-assumptions-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 8px;
           padding: 8px;
           border-top: 1px solid var(--cui-border-color);
@@ -1399,6 +1401,12 @@ export default function LoanCard({
 
         .loan-inline-link:hover {
           text-decoration: underline;
+        }
+
+        @media (max-width: 1200px) {
+          .loan-assumptions-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
         }
 
         @media (max-width: 768px) {

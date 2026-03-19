@@ -536,6 +536,14 @@
   margin-bottom: 0;
 }
 
+/* Income Approach: zero out parent padding and pull up to eliminate
+   the white/grey line between CCardHeader and pill bar */
+.project-folder-content:has(> .income-approach-content) {
+  padding: 0;
+  margin-top: -1px;
+  background-color: var(--surface-subheader);
+}
+
 /* Sales tab - use white background throughout */
 .project-folder-content[data-subtab="sales"] {
   background-color: transparent !important;

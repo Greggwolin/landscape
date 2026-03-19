@@ -33,19 +33,21 @@ type IncomePill = 'rent-comps' | 'expense-comps' | 'pro-forma';
 interface IncomeApproachContentProps {
   projectId: number;
   projectName?: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 }
 
-const PILLS: { id: IncomePill; label: string }[] = [
-  { id: 'rent-comps', label: 'Rent Comps' },
-  { id: 'expense-comps', label: 'Expense Comps' },
-  { id: 'pro-forma', label: 'Pro Forma / Cash Flow' },
+const PILLS: { id: IncomePill; label: string; badgeClass: string }[] = [
+  { id: 'rent-comps', label: 'Rent Comps', badgeClass: 'studio-badge-success' },
+  { id: 'expense-comps', label: 'Expense Comps', badgeClass: 'studio-badge-error' },
+  { id: 'pro-forma', label: 'Pro Forma / Cash Flow', badgeClass: 'studio-badge-info' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function IncomeApproachContent({ projectId, projectName }: IncomeApproachContentProps) {
+export function IncomeApproachContent({ projectId, projectName, latitude, longitude }: IncomeApproachContentProps) {
   const [activePill, setActivePill] = useState<IncomePill>('rent-comps');
 
   const {
@@ -133,7 +135,7 @@ export function IncomeApproachContent({ projectId, projectName }: IncomeApproach
 
   // ── Main render ────────────────────────────────────────────────────────
   return (
-    <div className="income-approach-content">
+    <div className="income-approach-content" style={{ backgroundColor: 'var(--surface-subheader)' }}>
       {/* Saving indicator */}
       {isSaving && (
         <div
@@ -165,16 +167,26 @@ export function IncomeApproachContent({ projectId, projectName }: IncomeApproach
         </div>
       )}
 
-      {/* ── Sub-tab Navigation (matches folder-tabs-row2 pattern) ─────── */}
-      <div className="folder-tabs-row2" style={{ marginBottom: '1rem' }}>
+      {/* ── Pill Navigation ─────────────────────────────────────────────── */}
+      <div
+        style={{
+          padding: '0.4rem 1rem',
+          backgroundColor: 'var(--surface-subheader)',
+          borderBottom: '1px solid var(--cui-border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.375rem',
+        }}
+      >
         {PILLS.map((pill) => {
           const isActive = activePill === pill.id;
           return (
             <button
               key={pill.id}
               type="button"
-              className={`sub-tab${isActive ? ' active' : ''}`}
+              className={isActive ? pill.badgeClass : undefined}
               onClick={() => setActivePill(pill.id)}
+              style={isActive ? activeBtnOverride : inactiveBtnStyle}
             >
               {pill.label}
             </button>
@@ -183,7 +195,7 @@ export function IncomeApproachContent({ projectId, projectName }: IncomeApproach
       </div>
 
       {/* ── Two-Panel Layout: Sidebar + Main ────────────────────────────── */}
-      <div className="d-flex" style={{ gap: '1.5rem', minHeight: '600px' }}>
+      <div className="d-flex" style={{ gap: '1.5rem', minHeight: '600px', padding: '0.75rem', backgroundColor: 'var(--cui-body-bg)' }}>
         {/* Left Panel — Contextual Sidebar */}
         <div
           style={{
@@ -234,6 +246,8 @@ export function IncomeApproachContent({ projectId, projectName }: IncomeApproach
             <RentCompsView
               projectId={projectId}
               projectName={projectName}
+              latitude={latitude}
+              longitude={longitude}
             />
           )}
           {activePill === 'expense-comps' && (
@@ -578,6 +592,29 @@ function ExpenseCompsSidebar({
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared sidebar styles
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Active: larger button, override studio-badge pill radius to rectangular
+const activeBtnOverride: React.CSSProperties = {
+  borderRadius: '0.25rem',
+  padding: '0.35rem 0.75rem',
+  fontSize: '0.8125rem',
+};
+
+// Inactive: smaller, subtle
+const inactiveBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0.2rem 0.5rem',
+  fontSize: '0.6875rem',
+  fontWeight: 500,
+  borderRadius: '0.25rem',
+  cursor: 'pointer',
+  border: '1px solid var(--cui-border-color)',
+  backgroundColor: 'transparent',
+  color: 'var(--cui-secondary-color)',
+  transition: 'all 0.15s ease',
+};
 
 const comingSoonBadge: React.CSSProperties = {
   fontSize: '0.5625rem',

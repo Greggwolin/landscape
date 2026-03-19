@@ -205,6 +205,22 @@ All table and grid components must follow:
    - **CoreUI / HTML:** `table-layout: auto`, `white-space: normal` on `<th>`, `white-space: nowrap` on `<td>`.
 4. **Exception:** Pinned utility columns may use fixed `width` + `maxWidth`.
 
+### Interior Padding Standard (CCard Sections)
+
+All assumption/form panels inside CCards must follow the Loan Card padding standard:
+
+| Element | Padding/Gap | Reference |
+|---------|------------|-----------|
+| Card body | `padding: 0` (content fills card) | `.loan-card .card-body` |
+| Card header | `padding: 8px 12px` | `.loan-card .card-header` |
+| Section grid (outer) | `padding: 8px; gap: 8px` | `.loan-assumptions-grid` |
+| Column internal gap | `gap: 8px` | `.loan-assumptions-column` |
+| Section header | `padding: 6px 12px` | `.loan-assumption-header` |
+| Form row | `padding: 2px 8px` | `.loan-assumption-row` |
+| Input fields | `padding: 3px 6px; height: 28px` | `.loan-assumption-row input` |
+
+**Key principles:** Compact density. Labels and values use `justify-content: space-between` within tight columns. No excess margin. Section borders use `var(--cui-border-color)`.
+
 ### Styling
 
 - **CoreUI CSS variables** — always use `var(--cui-*)` tokens; never hardcode hex colors

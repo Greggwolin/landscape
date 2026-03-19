@@ -73,24 +73,40 @@ const getComparableColor = (propertyName: string): string => {
   return COMPARABLE_COLOR_VARS[hash % COMPARABLE_COLOR_VARS.length];
 };
 
-const getComparablePopupHtml = (comp: RentalComparable, color: string): string => {
-  const rentValue = Number(comp.asking_rent || 0);
-  const sqftValue = Number(comp.avg_sqft || 0);
-  const bedroomsValue = Number(comp.bedrooms || 0);
-  const bathroomsValue = Number(comp.bathrooms || 0);
-  const addressLines = splitAddressLines(comp.address);
-  const addressHtml = addressLines
-    ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line1)}</div>${
-      addressLines.line2 ? `<div class="comparable-popup-address">${escapeHtml(addressLines.line2)}</div>` : ''
-    }`
-    : '';
+const getGroupedPopupHtml = (comps: RentalComparable[], color: string): string => {
+  const first = comps[0];
+  const addrStr = first.address ? escapeHtml(first.address.replace(/\s*\n\s*/g, ', ')) : '';
 
-  return `<div class="comparable-popup-content">
-    <div class="comparable-popup-name" style="color: ${color};">${escapeHtml(comp.property_name)}</div>
-    ${addressHtml}
-    <div class="comparable-popup-details">${bedroomsValue}BR/${bathroomsValue}BA · ${sqftValue > 0 ? sqftValue.toLocaleString() : '—'} SF</div>
-    <div class="comparable-popup-rent">$${Math.round(rentValue).toLocaleString()}/mo</div>
-    ${comp.distance_miles ? `<div class="comparable-popup-distance">${comp.distance_miles} mi away</div>` : ''}
+  // Filter to rows with meaningful data
+  const validRows = comps.filter((c) => {
+    const rent = Number(c.asking_rent);
+    const sqft = Number(c.avg_sqft);
+    const beds = Number(c.bedrooms);
+    return (Number.isFinite(rent) && rent > 0) || (Number.isFinite(sqft) && sqft > 0) || (Number.isFinite(beds) && beds > 0);
+  });
+
+  // Build floorplan rows
+  const floorplanRows = validRows
+    .sort((a, b) => Number(a.bedrooms) - Number(b.bedrooms))
+    .map((c) => {
+      const rent = Number(c.asking_rent);
+      const sqft = Number(c.avg_sqft);
+      const beds = Number(c.bedrooms);
+      const baths = Number(c.bathrooms);
+      const rentStr = Number.isFinite(rent) && rent > 0 ? `<b>$${Math.round(rent).toLocaleString()}</b>` : '—';
+      const sqftStr = Number.isFinite(sqft) && sqft > 0 ? `${sqft.toLocaleString()} SF` : '';
+      const label = `${beds}BR/${baths}BA`;
+      return `<tr><td style="padding:0 4px;font-size:11px;">${escapeHtml(label)}</td><td style="padding:0 4px;text-align:right;font-size:11px;color:#94a3b8;">${sqftStr}</td><td style="padding:0 4px;text-align:right;font-size:11px;">${rentStr}</td></tr>`;
+    })
+    .join('');
+
+  const distStr = first.distance_miles ? `<span style="font-size:10px;color:#94a3b8;">${first.distance_miles} mi away</span>` : '';
+
+  return `<div style="padding:6px 8px;min-width:160px;line-height:1.3;">
+    <div style="font-weight:600;font-size:12px;color:${color};margin-bottom:1px;">${escapeHtml(first.property_name)}</div>
+    ${addrStr ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:3px;">${addrStr}</div>` : ''}
+    <table style="width:100%;border-collapse:collapse;">${floorplanRows}</table>
+    ${distStr}
   </div>`;
 };
 
@@ -136,23 +152,38 @@ export default function LocationIntelligenceCard({
   });
 
   const rentalComparablePoints = useMemo<UserMapPoint[]>(() => {
-    return rentalComparables
-      .map((comp, index) => {
-        const lat = parseCoordinate(comp.latitude);
-        const lon = parseCoordinate(comp.longitude);
-        if (lat === null || lon === null) {
-          return null;
-        }
+    // Group comparables by property_name so each property gets one marker
+    const grouped = new Map<string, RentalComparable[]>();
+    rentalComparables.forEach((comp) => {
+      const key = comp.property_name;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(comp);
+    });
 
-        const color = comparableColors[comp.property_name] || getComparableColor(comp.property_name || `comp-${index + 1}`);
+    let markerIndex = 0;
+    return Array.from(grouped.entries())
+      .map(([propertyName, comps]) => {
+        // Use first comp with valid coords as the marker location
+        const withCoords = comps.find((c) => {
+          const lat = parseCoordinate(c.latitude);
+          const lon = parseCoordinate(c.longitude);
+          return lat !== null && lon !== null;
+        });
+        if (!withCoords) return null;
+
+        const lat = parseCoordinate(withCoords.latitude)!;
+        const lon = parseCoordinate(withCoords.longitude)!;
+        markerIndex += 1;
+
+        const color = comparableColors[propertyName] || getComparableColor(propertyName);
         return {
-          id: `comp-${comp.comparable_id}-${index}`,
-          label: comp.property_name || `Comparable ${index + 1}`,
+          id: `comp-property-${propertyName}`,
+          label: propertyName,
           category: 'competitor',
           coordinates: [lon, lat],
           markerColor: color,
-          markerLabel: String(index + 1),
-          popupHtml: getComparablePopupHtml(comp, color),
+          markerLabel: String(markerIndex),
+          popupHtml: getGroupedPopupHtml(comps, color),
         };
       })
       .filter((point): point is UserMapPoint => point !== null);
