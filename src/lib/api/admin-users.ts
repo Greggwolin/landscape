@@ -54,15 +54,52 @@ export interface SetPasswordData {
   password_confirm: string;
 }
 
+async function tryRefreshToken(): Promise<string | null> {
+  const storedTokens = localStorage.getItem('auth_tokens');
+  if (!storedTokens) return null;
+
+  const { refresh } = JSON.parse(storedTokens);
+  if (!refresh) return null;
+
+  try {
+    const response = await fetch(`${DJANGO_API_BASE}/api/token/refresh/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const newTokens = { access: data.access, refresh };
+      localStorage.setItem('auth_tokens', JSON.stringify(newTokens));
+      return data.access;
+    }
+  } catch {
+    // Refresh failed
+  }
+  return null;
+}
+
 async function authFetch(url: string, token: string, options: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+  const makeRequest = (accessToken: string) =>
+    fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+
+  let response = await makeRequest(token);
+
+  // On 401, try refreshing the token and retry once
+  if (response.status === 401) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { CCard, CAlert, CButton, CSpinner } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
 import { cilCheckCircle, cilWarning, cilX } from '@coreui/icons';
@@ -14,6 +15,7 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
+import { useFileDrop } from '@/contexts/FileDropContext';
 
 interface LandscaperPanelProps {
   projectId: number;
@@ -89,6 +91,39 @@ export function LandscaperPanel({
   const { rentRollJob, cancelJob: cancelExtractionJob } = useExtractionJobStatus(projectId);
   const { pendingCount: rentRollPendingCount, documentId: pendingDocumentId, refresh: refreshPendingExtractions } = usePendingRentRollExtractions(projectId);
   const [extractionBannerDismissed, setExtractionBannerDismissed] = useState(false);
+
+  // File drop — forward to FileDropContext → triggers UnifiedIntakeModal
+  const { addFiles } = useFileDrop();
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      addFiles(acceptedFiles);
+    }
+  }, [addFiles]);
+
+  const {
+    getRootProps,
+    getInputProps,
+    isDragActive,
+    isDragAccept,
+    isDragReject,
+  } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'text/csv': ['.csv'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 50 * 1024 * 1024,
+    multiple: true,
+    noClick: true,
+    noKeyboard: true,
+  });
 
   const RESIZER_SIZE = 6;
   const MIN_CHAT_HEIGHT = 180;
@@ -249,12 +284,51 @@ export function LandscaperPanel({
 
   return (
     <div
+      {...getRootProps()}
       className="flex flex-col h-full gap-1 relative"
       style={{
         borderRadius: 'var(--cui-card-border-radius)',
+        border: isDragActive ? '2px dashed var(--cui-primary)' : '2px dashed transparent',
+        backgroundColor: isDragActive ? 'var(--cui-tertiary-bg)' : 'transparent',
         transition: 'border-color 0.15s ease, background-color 0.15s ease'
       }}
     >
+      {/* Hidden file input for react-dropzone */}
+      <input {...getInputProps()} />
+
+      {/* Drag overlay */}
+      {isDragActive && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            zIndex: 50,
+            borderRadius: 'var(--cui-card-border-radius)',
+            backgroundColor: isDragAccept
+              ? 'rgba(34, 197, 94, 0.1)'
+              : isDragReject
+              ? 'rgba(239, 68, 68, 0.1)'
+              : 'rgba(0, 0, 0, 0.05)',
+            color: 'var(--cui-body-color)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div className="fw-semibold" style={{ fontSize: '1.1rem' }}>
+            {isDragReject ? 'File type not supported' : 'Drop documents for Landscaper'}
+          </div>
+          <div className="mt-1" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9rem' }}>
+            {isDragReject
+              ? 'Use PDF, Word, Excel, CSV, or image files'
+              : 'Drop rent roll, T-12, or OM documents'}
+          </div>
+        </div>
+      )}
+
       <div
         ref={splitContainerRef}
         className="flex flex-col flex-1 min-h-0"

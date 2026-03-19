@@ -29,6 +29,7 @@ interface Project {
   location_lon?: number | string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
+  state?: string;
 }
 
 interface PropertyTabProps {
@@ -2136,6 +2137,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         projectName={project.project_name}
         latitude={project.location_lat ?? project.latitude}
         longitude={project.location_lon ?? project.longitude}
+        projectState={project.state}
         rentalComparables={comparables}
         comparableColors={propertyColors}
       />

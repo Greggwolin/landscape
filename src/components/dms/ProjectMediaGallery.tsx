@@ -140,8 +140,8 @@ const ALL_CLASSIFICATIONS: Classification[] = [
  { classification_id: 14, code: 'other', name: 'Other', badge_color: 'secondary' },
 ];
 
-const TILE_MAX_WIDTH = 420;
-const TILE_HEIGHT = 270;
+const TILE_MAX_WIDTH = 320;
+const TILE_HEIGHT = 200;
 const TERMINAL_MEDIA_STATUSES = new Set(['classified', 'complete']);
 const ACTIVE_MEDIA_STATUSES = new Set([
  'scanning',
@@ -182,6 +182,28 @@ export default function ProjectMediaGallery({
  const [scanning, setScanning] = useState(false);
  const [scanProgress, setScanProgress] = useState('');
  const [savingMediaId, setSavingMediaId] = useState<number | null>(null);
+
+ // Favorites state (persisted in localStorage per project)
+ const [favorites, setFavorites] = useState<Set<number>>(() => {
+ try {
+ const stored = localStorage.getItem(`media-favorites-${projectId}`);
+ return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
+ } catch { return new Set(); }
+ });
+
+ const toggleFavorite = useCallback((mediaId: number) => {
+ setFavorites((prev) => {
+ const next = new Set(prev);
+ if (next.has(mediaId)) next.delete(mediaId); else next.add(mediaId);
+ try { localStorage.setItem(`media-favorites-${projectId}`, JSON.stringify([...next])); } catch {}
+ return next;
+ });
+ }, [projectId]);
+
+ // Rescan confirmation modal state
+ const [rescanModalOpen, setRescanModalOpen] = useState(false);
+ const [rescanSkipDeleted, setRescanSkipDeleted] = useState(true);
+ const [rescanForce, setRescanForce] = useState(false);
 
  // Tag-edit modal state
  const [editModalItem, setEditModalItem] = useState<MediaItem | null>(null);
@@ -354,12 +376,20 @@ export default function ProjectMediaGallery({
  // ── Filtering ──────────────────────────────────────────────────────────
 
  const filteredItems = useMemo(() => {
- if (filter === 'all') return mediaItems;
+ let items = mediaItems;
+ if (filter !== 'all') {
  const codes = FILTER_MAP[filter];
- return mediaItems.filter(
+ items = items.filter(
  (item) => item.classification && codes.includes(item.classification.code)
  );
- }, [mediaItems, filter]);
+ }
+ // Sort favorites to top, preserve original order within each group
+ return [...items].sort((a, b) => {
+ const aFav = favorites.has(a.media_id) ? 0 : 1;
+ const bFav = favorites.has(b.media_id) ? 0 : 1;
+ return aFav - bFav;
+ });
+ }, [mediaItems, filter, favorites]);
 
  // Count items per filter category
  const filterCounts = useMemo(() => {
@@ -550,16 +580,16 @@ export default function ProjectMediaGallery({
  // ── Rescan All action ────────────────────────────────────────────────
  // Resets all documents and re-runs full pipeline
 
- const handleRescanAll = useCallback(async (force = false) => {
+ const openRescanModal = useCallback((force = false) => {
  if (allPDFs.length === 0) return;
-
  if (hasActiveProcessing && !force) return;
- if (hasActiveProcessing && force) {
- const confirmed = window.confirm(
- 'Extraction is still running. Rescanning will restart from scratch. Continue?'
- );
- if (!confirmed) return;
- }
+ setRescanForce(force);
+ setRescanSkipDeleted(true);
+ setRescanModalOpen(true);
+ }, [allPDFs.length, hasActiveProcessing]);
+
+ const handleRescanAll = useCallback(async (skipDeleted: boolean) => {
+ setRescanModalOpen(false);
 
  setScanning(true);
  setScanProgress('Resetting media...');
@@ -573,6 +603,7 @@ export default function ProjectMediaGallery({
  {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ skip_deleted: skipDeleted }),
  }
  );
  } catch (err) {
@@ -596,7 +627,6 @@ export default function ProjectMediaGallery({
  }
  }, [
  allPDFs,
- hasActiveProcessing,
  scannedDocIds,
  djangoBaseUrl,
  runPipelineForDocs,
@@ -820,7 +850,7 @@ export default function ProjectMediaGallery({
  Scan New PDFs ({unscannedPDFs.length})
  </CDropdownItem>
  )}
- <CDropdownItem onClick={() => void handleRescanAll(false)}>
+ <CDropdownItem onClick={() => openRescanModal(false)}>
  Rescan All PDFs ({allPDFs.length})
  </CDropdownItem>
  </CDropdownMenu>
@@ -839,7 +869,7 @@ export default function ProjectMediaGallery({
  type="button"
  className="btn btn-outline-danger btn-sm"
  style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
- onClick={() => void handleRescanAll(true)}
+ onClick={() => openRescanModal(true)}
  >
  Force Rescan
  </button>
@@ -1164,8 +1194,28 @@ export default function ProjectMediaGallery({
  )}
  </div>
 
- {/* Edit / Delete buttons */}
+ {/* Favorite / Edit / Delete buttons */}
  <div className="d-flex gap-1" style={{ flexShrink: 0, marginTop: '0.15rem' }}>
+ <button
+ type="button"
+ title={favorites.has(item.media_id) ? 'Remove from favorites' : 'Add to favorites'}
+ onClick={(e) => {
+ e.stopPropagation();
+ toggleFavorite(item.media_id);
+ }}
+ style={{
+ background: 'transparent',
+ border: '1px solid var(--cui-border-color)',
+ borderRadius: '4px',
+ padding: '0.2rem 0.35rem',
+ cursor: 'pointer',
+ fontSize: '0.72rem',
+ lineHeight: 1,
+ color: favorites.has(item.media_id) ? '#e25555' : 'var(--cui-secondary-color)',
+ }}
+ >
+ {favorites.has(item.media_id) ? '\u2764' : '\u2661'}
+ </button>
  <button
  type="button"
  title="Edit tags"
@@ -1216,6 +1266,50 @@ export default function ProjectMediaGallery({
  </div>
  </>
  )}
+
+ {/* ── Rescan confirmation modal ── */}
+ <CModal
+ visible={rescanModalOpen}
+ onClose={() => setRescanModalOpen(false)}
+ alignment="center"
+ size="sm"
+ >
+ <CModalHeader closeButton>
+ <CModalTitle style={{ fontSize: '1rem' }}>Rescan All PDFs</CModalTitle>
+ </CModalHeader>
+ <CModalBody>
+ <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+ This will reset and re-extract all media from {allPDFs.length} PDF{allPDFs.length !== 1 ? 's' : ''}.
+ </p>
+ <label
+ className="d-flex align-items-center gap-2"
+ style={{ fontSize: '0.85rem', cursor: 'pointer' }}
+ >
+ <input
+ type="checkbox"
+ checked={rescanSkipDeleted}
+ onChange={(e) => setRescanSkipDeleted(e.target.checked)}
+ />
+ Skip previously deleted images
+ </label>
+ </CModalBody>
+ <CModalFooter className="d-flex justify-content-end gap-2" style={{ padding: '0.5rem 1rem' }}>
+ <button
+ type="button"
+ className="btn btn-ghost-secondary btn-sm"
+ onClick={() => setRescanModalOpen(false)}
+ >
+ Cancel
+ </button>
+ <button
+ type="button"
+ className="btn btn-primary btn-sm"
+ onClick={() => void handleRescanAll(rescanSkipDeleted)}
+ >
+ Rescan
+ </button>
+ </CModalFooter>
+ </CModal>
 
  {/* ── Tag-edit modal ── */}
  <CModal

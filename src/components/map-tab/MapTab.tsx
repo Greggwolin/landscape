@@ -200,6 +200,16 @@ export function MapTab({ project }: MapTabProps) {
     return false;
   }, [project.analysis_perspective, project.analysis_type, project.property_subtype]);
 
+  // Phoenix MSA check — county parcel overlays only available for Maricopa/Pinal
+  const isPhoenixMSA = useMemo(() => {
+    const state = typeof project.state === 'string' ? project.state.toUpperCase().trim() : '';
+    const county = (projectCounty ?? '').toLowerCase();
+    // Show county parcels panel only for AZ projects, or if county is already Maricopa/Pinal
+    if (state === 'AZ' || state === 'ARIZONA') return true;
+    if (county.includes('maricopa') || county.includes('pinal')) return true;
+    return false;
+  }, [project.state, projectCounty]);
+
   // ───── Coordinates ─────
   const { lat: projectLat, lon: projectLon } = useMemo(() => {
     const primary = normalizeLatLon(
@@ -1533,6 +1543,7 @@ export function MapTab({ project }: MapTabProps) {
           onToggleGroup={handleToggleGroup}
           onZoomToLayer={handleZoomToLayer}
         />
+        {isPhoenixMSA && (
         <div className="map-tab-parcel-panel">
           <div className="map-tab-panel-header">
             <div>
@@ -1644,6 +1655,7 @@ export function MapTab({ project }: MapTabProps) {
             )}
           </div>
         </div>
+        )}
         <div className="map-tab-tools">
           <div className="map-tab-tools-header">Draw / Measure</div>
           <DrawToolbar

@@ -16,7 +16,7 @@ interface DocumentsTabProps {
 
 export default function DocumentsTab({ project }: DocumentsTabProps) {
   return (
-    <div className="h-full">
+    <div>
       <DMSView
         projectId={project.project_id}
         projectName={project.project_name}

@@ -64,7 +64,10 @@ export function DropZoneWrapper({
       className={`drop-zone-wrapper ${className}`}
       style={{
         position: 'relative',
-        height: '100%',
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column' as const,
         width: '100%',
         borderRadius: 'var(--cui-card-border-radius)',
         border: isDragActive ? '2px dashed var(--cui-primary)' : '2px dashed transparent',

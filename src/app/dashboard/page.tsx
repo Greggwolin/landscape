@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDropzone } from 'react-dropzone';
 import { CContainer, CCard, CCardHeader, CCardBody } from '@coreui/react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
@@ -515,12 +516,74 @@ export default function DashboardPage() {
 
   const toggleLandscaperCollapsed = () => setLandscaperCollapsed((prev) => !prev);
 
+  // Dashboard-wide drop zone — dropping files opens the TriageModal
+  const onDashboardDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      setPendingFiles(acceptedFiles);
+      setIsTriageModalOpen(true);
+    }
+  }, []);
+
+  const {
+    getRootProps: getDashboardDropProps,
+    isDragActive: isDashboardDragActive,
+  } = useDropzone({
+    onDrop: onDashboardDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'text/csv': ['.csv'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 50 * 1024 * 1024,
+    multiple: true,
+    noClick: true,
+    noKeyboard: true,
+  });
+
   return (
     <CContainer
       fluid
       className="d-flex flex-column"
-      style={{ padding: 'var(--app-padding)', gap: 'var(--component-gap)' }}
+      style={{ padding: 'var(--app-padding)', gap: 'var(--component-gap)', position: 'relative' }}
+      {...getDashboardDropProps()}
     >
+      {/* Full-page drag overlay */}
+      {isDashboardDragActive && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              padding: '2rem 3rem',
+              borderRadius: '12px',
+              backgroundColor: 'var(--cui-body-bg)',
+              border: '3px dashed var(--cui-primary)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Drop to start a new project
+            </div>
+            <div style={{ fontSize: '0.9rem', color: 'var(--cui-secondary-color)', marginTop: '0.5rem' }}>
+              or add to an existing project
+            </div>
+          </div>
+        </div>
+      )}
       {/* Three-column layout: Activity+Landscaper | Projects | Map with Filters */}
       <div className="d-flex flex-grow-1" style={{ alignItems: 'flex-start', minHeight: 0, gap: 'var(--component-gap)' }}>
         {/* Left Column: Activity Feed (top) + Landscaper Chat (bottom) */}
