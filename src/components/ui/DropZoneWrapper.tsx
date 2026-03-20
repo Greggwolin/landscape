@@ -41,16 +41,6 @@ export function DropZoneWrapper({
     isDragReject,
   } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'text/csv': ['.csv'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-    },
     maxSize: 50 * 1024 * 1024, // 50MB
     multiple: true,
     disabled,
@@ -100,12 +90,10 @@ export function DropZoneWrapper({
           }}
         >
           <div className="fw-semibold" style={{ fontSize: '1.1rem' }}>
-            {isDragReject ? 'File type not supported' : 'Drop files for Landscaper'}
+            Drop files for Landscaper
           </div>
           <div className="mt-1" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9rem' }}>
-            {isDragReject
-              ? 'Use PDF, Excel, CSV, or image files'
-              : 'Drop rent roll, T-12, or OM documents'}
+            Drop rent roll, T-12, or OM documents
           </div>
         </div>
       )}

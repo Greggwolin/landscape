@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
@@ -73,6 +73,8 @@ const SCOPE_TO_FOLDER: Record<string, string> = {
   // → "property" folder
   unit_type: 'property',
   assumption: 'property',
+  lot_or_product: 'property',
+  lot_inventory: 'property',
   // → "operations" (income) or "budget" (land dev) folder
   income: 'operations',
   opex: 'operations',
@@ -87,6 +89,9 @@ const SCOPE_TO_FOLDER: Record<string, string> = {
 // Land dev aliases — same scopes map to different folder IDs
 const SCOPE_TO_FOLDER_LAND: Record<string, string> = {
   ...SCOPE_TO_FOLDER,
+  // Land dev parcels → "property" folder (labeled "Planning")
+  lot_or_product: 'property',
+  lot_inventory: 'property',
   income: 'budget',
   opex: 'budget',
   acquisition: 'budget',
@@ -276,6 +281,10 @@ export function useExtractionStaging(
   const queryClient = useQueryClient();
   const queryKey = ['extraction-staging', projectId, docId ?? 'all'];
 
+  // Track how long we've been polling with zero results (extraction may have failed)
+  const emptyPollStartRef = useRef<number | null>(null);
+  const EXTRACTION_TIMEOUT_MS = 90_000; // Stop fast-polling after 90s with no results
+
   const { data, isLoading, error } = useQuery<ApiResponse>({
     queryKey,
     queryFn: async () => {
@@ -290,12 +299,27 @@ export function useExtractionStaging(
     staleTime: 5_000,
     // Poll aggressively (3s) when scoped to a doc and no rows have arrived yet
     // (extraction is in-flight). Slow to 15s once results exist (user is reviewing).
+    // Stop fast-polling after EXTRACTION_TIMEOUT_MS to avoid hammering the server
+    // when the extraction pipeline failed silently.
     refetchInterval: (query) => {
       if (!docId) return false; // No doc scope — no auto-polling
       const qData = query.state.data as ApiResponse | undefined;
-      return (qData?.extractions?.length ?? 0) === 0
-        ? 3_000   // Awaiting extraction — fast poll
-        : 15_000; // Results exist — slow poll for background updates
+      const hasRows = (qData?.extractions?.length ?? 0) > 0;
+
+      if (hasRows) {
+        emptyPollStartRef.current = null; // Reset timeout tracker
+        return 15_000; // Results exist — slow poll for background updates
+      }
+
+      // No rows yet — track how long we've been waiting
+      if (!emptyPollStartRef.current) {
+        emptyPollStartRef.current = Date.now();
+      }
+      const elapsed = Date.now() - emptyPollStartRef.current;
+      if (elapsed > EXTRACTION_TIMEOUT_MS) {
+        return false; // Give up — extraction likely failed
+      }
+      return 3_000; // Still waiting — fast poll
     },
   });
 
@@ -303,7 +327,10 @@ export function useExtractionStaging(
 
   // True when we're scoped to a doc and the extraction pipeline hasn't produced
   // any staging rows yet — indicates extraction is still in-flight.
-  const isExtracting = !!docId && !isLoading && allRows.length === 0;
+  // Goes false once polling times out (extraction likely failed).
+  const extractionTimedOut = !!emptyPollStartRef.current &&
+    (Date.now() - emptyPollStartRef.current) > EXTRACTION_TIMEOUT_MS;
+  const isExtracting = !!docId && !isLoading && allRows.length === 0 && !extractionTimedOut;
 
   const sections = useMemo(
     () => buildSections(allRows, folders, isLandDev),

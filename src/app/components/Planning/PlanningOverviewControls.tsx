@@ -72,9 +72,9 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
       if (response.ok) {
         const data = await response.json();
         const normalized: GranularitySettings = {
-          level1Enabled: true,
+          level1Enabled: data?.level1Enabled !== false,
           level1Label: data?.level1Label ?? 'Area',
-          level2Enabled: true,
+          level2Enabled: data?.level2Enabled !== false,
           level2Label: data?.level2Label ?? 'Phase',
           level3Enabled: true,
           level3Label: data?.level3Label ?? 'Parcel',

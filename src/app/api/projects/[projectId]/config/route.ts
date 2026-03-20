@@ -46,6 +46,7 @@ export async function GET(
                tier_1_label as level1_label,
                tier_2_label as level2_label,
                tier_3_label as level3_label,
+               level1_enabled, level2_enabled,
                land_use_level1_label, land_use_level1_label_plural,
                land_use_level2_label, land_use_level2_label_plural,
                land_use_level3_label, land_use_level3_label_plural,

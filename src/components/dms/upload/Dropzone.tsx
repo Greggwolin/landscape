@@ -44,18 +44,6 @@ export default function Dropzone({
     isDragAccept,
   } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-      'image/gif': ['.gif'],
-      'text/plain': ['.txt'],
-      'text/csv': ['.csv'],
-    },
     maxSize: 32 * 1024 * 1024,
     maxFiles: 10,
   });
@@ -102,11 +90,11 @@ export default function Dropzone({
             </div>
           ) : (
             <div>
-              <p className="text-lg font-medium text-red-600">
-                Some files are not supported
+              <p className="text-lg font-medium text-green-600">
+                Drop files here to stage
               </p>
               <p className="text-sm text-body-secondary">
-                Only PDF, Office docs, images, and text files are allowed
+                Release to add files to the staging tray
               </p>
             </div>
           )

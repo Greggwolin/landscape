@@ -222,6 +222,7 @@ export function createFolderConfig(
             id: 'location',
             label: 'Location',
             projectTypes: [
+              'land_development',
               'multifamily',
               'office',
               'retail',

@@ -100,7 +100,7 @@ export const UnifiedIntakeModal: React.FC<UnifiedIntakeModalProps> = ({
         docId: extractDocs[0].docId,
         docName: extractDocs[0].file.name,
         docType: extractDocs[0].docType,
-        intakeUuid: `intake-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        intakeUuid: crypto.randomUUID(),
       });
 
       // Fire extraction trigger

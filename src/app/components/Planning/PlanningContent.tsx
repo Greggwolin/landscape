@@ -110,7 +110,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   const {
     labels,
     areaDisplayByNumber,
-    planningEfficiency
+    planningEfficiency,
+    level1Enabled,
+    level2Enabled
   } = useProjectConfig(projectId ?? undefined)
 
   const { level1Label, level2Label, level3Label, level1LabelPlural, level2LabelPlural, level3LabelPlural } = labels
@@ -785,12 +787,16 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
       <PlanningOverviewControls projectId={projectId} projectIdStr={projectIdStr} />
 
       {/* Plan Areas and Phases Overview - Read-only rollups from Parcel Detail */}
+      {(level1Enabled || level2Enabled) && (
       <div className={`grid gap-4 transition-all duration-300 ${
-        isAnyPhaseEditing
-          ? 'grid-cols-1 lg:grid-cols-[20%_1fr]'
-          : 'grid-cols-1 lg:grid-cols-[40%_1fr]'
+        !level1Enabled || !level2Enabled
+          ? 'grid-cols-1'
+          : isAnyPhaseEditing
+            ? 'grid-cols-1 lg:grid-cols-[20%_1fr]'
+            : 'grid-cols-1 lg:grid-cols-[40%_1fr]'
       }`}>
         {/* Level 1 summary - Wrapped with CollapsibleSection */}
+        {level1Enabled && (
         <CollapsibleSection
           title={level1LabelPlural}
           itemCount={areaCards.length}
@@ -837,8 +843,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
             </div>
           </div>
         </CollapsibleSection>
+        )}
 
         {/* Level 2 summary - Wrapped with CollapsibleSection */}
+        {level2Enabled && (
         <CollapsibleSection
           title={level2LabelPlural}
           itemCount={filteredPhases.length}
@@ -874,7 +882,9 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
             </div>
           </div>
         </CollapsibleSection>
+        )}
       </div>
+      )}
 
       {/* Parcel Detail Section */}
       <CollapsibleSection
@@ -901,7 +911,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
-              Import PDF
+              Import Data
             </button>
             <button
               onClick={() => { setShowAddParcelRow(true); setAddParcelAreaId(''); setAddParcelPhaseId('') }}
@@ -920,8 +930,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           <table className="w-full text-sm">
             <thead>
               <tr style={{ backgroundColor: 'var(--surface-subheader)', borderBottom: '1px solid var(--cui-border-color)' }}>
-                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Area</th>
-                <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>
+                {level1Enabled && <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>{level1Label}</th>}
+                {level2Enabled && <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>{level2Label}</th>}
                 <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Parcel</th>
                 <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Use Family</th>
                 <th className="text-center px-2 py-2 font-medium text-sm" style={{ color: 'var(--cui-body-color)' }}>Use Type</th>
@@ -937,6 +947,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
               {/* Add Parcel inline row — shown at top while entering */}
               {showAddParcelRow && (
                 <tr style={{ backgroundColor: 'rgba(25, 135, 84, 0.08)', borderBottom: '1px solid var(--cui-border-color)' }}>
+                  {level1Enabled && (
                   <td className="px-2 py-2 text-center" colSpan={1}>
                     <select
                       className="w-full rounded px-2 py-1 text-xs"
@@ -951,6 +962,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                       <option value="__new__">＋ New {level1Label}</option>
                     </select>
                   </td>
+                  )}
+                  {level2Enabled && (
                   <td className="px-2 py-2 text-center" colSpan={1}>
                     <select
                       className="w-full rounded px-2 py-1 text-xs"
@@ -966,6 +979,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                       <option value="__new__">＋ New {level2Label}</option>
                     </select>
                   </td>
+                  )}
                   {/* Parcel # — auto-assigned */}
                   <td className="px-2 py-2 text-center">
                     <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Auto</span>
@@ -1104,6 +1118,8 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                   allPhases={phaseOptions}
                   level1Label={level1Label}
                   level2Label={level2Label}
+                  level1Enabled={level1Enabled}
+                  level2Enabled={level2Enabled}
                   onAreaPhaseChanged={() => { mutateAreas(); mutatePhases(); mutateParcels() }}
                 />
               ))}
@@ -1125,10 +1141,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold mb-4" style={{ color: 'var(--cui-body-color)' }}>
-              PDF Import - Coming Soon
+              Data Import - Coming Soon
             </h3>
             <p className="mb-6" style={{ color: 'var(--cui-body-color)' }}>
-              Landscaper AI will soon extract parcel data from PDF tables automatically.
+              Landscaper AI will soon extract parcel data from PDFs and spreadsheets (CSV, XLSX) automatically.
               For now, please add parcels manually using the <strong>Add {level3Label}</strong> dropdown.
             </p>
             <div className="flex justify-end">
@@ -1168,8 +1184,10 @@ const EditableParcelRow: React.FC<{
   allPhases?: Phase[];
   level1Label?: string;
   level2Label?: string;
+  level1Enabled?: boolean;
+  level2Enabled?: boolean;
   onAreaPhaseChanged?: () => void;
-}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [], sharedLotProducts = new Map(), setSharedLotProducts, planningEfficiency, areas = [], allPhases = [], level1Label = 'Area', level2Label = 'Phase', onAreaPhaseChanged }) => {
+}> = ({ parcel, index, onSaved, onOpenDetail, onDelete, getFamilyName, formatParcelIdDisplay, projectId, sharedFamilies = [], sharedLotProducts = new Map(), setSharedLotProducts, planningEfficiency, areas = [], allPhases = [], level1Label = 'Area', level2Label = 'Phase', level1Enabled = true, level2Enabled = true, onAreaPhaseChanged }) => {
   const [editing, setEditing] = useState(false)
   const [editingFamily, setEditingFamily] = useState(false)
   const [editingType, setEditingType] = useState(false)
@@ -1609,6 +1627,7 @@ const EditableParcelRow: React.FC<{
         e.currentTarget.style.backgroundColor = 'var(--surface-bg)';
       }
     }}>
+      {level1Enabled && (
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }} onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           <select
@@ -1627,6 +1646,8 @@ const EditableParcelRow: React.FC<{
           parcel.area_no
         )}
       </td>
+      )}
+      {level2Enabled && (
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }} onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (
           <select
@@ -1646,6 +1667,7 @@ const EditableParcelRow: React.FC<{
           parcel.phase_name
         )}
       </td>
+      )}
       <td className="px-2 py-1.5 text-center" style={{ color: 'var(--cui-body-color)' }}>{formatParcelIdDisplay(parcel.parcel_name)}</td>
       <td className="px-2 py-1.5 text-center" onClick={(e) => editing && e.stopPropagation()}>
         {editing ? (

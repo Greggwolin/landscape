@@ -33,6 +33,8 @@ export interface ProjectConfig {
   tier_1_label: string
   tier_2_label: string
   tier_3_label: string
+  level1_enabled?: boolean
+  level2_enabled?: boolean
   land_use_level1_label?: string
   land_use_level1_label_plural?: string
   land_use_level2_label?: string

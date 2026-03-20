@@ -15,16 +15,8 @@ interface NewProjectDropZoneProps {
 
 type DropPhase = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
-// Allowed MIME types for validation
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'image/jpeg',
-  'image/png'
-];
+// Note: All file types are accepted for upload. Extraction currently supports
+// PDF, Word, Excel, CSV, and text files. Other file types are stored as-is.
 
 export default function NewProjectDropZone({
   onFileDrop,
@@ -100,7 +92,7 @@ export default function NewProjectDropZone({
     for (const item of Array.from(items)) {
       if (item.kind === 'file') {
         const file = item.getAsFile();
-        if (file && ALLOWED_MIME_TYPES.includes(file.type)) {
+        if (file) {
           event.preventDefault();
           // Process the pasted file
           processFile(file);
@@ -143,15 +135,6 @@ export default function NewProjectDropZone({
     isDragReject,
   } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-    },
     maxSize: 32 * 1024 * 1024, // 32MB
     maxFiles: multiple ? 20 : 1, // Allow up to 20 files for OM packages
     multiple,
@@ -269,9 +252,9 @@ export default function NewProjectDropZone({
               </div>
             ) : (
               <div>
-                <p className="text-base font-medium text-red-600">File not supported</p>
+                <p className="text-base font-medium text-green-600">Drop to upload</p>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Use PDF, Word, or Excel files
+                  Release to start analysis
                 </p>
               </div>
             )
