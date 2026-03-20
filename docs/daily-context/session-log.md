@@ -3,6 +3,55 @@
 > Running log of development sessions. Newest first.
 > Trigger: Say **"Document"** in any chat to add an entry.
 
+## Appraisal Extraction Pipeline — 2026-03-20
+
+**What was discussed:**
+- Built end-to-end appraisal/URAR document extraction support for Land Dev projects
+- Updated `LandDev_Input_FieldRegistry_v3.csv`: added `appraisal` evidence type to 8 existing project fields (name, address, city, county, state, zip, description, flood_zone); added 28 new field rows covering valuation conclusions (→ `tbl_valuation_reconciliation`), cost approach details (→ `tbl_project_assumption`), and appraiser metadata (→ `tbl_project_assumption`)
+- Created `backend/apps/landscaper/tools/appraisal_knowledge_tools.py` with 4 new Landscaper tools: `store_appraisal_valuation`, `store_market_intelligence`, `store_construction_benchmarks`, `get_appraisal_knowledge` — supports both project-scoped and platform-scoped (market_area entity) knowledge extraction
+- Added URAR-specific extraction prompt hints in `extraction_service.py` via new `_build_appraisal_extraction_hints()` method — handles UAD abbreviation decoding, comp grid parsing, cost approach worksheets, and market narrative extraction
+- Updated `extraction_writer.py` to handle `tbl_valuation_reconciliation` column writes (check-then-upsert pattern)
+- Registered new tools in `tool_executor.py`, updated tool count to 225
+
+**Open items:**
+- `tbl_valuation_reconciliation` lacks a unique constraint on `project_id` — may want to add one if only one reconciliation row per project is intended
+- Comparable sales from appraisals route to knowledge facts but not yet to structured `tbl_comparables` via the registry (would need `sales_comp` scope fields specific to URAR grid format)
+- `source_page` still not populated by extraction pipeline (existing backlog item)
+- Market intelligence tools store to knowledge entities/facts but no REST endpoint to query cross-project market data yet
+
+---
+
+---
+
+## Hierarchy Visibility, Dropzone Restrictions, Parcel Import Tools — 2026-03-19
+
+**What was discussed:**
+- Property > Parcels tab: Level 1 checkbox unchecked but Area column still rendered in parcel detail table; Areas/Phases CCards rendered regardless of hierarchy toggle state
+- All Landscaper dropzones rejected valid Excel files due to restrictive MIME-type accept filters — user wants all file types accepted everywhere
+- Weyyakin Phase IV project: user uploaded investment summary PDF + proforma XLSM spreadsheet. PDF extraction didn't capture individual lot data. Spreadsheet has 14-lot roster (6 Lemhi Ct + 8 Waahni Ct) with lot SF, unit SF, build schedule, and per-lot cost draws
+- Discussed Landscaper acting as "modeling advisor" during spreadsheet import — recognizing lot clusters, checking hierarchy config, guiding user to create phases when development cost profiles differ (Lemhi Ct = finished infrastructure, Waahni Ct = raw entitled land)
+
+**What changed:**
+- `src/app/api/project/granularity-settings/route.ts` — GET now SELECTs `level1_enabled`/`level2_enabled` from DB instead of hardcoding `true`; PUT now persists them
+- `src/app/api/projects/[projectId]/config/route.ts` — GET returns `level1_enabled`/`level2_enabled` in config query
+- `src/types/containers.ts` — Added `level1_enabled?`/`level2_enabled?` to ProjectConfig interface
+- `src/hooks/useProjectConfig.ts` — Exposes `level1Enabled`/`level2Enabled` booleans
+- `src/app/components/Planning/PlanningOverviewControls.tsx` — Reads actual DB enabled values instead of hardcoding `true`
+- `src/app/components/Planning/PlanningContent.tsx` — Areas CCard hidden when L1 unchecked, Phases CCard hidden when L2 unchecked, Area/Phase columns in parcel detail table conditionally rendered, "Import PDF" button renamed to "Import Data" with updated modal copy
+- Dropzone accept filters removed from all 5 components: `LandscaperPanel.tsx`, `DropZoneWrapper.tsx`, `DmsLandscaperPanel.tsx`, DMS `Dropzone.tsx`, `NewProjectDropZone.tsx` — all now accept any file type
+- **NEW FILE:** `backend/apps/landscaper/tools/parcel_import_tools.py` — 3 new Landscaper tools: `parse_spreadsheet_lots` (reads Excel via openpyxl, finds lot roster rows, detects groupings by street), `get_hierarchy_config` (reads project hierarchy enabled state + counts), `bulk_create_parcels` (mutation tool — creates phases + parcels with propose_only pattern)
+- `backend/apps/landscaper/tool_executor.py` — imports parcel_import_tools
+- `backend/apps/landscaper/tool_schemas.py` — Claude-facing JSON schemas for all 3 new tools
+- `backend/apps/landscaper/tool_registry.py` — Added tools to LAND_ONLY_TOOLS + `land_planning` page context
+- `backend/apps/landscaper/ai_handler.py` — Added `PARCEL_IMPORT_PROMPT_ADDITION` with modeling advisor instructions; injected for land dev projects on property/planning page
+
+**Open items:**
+- Workbench tile tab config for land dev parcels (staging → review → commit UI) — deferred
+- `livable_sf` column migration on `tbl_parcel` — currently stored as text in `lot_product` field
+- Field registry CSV additions for parcel-level extraction pipeline integration
+- Full spreadsheet extraction pipeline integration (currently tools work conversationally, not through Workbench staging flow)
+- Landscaper tool count now 220 (was 217) — CLAUDE.md needs update
+
 ---
 
 ## Documents Media Gallery — Visibility Fix, Favorites, Classification, Rescan — 2026-03-19

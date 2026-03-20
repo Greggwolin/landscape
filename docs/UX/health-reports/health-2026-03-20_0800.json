@@ -1,0 +1,64 @@
+{
+  "report": "Landscape Platform Health Check",
+  "timestamp": "2026-03-20T15:00:52Z",
+  "mode": "all",
+  "branch": "alpha08",
+  "results": [
+    {
+  "agent": "coreui-compliance-auditor",
+  "timestamp": "2026-03-20T15:00:32Z",
+  "status": "FAIL",
+  "total_violations": 6762,
+  "breakdown": {
+    "mui_imports": 139,
+    "hardcoded_hex_css": 790,
+    "forbidden_tailwind": 844,
+    "dark_variants": 80,
+    "inline_styles": 4909
+  }
+}
+,
+    {
+  "agent": "django-api-route-enforcer",
+  "timestamp": "2026-03-20T15:00:35Z",
+  "status": "PASS",
+  "new_nextjs_violations": 0,
+  "violation_files": [],
+  "context": {
+    "total_nextjs_routes": 417,
+    "total_django_viewsets": 22
+  }
+}
+,
+    {
+  "agent": "claudemd-sync-checker",
+  "timestamp": "2026-03-20T15:00:35Z",
+  "status": "WARN",
+  "stale_file_count": 1,
+  "stale_files": [{"file":"backend/apps/landscaper/tools/parcel_import_tools.py","hours_newer":14}]
+}
+,
+    {"agent":"extraction-queue-monitor","status":"SKIP","message":"Extraction table not found"}
+,
+    {
+  "agent": "dead-tool-detector",
+  "timestamp": "2026-03-20T15:00:52.217818+00:00",
+  "status": "PASS",
+  "tools_scanned": 9,
+  "dead_table_refs": 0,
+  "dead_column_refs": 0,
+  "dead_tables": [],
+  "dead_columns": []
+}
+,
+    {
+  "agent": "allowed-updates-auditor",
+  "timestamp": "2026-03-20T15:00:52.285310+00:00",
+  "status": "PASS",
+  "tools_checked": 0,
+  "critical_mismatches": 0,
+  "details": []
+}
+
+  ]
+}
