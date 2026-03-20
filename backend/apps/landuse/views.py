@@ -106,7 +106,25 @@ class LotProductViewSet(viewsets.ModelViewSet):
                     [type_id]
                 )
                 product_ids = [row[0] for row in cursor.fetchall()]
-            queryset = queryset.filter(product_id__in=product_ids)
+
+            if product_ids:
+                queryset = queryset.filter(product_id__in=product_ids)
+            else:
+                # Fallback: if junction table has no rows for this type,
+                # check if it's a residential type (SFD/BTR) and return all
+                # lot products directly from res_lot_product.
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT code, family_id FROM landscape.lu_type WHERE type_id = %s",
+                        [type_id]
+                    )
+                    row = cursor.fetchone()
+                if row and row[1] == 1 and row[0] in ('SFD', 'BTR', 'SFA'):
+                    # Residential type — return all lot products (no junction filter)
+                    pass
+                else:
+                    # Non-residential with no junction rows — return empty
+                    queryset = queryset.none()
 
         search = self.request.query_params.get('search')
         if search:

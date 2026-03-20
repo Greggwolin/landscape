@@ -220,6 +220,28 @@ class ExtractionWriter:
                     ON CONFLICT (project_id) DO UPDATE SET {column} = EXCLUDED.{column}, updated_at = NOW()
                 """
                 params = [self.project_id, converted_value]
+            elif table == 'tbl_valuation_reconciliation':
+                # Valuation reconciliation - check-then-upsert since table may
+                # not have a unique constraint on project_id alone
+                with connection.cursor() as chk:
+                    chk.execute(
+                        "SELECT reconciliation_id FROM landscape.tbl_valuation_reconciliation WHERE project_id = %s LIMIT 1",
+                        [self.project_id]
+                    )
+                    existing = chk.fetchone()
+                if existing:
+                    sql = f"""
+                        UPDATE landscape.{table}
+                        SET {column} = %s, updated_at = NOW()
+                        WHERE reconciliation_id = %s
+                    """
+                    params = [converted_value, existing[0]]
+                else:
+                    sql = f"""
+                        INSERT INTO landscape.{table} (project_id, {column}, created_at, updated_at)
+                        VALUES (%s, %s, NOW(), NOW())
+                    """
+                    params = [self.project_id, converted_value]
             else:
                 # Generic project-scoped table update
                 sql = f"""
@@ -620,29 +642,101 @@ class ExtractionWriter:
         scope_id: Optional[int] = None
     ) -> Tuple[bool, str]:
         """Write lot inventory to tbl_parcel (one row per lot type)."""
+        # Handle JSON strings from ai_extraction_staging
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         if not isinstance(value, list):
             value = [value]
 
         count = 0
         for lot in value:
+            if isinstance(lot, str):
+                try:
+                    lot = json.loads(lot)
+                except (json.JSONDecodeError, TypeError):
+                    continue
             if not isinstance(lot, dict):
                 continue
 
             phase_id = lot.get('phase_id', scope_id)
-            parcel_name = lot.get('parcel_name', lot.get('name', 'Unknown'))
-            units_total = lot.get('units_total', lot.get('count', 0))
-
-            cols = ['project_id', 'phase_id', 'parcel_name', 'units_total']
-            vals = [self.project_id, phase_id, parcel_name, units_total]
-
-            for field in ['parcel_code', 'lot_product', 'product_code', 'lot_width',
-                          'lot_depth', 'lot_area', 'acres_gross', 'landuse_code',
-                          'landuse_type', 'saleprice']:
-                if field in lot:
-                    cols.append(field)
-                    vals.append(lot[field])
+            parcel_name = lot.get('parcel_name', lot.get('name', lot.get('parcel_code', 'Unknown')))
+            units_total = lot.get('units_total', lot.get('count', 1))
 
             with connection.cursor() as cursor:
+                # Auto-resolve area_id if not provided
+                area_id = lot.get('area_id')
+                if not area_id:
+                    cursor.execute("""
+                        SELECT area_id FROM landscape.tbl_area
+                        WHERE project_id = %s ORDER BY area_no LIMIT 1
+                    """, [self.project_id])
+                    row = cursor.fetchone()
+                    if row:
+                        area_id = row[0]
+                    else:
+                        # Create a default area
+                        cursor.execute("""
+                            INSERT INTO landscape.tbl_area (project_id, area_no, label)
+                            VALUES (%s, 1, 'Default')
+                            RETURNING area_id
+                        """, [self.project_id])
+                        area_id = cursor.fetchone()[0]
+
+                # Auto-resolve phase_id from _phase_group or create default
+                if not phase_id:
+                    phase_group = lot.get('_phase_group', '')
+                    if phase_group:
+                        cursor.execute("""
+                            SELECT phase_id FROM landscape.tbl_phase
+                            WHERE area_id = %s AND label = %s
+                        """, [area_id, phase_group])
+                        row = cursor.fetchone()
+                        if row:
+                            phase_id = row[0]
+                        else:
+                            cursor.execute("""
+                                SELECT COALESCE(MAX(phase_no), 0) + 1
+                                FROM landscape.tbl_phase WHERE area_id = %s
+                            """, [area_id])
+                            next_no = cursor.fetchone()[0]
+                            cursor.execute("""
+                                INSERT INTO landscape.tbl_phase (area_id, phase_no, label)
+                                VALUES (%s, %s, %s) RETURNING phase_id
+                            """, [area_id, next_no, phase_group])
+                            phase_id = cursor.fetchone()[0]
+                    else:
+                        # Use first existing phase or create default
+                        cursor.execute("""
+                            SELECT phase_id FROM landscape.tbl_phase
+                            WHERE area_id = %s ORDER BY phase_no LIMIT 1
+                        """, [area_id])
+                        row = cursor.fetchone()
+                        if row:
+                            phase_id = row[0]
+                        else:
+                            cursor.execute("""
+                                INSERT INTO landscape.tbl_phase (area_id, phase_no, label)
+                                VALUES (%s, 1, 'Phase 1') RETURNING phase_id
+                            """, [area_id])
+                            phase_id = cursor.fetchone()[0]
+
+                cols = ['project_id', 'area_id', 'phase_id', 'parcel_name', 'units_total']
+                vals = [self.project_id, area_id, phase_id, parcel_name, units_total]
+
+                for field in ['parcel_code', 'lot_product', 'product_code', 'lot_width',
+                              'lot_depth', 'lot_area', 'acres_gross', 'landuse_code',
+                              'landuse_type', 'saleprice', 'family_name', 'type_code']:
+                    if field in lot and lot[field] is not None:
+                        # Skip internal metadata fields
+                        if field.startswith('_'):
+                            continue
+                        cols.append(field)
+                        vals.append(lot[field])
+
                 cursor.execute(f"""
                     INSERT INTO landscape.tbl_parcel ({', '.join(cols)})
                     VALUES ({', '.join(['%s'] * len(cols))})
@@ -1297,7 +1391,7 @@ class ExtractionWriter:
             self._create_comp_facts(data, comp_type, source_doc_id)
             return True, f"Inserted sales comp: {name}"
 
-        else:  # rent comp
+        elif comp_type == 'rent':  # rent comp
             columns = []
             values = []
             params = [self.project_id]
