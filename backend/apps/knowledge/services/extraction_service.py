@@ -3133,6 +3133,16 @@ Include a note in source_quote indicating whether value is monthly or annual."""
                     logger.warning(f"No field mapping for {field_key}")
                     continue
 
+                # Belt-and-suspenders: output fields should never appear in the
+                # extraction prompt (get_fields_by_scope filters them), but if
+                # the LLM returns one anyway, drop it here rather than staging it.
+                if field.field_role == 'output':
+                    logger.warning(
+                        f"Dropping output field '{field_key}' from batch staging — "
+                        "it should not have been in the extraction prompt"
+                    )
+                    continue
+
                 # Handle array-scoped fields
                 if field.scope in array_scopes and isinstance(value, list):
                     for array_idx, item in enumerate(value):

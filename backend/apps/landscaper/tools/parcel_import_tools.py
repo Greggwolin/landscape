@@ -399,6 +399,18 @@ def stage_parcel_lots(doc_id: int = None, lots: list = None, phase_mapping: dict
     if not lots:
         return {'success': False, 'error': 'lots list is required (from parse_spreadsheet_lots)'}
 
+    # Build the set of allowed DB column names from the field registry so that
+    # no calculated (field_role='output') columns can slip into the staged JSON.
+    # Keys prefixed with '_' are internal metadata and are always permitted.
+    from apps.knowledge.services.field_registry import get_registry as _get_registry
+    _reg = _get_registry()
+    _allowed_parcel_cols = {
+        m.resolved_column
+        for m in _reg.get_fields_by_scope('lot_inventory', 'land_development')
+        # get_fields_by_scope defaults to extractable_only=True which already
+        # excludes field_role='output' — the set here is purely input fields.
+    }
+
     try:
         staged_ids = []
         with connection.cursor() as cursor:
@@ -412,8 +424,9 @@ def stage_parcel_lots(doc_id: int = None, lots: list = None, phase_mapping: dict
                 if acres is None and lot_sf:
                     acres = round(lot_sf / 43560.0, 4)
 
-                # Build parcel data dict (mirrors tbl_parcel columns)
-                parcel_data = {
+                # Build parcel data dict using only registry-sanctioned columns.
+                # Keys are DB column names (resolved_column), not field_keys.
+                raw_parcel_data = {
                     'parcel_code': label,
                     'lot_area': lot_sf,
                     'acres_gross': acres,
@@ -423,11 +436,23 @@ def stage_parcel_lots(doc_id: int = None, lots: list = None, phase_mapping: dict
                     'lot_product': f"{unit_sf:.0f} SF livable" if unit_sf else None,
                 }
 
+                # Filter to registry-allowed columns only — rejects any future
+                # addition of a calculated field without a conscious registry update.
+                parcel_data = {
+                    k: v for k, v in raw_parcel_data.items()
+                    if k in _allowed_parcel_cols
+                }
+                if len(parcel_data) != len(raw_parcel_data):
+                    rejected = set(raw_parcel_data) - set(parcel_data)
+                    logger.warning(
+                        f"stage_parcel_lots: rejected non-registry columns for lot '{label}': {rejected}"
+                    )
+
                 # Determine phase group for scope_label
                 street = re.sub(r'^\d+\s+', '', label)
                 street = re.sub(r'\s+unit\s*\d+.*$', '', street, flags=re.IGNORECASE).strip()
                 phase_name = phase_mapping.get(street, street)
-                parcel_data['_phase_group'] = phase_name
+                parcel_data['_phase_group'] = phase_name  # internal metadata, not a DB column
 
                 # Stage as a single JSON row (same pattern as rent roll units)
                 cursor.execute("""

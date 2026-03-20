@@ -70,6 +70,9 @@ class ExtractionWriter:
         if not mapping.resolved:
             return False, f"Field {field_key} is not resolved (no write target)"
 
+        if mapping.field_role == 'output':
+            return False, f"Field {field_key} is a calculated output field and cannot be written via extraction"
+
         try:
             if mapping.is_row_based:
                 success, message = self._write_row_based(mapping, value, scope_id, source_doc_id, source_page)
