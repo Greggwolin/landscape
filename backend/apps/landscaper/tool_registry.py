@@ -105,6 +105,9 @@ LAND_ONLY_TOOLS = [
     "configure_project_hierarchy", "create_land_dev_containers",
     "update_lot_mix", "update_land_use_budget",
     "land_planning_run", "land_planning_save",
+    # Parcel import from spreadsheet
+    "parse_spreadsheet_lots", "get_hierarchy_config", "bulk_create_parcels",
+    "stage_parcel_lots",
 ]
 
 # Multifamily only — units, leases, rent roll, rental comps, MF property, MF extensions.
@@ -346,6 +349,11 @@ PAGE_TOOLS = {
         "create_land_dev_containers",
         "update_lot_mix",
         "update_land_use_budget",
+        # Parcel import from spreadsheet
+        "parse_spreadsheet_lots",
+        "get_hierarchy_config",
+        "bulk_create_parcels",
+        "stage_parcel_lots",
     ],
 
     "land_budget": [

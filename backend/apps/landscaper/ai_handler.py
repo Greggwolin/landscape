@@ -1630,6 +1630,62 @@ is reviewing AI-extracted field values from a document before committing them to
 5. **Use field_key names** the user can recognize (e.g., "monthly rent" not "base_rent_monthly")
 """
 
+PARCEL_IMPORT_PROMPT_ADDITION = """
+
+## SPREADSHEET PARCEL IMPORT
+
+When a user drops a spreadsheet on the Landscaper and mentions lot data, parcel data, or
+wants to populate the parcel table, follow this workflow:
+
+### STEP 1: UNDERSTAND THE HIERARCHY
+Call `get_hierarchy_config` to check:
+- Which levels are enabled (Area/Phase/Parcel)
+- How many phases/parcels already exist
+- The labels the user has configured
+
+### STEP 2: PARSE THE SPREADSHEET
+Call `parse_spreadsheet_lots` with the uploaded document's doc_id to identify:
+- The lot roster (addresses, lot IDs)
+- Lot attributes (lot SF, unit SF, acreage)
+- Natural groupings (by street, block, cluster)
+
+### STEP 3: ADVISE ON MODEL STRUCTURE
+**Be a modeling advisor, not just a data mapper.** Based on what you find:
+
+- If lots cluster into distinct groups (different streets, blocks) AND the hierarchy has
+  phases enabled → propose creating a phase per group. Explain WHY (different infrastructure
+  costs, different development timelines, etc.)
+- If lots cluster but phases are NOT enabled → ask the user if they want to enable phases.
+  Explain the benefit: "I see two distinct groups — Lemhi Ct (6 lots, infrastructure complete)
+  and Waahni Ct (8 lots, raw land). Grouping them as phases lets you track development costs
+  separately. Want me to enable phases?"
+- If NEITHER areas NOR phases are enabled (parcels only) → ask whether development costs
+  differ between lot groups. If yes, recommend enabling phases.
+- If all lots are essentially identical → no need for grouping, create flat parcels.
+
+### STEP 4: STAGE OR CREATE
+
+**Two paths depending on context:**
+
+**A) If the user is in the Ingestion Workbench** (file was uploaded through intake flow):
+Call `stage_parcel_lots` with the doc_id and parsed lots. This stages each lot as a
+row in ai_extraction_staging so the user can review, edit, and approve in the Workbench
+UI before committing. The Workbench shows lots under the "Planning" tile tab.
+
+**B) If the user is in the regular Landscaper chat** (no Workbench open):
+Call `bulk_create_parcels` with the structured data and phase mapping.
+This is a mutation — it will propose the creates for user confirmation first.
+
+### IMPORTANT:
+- Always show the user a summary table of what will be created BEFORE confirming
+- Include lot count per phase, lot SF, unit SF, and any attributes detected
+- Ask the user to name the phases (don't assume — suggest based on context)
+- If the spreadsheet has build schedules or sales timelines, mention them but note
+  they'll need to be entered separately (absorption schedule)
+- Prefer the staging path (stage_parcel_lots) when the Workbench is open — it gives
+  the user a visual review of each lot before committing
+"""
+
 
 def _get_ingestion_context(project_id: int, subtab_context: str = None) -> str:
     """
@@ -2480,6 +2536,14 @@ def get_landscaper_response(
         if ingestion_ctx:
             full_system += ingestion_ctx
         logger.info("Ingestion Workbench context added to system prompt")
+
+    # Add parcel import guidance for land dev projects on planning/property page
+    project_type_code = project_context.get('project_type_code', '')
+    is_land_dev = project_type_code in ('LAND', 'land_development', 'land')
+    is_planning_page = page_context and page_context.lower() in ('property', 'planning', 'land_planning')
+    if is_land_dev and is_planning_page:
+        full_system += PARCEL_IMPORT_PROMPT_ADDITION
+        logger.info("Parcel import guidance added to system prompt for land dev planning page")
 
     # Inject active what-if shadow state if present
     thread_id = project_context.get('thread_id')

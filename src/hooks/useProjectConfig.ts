@@ -21,6 +21,8 @@ export interface ProjectConfigResult {
     level2LabelPlural: string
     level3LabelPlural: string
   }
+  level1Enabled: boolean
+  level2Enabled: boolean
   isLoading: boolean
   error?: Error
   planningEfficiency: number | null
@@ -98,6 +100,8 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
   const error = (configError || containerError) as Error | undefined
 
   const planningEfficiency = configResponse?.planningEfficiency ?? null
+  const level1Enabled = config?.level1_enabled !== false
+  const level2Enabled = config?.level2_enabled !== false
 
   return {
     config,
@@ -108,6 +112,8 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
     phaseDisplayById: maps.phaseById,
     parcelDisplayById: maps.parcelById,
     labels,
+    level1Enabled,
+    level2Enabled,
     isLoading,
     error,
     planningEfficiency

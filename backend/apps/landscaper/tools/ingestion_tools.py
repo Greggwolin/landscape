@@ -31,8 +31,11 @@ def get_ingestion_staging(doc_id: int = None, status_filter: str = None,
     Returns field_key, extracted_value, confidence, status, source page/snippet
     for each extraction row.
     """
-    project_context = kwargs.get('project_context', {})
-    project_id = project_context.get('project_id')
+    # project_id can come directly as kwarg or nested in project_context
+    project_id = kwargs.get('project_id')
+    if not project_id:
+        project_context = kwargs.get('project_context', {})
+        project_id = project_context.get('project_id')
     tool_input = kwargs.get('tool_input', {})
 
     # Allow tool_input to override positional args
@@ -134,8 +137,11 @@ def update_staging_field(extraction_id: int = None, new_value=None,
     Update the extracted value of a staging field.
     Sets validated_value to the new corrected value.
     """
-    project_context = kwargs.get('project_context', {})
-    project_id = project_context.get('project_id')
+    # project_id can come directly as kwarg or nested in project_context
+    project_id = kwargs.get('project_id')
+    if not project_id:
+        project_context = kwargs.get('project_context', {})
+        project_id = project_context.get('project_id')
     tool_input = kwargs.get('tool_input', {})
     propose_only = kwargs.get('propose_only', True)
 
@@ -210,8 +216,11 @@ def approve_staging_field(extraction_ids: list = None, **kwargs):
     """
     Accept/approve extracted field values, marking them as 'accepted'.
     """
-    project_context = kwargs.get('project_context', {})
-    project_id = project_context.get('project_id')
+    # project_id can come directly as kwarg or nested in project_context
+    project_id = kwargs.get('project_id')
+    if not project_id:
+        project_context = kwargs.get('project_context', {})
+        project_id = project_context.get('project_id')
     tool_input = kwargs.get('tool_input', {})
     propose_only = kwargs.get('propose_only', True)
 
@@ -264,8 +273,11 @@ def reject_staging_field(extraction_ids: list = None, reason: str = None, **kwar
     """
     Reject extracted field values, marking them as 'rejected' with reason.
     """
-    project_context = kwargs.get('project_context', {})
-    project_id = project_context.get('project_id')
+    # project_id can come directly as kwarg or nested in project_context
+    project_id = kwargs.get('project_id')
+    if not project_id:
+        project_context = kwargs.get('project_context', {})
+        project_id = project_context.get('project_id')
     tool_input = kwargs.get('tool_input', {})
     propose_only = kwargs.get('propose_only', True)
 
@@ -324,8 +336,11 @@ def explain_extraction(extraction_id: int = None, **kwargs):
     Returns source text, page number, confidence reasoning, and surrounding
     context from the document to help the user understand the extraction.
     """
-    project_context = kwargs.get('project_context', {})
-    project_id = project_context.get('project_id')
+    # project_id can come directly as kwarg or nested in project_context
+    project_id = kwargs.get('project_id')
+    if not project_id:
+        project_context = kwargs.get('project_context', {})
+        project_id = project_context.get('project_id')
     tool_input = kwargs.get('tool_input', {})
 
     extraction_id = extraction_id or tool_input.get('extraction_id')

@@ -46,7 +46,7 @@ class FieldMapping:
 
     @property
     def is_row_based(self) -> bool:
-        return self.db_write_type in ('row_assumption', 'row_opex', 'row_allocation', 'row_budget', 'row_milestone', 'upsert')
+        return self.db_write_type in ('row_assumption', 'row_opex', 'row_allocation', 'row_budget', 'row_milestone', 'upsert', 'row_lot_inventory', 'row_absorption', 'row_land_use_budget')
 
     @property
     def table_name(self) -> str:
@@ -105,13 +105,18 @@ class FieldRegistry:
             reader = csv.DictReader(f)
             for row in reader:
                 # Skip comment lines
-                field_key = row.get('field_key', '').strip()
+                field_key = (row.get('field_key') or '').strip()
                 if not field_key or field_key.startswith('#'):
+                    continue
+
+                # Skip comment rows (# in property_type column)
+                prop_type_val = (row.get('property_type') or '').strip()
+                if prop_type_val.startswith('#'):
                     continue
 
                 # Parse selector_json
                 selector = None
-                selector_str = row.get('selector_json', '').strip()
+                selector_str = (row.get('selector_json') or '').strip()
                 if selector_str and selector_str != '':
                     try:
                         selector = json.loads(selector_str)
@@ -119,7 +124,7 @@ class FieldRegistry:
                         logger.warning(f"Failed to parse selector_json for {field_key}: {e}")
 
                 # Parse evidence_types (v4 uses pipe-separated, v3 uses comma)
-                evidence_str = row.get('evidence_types', '')
+                evidence_str = row.get('evidence_types') or ''
                 if '|' in evidence_str:
                     evidence = evidence_str.split('|')
                 else:
@@ -127,21 +132,21 @@ class FieldRegistry:
                 evidence = [e.strip() for e in evidence if e.strip()]
 
                 # Parse required - handle various formats (v4 doesn't have Required column)
-                required_val = row.get('Required', row.get('required', '')).strip()
+                required_val = (row.get('Required') or row.get('required') or '').strip()
                 is_required = required_val in ('✓', 'True', 'true', '1', 'yes', 'Yes')
 
                 # Parse resolved - v4 doesn't have this, default to True if target_table exists
-                resolved_val = row.get('resolved', '').strip()
+                resolved_val = (row.get('resolved') or '').strip()
                 if resolved_val:
                     is_resolved = resolved_val.lower() in ('true', '1', 'yes')
                 else:
                     # V4 format: resolved if target_table is provided
-                    is_resolved = bool(row.get('target_table', '').strip())
+                    is_resolved = bool((row.get('target_table') or '').strip())
 
                 # Build db_target from target_table.target_column (v4 format)
-                target_table = row.get('target_table', row.get('resolved_table', '')).strip()
-                target_column = row.get('target_column', row.get('resolved_column', '')).strip()
-                db_target = row.get('db_target', '')
+                target_table = (row.get('target_table') or row.get('resolved_table') or '').strip()
+                target_column = (row.get('target_column') or row.get('resolved_column') or '').strip()
+                db_target = row.get('db_target') or ''
                 if not db_target and target_table and target_column:
                     db_target = f"{target_table}.{target_column}"
 
@@ -159,10 +164,10 @@ class FieldRegistry:
                     extract_policy = 'auto_write'
 
                 # Get field_role (v5 has 'field_role' column, default to 'input')
-                field_role = row.get('field_role', 'input').strip() or 'input'
+                field_role = (row.get('field_role') or 'input').strip() or 'input'
 
                 # Get analytical_tier_default (v5 has 'analytical_tier_default' column)
-                analytical_tier_default = row.get('analytical_tier_default', 'supporting').strip() or 'supporting'
+                analytical_tier_default = (row.get('analytical_tier_default') or 'supporting').strip() or 'supporting'
 
                 mapping = FieldMapping(
                     property_type=row.get('property_type', property_type),

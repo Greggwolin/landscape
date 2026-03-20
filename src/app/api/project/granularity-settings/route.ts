@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
         tier_1_label as level1_label,
         tier_2_label as level2_label,
         tier_3_label as level3_label,
-        auto_number
+        auto_number,
+        level1_enabled,
+        level2_enabled
       FROM landscape.tbl_project_config
       WHERE project_id = ${projectId}
     `;
@@ -62,9 +64,9 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      level1Enabled: true,
+      level1Enabled: config.level1_enabled !== false,
       level1Label: config.level1_label ?? 'Area',
-      level2Enabled: true,
+      level2Enabled: config.level2_enabled !== false,
       level2Label: config.level2_label ?? 'Phase',
       level3Enabled: true,
       level3Label: config.level3_label ?? 'Parcel',
@@ -96,14 +98,16 @@ export async function PUT(request: NextRequest) {
     const settings: GranularitySettings = await request.json();
 
     await sql`
-      INSERT INTO landscape.tbl_project_config (project_id, asset_type, tier_1_label, tier_2_label, tier_3_label, auto_number)
-      VALUES (${projectId}, 'project', ${settings.level1Label}, ${settings.level2Label}, ${settings.level3Label}, ${settings.autoNumber})
+      INSERT INTO landscape.tbl_project_config (project_id, asset_type, tier_1_label, tier_2_label, tier_3_label, auto_number, level1_enabled, level2_enabled)
+      VALUES (${projectId}, 'project', ${settings.level1Label}, ${settings.level2Label}, ${settings.level3Label}, ${settings.autoNumber}, ${settings.level1Enabled !== false}, ${settings.level2Enabled !== false})
       ON CONFLICT (project_id) DO UPDATE
       SET
         tier_1_label = EXCLUDED.tier_1_label,
         tier_2_label = EXCLUDED.tier_2_label,
         tier_3_label = EXCLUDED.tier_3_label,
         auto_number = EXCLUDED.auto_number,
+        level1_enabled = EXCLUDED.level1_enabled,
+        level2_enabled = EXCLUDED.level2_enabled,
         updated_at = NOW()
     `;
 

@@ -1443,7 +1443,10 @@ class RegistryBasedExtractor:
             )
 
         # Step 4: Build extraction prompt from registry
-        prompt = self._build_registry_extraction_prompt(fields, doc_content['text'])
+        prompt = self._build_registry_extraction_prompt(
+            fields, doc_content['text'],
+            evidence_type=classification.evidence_type
+        )
 
         # Step 5: Call Claude for extraction
         try:
@@ -1659,7 +1662,8 @@ Never guess or make up values - only extract what is explicitly stated.""",
     def _build_registry_extraction_prompt(
         self,
         fields: List[FieldMapping],
-        document_text: str
+        document_text: str,
+        evidence_type: str = None
     ) -> str:
         """Build extraction prompt from registry field definitions."""
         # Group fields by scope
@@ -1776,13 +1780,18 @@ Extract each expense category found:
 }}
 """
 
+        # Doc-type-specific extraction hints
+        doc_type_hints = ""
+        if evidence_type == 'appraisal':
+            doc_type_hints = self._build_appraisal_extraction_hints()
+
         # Truncate document text if too long
         max_text_length = 60000
         if len(document_text) > max_text_length:
             document_text = document_text[:max_text_length] + "\n... [truncated]"
 
         prompt = f"""Extract the following fields from this document.
-
+{doc_type_hints}
 EXTRACTION SCHEMA:
 {fields_schema}
 {array_instructions}
@@ -1805,6 +1814,98 @@ DOCUMENT CONTENT:
 Extract all available fields. Return ONLY valid JSON, no other text."""
 
         return prompt
+
+    def _build_appraisal_extraction_hints(self) -> str:
+        """
+        Build URAR / appraisal-specific extraction hints.
+
+        Handles Fannie Mae Form 1004 (URAR) and similar appraisal formats:
+        - Structured grid pages with UAD abbreviation codes
+        - Comparable sales adjustment grids
+        - Cost approach worksheets
+        - Market conditions addenda with narrative text
+        """
+        return """
+## APPRAISAL DOCUMENT PARSING INSTRUCTIONS
+
+This document is a real estate appraisal, likely a URAR (Uniform Residential Appraisal Report,
+Fannie Mae Form 1004) or similar standardized form. Follow these specific parsing rules:
+
+### FORM STRUCTURE
+URAR appraisals have a structured grid layout. Key sections to identify:
+1. **Subject Section** (page 1 top): Property address, borrower, legal description, assessor info
+2. **Neighborhood Section** (page 1): Location type, built-up, growth rate, property values, demand/supply
+3. **Site Section** (page 1-2): Lot dimensions, zoning, utilities, FEMA flood zone
+4. **Improvements Section** (page 2): Design, quality, condition, GLA, room counts
+5. **Sales Comparison Approach** (page 2-3): Subject + 3-6 comparable sales in grid columns
+6. **Cost Approach** (page 3 or addendum): Site value, reproduction/replacement cost, depreciation
+7. **Reconciliation** (page 3-4): Final value opinion with effective date
+8. **Addenda** (remaining pages): Market narratives, additional comps, photos, maps
+
+### UAD ABBREVIATION CODES
+Appraisals use Uniform Appraisal Dataset (UAD) abbreviation codes. Decode these when extracting:
+
+**Quality Ratings:** Q1 (highest) through Q6 (lowest)
+**Condition Ratings:** C1 (new/excellent) through C6 (poor/needs major repair)
+**Location:** B;Res; = Beneficial;Residential  |  N;Res; = Neutral;Residential  |  A;Res; = Adverse;Residential
+**View:** N;Mtn; = Neutral;Mountain  |  B;Mtn; = Beneficial;Mountain  |  N;Res; = Neutral;Residential
+**Design/Style:** DT2;Contemp = Detached;Contemporary  |  DT1;Ranch = Detached;Ranch
+
+When extracting values, provide the DECODED human-readable meaning, not the raw UAD code.
+Example: For quality "Q2", extract "Q2 - Good quality construction" not just "Q2".
+
+### COMPARABLE SALES EXTRACTION
+The sales comparison grid has the subject property in the leftmost column and comparables in
+subsequent columns. For each comparable sale, extract:
+- Address/location (from the "Address" row)
+- Sale price (from "Sale Price" row — may include "$/GLA" or per-unit metrics)
+- Sale date (from "Date of Sale/Time" row)
+- Adjustments are listed line-by-line (site, view, design, quality, age, condition, GLA, etc.)
+- Net and gross adjustment percentages are at the bottom of each comp column
+- Adjusted sale price = sale price + net adjustments
+
+Do NOT confuse the Subject column values with comparable sale values.
+
+### COST APPROACH EXTRACTION
+Look for these specific line items:
+- "Dwelling" or "Main Improvement" cost with $/SF and total SF
+- "Garage/Carport" cost with separate $/SF
+- "Site Improvements" (landscaping, driveways, etc.)
+- "Entrepreneurial Profit" or "Developer's Profit" (usually a percentage)
+- Physical/Functional/External depreciation amounts
+- "Site Value" or "Land Value" (opinion of land value, separate from improvements)
+- "As-Is" value (total including land + depreciated improvements)
+
+Cost figures: Extract the DOLLAR AMOUNT, not the percentage, unless the field specifically
+asks for a percentage (e.g., entrepreneurial_profit_pct).
+
+### RECONCILIATION EXTRACTION
+The reconciliation section provides:
+- Indicated value by Sales Comparison Approach
+- Indicated value by Cost Approach
+- Indicated value by Income Approach (often $0 for single-family/vacant land)
+- Final reconciled/appraised value
+- Effective date of appraisal
+
+### VALUE CONVENTIONS
+- All currency values should be plain numbers (no $ signs, no commas): 7400000 not "$7,400,000"
+- Percentages as decimals: 0.30 for 30%, 0.05 for 5%
+- Dates in YYYY-MM-DD format when possible
+- Square footage as integers: 4609 not "4,609 SF"
+- "As-Is" value is the current market value of the property in its present condition
+- "Site Value" is the land-only value (no improvements)
+
+### ADDENDA / MARKET NARRATIVE
+Appraisal addenda often contain rich market data. Look for:
+- Market conditions (appreciation/depreciation trends, DOM, inventory levels)
+- Neighborhood description and boundaries
+- Construction cost benchmarks ($/SF ranges by quality tier)
+- Vacant land market data (sales volume, price ranges, inventory)
+- Highest and best use analysis
+- Exposure time estimates
+
+Extract these as the relevant field_key values when they match schema fields.
+"""
 
     def _parse_extraction_response(self, response_text: str) -> Optional[Dict]:
         """Parse JSON from Claude's response."""
@@ -2248,7 +2349,7 @@ def classify_and_preview(project_id: int, doc_id: int) -> Dict[str, Any]:
 # BATCHED EXTRACTION SERVICE
 # ============================================================
 
-EXTRACTION_BATCHES = [
+EXTRACTION_BATCHES_MF = [
     {
         'name': 'core_property',
         'scopes': ['project', 'mf_property'],
@@ -2280,6 +2381,45 @@ EXTRACTION_BATCHES = [
         'description': 'Full unit-level rent roll (array extraction)',
     },
 ]
+
+EXTRACTION_BATCHES_LAND = [
+    {
+        'name': 'core_project',
+        'scopes': ['project'],
+        'description': 'Core project identification, location, entitlements, and acreage',
+    },
+    {
+        'name': 'lot_inventory',
+        'scopes': ['lot_inventory', 'lot_or_product'],
+        'description': 'Parcel/lot inventory: lot codes, areas, widths, depths, unit counts, product types, phase assignments',
+    },
+    {
+        'name': 'financials',
+        'scopes': ['opex', 'income', 'assumption'],
+        'description': 'Operating expenses, revenue assumptions, and underwriting parameters',
+    },
+    {
+        'name': 'land_comparables',
+        'scopes': ['land_comp'],
+        'description': 'Land sales comparables for cost approach (array extraction)',
+    },
+    {
+        'name': 'deal_market',
+        'scopes': ['acquisition', 'market'],
+        'description': 'Acquisition terms and market demographics',
+    },
+]
+
+# Legacy alias — default to MF batches for backward compatibility
+EXTRACTION_BATCHES = EXTRACTION_BATCHES_MF
+
+
+def get_extraction_batches(property_type: str) -> list:
+    """Return the appropriate extraction batch config for the property type."""
+    if property_type in ('land_development', 'LAND'):
+        return EXTRACTION_BATCHES_LAND
+    # Future: add hotel, retail, office, etc.
+    return EXTRACTION_BATCHES_MF
 
 
 class BatchedExtractionService:
@@ -2325,10 +2465,11 @@ class BatchedExtractionService:
         errors = []
         total_staged = 0
 
-        # Determine which batches to run
-        batches_to_run = EXTRACTION_BATCHES
+        # Determine which batches to run (property-type-aware)
+        all_batches = get_extraction_batches(self.property_type)
+        batches_to_run = all_batches
         if batches:
-            batches_to_run = [b for b in EXTRACTION_BATCHES if b['name'] in batches]
+            batches_to_run = [b for b in all_batches if b['name'] in batches]
 
         # Get document content once (reuse across batches)
         doc_content = self._get_document_content(doc_id)
@@ -2906,23 +3047,33 @@ Include a note in source_quote indicating whether value is monthly or annual."""
             logger.error("No JSON object found in response")
             return None
 
+        json_str = response_text[start:end]
+
+        # First try: strict parse
         try:
-            parsed = json.loads(response_text[start:end])
+            parsed = json.loads(json_str)
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            pass
+
+        # Second try: strict=False allows control chars inside strings
+        try:
+            parsed = json.loads(json_str, strict=False)
             return parsed if isinstance(parsed, dict) else None
         except json.JSONDecodeError as e:
             logger.error(f"JSON parse error: {e}")
-            # Try to extract partial JSON
-            try:
-                # Sometimes response has markdown code blocks
-                clean = response_text.replace('```json', '').replace('```', '').strip()
-                start = clean.find('{')
-                end = clean.rfind('}') + 1
-                if start >= 0 and end > start:
-                    parsed = json.loads(clean[start:end])
-                    return parsed if isinstance(parsed, dict) else None
-            except Exception:
-                pass
-            return None
+
+        # Third try: markdown code blocks + strict=False
+        try:
+            clean = response_text.replace('```json', '').replace('```', '').strip()
+            s2 = clean.find('{')
+            e2 = clean.rfind('}') + 1
+            if s2 >= 0 and e2 > s2:
+                parsed = json.loads(clean[s2:e2], strict=False)
+                return parsed if isinstance(parsed, dict) else None
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def _clean_extracted_value(value):

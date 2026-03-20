@@ -786,7 +786,35 @@ def extract_document_batched(request, doc_id: int):
         )
 
     batches = body.get('batches')  # Optional list of batch names
-    property_type = body.get('property_type', 'multifamily')
+    property_type = body.get('property_type')
+
+    # Auto-detect property type from project if not explicitly provided
+    if not property_type:
+        try:
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT project_type_code FROM landscape.tbl_project WHERE project_id = %s",
+                    [project_id_int]
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    code = row[0].upper()
+                    TYPE_MAP = {
+                        'LAND': 'land_development',
+                        'MF': 'multifamily',
+                        'OFF': 'multifamily',  # Use MF batches for now
+                        'RET': 'multifamily',
+                        'IND': 'multifamily',
+                        'HTL': 'multifamily',
+                        'MXU': 'multifamily',
+                    }
+                    property_type = TYPE_MAP.get(code, 'multifamily')
+        except Exception as e:
+            print(f"[extract_batched] Failed to auto-detect property type: {e}")
+
+    if not property_type:
+        property_type = 'multifamily'
 
     # Get user_id if available
     user_id = None

@@ -18,11 +18,18 @@ export const dmsUploader = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { maxFileSize: "16MB" },
     "application/vnd.ms-excel": { maxFileSize: "16MB" },
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { maxFileSize: "16MB" },
+    "application/vnd.ms-excel.sheet.macroEnabled.12": { maxFileSize: "16MB" },
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": { maxFileSize: "32MB" },
+    "application/vnd.ms-powerpoint": { maxFileSize: "32MB" },
     "image/jpeg": { maxFileSize: "8MB" },
     "image/png": { maxFileSize: "8MB" },
     "image/gif": { maxFileSize: "8MB" },
+    "image/webp": { maxFileSize: "8MB" },
+    "image/tiff": { maxFileSize: "16MB" },
     "text/plain": { maxFileSize: "4MB" },
-    "text/csv": { maxFileSize: "8MB" }
+    "text/csv": { maxFileSize: "8MB" },
+    "application/zip": { maxFileSize: "64MB" },
+    "application/octet-stream": { maxFileSize: "32MB" },
   })
     .middleware(async ({ req }) => {
       // Extract metadata from request headers or query params

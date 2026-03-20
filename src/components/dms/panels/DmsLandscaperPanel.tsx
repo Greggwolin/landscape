@@ -390,15 +390,6 @@ export default function DmsLandscaperPanel({
  onDropFiles(acceptedFiles);
  }
  },
- accept: {
- 'application/pdf': ['.pdf'],
- 'application/msword': ['.doc'],
- 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
- 'application/vnd.ms-excel': ['.xls'],
- 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
- 'image/jpeg': ['.jpg', '.jpeg'],
- 'image/png': ['.png']
- },
  multiple: true,
  noClick: true,
  noKeyboard: true
@@ -610,10 +601,10 @@ export default function DmsLandscaperPanel({
  >
  <CIcon icon={cilCloudUpload} className="mb-2" />
  <div className="text-sm font-medium">
- {isDragReject ? 'File type not supported' : 'Drop documents to upload'}
+ Drop documents to upload
  </div>
  <div className="text-xs text-body-tertiary mt-1">
- PDF, Word, Excel, or image files
+ All file types accepted
  </div>
  </div>
  )}

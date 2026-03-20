@@ -445,7 +445,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **217 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools added Mar 2026
+- Claude AI with **220 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools added Mar 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -608,7 +608,7 @@ Two distinct failure modes — treat separately:
 | Frontend (React pages) | ✅ | — | All UI rendering |
 | Legacy API routes (`src/app/api/dms/`, etc.) | ✅ | — | Direct Neon DB queries |
 | Django REST API (`/api/projects/`, `/api/containers/`, etc.) | — | ✅ | Primary API target |
-| Landscaper chat | — | ✅ | 217 tools, Claude AI |
+| Landscaper chat | — | ✅ | 220 tools, Claude AI |
 | Knowledge/extraction pipeline | — | ✅ | Document processing |
 | Ingestion Workbench API | — | ✅ | `workbench_views.py` |
 | Financial engine (IRR/NPV/DSCR) | — | ✅ | Python calculations |
@@ -803,7 +803,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-12*
+*Last updated: 2026-03-20*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: 217*
+*Landscaper tool count: 225*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

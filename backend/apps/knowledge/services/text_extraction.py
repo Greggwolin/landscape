@@ -70,7 +70,10 @@ def extract_text_from_url(storage_uri: str, mime_type: str = None) -> Tuple[Opti
                 return _extract_pdf(tmp_path), None
             elif mime_type in ('application/vnd.openxmlformats-officedocument.wordprocessingml.document',):
                 return _extract_docx(tmp_path), None
-            elif mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+            elif mime_type in (
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel.sheet.macroEnabled.12',
+            ):
                 return _extract_xlsx(tmp_path), None
             elif mime_type == 'application/vnd.ms-excel':
                 return None, "Legacy .xls format not supported. Please convert to .xlsx"
@@ -117,7 +120,10 @@ def extract_text_and_page_count_from_url(
                 return text, page_count, None
             if mime_type in ('application/vnd.openxmlformats-officedocument.wordprocessingml.document',):
                 return _extract_docx(tmp_path), None, None
-            if mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+            if mime_type in (
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-excel.sheet.macroEnabled.12',
+            ):
                 return _extract_xlsx(tmp_path), None, None
             if mime_type == 'application/vnd.ms-excel':
                 return None, None, "Legacy .xls format not supported. Please convert to .xlsx"
@@ -281,7 +287,18 @@ def _get_extension(mime_type: str) -> str:
         'application/msword': '.doc',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
         'application/vnd.ms-excel': '.xls',
+        'application/vnd.ms-excel.sheet.macroEnabled.12': '.xlsm',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+        'application/vnd.ms-powerpoint': '.ppt',
         'text/plain': '.txt',
         'text/markdown': '.md',
+        'text/csv': '.csv',
+        'application/json': '.json',
+        'application/xml': '.xml',
+        'image/jpeg': '.jpg',
+        'image/png': '.png',
+        'image/tiff': '.tiff',
+        'image/webp': '.webp',
+        'application/zip': '.zip',
     }
-    return mapping.get(mime_type, '.bin')
+    return mapping.get(mime_type, '.tmp')
