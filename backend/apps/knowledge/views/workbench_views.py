@@ -80,6 +80,12 @@ def _strip_wrapping_quotes(val):
     return val
 
 
+def _is_output_field(registry, field_key: str, property_type: str) -> bool:
+    """Return True if the field is a calculated output field that should never appear in the workbench."""
+    mapping = registry.get_mapping(field_key, property_type)
+    return mapping is not None and mapping.field_role == 'output'
+
+
 def _serialize_extraction(row: dict) -> dict:
     """Serialize datetime objects and add label enrichment. scope is passed through as-is."""
     row['field_label'] = get_field_label(row.get('field_key', ''))
@@ -311,6 +317,18 @@ def list_staging(request, project_id: int):
         cursor.execute(query, params)
         columns = [col[0] for col in cursor.description]
         rows = [dict(zip(columns, r)) for r in cursor.fetchall()]
+
+    # ── Strip calculated output fields ────────────────────────────────────
+    # Output fields (field_role='output') are derived/calculated values that
+    # should never be extracted from a document or appear in the workbench.
+    # This guards against stale staging rows created before the field_role
+    # column was added to the land dev registry.
+    from apps.knowledge.services.field_registry import get_registry as _get_registry
+    _registry = _get_registry()
+    rows = [
+        r for r in rows
+        if not _is_output_field(_registry, r.get('field_key', ''), r.get('property_type') or 'multifamily')
+    ]
 
     extractions = []
     scope_counts = {}
@@ -637,33 +655,75 @@ def accept_all_pending(request, project_id: int):
 
     scopes = body.get('scopes')
 
+    # Collect all output (calculated) field keys from both registries so the
+    # bulk-accept never promotes a field that should not be written.
+    from apps.knowledge.services.field_registry import get_registry as _get_registry
+    _registry = _get_registry()
+    output_field_keys = sorted(
+        m.field_key
+        for pt in ('multifamily', 'land_development')
+        for m in _registry.get_all_mappings(pt).values()
+        if m.field_role == 'output'
+    )
+
     with connection.cursor() as cursor:
         if scopes and isinstance(scopes, list):
-            placeholders = ', '.join(['%s'] * len(scopes))
-            cursor.execute(
-                f"""
-                UPDATE landscape.ai_extraction_staging
-                SET status = 'accepted',
-                    validated_by = 'user',
-                    validated_at = NOW()
-                WHERE project_id = %s
-                  AND status = 'pending'
-                  AND scope IN ({placeholders})
-                """,
-                [int(project_id)] + scopes,
-            )
+            scope_placeholders = ', '.join(['%s'] * len(scopes))
+            if output_field_keys:
+                key_placeholders = ', '.join(['%s'] * len(output_field_keys))
+                cursor.execute(
+                    f"""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'accepted',
+                        validated_by = 'user',
+                        validated_at = NOW()
+                    WHERE project_id = %s
+                      AND status = 'pending'
+                      AND scope IN ({scope_placeholders})
+                      AND field_key NOT IN ({key_placeholders})
+                    """,
+                    [int(project_id)] + scopes + output_field_keys,
+                )
+            else:
+                cursor.execute(
+                    f"""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'accepted',
+                        validated_by = 'user',
+                        validated_at = NOW()
+                    WHERE project_id = %s
+                      AND status = 'pending'
+                      AND scope IN ({scope_placeholders})
+                    """,
+                    [int(project_id)] + scopes,
+                )
         else:
-            cursor.execute(
-                """
-                UPDATE landscape.ai_extraction_staging
-                SET status = 'accepted',
-                    validated_by = 'user',
-                    validated_at = NOW()
-                WHERE project_id = %s
-                  AND status = 'pending'
-                """,
-                [int(project_id)],
-            )
+            if output_field_keys:
+                key_placeholders = ', '.join(['%s'] * len(output_field_keys))
+                cursor.execute(
+                    f"""
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'accepted',
+                        validated_by = 'user',
+                        validated_at = NOW()
+                    WHERE project_id = %s
+                      AND status = 'pending'
+                      AND field_key NOT IN ({key_placeholders})
+                    """,
+                    [int(project_id)] + output_field_keys,
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE landscape.ai_extraction_staging
+                    SET status = 'accepted',
+                        validated_by = 'user',
+                        validated_at = NOW()
+                    WHERE project_id = %s
+                      AND status = 'pending'
+                    """,
+                    [int(project_id)],
+                )
 
         updated = cursor.rowcount
 
