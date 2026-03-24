@@ -575,11 +575,37 @@ export default function ProjectMediaGallery({
  // ── Scan New action ──────────────────────────────────────────────────
  // Only scans PDFs that haven't been scanned yet
 
- const handleCancelPipeline = useCallback(() => {
+ const handleCancelPipeline = useCallback(async () => {
+ // Abort any in-flight frontend fetches
  pipelineCancelRef.current?.abort();
- setScanProgress('Cancelled');
+ setScanProgress('');
  setScanning(false);
- }, []);
+
+ // Reset actively-processing docs on the backend so they stop showing as "in progress"
+ for (const doc of processingDocs) {
+ try {
+ await fetch(
+ `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/reset/`,
+ {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ skip_deleted: true }),
+ }
+ );
+ } catch (err) {
+ console.error(`Cancel reset failed for doc ${doc.doc_id}:`, err);
+ }
+ }
+
+ // Refresh doc list to pick up reset statuses
+ queryClient.invalidateQueries({
+ queryKey: ['project-docs-for-scan', projectId],
+ });
+ queryClient.invalidateQueries({
+ queryKey: ['project-all-media', projectId],
+ });
+ await refetchMedia();
+ }, [processingDocs, djangoBaseUrl, queryClient, projectId, refetchMedia]);
 
  const handleScanNew = useCallback(async () => {
  if (isPipelineBusy) return;
@@ -937,19 +963,12 @@ export default function ProjectMediaGallery({
  Media processing in progress
  </span>
  </div>
+ <div className="d-flex align-items-center gap-2">
  <span className="text-body-secondary" style={{ fontSize: '0.8rem' }}>
  {aggregateDetected > 0
  ? `${aggregateExtracted} of ${aggregateDetected} extracted`
  : 'Preparing extraction...'}
  </span>
- </div>
- {scanProgress && (
- <div
- className="d-flex align-items-center gap-2 mb-2"
- style={{ fontSize: '0.78rem' }}
- >
- <span className="text-body-secondary">{scanProgress}</span>
- {scanning && (
  <button
  className="btn btn-outline-danger btn-sm"
  style={{ fontSize: '0.7rem', padding: '1px 8px' }}
@@ -957,7 +976,14 @@ export default function ProjectMediaGallery({
  >
  Cancel
  </button>
- )}
+ </div>
+ </div>
+ {scanProgress && (
+ <div
+ className="text-body-secondary mb-2"
+ style={{ fontSize: '0.78rem' }}
+ >
+ {scanProgress}
  </div>
  )}
  <div

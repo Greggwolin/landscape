@@ -334,7 +334,7 @@ DEFAULT_CREDIT_LOSS_PCT = config('DEFAULT_CREDIT_LOSS_PCT', default=0.02, cast=f
 # Project IDs to clone for new alpha testers on first login
 DEMO_PROJECT_IDS = {
     'chadron': 17,       # Chadron Terrace - Multifamily demo
-    'peoria_lakes': 7,   # Peoria Lakes MPC - Land development demo
+    'peoria_meadows': 9, # Peoria Meadows - Land development demo
 }
 
 # ============================================================================

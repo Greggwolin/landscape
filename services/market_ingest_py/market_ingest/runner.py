@@ -143,7 +143,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         for target in targets:
             target_geo = db.get_geo(target.geo_id)
             for source, metas in providers.items():
-                if target.geo_level not in {"CITY", "COUNTY", "MSA", "STATE", "US", "TRACT"}:
+                if target.geo_level not in {"CITY", "COUNTY", "MSA", "MICRO", "STATE", "US", "TRACT"}:
                     continue
 
                 eligible_metas = [

@@ -34,7 +34,13 @@ DEFAULT_BUNDLES: Dict[str, List[str]] = {
         "ACS_POPULATION",
         "ACS_HOUSEHOLDS",
         "ACS_MEDIAN_HH_INC",
+        "ACS_COUNTY_POPULATION",
+        "ACS_COUNTY_MEDIAN_HH_INC",
+        "ACS_MICRO_POPULATION",
+        "ACS_MICRO_MEDIAN_HH_INC",
         "LAUS_STATE_UNRATE",
+        "LAUS_COUNTY_UNRATE",
+        "LAUS_COUNTY_EMP",
         "PERSONAL_INCOME_PC_STATE",
     ]
 }

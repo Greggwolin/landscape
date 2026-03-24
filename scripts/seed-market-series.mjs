@@ -90,7 +90,7 @@ const ALIAS_TEMPLATES = {
 };
 
 async function seedSeries() {
-  const csvPath = join(projectRoot, 'seed', 'market_series_v1.csv');
+  const csvPath = join(projectRoot, 'data', 'seed', 'market_series_v1.csv');
   const csvContent = readFileSync(csvPath, 'utf8');
   const records = parseCsv(csvContent);
 

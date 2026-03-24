@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { sql } from '@/lib/db';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -39,6 +40,7 @@ interface GeoTarget {
 
 interface AnalysisRequest {
   tier: 't1' | 't2' | 't3';
+  projectId?: number;
   project: {
     name: string;
     type_code: string;
@@ -121,10 +123,118 @@ market capture potential within the submarket.`,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Document context retrieval — pulls location-relevant content from project DMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Location-related field keys from ai_extraction_staging */
+const LOCATION_FIELD_PATTERNS = [
+  'neighborhood%', 'location%', 'site_description%', 'area_description%',
+  'market_area%', 'submarket%', 'surrounding%', 'access%', 'proximity%',
+  'zoning%', 'land_use%', 'flood_zone%', 'topography%', 'utilities%',
+  'transportation%', 'amenities%', 'school%', 'property_description%',
+  'property_address%', 'legal_description%', 'census_tract%',
+];
+
+/** Document types most likely to contain location/neighborhood descriptions */
+const LOCATION_DOC_TYPES = [
+  'Appraisal', 'Market Study', 'Offering Memorandum', 'Broker Opinion',
+  'Environmental', 'Zoning Report', 'Site Plan', 'Survey', 'Title Report',
+  'Market Data', 'Feasibility Study', 'Due Diligence',
+];
+
+async function fetchDocumentContext(projectId: number, tier: string): Promise<string> {
+  const sections: string[] = [];
+
+  try {
+    // 1. Accepted staging fields with location-relevant keys
+    const likeConditions = LOCATION_FIELD_PATTERNS.map((p) => `aes.field_key ILIKE '${p}'`).join(' OR ');
+    const stagingRows = await sql`
+      SELECT aes.field_key,
+             COALESCE(aes.validated_value::text, aes.extracted_value::text) AS field_value,
+             aes.source_snippet,
+             cd.doc_name
+      FROM landscape.ai_extraction_staging aes
+      JOIN landscape.core_doc cd ON cd.doc_id = aes.doc_id
+      WHERE aes.project_id = ${projectId}
+        AND aes.status IN ('accepted', 'pending')
+        AND cd.deleted_at IS NULL
+        AND (${sql.unsafe(likeConditions)})
+      ORDER BY aes.confidence DESC NULLS LAST
+      LIMIT 30
+    `;
+
+    if (stagingRows.length > 0) {
+      const fieldLines: string[] = [];
+      for (const row of stagingRows) {
+        const val = typeof row.field_value === 'string'
+          ? row.field_value.replace(/^"|"$/g, '')
+          : JSON.stringify(row.field_value);
+        if (val && val !== 'null' && val.length > 2) {
+          fieldLines.push(`  ${row.field_key}: ${val.slice(0, 500)}`);
+        }
+      }
+      if (fieldLines.length > 0) {
+        sections.push(`Extracted Property & Location Fields:\n${fieldLines.join('\n')}`);
+      }
+    }
+
+    // 2. Raw extracted text from project documents — location-relevant doc types
+    //    Search dms_extract_queue for docs with relevant types
+    const docTypeLower = LOCATION_DOC_TYPES.map((t) => t.toLowerCase());
+    const textRows = await sql`
+      SELECT cd.doc_name, cd.doc_type,
+             LEFT(deq.extracted_text, 3000) AS text_excerpt
+      FROM landscape.dms_extract_queue deq
+      JOIN landscape.core_doc cd ON cd.doc_id = deq.doc_id
+      WHERE cd.project_id = ${projectId}
+        AND cd.deleted_at IS NULL
+        AND deq.extracted_text IS NOT NULL
+        AND LENGTH(deq.extracted_text) > 50
+        AND deq.status = 'completed'
+      ORDER BY
+        CASE WHEN LOWER(cd.doc_type) = ANY(${docTypeLower}) THEN 0 ELSE 1 END,
+        cd.updated_at DESC
+      LIMIT 5
+    `;
+
+    if (textRows.length > 0) {
+      // Extract location-relevant paragraphs from document text
+      const locationKeywords = /\b(neighborhood|location|site|area|submarket|surrounding|access|proximity|zoning|amenit|school|transport|topograph|flood|utilit|infra|develop|land use|community|district|corridor)\b/i;
+
+      for (const row of textRows) {
+        if (!row.text_excerpt) continue;
+        const paragraphs = row.text_excerpt.split(/\n{2,}|\r?\n(?=[A-Z])/);
+        const relevant = paragraphs
+          .filter((p: string) => locationKeywords.test(p) && p.length > 40)
+          .slice(0, 3)
+          .map((p: string) => p.trim().slice(0, 600));
+
+        if (relevant.length > 0) {
+          sections.push(
+            `From "${row.doc_name}" (${row.doc_type || 'document'}):\n${relevant.join('\n\n')}`
+          );
+        }
+      }
+    }
+  } catch (err) {
+    // Non-critical — log but don't fail the analysis
+    console.warn('[market/analysis] Document context retrieval error:', err);
+  }
+
+  // Cap total context to ~4000 chars to avoid overwhelming the prompt
+  let combined = sections.join('\n\n');
+  if (combined.length > 4000) {
+    combined = combined.slice(0, 4000) + '\n  [... additional document content truncated]';
+  }
+
+  return combined;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Prompt builder
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildAnalysisPrompt(req: AnalysisRequest): { system: string; user: string } {
+function buildAnalysisPrompt(req: AnalysisRequest, documentContext?: string): { system: string; user: string } {
   const framework = TIER_FRAMEWORKS[req.tier];
   if (!framework) throw new Error(`Unknown tier: ${req.tier}`);
 
@@ -182,6 +292,9 @@ Writing style:
 - Do NOT restate metric definitions or explain what standard economic terms mean
 - The summary MUST be exactly 2-3 sentences — a tight executive snapshot, not a multi-paragraph essay
 - Reference the analysis date provided — do NOT reference older dates or time periods unless discussing historical trends
+- When "Project Document Context" is provided, weave relevant details into the analysis — property descriptions,
+  neighborhood characteristics, zoning, access, amenities, and any site-specific observations from uploaded documents.
+  Cite these as "per project documentation" rather than inventing a source name.
 
 You MUST respond with valid JSON matching this exact structure:
 {
@@ -192,6 +305,13 @@ You MUST respond with valid JSON matching this exact structure:
 }
 
 Include exactly ${framework.sections.length} sections with these titles: ${framework.sections.map((s) => `"${s}"`).join(', ')}`;
+
+  // Document context section (from project DMS)
+  const docSection = documentContext
+    ? `\nProject Document Context (extracted from uploaded documents — incorporate relevant details):
+${documentContext}
+`
+    : '';
 
   const user = `Generate the "${framework.title}" analysis (Tier ${req.tier.toUpperCase()}) for:
 
@@ -206,7 +326,7 @@ Analysis Date: ${today}
 
 Market Data (latest values with year-over-year change):
 ${dataLines.join('\n') || '  No quantitative data available — provide qualitative analysis.'}
-
+${docSection}
 Analytical Framework:
 ${framework.guidance}
 
@@ -238,7 +358,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { system, user } = buildAnalysisPrompt(body);
+    // Fetch location-relevant content from project DMS (non-blocking on failure)
+    let documentContext = '';
+    if (body.projectId) {
+      documentContext = await fetchDocumentContext(body.projectId, body.tier);
+    }
+
+    const { system, user } = buildAnalysisPrompt(body, documentContext);
 
     const client = new Anthropic({ apiKey });
 

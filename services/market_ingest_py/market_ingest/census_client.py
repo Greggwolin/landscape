@@ -109,6 +109,9 @@ ACS_SERIES_VARIABLES: Dict[str, str] = {
     "ACS_MSA_MEDIAN_HH_INC": "B19013_001E",
     "ACS_COUNTY_MEDIAN_HH_INC": "B19013_001E",
     "ACS_TRACT_MEDIAN_HH_INC": "B19013_001E",
+    # Micropolitan-level series (Census API treats MICRO same as MSA)
+    "ACS_MICRO_POPULATION": "B01001_001E",
+    "ACS_MICRO_MEDIAN_HH_INC": "B19013_001E",
 }
 
 
@@ -148,6 +151,7 @@ class CensusClient:
             "CITY": ["acs/acs1", "acs/acs5"],
             "COUNTY": ["acs/acs1", "acs/acs5"],
             "MSA": ["acs/acs1", "acs/acs5"],
+            "MICRO": ["acs/acs1", "acs/acs5"],
             "TRACT": ["acs/acs5"],  # Tracts only in 5-year estimates
             "STATE": ["acs/acs1"],
             "US": ["acs/acs1"],
@@ -165,7 +169,7 @@ class CensusClient:
             elif geo.geo_level == "COUNTY":
                 params["for"] = f"county:{geo.county_fips}"
                 params["in"] = f"state:{geo.state_fips}"
-            elif geo.geo_level == "MSA":
+            elif geo.geo_level in ("MSA", "MICRO"):
                 params["for"] = f"metropolitan statistical area/micropolitan statistical area:{geo.cbsa_code}"
             elif geo.geo_level == "TRACT":
                 # Extract the 6-digit tract code from the full 11-digit FIPS

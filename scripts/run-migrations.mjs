@@ -36,7 +36,7 @@ async function main() {
   }
 
   const sql = neon(databaseUrl)
-  const migrationsDir = join(projectRoot, 'db', 'migrations')
+  const migrationsDir = join(projectRoot, 'migrations')
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.up.sql'))
     .sort()

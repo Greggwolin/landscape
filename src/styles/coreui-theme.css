@@ -1175,4 +1175,9 @@ thead th,
 }
 .sub-section-accordion .accordion-button:not(.collapsed) {
   background: color-mix(in srgb, var(--cui-card-cap-bg, #f0f1f2) 40%, var(--cui-card-bg, #fff)) !important;
+  color: var(--cui-body-color) !important;
+}
+/* Ensure accordion active text inherits body color in dark mode (prevents purple) */
+.sub-section-accordion .accordion-button:not(.collapsed) * {
+  color: inherit;
 }

@@ -27,7 +27,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--project',
             type=str,
-            choices=['chadron', 'peoria_lakes', 'all'],
+            choices=['chadron', 'peoria_meadows', 'all'],
             default='all',
             help='Which demo project to clone (default: all)'
         )
@@ -69,7 +69,7 @@ class Command(BaseCommand):
         if not demo_ids:
             raise CommandError(
                 "DEMO_PROJECT_IDS not configured in settings. "
-                "Add DEMO_PROJECT_IDS = {'chadron': 17, 'peoria_lakes': 7} to settings.py"
+                "Add DEMO_PROJECT_IDS = {'chadron': 17, 'peoria_meadows': 9} to settings.py"
             )
 
         # Determine which projects to clone

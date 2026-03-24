@@ -40,6 +40,8 @@ ACS_MEDIAN_HH_INC,ACS Median Household Income,CITY,ACS,2017 USD,A,NSA,ACS,CITY,I
 LAUS_PLACE_EMPLOYED,City/Place Employment Level,LABOR,EMPLOYMENT,Persons,M,NSA,BLS,CITY,Sourced from LAUS place employment
 ACS_STATE_POPULATION,ACS Total Population (State),CITY,ACS,Persons,A,NSA,ACS,STATE,ACS control for state rollups
 ACS_COUNTY_POPULATION,ACS Total Population (County),CITY,ACS,Persons,A,NSA,ACS,COUNTY,
+ACS_MICRO_POPULATION,ACS Total Population (Micropolitan),CITY,ACS,Persons,A,NSA,ACS,MICRO,Census ACS 5-year (B01001_001E)
+ACS_MICRO_MEDIAN_HH_INC,ACS Median Household Income (Micropolitan),CITY,ACS,2017 USD,A,NSA,ACS,MICRO,Census ACS 5-year (B19013_001E)
 PERMIT_PLACE_TOTAL,Building Permits - Place Level Total Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,Direct place-level permits
 PERMIT_PLACE_1UNIT,Building Permits - Place Level 1 Unit,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,
 PERMIT_PLACE_5PLUS,Building Permits - Place Level 5+ Units,HOUSING,PERMITS,Units,M,NSA,BPS,CITY,

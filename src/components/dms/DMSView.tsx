@@ -250,22 +250,27 @@ function DMSViewInner({
         };
       });
 
-      // Add any counted doc types not in the merged list
+      // Bucket non-template doc types under "Other" instead of showing bogus filter names
       const typeSet = new Set(docTypeItems.map(item => item.doc_type_name.toLowerCase()));
-      const extraFilters = countEntries
+      const otherCount = countEntries
         .filter(({ doc_type }) => doc_type && !typeSet.has(doc_type.toLowerCase()))
-        .map(({ doc_type, count }) => ({
-          doc_type,
+        .reduce((sum, { count }) => sum + (count ?? 0), 0);
+
+      const finalFilters = [...typeFilters];
+      if (otherCount > 0) {
+        finalFilters.push({
+          doc_type: 'Other',
           icon: '📁',
-          count: count ?? 0,
+          count: otherCount,
           is_expanded: false,
           documents: [],
-          is_from_template: true, // treat as template since it came from actual docs
-        }));
+          is_from_template: false,
+        });
+      }
 
-      setAllFilters([...typeFilters, ...extraFilters]);
+      setAllFilters(finalFilters);
       // Keep current expanded filter open if it still exists
-      if (expandedFilter && ![...typeFilters, ...extraFilters].some(f => f.doc_type === expandedFilter)) {
+      if (expandedFilter && !finalFilters.some(f => f.doc_type === expandedFilter)) {
         setExpandedFilter(null);
       }
     } catch (error) {
@@ -321,20 +326,36 @@ function DMSViewInner({
     setExpandedFilter(docType);
 
     try {
-      const response = await fetch(
-        `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
-      );
+      let documents: DMSDocument[] = [];
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
+      if (docType === 'Other') {
+        // "Other" bucket: fetch ALL docs, then filter out template-matching ones client-side
+        const templateTypes = new Set(
+          allFilters
+            .filter(f => f.doc_type !== 'Other')
+            .map(f => f.doc_type.toLowerCase())
+        );
+        const response = await fetch(
+          `/api/dms/search?project_id=${projectId}&limit=100`
+        );
+        if (!response.ok) throw new Error('Failed to fetch documents');
+        const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
+        documents = (data.results || []).filter(
+          d => d.doc_type && !templateTypes.has(d.doc_type.toLowerCase())
+        );
+      } else {
+        const response = await fetch(
+          `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
+        );
+        if (!response.ok) throw new Error('Failed to fetch documents');
+        const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
+        documents = data.results || [];
       }
-
-      const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
 
       setAllFilters((prev) =>
         prev.map((f) =>
           f.doc_type === docType
-            ? { ...f, is_expanded: true, documents: data.results || [] }
+            ? { ...f, is_expanded: true, documents }
             : f
         )
       );

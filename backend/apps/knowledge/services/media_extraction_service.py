@@ -185,7 +185,9 @@ class MediaExtractionService:
             return []
 
         results = []
-        seen_hashes: set[str] = set()  # SHA-256 dedup within this document
+        # Cross-document dedup: pre-load all existing image hashes for this project
+        # so we don't extract duplicate images already saved from other documents
+        seen_hashes: set[str] = self._get_project_image_hashes(project_id, doc_id)
         try:
             doc = fitz.open(tmp_path)
             try:
@@ -706,6 +708,34 @@ class MediaExtractionService:
             'storage_uri': row[3],
             'doc_name': row[4],
         }
+
+    def _get_project_image_hashes(self, project_id: int, exclude_doc_id: int = None) -> set[str]:
+        """Load all existing image hashes for this project (cross-document dedup).
+
+        Returns a set of SHA-256 hashes from previously extracted media in
+        the same project, excluding rejected/deleted items and optionally
+        excluding a specific document (to allow re-extraction of its own images).
+        """
+        try:
+            with connection.cursor() as c:
+                c.execute("""
+                    SELECT DISTINCT image_hash
+                    FROM landscape.core_doc_media
+                    WHERE project_id = %s
+                      AND image_hash IS NOT NULL
+                      AND status NOT IN ('rejected', 'pending')
+                      AND deleted_at IS NULL
+                      AND (%s IS NULL OR doc_id != %s)
+                """, [project_id, exclude_doc_id, exclude_doc_id])
+                rows = c.fetchall()
+            hashes = {row[0] for row in rows}
+            logger.info(
+                f"[project_id={project_id}] Loaded {len(hashes)} existing image hashes for cross-doc dedup"
+            )
+            return hashes
+        except Exception:
+            logger.exception(f"[project_id={project_id}] Failed to load project image hashes")
+            return set()
 
     def _set_media_scan_status(self, doc_id: int, status: str):
         """Update media_scan_status on core_doc."""
