@@ -6,7 +6,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import ProjectViewSet, AnalysisTypeConfigViewSet, AnalysisDraftViewSet
 from .views_preferences import UserPreferenceViewSet
-from apps.market_intel.views import RentComparableViewSet, MarketRateAnalysisViewSet, MarketCompetitiveProjectViewSet, MarketMacroDataViewSet
+from apps.market_intel.views import RentComparableViewSet, MarketRateAnalysisViewSet, MarketCompetitiveProjectViewSet, MarketMacroDataViewSet, ExpenseComparableViewSet
 
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
@@ -41,6 +41,13 @@ urlpatterns = [
     path('projects/<int:project_pk>/market/competitors/<int:pk>/',
          MarketCompetitiveProjectViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
          name='project-market-competitors-detail'),
+    # Expense comparables endpoints
+    path('projects/<int:project_pk>/expense-comps/',
+         ExpenseComparableViewSet.as_view({'get': 'list', 'post': 'create'}),
+         name='project-expense-comps-list'),
+    path('projects/<int:project_pk>/expense-comps/<int:pk>/',
+         ExpenseComparableViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
+         name='project-expense-comps-detail'),
     # Market macro data endpoints
     path('projects/<int:project_pk>/market/macro/',
          MarketMacroDataViewSet.as_view({'get': 'list', 'post': 'create'}),

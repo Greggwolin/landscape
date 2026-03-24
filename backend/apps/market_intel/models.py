@@ -331,3 +331,43 @@ class MarketObservation(models.Model):
 
     def __str__(self):
         return f"{self.series.series_code} @ {self.obs_date}: {self.value}"
+
+
+class ExpenseComparable(models.Model):
+    """
+    Model for expense comparables — competing property operating statements.
+    Expenses stored as JSONB: { "Real Estate Taxes": 285000, ... }
+    Maps to landscape.tbl_expense_comparable
+    """
+
+    comparable_id = models.AutoField(primary_key=True)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        db_column='project_id',
+        related_name='expense_comparables'
+    )
+    property_name = models.CharField(max_length=200)
+    address = models.CharField(max_length=300, null=True, blank=True)
+    distance_miles = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    year_built = models.IntegerField(null=True, blank=True)
+    total_units = models.IntegerField(null=True, blank=True)
+    total_sqft = models.IntegerField(null=True, blank=True)
+    expenses = models.JSONField(default=dict)
+    total_opex = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    data_source = models.CharField(max_length=100, null=True, blank=True)
+    as_of_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'tbl_expense_comparable'
+        ordering = ['project', 'distance_miles']
+
+    def __str__(self):
+        return f"{self.property_name} ({self.total_units or '?'} units)"

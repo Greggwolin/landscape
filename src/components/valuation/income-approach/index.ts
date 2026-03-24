@@ -16,3 +16,4 @@ export { RentCompsView } from './RentCompsView';
 export { RentCompDetailModal } from './RentCompDetailModal';
 export { ExpenseCompsView } from './ExpenseCompsView';
 export type { PlatformEstimate } from './ExpenseCompsView';
+export { ExpenseCompDetailModal } from './ExpenseCompDetailModal';

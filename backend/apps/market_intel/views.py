@@ -2,16 +2,18 @@
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db.models import Avg, Min, Max, Count
-from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData
+from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData, ExpenseComparable
 from .serializers import (
     AIIngestionHistorySerializer,
     MarketReportSerializer,
     RentComparableSerializer,
     MarketRateAnalysisSerializer,
     MarketCompetitiveProjectSerializer,
-    MarketMacroDataSerializer
+    MarketMacroDataSerializer,
+    ExpenseComparableSerializer
 )
 
 
@@ -300,3 +302,35 @@ class MarketMacroDataViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(data_year=data_year)
 
         return queryset.order_by('-data_year', '-created_at')
+
+
+class ExpenseComparableViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Expense Comparables.
+
+    Endpoints:
+    - GET /api/projects/:project_id/expense-comps/ - List expense comps for project
+    - POST /api/projects/:project_id/expense-comps/ - Create new expense comp
+    - GET /api/projects/:project_id/expense-comps/:id/ - Get detail
+    - PUT/PATCH /api/projects/:project_id/expense-comps/:id/ - Update
+    - DELETE /api/projects/:project_id/expense-comps/:id/ - Delete
+    """
+
+    serializer_class = ExpenseComparableSerializer
+    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
+
+    def get_queryset(self):
+        project_id = self.kwargs.get('project_pk')
+        queryset = ExpenseComparable.objects.filter(project_id=project_id)
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        return queryset.order_by('distance_miles', 'property_name')
+
+    def perform_create(self, serializer):
+        project_id = self.kwargs.get('project_pk')
+        serializer.save(project_id=project_id)
+
+    def perform_update(self, serializer):
+        project_id = self.kwargs.get('project_pk')
+        serializer.save(project_id=project_id)

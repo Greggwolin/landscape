@@ -1,0 +1,225 @@
+.modalRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 1055;
+  display: block;
+}
+
+.modalDialog {
+  width: 820px;
+  max-width: 820px;
+  margin: 1.25rem auto;
+  pointer-events: auto;
+}
+
+.modalContent {
+  background: var(--cui-card-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.75rem;
+  color: var(--cui-body-color);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 95vh;
+  box-shadow: 0 1.25rem 2.75rem rgba(var(--cui-body-color-rgb), 0.28);
+}
+
+.header {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-card-bg);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.badgeOutline {
+  color: var(--cui-secondary-color);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 0.25rem;
+  background: transparent;
+  letter-spacing: 0.02rem;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  position: relative;
+  background: var(--cui-card-bg);
+}
+
+.body::-webkit-scrollbar {
+  width: 0.3125rem;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: var(--cui-border-color);
+  border-radius: 0.1875rem;
+}
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  padding: 0.5rem 1rem;
+}
+
+.kpiItem {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+
+.kpiItem:not(:last-child) {
+  border-right: 1px solid var(--cui-border-color);
+}
+
+.kpiTitle {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04rem;
+  color: var(--cui-secondary-color);
+  margin-bottom: 0.125rem;
+}
+
+.kpiValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.section {
+  border: none;
+  border-radius: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.sectionHeader {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  user-select: none;
+  background: var(--cui-tertiary-bg);
+  border: none;
+  border-bottom: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  gap: 0.5rem;
+}
+
+.sectionHeaderOpen {
+  background: var(--cui-tertiary-bg);
+}
+
+.sectionBody {
+  padding: 0.75rem 1rem;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem 1.25rem;
+}
+
+.fieldGrid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.625rem 1.25rem;
+}
+
+.fieldGrid4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0.625rem 1.25rem;
+}
+
+.fieldLabel {
+  font-size: 0.6875rem;
+  color: var(--cui-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.03rem;
+  margin-bottom: 0.1875rem;
+}
+
+.smallControl {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+  height: 30px;
+  background: var(--cui-input-bg);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+}
+
+.smallControl:focus {
+  border-color: var(--cui-primary);
+  box-shadow: 0 0 0 0.15rem rgba(var(--cui-primary-rgb), 0.25);
+}
+
+.valueRight {
+  text-align: right;
+}
+
+.inputPrefix {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prefix {
+  position: absolute;
+  left: 0.5rem;
+  color: var(--cui-secondary-color);
+  font-size: 0.8125rem;
+  pointer-events: none;
+}
+
+.prefixedInput {
+  padding-left: 1.25rem !important;
+}
+
+.notesArea {
+  font-size: 0.8125rem;
+  background: var(--cui-input-bg);
+  border-color: var(--cui-border-color);
+  color: var(--cui-body-color);
+  min-height: 4rem;
+  resize: vertical;
+}
+
+.footer {
+  padding: 0.625rem 1.25rem;
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-card-bg);
+  flex-shrink: 0;
+}
+
+.mutedText {
+  color: var(--cui-secondary-color);
+}
+
+.chevron {
+  transition: transform 0.15s ease;
+  color: var(--cui-secondary-color);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.categoryLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--cui-secondary-color);
+  padding: 0.5rem 0 0.25rem;
+  border-bottom: 1px solid var(--cui-border-color-translucent);
+  margin-bottom: 0.375rem;
+}

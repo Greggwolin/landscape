@@ -1,7 +1,7 @@
 """Serializers for Market Intelligence application."""
 
 from rest_framework import serializers
-from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData
+from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData, ExpenseComparable
 
 
 class AIIngestionHistorySerializer(serializers.ModelSerializer):
@@ -166,3 +166,57 @@ class MarketMacroDataSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ExpenseComparableSerializer(serializers.ModelSerializer):
+    """Serializer for Expense Comparable model."""
+
+    opex_per_unit = serializers.SerializerMethodField()
+    opex_per_sf = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExpenseComparable
+        fields = [
+            'comparable_id', 'project',
+            'property_name', 'address', 'distance_miles',
+            'year_built', 'total_units', 'total_sqft',
+            'expenses', 'total_opex', 'opex_per_unit', 'opex_per_sf',
+            'data_source', 'as_of_date', 'notes', 'is_active',
+            'latitude', 'longitude',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['comparable_id', 'project', 'opex_per_unit', 'opex_per_sf', 'created_at', 'updated_at']
+
+    def get_opex_per_unit(self, obj):
+        if obj.total_opex and obj.total_units and obj.total_units > 0:
+            return round(float(obj.total_opex) / obj.total_units, 2)
+        return None
+
+    def get_opex_per_sf(self, obj):
+        if obj.total_opex and obj.total_sqft and obj.total_sqft > 0:
+            return round(float(obj.total_opex) / obj.total_sqft, 2)
+        return None
+
+    def validate_expenses(self, value):
+        """Ensure expenses is a dict of string keys to numeric values."""
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("expenses must be a JSON object")
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise serializers.ValidationError(f"Expense key must be a string, got {type(k)}")
+            if v is not None and not isinstance(v, (int, float)):
+                raise serializers.ValidationError(f"Expense value for '{k}' must be numeric or null")
+        return value
+
+    def create(self, validated_data):
+        """Auto-calculate total_opex from expenses on create."""
+        expenses = validated_data.get('expenses', {})
+        validated_data['total_opex'] = sum(v for v in expenses.values() if isinstance(v, (int, float)))
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        """Auto-calculate total_opex from expenses on update."""
+        expenses = validated_data.get('expenses', instance.expenses)
+        if expenses:
+            validated_data['total_opex'] = sum(v for v in expenses.values() if isinstance(v, (int, float)))
+        return super().update(instance, validated_data)

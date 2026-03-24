@@ -4,14 +4,18 @@
  * ExpenseCompsView Component
  *
  * Expense comparable benchmarking table within the Income Approach tab.
- * Shows subject F-12 expenses alongside project comps and platform knowledge
+ * Shows subject F-12 expenses alongside saved expense comps and platform knowledge
  * with accept/reject controls per line item.
  *
  * Session: QV17 — Income Approach Redesign
+ * Updated: 2026-03-24 — Add Comp button + CRUD modal + live API data
  * @created 2026-03-15
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Plus, Pencil } from 'lucide-react';
+import { getExpenseComparables, type ExpenseComparable } from '@/lib/api/expenseComps';
+import { ExpenseCompDetailModal } from './ExpenseCompDetailModal';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -31,15 +35,6 @@ interface ExpenseLineItem {
   subjectAmount: number; // Annual total from Operations tab
 }
 
-interface ProjectComp {
-  projectName: string;
-  unitCount: number;
-  yearBuilt?: number;
-  expenses: Record<string, number>; // lineItem name → annual amount
-  totalUnits: number;
-  totalSqft: number;
-}
-
 type DisplayMode = 'per_unit' | 'per_sf' | 'total';
 
 interface ExpenseCompsViewProps {
@@ -51,8 +46,6 @@ interface ExpenseCompsViewProps {
   subjectTotalSqft?: number;
   /** Operating expense items from the Operations tab */
   opexItems?: ExpenseLineItem[];
-  /** Comparable projects from user's account (stub for now) */
-  projectComps?: ProjectComp[];
   /** Platform knowledge estimates (stub for now) */
   platformEstimates?: PlatformEstimate[];
   /** Callback when recommendations are applied */
@@ -187,12 +180,47 @@ export function ExpenseCompsView({
   subjectYearBuilt,
   subjectTotalSqft = 96000,
   opexItems,
-  projectComps = [],
   platformEstimates,
   onApplyRecommendations,
 }: ExpenseCompsViewProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('per_unit');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  // ── Modal state ──
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingCompId, setEditingCompId] = useState<number | undefined>(undefined);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ── Fetch expense comps from API ──
+  const [expenseComps, setExpenseComps] = useState<ExpenseComparable[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getExpenseComparables(projectId)
+      .then((comps) => {
+        if (!cancelled) setExpenseComps(comps.filter((c) => c.is_active));
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Failed to fetch expense comps:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, refreshKey]);
+
+  const openAddModal = useCallback(() => {
+    setEditingCompId(undefined);
+    setModalOpen(true);
+  }, []);
+
+  const openEditModal = useCallback((compId: number) => {
+    setEditingCompId(compId);
+    setModalOpen(true);
+  }, []);
+
+  const handleSaved = useCallback(() => {
+    setModalOpen(false);
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   // Use stubs when no real data provided
   const expenses = opexItems && opexItems.length > 0 ? opexItems : STUB_SUBJECT_EXPENSES;
@@ -261,6 +289,42 @@ export function ExpenseCompsView({
           backgroundColor: 'var(--cui-card-bg)',
         }}
       >
+        {/* ── Table Header Bar with Add button ── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.375rem 0.75rem',
+            backgroundColor: 'var(--cui-card-header-bg)',
+            borderBottom: '1px solid var(--cui-border-color)',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', color: 'var(--cui-secondary-color)' }}>
+            {expenseComps.length > 0
+              ? `${expenseComps.length} comp${expenseComps.length !== 1 ? 's' : ''}`
+              : 'No comps added'}
+          </span>
+          <button
+            onClick={openAddModal}
+            style={{
+              fontSize: '0.6875rem',
+              padding: '0.1875rem 0.5rem',
+              borderRadius: '0.25rem',
+              color: 'var(--cui-white)',
+              backgroundColor: 'var(--cui-primary)',
+              border: '1px solid var(--cui-primary)',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+          >
+            <Plus size={12} /> Add Comp
+          </button>
+        </div>
+
         <table
           style={{
             width: '100%',
@@ -283,12 +347,31 @@ export function ExpenseCompsView({
               <th style={{ ...thStyle, ...subjectHighlight, textAlign: 'right', whiteSpace: 'normal' }}>
                 Subject F-12
               </th>
-              {projectComps.map((comp) => (
+              {/* ── Saved Expense Comp Columns ── */}
+              {expenseComps.map((comp) => (
                 <th
-                  key={comp.projectName}
-                  style={{ ...thStyle, textAlign: 'right', whiteSpace: 'normal' }}
+                  key={comp.comparable_id}
+                  style={{ ...thStyle, textAlign: 'right', whiteSpace: 'normal', minWidth: '100px' }}
                 >
-                  {comp.projectName}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                    <span>{comp.property_name}</span>
+                    <button
+                      onClick={() => openEditModal(comp.comparable_id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '0.125rem',
+                        cursor: 'pointer',
+                        color: 'var(--cui-secondary-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        borderRadius: '0.125rem',
+                      }}
+                      title={`Edit ${comp.property_name}`}
+                    >
+                      <Pencil size={10} />
+                    </button>
+                  </div>
                 </th>
               ))}
               <th
@@ -313,7 +396,7 @@ export function ExpenseCompsView({
                 items={cat.items}
                 expenseLookup={expenseLookup}
                 platformLookup={platformLookup}
-                projectComps={projectComps}
+                expenseComps={expenseComps}
                 displayMode={displayMode}
                 unitCount={subjectUnitCount}
                 totalSqft={subjectTotalSqft}
@@ -328,11 +411,13 @@ export function ExpenseCompsView({
               <td style={{ ...tdStyle, ...subjectHighlight, textAlign: 'right', fontWeight: 700 }}>
                 {formatExpenseValue(subjectTotal, displayMode, subjectUnitCount, subjectTotalSqft)}
               </td>
-              {projectComps.map((comp) => {
-                const compTotal = Object.values(comp.expenses).reduce((s, v) => s + v, 0);
+              {expenseComps.map((comp) => {
+                const compTotal = comp.total_opex || Object.values(comp.expenses || {}).reduce((s: number, v) => s + (Number(v) || 0), 0);
                 return (
-                  <td key={comp.projectName} style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
-                    {formatExpenseValue(compTotal, displayMode, comp.totalUnits, comp.totalSqft)}
+                  <td key={comp.comparable_id} style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
+                    {compTotal > 0
+                      ? formatExpenseValue(compTotal, displayMode, comp.total_units || 1, comp.total_sqft || 1)
+                      : '—'}
                   </td>
                 );
               })}
@@ -355,8 +440,8 @@ export function ExpenseCompsView({
               <td style={{ ...tdStyle, ...subjectHighlight, textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
                 {subjectExpenseRatio}%
               </td>
-              {projectComps.map((comp) => (
-                <td key={comp.projectName} style={{ ...tdStyle, textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
+              {expenseComps.map((comp) => (
+                <td key={comp.comparable_id} style={{ ...tdStyle, textAlign: 'right', color: 'var(--cui-secondary-color)' }}>
                   —
                 </td>
               ))}
@@ -436,6 +521,15 @@ export function ExpenseCompsView({
           from market norms. Ask Landscaper for a detailed expense analysis.
         </div>
       </div>
+
+      {/* ── CRUD Modal ── */}
+      <ExpenseCompDetailModal
+        projectId={projectId}
+        comparableId={editingCompId}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }
@@ -449,7 +543,7 @@ interface CategoryGroupProps {
   items: string[];
   expenseLookup: Map<string, ExpenseLineItem>;
   platformLookup: Map<string, PlatformEstimate>;
-  projectComps: ProjectComp[];
+  expenseComps: ExpenseComparable[];
   displayMode: DisplayMode;
   unitCount: number;
   totalSqft: number;
@@ -462,7 +556,7 @@ function CategoryGroup({
   items,
   expenseLookup,
   platformLookup,
-  projectComps,
+  expenseComps,
   displayMode,
   unitCount,
   totalSqft,
@@ -474,7 +568,7 @@ function CategoryGroup({
       {/* Category Header Row */}
       <tr>
         <td
-          colSpan={3 + projectComps.length}
+          colSpan={3 + expenseComps.length}
           style={{
             padding: '0.5rem 0.75rem 0.25rem',
             fontSize: '0.6875rem',
@@ -507,13 +601,15 @@ function CategoryGroup({
                 : '—'}
             </td>
 
-            {/* Project Comps */}
-            {projectComps.map((comp) => {
-              const compAmount = comp.expenses[itemName];
+            {/* Saved Expense Comps */}
+            {expenseComps.map((comp) => {
+              const compAmount = comp.expenses?.[itemName];
+              const compUnits = comp.total_units || 1;
+              const compSqft = comp.total_sqft || 1;
               return (
-                <td key={comp.projectName} style={{ ...tdStyle, textAlign: 'right' }}>
-                  {compAmount != null
-                    ? formatExpenseValue(compAmount, displayMode, comp.totalUnits, comp.totalSqft)
+                <td key={comp.comparable_id} style={{ ...tdStyle, textAlign: 'right' }}>
+                  {compAmount != null && Number(compAmount) > 0
+                    ? formatExpenseValue(Number(compAmount), displayMode, compUnits, compSqft)
                     : '—'}
                 </td>
               );
