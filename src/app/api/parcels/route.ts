@@ -24,9 +24,13 @@ export async function GET(request: Request) {
         CASE
           WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
           THEN CONCAT(a.area_no::text, '.', ph.phase_no::text)
+          WHEN ph.phase_no IS NOT NULL
+          THEN ph.phase_no::text
           ELSE COALESCE(p.parcel_code, 'Unassigned')
         END AS phase_name,
         CASE
+          WHEN p.parcel_code IS NOT NULL AND p.parcel_code != ''
+          THEN p.parcel_code
           WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
           THEN CONCAT(
             a.area_no::text,
@@ -39,7 +43,17 @@ export async function GET(request: Request) {
               '0'
             )
           )
-          ELSE COALESCE(p.parcel_code, CONCAT('Parcel-', p.parcel_id::text))
+          WHEN ph.phase_no IS NOT NULL
+          THEN CONCAT(
+            ph.phase_no::text,
+            '.',
+            LPAD(
+              ROW_NUMBER() OVER (PARTITION BY ph.phase_no ORDER BY p.parcel_id)::text,
+              2,
+              '0'
+            )
+          )
+          ELSE CONCAT('Parcel-', p.parcel_id::text)
         END AS parcel_name,
         COALESCE(p.landuse_code, '') as usecode,
         COALESCE(CAST(p.acres_gross AS FLOAT), 0) as acres,
@@ -96,6 +110,8 @@ export async function POST(request: Request) {
       density_code,
       type_code,
       product_code,
+      // Parcel identifier (user-entered when autoNumber is off)
+      parcel_code,
       // New non-residential fields
       building_sf,
       site_coverage_pct,
@@ -117,6 +133,7 @@ export async function POST(request: Request) {
         project_id,
         area_id,
         phase_id,
+        parcel_code,
         landuse_code,
         acres_gross,
         units_total,
@@ -131,6 +148,7 @@ export async function POST(request: Request) {
         ${project_id},
         ${area_id},
         ${phase_id},
+        ${parcel_code || null},
         ${landuse_code || null},
         ${acres_gross || null},
         ${units_total || null},
@@ -156,17 +174,40 @@ export async function POST(request: Request) {
         p.phase_id,
         a.area_no AS area_no,
         ph.phase_no AS phase_no,
-        CONCAT(a.area_no::text, '.', ph.phase_no::text) AS phase_name,
-        CONCAT(
-          a.area_no::text,
-          '.',
-          ph.phase_no::text,
-          LPAD(
-            ROW_NUMBER() OVER (PARTITION BY a.area_no, ph.phase_no ORDER BY p.parcel_id)::text,
-            2,
-            '0'
+        CASE
+          WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+          THEN CONCAT(a.area_no::text, '.', ph.phase_no::text)
+          WHEN ph.phase_no IS NOT NULL
+          THEN ph.phase_no::text
+          ELSE 'Unassigned'
+        END AS phase_name,
+        CASE
+          WHEN p.parcel_code IS NOT NULL AND p.parcel_code != ''
+          THEN p.parcel_code
+          WHEN a.area_no IS NOT NULL AND ph.phase_no IS NOT NULL
+          THEN CONCAT(
+            a.area_no::text,
+            '.',
+            ph.phase_no::text,
+            '.',
+            LPAD(
+              ROW_NUMBER() OVER (PARTITION BY a.area_no, ph.phase_no ORDER BY p.parcel_id)::text,
+              2,
+              '0'
+            )
           )
-        ) AS parcel_name,
+          WHEN ph.phase_no IS NOT NULL
+          THEN CONCAT(
+            ph.phase_no::text,
+            '.',
+            LPAD(
+              ROW_NUMBER() OVER (PARTITION BY ph.phase_no ORDER BY p.parcel_id)::text,
+              2,
+              '0'
+            )
+          )
+          ELSE CONCAT('Parcel-', p.parcel_id::text)
+        END AS parcel_name,
         COALESCE(p.landuse_code, '') as usecode,
         COALESCE(CAST(p.acres_gross AS FLOAT), 0) as acres,
         COALESCE(p.lot_product, '') as product,

@@ -3,6 +3,86 @@
 > Running log of development sessions. Newest first.
 > Trigger: Say **"Document"** in any chat to add an entry.
 
+## 2026-03-23 — HEALTH CHECK FAILURE
+
+**Failed checks:**
+- Both servers DOWN — Next.js (port 3000) and Django (port 8000) not responding
+- All 14 endpoint checks skipped due to servers being unavailable
+
+**Passing checks:** 0 of 14 passed
+
+**Possible causes:**
+- Servers were not started in the Cowork VM environment (this is a sandboxed session — servers need to be launched manually)
+- No recent commits suggest breaking changes — last commit was `3f1d84f chore: bump version to v0.1.09` (3 days ago)
+
+---
+
+## Geo Auto-Seeding + Micropolitan Support + Location Tab Fixes — 2026-03-20
+
+**What was discussed:**
+- Multiple interconnected Location tab bugs traced and fixed: `jurisdiction_city` not syncing with `city` on project profile PATCH, mutation approval UI not rendering in thread-based `ai_handler.py`, state name normalization ("Arizona" vs "AZ") breaking geo_xwalk lookups, and location analysis not persisting on navigation.
+- Built a complete auto-seeding system for `geo_xwalk` — any US city now auto-resolves its full geographic hierarchy (US → State → MSA/μSA → County → City) via Census Bureau APIs on first Location tab load. No manual seeding required.
+- Added Micropolitan Statistical Area (μSA) support throughout the stack. Ketchum, ID (Hailey μSA) was the test case — `cbsa_lookup.py` only covered Metropolitan areas, `geo_xwalk` had zero Idaho coverage, and no `MICRO` geo_level existed anywhere.
+- Created `src/lib/geo/bootstrap.ts` — TypeScript port of `geo_bootstrap.py` with μSA support baked in. Uses Census ACS API for place FIPS, Census Geocoder for county + dynamic CBSA extraction, plus hardcoded fallback for common resort/mountain μSAs.
+- Auto-bootstrap wired into `geos/route.ts`: on cache miss, calls Census APIs, upserts records, re-queries. Also removed the 404 on "no market data" — now returns geo hierarchy with a notice so Location tab can display scope even before data ingestion.
+- LocationSubTab now dynamically swaps T2 tier label to "Micropolitan Statistical Area (μSA)" when geo data includes a MICRO target.
+
+**Files created:**
+- `src/lib/geo/constants.ts` — FIPS codes, state mappings, `normalizeState()`, `GEO_LEVEL_ORDER` with MICRO
+- `src/lib/geo/bootstrap.ts` — Census API auto-resolution + geo_xwalk upsert
+- `src/lib/geo/index.ts` — Barrel export
+- `src/app/api/market/geos/bootstrap/route.ts` — POST endpoint for explicit bootstrap
+
+**Files modified:**
+- `src/app/api/projects/[projectId]/profile/route.ts` — jurisdiction_* sync on PATCH
+- `src/app/api/market/geos/route.ts` — MICRO in ORDER, auto-bootstrap on miss, removed 404 on no data
+- `src/app/projects/[projectId]/components/tabs/LocationSubTab.tsx` — MICRO in GEO_LEVEL_ORDER, dynamic T2 tier label, MICRO series codes
+- `backend/apps/landscaper/ai_handler.py` — mutation_proposals tracking for Level 2 autonomy UI
+- `services/market_ingest_py/market_ingest/cbsa_lookup.py` — COUNTY_TO_MICRO dict, `get_micro()`, `get_cbsa_or_micro()`
+- `services/market_ingest_py/market_ingest/geo_bootstrap.py` — MICRO geo_level support
+- `services/market_ingest_py/market_ingest/geo.py` — MICRO in hierarchy order
+
+**Open items:**
+- Test end-to-end with Ketchum project on running dev server (Census API calls need network access)
+- Market data ingestion for Micropolitan areas — FRED/BLS series codes for μSAs not yet mapped
+- Full Census CBSA delineation file parsing (currently uses hardcoded μSA fallback + dynamic geocoder extraction)
+- CLAUDE.md needs update: geo auto-seeding feature, MICRO geo_level, new `src/lib/geo/` library
+
+---
+
+## Satellite Imagery Research + Rent Comp Harvester POC — 2026-03-20
+
+**What was discussed:**
+- Wide-ranging exploration triggered by Reddit post about replicating hedge fund satellite imagery analysis. Led to two feature concepts: (1) satellite-based absorption intelligence for land dev, and (2) automated rent comp harvesting for multifamily.
+- Rent comp harvester POC tested across 4 sessions (GR21, GR30, GR37, GR39). Redfin rentals API (`/api/v1/search/rentals?poly={bbox}&num_homes=100`) validated as primary data source — returns 200-700+ properties with rent ranges per polygon query. Works nationwide; `market` parameter is ignored when polygon is provided. No API key needed.
+- Polygon search confirmed as the only reliable approach. Region_id resolution is unreliable (unpredictable ID-to-city mapping, autocomplete returns 403 from server environments). Lat/lng → bounding box → polygon is deterministic and works from any environment.
+- RentCafe/Yardi GA4 data attributes identified as best enrichment source for institutional comps (~15% of properties have own websites, but those are disproportionately the ones appraisers care about). Deterministic regex parser on `setGA4Cookie` calls — no LLM needed.
+- Schema migration needed on `tbl_rental_comparable`: missing source_type, source_url, redfin_rental_id, redfin_property_id, google_place_id, as_of_date, last_refreshed, available_units, rent_range_min, rent_range_max, is_active.
+- Satellite absorption concept validated conceptually but not POC-tested. Sentinel-2 (10m, free) sufficient for construction detection (binary yes/no), not car counting. Maricopa County Assessor API (free, REST) supports subdivision search. Click-to-expand boundary inference avoids data licensing costs.
+- LA County dropped from satellite target markets (high-density infill, not subdivision absorption). Target: Sunbelt horizontal growth (Phoenix, DFW, Houston, etc.).
+- Katona et al. paper findings: satellite parking lot imagery yields ~4.76% abnormal returns around earnings; bad-news signals ~3x more predictive than good-news. Requires 30cm commercial imagery ($100K+/yr) — free 10m Sentinel-2 cannot replicate car counting but CAN detect construction activity.
+- Zonda acquired Bird.i (satellite) in 2020, has 3.3M+ parcels with construction status. Built for homebuilder audience, not underwriting.
+- Fred Gortner (gernblanston) identified as key alpha tester for value-add MF workflow.
+
+**Key artifacts:**
+- `CC_RENT_COMP_HARVESTER_TEST_GR21.md` — POC v1 prompt (Google Places + website scraping)
+- `CC_RENTAL_COMP_HARVESTER_REDFIN_GR30.md` — POC v2 prompt (Redfin rentals API)
+- `COWORK_REDFIN_REGION_TEST_GR37.md` — Region_id resolution testing prompt
+- `LANDSCAPE_INTELLIGENT_MARKET_DATA_HARVESTING_CONCEPT.md` — Feature concept doc (primary deliverable)
+- `backend/tools/redfin_ingest/rental_comp_poc_v2.py` — Working POC script
+- `backend/tools/redfin_ingest/rental_comp_poc_results_v2.json` — 231 Hawthorne results
+
+**POC coverage progression:** Google Places + scraping: 3/20 (15%) → + Redfin sales CSV: still 15% (added nothing) → Redfin rentals API: 231 (Hawthorne), 709 (Phoenix)
+
+**Open items:**
+- Scope rent comp harvester implementation — schema migration, backend service, API endpoint, frontend, Landscaper tool
+- Test Redfin rentals API from Railway/production environment (confirm works from actual backend)
+- Evaluate paid API fallback (RentCast, HelloData, Dwellsy API IQ) for properties Redfin misses
+- Satellite POC — Maricopa API + Google Earth Engine for a known subdivision (future session)
+- CLAUDE.md updates needed: rent comp harvester feature, Redfin rentals API docs, `tbl_rental_comparable` migration queued, satellite concept on future roadmap
+
+---
+
 ## Appraisal Extraction Pipeline — 2026-03-20
 
 **What was discussed:**

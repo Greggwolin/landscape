@@ -54,7 +54,7 @@ class GeoResolver:
         return targets
 
     def build_hierarchy_payload(self, targets: Iterable[GeoTarget]) -> Dict[str, str]:
-        order = ["CITY", "COUNTY", "MSA", "STATE", "US"]
+        order = ["CITY", "COUNTY", "MSA", "MICRO", "STATE", "US"]
         hierarchy: Dict[str, str] = {}
         for target in targets:
             key = target.geo_level.lower()

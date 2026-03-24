@@ -146,16 +146,17 @@ type TierKey = 't1' | 't2' | 't3';
 // Constants
 // ---------------------------------------------------------------------------
 
-const GEO_LEVEL_ORDER = ['US', 'STATE', 'MSA', 'COUNTY', 'CITY'] as const;
+const GEO_LEVEL_ORDER = ['US', 'STATE', 'MSA', 'MICRO', 'COUNTY', 'CITY'] as const;
 
 const INDICATOR_CONFIG = [
-  { id: 'population', label: 'Population', codes: ['POP_US', 'POP_STATE', 'POP_MSA', 'POP_COUNTY', 'ACS_POPULATION', 'ACS_COUNTY_POPULATION', 'POP_'], format: 'number' as const },
-  { id: 'employment', label: 'Employment', codes: ['PAYEMS', 'PAYEMS_STATE', 'PAYEMS_MSA', 'LAUS_COUNTY_EMP', 'CES_STATE', 'LAUS_EMP', 'LAUS_STATE_EMP', 'LAUS_MSA_EMP', 'EMP_', 'CE_'], format: 'number' as const },
-  { id: 'unemployment', label: 'Unemployment Rate', codes: ['LAUS_UNRATE', 'LAUS_STATE_UNRATE', 'LAUS_MSA_UNRATE', 'LAUS_COUNTY_UNRATE', 'LAUS_PLACE_UNRATE', 'UNRATE'], format: 'percent' as const },
-  { id: 'income', label: 'Median HH Income', codes: ['MEHOINUSA', 'MEHI_STATE', 'ACS_MEDIAN_HH_INC', 'ACS_COUNTY_MEDIAN_HH_INC', 'ACS_MSA_MEDIAN_HH_INC', 'MEHI_', 'MHHI_'], format: 'currency' as const },
+  { id: 'population', label: 'Population', codes: ['POP_US', 'POP_STATE', 'POP_MSA', 'POP_MICRO', 'POP_COUNTY', 'ACS_POPULATION', 'ACS_COUNTY_POPULATION', 'POP_'], format: 'number' as const },
+  { id: 'employment', label: 'Employment', codes: ['PAYEMS', 'PAYEMS_STATE', 'PAYEMS_MSA', 'PAYEMS_MICRO', 'LAUS_COUNTY_EMP', 'CES_STATE', 'LAUS_EMP', 'LAUS_STATE_EMP', 'LAUS_MSA_EMP', 'LAUS_MICRO_EMP', 'EMP_', 'CE_'], format: 'number' as const },
+  { id: 'unemployment', label: 'Unemployment Rate', codes: ['LAUS_UNRATE', 'LAUS_STATE_UNRATE', 'LAUS_MSA_UNRATE', 'LAUS_MICRO_UNRATE', 'LAUS_COUNTY_UNRATE', 'LAUS_PLACE_UNRATE', 'UNRATE'], format: 'percent' as const },
+  { id: 'income', label: 'Median HH Income', codes: ['MEHOINUSA', 'MEHI_STATE', 'ACS_MEDIAN_HH_INC', 'ACS_COUNTY_MEDIAN_HH_INC', 'ACS_MSA_MEDIAN_HH_INC', 'ACS_MICRO_MEDIAN_HH_INC', 'MEHI_', 'MHHI_'], format: 'currency' as const },
 ];
 
-const TIER_CONFIG: Record<TierKey, { title: string; badge: string; placeholder: string }> = {
+// Base tier config — T2 title/placeholder are overridden dynamically when μSA detected
+const TIER_CONFIG_BASE: Record<TierKey, { title: string; badge: string; placeholder: string }> = {
   t1: {
     title: 'National & State Economy',
     badge: 'T1',
@@ -171,6 +172,13 @@ const TIER_CONFIG: Record<TierKey, { title: string; badge: string; placeholder: 
     badge: 'T3',
     placeholder: "Hyperlocal analysis of the subject's neighborhood covering demographics, property market conditions, zoning, infrastructure, and competitive position.",
   },
+};
+
+// Micropolitan override for T2
+const TIER_CONFIG_MICRO_T2 = {
+  title: 'Micropolitan Statistical Area (μSA)',
+  badge: 'T2',
+  placeholder: "Regional economic analysis covering the micropolitan area's economic base, employment centers, demographic trends, and housing market dynamics.",
 };
 
 // ---------------------------------------------------------------------------
@@ -365,7 +373,7 @@ function AnalysisAccordionSection({
   itemKey,
   staleness,
 }: {
-  config: (typeof TIER_CONFIG)['t1'];
+  config: (typeof TIER_CONFIG_BASE)['t1'];
   analysis: TierAnalysis | null;
   isGenerating: boolean;
   onGenerate: () => void;
@@ -478,14 +486,17 @@ function AnalysisAccordionSection({
                 fontSize: '0.85rem',
                 lineHeight: 1.7,
                 color: 'var(--cui-body-color)',
-                marginBottom: '1rem',
+                marginBottom: '0.75rem',
               }}
             >
-              {analysis.summary.split('\n\n').map((para, i) => (
-                <p key={i} style={{ marginBottom: '0.6rem' }}>
-                  {para}
-                </p>
-              ))}
+              {(() => {
+                const firstPara = analysis.summary.split('\n\n')[0] || analysis.summary;
+                const maxLen = 280;
+                const truncated = firstPara.length > maxLen
+                  ? firstPara.slice(0, maxLen).replace(/\s+\S*$/, '') + '…'
+                  : firstPara;
+                return <p style={{ marginBottom: 0 }}>{truncated}</p>;
+              })()}
             </div>
             <div className="d-flex gap-2">
               <CButton
@@ -521,7 +532,7 @@ function AnalysisDetailFlyout({
 }: {
   visible: boolean;
   analysis: TierAnalysis | null;
-  config: (typeof TIER_CONFIG)['t1'];
+  config: (typeof TIER_CONFIG_BASE)['t1'];
   onClose: () => void;
 }) {
   if (!analysis) return null;
@@ -690,8 +701,8 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
     [sidebarWidth],
   );
 
-  const city = (project.jurisdiction_city as string) || '';
-  const state = (project.jurisdiction_state as string) || '';
+  const city = (project.jurisdiction_city as string) || (project.city as string) || '';
+  const state = (project.jurisdiction_state as string) || (project.state as string) || '';
 
   // Fetch geo + series data
   useEffect(() => {
@@ -794,6 +805,15 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
     });
   }, [geoData, seriesData]);
 
+  // Compute effective TIER_CONFIG — override T2 title for Micropolitan areas
+  const TIER_CONFIG = useMemo(() => {
+    const hasMicro = geoData?.targets?.some((t) => t.geo_level === 'MICRO');
+    return {
+      ...TIER_CONFIG_BASE,
+      t2: hasMicro ? TIER_CONFIG_MICRO_T2 : TIER_CONFIG_BASE.t2,
+    };
+  }, [geoData]);
+
   // Persist an analysis to the database
   const saveAnalysisToDB = useCallback(
     async (tier: TierKey, analysis: TierAnalysis) => {
@@ -868,10 +888,14 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
           );
         }
         const result: TierAnalysis = await res.json();
-        setAnalyses((prev) => ({ ...prev, [tier]: result }));
 
-        // Save to database with data snapshot
+        // Save to database BEFORE updating state — if the user navigates away
+        // mid-generation, the unmounted component silently drops state updates
+        // and the subsequent saveAnalysisToDB call never executes. Saving first
+        // ensures the result persists regardless of component lifecycle.
         await saveAnalysisToDB(tier, result);
+
+        setAnalyses((prev) => ({ ...prev, [tier]: result }));
 
         // Clear staleness after regeneration
         setStaleness((prev) => ({

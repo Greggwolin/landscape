@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-08
-**Version:** 4.3
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026)
+**Last Updated:** 2026-03-23
+**Version:** 4.4
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools)
 
 ---
 
@@ -9,7 +9,31 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Schema Refresh + Extraction Pipeline Fixes (March 8, 2026)**
+### 🆕 **Latest Update: Planning Land Use Integration + Level 2 Autonomy Wiring (March 23, 2026)**
+
+**In-progress (uncommitted): PlanningContent overhaul, area API refactor, Landscaper autonomy metadata**
+
+- 🔧 **PlanningContent land use integration** — Add-parcel row now uses Django land use API for cascading Family → Type → Product selectors scoped to project config, with fallback to parcel-derived data
+- 🔧 **Area API refactor** — Switched to `area_alias` column, added DELETE endpoint with child orphaning
+- 🔧 **Level 2 autonomy metadata** — `ai_handler.py` surfaces `mutation_proposals` and `has_pending_mutations` in response metadata for frontend approval UI
+- 🔧 **μSA hardening** — `COUNTY_TO_MICRO` dict expanded (~30 entries), `get_cbsa_or_micro()` function, MICRO series codes in LocationSubTab
+- 🔧 **Media pipeline cancellation** — User-cancellable media extraction via AbortController propagation
+- 📁 **See:** `docs/09-session-notes/2026-03-23-daily-sync.md`
+
+### Previous Update: Extraction Pipeline v2, Geo Auto-Seeding, Appraisal Knowledge Tools (March 20, 2026)
+
+**v0.1.08–v0.1.09: Extraction hardening, new Landscaper tools, and location intelligence auto-seeding**
+
+- ✅ **Extraction pipeline v2** — Property-type-aware batched extraction, `field_role` column on land dev registry, 5-layer output-field blocking (extraction_service → extraction_writer → workbench_views → parcel_import_tools → accept_all_pending)
+- ✅ **Appraisal knowledge tools** (4 new) — `store_appraisal_valuation`, `store_market_intelligence`, `store_construction_benchmarks`, `get_appraisal_knowledge` for persisting extracted appraisal data
+- ✅ **Parcel import tools** (4 tools) — `parse_spreadsheet_lots`, `get_hierarchy_config`, `stage_parcel_lots`, `bulk_create_parcels` — registry-aware with output-field filtering
+- ✅ **Geo auto-seeding** — `src/lib/geo/bootstrap.ts` auto-resolves full geographic hierarchy (US → State → MSA/μSA → County → City) via Census APIs on first Location tab load
+- ✅ **Micropolitan (μSA) support** — Throughout stack: `cbsa_lookup.py`, `geo_bootstrap.py`, `LocationSubTab.tsx`, `geos/route.ts`
+- ✅ **UI improvements** — Hierarchy level flags, drop zone liberalization, extraction timeout handling
+- ✅ **Landscaper tool count → 229**
+- 📁 **See:** `docs/09-session-notes/2026-03-20-daily-sync.md`
+
+### Previous Update: Schema Refresh + Extraction Pipeline Fixes (March 8, 2026)
 
 **Rich Schema Regeneration and Ingestion Pipeline Reliability**
 

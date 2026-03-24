@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { normalizeState, GEO_LEVEL_ORDER } from '@/lib/geo/constants';
+import { bootstrapCity } from '@/lib/geo/bootstrap';
 
 type GeoRow = {
   geo_id: string;
@@ -10,7 +12,8 @@ type GeoRow = {
   usps_state: string | null;
 };
 
-const ORDER = ['CITY', 'COUNTY', 'MSA', 'STATE', 'US'] as const;
+const ORDER = GEO_LEVEL_ORDER;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -56,10 +59,29 @@ export async function GET(request: NextRequest) {
       `;
       baseRow = rows[0] ?? null;
     } else if (city && state) {
-      baseRow = await findCity(city, state);
+      const normalizedState = normalizeState(state);
+      baseRow = await findCity(city, normalizedState);
+
+      // Auto-bootstrap: if city not in geo_xwalk, resolve via Census APIs
+      if (!baseRow) {
+        try {
+          console.log(`[geos] City '${city}, ${normalizedState}' not in geo_xwalk — auto-bootstrapping...`);
+          const result = await bootstrapCity(city, normalizedState);
+          console.log(`[geos] Bootstrap complete: ${result.city_geo_id} (${result.records_upserted} records)`);
+
+          // Re-query after bootstrap
+          baseRow = await findCity(city, normalizedState);
+          if (baseRow) {
+            notice = `Geography auto-resolved for ${city}, ${normalizedState} via Census Bureau APIs.`;
+          }
+        } catch (bootstrapErr) {
+          console.warn(`[geos] Auto-bootstrap failed for '${city}, ${normalizedState}':`, bootstrapErr);
+          // Fall through to state-level fallback
+        }
+      }
 
       if (!baseRow) {
-        baseRow = await findState(state);
+        baseRow = await findState(normalizedState);
         if (baseRow) {
           const statewideName = baseRow.geo_name ?? state.toUpperCase();
           notice = `City-level geography "${city}, ${state}" not found; showing statewide coverage for ${statewideName}.`;
@@ -88,8 +110,10 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Fall back to old dict-based hierarchy format
-      for (const key of ORDER.slice(1)) {
-        const value = hierarchy[key.toLowerCase()];
+      // Check both MSA and MICRO keys since a city may have either
+      const keysToCheck = ['county', 'msa', 'micro', 'state', 'us'];
+      for (const key of keysToCheck) {
+        const value = hierarchy[key];
         if (typeof value === 'string') {
           ids.push(value);
         } else if (value && typeof value === 'object' && 'geo_id' in (value as Record<string, unknown>)) {
@@ -145,7 +169,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (!candidateWithData) {
-      return NextResponse.json({ error: 'Market data unavailable for requested geography' }, { status: 404 });
+      // No market_data rows yet — still return the geo hierarchy so
+      // the Location tab can display the geographic scope and trigger
+      // analysis generation. The left-panel indicators will show "—".
+      notice = notice
+        ? `${notice} No market data ingested yet for this geography.`
+        : 'No market data ingested yet for this geography. Economic indicators will populate after data ingestion.';
     }
 
     const targets = ORDER.map((level) => {

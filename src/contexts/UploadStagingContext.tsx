@@ -118,6 +118,9 @@ export function UploadStagingProvider({
   const analyzeQueueRef = useRef<StagedFile[]>([]);
   const isAnalyzingRef = useRef(false);
 
+  // IDs of files that should auto-confirm after analysis (drag-to-filter uploads)
+  const [autoConfirmIds, setAutoConfirmIds] = React.useState<Set<string>>(new Set());
+
   // UploadThing hook for executing confirmed uploads
   const { startUpload } = useUploadThing('documentUploader', {
     headers: {
@@ -194,7 +197,18 @@ export function UploadStagingProvider({
       );
 
       dispatch({ type: 'ADD_FILES', files: newStaged });
-      setIsTrayOpen(true);
+
+      if (options?.suggestedDocType) {
+        // Drag-to-filter: doc type is already known. Track these for auto-confirm
+        // after analysis (hash/collision check). Don't open tray unless collision.
+        setAutoConfirmIds(prev => {
+          const next = new Set(prev);
+          newStaged.forEach(f => next.add(f.id));
+          return next;
+        });
+      } else {
+        setIsTrayOpen(true);
+      }
 
       // Queue for analysis
       analyzeQueueRef.current.push(...newStaged);
@@ -399,6 +413,45 @@ export function UploadStagingProvider({
     }
     onUploadComplete?.();
   }, [stagedFiles, confirmFile, onUploadComplete]);
+
+  // ------------------------------------------
+  // Auto-confirm drag-to-filter uploads once analysis completes
+  // ------------------------------------------
+
+  useEffect(() => {
+    if (autoConfirmIds.size === 0) return;
+
+    const readyToAutoConfirm = stagedFiles.filter(
+      f => autoConfirmIds.has(f.id) && f.status === 'ready' && !f.collision
+    );
+    const collisionFiles = stagedFiles.filter(
+      f => autoConfirmIds.has(f.id) && f.status === 'ready' && f.collision
+    );
+
+    // If any have collisions, remove from auto-confirm and open tray for manual review
+    if (collisionFiles.length > 0) {
+      setAutoConfirmIds(prev => {
+        const next = new Set(prev);
+        collisionFiles.forEach(f => next.delete(f.id));
+        return next;
+      });
+      setIsTrayOpen(true);
+    }
+
+    if (readyToAutoConfirm.length === 0) return;
+
+    // Remove from set first to prevent re-trigger
+    setAutoConfirmIds(prev => {
+      const next = new Set(prev);
+      readyToAutoConfirm.forEach(f => next.delete(f.id));
+      return next;
+    });
+
+    // Auto-confirm each file
+    for (const file of readyToAutoConfirm) {
+      void confirmFile(file.id);
+    }
+  }, [stagedFiles, autoConfirmIds, confirmFile]);
 
   // ------------------------------------------
   // Auto-close tray when all files are done

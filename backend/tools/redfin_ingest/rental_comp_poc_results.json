@@ -1,0 +1,485 @@
+{
+  "test_metadata": {
+    "test_name": "Rental Comp Harvester POC \u2014 Redfin + Google Places + Websites",
+    "date": "2026-03-20T14:59:36.696900",
+    "subject": {
+      "name": "Chadron Terraces",
+      "address": "14105 Chadron Avenue, Hawthorne, CA 90250",
+      "lat": 33.9164,
+      "lng": -118.3526,
+      "units": 113,
+      "project_id": 17
+    },
+    "search_radius_miles": 3.0,
+    "redfin_requests_used": 8,
+    "redfin_request_cap": 20
+  },
+  "discovery": {
+    "total": 20,
+    "with_websites": 4,
+    "places": [
+      {
+        "name": "Brookside Square Apartment",
+        "address": "14415 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.90052,
+        "lng": -118.3289433,
+        "rating": 1.7,
+        "rating_count": 6,
+        "distance_miles": 1.74,
+        "website": "",
+        "google_place_id": "ChIJw_nW17i1woARox23uUXa0Nk",
+        "google_maps_url": "https://maps.google.com/?cid=15695284694389562787"
+      },
+      {
+        "name": "El Caballero",
+        "address": "13724 Chadron Ave # 1, Hawthorne, CA 90250, USA",
+        "lat": 33.9064676,
+        "lng": -118.3285375,
+        "rating": 3.8,
+        "rating_count": 16,
+        "distance_miles": 1.54,
+        "website": "",
+        "google_place_id": "ChIJHUS3L8G1woARQ9drGzPU3jc",
+        "google_maps_url": "https://maps.google.com/?cid=4025888432884275011"
+      },
+      {
+        "name": "London Arms Apartments",
+        "address": "14100 Chadron Ave # 127, Hawthorne, CA 90250, USA",
+        "lat": 33.9033019,
+        "lng": -118.328091,
+        "rating": 2,
+        "rating_count": 3,
+        "distance_miles": 1.67,
+        "website": "",
+        "google_place_id": "ChIJXSDKV7-1woARbbYPwOwF6-Q",
+        "google_maps_url": "https://maps.google.com/?cid=16495284574567249517"
+      },
+      {
+        "name": "Hawthorne Chateau Apartments",
+        "address": "3505 139th St #1, Hawthorne, CA 90250, USA",
+        "lat": 33.9059461,
+        "lng": -118.3335794,
+        "rating": 4.9,
+        "rating_count": 9,
+        "distance_miles": 1.31,
+        "website": "",
+        "google_place_id": "ChIJM0xIPsa1woARKo7xS3VKjUo",
+        "google_maps_url": "https://maps.google.com/?cid=5372031798168620586"
+      },
+      {
+        "name": "Chadron Apartments",
+        "address": "13622 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9074662,
+        "lng": -118.3280336,
+        "rating": 3,
+        "rating_count": 13,
+        "distance_miles": 1.54,
+        "website": "https://www.rentchadron.com/",
+        "google_place_id": "ChIJb6vnSMG1woARn-7bFAx1ajQ",
+        "google_maps_url": "https://maps.google.com/?cid=3776959932253597343"
+      },
+      {
+        "name": "Lemoli Apartments",
+        "address": "13751 Lemoli Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9065163,
+        "lng": -118.3313088,
+        "rating": 4.1,
+        "rating_count": 7,
+        "distance_miles": 1.4,
+        "website": "http://www.rentlemoli.com/",
+        "google_place_id": "ChIJV5BTgMa1woARjVFc9qO4emA",
+        "google_maps_url": "https://maps.google.com/?cid=6952071989152207245"
+      },
+      {
+        "name": "Pacific West Apartments",
+        "address": "13930 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.90472980000001,
+        "lng": -118.3285358,
+        "rating": 5,
+        "rating_count": 2,
+        "distance_miles": 1.6,
+        "website": "",
+        "google_place_id": "ChIJZ_3LysC1woARRq_xx45l4Qs",
+        "google_maps_url": "https://maps.google.com/?cid=856077068091371334"
+      },
+      {
+        "name": "Laurel Pointe Apartments",
+        "address": "13607 Cordary Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.907705,
+        "lng": -118.3418592,
+        "rating": 3.7,
+        "rating_count": 65,
+        "distance_miles": 0.86,
+        "website": "http://www.liveatlaurelpointe.com/",
+        "google_place_id": "ChIJOXOFtc21woARxEt8zm3wq6E",
+        "google_maps_url": "https://maps.google.com/?cid=11649669215530273732"
+      },
+      {
+        "name": "Icon at Rosecrans Apartments",
+        "address": "14135 Cerise Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9026016,
+        "lng": -118.3332286,
+        "rating": 3.3,
+        "rating_count": 17,
+        "distance_miles": 1.46,
+        "website": "",
+        "google_place_id": "ChIJo45Pjce1woARzIJDqP44jrg",
+        "google_maps_url": "https://maps.google.com/?cid=13298629416067498700"
+      },
+      {
+        "name": "Oaktree Apartments",
+        "address": "13710 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9067853,
+        "lng": -118.3285298,
+        "rating": 3.8,
+        "rating_count": 6,
+        "distance_miles": 1.53,
+        "website": "",
+        "google_place_id": "ChIJV77mMMG1woAR89pNhiYsoFc",
+        "google_maps_url": "https://maps.google.com/?cid=6314095221547064051"
+      },
+      {
+        "name": "Casa Del Sol South Apartments",
+        "address": "14037 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9035988,
+        "lng": -118.3288299,
+        "rating": 2.3,
+        "rating_count": 3,
+        "distance_miles": 1.62,
+        "website": "",
+        "google_place_id": "ChIJD_H3UMe1woARxcUVntLTEXI",
+        "google_maps_url": "https://maps.google.com/?cid=8219583696476685765"
+      },
+      {
+        "name": "Doty Avenue Apartments",
+        "address": "13942 Doty Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9046827,
+        "lng": -118.3393548,
+        "rating": 4,
+        "rating_count": 8,
+        "distance_miles": 1.11,
+        "website": "",
+        "google_place_id": "ChIJPXqDQ8m1woARrbf8pW8iBOo",
+        "google_maps_url": "https://maps.google.com/?cid=16862640767703496621"
+      },
+      {
+        "name": "Villa Fiorita",
+        "address": "13611 Yukon Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9076356,
+        "lng": -118.3357879,
+        "rating": 4.3,
+        "rating_count": 7,
+        "distance_miles": 1.14,
+        "website": "",
+        "google_place_id": "ChIJHdNsQ8-1woARw5yH0MEom4E",
+        "google_maps_url": "https://maps.google.com/?cid=9339103065175203011"
+      },
+      {
+        "name": "13640 Chadron Apartment Rentals",
+        "address": "13640 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9071174,
+        "lng": -118.3282733,
+        "rating": 4,
+        "rating_count": 1,
+        "distance_miles": 1.54,
+        "website": "",
+        "google_place_id": "ChIJBfMQ7v-1woARcGVjFIb9QBA",
+        "google_maps_url": "https://maps.google.com/?cid=1171214655425832304"
+      },
+      {
+        "name": "Casa Grande Apartments",
+        "address": "13518 Yukon Ave # 105, Hawthorne, CA 90250, USA",
+        "lat": 33.9085664,
+        "lng": -118.3350495,
+        "rating": 3.5,
+        "rating_count": 18,
+        "distance_miles": 1.14,
+        "website": "",
+        "google_place_id": "ChIJmSoiZc-1woARxP2om6_6X2w",
+        "google_maps_url": "https://maps.google.com/?cid=7809235911021493700"
+      },
+      {
+        "name": "Monterey Terrace",
+        "address": "13522 Chadron Ave apt 123, Hawthorne, CA 90250, USA",
+        "lat": 33.9086865,
+        "lng": -118.3283959,
+        "rating": 5,
+        "rating_count": 1,
+        "distance_miles": 1.49,
+        "website": "",
+        "google_place_id": "ChIJM8XA_sO1woARS-DNErZHHOE",
+        "google_maps_url": "https://maps.google.com/?cid=16220918805206786123"
+      },
+      {
+        "name": "Cerise Apartments",
+        "address": "13802 Cerise Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9062122,
+        "lng": -118.3324109,
+        "rating": 5,
+        "rating_count": 3,
+        "distance_miles": 1.35,
+        "website": "",
+        "google_place_id": "ChIJVUY_aMa1woARBnNtYBihQ00",
+        "google_maps_url": "https://maps.google.com/?cid=5567470690429137670"
+      },
+      {
+        "name": "Hawthorne Terrace Apartments",
+        "address": "13006 Kornblum Ave., Hawthorne, CA 90250, USA",
+        "lat": 33.9147262,
+        "lng": -118.3368453,
+        "rating": 4.1,
+        "rating_count": 7,
+        "distance_miles": 0.91,
+        "website": "https://www.liveathawthorneterrace.com/",
+        "google_place_id": "ChIJUzfophC1woARMYiwvQGf9eE",
+        "google_maps_url": "https://maps.google.com/?cid=16282094857654143025"
+      },
+      {
+        "name": "San Marcos Apartments",
+        "address": "13921 Yukon Ave UNIT 101, Hawthorne, CA 90250, USA",
+        "lat": 33.904967,
+        "lng": -118.3358198,
+        "rating": 4.1,
+        "rating_count": 9,
+        "distance_miles": 1.24,
+        "website": "",
+        "google_place_id": "ChIJc4ODk8i1woARB66Oe1gwVa0",
+        "google_maps_url": "https://maps.google.com/?cid=12489942298170142215"
+      },
+      {
+        "name": "Chadron Manor",
+        "address": "13717 Chadron Ave, Hawthorne, CA 90250, USA",
+        "lat": 33.9065788,
+        "lng": -118.328919,
+        "rating": 5,
+        "rating_count": 5,
+        "distance_miles": 1.52,
+        "website": "",
+        "google_place_id": "ChIJ9XX7zMa1woARKhih9RSezWM",
+        "google_maps_url": "https://maps.google.com/?cid=7191577992838060074"
+      }
+    ]
+  },
+  "redfin_csv_tests": {
+    "status=130 (For Rent), uipt=2,3,4": {
+      "status": "csv_returned",
+      "total_lines": 52,
+      "data_rows": 51,
+      "header": "SALE TYPE,SOLD DATE,PROPERTY TYPE,ADDRESS,CITY,STATE OR PROVINCE,ZIP OR POSTAL CODE,PRICE,BEDS,BATHS,LOCATION,SQUARE FEET,LOT SIZE,YEAR BUILT,DAYS ON MARKET,$/SQUARE FEET,HOA/MONTH,STATUS,NEXT OPEN HOUSE START TIME,NEXT OPEN HOUSE END TIME,URL (SEE https://www.redfin.com/buy-a-home/comparative-market-analysis FOR INFO ON PRICING),SOURCE,MLS#,FAVORITE,INTERESTED,LATITUDE,LONGITUDE\r",
+      "sample_rows": [
+        "\"In accordance with local MLS rules, some MLS listings are not included in the download\"\r",
+        "PAST SALE,October-31-2025,Condo/Co-op,322 E Spruce Ave Unit E,Inglewood,CA,90301,525000,2,2.0,North Inglewood,1233,9509,1964,,426,350,Sold,,,https://www.redfin.com/CA/Inglewood/322-E-Spruce-Ave-90301/unit-E/home/6451475,TheMLS,25588339,N,Y,33.9586948,-118.3494368\r",
+        "PAST SALE,February-24-2026,Townhouse,2304 Mathews Ave #2,Redondo Beach,CA,90278,868000,2,2.5,151 - N Redondo Bch/Villas North,1490,45004,1978,,583,445,Sold,,,https://www.redfin.com/CA/Redondo-Beach/2304-Mathews-Ave-90278/unit-2/home/6682559,CRMLS,SB25275963,N,Y,33.8735494,-118.3696303\r"
+      ]
+    },
+    "status=1 (Active), uipt=4 (Multi-Family)": {
+      "status": "csv_returned",
+      "total_lines": 52,
+      "data_rows": 51,
+      "header": "SALE TYPE,SOLD DATE,PROPERTY TYPE,ADDRESS,CITY,STATE OR PROVINCE,ZIP OR POSTAL CODE,PRICE,BEDS,BATHS,LOCATION,SQUARE FEET,LOT SIZE,YEAR BUILT,DAYS ON MARKET,$/SQUARE FEET,HOA/MONTH,STATUS,NEXT OPEN HOUSE START TIME,NEXT OPEN HOUSE END TIME,URL (SEE https://www.redfin.com/buy-a-home/comparative-market-analysis FOR INFO ON PRICING),SOURCE,MLS#,FAVORITE,INTERESTED,LATITUDE,LONGITUDE\r",
+      "sample_rows": [
+        "\"In accordance with local MLS rules, some MLS listings are not included in the download\"\r",
+        "PAST SALE,,Multi-Family (2-4 Unit),16505 Prairie Ave,Lawndale,CA,90260,830000,4,4.0,,1320,3801,1956,,629,,,,,https://www.redfin.com/CA/Lawndale/16505-Prairie-Ave-90260/home/6556282,,,N,Y,33.880774,-118.344137\r",
+        "PAST SALE,,Multi-Family (2-4 Unit),10518 Dalerose Ave,Inglewood,CA,90304,825000,4,2.0,,1482,8402,1958,,557,,,,,https://www.redfin.com/CA/Inglewood/10518-Dalerose-Ave-90304/home/6484540,,,N,Y,33.9404478,-118.3599342\r"
+      ]
+    },
+    "status=9 (Sold), uipt=4 (Multi-Family)": {
+      "status": "csv_returned",
+      "total_lines": 52,
+      "data_rows": 51,
+      "header": "SALE TYPE,SOLD DATE,PROPERTY TYPE,ADDRESS,CITY,STATE OR PROVINCE,ZIP OR POSTAL CODE,PRICE,BEDS,BATHS,LOCATION,SQUARE FEET,LOT SIZE,YEAR BUILT,DAYS ON MARKET,$/SQUARE FEET,HOA/MONTH,STATUS,NEXT OPEN HOUSE START TIME,NEXT OPEN HOUSE END TIME,URL (SEE https://www.redfin.com/buy-a-home/comparative-market-analysis FOR INFO ON PRICING),SOURCE,MLS#,FAVORITE,INTERESTED,LATITUDE,LONGITUDE\r",
+      "sample_rows": [
+        "\"In accordance with local MLS rules, some MLS listings are not included in the download\"\r",
+        "PAST SALE,,Multi-Family (2-4 Unit),16505 Prairie Ave,Lawndale,CA,90260,830000,4,4.0,,1320,3801,1956,,629,,,,,https://www.redfin.com/CA/Lawndale/16505-Prairie-Ave-90260/home/6556282,,,N,Y,33.880774,-118.344137\r",
+        "PAST SALE,,Multi-Family (2-4 Unit),10518 Dalerose Ave,Inglewood,CA,90304,825000,4,2.0,,1482,8402,1958,,557,,,,,https://www.redfin.com/CA/Inglewood/10518-Dalerose-Ave-90304/home/6484540,,,N,Y,33.9404478,-118.3599342\r"
+      ]
+    }
+  },
+  "redfin_property_lookups": {
+    "Brookside Square Apartment": {
+      "status": "http_403"
+    },
+    "El Caballero": {
+      "status": "http_403"
+    },
+    "London Arms Apartments": {
+      "status": "http_403"
+    },
+    "Hawthorne Chateau Apartments": {
+      "status": "http_403"
+    },
+    "Chadron Apartments": {
+      "status": "http_403"
+    }
+  },
+  "website_extractions": {
+    "Chadron Apartments": {
+      "status": "extracted",
+      "source": "rentcafe_ga4",
+      "confidence": "high",
+      "unit_types": [
+        {
+          "floorplan_name": "Stillman",
+          "bedrooms": 1,
+          "sqft_min": 742,
+          "sqft_max": 742,
+          "rent_min": 2054,
+          "rent_max": 2220
+        },
+        {
+          "floorplan_name": "Harvard (Townhouse)",
+          "bedrooms": 2,
+          "sqft_min": 918,
+          "sqft_max": 918,
+          "rent_min": 2840,
+          "rent_max": 2881
+        },
+        {
+          "floorplan_name": "Harvard (Townhouse)",
+          "bedrooms": 2,
+          "sqft_min": 918,
+          "sqft_max": 918,
+          "rent_min": 2840,
+          "rent_max": 2881
+        },
+        {
+          "floorplan_name": "Princeton (Townhouse)",
+          "bedrooms": 1,
+          "sqft_min": 742,
+          "sqft_max": 742,
+          "rent_min": 2277,
+          "rent_max": 2277
+        },
+        {
+          "floorplan_name": "Princeton (Townhouse)",
+          "bedrooms": 1,
+          "sqft_min": 742,
+          "sqft_max": 742,
+          "rent_min": 2277,
+          "rent_max": 2277
+        },
+        {
+          "floorplan_name": "Stanford",
+          "bedrooms": 2,
+          "sqft_min": 944,
+          "sqft_max": 944,
+          "rent_min": 2590,
+          "rent_max": 2605
+        },
+        {
+          "floorplan_name": "Stanford",
+          "bedrooms": 2,
+          "sqft_min": 944,
+          "sqft_max": 944,
+          "rent_min": 2590,
+          "rent_max": 2605
+        }
+      ]
+    },
+    "Lemoli Apartments": {
+      "status": "extracted",
+      "source": "rentcafe_ga4",
+      "confidence": "high",
+      "unit_types": [
+        {
+          "floorplan_name": "Mariposa (Townhouse)",
+          "bedrooms": 1,
+          "sqft_min": 750,
+          "sqft_max": 750,
+          "rent_min": 2252,
+          "rent_max": 2293
+        },
+        {
+          "floorplan_name": "Birch",
+          "bedrooms": 2,
+          "sqft_min": 830,
+          "sqft_max": 830,
+          "rent_min": 2573,
+          "rent_max": 2573
+        },
+        {
+          "floorplan_name": "Acacia",
+          "bedrooms": 2,
+          "sqft_min": 830,
+          "sqft_max": 830,
+          "rent_min": 2550,
+          "rent_max": 2550
+        },
+        {
+          "floorplan_name": "Maple",
+          "bedrooms": 3,
+          "sqft_min": 1065,
+          "sqft_max": 1065,
+          "rent_min": 3417,
+          "rent_max": 3417
+        },
+        {
+          "floorplan_name": "Dogwood",
+          "bedrooms": 3,
+          "sqft_min": 1065,
+          "sqft_max": 1065,
+          "rent_min": 3382,
+          "rent_max": 3382
+        },
+        {
+          "floorplan_name": "Elm (Townhouse)",
+          "bedrooms": 3,
+          "sqft_min": 1040,
+          "sqft_max": 1040,
+          "rent_min": 2563,
+          "rent_max": 2663
+        },
+        {
+          "floorplan_name": "Ash",
+          "bedrooms": 3,
+          "sqft_min": 1065,
+          "sqft_max": 1065,
+          "rent_min": 3203,
+          "rent_max": 3203
+        }
+      ]
+    },
+    "Laurel Pointe Apartments": {
+      "status": "http_timeout",
+      "source": "website"
+    },
+    "Hawthorne Terrace Apartments": {
+      "status": "extracted",
+      "source": "rentcafe_ga4",
+      "confidence": "high",
+      "unit_types": [
+        {
+          "floorplan_name": "1 Bedroom / 1 Bath",
+          "bedrooms": 1,
+          "sqft_min": 699,
+          "sqft_max": 699,
+          "rent_min": null,
+          "rent_max": null
+        },
+        {
+          "floorplan_name": "2 Bedroom / 1 Bath",
+          "bedrooms": 2,
+          "sqft_min": 899,
+          "sqft_max": 899,
+          "rent_min": null,
+          "rent_max": null
+        },
+        {
+          "floorplan_name": "3 Bedroom / 2 Bath",
+          "bedrooms": 3,
+          "sqft_min": 1144,
+          "sqft_max": 1144,
+          "rent_min": null,
+          "rent_max": null
+        }
+      ]
+    }
+  },
+  "coverage": {
+    "redfin_only": 0,
+    "website_only": 3,
+    "combined": 3,
+    "total_discovered": 20,
+    "combined_pct": 15.0
+  }
+}

@@ -181,6 +181,7 @@ export default function ProjectMediaGallery({
  const [filter, setFilter] = useState<FilterKey>('all');
  const [scanning, setScanning] = useState(false);
  const [scanProgress, setScanProgress] = useState('');
+ const pipelineCancelRef = useRef<AbortController | null>(null);
  const [savingMediaId, setSavingMediaId] = useState<number | null>(null);
 
  // Favorites state (persisted in localStorage per project)
@@ -474,8 +475,15 @@ export default function ProjectMediaGallery({
  const runPipelineForDocs = useCallback(
  async (docs: DocListItem[]) => {
  for (let i = 0; i < docs.length; i++) {
+ // Check for cancellation between documents
+ if (pipelineCancelRef.current?.signal.aborted) {
+ console.log('[MediaGallery] Pipeline cancelled by user');
+ break;
+ }
+
  const doc = docs[i];
  const name = doc.doc_name || doc.file_name || `Document ${doc.doc_id}`;
+ const signal = pipelineCancelRef.current?.signal;
 
  try {
  // Step 1: Scan (detect images)
@@ -486,6 +494,7 @@ export default function ProjectMediaGallery({
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ mode: 'full' }),
+ signal,
  }
  );
 
@@ -497,6 +506,7 @@ export default function ProjectMediaGallery({
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ extract_all: true }),
+ signal,
  }
  );
 
@@ -507,6 +517,10 @@ export default function ProjectMediaGallery({
  () => classifyController.abort(),
  5 * 60 * 1000
  );
+ // Also abort classify if pipeline is cancelled
+ if (signal) {
+ signal.addEventListener('abort', () => classifyController.abort(), { once: true });
+ }
  await fetch(
  `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/classify/`,
  {
@@ -521,7 +535,8 @@ export default function ProjectMediaGallery({
  // Step 4: Auto-confirm with suggested actions
  setScanProgress(`Saving ${i + 1} of ${docs.length}: ${name}`);
  const mediaListRes = await fetch(
- `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/`
+ `${djangoBaseUrl}/api/dms/documents/${doc.doc_id}/media/`,
+ { signal }
  );
  if (mediaListRes.ok) {
  const mediaList: DocMediaResponse = await mediaListRes.json();
@@ -536,12 +551,17 @@ export default function ProjectMediaGallery({
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({ actions }),
+ signal,
  }
  );
  }
  }
  } catch (err) {
  if (err instanceof DOMException && err.name === 'AbortError') {
+ if (pipelineCancelRef.current?.signal.aborted) {
+ console.log('[MediaGallery] Pipeline cancelled by user');
+ break;
+ }
  console.warn(`Classify timed out for doc ${doc.doc_id}, continuing...`);
  } else {
  console.error(`Media pipeline failed for doc ${doc.doc_id}:`, err);
@@ -555,9 +575,16 @@ export default function ProjectMediaGallery({
  // ── Scan New action ──────────────────────────────────────────────────
  // Only scans PDFs that haven't been scanned yet
 
+ const handleCancelPipeline = useCallback(() => {
+ pipelineCancelRef.current?.abort();
+ setScanProgress('Cancelled');
+ setScanning(false);
+ }, []);
+
  const handleScanNew = useCallback(async () => {
  if (isPipelineBusy) return;
  if (unscannedPDFs.length === 0) return;
+ pipelineCancelRef.current = new AbortController();
  setScanning(true);
  setScanProgress('Preparing scan...');
 
@@ -590,6 +617,7 @@ export default function ProjectMediaGallery({
 
  const handleRescanAll = useCallback(async (skipDeleted: boolean) => {
  setRescanModalOpen(false);
+ pipelineCancelRef.current = new AbortController();
 
  setScanning(true);
  setScanProgress('Resetting media...');
@@ -917,10 +945,19 @@ export default function ProjectMediaGallery({
  </div>
  {scanProgress && (
  <div
- className="text-body-secondary mb-2"
+ className="d-flex align-items-center gap-2 mb-2"
  style={{ fontSize: '0.78rem' }}
  >
- {scanProgress}
+ <span className="text-body-secondary">{scanProgress}</span>
+ {scanning && (
+ <button
+ className="btn btn-outline-danger btn-sm"
+ style={{ fontSize: '0.7rem', padding: '1px 8px' }}
+ onClick={handleCancelPipeline}
+ >
+ Cancel
+ </button>
+ )}
  </div>
  )}
  <div

@@ -445,7 +445,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **220 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools added Mar 2026
+- Claude AI with **225+ registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -518,6 +518,8 @@ Two distinct failure modes — treat separately:
 **Backend endpoints:**
 - `GET /api/v1/location-intelligence/demographics/state-coverage/?state=ID` — check if state data is loaded
 - `POST /api/v1/location-intelligence/demographics/load-state/` — trigger background load (`{"state": "TX"}`)
+
+**Geo auto-seeding (Mar 2026):** `geo_xwalk` records are now auto-created on first Location tab load for any US city. The system resolves the full geographic hierarchy (US → State → MSA/μSA → County → City) via Census Bureau APIs. Micropolitan Statistical Areas (μSAs) are supported throughout the stack — `cbsa_lookup.py` has `COUNTY_TO_MICRO` dict + `get_cbsa_or_micro()`, and the Location tab dynamically swaps the T2 tier label for μSA markets. Key files: `src/lib/geo/bootstrap.ts`, `src/lib/geo/constants.ts`, `services/market_ingest_py/market_ingest/cbsa_lookup.py`.
 
 **County parcel selector:** Only visible for Arizona projects (Phoenix MSA). Supports Maricopa and Pinal County tax parcel overlays via external ArcGIS tile services.
 
@@ -803,7 +805,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-20*
+*Last updated: 2026-03-22 (nightly sync)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: 225*
+*Landscaper tool count: 229*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from loguru import logger
 
-from .cbsa_lookup import get_cbsa
+from .cbsa_lookup import get_cbsa, get_cbsa_or_micro
 from .db import Database, GeoRecord
 
 # ---------------------------------------------------------------------------
@@ -317,15 +317,18 @@ def bootstrap_city(
     # Step 2: Resolve county FIPS
     county_fips, county_name = resolve_county_fips(city, state_abbr, state_fips, session)
 
-    # Step 3: Resolve CBSA (MSA) from static lookup
-    cbsa_result = get_cbsa(state_fips, county_fips)
+    # Step 3: Resolve CBSA (MSA or μSA) from static lookup
+    cbsa_unified = get_cbsa_or_micro(state_fips, county_fips)
     cbsa_code: Optional[str] = None
     msa_name: Optional[str] = None
-    if cbsa_result:
-        cbsa_code, msa_name = cbsa_result
-        logger.info("MSA resolved: {} ({})", msa_name, cbsa_code)
+    is_micro: bool = False
+    if cbsa_unified:
+        cbsa_code, msa_name, is_metro = cbsa_unified
+        is_micro = not is_metro
+        level_label = "MSA" if is_metro else "μSA"
+        logger.info("{} resolved: {} ({})", level_label, msa_name, cbsa_code)
     else:
-        logger.info("No MSA for county {}{} (non-metro area)", state_fips, county_fips)
+        logger.info("No MSA/μSA for county {}{} (non-CBSA area)", state_fips, county_fips)
 
     # Step 4: Build geo_id values
     state_geo_id = state_fips
@@ -347,7 +350,7 @@ def bootstrap_city(
         "us": "US",
     }
     if msa_geo_id:
-        hierarchy["msa"] = msa_geo_id
+        hierarchy["micro" if is_micro else "msa"] = msa_geo_id
 
     # Step 6: Build records in hierarchical order (parents first)
     records: List[Dict] = [
@@ -395,16 +398,16 @@ def bootstrap_city(
                 "chain": [county_geo_id] + ([msa_geo_id] if msa_geo_id else []) + [state_geo_id, "US"],
                 "state": state_geo_id,
                 "us": "US",
-                **({"msa": msa_geo_id} if msa_geo_id else {}),
+                **({"micro" if is_micro else "msa": msa_geo_id} if msa_geo_id else {}),
             },
         },
     ]
 
-    # MSA (optional)
+    # MSA or MICRO (optional)
     if msa_geo_id and msa_name:
         records.append({
             "geo_id": msa_geo_id,
-            "geo_level": "MSA",
+            "geo_level": "MICRO" if is_micro else "MSA",
             "geo_name": msa_name,
             "state_fips": state_fips,
             "county_fips": None,

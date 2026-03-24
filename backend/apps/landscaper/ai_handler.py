@@ -2816,6 +2816,7 @@ def get_landscaper_response(
         field_updates = []
         tool_calls_made = []
         tool_executions = list(_forced_delta_executions)  # Include any forced delta execution
+        mutation_proposals = []  # Track mutation proposals for Level 2 autonomy UI
         media_summary = None  # Track media summary for inline chat card
         final_content = ""
         total_input_tokens = response.usage.input_tokens
@@ -2946,6 +2947,11 @@ def get_landscaper_response(
                         logger.info(f"[DIAGNOSTIC] TOOL RESULT for {tool_name} ({len(result_str)} chars):\n{result_str[:1500]}")
                         print(f"=== DIAGNOSTIC: TOOL RESULT for {tool_name}: {len(result_str)} chars ===")
 
+                    # Check if this was a mutation proposal (Level 2 autonomy)
+                    if result.get('mutation_id') or result.get('batch_id'):
+                        mutation_proposals.append(result)
+                        logger.info(f"[Tool Loop] Created mutation proposal: {result.get('mutation_id') or result.get('batch_id')}")
+
                     # Track field updates
                     if tool_name in ('update_project_field', 'bulk_update_fields'):
                         if result.get('success'):
@@ -2997,11 +3003,12 @@ def get_landscaper_response(
                     })
 
                     # Track tool execution for frontend mutation events
+                    is_proposal = bool(result.get('mutation_id') or result.get('batch_id'))
                     tool_executions.append({
                         'tool': tool_name,
                         'tool_use_id': tool_id,
                         'success': result.get('success', False),
-                        'is_proposal': False,
+                        'is_proposal': is_proposal,
                         'result': _sanitize_for_json(result)
                     })
                 except Exception as e:
@@ -3199,17 +3206,27 @@ def get_landscaper_response(
                 "Try breaking this into smaller steps (e.g., \"update units 100–110 first\")."
             )
 
+        # Build metadata
+        metadata = {
+            'model': CLAUDE_MODEL,
+            'input_tokens': total_input_tokens,
+            'output_tokens': total_output_tokens,
+            'stop_reason': response.stop_reason,
+            'system_prompt_category': project_type or 'default',
+            'tool_executions': _sanitize_for_json(tool_executions),
+            **(({'media_summary': _sanitize_for_json(media_summary)}) if media_summary else {}),
+        }
+
+        # Add mutation proposals to metadata (Level 2 autonomy)
+        if mutation_proposals:
+            metadata['mutation_proposals'] = _sanitize_for_json(mutation_proposals)
+            metadata['has_pending_mutations'] = True
+        else:
+            metadata['has_pending_mutations'] = False
+
         return {
             'content': final_content,
-            'metadata': {
-                'model': CLAUDE_MODEL,
-                'input_tokens': total_input_tokens,
-                'output_tokens': total_output_tokens,
-                'stop_reason': response.stop_reason,
-                'system_prompt_category': project_type or 'default',
-                'tool_executions': _sanitize_for_json(tool_executions),
-                **(({'media_summary': _sanitize_for_json(media_summary)}) if media_summary else {}),
-            },
+            'metadata': metadata,
             'tool_calls': _sanitize_for_json(tool_calls_made),
             'field_updates': _sanitize_for_json(field_updates)
         }

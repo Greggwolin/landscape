@@ -118,7 +118,9 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
 
         // Show success message briefly
         const successMsg = document.createElement('div');
-        successMsg.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded shadow-lg z-50 transition-opacity';
+        successMsg.className = 'fixed top-4 right-4 px-6 py-3 rounded shadow-lg z-50 transition-opacity';
+        successMsg.style.backgroundColor = 'var(--cui-success)';
+        successMsg.style.color = '#fff';
         successMsg.textContent = 'Settings saved! Labels updated.';
         document.body.appendChild(successMsg);
         setTimeout(() => {
@@ -176,7 +178,9 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
 
           // Show brief success indicator
           const indicator = document.createElement('div');
-          indicator.className = 'fixed top-20 right-4 bg-green-500 text-white px-3 py-1.5 rounded shadow-lg z-50 text-sm';
+          indicator.className = 'fixed top-20 right-4 px-3 py-1.5 rounded shadow-lg z-50 text-sm';
+          indicator.style.backgroundColor = 'var(--cui-success)';
+          indicator.style.color = '#fff';
           indicator.textContent = '✓ Efficiency saved';
           document.body.appendChild(indicator);
           setTimeout(() => {
@@ -278,7 +282,7 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
                   />
                   <div className="flex-1 flex items-center gap-2">
                     <label className="text-xs font-medium w-16" style={{ color: 'var(--cui-body-color)' }}>
-                      Level {level}{isLevel3 && <span className="text-[10px] text-slate-400"> (req)</span>}
+                      Level {level}{isLevel3 && <span className="text-[10px]" style={{ color: 'var(--cui-secondary-color)' }}> (req)</span>}
                     </label>
                     <select
                       value={settings[key] as string}
@@ -287,7 +291,7 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
                       className="h-10 flex-1 max-w-[220px] rounded border px-2 text-sm"
                       style={{
                         borderColor: 'var(--cui-border-color)',
-                        backgroundColor: enabled ? 'var(--surface-bg)' : 'rgb(243,244,246)',
+                        backgroundColor: enabled ? 'var(--surface-bg)' : 'var(--cui-tertiary-bg)',
                         color: 'var(--cui-body-color)',
                         cursor: enabled ? 'pointer' : 'not-allowed'
                       }}

@@ -13,52 +13,52 @@
 }
 
 .familyResidential {
-  --badge-bg: rgba(var(--cui-primary-rgb), 0.15);
-  --badge-color: var(--cui-primary);
+  --badge-bg: rgba(var(--cui-primary-rgb), 0.35);
+  --badge-color: #93b5ff;
 }
 
 .familyCommercial {
-  --badge-bg: rgba(var(--cui-info-rgb), 0.15);
-  --badge-color: var(--cui-info);
+  --badge-bg: rgba(var(--cui-info-rgb), 0.35);
+  --badge-color: #7dccff;
 }
 
 .familyIndustrial {
-  --badge-bg: rgba(var(--cui-warning-rgb), 0.15);
-  --badge-color: var(--cui-warning);
+  --badge-bg: rgba(var(--cui-warning-rgb), 0.35);
+  --badge-color: #ffc870;
 }
 
 .familyDefault {
-  --badge-bg: var(--cui-tertiary-bg);
+  --badge-bg: rgba(var(--cui-secondary-rgb), 0.25);
   --badge-color: var(--cui-secondary-color);
 }
 
 .phaseBadgePrimary {
-  --badge-bg: rgba(var(--cui-primary-rgb), 0.12);
-  --badge-color: var(--cui-primary);
+  --badge-bg: rgba(var(--cui-primary-rgb), 0.35);
+  --badge-color: #93b5ff;
 }
 
 .phaseBadgeSuccess {
-  --badge-bg: rgba(var(--cui-success-rgb), 0.12);
-  --badge-color: var(--cui-success);
+  --badge-bg: rgba(var(--cui-success-rgb), 0.35);
+  --badge-color: #6de0a0;
 }
 
 .phaseBadgeWarning {
-  --badge-bg: rgba(var(--cui-warning-rgb), 0.15);
-  --badge-color: var(--cui-warning);
+  --badge-bg: rgba(var(--cui-warning-rgb), 0.35);
+  --badge-color: #ffc870;
 }
 
 .phaseBadgeDanger {
-  --badge-bg: rgba(var(--cui-danger-rgb), 0.15);
-  --badge-color: var(--cui-danger);
+  --badge-bg: rgba(var(--cui-danger-rgb), 0.35);
+  --badge-color: #f09090;
 }
 
 .phaseBadgeInfo {
-  --badge-bg: rgba(var(--cui-info-rgb), 0.15);
-  --badge-color: var(--cui-info);
+  --badge-bg: rgba(var(--cui-info-rgb), 0.35);
+  --badge-color: #7dccff;
 }
 
 .phaseBadgeSecondary {
-  --badge-bg: var(--cui-card-bg);
+  --badge-bg: rgba(var(--cui-secondary-rgb), 0.25);
   --badge-color: var(--cui-secondary-color);
 }
 

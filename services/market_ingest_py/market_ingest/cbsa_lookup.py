@@ -1274,6 +1274,41 @@ COUNTY_TO_CBSA = {
 }
 
 
+# County FIPS -> (CBSA code, μSA name) for Micropolitan Statistical Areas
+# Source: Census Bureau CBSA Delineation 2020/2023
+COUNTY_TO_MICRO: dict[str, tuple[str, str]] = {
+    # Idaho Micropolitans
+    "16013": ("25200", "Hailey, ID Micro Area"),
+    "16027": ("39940", "Rexburg, ID Micro Area"),
+    "16055": ("33340", "Moscow, ID Micro Area"),
+    "16065": ("43300", "Sandpoint, ID Micro Area"),
+    "16083": ("46300", "Twin Falls, ID Micro Area"),
+    "16051": ("15420", "Burley, ID Micro Area"),
+    "16031": ("38540", "Pocatello, ID Micro Area"),
+    # Montana Micropolitans
+    "30031": ("14580", "Bozeman, MT Micro Area"),
+    "30049": ("25740", "Helena, MT Micro Area"),
+    "30063": ("28060", "Kalispell, MT Micro Area"),
+    "30029": ("24500", "Great Falls, MT Micro Area"),
+    # Colorado Micropolitans
+    "08037": ("20780", "Edwards, CO Micro Area"),
+    "08097": ("44460", "Steamboat Springs, CO Micro Area"),
+    "08045": ("17780", "Craig, CO Micro Area"),
+    # Wyoming Micropolitans
+    "56039": ("27220", "Jackson, WY-ID Micro Area"),
+    "56025": ("40180", "Riverton, WY Micro Area"),
+    "56013": ("43260", "Sheridan, WY Micro Area"),
+    # Utah Micropolitans
+    "49025": ("25720", "Heber, UT Micro Area"),
+    "49021": ("16260", "Cedar City, UT Micro Area"),
+    "49053": ("41100", "St. George, UT Micro Area"),
+    # Resort/mountain area Micropolitans
+    "08117": ("44460", "Steamboat Springs, CO Micro Area"),
+    "30047": ("28060", "Kalispell, MT Micro Area"),
+    "56035": ("40540", "Rock Springs, WY Micro Area"),
+}
+
+
 def get_cbsa(state_fips: str, county_fips: str) -> Optional[Tuple[str, str]]:
     """
     Look up the CBSA code and MSA name for a county.
@@ -1287,3 +1322,35 @@ def get_cbsa(state_fips: str, county_fips: str) -> Optional[Tuple[str, str]]:
     """
     key = f"{state_fips.zfill(2)}{county_fips.zfill(3)}"
     return COUNTY_TO_CBSA.get(key)
+
+
+def get_micro(state_fips: str, county_fips: str) -> Optional[Tuple[str, str]]:
+    """
+    Look up the CBSA code and μSA name for a county in a Micropolitan area.
+
+    Args:
+        state_fips: 2-digit state FIPS code (e.g., "16" for Idaho)
+        county_fips: 3-digit county FIPS code (e.g., "013" for Blaine)
+
+    Returns:
+        Tuple of (cbsa_code, micro_name) or None if county is not in a micropolitan area.
+    """
+    key = f"{state_fips.zfill(2)}{county_fips.zfill(3)}"
+    return COUNTY_TO_MICRO.get(key)
+
+
+def get_cbsa_or_micro(state_fips: str, county_fips: str) -> Optional[Tuple[str, str, bool]]:
+    """
+    Look up CBSA (MSA or μSA) for a county.
+
+    Returns:
+        Tuple of (cbsa_code, name, is_metro) or None.
+        is_metro=True for Metropolitan, False for Micropolitan.
+    """
+    result = get_cbsa(state_fips, county_fips)
+    if result:
+        return (result[0], result[1], True)
+    result = get_micro(state_fips, county_fips)
+    if result:
+        return (result[0], result[1], False)
+    return None

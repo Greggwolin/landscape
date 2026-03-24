@@ -245,6 +245,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fire-and-forget: bootstrap geo_xwalk for this city so Location tab
+    // has full geographic hierarchy (US → State → MSA/μSA → County → City)
+    // by the time the user navigates there.
+    if (city && state) {
+      import('@/lib/geo/bootstrap').then(({ bootstrapCity }) => {
+        bootstrapCity(city, state).then((result) => {
+          console.log(`[project-create] Geo bootstrap complete for ${city}, ${state}: ${result.city_geo_id} (${result.records_upserted} records)`)
+        }).catch((err) => {
+          console.warn(`[project-create] Geo bootstrap failed for ${city}, ${state} (non-fatal):`, err)
+        })
+      }).catch(() => {})
+    }
+
     return NextResponse.json({
       project: inserted[0]
     })

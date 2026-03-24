@@ -43,8 +43,8 @@ function formatPercent(value: number | undefined): string {
 /**
  * Format multiplier
  */
-function formatMultiple(value: number | undefined): string {
-  if (value === undefined || isNaN(value)) return '—';
+function formatMultiple(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '—';
   return `${value.toFixed(2)}x`;
 }
 

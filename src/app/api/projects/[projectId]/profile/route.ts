@@ -238,6 +238,25 @@ export async function PATCH(
       paramCount++;
     }
 
+    // Keep jurisdiction_* fields in sync when address fields change
+    // LocationSubTab reads from jurisdiction_city/state/county for market geo lookups,
+    // so these must stay in sync when the user edits city/county/state on the Project tab
+    if (body.city !== undefined) {
+      updates.push(`jurisdiction_city = $${paramCount}`);
+      values.push(body.city);
+      paramCount++;
+    }
+    if (body.county !== undefined) {
+      updates.push(`jurisdiction_county = $${paramCount}`);
+      values.push(body.county);
+      paramCount++;
+    }
+    if (body.state !== undefined) {
+      updates.push(`jurisdiction_state = $${paramCount}`);
+      values.push(body.state);
+      paramCount++;
+    }
+
     // Auto-geocode when address, city, or county changes
     // This populates location_lat and location_lon for map display
     if (
@@ -286,6 +305,18 @@ export async function PATCH(
           console.error('Geocoding error:', error);
           // Don't fail the whole update if geocoding fails
         }
+      }
+
+      // Fire-and-forget: bootstrap geo_xwalk for the (possibly new) city/state
+      // so Location tab has full geographic hierarchy on next load.
+      if (city && state) {
+        import('@/lib/geo/bootstrap').then(({ bootstrapCity }) => {
+          bootstrapCity(city, state).then((result) => {
+            console.log(`[profile-patch] Geo bootstrap for ${city}, ${state}: ${result.city_geo_id}`)
+          }).catch((err) => {
+            console.warn(`[profile-patch] Geo bootstrap failed for ${city}, ${state} (non-fatal):`, err)
+          })
+        }).catch(() => {})
       }
     }
 

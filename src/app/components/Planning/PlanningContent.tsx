@@ -6,6 +6,7 @@ import { fetchJson } from '@/lib/fetchJson'
 import PlanningOverviewControls from './PlanningOverviewControls'
 import CollapsibleSection from './CollapsibleSection'
 import { ExportButton } from '@/components/admin'
+import styles from './PlanningContent.module.css'
 
 interface Parcel {
   parcel_id: number;
@@ -30,6 +31,7 @@ interface Phase {
   phase_id: number;
   area_no: number;
   area_id?: number;
+  phase_no?: number;
   phase_name: string;
   gross_acres: number;
   net_acres: number;
@@ -190,20 +192,146 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   // Import PDF modal state
   const [showImportPdfModal, setShowImportPdfModal] = useState(false)
 
+  // Granularity settings (for autoNumber flag)
+  const { data: granularityData } = useSWR(
+    projectId ? `/api/project/granularity-settings?project_id=${projectId}` : null,
+    fetcher
+  )
+  const autoNumber = Boolean((granularityData as Record<string, unknown>)?.autoNumber)
+
+  // Project land use selections — try Django API first, fallback to parcel-derived data
+  const DJANGO_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'
+  const { data: projectLandUseData } = useSWR(
+    projectId ? `${DJANGO_URL}/api/landuse/project-land-use/by_project/${projectId}/` : null,
+    async (url: string) => {
+      const headers: Record<string, string> = {}
+      try {
+        const raw = localStorage.getItem('auth_tokens')
+        if (raw) { const parsed = JSON.parse(raw); if (parsed?.access) headers.Authorization = `Bearer ${parsed.access}` }
+      } catch { /* ignore */ }
+      const r = await fetch(url, { headers })
+      if (!r.ok) {
+        console.warn(`[PlanningContent] Land use API ${r.status}: ${r.statusText}`)
+        return null
+      }
+      return r.json()
+    },
+    { shouldRetryOnError: false, revalidateOnFocus: true }
+  )
+
+  // Flatten project land use config into selectable options
+  interface PLUFamily { family_id: number; family_name: string; family_code: string }
+  interface PLUType { type_id: number; type_name: string; type_code: string; family_id: number; family_code: string; is_active: boolean; product_selections?: PLUProduct[] }
+  interface PLUProduct { product_id: number; product_code: string; lot_w_ft?: number; is_active: boolean }
+
+  // Derive land use options from Django API or fallback to existing parcels
+  const projectFamilies = useMemo<PLUFamily[]>(() => {
+    // Try Django API data first
+    if (projectLandUseData?.families?.length) {
+      return projectLandUseData.families
+        .filter((f: { types: PLUType[] }) => f.types?.some((t: PLUType) => t.is_active))
+        .map((f: { family_id: number; family_name: string; family_code: string }) => ({ family_id: f.family_id, family_name: f.family_name, family_code: f.family_code }))
+    }
+    // Fallback: derive from existing parcels
+    const seen = new Map<string, PLUFamily>()
+    for (const p of parcels) {
+      if (p.family_name && !seen.has(p.family_name)) {
+        seen.set(p.family_name, { family_id: 0, family_name: p.family_name, family_code: p.family_name.substring(0, 3).toUpperCase() })
+      }
+    }
+    return Array.from(seen.values())
+  }, [projectLandUseData, parcels])
+
+  const projectTypes = useMemo<PLUType[]>(() => {
+    // Try Django API data first
+    if (projectLandUseData?.families?.length) {
+      const types: PLUType[] = []
+      for (const f of projectLandUseData.families) {
+        for (const t of (f.types || [])) {
+          if (t.is_active) types.push({ ...t, family_id: f.family_id, family_code: f.family_code })
+        }
+      }
+      return types
+    }
+    // Fallback: derive from existing parcels
+    const seen = new Map<string, PLUType>()
+    for (const p of parcels) {
+      if (p.type_code && !seen.has(p.type_code)) {
+        const familyCode = p.family_name ? p.family_name.substring(0, 3).toUpperCase() : ''
+        seen.set(p.type_code, { type_id: 0, type_name: p.type_code, type_code: p.type_code, family_id: 0, family_code: familyCode, is_active: true })
+      }
+    }
+    return Array.from(seen.values())
+  }, [projectLandUseData, parcels])
+
+  const projectProducts = useMemo<(PLUProduct & { type_code: string; family_code: string })[]>(() => {
+    // Try Django API data first
+    if (projectLandUseData?.families?.length) {
+      const products: (PLUProduct & { type_code: string; family_code: string })[] = []
+      for (const t of projectTypes) {
+        for (const p of (t.product_selections || [])) {
+          if (p.is_active) products.push({ ...p, type_code: t.type_code, family_code: t.family_code })
+        }
+      }
+      return products
+    }
+    // Fallback: derive from existing parcels
+    const seen = new Map<string, PLUProduct & { type_code: string; family_code: string }>()
+    for (const p of parcels) {
+      if (p.product_code && !seen.has(p.product_code)) {
+        seen.set(p.product_code, { product_id: 0, product_code: p.product_code, is_active: true, type_code: p.type_code || '', family_code: '' })
+      }
+    }
+    return Array.from(seen.values())
+  }, [projectLandUseData, projectTypes, parcels])
+
   // Add Parcel inline row state
   const [showAddParcelRow, setShowAddParcelRow] = useState(false)
   const [addParcelAreaId, setAddParcelAreaId] = useState<number | string>('')
-  const [addParcelPhaseId, setAddParcelPhaseId] = useState<number | string>('')
+  const [addParcelAreaNo, setAddParcelAreaNo] = useState<string>('')  // area NUMBER (user types or selects)
+  const [addParcelPhaseNo, setAddParcelPhaseNo] = useState<string>('')  // phase NUMBER (user types or selects)
+  const [addParcelName, setAddParcelName] = useState<string>('')
   const [addParcelSaving, setAddParcelSaving] = useState(false)
   const [addParcelAcres, setAddParcelAcres] = useState<string>('')
   const [addParcelUnits, setAddParcelUnits] = useState<string>('')
-  const [addParcelFamilyId, setAddParcelFamilyId] = useState<string>('')
-  const [addParcelTypeId, setAddParcelTypeId] = useState<string>('')
+  const [addParcelFamilyCode, setAddParcelFamilyCode] = useState<string>('')
+  const [addParcelTypeCode, setAddParcelTypeCode] = useState<string>('')
   const [addParcelProductCode, setAddParcelProductCode] = useState<string>('')
-  const [addParcelTypes, setAddParcelTypes] = useState<{ type_id: string; family_id: string; name: string; code: string }[]>([])
-  const [addParcelProducts, setAddParcelProducts] = useState<{ product_id: string; code: string; name?: string; lot_width?: number }[]>([])
 
-  // Cascading taxonomy loaders for Add Parcel row
+  // Auto-populate when project has only one option at a level
+  useEffect(() => {
+    if (!showAddParcelRow) return
+    if (projectFamilies.length === 1 && !addParcelFamilyCode) {
+      setAddParcelFamilyCode(projectFamilies[0].family_code)
+    }
+  }, [showAddParcelRow, projectFamilies, addParcelFamilyCode])
+
+  useEffect(() => {
+    if (!showAddParcelRow || !addParcelFamilyCode) return
+    const typesForFamily = projectTypes.filter(t => t.family_code === addParcelFamilyCode)
+    if (typesForFamily.length === 1 && !addParcelTypeCode) {
+      setAddParcelTypeCode(typesForFamily[0].type_code)
+    }
+  }, [showAddParcelRow, addParcelFamilyCode, projectTypes, addParcelTypeCode])
+
+  useEffect(() => {
+    if (!showAddParcelRow || !addParcelTypeCode) return
+    const productsForType = projectProducts.filter(p => p.type_code === addParcelTypeCode)
+    if (productsForType.length === 1 && !addParcelProductCode) {
+      setAddParcelProductCode(productsForType[0].product_code)
+    }
+  }, [showAddParcelRow, addParcelTypeCode, projectProducts, addParcelProductCode])
+
+  // Filtered options for dropdowns (scoped to project land use config)
+  const typesForSelectedFamily = useMemo(() =>
+    addParcelFamilyCode ? projectTypes.filter(t => t.family_code === addParcelFamilyCode) : projectTypes
+  , [addParcelFamilyCode, projectTypes])
+
+  const productsForSelectedType = useMemo(() =>
+    addParcelTypeCode ? projectProducts.filter(p => p.type_code === addParcelTypeCode) : projectProducts
+  , [addParcelTypeCode, projectProducts])
+
+  // Legacy cascading loaders kept for EditableParcelRow compatibility
   const loadAddParcelTypes = async (familyId: string) => {
     try {
       const res = await fetch(`/api/landuse/types/${familyId}`)
@@ -215,26 +343,21 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           name: String(t.type_name ?? t.name ?? ''),
           code: String(t.code ?? t.type_code ?? '')
         })).filter(t => t.type_id && t.name) : []
-        setAddParcelTypes(normalized)
+        void normalized // kept for EditableParcelRow
       }
-    } catch { setAddParcelTypes([]) }
+    } catch { /* noop */ }
   }
 
   const loadAddParcelProducts = async (typeId: string) => {
-    // Check shared cache first
-    if (sharedLotProducts.has(typeId)) {
-      setAddParcelProducts(sharedLotProducts.get(typeId) || [])
-      return
-    }
+    if (sharedLotProducts.has(typeId)) return
     try {
       const res = await fetch(`/api/landuse/lot-products/${typeId}`)
       if (res.ok) {
         const data = await res.json()
         const products = Array.isArray(data) ? data : []
-        setAddParcelProducts(products)
         setSharedLotProducts(prev => new Map(prev).set(typeId, products))
       }
-    } catch { setAddParcelProducts([]) }
+    } catch { /* noop */ }
   }
 
   // Derive area options from areas state (tbl_area) with parcel-based fallback
@@ -270,10 +393,39 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   }, [phases, parcels])
 
   // Get phases for a given area_id (cascading from area selection)
+  // When L1 is disabled, show ALL phases (no area filtering needed)
   const phasesForArea = useMemo(() => {
-    if (!addParcelAreaId || addParcelAreaId === '__new__') return []
-    return phaseOptions.filter(p => p.area_id === Number(addParcelAreaId))
-  }, [phaseOptions, addParcelAreaId])
+    if (!level1Enabled) return phaseOptions
+    const areaNum = parseInt(addParcelAreaNo.trim(), 10)
+    if (!addParcelAreaNo.trim() || isNaN(areaNum)) return []
+    const matchedArea = areaOptions.find(a => a.area_no === areaNum)
+    if (!matchedArea) return []
+    return phaseOptions.filter(p => p.area_id === matchedArea.area_id)
+  }, [phaseOptions, addParcelAreaNo, areaOptions, level1Enabled])
+
+  // When L1 is disabled, transparently ensure a default area exists for phase/parcel creation
+  const getOrCreateDefaultArea = async (): Promise<{ area_id: number; area_no: number } | null> => {
+    if (!projectId) return null
+    // Use first existing area if any
+    if (areaOptions.length > 0) {
+      return { area_id: areaOptions[0].area_id, area_no: areaOptions[0].area_no }
+    }
+    // Create a default area
+    try {
+      const res = await fetch('/api/areas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId, area_name: 'Default' })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const result = await res.json()
+      await mutateAreas()
+      return { area_id: result.area_id, area_no: result.area_no }
+    } catch (e) {
+      console.error('Failed to create default area:', e)
+      return null
+    }
+  }
 
   // Create area on the fly, returns area_id
   const getOrCreateArea = async (areaIdOrNew: number | string): Promise<number | null> => {
@@ -320,45 +472,87 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
 
   // Add parcel using the inline row selections
   const addParcelFromRow = async () => {
-    if (!projectId || !addParcelAreaId || !addParcelPhaseId) {
-      alert(`Please select both an ${level1Label} and a ${level2Label}`)
+    if (!projectId) return
+
+    // Validate: L1 requires area number; L2 requires a phase number
+    if (level1Enabled && !addParcelAreaNo.trim()) {
+      alert(`Please enter a ${level1Label} number`)
       return
     }
+    if (level2Enabled && !addParcelPhaseNo.trim()) {
+      alert(`Please enter a ${level2Label} number`)
+      return
+    }
+
     setAddParcelSaving(true)
     try {
-      // Resolve area (may create new)
-      const resolvedAreaId = await getOrCreateArea(addParcelAreaId)
-      if (!resolvedAreaId) { setAddParcelSaving(false); return }
+      // --- Resolve area by number ---
+      let resolvedAreaId: number | null
+      let areaNo: number
 
-      // Get area_no for the resolved area — use areaOptions first, then fresh fetch as fallback
-      let areaRecord = areaOptions.find((a: Area) => a.area_id === resolvedAreaId)
-      if (!areaRecord) {
-        try {
-          const freshAreas = await fetch(`/api/areas?project_id=${projectId}`).then(r => r.json())
-          if (Array.isArray(freshAreas)) {
-            areaRecord = freshAreas.find((a: Area) => a.area_id === resolvedAreaId)
+      if (level1Enabled) {
+        const enteredAreaNo = parseInt(addParcelAreaNo.trim(), 10)
+        // Try to find existing area with this number
+        const existingArea = areaOptions.find(a => a.area_no === enteredAreaNo)
+        if (existingArea) {
+          resolvedAreaId = existingArea.area_id
+          areaNo = existingArea.area_no
+        } else {
+          // Create new area with this number
+          const newAreaName = `${level1Label} ${enteredAreaNo}`
+          try {
+            const res = await fetch('/api/areas', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ project_id: projectId, area_name: newAreaName })
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const result = await res.json()
+            await mutateAreas()
+            resolvedAreaId = result.area_id
+            areaNo = result.area_no
+          } catch (e) {
+            alert(`Failed to create ${level1Label}: ${e instanceof Error ? e.message : String(e)}`)
+            setAddParcelSaving(false)
+            return
           }
-        } catch { /* fallback failed, areaRecord stays undefined */ }
-      }
-      const areaNo = areaRecord?.area_no
-
-      // Resolve phase (may create new)
-      let resolvedPhaseId: number | null
-      if (addParcelPhaseId === '__new__' && areaNo) {
-        resolvedPhaseId = await getOrCreatePhase('__new__', areaNo)
+        }
       } else {
-        resolvedPhaseId = Number(addParcelPhaseId)
+        const defaultArea = await getOrCreateDefaultArea()
+        if (!defaultArea) { setAddParcelSaving(false); return }
+        resolvedAreaId = defaultArea.area_id
+        areaNo = defaultArea.area_no
       }
-      if (!resolvedPhaseId) { setAddParcelSaving(false); return }
 
-      // Resolve family name from family_id
-      const familyName = addParcelFamilyId
-        ? sharedFamilies.find(f => f.family_id === addParcelFamilyId)?.name || 'Residential'
-        : 'Residential'
-      // Resolve type_code from type_id
-      const typeCode = addParcelTypeId
-        ? addParcelTypes.find(t => t.type_id === addParcelTypeId)?.code || null
-        : null
+      // --- Resolve phase by number ---
+      let resolvedPhaseId: number | null
+      if (level2Enabled) {
+        const enteredPhaseNo = parseInt(addParcelPhaseNo.trim(), 10)
+        // Try to find existing phase with this number under the resolved area
+        const existingPhase = phaseOptions.find(p =>
+          p.area_id === resolvedAreaId && (p.phase_no === enteredPhaseNo || p.phase_name === `${areaNo}.${enteredPhaseNo}`)
+        )
+        if (existingPhase) {
+          resolvedPhaseId = existingPhase.phase_id
+        } else {
+          // Create new phase — POST /api/phases auto-increments phase_no
+          resolvedPhaseId = await getOrCreatePhase('__new__', areaNo)
+        }
+        if (!resolvedPhaseId) { setAddParcelSaving(false); return }
+      } else {
+        const existingPhase = phaseOptions.find(p => p.area_id === resolvedAreaId)
+        if (existingPhase) {
+          resolvedPhaseId = existingPhase.phase_id
+        } else {
+          resolvedPhaseId = await getOrCreatePhase('__new__', areaNo)
+          if (!resolvedPhaseId) { setAddParcelSaving(false); return }
+        }
+      }
+
+      // --- Resolve family/type from project land use config ---
+      const familyCode = addParcelFamilyCode || projectFamilies[0]?.family_code || ''
+      const familyName = projectFamilies.find(f => f.family_code === familyCode)?.family_name || 'Residential'
+      const typeCode = addParcelTypeCode || typesForSelectedFamily[0]?.type_code || null
 
       // Create the parcel
       const res = await fetch('/api/parcels', {
@@ -368,9 +562,10 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           project_id: projectId,
           area_id: resolvedAreaId,
           phase_id: resolvedPhaseId,
+          parcel_code: !autoNumber && addParcelName.trim() ? addParcelName.trim() : null,
           family_name: familyName,
           type_code: typeCode,
-          product_code: addParcelProductCode || null,
+          product_code: addParcelProductCode || productsForSelectedType[0]?.product_code || null,
           acres_gross: addParcelAcres ? parseFloat(addParcelAcres) : null,
           units_total: addParcelUnits ? parseInt(addParcelUnits, 10) : null
         })
@@ -383,14 +578,14 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
       await mutateAreas()
       setShowAddParcelRow(false)
       setAddParcelAreaId('')
-      setAddParcelPhaseId('')
+      setAddParcelAreaNo('')
+      setAddParcelPhaseNo('')
+      setAddParcelName('')
       setAddParcelAcres('')
       setAddParcelUnits('')
-      setAddParcelFamilyId('')
-      setAddParcelTypeId('')
+      setAddParcelFamilyCode('')
+      setAddParcelTypeCode('')
       setAddParcelProductCode('')
-      setAddParcelTypes([])
-      setAddParcelProducts([])
 
       window.dispatchEvent(new CustomEvent('dataChanged', {
         detail: { entity: 'parcel', projectId }
@@ -822,9 +1017,44 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                     style={{
                       padding: '0.875rem 1rem',
                       borderLeft: `3px solid ${accentColor}`,
+                      position: 'relative',
                     }}
                     onClick={() => toggleAreaFilter(areaNo)}
                   >
+                    <button
+                      className="text-xs rounded-full"
+                      style={{
+                        position: 'absolute', top: '4px', right: '4px',
+                        width: '18px', height: '18px', lineHeight: '16px',
+                        backgroundColor: 'var(--cui-danger)', color: 'white',
+                        border: 'none', cursor: 'pointer', fontSize: '10px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                      title={`Delete ${level1Label} ${areaNo}`}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const hasChildren = stats.phases > 0 || stats.parcels > 0
+                        const msg = hasChildren
+                          ? `Delete ${level1Label} ${areaNo}? Its ${stats.phases} ${level2LabelPlural.toLowerCase()} and ${stats.parcels} ${level3LabelPlural.toLowerCase()} will remain but lose their ${level1Label.toLowerCase()} grouping.`
+                          : `Delete ${level1Label} ${areaNo}?`
+                        if (!confirm(msg)) return
+                        const area = areaOptions.find(a => a.area_no === areaNo)
+                        if (!area) return
+                        try {
+                          const res = await fetch(`/api/areas?area_id=${area.area_id}`, { method: 'DELETE' })
+                          if (!res.ok) {
+                            const data = await res.json().catch(() => ({}))
+                            throw new Error(data.error || 'Delete failed')
+                          }
+                          await mutateAreas()
+                          await mutateParcels()
+                        } catch (err) {
+                          alert(`Failed to delete: ${err instanceof Error ? err.message : String(err)}`)
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
                     <div
                       className="planning-tile-header whitespace-nowrap"
                       title={title}
@@ -914,7 +1144,17 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
               Import Data
             </button>
             <button
-              onClick={() => { setShowAddParcelRow(true); setAddParcelAreaId(''); setAddParcelPhaseId('') }}
+              onClick={() => {
+                setShowAddParcelRow(true); setAddParcelAreaId(''); setAddParcelAreaNo(''); setAddParcelPhaseNo('')
+                // Pre-populate family/type/product when only one option exists
+                const fam = projectFamilies.length === 1 ? projectFamilies[0].family_code : ''
+                setAddParcelFamilyCode(fam)
+                const types = fam ? projectTypes.filter(t => t.family_code === fam) : []
+                const typ = types.length === 1 ? types[0].type_code : ''
+                setAddParcelTypeCode(typ)
+                const prods = typ ? projectProducts.filter(p => p.type_code === typ) : []
+                setAddParcelProductCode(prods.length === 1 ? prods[0].product_code : '')
+              }}
               className="px-2.5 py-1 text-xs text-white rounded transition-colors"
               style={{ backgroundColor: 'var(--cui-success)' }}
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
@@ -949,132 +1189,136 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                 <tr style={{ backgroundColor: 'rgba(25, 135, 84, 0.08)', borderBottom: '1px solid var(--cui-border-color)' }}>
                   {level1Enabled && (
                   <td className="px-2 py-2 text-center" colSpan={1}>
-                    <select
+                    {/* Area: select existing or type a new number */}
+                    <input
+                      type="text"
+                      list="add-parcel-area-list"
                       className="w-full rounded px-2 py-1 text-xs"
-                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                      value={addParcelAreaId}
-                      onChange={e => { setAddParcelAreaId(e.target.value); setAddParcelPhaseId('') }}
-                    >
-                      <option value="">Select {level1Label}</option>
+                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid', maxWidth: '100px' }}
+                      placeholder={`${level1Label} #`}
+                      value={addParcelAreaNo}
+                      onChange={e => { setAddParcelAreaNo(e.target.value); setAddParcelPhaseNo('') }}
+                    />
+                    <datalist id="add-parcel-area-list">
                       {areaOptions.map(a => (
-                        <option key={a.area_id} value={a.area_id}>{a.label || a.area_name || `${level1Label} ${a.area_no}`}</option>
+                        <option key={a.area_id} value={String(a.area_no)}>{a.label || a.area_name || `${level1Label} ${a.area_no}`}</option>
                       ))}
-                      <option value="__new__">＋ New {level1Label}</option>
-                    </select>
+                    </datalist>
                   </td>
                   )}
                   {level2Enabled && (
                   <td className="px-2 py-2 text-center" colSpan={1}>
-                    <select
+                    {/* Phase: select existing or type a new number */}
+                    <input
+                      type="text"
+                      list="add-parcel-phase-list"
                       className="w-full rounded px-2 py-1 text-xs"
-                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                      value={addParcelPhaseId}
-                      onChange={e => setAddParcelPhaseId(e.target.value)}
-                      disabled={!addParcelAreaId}
-                    >
-                      <option value="">Select {level2Label}</option>
+                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid', maxWidth: '100px' }}
+                      placeholder={`${level2Label} #`}
+                      value={addParcelPhaseNo}
+                      onChange={e => setAddParcelPhaseNo(e.target.value)}
+                    />
+                    <datalist id="add-parcel-phase-list">
                       {phasesForArea.map(p => (
-                        <option key={p.phase_id} value={p.phase_id}>{p.phase_name}</option>
+                        <option key={p.phase_id} value={String(p.phase_no ?? p.phase_name?.split('.').pop() ?? '')}>{p.phase_name}</option>
                       ))}
-                      <option value="__new__">＋ New {level2Label}</option>
-                    </select>
+                    </datalist>
                   </td>
                   )}
-                  {/* Parcel # — auto-assigned */}
+                  {/* Parcel # — auto-assigned or manual entry */}
                   <td className="px-2 py-2 text-center">
-                    <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Auto</span>
+                    {autoNumber ? (
+                      <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>Auto</span>
+                    ) : (
+                      <input
+                        type="text"
+                        className="w-full rounded px-1 py-1 text-xs text-center"
+                        style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid', maxWidth: '80px' }}
+                        placeholder="#"
+                        value={addParcelName}
+                        onChange={e => setAddParcelName(e.target.value)}
+                      />
+                    )}
                   </td>
-                  {addParcelAreaId && addParcelAreaId !== '__new__' && addParcelPhaseId && addParcelPhaseId !== '__new__' ? (
-                    <>
-                      {/* Use Family */}
-                      <td className="px-2 py-2 text-center">
-                        <select
-                          className="w-full rounded px-1 py-1 text-xs"
-                          style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                          value={addParcelFamilyId}
-                          onChange={e => {
-                            const fid = e.target.value
-                            setAddParcelFamilyId(fid)
-                            setAddParcelTypeId('')
-                            setAddParcelProductCode('')
-                            setAddParcelProducts([])
-                            if (fid) { loadAddParcelTypes(fid) } else { setAddParcelTypes([]) }
-                          }}
-                        >
-                          <option value="">Family</option>
-                          {sharedFamilies.map(f => (
-                            <option key={f.family_id} value={f.family_id}>{f.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      {/* Use Type — cascades from Family */}
-                      <td className="px-2 py-2 text-center">
-                        <select
-                          className="w-full rounded px-1 py-1 text-xs"
-                          style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                          value={addParcelTypeId}
-                          onChange={e => {
-                            const tid = e.target.value
-                            setAddParcelTypeId(tid)
-                            setAddParcelProductCode('')
-                            if (tid) { loadAddParcelProducts(tid) } else { setAddParcelProducts([]) }
-                          }}
-                          disabled={!addParcelFamilyId}
-                        >
-                          <option value="">Type</option>
-                          {addParcelTypes.filter(t => t.family_id === addParcelFamilyId).map(t => (
-                            <option key={t.type_id} value={t.type_id}>{t.name}</option>
-                          ))}
-                        </select>
-                      </td>
-                      {/* Product — cascades from Type */}
-                      <td className="px-2 py-2 text-center">
-                        <select
-                          className="w-full rounded px-1 py-1 text-xs"
-                          style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                          value={addParcelProductCode}
-                          onChange={e => setAddParcelProductCode(e.target.value)}
-                          disabled={!addParcelTypeId}
-                        >
-                          <option value="">Product</option>
-                          {addParcelProducts.map(p => (
-                            <option key={p.product_id || p.code} value={p.code}>{p.name || p.code}</option>
-                          ))}
-                        </select>
-                      </td>
-                      {/* Acres */}
-                      <td className="px-2 py-2 text-center">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="w-full rounded px-1 py-1 text-xs text-center"
-                          style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                          placeholder="0.00"
-                          value={addParcelAcres}
-                          onChange={e => setAddParcelAcres(e.target.value)}
-                        />
-                      </td>
-                      {/* Units */}
-                      <td className="px-2 py-2 text-center">
-                        <input
-                          type="number"
-                          step="1"
-                          className="w-full rounded px-1 py-1 text-xs text-center"
-                          style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
-                          placeholder="0"
-                          value={addParcelUnits}
-                          onChange={e => setAddParcelUnits(e.target.value)}
-                        />
-                      </td>
-                    </>
-                  ) : (
-                    <td className="px-2 py-2 text-center" colSpan={5}>
-                      <span className="text-xs italic" style={{ color: 'var(--cui-secondary-color)' }}>
-                        Select {level1Label} &amp; {level2Label} first
-                      </span>
-                    </td>
-                  )}
-                  {/* DUA, FF/Acre — not applicable for new row */}
+                  {/* Use Family — scoped to project land use config */}
+                  <td className="px-2 py-2 text-center">
+                    {projectFamilies.length <= 1 ? (
+                      <span className="text-xs" style={{ color: 'var(--cui-body-color)' }}>{projectFamilies[0]?.family_name || '—'}</span>
+                    ) : (
+                      <select
+                        className="w-full rounded px-1 py-1 text-xs"
+                        style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
+                        value={addParcelFamilyCode}
+                        onChange={e => { setAddParcelFamilyCode(e.target.value); setAddParcelTypeCode(''); setAddParcelProductCode('') }}
+                      >
+                        <option value="">Family</option>
+                        {projectFamilies.map(f => (
+                          <option key={f.family_id} value={f.family_code}>{f.family_name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  {/* Use Type — scoped to selected family */}
+                  <td className="px-2 py-2 text-center">
+                    {typesForSelectedFamily.length <= 1 ? (
+                      <span className="text-xs" style={{ color: 'var(--cui-body-color)' }}>{typesForSelectedFamily[0]?.type_name || '—'}</span>
+                    ) : (
+                      <select
+                        className="w-full rounded px-1 py-1 text-xs"
+                        style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
+                        value={addParcelTypeCode}
+                        onChange={e => { setAddParcelTypeCode(e.target.value); setAddParcelProductCode('') }}
+                      >
+                        <option value="">Type</option>
+                        {typesForSelectedFamily.map(t => (
+                          <option key={t.type_id} value={t.type_code}>{t.type_name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  {/* Product — scoped to selected type */}
+                  <td className="px-2 py-2 text-center">
+                    {productsForSelectedType.length <= 1 ? (
+                      <span className="text-xs" style={{ color: 'var(--cui-body-color)' }}>{productsForSelectedType[0]?.product_code || '—'}</span>
+                    ) : (
+                      <select
+                        className="w-full rounded px-1 py-1 text-xs"
+                        style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
+                        value={addParcelProductCode}
+                        onChange={e => setAddParcelProductCode(e.target.value)}
+                      >
+                        <option value="">Product</option>
+                        {productsForSelectedType.map(p => (
+                          <option key={p.product_id} value={p.product_code}>{p.product_code}{p.lot_w_ft ? ` (${p.lot_w_ft}')` : ''}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  {/* Acres */}
+                  <td className="px-2 py-2 text-center">
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-full rounded px-1 py-1 text-xs text-center"
+                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
+                      placeholder="0.00"
+                      value={addParcelAcres}
+                      onChange={e => setAddParcelAcres(e.target.value)}
+                    />
+                  </td>
+                  {/* Units */}
+                  <td className="px-2 py-2 text-center">
+                    <input
+                      type="number"
+                      step="1"
+                      className="w-full rounded px-1 py-1 text-xs text-center"
+                      style={{ backgroundColor: 'var(--surface-bg)', borderColor: 'var(--cui-border-color)', color: 'var(--cui-body-color)', border: '1px solid' }}
+                      placeholder="0"
+                      value={addParcelUnits}
+                      onChange={e => setAddParcelUnits(e.target.value)}
+                    />
+                  </td>
+                  {/* DUA, FF/Acre — computed, not editable */}
                   <td className="px-2 py-2 text-center">
                     <span className="text-xs" style={{ color: 'var(--cui-secondary-color)' }}>—</span>
                   </td>
@@ -1086,7 +1330,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                       <button
                         className="px-2 py-1 text-xs text-white rounded transition-colors"
                         style={{ backgroundColor: 'var(--cui-success)', opacity: addParcelSaving ? 0.6 : 1 }}
-                        disabled={addParcelSaving || !addParcelAreaId || !addParcelPhaseId}
+                        disabled={addParcelSaving}
                         onClick={addParcelFromRow}
                       >
                         {addParcelSaving ? 'Adding...' : 'Add'}
@@ -1094,7 +1338,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                       <button
                         className="px-2 py-1 text-xs rounded transition-colors"
                         style={{ backgroundColor: 'var(--cui-secondary)', color: 'white' }}
-                        onClick={() => { setShowAddParcelRow(false); setAddParcelAreaId(''); setAddParcelPhaseId(''); setAddParcelAcres(''); setAddParcelUnits(''); setAddParcelFamilyId(''); setAddParcelTypeId(''); setAddParcelProductCode(''); setAddParcelTypes([]); setAddParcelProducts([]) }}
+                        onClick={() => { setShowAddParcelRow(false); setAddParcelAreaId(''); setAddParcelAreaNo(''); setAddParcelPhaseNo(''); setAddParcelName(''); setAddParcelAcres(''); setAddParcelUnits(''); setAddParcelFamilyCode(''); setAddParcelTypeCode(''); setAddParcelProductCode('') }}
                       >
                         Cancel
                       </button>
@@ -1729,12 +1973,12 @@ const EditableParcelRow: React.FC<{
             )}
           </select>
         ) : (
-          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-            parcel.family_name === 'Residential' ? 'bg-blue-900 text-blue-300' :
-            parcel.family_name === 'Commercial' ? 'bg-purple-900 text-purple-300' :
-            parcel.family_name === 'Industrial' ? 'bg-orange-900 text-orange-300' :
-            'bg-indigo-900 text-indigo-300'
-          }`}>
+          <span className={`${styles.badgeBase} ${
+              parcel.family_name === 'Residential' ? styles.familyResidential :
+              parcel.family_name === 'Commercial' ? styles.familyCommercial :
+              parcel.family_name === 'Industrial' ? styles.familyIndustrial :
+              styles.familyDefault
+            }`}>
             {parcel.type_code || 'No Type'}
           </span>
         )}
@@ -2007,16 +2251,12 @@ const PhaseRow: React.FC<{
         <td className="py-2 px-2 text-left">
           <div className="flex flex-wrap gap-1">
             {phaseUseCodes.map((useCode, idx) => (
-              <span key={useCode} className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                idx % 8 === 0 ? 'bg-blue-900 text-blue-300' :
-                idx % 8 === 1 ? 'bg-purple-900 text-purple-300' :
-                idx % 8 === 2 ? 'bg-orange-900 text-orange-300' :
-                idx % 8 === 3 ? 'bg-green-900 text-green-300' :
-                idx % 8 === 4 ? 'bg-red-900 text-red-300' :
-                idx % 8 === 5 ? 'bg-yellow-900 text-yellow-300' :
-                idx % 8 === 6 ? 'bg-pink-900 text-pink-300' :
-                'bg-indigo-900 text-indigo-300'
-              }`}>
+              <span
+                key={useCode}
+                className={`${styles.badgeBase} ${
+                  [styles.phaseBadgePrimary, styles.phaseBadgeSuccess, styles.phaseBadgeWarning, styles.phaseBadgeDanger, styles.phaseBadgeInfo, styles.phaseBadgeSecondary][idx % 6] || styles.phaseBadgeSecondary
+                }`}
+              >
                 {useCode}
               </span>
             ))}

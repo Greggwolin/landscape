@@ -141,18 +141,21 @@ export default function DocTypeFilters({
         count: countMap.get(type) ?? countMap.get(type.toLowerCase()) ?? 0
       }));
 
+      // Bucket non-template doc_types under "Other" instead of showing bogus filter names
       const templateSet = new Set(docTypeOptions.map((type) => type.toLowerCase()));
-      const extraFilters = countEntries
+      const otherCount = countEntries
         .filter(({ doc_type }) => doc_type && !templateSet.has(doc_type.toLowerCase()))
-        .map(({ doc_type, count }) => ({
-          doc_type,
-          count: count ?? 0
-        }));
+        .reduce((sum, { count }) => sum + (count ?? 0), 0);
+
+      const allFilters = [...templateFilters];
+      if (otherCount > 0) {
+        allFilters.push({ doc_type: 'Other', count: otherCount });
+      }
 
       const platformData = platformResponse.ok
         ? await parseJsonSafely<{ totalHits?: number }>(platformResponse, 'platform-knowledge filters')
         : { totalHits: 0 };
-      setDocTypes(applyPlatformKnowledge([...templateFilters, ...extraFilters], platformData.totalHits || 0));
+      setDocTypes(applyPlatformKnowledge(allFilters, platformData.totalHits || 0));
       setSmartFilters(
         Array.isArray(countsData.smart_filters)
           ? countsData.smart_filters.map((item: any) => ({

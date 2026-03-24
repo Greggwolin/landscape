@@ -173,20 +173,21 @@ The Appraisal of Real Estate (14th Edition, Appraisal Institute).
 
 Writing style:
 - Professional, analytical tone appropriate for institutional lenders and investors
-- Each section should be 2-3 concise paragraphs (4-8 sentences each)
-- Reference specific data values when available (include the numbers)
-- When data shows notable trends (large YoY changes), highlight and explain implications
-- Where data is unavailable or shows "—", provide qualitative analysis based on general market knowledge but note the data gap
+- CONCISE: Each section should be 1-2 short paragraphs (3-5 sentences each). Favor density over length.
+- Reference specific data values when available — cite the number inline without restating the label verbosely
+- When data shows notable trends (large YoY changes), note the direction and implication in one sentence
+- Where data is unavailable or shows "—", skip it or note briefly — do NOT pad with generic filler
 - Do NOT use bullet points or lists — write in flowing analytical prose
 - Do NOT include headers or markdown formatting in the content text — just paragraphs
-- The summary should be 2-3 paragraphs providing an executive overview
+- Do NOT restate metric definitions or explain what standard economic terms mean
+- The summary MUST be exactly 2-3 sentences — a tight executive snapshot, not a multi-paragraph essay
 - Reference the analysis date provided — do NOT reference older dates or time periods unless discussing historical trends
 
 You MUST respond with valid JSON matching this exact structure:
 {
-  "summary": "2-3 paragraph executive summary of the analysis",
+  "summary": "2-3 sentence executive snapshot — brief, dense, no filler",
   "sections": [
-    {"title": "Section Title", "content": "2-3 paragraphs of analytical prose"}
+    {"title": "Section Title", "content": "1-2 short paragraphs of analytical prose"}
   ]
 }
 
@@ -243,7 +244,7 @@ export async function POST(request: NextRequest) {
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 3000,
+      max_tokens: 2000,
       system,
       messages: [{ role: 'user', content: user }],
     });
