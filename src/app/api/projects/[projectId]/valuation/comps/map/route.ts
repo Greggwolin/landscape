@@ -39,8 +39,9 @@ export async function GET(
 
     // Fetch comparables with their actual coordinates.
     // For non-land projects, exclude explicitly-tagged land comps.
+    // Include comp_number so map labels match the grid.
     const compsResult = await pool.query(
-      `SELECT comparable_id, property_name, address, city, state,
+      `SELECT comparable_id, comp_number, property_name, address, city, state,
               sale_price, sale_date, units, building_sf, price_per_unit,
               latitude, longitude
        FROM landscape.tbl_sales_comparables
@@ -50,49 +51,56 @@ export async function GET(
       [projectId]
     );
 
-    // Use actual coordinates from database
-    const compsFeatures = compsResult.rows.map((comp, index) => {
-      // Use actual lat/lon from database, fallback to subject location if missing
-      const compLng = comp.longitude ? Number(comp.longitude) : Number(subject.lng);
-      const compLat = comp.latitude ? Number(comp.latitude) : Number(subject.lat);
+    // Use actual coordinates from database.
+    // Skip comps without coordinates instead of stacking them on the subject.
+    // Use comp_number for labeling so map matches grid numbering.
+    const compsFeatures = compsResult.rows
+      .filter(comp => comp.latitude && comp.longitude)
+      .map((comp, index) => {
+        const compLng = Number(comp.longitude);
+        const compLat = Number(comp.latitude);
 
-      const offsetLng = 0.0002;
-      const offsetLat = 0.0001;
+        const offsetLng = 0.0002;
+        const offsetLat = 0.0001;
 
-      const pricePerUnit = comp.price_per_unit
-        ? Number(comp.price_per_unit)
-        : (comp.sale_price && comp.units ? Number(comp.sale_price) / Number(comp.units) : null);
+        // Use comp_number from DB (matches grid), fall back to array index + 1
+        const compNumber = comp.comp_number ?? (index + 1);
 
-      return {
-        type: 'Feature',
-        id: `comp-${comp.comparable_id}`,
-        properties: {
+        const pricePerUnit = comp.price_per_unit
+          ? Number(comp.price_per_unit)
+          : (comp.sale_price && comp.units ? Number(comp.sale_price) / Number(comp.units) : null);
+
+        return {
+          type: 'Feature',
           id: `comp-${comp.comparable_id}`,
-          compId: String(comp.comparable_id),
-          name: `${comp.property_name || comp.address}`,
-          type: 'sale',
-          price: comp.sale_price ? Number(comp.sale_price) : null,
-          price_per_unit: pricePerUnit,
-          date: comp.sale_date,
-          stories: Math.ceil(Number(comp.building_sf || 0) / Number(comp.units || 1) / 1000) || 3,
-          defaultStories: 3,
-          selected: index === 0, // First comp selected by default
-          color: index === 0 ? '#10b981' : '#f59e0b'
-        },
-        geometry: {
-          type: 'Polygon',
-          coordinates: [
-            [
-              [compLng - offsetLng, compLat - offsetLat],
-              [compLng - offsetLng, compLat + offsetLat],
-              [compLng + offsetLng, compLat + offsetLat],
-              [compLng + offsetLng, compLat - offsetLat],
-              [compLng - offsetLng, compLat - offsetLat]
+          properties: {
+            id: `comp-${comp.comparable_id}`,
+            compId: String(comp.comparable_id),
+            compNumber,
+            name: `${comp.property_name || comp.address}`,
+            type: 'sale',
+            price: comp.sale_price ? Number(comp.sale_price) : null,
+            price_per_unit: pricePerUnit,
+            date: comp.sale_date,
+            stories: Math.ceil(Number(comp.building_sf || 0) / Number(comp.units || 1) / 1000) || 3,
+            defaultStories: 3,
+            selected: index === 0,
+            color: index === 0 ? '#10b981' : '#f59e0b'
+          },
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [compLng - offsetLng, compLat - offsetLat],
+                [compLng - offsetLng, compLat + offsetLat],
+                [compLng + offsetLng, compLat + offsetLat],
+                [compLng + offsetLng, compLat - offsetLat],
+                [compLng - offsetLng, compLat - offsetLat]
+              ]
             ]
-          ]
-        }
-      };
-    });
+          }
+        };
+      });
 
     const offsetLng = 0.0003;
     const offsetLat = 0.0002;
