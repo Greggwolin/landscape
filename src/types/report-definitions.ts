@@ -20,15 +20,26 @@ export interface ReportDefinition {
   updated_at: string;
 }
 
+export interface ReportMapMarker {
+  id: string;
+  coordinates: [number, number];
+  color?: string;
+  label?: string;
+  name?: string;
+  variant?: 'pin' | 'dot' | 'numbered';
+}
+
 export interface ReportPreviewSection {
   heading: string;
-  type: 'table' | 'kpi_cards' | 'text';
+  type: 'table' | 'kpi_cards' | 'text' | 'map';
   columns?: ReportColumn[];
   rows?: Record<string, unknown>[];
   totals?: Record<string, unknown>;
   group_by?: string;
   cards?: ReportKPICard[];
   content?: string;
+  center?: [number, number];
+  markers?: ReportMapMarker[];
 }
 
 export interface ReportColumn {

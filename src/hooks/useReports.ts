@@ -305,7 +305,15 @@ export function useReportExport() {
           body: JSON.stringify({ format, parameters }),
         }
       );
-      if (!response.ok) throw new Error('Failed to export report');
+      if (!response.ok) {
+        // Try to extract error message from JSON response
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const errData = await response.json();
+          throw new Error(errData.error || `Export failed (${response.status})`);
+        }
+        throw new Error(`Export failed (${response.status})`);
+      }
       const blob = await response.blob();
       return { blob, reportCode, projectId, format };
     },

@@ -188,9 +188,9 @@ def report_export(request, report_code, project_id):
 
     try:
         if export_format == 'pdf':
-            blob, content_type = generator.generate_pdf_export()
+            blob, content_type = generator.generate_pdf(), 'application/pdf'
         elif export_format == 'excel':
-            blob, content_type = generator.generate_excel_export()
+            blob, content_type = generator.generate_excel(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         else:
             return JsonResponse({'error': f'Unsupported format: {export_format}'}, status=400)
     except NotImplementedError:
