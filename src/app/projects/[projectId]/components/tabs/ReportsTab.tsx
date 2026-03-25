@@ -1,143 +1,90 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { CCard, CCardBody, CCardHeader } from '@coreui/react';
-import CIcon from '@coreui/icons-react';
-import { cilChevronBottom, cilChevronRight } from '@coreui/icons';
-import { RentScheduleReport } from '@/components/reports/RentScheduleReport';
+import React, { useState, useCallback, useMemo } from 'react';
+import { CSpinner } from '@coreui/react';
+import { useReportDefinitions } from '@/hooks/useReports';
+import ReportBrowser from '@/components/reports/ReportBrowser';
+import ReportViewer from '@/components/reports/ReportViewer';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
+import type { ReportDefinition } from '@/types/report-definitions';
 
 interface Project {
   project_id: number;
   project_name: string;
+  project_type_code?: string;
+  project_type?: string;
+  property_subtype?: string;
 }
 
 interface ReportsTabProps {
   project: Project;
 }
 
-interface ReportItem {
-  id: string;
-  name: string;
-  description: string;
-  component?: React.ReactNode;
-}
-
 export default function ReportsTab({ project }: ReportsTabProps) {
-  const [auditOpen, setAuditOpen] = useState(true);
-  const [summariesOpen, setSummariesOpen] = useState(false);
-  const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const effectiveProjectType = project.project_type_code
+    || project.project_type
+    || project.property_subtype
+    || 'LAND';
+
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const { data: definitions, isLoading, error } = useReportDefinitions(effectiveProjectType);
 
   // Force child remount on Landscaper mutations
   const [refreshKey, setRefreshKey] = useState(0);
-  const watchedTables = useMemo(() => ['project', 'cashflow'], []);
+  const watchedTables = useMemo(() => ['project', 'cashflow', 'budget', 'container'], []);
   const handleRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
   useLandscaperRefresh(project.project_id, watchedTables, handleRefresh);
 
-  const inflowReports: ReportItem[] = [
-    {
-      id: 'rent-schedule',
-      name: 'Rent Schedule',
-      description: 'Unit-level rent roll with current and market rents, vacancy, and concessions.',
-      component: <RentScheduleReport key={refreshKey} projectId={project.project_id} />,
-    },
-  ];
+  const selectedDefinition: ReportDefinition | null = useMemo(() => {
+    if (!selectedCode || !definitions) return null;
+    return definitions.find(d => d.report_code === selectedCode) ?? null;
+  }, [selectedCode, definitions]);
 
-  const toggleReport = (reportId: string) => {
-    setExpandedReport((prev) => (prev === reportId ? null : reportId));
-  };
+  if (isLoading) {
+    return (
+      <div className="d-flex align-items-center justify-content-center"
+        style={{ minHeight: '500px' }}
+      >
+        <CSpinner color="primary" />
+        <span className="ms-2" style={{ color: 'var(--cui-secondary-color)' }}>
+          Loading report catalog...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="d-flex align-items-center justify-content-center"
+        style={{ minHeight: '500px', color: 'var(--cui-danger)' }}
+      >
+        Failed to load report catalog: {(error as Error).message}
+      </div>
+    );
+  }
 
   return (
-    <div className="d-flex flex-column gap-3">
+    <div className="d-flex" style={{
+      height: 'calc(100vh - 220px)',
+      border: '1px solid var(--cui-border-color)',
+      borderRadius: '6px',
+      overflow: 'hidden',
+      background: 'var(--cui-body-bg)',
+    }}>
+      {/* Left panel: Report catalog browser */}
+      <ReportBrowser
+        definitions={definitions || []}
+        selectedCode={selectedCode}
+        onSelect={setSelectedCode}
+      />
 
-      {/* ── Audit Panel ── */}
-      <CCard>
-        <CCardHeader
-          className="d-flex align-items-center justify-content-between"
-          style={{ cursor: 'pointer', userSelect: 'none' }}
-          onClick={() => setAuditOpen(!auditOpen)}
-        >
-          <h5 className="mb-0 fw-semibold">Audit</h5>
-          <CIcon icon={auditOpen ? cilChevronBottom : cilChevronRight} size="lg" />
-        </CCardHeader>
-        {auditOpen && (
-          <CCardBody className="pt-2">
-
-            {/* Inflows */}
-            <h6
-              className="text-body-secondary fw-semibold mb-3"
-              style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}
-            >
-              Inflows
-            </h6>
-            <div className="d-flex flex-column gap-2 mb-4">
-              {inflowReports.map((report) => (
-                <div key={report.id}>
-                  <div
-                    className="d-flex align-items-center gap-2 px-3 py-2 rounded"
-                    style={{
-                      cursor: 'pointer',
-                      backgroundColor: expandedReport === report.id
-                        ? 'var(--cui-tertiary-bg)'
-                        : 'transparent',
-                    }}
-                    onClick={() => toggleReport(report.id)}
-                  >
-                    <CIcon
-                      icon={expandedReport === report.id ? cilChevronBottom : cilChevronRight}
-                      size="sm"
-                      className="text-body-secondary flex-shrink-0"
-                    />
-                    <span className="fw-medium">{report.name}</span>
-                    <span className="text-body-secondary" style={{ fontSize: '0.85rem' }}>
-                      — {report.description}
-                    </span>
-                  </div>
-                  {expandedReport === report.id && (
-                    <div className="mt-2 ms-4">
-                      {report.component}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Outflows */}
-            <h6
-              className="text-body-secondary fw-semibold mb-3"
-              style={{ fontSize: '0.75rem', letterSpacing: '0.05em' }}
-            >
-              Outflows
-            </h6>
-            <div className="px-3">
-              <p className="text-body-secondary mb-0" style={{ fontStyle: 'italic' }}>
-                Coming soon
-              </p>
-            </div>
-
-          </CCardBody>
-        )}
-      </CCard>
-
-      {/* ── Summaries Panel ── */}
-      <CCard>
-        <CCardHeader
-          className="d-flex align-items-center justify-content-between"
-          style={{ cursor: 'pointer', userSelect: 'none' }}
-          onClick={() => setSummariesOpen(!summariesOpen)}
-        >
-          <h5 className="mb-0 fw-semibold">Summaries</h5>
-          <CIcon icon={summariesOpen ? cilChevronBottom : cilChevronRight} size="lg" />
-        </CCardHeader>
-        {summariesOpen && (
-          <CCardBody>
-            <p className="text-body-secondary mb-0" style={{ fontStyle: 'italic' }}>
-              Coming soon
-            </p>
-          </CCardBody>
-        )}
-      </CCard>
-
+      {/* Right panel: Report viewer */}
+      <div key={refreshKey} style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+        <ReportViewer
+          definition={selectedDefinition}
+          projectId={project.project_id}
+        />
+      </div>
     </div>
   );
 }

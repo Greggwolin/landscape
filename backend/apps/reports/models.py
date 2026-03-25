@@ -1,11 +1,83 @@
 """
-Models for report templates and configurations.
+Models for report templates, definitions, and history.
 
+ReportDefinition: Catalog of what reports exist and which project types can see them.
 ReportTemplate: Stores custom report configurations that can be assigned to project tabs.
-Users configure which sections to include and which tabs should show export buttons.
+ReportHistory: Tracks each report generation event.
 """
 
 from django.db import models
+from django.contrib.postgres.fields import ArrayField
+
+
+class ReportDefinition(models.Model):
+    """
+    Report catalog — defines what reports exist and which project types can see them.
+    Separate from ReportTemplate which defines how to render a specific report format.
+    """
+
+    READINESS_CHOICES = [
+        ('ready', 'Ready'),
+        ('partial', 'Partial'),
+        ('not_ready', 'Not Ready'),
+    ]
+
+    TIER_CHOICES = [
+        ('essential', 'Essential'),
+        ('advanced', 'Advanced'),
+        ('premium', 'Premium'),
+    ]
+
+    report_code = models.CharField(max_length=50, unique=True)
+    report_name = models.CharField(max_length=200)
+    report_category = models.CharField(max_length=50)
+    property_types = ArrayField(
+        models.CharField(max_length=10),
+        default=list,
+        help_text="Project type codes: LAND, MF, OFF, RET, IND, HTL, MXU"
+    )
+    report_tier = models.CharField(max_length=20, choices=TIER_CHOICES, default='essential')
+    description = models.TextField(blank=True, default='')
+    argus_equivalent = models.CharField(max_length=200, blank=True, default='')
+    spec_file = models.CharField(max_length=100, blank=True, default='')
+    data_readiness = models.CharField(max_length=20, choices=READINESS_CHOICES, default='not_ready')
+    generator_class = models.CharField(max_length=100, blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_report_definition'
+        managed = True
+        ordering = ['sort_order']
+
+    def __str__(self):
+        return f"{self.report_code}: {self.report_name}"
+
+
+class ReportHistory(models.Model):
+    """Tracks each report generation event for audit/re-run purposes."""
+
+    report_definition = models.ForeignKey(
+        ReportDefinition,
+        on_delete=models.CASCADE,
+        related_name='history'
+    )
+    project_id = models.BigIntegerField()
+    parameters = models.JSONField(default=dict, blank=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+    export_format = models.CharField(max_length=20, default='html')
+    file_path = models.TextField(blank=True, default='')
+    generation_time_ms = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_report_history'
+        managed = True
+        ordering = ['-generated_at']
+
+    def __str__(self):
+        return f"{self.report_definition.report_code} for project {self.project_id}"
 
 
 class ReportTemplate(models.Model):
@@ -45,6 +117,19 @@ class ReportTemplate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.TextField(blank=True, null=True, help_text="User who created this template")
+    report_definition = models.ForeignKey(
+        'ReportDefinition',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='templates'
+    )
+    property_types = ArrayField(
+        models.CharField(max_length=10),
+        default=list,
+        blank=True
+    )
+    report_category = models.CharField(max_length=50, blank=True, default='')
 
     class Meta:
         db_table = 'landscape"."report_templates'

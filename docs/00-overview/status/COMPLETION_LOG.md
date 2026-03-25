@@ -6,6 +6,15 @@ Historical record of feature and migration completions. For current implementati
 
 ## 2026
 
+### March
+
+| Date | Milestone | Notes |
+|------|-----------|-------|
+| 2026-03-24 | Expense Comparable CRUD | `tbl_expense_comparable` table, Django API, ExpenseCompDetailModal for income approach |
+| 2026-03-24 | Report System Architecture (uncommitted) | 20 report generators, generator_router, ReportBrowser/Viewer, report definition seed |
+| 2026-03-24 | Location Tab + County/Micro ACS | County + micropolitan ACS series, DMS-aware market analysis |
+| 2026-03-24 | v0.1.10 Release | Version bump, mega-commit of prior geo/planning/landscaper work |
+
 ### February
 
 | Date | Milestone | Notes |

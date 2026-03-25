@@ -1,0 +1,303 @@
+"""
+Data migration: Seed 20 report definitions into tbl_report_definition.
+
+These reports form the Phase 1 catalog for the DB-driven report system.
+Categories align with frontend REPORT_CATEGORIES in report-definitions.ts.
+"""
+
+from django.db import migrations
+
+
+REPORT_DEFINITIONS = [
+    # ── Universal (Land Dev + Income Property) ──
+    {
+        'report_code': 'RPT_01',
+        'report_name': 'Sources & Uses',
+        'report_category': 'capital_structure',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'essential',
+        'description': 'Capital structure overview showing debt, equity, and uses of proceeds.',
+        'argus_equivalent': 'Sources & Uses report',
+        'spec_file': 'RPT_01_SOURCES_AND_USES.md',
+        'data_readiness': 'partial',
+        'generator_class': 'SourcesAndUsesGenerator',
+        'sort_order': 10,
+    },
+    {
+        'report_code': 'RPT_02',
+        'report_name': 'Debt Summary',
+        'report_category': 'capital_structure',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'essential',
+        'description': 'Loan configuration, amortization schedule, and debt service metrics.',
+        'argus_equivalent': 'Loan Amortization / Debt Schedule',
+        'spec_file': 'RPT_02_DEBT_SUMMARY.md',
+        'data_readiness': 'not_ready',
+        'generator_class': 'DebtSummaryGenerator',
+        'sort_order': 20,
+    },
+    {
+        'report_code': 'RPT_03',
+        'report_name': 'Loan Budget',
+        'report_category': 'capital_structure',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'essential',
+        'description': 'Hard costs, soft costs, and fees organized for loan underwriting.',
+        'argus_equivalent': 'Loan Budget / Sources & Uses (debt-focused)',
+        'spec_file': 'RPT_03_LOAN_BUDGET.md',
+        'data_readiness': 'not_ready',
+        'generator_class': 'LoanBudgetPreviewGenerator',
+        'sort_order': 30,
+    },
+    {
+        'report_code': 'RPT_04',
+        'report_name': 'Equity Waterfall',
+        'report_category': 'capital_structure',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'advanced',
+        'description': 'Equity returns, preferred returns, and promote distributions over project life.',
+        'argus_equivalent': 'Waterfall / Pref Return + Promote schedules',
+        'spec_file': 'RPT_04_EQUITY_WATERFALL.md',
+        'data_readiness': 'partial',
+        'generator_class': 'EquityWaterfallGenerator',
+        'sort_order': 40,
+    },
+    {
+        'report_code': 'RPT_05',
+        'report_name': 'Assumptions Summary',
+        'report_category': 'underwriting',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'essential',
+        'description': 'Project profile, land use mix, feasibility, and valuation assumptions.',
+        'argus_equivalent': 'Assumptions / Inputs pages',
+        'spec_file': 'RPT_05_ASSUMPTIONS_SUMMARY.md',
+        'data_readiness': 'partial',
+        'generator_class': 'AssumptionsSummaryGenerator',
+        'sort_order': 50,
+    },
+    {
+        'report_code': 'RPT_06',
+        'report_name': 'Project Summary',
+        'report_category': 'executive',
+        'property_types': ['LAND', 'MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU'],
+        'report_tier': 'essential',
+        'description': 'Executive brief with KPI cards, project snapshot, and key financial metrics.',
+        'argus_equivalent': 'Executive Summary + Project Overview',
+        'spec_file': 'RPT_06_PROJECT_SUMMARY.md',
+        'data_readiness': 'partial',
+        'generator_class': 'ProjectSummaryGenerator',
+        'sort_order': 60,
+    },
+
+    # ── Multifamily / Income Property ──
+    {
+        'report_code': 'RPT_07',
+        'report_name': 'Rent Roll',
+        'report_category': 'property',
+        'property_types': ['MF', 'OFF', 'RET', 'IND'],
+        'report_tier': 'essential',
+        'description': 'Unit-level lease details including occupancy, contract rent, and market rent.',
+        'argus_equivalent': 'Rent Roll Current / Rent Roll Presentation',
+        'spec_file': 'RPT_07_RENT_ROLL.md',
+        'data_readiness': 'ready',
+        'generator_class': 'RentRollPreviewGenerator',
+        'sort_order': 70,
+    },
+    {
+        'report_code': 'RPT_08',
+        'report_name': 'Unit Mix Summary',
+        'report_category': 'property',
+        'property_types': ['MF'],
+        'report_tier': 'essential',
+        'description': 'Unit type distribution by bedroom/bathroom count with average rents and SF.',
+        'argus_equivalent': 'Unit Occupancy / Unit Audit',
+        'spec_file': 'RPT_08_UNIT_MIX.md',
+        'data_readiness': 'ready',
+        'generator_class': 'UnitMixGenerator',
+        'sort_order': 80,
+    },
+    {
+        'report_code': 'RPT_09',
+        'report_name': 'Operating Statement',
+        'report_category': 'operations',
+        'property_types': ['MF', 'OFF', 'RET', 'IND'],
+        'report_tier': 'essential',
+        'description': 'NOI statement with gross revenue, vacancy, operating expenses, and net income.',
+        'argus_equivalent': 'Cash Flow report / Operating Statement',
+        'spec_file': 'RPT_09_OPERATING_STATEMENT.md',
+        'data_readiness': 'ready',
+        'generator_class': 'OperatingStatementGenerator',
+        'sort_order': 90,
+    },
+    {
+        'report_code': 'RPT_10',
+        'report_name': 'Direct Cap Summary',
+        'report_category': 'valuation',
+        'property_types': ['MF', 'OFF', 'RET', 'IND'],
+        'report_tier': 'advanced',
+        'description': 'NOI-to-value conversion using cap rate methodology with 3 NOI bases.',
+        'argus_equivalent': 'Direct Capitalization / Cap Rate Analysis',
+        'spec_file': 'RPT_10_DIRECT_CAP.md',
+        'data_readiness': 'ready',
+        'generator_class': 'DirectCapGenerator',
+        'sort_order': 100,
+    },
+    {
+        'report_code': 'RPT_11',
+        'report_name': 'Sales Comparison Grid',
+        'report_category': 'valuation',
+        'property_types': ['MF', 'OFF', 'RET', 'IND', 'LAND'],
+        'report_tier': 'advanced',
+        'description': 'Subject and comparable properties with adjustment analysis and value indication.',
+        'argus_equivalent': 'Market Data / Comparable Properties report',
+        'spec_file': 'RPT_11_SALES_COMPARISON.md',
+        'data_readiness': 'ready',
+        'generator_class': 'SalesComparisonGenerator',
+        'sort_order': 110,
+    },
+    {
+        'report_code': 'RPT_12',
+        'report_name': 'Leveraged Cash Flow',
+        'report_category': 'cash_flow',
+        'property_types': ['MF', 'OFF', 'RET', 'IND'],
+        'report_tier': 'premium',
+        'description': 'Annual equity cash flows accounting for debt service, reserves, and distributions.',
+        'argus_equivalent': 'Leveraged CF / Proforma with Debt Schedule',
+        'spec_file': 'RPT_12_LEVERAGED_CF.md',
+        'data_readiness': 'not_ready',
+        'generator_class': 'LeveragedCashFlowGenerator',
+        'sort_order': 120,
+    },
+    {
+        'report_code': 'RPT_13',
+        'report_name': 'DCF Returns Summary',
+        'report_category': 'valuation',
+        'property_types': ['MF', 'OFF', 'RET', 'IND'],
+        'report_tier': 'premium',
+        'description': '10-year unleveraged NOI projection with terminal value and IRR/NPV analysis.',
+        'argus_equivalent': 'IRR Matrix / Present Value / Sensitivity Analysis',
+        'spec_file': 'RPT_13_DCF_RETURNS.md',
+        'data_readiness': 'partial',
+        'generator_class': 'DCFReturnsGenerator',
+        'sort_order': 130,
+    },
+
+    # ── Land Development ──
+    {
+        'report_code': 'RPT_14',
+        'report_name': 'Parcel Inventory',
+        'report_category': 'property',
+        'property_types': ['LAND'],
+        'report_tier': 'essential',
+        'description': 'Phase and parcel-level inventory with lot sizes, land use, and pricing.',
+        'argus_equivalent': 'Property Summary > Parcel Inventory',
+        'spec_file': 'RPT_14_PARCEL_TABLE.md',
+        'data_readiness': 'ready',
+        'generator_class': 'ParcelTableGenerator',
+        'sort_order': 140,
+    },
+    {
+        'report_code': 'RPT_15',
+        'report_name': 'Budget Cost Summary',
+        'report_category': 'budget',
+        'property_types': ['LAND'],
+        'report_tier': 'essential',
+        'description': 'Line-item budget by cost category with actuals tracking framework.',
+        'argus_equivalent': 'Development Costs > Budget v Actual',
+        'spec_file': 'RPT_15_BUDGET_COST_SUMMARY.md',
+        'data_readiness': 'partial',
+        'generator_class': 'BudgetCostSummaryGenerator',
+        'sort_order': 150,
+    },
+    {
+        'report_code': 'RPT_16',
+        'report_name': 'Sales Schedule',
+        'report_category': 'revenue',
+        'property_types': ['LAND'],
+        'report_tier': 'advanced',
+        'description': 'Phase and product type revenue schedule with absorption projections.',
+        'argus_equivalent': 'Income Forecast > Sales / Absorption Schedule',
+        'spec_file': 'RPT_16_SALES_SCHEDULE.md',
+        'data_readiness': 'not_ready',
+        'generator_class': 'SalesScheduleGenerator',
+        'sort_order': 160,
+    },
+    {
+        'report_code': 'RPT_17',
+        'report_name': 'Cash Flow \u2014 Monthly',
+        'report_category': 'cash_flow',
+        'property_types': ['LAND'],
+        'report_tier': 'advanced',
+        'description': 'Month-by-month revenue, costs, and net cash position over project life.',
+        'argus_equivalent': 'Development Schedule > Quarterly (monthly detail)',
+        'spec_file': 'RPT_17_CASHFLOW_MONTHLY.md',
+        'data_readiness': 'partial',
+        'generator_class': 'CashFlowMonthlyGenerator',
+        'sort_order': 170,
+    },
+    {
+        'report_code': 'RPT_18',
+        'report_name': 'Cash Flow \u2014 Annual',
+        'report_category': 'cash_flow',
+        'property_types': ['LAND'],
+        'report_tier': 'advanced',
+        'description': 'Year-by-year aggregate cash position showing total costs, revenues, and net position.',
+        'argus_equivalent': 'Development: Cash Flow \u2014 Summary (Annual)',
+        'spec_file': 'RPT_18_CASHFLOW_ANNUAL.md',
+        'data_readiness': 'partial',
+        'generator_class': 'CashFlowAnnualGenerator',
+        'sort_order': 180,
+    },
+    {
+        'report_code': 'RPT_19',
+        'report_name': 'Cash Flow by Phase',
+        'report_category': 'cash_flow',
+        'property_types': ['LAND'],
+        'report_tier': 'advanced',
+        'description': 'Cash flow segmented by phase to isolate individual phase returns and timing.',
+        'argus_equivalent': 'Development: Cash Flow by Phase',
+        'spec_file': 'RPT_19_CASHFLOW_BY_PHASE.md',
+        'data_readiness': 'partial',
+        'generator_class': 'CashFlowByPhaseGenerator',
+        'sort_order': 190,
+    },
+    {
+        'report_code': 'RPT_20',
+        'report_name': 'Budget vs. Actual',
+        'report_category': 'budget',
+        'property_types': ['LAND'],
+        'report_tier': 'essential',
+        'description': 'Spend tracking against budget with variance analysis and costs to complete.',
+        'argus_equivalent': 'Development: Budget vs. Actual (By Phase or Summary)',
+        'spec_file': 'RPT_20_BUDGET_VS_ACTUAL.md',
+        'data_readiness': 'partial',
+        'generator_class': 'BudgetVsActualGenerator',
+        'sort_order': 200,
+    },
+]
+
+
+def seed_report_definitions(apps, schema_editor):
+    ReportDefinition = apps.get_model('reports', 'ReportDefinition')
+    for defn in REPORT_DEFINITIONS:
+        ReportDefinition.objects.update_or_create(
+            report_code=defn['report_code'],
+            defaults=defn,
+        )
+
+
+def remove_report_definitions(apps, schema_editor):
+    ReportDefinition = apps.get_model('reports', 'ReportDefinition')
+    codes = [d['report_code'] for d in REPORT_DEFINITIONS]
+    ReportDefinition.objects.filter(report_code__in=codes).delete()
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('reports', '0004_reportdefinition_reporthistory'),
+    ]
+
+    operations = [
+        migrations.RunPython(seed_report_definitions, remove_report_definitions),
+    ]

@@ -1,8 +1,13 @@
 /**
- * React Query hooks for Report Templates API
+ * React Query hooks for Report Templates API and Report Definitions API
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type {
+  ReportDefinition,
+  ReportPreviewResponse,
+  ReportHistoryEntry,
+} from '@/types/report-definitions';
 
 export interface ReportTemplate {
   id: number;
@@ -215,5 +220,110 @@ export function useGenerateReport() {
       const blob = await response.blob();
       return { blob, templateId, projectId };
     },
+  });
+}
+
+
+// =============================================================================
+// Report Definitions API (DB-driven report catalog)
+// =============================================================================
+
+/**
+ * Fetch report definitions filtered by project type
+ */
+export function useReportDefinitions(propertyType: string) {
+  return useQuery<ReportDefinition[]>({
+    queryKey: ['reportDefinitions', propertyType],
+    queryFn: async () => {
+      const url = `${DJANGO_API_URL}/api/report-definitions/by-type/${propertyType}/`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch report definitions');
+      return response.json();
+    },
+    enabled: !!propertyType,
+  });
+}
+
+/**
+ * Fetch all report definitions (unfiltered)
+ */
+export function useAllReportDefinitions() {
+  return useQuery<ReportDefinition[]>({
+    queryKey: ['reportDefinitions', 'all'],
+    queryFn: async () => {
+      const url = `${DJANGO_API_URL}/api/report-definitions/`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch report definitions');
+      const data = await response.json();
+      return data.results || data;
+    },
+  });
+}
+
+/**
+ * Fetch preview data for a specific report
+ */
+export function useReportPreview(
+  reportCode: string | null,
+  projectId: number | string | null,
+  params?: Record<string, string>
+) {
+  const queryParams = params ? '?' + new URLSearchParams(params).toString() : '';
+  return useQuery<ReportPreviewResponse>({
+    queryKey: ['reportPreview', reportCode, projectId, params],
+    queryFn: async () => {
+      const url = `${DJANGO_API_URL}/api/reports/preview/${reportCode}/${projectId}/${queryParams}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch report preview');
+      return response.json();
+    },
+    enabled: !!reportCode && !!projectId,
+  });
+}
+
+/**
+ * Export report as PDF or Excel
+ */
+export function useReportExport() {
+  return useMutation({
+    mutationFn: async ({
+      reportCode,
+      projectId,
+      format,
+      parameters = {},
+    }: {
+      reportCode: string;
+      projectId: number | string;
+      format: 'pdf' | 'excel';
+      parameters?: Record<string, unknown>;
+    }) => {
+      const response = await fetch(
+        `${DJANGO_API_URL}/api/reports/export/${reportCode}/${projectId}/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format, parameters }),
+        }
+      );
+      if (!response.ok) throw new Error('Failed to export report');
+      const blob = await response.blob();
+      return { blob, reportCode, projectId, format };
+    },
+  });
+}
+
+/**
+ * Fetch report generation history for a project
+ */
+export function useReportHistory(projectId: number | string | null) {
+  return useQuery<ReportHistoryEntry[]>({
+    queryKey: ['reportHistory', projectId],
+    queryFn: async () => {
+      const url = `${DJANGO_API_URL}/api/reports/history/${projectId}/`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch report history');
+      return response.json();
+    },
+    enabled: !!projectId,
   });
 }

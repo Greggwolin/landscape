@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-23
-**Version:** 4.4
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools)
+**Last Updated:** 2026-03-24
+**Version:** 4.5
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Architecture)
 
 ---
 
@@ -9,15 +9,25 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Planning Land Use Integration + Level 2 Autonomy Wiring (March 23, 2026)**
+### 🆕 **Latest Update: Expense Comparables + Report System + Location Hardening (March 24, 2026)**
 
-**In-progress (uncommitted): PlanningContent overhaul, area API refactor, Landscaper autonomy metadata**
+**v0.1.10: Expense comparable CRUD, 20-report generator catalog, county/micro ACS pipeline**
 
-- 🔧 **PlanningContent land use integration** — Add-parcel row now uses Django land use API for cascading Family → Type → Product selectors scoped to project config, with fallback to parcel-derived data
-- 🔧 **Area API refactor** — Switched to `area_alias` column, added DELETE endpoint with child orphaning
-- 🔧 **Level 2 autonomy metadata** — `ai_handler.py` surfaces `mutation_proposals` and `has_pending_mutations` in response metadata for frontend approval UI
-- 🔧 **μSA hardening** — `COUNTY_TO_MICRO` dict expanded (~30 entries), `get_cbsa_or_micro()` function, MICRO series codes in LocationSubTab
-- 🔧 **Media pipeline cancellation** — User-cancellable media extraction via AbortController propagation
+- ✅ **Expense comparable CRUD** — New `tbl_expense_comparable` table, Django API endpoints, `ExpenseCompDetailModal` with full create/edit/delete UI for income approach
+- 🔧 **Report system architecture (uncommitted)** — 20 report generators (`rpt_01`–`rpt_20`), `generator_router.py`, `ReportBrowser.tsx` + `ReportViewer.tsx` frontend, report definition seed migration, loan budget report + Excel export. Replaces hardcoded project-17 reports.
+- ✅ **Location tab + ACS pipeline** — County + micropolitan ACS data series, DMS-aware market analysis, media extraction improvements
+- ✅ **Prior day's work committed** — Mega-commit `0409b2e`: PlanningContent land use, area API refactor, Level 2 autonomy wiring, geo auto-seeding, μSA hardening, rental comp POC, schema refresh
+- 📁 **See:** `docs/09-session-notes/2026-03-24-daily-sync.md`
+
+### Previous Update: Planning Land Use Integration + Level 2 Autonomy Wiring (March 23, 2026)
+
+**Committed in `0409b2e` on March 24**
+
+- ✅ **PlanningContent land use integration** — Add-parcel row now uses Django land use API for cascading Family → Type → Product selectors scoped to project config, with fallback to parcel-derived data
+- ✅ **Area API refactor** — Switched to `area_alias` column, added DELETE endpoint with child orphaning
+- ✅ **Level 2 autonomy metadata** — `ai_handler.py` surfaces `mutation_proposals` and `has_pending_mutations` in response metadata for frontend approval UI
+- ✅ **μSA hardening** — `COUNTY_TO_MICRO` dict expanded (~30 entries), `get_cbsa_or_micro()` function, MICRO series codes in LocationSubTab
+- ✅ **Media pipeline cancellation** — User-cancellable media extraction via AbortController propagation
 - 📁 **See:** `docs/09-session-notes/2026-03-23-daily-sync.md`
 
 ### Previous Update: Extraction Pipeline v2, Geo Auto-Seeding, Appraisal Knowledge Tools (March 20, 2026)

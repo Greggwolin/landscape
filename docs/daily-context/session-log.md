@@ -3,6 +3,22 @@
 > Running log of development sessions. Newest first.
 > Trigger: Say **"Document"** in any chat to add an entry.
 
+## DB-Driven Report System (20 Reports) — 2026-03-25
+
+**What was discussed:**
+- Built and deployed the full DB-driven report system: 20 report definitions seeded into `tbl_report_definition`, property-type routing (LAND sees 13 reports, MF sees 14), 9 report categories, two-panel ReportsTab UI (ReportBrowser + ReportViewer).
+- Created `PreviewBaseGenerator` base class with SQL helpers, formatting utilities, and section builders. All 20 generators inherit from it and implement `generate_preview()` returning structured JSON consumed by the React frontend.
+- 6 generators return live data (RPT_06 Project Summary, RPT_07 Rent Roll, RPT_08 Unit Mix, RPT_14 Parcel Inventory, RPT_15 Budget Cost Summary, RPT_16 Sales Schedule). Remaining 14 are functional stubs that return "data not available" when underlying tables don't exist yet.
+- Rewrote `ReportsTab.tsx` from a stub with one hardcoded report to a full two-panel layout with project-type-aware catalog browsing, category grouping, readiness badges, and live preview rendering.
+- CC verified all 8 success criteria passed: migration clean, 20 definitions seeded, API filtering works, `npm run build` passes, UI renders correctly with live data.
+
+**Open items:**
+- 14 generators are stubs pending their underlying feature tables (equity waterfall, DCF, leveraged CF, etc.)
+- PDF export pipeline not yet wired (generators have `generate_pdf()` stub)
+- CLAUDE.md needs tool count update (229 → still 229, reports don't add Landscaper tools)
+
+---
+
 ## 2026-03-23 — HEALTH CHECK FAILURE
 
 **Failed checks:**

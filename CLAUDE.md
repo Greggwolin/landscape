@@ -392,7 +392,7 @@ Django uses DRF serializers with consistent envelope:
 
 ### Target Workflow: MF Appraiser Valuation
 
-**Overall Status: ~70% Alpha-Ready** — Core valuation workflow functional, key gaps in reconciliation UI and reports.
+**Overall Status: ~78% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system in progress.
 
 ### Feature Status by Workflow Step
 
@@ -404,23 +404,23 @@ Django uses DRF serializers with consistent envelope:
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
 | 6 | Operations Tab | ⚠️ PARTIAL | Save endpoint still on legacy Next.js |
-| 7 | Landscaper Chat | ✅ WORKS | 210+ tools, thread-based, mutations |
+| 7 | Landscaper Chat | ✅ WORKS | 229 tools, thread-based, mutations |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
-| 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases |
-| 11 | Reconciliation | 🔧 STUBBED | Backend done, frontend placeholder only |
+| 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
+| 11 | Reconciliation | ✅ WORKS | Weights, narrative versioning, IndicatedValueSummary |
 | 12 | Capitalization | ⚠️ PARTIAL | Waterfall calc endpoint missing (404) |
-| 13 | Reports | 🔧 STUBBED | Hardcoded to project 17, no PDF gen |
+| 13 | Reports | ⚠️ PARTIAL | 20-report catalog + generators built (uncommitted); preview/PDF pipeline in progress |
 | 14 | Knowledge Base | ⚠️ PARTIAL | RAG works, pgvector Phase 2, no Library UI |
 
 ### Alpha Blockers (Priority Order)
 
-1. **Reconciliation frontend** — Build `ReconciliationPanel.tsx` (backend ready)
+1. ~~**Reconciliation frontend**~~ — ✅ RESOLVED (Feb 21). ReconciliationPanel + IndicatedValueSummary built.
 2. **Operations save migration** — Move to Django from legacy Next.js route
-3. **Reports project scoping** — Remove hardcoded project 17
+3. **Reports project scoping** — ⚠️ IN PROGRESS. 20-report catalog defined, generator_router + 20 generator stubs built, ReportBrowser + ReportViewer frontend. Still needs: preview rendering, PDF export, project scoping verification.
 4. **Waterfall calculate endpoint** — Wire to financial engine
 5. **Extraction pipeline** — Ingestion Workbench implemented and committed. Known gap: scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution).
-6. **PDF report generation** — At minimum property summary
+6. **PDF report generation** — ⚠️ IN PROGRESS. Report generator infrastructure built (20 generators). PDF rendering pipeline not yet wired.
 
 ### Known Technical Debt
 
@@ -429,7 +429,7 @@ Django uses DRF serializers with consistent envelope:
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
 - Operations save endpoint on legacy Next.js (being migrated)
-- Reports page hardcoded to project 17
+- Reports system rebuilt with 20 generators but not yet committed — preview/PDF pipeline incomplete
 - Waterfall calc endpoint called but doesn't exist (404)
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
@@ -445,7 +445,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **225+ registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026
+- Claude AI with **229 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -544,8 +544,8 @@ Two distinct failure modes — treat separately:
 
 - **Sales Comparison:** Full CRUD, adjustment matrix, property-type-specific tables
 - **Cost Approach:** Marshall & Swift factors, 3 depreciation types, container cost metadata
-- **Income Approach:** 3 NOI bases (F-12 Current/Market/Stabilized), DCF monthly for MF
-- **Reconciliation:** Backend complete (weights, narrative versioning), no frontend
+- **Income Approach:** 3 NOI bases (F-12 Current/Market/Stabilized), DCF monthly for MF, expense comparables CRUD
+- **Reconciliation:** Complete — weights, narrative versioning, IndicatedValueSummary panel
 - **Financial Engine:** `services/financial_engine_py/` with IRR/NPV/DSCR/waterfall tests
 - **Construction Loan Engine:** Phase 6A complete (draw-repay-redraw validated); Phase 6B land dev conversational parsing complete
 
@@ -805,7 +805,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-22 (nightly sync)*
+*Last updated: 2026-03-24 (nightly sync)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 229*
+*Reports catalog: 20 generators (uncommitted)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
