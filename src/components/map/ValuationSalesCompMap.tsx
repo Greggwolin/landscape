@@ -255,7 +255,7 @@ export default function ValuationSalesCompMap({
               const popupHTML = `
                 <div style="padding: 10px 12px; min-width: 220px; color: var(--cui-body-color); font-family: system-ui, -apple-system, Segoe UI, sans-serif;">
                   <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: var(--cui-body-color);">
-                    <span style="color: var(--cui-primary); font-weight:600;">Name:</span> ${props.name || `Comp ${idx + 1}`}
+                    <span style="color: var(--cui-primary); font-weight:600;">Name:</span> ${props.name || `Comp ${props.compNumber || idx + 1}`}
                   </div>
                   ${priceLine ? `<div style="font-size: 13px; color: var(--cui-body-color); margin-bottom: 6px;">
                     <span style="color: var(--cui-primary); font-weight:600;">Price:</span> ${priceLine}
@@ -267,13 +267,13 @@ export default function ValuationSalesCompMap({
               `;
 
               return {
-                id: `comp-${idx}`,
+                id: props.compId ? `comp-${props.compId}` : `comp-${idx}`,
                 coordinates: (f.geometry.type === 'Polygon'
                   ? [f.geometry.coordinates[0][0][0] as number, f.geometry.coordinates[0][0][1] as number]
                   : [0, 0]) as [number, number],
                 color: compColor,
                 stroke: '#ffffff',
-                label: `${idx + 1}`,
+                label: `${props.compNumber || idx + 1}`,
                 variant: 'numbered' as const,
                 popup: popupHTML
               };
@@ -326,10 +326,10 @@ export default function ValuationSalesCompMap({
                 lineHeight: 1,
               }}
             >
-              {idx + 1}
+              {f.properties.compNumber || idx + 1}
             </div>
             <span style={{ color: 'var(--cui-secondary-color)' }}>
-              {f.properties.name || `Comp ${idx + 1}`}
+              {f.properties.name || `Comp ${f.properties.compNumber || idx + 1}`}
             </span>
           </div>
         ))}
