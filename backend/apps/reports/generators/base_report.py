@@ -4,7 +4,8 @@ from decimal import Decimal
 from datetime import datetime
 from pathlib import Path
 from django.template.loader import render_to_string
-from weasyprint import HTML
+# Lazy import — weasyprint requires system libs (gobject/pango) not available on all hosts
+HTML = None
 import os
 
 
@@ -61,8 +62,9 @@ class BaseReport:
         """
         html_content = self.render_html()
 
-        # Generate PDF using WeasyPrint
-        pdf = HTML(string=html_content).write_pdf()
+        # Generate PDF using WeasyPrint (lazy import — requires system libs)
+        from weasyprint import HTML as WeasyHTML
+        pdf = WeasyHTML(string=html_content).write_pdf()
 
         return pdf
 
