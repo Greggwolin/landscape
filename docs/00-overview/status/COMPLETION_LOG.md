@@ -10,6 +10,8 @@ Historical record of feature and migration completions. For current implementati
 
 | Date | Milestone | Notes |
 |------|-----------|-------|
+| 2026-03-25 | Report System Committed + PDF/Excel Export | 20 generators committed (`a4d1547`), WeasyPrint PDF + openpyxl Excel export, Sales Comparison fully wired, v0.1.12 |
+| 2026-03-25 | Comp Map DB Coordinates | Sales comp map reads lat/lng from DB, uses comp_number for labels |
 | 2026-03-24 | Expense Comparable CRUD | `tbl_expense_comparable` table, Django API, ExpenseCompDetailModal for income approach |
 | 2026-03-24 | Report System Architecture (uncommitted) | 20 report generators, generator_router, ReportBrowser/Viewer, report definition seed |
 | 2026-03-24 | Location Tab + County/Micro ACS | County + micropolitan ACS series, DMS-aware market analysis |

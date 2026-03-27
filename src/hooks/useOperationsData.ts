@@ -17,6 +17,8 @@ import {
   SCENARIO_PRIORITY
 } from '@/components/operations/types';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -342,7 +344,7 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
       });
 
       // Send batch update
-      const response = await fetch(`/api/projects/${projectId}/operations/inputs`, {
+      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/inputs/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -384,7 +386,7 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
     setData(prev => prev ? { ...prev, value_add_enabled: newValue } : prev);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/operations/settings`, {
+      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/settings/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value_add_enabled: newValue })
