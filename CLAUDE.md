@@ -392,7 +392,7 @@ Django uses DRF serializers with consistent envelope:
 
 ### Target Workflow: MF Appraiser Valuation
 
-**Overall Status: ~78% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system in progress.
+**Overall Status: ~82% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system committed with PDF/Excel export.
 
 ### Feature Status by Workflow Step
 
@@ -410,17 +410,17 @@ Django uses DRF serializers with consistent envelope:
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
 | 11 | Reconciliation | ✅ WORKS | Weights, narrative versioning, IndicatedValueSummary |
 | 12 | Capitalization | ⚠️ PARTIAL | Waterfall calc endpoint missing (404) |
-| 13 | Reports | ⚠️ PARTIAL | 20-report catalog + generators built (uncommitted); preview/PDF pipeline in progress |
+| 13 | Reports | ⚠️ PARTIAL | 20 generators committed + PDF/Excel export; preview rendering wired for Sales Comparison; remaining generators need preview SQL |
 | 14 | Knowledge Base | ⚠️ PARTIAL | RAG works, pgvector Phase 2, no Library UI |
 
 ### Alpha Blockers (Priority Order)
 
 1. ~~**Reconciliation frontend**~~ — ✅ RESOLVED (Feb 21). ReconciliationPanel + IndicatedValueSummary built.
 2. **Operations save migration** — Move to Django from legacy Next.js route
-3. **Reports project scoping** — ⚠️ IN PROGRESS. 20-report catalog defined, generator_router + 20 generator stubs built, ReportBrowser + ReportViewer frontend. Still needs: preview rendering, PDF export, project scoping verification.
+3. **Reports project scoping** — ⚠️ MOSTLY RESOLVED (Mar 25). 20 generators committed, generator_router, ReportBrowser + ReportViewer frontend, PDF/Excel export via WeasyPrint + openpyxl. Sales Comparison preview fully wired. Remaining: wire preview SQL for other 19 generators.
 4. **Waterfall calculate endpoint** — Wire to financial engine
 5. **Extraction pipeline** — Ingestion Workbench implemented and committed. Known gap: scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution).
-6. **PDF report generation** — ⚠️ IN PROGRESS. Report generator infrastructure built (20 generators). PDF rendering pipeline not yet wired.
+6. ~~**PDF report generation**~~ — ✅ RESOLVED (Mar 25). WeasyPrint PDF export + Excel export added to preview_base.py. Lazy import for Railway compatibility.
 
 ### Known Technical Debt
 
@@ -429,7 +429,7 @@ Django uses DRF serializers with consistent envelope:
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
 - Operations save endpoint on legacy Next.js (being migrated)
-- Reports system rebuilt with 20 generators but not yet committed — preview/PDF pipeline incomplete
+- Reports system committed with 20 generators + PDF/Excel export — only Sales Comparison preview fully wired; 19 others need preview SQL
 - Waterfall calc endpoint called but doesn't exist (404)
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
@@ -805,7 +805,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-24 (nightly sync)*
+*Last updated: 2026-03-25 (nightly sync)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 229*
 *Reports catalog: 20 generators (uncommitted)*

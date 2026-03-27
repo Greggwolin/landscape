@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-24
-**Version:** 4.5
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Architecture)
+**Last Updated:** 2026-03-25
+**Version:** 4.6
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed)
 
 ---
 
@@ -9,12 +9,21 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Expense Comparables + Report System + Location Hardening (March 24, 2026)**
+### 🆕 **Latest Update: Report System Committed + PDF/Excel Export (March 25, 2026)**
 
-**v0.1.10: Expense comparable CRUD, 20-report generator catalog, county/micro ACS pipeline**
+**v0.1.12: 20 report generators committed, PDF/Excel export, comp map fix**
+
+- ✅ **Report system committed** (`a4d1547`) — 20 report generators (`rpt_01`–`rpt_20`), `generator_router.py`, `preview_base.py`, `ReportBrowser.tsx` + `ReportViewer.tsx`, report definition seed migration, loan budget report + Excel export. 51 files, ~6,500 lines.
+- ✅ **PDF/Excel export** (`e462ac6`) — WeasyPrint PDF + openpyxl Excel export added to `preview_base.py`. Sales Comparison (`rpt_11`) fully wired with preview SQL. ReportViewer updated with download buttons.
+- ✅ **WeasyPrint lazy import** (`c3b83e6`) — Fixed Railway deploy crash from eager WeasyPrint import.
+- ✅ **Comp map fix** (`f81c595`) — Sales comparison map now uses DB coordinates and `comp_number` for labels.
+- 📁 **See:** `docs/09-session-notes/2026-03-25-daily-sync.md`
+
+### Previous Update: Expense Comparables + Report System Architecture (March 24, 2026)
+
+**v0.1.10: Expense comparable CRUD, county/micro ACS pipeline**
 
 - ✅ **Expense comparable CRUD** — New `tbl_expense_comparable` table, Django API endpoints, `ExpenseCompDetailModal` with full create/edit/delete UI for income approach
-- 🔧 **Report system architecture (uncommitted)** — 20 report generators (`rpt_01`–`rpt_20`), `generator_router.py`, `ReportBrowser.tsx` + `ReportViewer.tsx` frontend, report definition seed migration, loan budget report + Excel export. Replaces hardcoded project-17 reports.
 - ✅ **Location tab + ACS pipeline** — County + micropolitan ACS data series, DMS-aware market analysis, media extraction improvements
 - ✅ **Prior day's work committed** — Mega-commit `0409b2e`: PlanningContent land use, area API refactor, Level 2 autonomy wiring, geo auto-seeding, μSA hardening, rental comp POC, schema refresh
 - 📁 **See:** `docs/09-session-notes/2026-03-24-daily-sync.md`

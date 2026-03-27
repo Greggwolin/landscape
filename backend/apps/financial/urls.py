@@ -64,6 +64,7 @@ from .views_debt import (
     InterestReserveCalculationView,
 )
 from .views_debt_schedule import DebtScheduleView
+from .views_operations import operations_inputs, operations_settings
 
 router = DefaultRouter()
 
@@ -209,6 +210,10 @@ urlpatterns = [
         LoanViewSet.as_view({'post': 'calculate'}),
         name='loan-calculate',
     ),
+
+    # Operations save endpoints (migrated from legacy Next.js routes)
+    path('projects/<int:project_id>/operations/inputs/', operations_inputs, name='operations-inputs'),
+    path('projects/<int:project_id>/operations/settings/', operations_settings, name='operations-settings'),
 
     # Budget Variance endpoints
     path('budget/variance/<int:project_id>/', get_project_variance_summary, name='budget-variance-summary'),
