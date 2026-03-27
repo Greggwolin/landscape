@@ -17,6 +17,8 @@ import {
 import { getProjectCategory, isIncomeProperty } from '@/components/projects/tiles/tileConfig';
 import '@/styles/operations-tab.css';
 import { useOperationsData } from '@/hooks/useOperationsData';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { useValueAddAssumptions } from '@/hooks/useValueAddAssumptions';
 
@@ -276,7 +278,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       if (currentSource === 'ingestion') {
         // Lock clicked → set vacancy override to current calculated value (makes it editable)
         const currentRate = vacancyRows.find(r => r.line_item_key === 'physical_vacancy')?.as_is?.rate;
-        fetch(`/api/projects/${project.project_id}/operations/settings`, {
+        fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vacancy_override_pct: currentRate ?? 0.05 })
@@ -284,7 +286,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       } else if (currentSource === 'user_modified') {
         // Revert to rent-roll-calculated value
         if (window.confirm('Revert physical vacancy to the rent-roll-calculated value?')) {
-          fetch(`/api/projects/${project.project_id}/operations/settings`, {
+          fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ vacancy_override_pct: null })
@@ -304,7 +306,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         );
         const derivedPct = mgmtRow?.derived_management_fee_pct ?? mgmtRow?.management_fee_pct ?? 0.03;
 
-        fetch(`/api/projects/${project.project_id}/operations/settings`, {
+        fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -315,7 +317,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       } else if (currentSource === 'user_modified') {
         // Revert to extracted value
         if (window.confirm('Revert management fee to the extracted value?')) {
-          fetch(`/api/projects/${project.project_id}/operations/settings`, {
+          fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

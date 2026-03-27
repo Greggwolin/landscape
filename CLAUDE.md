@@ -392,7 +392,7 @@ Django uses DRF serializers with consistent envelope:
 
 ### Target Workflow: MF Appraiser Valuation
 
-**Overall Status: ~82% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system committed with PDF/Excel export.
+**Overall Status: ~90% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system fully wired with PDF/Excel export, operations save migrated to Django.
 
 ### Feature Status by Workflow Step
 
@@ -403,24 +403,24 @@ Django uses DRF serializers with consistent envelope:
 | 3 | Document Management | ✅ WORKS | Full DMS with 30+ API routes |
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
-| 6 | Operations Tab | ⚠️ PARTIAL | Save endpoint still on legacy Next.js |
+| 6 | Operations Tab | ⚠️ PARTIAL | Save migrated to Django; GET (P&L) still on legacy Next.js |
 | 7 | Landscaper Chat | ✅ WORKS | 229 tools, thread-based, mutations |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
 | 11 | Reconciliation | ✅ WORKS | Weights, narrative versioning, IndicatedValueSummary |
-| 12 | Capitalization | ⚠️ PARTIAL | Waterfall calc endpoint missing (404) |
-| 13 | Reports | ⚠️ PARTIAL | 20 generators committed + PDF/Excel export; preview rendering wired for Sales Comparison; remaining generators need preview SQL |
+| 12 | Capitalization | ✅ WORKS | Waterfall calc endpoint wired (Next.js proxy → Django → Python engine) |
+| 13 | Reports | ✅ WORKS | 20 generators with real SQL + PDF/Excel export; all generators produce preview data with graceful degradation |
 | 14 | Knowledge Base | ⚠️ PARTIAL | RAG works, pgvector Phase 2, no Library UI |
 
 ### Alpha Blockers (Priority Order)
 
 1. ~~**Reconciliation frontend**~~ — ✅ RESOLVED (Feb 21). ReconciliationPanel + IndicatedValueSummary built.
-2. **Operations save migration** — Move to Django from legacy Next.js route
-3. **Reports project scoping** — ⚠️ MOSTLY RESOLVED (Mar 25). 20 generators committed, generator_router, ReportBrowser + ReportViewer frontend, PDF/Excel export via WeasyPrint + openpyxl. Sales Comparison preview fully wired. Remaining: wire preview SQL for other 19 generators.
-4. **Waterfall calculate endpoint** — Wire to financial engine
+2. ~~**Operations save migration**~~ — ✅ RESOLVED (Mar 27). Django endpoints created (`views_operations.py`), frontend hooks + OperationsTab updated to call Django. GET (P&L) still on legacy Next.js — separate migration task.
+3. ~~**Reports project scoping**~~ — ✅ RESOLVED (Mar 27). All 20 generators have real SQL with graceful degradation. PDF export via reportlab + Excel export via openpyxl. `data_readiness` flags updated (migration 0006).
+4. ~~**Waterfall calculate endpoint**~~ — ✅ RESOLVED (verified Mar 27). Endpoint is fully wired: Next.js proxy → Django calculations app → Python financial engine. Was incorrectly flagged as 404.
 5. **Extraction pipeline** — Ingestion Workbench implemented and committed. Known gap: scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution).
-6. ~~**PDF report generation**~~ — ✅ RESOLVED (Mar 25). WeasyPrint PDF export + Excel export added to preview_base.py. Lazy import for Railway compatibility.
+6. ~~**PDF report generation**~~ — ✅ RESOLVED (Mar 25). reportlab PDF export + openpyxl Excel export in preview_base.py. Lazy import for Railway compatibility.
 
 ### Known Technical Debt
 
@@ -428,9 +428,8 @@ Django uses DRF serializers with consistent envelope:
 - Multiple grid libraries need consolidation (TanStack preferred for new; AG-Grid retained in rent roll)
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
-- Operations save endpoint on legacy Next.js (being migrated)
-- Reports system committed with 20 generators + PDF/Excel export — only Sales Comparison preview fully wired; 19 others need preview SQL
-- Waterfall calc endpoint called but doesn't exist (404)
+- Operations GET endpoint (P&L calculation, 1,303-line route) still on legacy Next.js — save endpoints migrated to Django
+- Reports system complete: 20 generators with real SQL + PDF/Excel export; data_readiness flags updated
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
 
@@ -805,8 +804,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-25 (nightly sync)*
+*Last updated: 2026-03-27 (session sync — operations save migrated, reports verified, waterfall confirmed, CLAUDE.md corrected)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 229*
-*Reports catalog: 20 generators (uncommitted)*
+*Reports catalog: 20 generators with real SQL (all committed, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
