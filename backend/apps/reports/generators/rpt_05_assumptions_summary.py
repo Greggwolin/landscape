@@ -81,12 +81,12 @@ class AssumptionsSummaryGenerator(PreviewBaseGenerator):
     def _land_cost_section(self) -> dict:
         rows = self.execute_query("""
             SELECT
-                COALESCE(bc.category_name, 'Uncategorized') AS cost_item,
+                COALESCE(cat.category_name, 'Uncategorized') AS cost_item,
                 COALESCE(SUM(b.amount), 0) AS total_budget
             FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_budget_category bc ON b.category_id = bc.id
+            LEFT JOIN landscape.core_unit_cost_category cat ON b.category_id = cat.category_id
             WHERE b.project_id = %s
-            GROUP BY COALESCE(bc.category_name, 'Uncategorized')
+            GROUP BY COALESCE(cat.category_name, 'Uncategorized')
             ORDER BY total_budget DESC
         """, [self.project_id])
 
@@ -168,12 +168,12 @@ class AssumptionsSummaryGenerator(PreviewBaseGenerator):
             SELECT
                 COALESCE(loan_name, loan_type, 'Loan') AS loan_name,
                 COALESCE(loan_amount, 0) AS amount,
-                COALESCE(interest_rate, 0) AS rate,
-                COALESCE(ltv_ratio, 0) AS ltv,
+                COALESCE(interest_rate_pct, 0) AS rate,
+                COALESCE(loan_to_value_pct, 0) AS ltv,
                 COALESCE(loan_term_months, 0) AS term
             FROM landscape.tbl_loan
             WHERE project_id = %s
-            ORDER BY sort_order
+            ORDER BY seniority, loan_id
         """, [self.project_id])
 
         if not loans:

@@ -17,8 +17,8 @@ export default function ReportPlaceholder({ definition, message }: ReportPlaceho
 
   return (
     <CCard className="h-100">
-      <CCardBody className="d-flex flex-column align-items-center justify-content-center p-4"
-        style={{ minHeight: '400px' }}
+      <CCardBody className="d-flex flex-column align-items-center justify-content-center"
+        style={{ minHeight: '400px', padding: '8px' }}
       >
         <CIcon icon={cilInfo} size="3xl" style={{ color: 'var(--cui-secondary-color)', marginBottom: '16px' }} />
         <h4 style={{ color: 'var(--cui-body-color)', marginBottom: '8px' }}>

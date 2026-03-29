@@ -52,7 +52,7 @@ export function PropertySummaryView({ propertyId, scenario = 'current' }: Proper
   if (loading) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
           <CSpinner color="primary" />
           <div className="mt-3">Loading property data...</div>
         </CCardBody>
@@ -104,7 +104,7 @@ export function PropertySummaryView({ propertyId, scenario = 'current' }: Proper
     <div>
       {/* Header Card */}
       <CCard className="mb-4">
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h2 className="h4 mb-1">Property Summary Report</h2>
@@ -175,7 +175,7 @@ export function PropertySummaryView({ propertyId, scenario = 'current' }: Proper
         <CCardHeader>
           <h5 className="mb-0">Operating Income Statement</h5>
         </CCardHeader>
-        <CCardBody className="p-0">
+        <CCardBody style={{ padding: 0 }}>
           <CTable responsive hover className="mb-0">
             <thead>
               <tr>
@@ -300,7 +300,7 @@ function MetricCard({ label, value, subvalue, highlight = false }: MetricCardPro
   return (
     <div className="col-12 col-sm-6 col-md-4 col-lg-3">
       <CCard className={`h-100 ${highlight ? 'border-primary' : ''}`}>
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <div className="text-body-secondary small mb-1">
             {label}
           </div>

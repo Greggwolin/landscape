@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-25
-**Version:** 4.6
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed)
+**Last Updated:** 2026-03-27
+**Version:** 4.7
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Save Migration + Inline PDF Reports)
 
 ---
 
@@ -9,7 +9,19 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Report System Committed + PDF/Excel Export (March 25, 2026)**
+### 🆕 **Latest Update: Operations Save Migration + Inline PDF Reports (March 27, 2026)**
+
+**v0.1.13: Operations save to Django, inline PDF preview, PDF layout improvements**
+
+- ✅ **Operations save migrated to Django** (`4f2409f`) — Created `views_operations.py` (232 lines) with save endpoints. Frontend wired (`ced6a71`). GET (P&L) remains on legacy Next.js — separate task.
+- ✅ **Report `data_readiness` migration** (`4f2409f`) — Migration `0006` updates readiness flags for all 20 generators.
+- ⏳ **Inline PDF preview** (uncommitted) — `ReportViewer.tsx` rewritten to display server-generated PDF in iframe via blob URL. Removes client-side JSON rendering.
+- ⏳ **Content-aware PDF layout** (uncommitted) — `preview_base.py` upgraded with proportional column widths, Paragraph wrapping, auto landscape for wide tables, proper alignment.
+- ⏳ **Generator format fixes** (uncommitted) — rpt_01, 02, 03, 05, 06, 15, 20 updated for alignment and formatting.
+- ✅ **alpha13 merged to main** (`f5a433a`).
+- 📁 **See:** `docs/09-session-notes/2026-03-27-daily-sync.md`
+
+### Previous Update: Report System Committed + PDF/Excel Export (March 25, 2026)
 
 **v0.1.12: 20 report generators committed, PDF/Excel export, comp map fix**
 

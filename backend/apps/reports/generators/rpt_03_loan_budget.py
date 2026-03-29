@@ -1,6 +1,16 @@
-"""RPT_03: Loan Budget (Star Valley Format) generator."""
+"""RPT_03: Loan Budget generator.
+
+Uses LoanSizingService.build_budget_summary() — the same data source
+that powers the Loan Budget panel in the app UI.  Produces three
+sections per loan: Loan Budget (Total/Borrower/Lender), Summary of
+Proceeds, and Equity to Close.
+"""
+
+import logging
 
 from .preview_base import PreviewBaseGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class LoanBudgetPreviewGenerator(PreviewBaseGenerator):
@@ -11,66 +21,136 @@ class LoanBudgetPreviewGenerator(PreviewBaseGenerator):
         project = self.get_project()
         sections = []
 
-        # Budget by category grouped into Hard/Soft/Finance buckets
-        budget_rows = self.execute_query("""
-            SELECT
-                COALESCE(bc.category_name, 'Uncategorized') AS category_name,
-                COALESCE(bc.parent_category, 'Other') AS parent_category,
-                COALESCE(SUM(b.amount), 0) AS amount
-            FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_budget_category bc ON b.category_id = bc.id
-            WHERE b.project_id = %s
-            GROUP BY
-                COALESCE(bc.category_name, 'Uncategorized'),
-                COALESCE(bc.parent_category, 'Other')
-            ORDER BY amount DESC
+        # Fetch loans for this project
+        loans = self.execute_query("""
+            SELECT loan_id, COALESCE(loan_name, loan_type, 'Loan') AS loan_name
+            FROM landscape.tbl_loan
+            WHERE project_id = %s
+            ORDER BY seniority, loan_id
         """, [self.project_id])
 
-        if not budget_rows:
+        if not loans:
             return {
                 'title': 'Loan Budget',
                 'subtitle': project.get('project_name', ''),
-                'message': 'No budget data available. Add budget items in the Budget tab.',
+                'message': 'No loans configured. Add financing in the Capitalization tab.',
                 'sections': [],
             }
 
-        # Group by parent category
-        groups = {}
-        for r in budget_rows:
-            parent = r['parent_category'] or 'Other'
-            if parent not in groups:
-                groups[parent] = []
-            groups[parent].append({
-                'line_item': r['category_name'],
-                'amount': float(r['amount']),
-            })
+        # Import service + models inside method to avoid circular imports
+        try:
+            from apps.calculations.loan_sizing_service import LoanSizingService
+            from apps.financial.models_debt import Loan
+            from apps.projects.models import Project as ProjectModel
+        except ImportError:
+            logger.warning("Could not import LoanSizingService — falling back to empty report")
+            return {
+                'title': 'Loan Budget',
+                'subtitle': project.get('project_name', ''),
+                'message': 'Loan sizing service unavailable.',
+                'sections': [],
+            }
 
-        total_budget = sum(float(r['amount']) for r in budget_rows)
+        # Load ORM objects for the service
+        try:
+            project_obj = ProjectModel.objects.get(project_id=self.project_id)
+        except ProjectModel.DoesNotExist:
+            return {
+                'title': 'Loan Budget',
+                'subtitle': project.get('project_name', ''),
+                'message': 'Project not found.',
+                'sections': [],
+            }
 
-        # KPIs
-        sections.append(self.make_kpi_section('Budget Overview', [
-            self.make_kpi_card('Total Budget', self.fmt_currency(total_budget)),
-            self.make_kpi_card('Categories', str(len(budget_rows))),
-        ]))
+        for loan_row in loans:
+            loan_id = loan_row['loan_id']
+            loan_name = loan_row['loan_name']
 
-        # One table per parent group
-        columns = [
-            {'key': 'line_item', 'label': 'Line Item', 'align': 'left'},
-            {'key': 'amount', 'label': 'Budget Amount', 'align': 'right', 'format': 'currency'},
-            {'key': 'pct', 'label': '% of Total', 'align': 'right', 'format': 'percentage'},
-        ]
+            try:
+                loan_obj = Loan.objects.get(loan_id=loan_id)
+                summary = LoanSizingService.build_budget_summary(loan_obj, project_obj)
+            except Loan.DoesNotExist:
+                continue
+            except Exception as e:
+                logger.warning("LoanSizingService failed for loan %s: %s", loan_id, e)
+                continue
 
-        for group_name, items in groups.items():
-            group_total = sum(i['amount'] for i in items)
-            for item in items:
-                item['pct'] = self.safe_div(item['amount'], total_budget) * 100
+            # ── KPI cards for this loan ──────────────────────────────
+            sections.append(self.make_kpi_section(f'{loan_name} — Overview', [
+                self.make_kpi_card('Commitment', self.fmt_currency(summary.get('commitment_amount', 0))),
+                self.make_kpi_card('Net Proceeds', self.fmt_currency(summary.get('net_loan_proceeds', 0))),
+                self.make_kpi_card('Constraint', str(summary.get('governing_constraint', '—'))),
+            ]))
 
+            # ── 1. Loan Budget table (Total / Borrower / Lender) ────
+            lb = summary.get('loan_budget', {})
+            lb_rows = lb.get('rows', [])
+            lb_totals = lb.get('totals', {})
+
+            budget_cols = [
+                {'key': 'label', 'label': 'Line Item', 'align': 'left'},
+                {'key': 'total', 'label': 'Total', 'align': 'right', 'format': 'currency'},
+                {'key': 'borrower', 'label': 'Borrower', 'align': 'right', 'format': 'currency'},
+                {'key': 'lender', 'label': 'Lender', 'align': 'right', 'format': 'currency'},
+            ]
+            budget_data = [
+                {
+                    'label': r['label'],
+                    'total': r['total'],
+                    'borrower': r['borrower'],
+                    'lender': r['lender'],
+                }
+                for r in lb_rows
+            ]
+            budget_totals_row = {
+                'total': lb_totals.get('total_budget', 0),
+                'borrower': lb_totals.get('borrower_total', 0),
+                'lender': lb_totals.get('lender_total', 0),
+            }
             sections.append(self.make_table_section(
-                group_name,
-                columns,
-                items,
-                {'amount': group_total, 'pct': self.safe_div(group_total, total_budget) * 100},
+                f'{loan_name} — Loan Budget', budget_cols, budget_data, budget_totals_row
             ))
+
+            # ── 2. Summary of Proceeds ──────────────────────────────
+            sop = summary.get('summary_of_proceeds', [])
+            proceeds_cols = [
+                {'key': 'label', 'label': 'Line Item', 'align': 'left'},
+                {'key': 'pct_of_loan', 'label': '% of Loan', 'align': 'right', 'format': 'percentage'},
+                {'key': 'total', 'label': 'Amount', 'align': 'right', 'format': 'currency'},
+            ]
+            proceeds_data = [
+                {
+                    'label': r['label'],
+                    'pct_of_loan': r.get('pct_of_loan') or 0,
+                    'total': r['total'],
+                }
+                for r in sop
+            ]
+            sections.append(self.make_table_section(
+                f'{loan_name} — Summary of Proceeds', proceeds_cols, proceeds_data
+            ))
+
+            # ── 3. Equity to Close ──────────────────────────────────
+            etc = summary.get('equity_to_close', [])
+            equity_cols = [
+                {'key': 'label', 'label': 'Line Item', 'align': 'left'},
+                {'key': 'total', 'label': 'Amount', 'align': 'right', 'format': 'currency'},
+            ]
+            equity_data = [
+                {'label': r['label'], 'total': r['total']}
+                for r in etc
+            ]
+            sections.append(self.make_table_section(
+                f'{loan_name} — Equity to Close', equity_cols, equity_data
+            ))
+
+        if not sections:
+            return {
+                'title': 'Loan Budget',
+                'subtitle': project.get('project_name', ''),
+                'message': 'Could not generate loan budget data.',
+                'sections': [],
+            }
 
         return {
             'title': 'Loan Budget',
