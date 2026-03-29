@@ -15,7 +15,8 @@ const TYPE_MAP: Record<string, LookupConfig> = {
   'lease-statuses': { picklistType: 'LEASE_STATUS' },
   'lease-types': { picklistType: 'LEASE_TYPE' },
   'inflation-types': { picklistType: 'INFLATION_TYPE' },
-  'analysis-types': { picklistType: 'ANALYSIS_TYPE' }
+  'analysis-types': { picklistType: 'ANALYSIS_TYPE' },
+  'acquisition-event-types': { picklistType: 'ACQUISITION_EVENT_TYPE', parentType: 'ACQUISITION_EVENT_TYPE' }
 };
 
 type Params = { params: Promise<{ type: string }> };

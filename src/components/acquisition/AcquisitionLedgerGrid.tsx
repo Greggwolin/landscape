@@ -15,14 +15,15 @@ import { cilPlus, cilTrash, cilReload, cilSettings } from '@coreui/icons';
 import CIcon from '@coreui/icons-react';
 import { SemanticBadge, SemanticButton } from '@/components/ui/landscape';
 import {
-  MILESTONE_ACTIONS,
-  FINANCIAL_ACTIONS,
   isMilestoneAction,
+  FALLBACK_MILESTONE_OPTIONS,
+  FALLBACK_FINANCIAL_OPTIONS,
   type AcquisitionEvent,
-  type AcquisitionEventType,
+  type AcquisitionEventTypeOption,
   type AcquisitionCategoryOption,
   type AcquisitionCategoriesResponse,
 } from '@/types/acquisition';
+import { useAcquisitionEventTypeOptions } from '@/hooks/usePicklistOptions';
 import { formatMoney } from '@/utils/formatters/number';
 
 interface Props {
@@ -93,7 +94,7 @@ const mapRow = (row: any): AcquisitionEvent => ({
   categoryName: row.category_name ?? null,
   subcategoryName: row.subcategory_name ?? null,
   eventDate: row.event_date,
-  eventType: (row.event_type ?? 'Deposit') as AcquisitionEventType,
+  eventType: row.event_type ?? 'DEPOSIT',
   description: row.description,
   amount: row.amount === null || row.amount === undefined ? null : Number(row.amount),
   isAppliedToPurchase: row.is_applied_to_purchase ?? true,
@@ -115,7 +116,7 @@ const truncate = (value: string | null | undefined, length = 40) => {
 const NEW_ROW_ID = -1;
 
 const emptyNewRow: Partial<AcquisitionEvent> = {
-  eventType: 'Deposit',
+  eventType: 'DEPOSIT',
   eventDate: '',
   categoryId: null,
   subcategoryId: null,
@@ -141,6 +142,71 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
   // Category state
   const [categories, setCategories] = useState<AcquisitionCategoryOption[]>([]);
   const [subcategoriesByParent, setSubcategoriesByParent] = useState<Record<string, AcquisitionCategoryOption[]>>({});
+
+  // Picklist-driven event types (falls back to hardcoded if fetch fails)
+  const { options: picklistEventTypes } = useAcquisitionEventTypeOptions();
+
+  // Split into milestone vs financial groups.
+  // Picklist rows use parent_id to distinguish groups:
+  //   - parent_id pointing to MILESTONE group parent → milestone
+  //   - parent_id pointing to FINANCIAL group parent → financial
+  // If picklist hasn't loaded yet, use fallback constants.
+  const { milestoneOptions, financialOptions, milestoneCodeSet } = useMemo(() => {
+    if (picklistEventTypes.length === 0) {
+      return {
+        milestoneOptions: FALLBACK_MILESTONE_OPTIONS,
+        financialOptions: FALLBACK_FINANCIAL_OPTIONS,
+        milestoneCodeSet: new Set(FALLBACK_MILESTONE_OPTIONS.map(o => o.value)),
+      };
+    }
+
+    // Find the two group-header rows (parent_id is null for group headers)
+    const groupHeaders = picklistEventTypes.filter(o => o.parent_id === null || o.parent_id === undefined);
+    const milestoneHeader = groupHeaders.find(h => h.value === 'MILESTONE_GROUP');
+    const financialHeader = groupHeaders.find(h => h.value === 'FINANCIAL_GROUP');
+
+    // Children reference their group header's picklist_id via parent_id
+    const milestones: AcquisitionEventTypeOption[] = [];
+    const financials: AcquisitionEventTypeOption[] = [];
+
+    for (const opt of picklistEventTypes) {
+      // Skip group headers themselves — they aren't selectable event types
+      if (opt.value === 'MILESTONE_GROUP' || opt.value === 'FINANCIAL_GROUP') continue;
+
+      if (milestoneHeader && opt.parent_id === (milestoneHeader as unknown as { picklist_id?: number }).picklist_id) {
+        milestones.push(opt);
+      } else if (financialHeader && opt.parent_id === (financialHeader as unknown as { picklist_id?: number }).picklist_id) {
+        financials.push(opt);
+      } else {
+        // If parent structure isn't available, fall back to code-prefix heuristic
+        // Codes: MILESTONE, OPEN_ESCROW, CRITICAL_DATE are milestones; rest (including CLOSING) are financial
+        const MILESTONE_CODES_FALLBACK = new Set(['MILESTONE', 'OPEN_ESCROW', 'CRITICAL_DATE']);
+        if (MILESTONE_CODES_FALLBACK.has(opt.value)) {
+          milestones.push(opt);
+        } else {
+          financials.push(opt);
+        }
+      }
+    }
+
+    // If the parent-based split didn't work (no group headers), use code heuristic
+    if (milestones.length === 0 && financials.length === 0) {
+      const MILESTONE_CODES_FALLBACK = new Set(['MILESTONE', 'OPEN_ESCROW', 'CRITICAL_DATE']);
+      for (const opt of picklistEventTypes) {
+        if (MILESTONE_CODES_FALLBACK.has(opt.value)) {
+          milestones.push(opt);
+        } else {
+          financials.push(opt);
+        }
+      }
+    }
+
+    return {
+      milestoneOptions: milestones.length > 0 ? milestones : FALLBACK_MILESTONE_OPTIONS,
+      financialOptions: financials.length > 0 ? financials : FALLBACK_FINANCIAL_OPTIONS,
+      milestoneCodeSet: new Set(milestones.map(o => o.value)),
+    };
+  }, [picklistEventTypes]);
 
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -676,11 +742,13 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
           (getInlineValue(row, 'eventDate') as string) || '—'
         );
 
-      case 'eventType':
+      case 'eventType': {
+        const currentCode = getInlineValue(row, 'eventType') as string;
+        const currentLabel = [...milestoneOptions, ...financialOptions].find(o => o.value === currentCode)?.label || currentCode;
         return isEditingField('eventType') ? (
           <CFormSelect
             size="sm"
-            value={getInlineValue(row, 'eventType') as string}
+            value={currentCode}
             onChange={(e) => setInlineValue(row.acquisitionId, 'eventType', e.target.value)}
             onBlur={() => handleInlineSave(row.acquisitionId)}
             onKeyDown={(e) => {
@@ -690,24 +758,25 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
             autoFocus
           >
             {/* Milestone Events */}
-            {MILESTONE_ACTIONS.map((type) => (
-              <option key={type} value={type}>{type}</option>
+            {milestoneOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
             {/* Visual Separator */}
             <option disabled style={{ fontSize: '1px', backgroundColor: 'var(--cui-border-color)' }}>
               ────────────
             </option>
             {/* Financial Events */}
-            {FINANCIAL_ACTIONS.map((type) => (
-              <option key={type} value={type}>{type}</option>
+            {financialOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </CFormSelect>
         ) : (
-          <span className="fw-semibold">{getInlineValue(row, 'eventType') as string}</span>
+          <span className="fw-semibold">{currentLabel}</span>
         );
+      }
 
       case 'category': {
-        const isMilestone = isMilestoneAction(row.eventType);
+        const isMilestone = isMilestoneAction(row.eventType, milestoneCodeSet);
         // Milestone actions - show empty cell (no dropdown needed)
         if (isMilestone) {
           return null;
@@ -746,7 +815,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
       }
 
       case 'subcategory': {
-        const isMilestone = isMilestoneAction(row.eventType);
+        const isMilestone = isMilestoneAction(row.eventType, milestoneCodeSet);
         // Milestone actions - show empty cell (no dropdown needed)
         if (isMilestone) {
           return null;
@@ -802,7 +871,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
               if (e.key === 'Enter') handleInlineSave(row.acquisitionId);
               if (e.key === 'Escape') cancelEditing();
             }}
-            placeholder={row.eventType === 'Milestone' ? 'e.g., DD Expires, Title Review...' : 'Description'}
+            placeholder={row.eventType === 'MILESTONE' ? 'e.g., DD Expires, Title Review...' : 'Description'}
             autoFocus
           />
         ) : (
@@ -810,7 +879,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         );
 
       case 'amount': {
-        const isMilestone = isMilestoneAction(row.eventType);
+        const isMilestone = isMilestoneAction(row.eventType, milestoneCodeSet);
         // Milestone actions - show disabled input
         if (isMilestone) {
           return (
@@ -923,7 +992,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
     rowCategoryId: number | null,
     isDepositRow: boolean
   ) => {
-    const isMilestone = isMilestoneAction(row.eventType);
+    const isMilestone = isMilestoneAction(row.eventType, milestoneCodeSet);
 
     switch (columnKey) {
       case 'eventDate':
@@ -961,10 +1030,10 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
   };
 
   // Get cell class based on column key
-  const getCellClass = (columnKey: string, rowCategoryId: number | null, isDepositRow: boolean, eventType: AcquisitionEventType) => {
+  const getCellClass = (columnKey: string, rowCategoryId: number | null, isDepositRow: boolean, eventType: string) => {
     const column = COLUMN_CONFIGS.find(c => c.key === columnKey);
     const baseClass = column?.className || '';
-    const isMilestone = isMilestoneAction(eventType);
+    const isMilestone = isMilestoneAction(eventType, milestoneCodeSet);
 
     switch (columnKey) {
       case 'eventDate':
@@ -990,7 +1059,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
   // Render new row cell content
   const renderNewRowCellContent = (columnKey: string) => {
     const isEditing = (field: string) => editingCell?.rowId === NEW_ROW_ID && editingCell?.field === field;
-    const isDepositRow = newRowValues.eventType === 'Deposit';
+    const isDepositRow = newRowValues.eventType === 'DEPOSIT';
     const newRowSubcatOptions = getSubcategoryOptions(newRowValues.categoryId);
 
     switch (columnKey) {
@@ -1011,12 +1080,13 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
           <span className="text-muted">{newRowValues.eventDate || 'Date'}</span>
         );
 
-      case 'eventType':
+      case 'eventType': {
+        const newRowLabel = [...milestoneOptions, ...financialOptions].find(o => o.value === newRowValues.eventType)?.label || newRowValues.eventType;
         return isEditing('eventType') ? (
           <CFormSelect
             size="sm"
             value={newRowValues.eventType}
-            onChange={(e) => setNewRowValues((prev) => ({ ...prev, eventType: e.target.value as AcquisitionEventType }))}
+            onChange={(e) => setNewRowValues((prev) => ({ ...prev, eventType: e.target.value }))}
             onKeyDown={(e) => {
               if (e.key === 'Escape') { setShowNewRow(false); cancelEditing(); }
               if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); startEditing(NEW_ROW_ID, 'category'); }
@@ -1024,24 +1094,25 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
             autoFocus
           >
             {/* Milestone Events */}
-            {MILESTONE_ACTIONS.map((type) => (
-              <option key={type} value={type}>{type}</option>
+            {milestoneOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
             {/* Visual Separator */}
             <option disabled style={{ fontSize: '1px', backgroundColor: 'var(--cui-border-color)' }}>
               ────────────
             </option>
             {/* Financial Events */}
-            {FINANCIAL_ACTIONS.map((type) => (
-              <option key={type} value={type}>{type}</option>
+            {financialOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </CFormSelect>
         ) : (
-          <span className="fw-semibold">{newRowValues.eventType}</span>
+          <span className="fw-semibold">{newRowLabel}</span>
         );
+      }
 
       case 'category': {
-        const isMilestone = isMilestoneAction(newRowValues.eventType);
+        const isMilestone = isMilestoneAction(newRowValues.eventType, milestoneCodeSet);
         // Milestone actions - show disabled dropdown
         if (isMilestone) {
           return (
@@ -1082,7 +1153,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
       }
 
       case 'subcategory': {
-        const isMilestone = isMilestoneAction(newRowValues.eventType);
+        const isMilestone = isMilestoneAction(newRowValues.eventType, milestoneCodeSet);
         // Milestone actions - show disabled dropdown
         if (isMilestone) {
           return (
@@ -1127,7 +1198,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         return isEditing('description') ? (
           <CFormInput
             size="sm"
-            placeholder={newRowValues.eventType === 'Milestone' ? 'e.g., DD Expires, Title Review...' : 'Description'}
+            placeholder={newRowValues.eventType === 'MILESTONE' ? 'e.g., DD Expires, Title Review...' : 'Description'}
             value={newRowValues.description || ''}
             onChange={(e) => setNewRowValues((prev) => ({ ...prev, description: e.target.value }))}
             onKeyDown={(e) => {
@@ -1141,7 +1212,7 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
         );
 
       case 'amount': {
-        const isMilestone = isMilestoneAction(newRowValues.eventType);
+        const isMilestone = isMilestoneAction(newRowValues.eventType, milestoneCodeSet);
         // Milestone actions - show disabled input
         if (isMilestone) {
           return (
@@ -1259,8 +1330,8 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
 
   // Get new row cell click handler
   const getNewRowCellClickHandler = (columnKey: string) => {
-    const isDepositRow = newRowValues.eventType === 'Deposit';
-    const isMilestone = isMilestoneAction(newRowValues.eventType);
+    const isDepositRow = newRowValues.eventType === 'DEPOSIT';
+    const isMilestone = isMilestoneAction(newRowValues.eventType, milestoneCodeSet);
 
     switch (columnKey) {
       case 'eventDate':
@@ -1499,13 +1570,13 @@ export default function AcquisitionLedgerGrid({ projectId, onEventsChange }: Pro
                   </tr>
                 )}
                 {events.map((row) => {
-                  const isDepositRow = row.eventType === 'Deposit';
+                  const isDepositRow = row.eventType === 'DEPOSIT';
                   const isEditingField = (field: string) => editingCell?.rowId === row.acquisitionId && editingCell?.field === field;
                   const rowCategoryId = getInlineValue(row, 'categoryId') as number | null;
                   const rowSubcatOptions = getSubcategoryOptions(rowCategoryId);
 
                   return (
-                    <tr key={row.acquisitionId} className={isMilestoneAction(row.eventType) ? 'milestone-row' : ''}>
+                    <tr key={row.acquisitionId} className={isMilestoneAction(row.eventType, milestoneCodeSet) ? 'milestone-row' : ''}>
                       {orderedColumns.map((column) => {
                         const onClick = getCellClickHandler(column.key, row, rowCategoryId, isDepositRow);
                         const cellClass = getCellClass(column.key, rowCategoryId, isDepositRow, row.eventType);

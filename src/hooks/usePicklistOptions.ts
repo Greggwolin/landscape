@@ -43,3 +43,4 @@ export const useLeaseStatusOptions = () => usePicklistOptions('lease-statuses');
 export const useLeaseTypeOptions = () => usePicklistOptions('lease-types');
 export const useInflationTypeOptions = () => usePicklistOptions('inflation-types');
 export const useAnalysisTypeOptions = () => usePicklistOptions('analysis-types');
+export const useAcquisitionEventTypeOptions = () => usePicklistOptions('acquisition-event-types');
