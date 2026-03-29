@@ -895,15 +895,39 @@ class DCFCalculationService:
         # (NOI for months 1..N-1, NOI + reversion for month N)
         present_value = sum(p['pv_cash_flow'] for p in projections)
 
-        # Calculate IRR using numpy-financial (with monthly cash flows)
-        irr = self._calculate_monthly_irr(noi_series, net_reversion, present_value)
+        # Get analysis_purpose early — needed for metric branching
+        analysis_purpose = getattr(project, 'analysis_purpose', None) or 'VALUATION'
+
+        # Fetch acquisition cost for UNDERWRITING mode
+        acquisition_cost_info = self._fetch_effective_acquisition_cost()
+        effective_acquisition_cost = acquisition_cost_info['amount']
+        acquisition_source = acquisition_cost_info['source']
+
+        # Calculate IRR based on analysis_purpose
+        if analysis_purpose == 'UNDERWRITING' and effective_acquisition_cost and effective_acquisition_cost > 0:
+            # UNDERWRITING: IRR against actual acquisition cost
+            irr = self._calculate_monthly_irr(
+                noi_series, net_reversion, effective_acquisition_cost
+            )
+            # NPV = PV of cash flows - acquisition cost
+            npv = round(present_value - effective_acquisition_cost, 2)
+            # Equity multiple = total cash in / total cash out
+            total_cash_in = sum(noi_series) + net_reversion
+            equity_multiple = round(
+                total_cash_in / effective_acquisition_cost, 4
+            ) if effective_acquisition_cost > 0 else None
+        else:
+            # VALUATION: IRR is implied return at indicated value (PV as investment)
+            irr = self._calculate_monthly_irr(noi_series, net_reversion, present_value)
+            npv = None
+            equity_multiple = None
 
         # Metrics
         metrics = {
             'present_value': round(present_value, 2),
             'irr': round(irr, 6) if irr is not None else None,
-            'npv': None,
-            'equity_multiple': None,
+            'npv': npv,
+            'equity_multiple': equity_multiple,
             'price_per_unit': round(present_value / unit_count, 2) if unit_count > 0 else None,
             'price_per_sf': round(present_value / total_sf, 2) if total_sf > 0 else None,
         }
@@ -918,9 +942,6 @@ class DCFCalculationService:
             discount_interval=float(assumptions.get('discount_rate_interval', 0.005)),
             cap_interval=float(assumptions.get('cap_rate_interval', 0.005)),
         )
-
-        # Get analysis_purpose for frontend label selection
-        analysis_purpose = getattr(project, 'analysis_purpose', None) or 'VALUATION'
 
         result = {
             'project_id': self.project_id,
@@ -952,6 +973,10 @@ class DCFCalculationService:
             'terminal_year': terminal_year,
             'metrics': metrics,
             'sensitivity_matrix': sensitivity_matrix,
+            'acquisition': {
+                'effective_cost': round(effective_acquisition_cost, 2) if effective_acquisition_cost else None,
+                'source': acquisition_source,
+            },
         }
 
         if reno_schedule:
@@ -971,6 +996,47 @@ class DCFCalculationService:
             }
 
         return result
+
+    def _fetch_effective_acquisition_cost(self) -> Dict[str, Any]:
+        """
+        Fetch the effective acquisition cost for this project.
+
+        Priority:
+        1. Calculated from acquisition ledger (tbl_acquisition) if financial
+           events with amounts exist (is_applied_to_purchase=true).
+        2. Asking price from tbl_project.asking_price as fallback.
+        3. None if neither exists.
+
+        Returns: {'amount': float|None, 'source': 'ledger'|'asking'|None}
+        """
+        with connection.cursor() as cursor:
+            # Sum financial events from acquisition ledger
+            cursor.execute("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN event_type IN ('DEPOSIT', 'FEE', 'ADJUSTMENT', 'CLOSING_COSTS')
+                                     THEN amount ELSE 0 END), 0)
+                    -
+                    COALESCE(SUM(CASE WHEN event_type IN ('CREDIT', 'REFUND')
+                                     THEN amount ELSE 0 END), 0)
+                    AS net_acquisition_cost
+                FROM landscape.tbl_acquisition
+                WHERE project_id = %s
+                  AND is_applied_to_purchase = true
+                  AND amount > 0
+            """, [self.project_id])
+            row = cursor.fetchone()
+            ledger_total = float(row[0]) if row and row[0] else 0
+
+        if ledger_total > 0:
+            return {'amount': ledger_total, 'source': 'ledger'}
+
+        # Fallback to asking_price
+        project = get_object_or_404(Project, project_id=self.project_id)
+        asking = getattr(project, 'asking_price', None)
+        if asking and float(asking) > 0:
+            return {'amount': float(asking), 'source': 'asking'}
+
+        return {'amount': None, 'source': None}
 
     def _calculate_monthly_irr(
         self,

@@ -19,6 +19,7 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from typing import Any, Dict, List, Optional
 
+from django.db import connection
 from django.shortcuts import get_object_or_404
 
 from apps.projects.models import Project
@@ -104,6 +105,11 @@ class IncomePropertyCashFlowService:
             )
         else:
             sections = self._build_income_sections(projections, period_count)
+
+        # Step 3b: Add acquisition costs at time=0 (if any exist in ledger)
+        acquisition_section = self._build_acquisition_section(period_count)
+        if acquisition_section:
+            sections.insert(0, acquisition_section)
 
         # Step 4: Add financing section if requested
         loan_payoff = 0.0
@@ -759,6 +765,70 @@ class IncomePropertyCashFlowService:
             'selling_costs_pct': float(exit_analysis.get('sellingCostsPct', 0) or 0),
             'net_reversion': float(exit_analysis.get('netReversion', 0) or 0),
             'is_value_add': is_value_add,
+        }
+
+    # =========================================================================
+    # ACQUISITION COSTS (TIME=0)
+    # =========================================================================
+
+    def _build_acquisition_section(
+        self, period_count: int
+    ) -> Optional[Dict]:
+        """
+        Fetch acquisition ledger events and build a cost section at time=0.
+
+        Queries tbl_acquisition for events where is_applied_to_purchase=true
+        and places the total as a negative cash flow at periodIndex 0.
+        This mirrors LandDevCashFlowService._fetch_acquisition_costs() but
+        without the acre-based allocation (income properties don't filter
+        by container).
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    COALESCE(SUM(amount), 0) AS total_acquisition
+                FROM landscape.tbl_acquisition
+                WHERE project_id = %s
+                  AND is_applied_to_purchase = true
+                  AND amount > 0
+            """, [self.project_id])
+            row = cursor.fetchone()
+            total_acquisition = float(row[0]) if row and row[0] else 0
+
+        if total_acquisition <= 0:
+            return None
+
+        # Place acquisition costs at period 0 (time=0) as negative cash flow
+        line_items = [{
+            'lineId': 'acq-cost',
+            'category': 'Acquisition',
+            'subcategory': '',
+            'description': 'Acquisition Cost',
+            'periods': [{
+                'periodIndex': 0,
+                'periodSequence': 1,
+                'amount': round(-total_acquisition, 2),
+                'source': 'acquisition',
+            }],
+            'total': round(-total_acquisition, 2),
+            'sourceType': 'acquisition',
+        }]
+
+        subtotals = [{
+            'periodIndex': 0,
+            'periodSequence': 1,
+            'amount': round(-total_acquisition, 2),
+            'source': 'calculated',
+        }]
+
+        return {
+            'sectionId': 'cost-acquisition',
+            'sectionName': 'ACQUISITION COST',
+            'lineItems': line_items,
+            'subtotals': subtotals,
+            'sectionTotal': round(-total_acquisition, 2),
+            'sortOrder': 0,
+            'isTime0': True,
         }
 
     # =========================================================================

@@ -309,6 +309,10 @@ export default function LeveragedCashFlow({
   const sections = cfData?.sections || [];
   const periodLabels = cfData?.periods || [];
 
+  /* Analysis purpose: VALUATION = no acquisition at Time 0, UNDERWRITING = show deal economics */
+  const analysisPurpose: string = (incomeApproachMonthly as any)?.analysis_purpose || 'VALUATION';
+  const isUnderwriting = analysisPurpose === 'UNDERWRITING';
+
   /* Determine what data is available */
   const revenueSection = sections.find((s) => s.sectionId === 'revenue-gross');
   const deductionsSection = sections.find((s) => s.sectionId === 'revenue-deductions');
@@ -369,25 +373,31 @@ export default function LeveragedCashFlow({
     const zeroes = new Array(totalPeriods).fill(0);
     const zeroesAgg = new Array(hdrs.length).fill(0);
 
-    const acquisitionPrice = toNumber(acquisitionSummary?.effective_acquisition_price);
+    /* ---- Initial Capitalization (UNDERWRITING only) ---- */
+    /* In VALUATION mode the DCF solves for value — no acquisition outflow at Time 0 */
+    const acquisitionPrice = isUnderwriting
+      ? toNumber(acquisitionSummary?.effective_acquisition_price)
+      : 0;
     const initialAcquisitionOutflow = acquisitionPrice > 0 ? -acquisitionPrice : 0;
     const acquisitionRowLabel =
       acquisitionSummary?.price_source === 'asking'
         ? 'Asking Price'
         : 'Acquisition Price (Incl Costs)';
 
-    const perLoanNetProceeds = loans
-      .map((loan) => ({
-        loanId: loan.loan_id,
-        loanName: loan.loan_name || `Loan ${loan.loan_id}`,
-        amount: resolveLoanNetProceeds(loan),
-      }))
-      .filter((entry) => entry.amount !== 0);
+    const perLoanNetProceeds = isUnderwriting
+      ? loans
+          .map((loan) => ({
+            loanId: loan.loan_id,
+            loanName: loan.loan_name || `Loan ${loan.loan_id}`,
+            amount: resolveLoanNetProceeds(loan),
+          }))
+          .filter((entry) => entry.amount !== 0)
+      : [];
 
     const initialNetLoanProceeds = perLoanNetProceeds.reduce((sum, entry) => sum + entry.amount, 0);
     const netTimeZero = initialAcquisitionOutflow + initialNetLoanProceeds;
 
-    if (initialAcquisitionOutflow !== 0 || initialNetLoanProceeds !== 0) {
+    if (isUnderwriting && (initialAcquisitionOutflow !== 0 || initialNetLoanProceeds !== 0)) {
       displayRows.push({
         label: 'Initial Capitalization',
         rowType: 'section-header',
@@ -1078,6 +1088,7 @@ export default function LeveragedCashFlow({
     costGranularity,
     loans,
     acquisitionSummary,
+    isUnderwriting,
   ]);
 
   /* Reversion modal state */
@@ -1197,6 +1208,7 @@ export default function LeveragedCashFlow({
               >
                 Line Item
               </th>
+              {isUnderwriting && (
               <th
                 style={{
                   backgroundColor: 'var(--cui-secondary-bg)',
@@ -1213,6 +1225,7 @@ export default function LeveragedCashFlow({
               >
                 Time 0
               </th>
+              )}
               {headers.map((h, i) => (
                 <th
                   key={i}
@@ -1240,7 +1253,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + 2}
+                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
                       style={{ height: '4px', padding: 0, borderBottom: '1px solid var(--cui-border-color)' }}
                     />
                   </tr>
@@ -1252,7 +1265,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + 2}
+                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
                       style={{
                         fontWeight: 700,
                         fontSize: '0.8125rem',
@@ -1283,7 +1296,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + 2}
+                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
                       style={{
                         fontWeight: 700,
                         fontSize: '0.8125rem',
@@ -1348,6 +1361,7 @@ export default function LeveragedCashFlow({
                     >
                       {row.label}
                     </td>
+                    {isUnderwriting && (
                     <td
                       style={{
                         textAlign: 'right',
@@ -1361,6 +1375,7 @@ export default function LeveragedCashFlow({
                     >
                       {row.time0Value ? formatLCFCurrency(row.time0Value) : '-'}
                     </td>
+                    )}
                     {row.values.map((val, colIdx) => {
                       if (row.showDashForZero && val === 0) {
                         return (
@@ -1425,6 +1440,7 @@ export default function LeveragedCashFlow({
                     >
                       {row.label}
                     </td>
+                    {isUnderwriting && (
                     <td
                       style={{
                         textAlign: 'right',
@@ -1449,6 +1465,7 @@ export default function LeveragedCashFlow({
                         row.time0Value != null ? formatLCFCurrency(row.time0Value) : '-'
                       )}
                     </td>
+                    )}
                     {headers.map((_, i) => (
                       <td
                         key={i}
@@ -1488,6 +1505,7 @@ export default function LeveragedCashFlow({
                   >
                     {row.label}
                   </td>
+                  {isUnderwriting && (
                   <td
                     style={{
                       textAlign: 'right',
@@ -1503,6 +1521,7 @@ export default function LeveragedCashFlow({
                   >
                     {row.time0Value && row.time0Value !== 0 ? formatLCFCurrency(row.time0Value) : '-'}
                   </td>
+                  )}
                   {row.values.map((val, colIdx) => {
                     const displayValue =
                       val === 0 && isNetCf && !hasAnyIncomeData

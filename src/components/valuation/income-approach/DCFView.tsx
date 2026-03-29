@@ -15,7 +15,7 @@
  * Session: DCF Implementation / MF DCF Unification
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CashFlowGrid, TimeScale } from '@/components/analysis/shared';
 import type {
   DCFViewProps,
@@ -31,14 +31,23 @@ import {
 } from '@/types/income-approach';
 import {
   aggregateMFCashFlow,
+  prependAcquisitionCost,
   formatMFDcfValue,
   type MFDcfMonthlyApiResponse,
 } from './mfCashFlowTransform';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+interface AcquisitionSummary {
+  effective_acquisition_price: number | null;
+  price_source: string | null;
+}
+
 interface ExtendedDCFViewProps extends DCFViewProps {
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
   monthlyData?: MFDcfMonthlyApiResponse | null;
+  projectId?: number;
 }
 
 export function DCFView({
@@ -47,16 +56,49 @@ export function DCFView({
   isLoading,
   onMethodChange,
   monthlyData,
+  projectId,
 }: ExtendedDCFViewProps) {
   const { theme } = useTheme();
   const dcfColors = getDCFTileColor(theme);
   const [timeScale, setTimeScale] = useState<TimeScale>('annual');
+  const [acquisitionSummary, setAcquisitionSummary] = useState<AcquisitionSummary | null>(null);
+  const [showPVAnalysis, setShowPVAnalysis] = useState(false);
+
+  // Fetch acquisition price summary for Time 0 column
+  useEffect(() => {
+    if (!projectId) return;
+    fetch(`${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setAcquisitionSummary(data);
+      })
+      .catch(() => {/* silent — grid works without acquisition */});
+  }, [projectId]);
 
   // Transform monthly data for grid display
   const gridData = useMemo(() => {
     if (!monthlyData) return null;
-    return aggregateMFCashFlow(monthlyData, timeScale);
-  }, [monthlyData, timeScale]);
+    const base = aggregateMFCashFlow(monthlyData, timeScale);
+    // Prepend Time 0 acquisition cost if available
+    const acqPrice = acquisitionSummary?.effective_acquisition_price;
+    if (acqPrice && acqPrice > 0) {
+      const label = acquisitionSummary?.price_source === 'asking'
+        ? 'Asking Price'
+        : 'Acquisition Price (Incl Costs)';
+      return prependAcquisitionCost(base, acqPrice, label);
+    }
+    return base;
+  }, [monthlyData, timeScale, acquisitionSummary]);
+
+  // Filter out PV Analysis section when collapsed
+  const displayGridData = useMemo(() => {
+    if (!gridData) return null;
+    if (showPVAnalysis) return gridData;
+    return {
+      ...gridData,
+      sections: gridData.sections.filter((s) => s.id !== 'dcf'),
+    };
+  }, [gridData, showPVAnalysis]);
 
   if (isLoading) {
     return (
@@ -103,10 +145,10 @@ export function DCFView({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Cash Flow Grid (if monthly data available) OR Legacy Table */}
-      {gridData ? (
+      {displayGridData ? (
         <CashFlowGrid
-          periods={gridData.periods}
-          sections={gridData.sections}
+          periods={displayGridData.periods}
+          sections={displayGridData.sections}
           timeScale={timeScale}
           onTimeScaleChange={setTimeScale}
           showTimeScaleToggle={true}
@@ -192,14 +234,20 @@ export function DCFView({
               <span style={{ color: 'var(--cui-body-color)' }}>{assumptions.hold_period_years} years</span>
             </div>
             <div
+              onClick={() => setShowPVAnalysis((prev) => !prev)}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 paddingTop: '0.5rem',
                 borderTop: '1px solid var(--cui-border-color)',
+                cursor: 'pointer',
+                userSelect: 'none',
               }}
+              title={showPVAnalysis ? 'Hide PV Analysis rows' : 'Show PV Analysis rows'}
             >
-              <span style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>Present Value</span>
+              <span style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>
+                Present Value {showPVAnalysis ? '▾' : '▸'}
+              </span>
               <span style={{ fontWeight: 700, fontSize: '1.125rem', color: dcfColors.text }}>
                 {formatCurrency(metrics.present_value)}
               </span>
