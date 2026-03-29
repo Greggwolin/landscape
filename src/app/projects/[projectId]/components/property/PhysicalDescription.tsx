@@ -611,7 +611,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <CCardHeader className="studio-card-header">
           <span className="fw-semibold">Physical Description</span>
         </CCardHeader>
-        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center py-5">
+        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center" style={{ padding: '8px' }}>
           <CSpinner size="sm" className="me-2" />
           <span style={{ color: 'var(--cui-secondary-color)' }}>Loading property details...</span>
         </CCardBody>
@@ -632,7 +632,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
         <CCardHeader className="studio-card-header">
           <span className="fw-semibold">Physical Description</span>
         </CCardHeader>
-        <CCardBody className="studio-card-body">
+        <CCardBody className="studio-card-body" style={{ padding: '8px' }}>
           <div className="studio-text-error">{error}</div>
         </CCardBody>
       </CCard>
@@ -977,7 +977,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
           {filledFields}/{totalFields} fields
         </span>
       </CCardHeader>
-      <CCardBody className="studio-card-body p-2 pt-3">
+      <CCardBody className="studio-card-body" style={{ padding: '8px' }}>
         {/* Section A: Property Identification */}
         <div className="physical-section" style={{ marginBottom: '0.5rem' }}>
           <div className="d-flex justify-content-between align-items-center mb-3" style={{ background: 'var(--surface-subheader)', margin: '-0.5rem -0.5rem 0.75rem -0.5rem', padding: '0.75rem 1rem', borderRadius: '4px' }}>

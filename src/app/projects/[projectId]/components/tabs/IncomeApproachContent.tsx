@@ -5,7 +5,7 @@
  *
  * Wrapper component that uses the useIncomeApproach hook and renders
  * the Income Approach UI components with internal pill navigation:
- *   Rent Comps | Expense Comps | Pro Forma / Cash Flow
+ *   Rent Comps | Expense Comps | Direct Cap | Cash Flow
  *
  * Each pill view has its own contextual sidebar content.
  *
@@ -28,7 +28,7 @@ import { ExpenseCompsView } from '@/components/valuation/income-approach/Expense
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type IncomePill = 'rent-comps' | 'expense-comps' | 'pro-forma';
+type IncomePill = 'rent-comps' | 'expense-comps' | 'direct-cap' | 'cash-flow';
 
 interface IncomeApproachContentProps {
   projectId: number;
@@ -40,7 +40,8 @@ interface IncomeApproachContentProps {
 const PILLS: { id: IncomePill; label: string; badgeClass: string }[] = [
   { id: 'rent-comps', label: 'Rent Comps', badgeClass: 'studio-badge-success' },
   { id: 'expense-comps', label: 'Expense Comps', badgeClass: 'studio-badge-error' },
-  { id: 'pro-forma', label: 'Pro Forma / Cash Flow', badgeClass: 'studio-badge-info' },
+  { id: 'direct-cap', label: 'Direct Cap', badgeClass: 'studio-badge-info' },
+  { id: 'cash-flow', label: 'Cash Flow', badgeClass: 'studio-badge-info' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ export function IncomeApproachContent({ projectId, projectName, latitude, longit
     return (
       <CCard style={{ borderColor: 'var(--cui-danger)' }}>
         <CCardBody
-          style={{ padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
+          style={{ padding: '8px', textAlign: 'center', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
         >
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>
@@ -185,7 +186,11 @@ export function IncomeApproachContent({ projectId, projectName, latitude, longit
               key={pill.id}
               type="button"
               className={isActive ? pill.badgeClass : undefined}
-              onClick={() => setActivePill(pill.id)}
+              onClick={() => {
+                setActivePill(pill.id);
+                if (pill.id === 'direct-cap') setActiveMethod('direct_cap');
+                if (pill.id === 'cash-flow') setActiveMethod('dcf');
+              }}
               style={isActive ? activeBtnOverride : inactiveBtnStyle}
             >
               {pill.label}
@@ -226,7 +231,7 @@ export function IncomeApproachContent({ projectId, projectName, latitude, longit
               totalOpex={data.operating_expenses?.total}
             />
           )}
-          {activePill === 'pro-forma' && (
+          {(activePill === 'direct-cap' || activePill === 'cash-flow') && (
             <AssumptionsPanel
               assumptions={data.assumptions}
               rentRoll={data.rent_roll}
@@ -258,34 +263,31 @@ export function IncomeApproachContent({ projectId, projectName, latitude, longit
               subjectTotalSqft={data.property_summary?.total_sf}
             />
           )}
-          {activePill === 'pro-forma' && (
-            <>
-              {activeMethod === 'direct_cap' && selectedTile && (
-                <DirectCapView
-                  calculation={selectedTile.calculation}
-                  value={selectedTile.value}
-                  capRate={selectedTile.cap_rate}
-                  propertySummary={data.property_summary}
-                  rentRollItems={data.rent_roll.items}
-                  opexItems={data.operating_expenses.items}
-                  opexGroups={data.operating_expenses.groups}
-                  sensitivityMatrix={data.sensitivity_matrix}
-                  keyMetrics={data.key_metrics}
-                  selectedBasis={selectedBasis}
-                  allTiles={data.value_tiles}
-                  onMethodChange={setActiveMethod}
-                />
-              )}
-              {activeMethod === 'dcf' && (
-                <DCFView
-                  data={dcfData!}
-                  propertySummary={data.property_summary}
-                  isLoading={isDCFLoading || isMonthlyDCFLoading}
-                  onMethodChange={setActiveMethod}
-                  monthlyData={monthlyDcfData}
-                />
-              )}
-            </>
+          {activePill === 'direct-cap' && selectedTile && (
+            <DirectCapView
+              calculation={selectedTile.calculation}
+              value={selectedTile.value}
+              capRate={selectedTile.cap_rate}
+              propertySummary={data.property_summary}
+              rentRollItems={data.rent_roll.items}
+              opexItems={data.operating_expenses.items}
+              opexGroups={data.operating_expenses.groups}
+              sensitivityMatrix={data.sensitivity_matrix}
+              keyMetrics={data.key_metrics}
+              selectedBasis={selectedBasis}
+              allTiles={data.value_tiles}
+              onMethodChange={setActiveMethod}
+            />
+          )}
+          {activePill === 'cash-flow' && (
+            <DCFView
+              data={dcfData!}
+              propertySummary={data.property_summary}
+              isLoading={isDCFLoading || isMonthlyDCFLoading}
+              onMethodChange={setActiveMethod}
+              monthlyData={monthlyDcfData}
+              projectId={projectId}
+            />
           )}
         </div>
       </div>

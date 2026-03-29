@@ -75,7 +75,7 @@ export function PresentationModeView({
   if (totalSlides === 0) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody className="text-center" style={{ padding: '8px' }}>
           <div className="text-body-secondary mb-3">
             No scenarios to present. Run an IC session first.
           </div>

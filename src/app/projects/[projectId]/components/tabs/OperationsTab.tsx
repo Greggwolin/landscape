@@ -533,10 +533,12 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
                 <input type="checkbox" checked={!hideLossToLease} onChange={() => setHideLossToLease(prev => !prev)} />
                 Loss to Lease
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0.35rem', cursor: 'pointer', color: showPostRehab ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)' }}>
-                <input type="checkbox" checked={!hidePostReno} onChange={() => { if (showPostRehab) setHidePostReno(prev => !prev); }} disabled={!showPostRehab} />
+              {showPostRehab && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0.35rem', cursor: 'pointer', color: 'var(--cui-body-color)' }}>
+                <input type="checkbox" checked={!hidePostReno} onChange={() => setHidePostReno(prev => !prev)} />
                 Post-Reno Rent / Annual
               </label>
+              )}
             </div>
           )}
         </div>

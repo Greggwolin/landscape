@@ -38,6 +38,7 @@ PyYAML>=6.0.0
 # PDF Generation
 WeasyPrint==62.3
 Pillow>=10.1.0
+staticmap>=0.5.7
 
 # OCR Support
 pytesseract==0.3.10

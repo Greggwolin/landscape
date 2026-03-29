@@ -357,7 +357,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
         {/* Right Column - Landscaper Analysis */}
         <div>
           <CCard className="h-100">
-            <CCardHeader className="d-flex justify-content-between align-items-center">
+            <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
               <div className="d-flex align-items-center gap-2">
                 <LandscaperIcon
                   style={{
@@ -370,10 +370,11 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
                 <span className="fw-semibold">Landscaper Analysis</span>
               </div>
             </CCardHeader>
-            <CCardBody>
+            <CCardBody style={{ padding: '8px' }}>
               <div
-                className="rounded p-3"
+                className="rounded"
                 style={{
+                  padding: '8px',
                   backgroundColor: 'var(--cui-tertiary-bg)',
                   border: '1px solid var(--cui-border-color)',
                 }}
@@ -432,10 +433,10 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Map */}
         <CCard className="h-100 overflow-hidden">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
+          <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
             <span className="fw-semibold">Competitive Projects Map</span>
           </CCardHeader>
-          <CCardBody className="p-3">
+          <CCardBody style={{ padding: 0 }}>
             <MarketMapView
               projectId={projectId}
               competitors={competitors}
@@ -449,7 +450,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
 
         {/* Competitor List */}
         <CCard className="h-100 overflow-hidden">
-          <CCardHeader className="d-flex justify-content-between align-items-center">
+          <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
             <span className="fw-semibold">Competitive Projects</span>
             <div className="flex gap-2">
               <button
@@ -472,7 +473,7 @@ function LandDevMarketContent({ projectId }: { projectId: number }) {
             </div>
           </CCardHeader>
 
-          <CCardBody className="max-h-[500px] overflow-y-auto">
+          <CCardBody style={{ padding: '8px', maxHeight: '500px', overflowY: 'auto' }}>
             {/* Competitor Form */}
             {showCompForm && (
               <div className="mb-4 p-4 rounded" style={{ backgroundColor: 'var(--cui-tertiary-bg)', border: '1px solid var(--cui-border-color)' }}>

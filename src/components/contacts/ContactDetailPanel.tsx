@@ -267,7 +267,7 @@ export default function ContactDetailPanel({
               {/* Details Tab */}
               <CTabPane visible={activeTab === 'details'}>
                 <CCard className="border-0 shadow-sm mb-3">
-                  <CCardBody>
+                  <CCardBody style={{ padding: '8px' }}>
                     <h6 className="text-muted mb-3">Contact Information</h6>
                     <CListGroup flush>
                       {contact.company_name && (
@@ -328,7 +328,7 @@ export default function ContactDetailPanel({
 
                 {contact.notes && (
                   <CCard className="border-0 shadow-sm mb-3">
-                    <CCardBody>
+                    <CCardBody style={{ padding: '8px' }}>
                       <h6 className="text-muted mb-3">Notes</h6>
                       <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
                         {contact.notes}
@@ -339,7 +339,7 @@ export default function ContactDetailPanel({
 
                 {contact.tags && contact.tags.length > 0 && (
                   <CCard className="border-0 shadow-sm">
-                    <CCardBody>
+                    <CCardBody style={{ padding: '8px' }}>
                       <h6 className="text-muted mb-3">Tags</h6>
                       <div className="d-flex flex-wrap gap-1">
                         {contact.tags.map((tag, index) => (
@@ -359,7 +359,7 @@ export default function ContactDetailPanel({
                   <>
                     {relationships.outgoing.length > 0 && (
                       <CCard className="border-0 shadow-sm mb-3">
-                        <CCardBody>
+                        <CCardBody style={{ padding: '8px' }}>
                           <h6 className="text-muted mb-3">Affiliated With</h6>
                           <CListGroup flush>
                             {relationships.outgoing.map((rel) => (
@@ -387,7 +387,7 @@ export default function ContactDetailPanel({
 
                     {relationships.incoming.length > 0 && (
                       <CCard className="border-0 shadow-sm mb-3">
-                        <CCardBody>
+                        <CCardBody style={{ padding: '8px' }}>
                           <h6 className="text-muted mb-3">Affiliations (Incoming)</h6>
                           <CListGroup flush>
                             {relationships.incoming.map((rel) => (
@@ -428,7 +428,7 @@ export default function ContactDetailPanel({
               <CTabPane visible={activeTab === 'projects'}>
                 {projects.length > 0 ? (
                   <CCard className="border-0 shadow-sm">
-                    <CCardBody>
+                    <CCardBody style={{ padding: '8px' }}>
                       <CListGroup flush>
                         {projects.map((project) => (
                           <CListGroupItem key={project.project_contact_id} className="px-0">

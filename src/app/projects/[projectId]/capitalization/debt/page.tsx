@@ -71,7 +71,7 @@ const calculateMonthlyPayment = (loan: Loan): number => {
 
 const SummaryCard = ({ label, value }: { label: string; value: string }) => (
   <CCard style={{ background: 'var(--cui-card-bg)' }}>
-    <CCardBody>
+    <CCardBody style={{ padding: '8px' }}>
       <div className="small" style={{ color: 'var(--cui-body-color)' }}>
         {label}
       </div>
@@ -150,7 +150,7 @@ const LoanSummaryCards = ({ loans }: { loans: Loan[] }) => {
   })();
 
   return (
-    <CRow className="g-3 mb-4">
+    <CRow className="g-3" style={{ marginBottom: '8px' }}>
       {cards.map((card) => (
         <CCol key={card.label} xs={12} md={3}>
           <SummaryCard label={card.label} value={card.value} />
@@ -228,17 +228,17 @@ export default function DebtPage() {
 
       {(!loans || loans.length === 0) && !newLoanMode && (
         <CCard className="mb-3">
-          <CCardBody className="text-center py-5 text-muted">
+          <CCardBody style={{ padding: '8px', textAlign: 'center' }} className="text-muted">
             No loans defined. Click &ldquo;+ Add Loan&rdquo; to begin.
           </CCardBody>
         </CCard>
       )}
 
-      <CCard className="mb-4">
-        <CCardHeader>
+      <CCard>
+        <CCardHeader style={{ padding: '8px 12px' }}>
           <h5 className="mb-0">Cash Flow - Leveraged</h5>
         </CCardHeader>
-        <CCardBody>
+        <CCardBody style={{ padding: 0 }}>
           <LeveragedCashFlow projectId={projectId} loans={loans} />
         </CCardBody>
       </CCard>

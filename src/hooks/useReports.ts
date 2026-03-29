@@ -282,6 +282,42 @@ export function useReportPreview(
 }
 
 /**
+ * Fetch report PDF for inline preview (rendered in iframe).
+ * Returns a blob URL that can be used as iframe src.
+ */
+export function useReportPdfPreview(
+  reportCode: string | null,
+  projectId: number | string | null,
+) {
+  return useQuery<string>({
+    queryKey: ['reportPdfPreview', reportCode, projectId],
+    queryFn: async () => {
+      const response = await fetch(
+        `${DJANGO_API_URL}/api/reports/export/${reportCode}/${projectId}/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: 'pdf', parameters: {} }),
+        }
+      );
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const errData = await response.json();
+          throw new Error(errData.error || `PDF preview failed (${response.status})`);
+        }
+        throw new Error(`PDF preview failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    },
+    enabled: !!reportCode && !!projectId,
+    staleTime: 5 * 60 * 1000, // Cache 5 min — PDF generation is expensive
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+/**
  * Export report as PDF or Excel
  */
 export function useReportExport() {

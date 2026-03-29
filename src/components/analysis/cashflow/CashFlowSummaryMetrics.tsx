@@ -70,7 +70,7 @@ function MetricCard({
         borderColor: 'var(--cui-border-color)',
       }}
     >
-      <CCardBody className="p-3">
+      <CCardBody style={{ padding: '8px' }}>
         <div
           className="mb-1"
           style={{
@@ -123,7 +123,7 @@ export default function CashFlowSummaryMetrics({ summary }: Props) {
             borderColor: 'var(--cui-border-color)',
           }}
         >
-          <CCardBody className="p-3">
+          <CCardBody style={{ padding: '8px' }}>
             {/* Gross Revenue */}
             <div className="d-flex justify-content-between mb-2">
               <span

@@ -627,7 +627,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
   if (isLoading) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
           <CSpinner color="primary" />
           <p className="mt-3 text-body-secondary">Loading extraction history...</p>
         </CCardBody>
@@ -639,7 +639,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
   if (error) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
           <p className="text-danger">Failed to load extraction history</p>
           <p className="text-body-secondary small">{error.message}</p>
         </CCardBody>
@@ -651,7 +651,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
   if (total === 0 && Object.values(categoryCounts).every((c) => c === 0)) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
           <CIcon icon={cilCloudUpload} size="3xl" className="text-muted mb-3" />
           <h5>No Extraction History</h5>
           <p className="text-body-secondary">
@@ -687,7 +687,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
 
       {/* Filter Pills */}
       <CCard className="mb-3">
-        <CCardBody className="py-2">
+        <CCardBody style={{ padding: '8px' }}>
           <ExtractionFilterPills
             selectedCategories={selectedCategories}
             categoryCounts={categoryCounts}
@@ -700,7 +700,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
 
       {/* Status Filter & Bulk Actions */}
       <CCard className="mb-3">
-        <CCardBody className="py-2">
+        <CCardBody style={{ padding: '8px' }}>
           <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
             {/* Status Filter */}
             <div className="d-flex align-items-center gap-2">
@@ -770,14 +770,14 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
 
       {/* Data Table */}
       <CCard>
-        <CCardHeader className="d-flex justify-content-between align-items-center">
+        <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
           <div className="d-flex align-items-center gap-2">
             <CIcon icon={cilHistory} />
             <span className="fw-medium">Extraction History</span>
           </div>
           <CBadge color="secondary">{extractions.length} records</CBadge>
         </CCardHeader>
-        <CCardBody className="p-0">
+        <CCardBody style={{ padding: 0 }}>
           <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
             <table className="table table-hover table-striped mb-0">
               <thead className="sticky-top bg-body">

@@ -146,12 +146,12 @@ class ProjectSummaryGenerator(PreviewBaseGenerator):
     def _land_budget_section(self) -> dict:
         rows = self.execute_query("""
             SELECT
-                COALESCE(bc.category_name, 'Uncategorized') AS category,
+                COALESCE(cat.category_name, 'Uncategorized') AS category,
                 COALESCE(SUM(b.amount), 0) AS budget_amount
             FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_budget_category bc ON b.category_id = bc.id
+            LEFT JOIN landscape.core_unit_cost_category cat ON b.category_id = cat.category_id
             WHERE b.project_id = %s
-            GROUP BY COALESCE(bc.category_name, 'Uncategorized')
+            GROUP BY COALESCE(cat.category_name, 'Uncategorized')
             ORDER BY budget_amount DESC
         """, [self.project_id])
 

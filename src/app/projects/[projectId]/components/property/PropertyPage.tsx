@@ -31,10 +31,10 @@ export default function PropertyPage({ projectId }: PropertyPageProps) {
         <CCol xs={12} lg={7}>
           {/* Map - 3D Oblique View */}
           <CCard className="studio-card mb-3">
-            <CCardHeader className="studio-card-header">
+            <CCardHeader className="studio-card-header" style={{ padding: '8px 12px' }}>
               <span className="fw-semibold">Map - 3D Oblique View</span>
             </CCardHeader>
-            <CCardBody className="studio-card-body" style={{ padding: '0.5rem' }}>
+            <CCardBody className="studio-card-body" style={{ padding: '8px' }}>
               <ProjectTabMap
                 projectId={String(projectId)}
                 styleUrl={process.env.NEXT_PUBLIC_MAP_STYLE_URL || 'aerial'}

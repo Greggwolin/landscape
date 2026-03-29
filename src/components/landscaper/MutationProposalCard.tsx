@@ -184,8 +184,9 @@ export function MutationProposalCard({
       }}
     >
       <CCardHeader
-        className="d-flex align-items-center justify-content-between py-2 px-3"
+        className="d-flex align-items-center justify-content-between"
         style={{
+          padding: '8px 12px',
           backgroundColor: 'var(--cui-warning, #ffc107)',
           color: 'var(--cui-dark, #212529)',
           cursor: 'pointer',
@@ -227,7 +228,7 @@ export function MutationProposalCard({
       </CCardHeader>
 
       <CCollapse visible={expanded}>
-        <CCardBody className="p-3">
+        <CCardBody style={{ padding: '8px' }}>
           <div className="d-flex flex-column gap-2">
             {pendingProposals.map((proposal) => (
               <div

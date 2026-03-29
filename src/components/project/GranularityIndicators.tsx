@@ -42,7 +42,7 @@ export default function GranularityIndicators({
   if (isLoading) {
     return (
       <CCard className="granularity-indicators">
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <h6 className="mb-3">Data Granularity</h6>
           <div className="text-muted">Loading...</div>
         </CCardBody>
@@ -52,7 +52,7 @@ export default function GranularityIndicators({
 
   return (
     <CCard className="granularity-indicators">
-      <CCardBody>
+      <CCardBody style={{ padding: '8px' }}>
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h6 className="mb-0">Data Granularity</h6>
           <div className="text-muted small">

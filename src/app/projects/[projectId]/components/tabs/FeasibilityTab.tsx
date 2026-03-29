@@ -69,7 +69,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
       <CContainer className="py-5 d-flex justify-content-center">
         <div style={{ maxWidth: '640px', width: '100%' }}>
           <CCard>
-            <CCardBody className="text-center p-5">
+            <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>🏗️</div>
               <h4 className="mb-3">
                 {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Feasibility Tab Not Available
@@ -129,7 +129,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <ExportButton tabName="Feasibility-Returns" projectId={projectId.toString()} />
             </div>
             <CCard>
-              <CCardBody className="text-center py-5">
+              <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📈</div>
                 <h5 className="mb-2">Returns Analysis</h5>
                 <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>
@@ -151,7 +151,7 @@ function FeasibilityTab({ project, activeTab = 'cashflow' }: FeasibilityTabProps
               <ExportButton tabName="Feasibility-Sensitivity" projectId={projectId.toString()} />
             </div>
             <CCard>
-              <CCardBody className="text-center py-5">
+              <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📐</div>
                 <h5 className="mb-2">Sensitivity Analysis</h5>
                 <p className="mb-1" style={{ fontSize: '0.875rem', color: 'var(--cui-secondary-color)' }}>

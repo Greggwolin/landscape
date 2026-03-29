@@ -202,7 +202,7 @@ function KPIStrip({ kpis }: { kpis: MarketKPI[] }) {
             borderColor: 'var(--cui-border-color)',
           }}
         >
-          <CCardBody className="p-2">
+          <CCardBody style={{ padding: '8px' }}>
             <div
               style={{
                 fontSize: '0.7rem',
@@ -501,7 +501,7 @@ function NarrativeBlock({
         borderColor: 'var(--cui-border-color)',
       }}
     >
-      <CCardBody className="p-3">
+      <CCardBody style={{ padding: '8px' }}>
         <div className="d-flex align-items-center gap-2 mb-2">
           <CBadge
             color="primary"
@@ -782,7 +782,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
               {propertyGroups.length} properties · {comparables.length} floorplans
             </span>
           </CCardHeader>
-          <CCardBody style={{ padding: '0.35rem' }}>
+          <CCardBody style={{ padding: '8px' }}>
             <div style={{ overflowY: 'auto', maxHeight: 420 }}>
               {comparables.length > 0 ? (
                 <CompetitiveSupplyTable comparables={comparables} project={project} />
@@ -817,7 +817,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
                 {mapPoints.length} locations
               </span>
             </CCardHeader>
-            <CCardBody style={{ padding: '0.35rem', position: 'relative', minHeight: 360 }}>
+            <CCardBody style={{ padding: 0, position: 'relative', minHeight: 360 }}>
               {mapMounted ? (
                 <LocationMap
                   center={projectCenter}
@@ -917,7 +917,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
           background: 'rgba(var(--cui-success-rgb), 0.04)',
         }}
       >
-        <CCardBody className="p-3">
+        <CCardBody style={{ padding: '8px' }}>
           <div
             className="d-flex align-items-center gap-2 mb-2"
             style={{ color: 'var(--cui-success)' }}

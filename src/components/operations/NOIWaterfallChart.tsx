@@ -175,13 +175,13 @@ export function NOIWaterfallChart({
     <CCard>
       <CCardHeader
         className="d-flex align-items-center"
-        style={{ padding: '0.5rem 0.75rem' }}
+        style={{ padding: '8px 12px' }}
       >
         <span className="text-sm font-semibold" style={{ color: 'var(--cui-body-color)' }}>
           NOI Waterfall
         </span>
       </CCardHeader>
-      <CCardBody style={{ padding: '0.75rem', height: '280px' }}>
+      <CCardBody style={{ padding: 0, height: '280px' }}>
         <CChart
           ref={chartRef}
           type="bar"

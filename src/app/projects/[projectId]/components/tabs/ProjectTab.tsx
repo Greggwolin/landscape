@@ -420,10 +420,10 @@ export default function ProjectTab({
   const renderMapCard = () => {
     return (
       <CCard className="h-100" style={{ minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
-        <CCardHeader className="d-flex align-items-center justify-content-between">
+        <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px' }}>
           <span className="fw-semibold">Map - 3D Oblique View</span>
         </CCardHeader>
-        <CCardBody style={{ padding: '0.5rem', flex: 1 }}>
+        <CCardBody style={{ padding: 0, flex: 1 }}>
           <div style={{ height: '100%' }}>
             <ProjectTabMap
               projectId={String(project.project_id)}
@@ -437,8 +437,8 @@ export default function ProjectTab({
   };
 
   const renderLocationCard = () => (
-    <CCard className="mb-3" style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
-      <CCardHeader className="d-flex justify-content-between align-items-center gap-3">
+    <CCard style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-body-color)" }}>
+      <CCardHeader className="d-flex justify-content-between align-items-center gap-3" style={{ padding: '8px 12px' }}>
         <div className="flex-grow-1">
           <span className="fw-semibold">Project Profile</span>
         </div>
@@ -472,9 +472,9 @@ export default function ProjectTab({
           </div>
         )}
       </CCardHeader>
-      <CCardBody style={{ backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
+      <CCardBody style={{ padding: 0, backgroundColor: "var(--cui-body-bg)", color: "var(--cui-secondary-color)" }}>
         {!editingLocation ? (
-          <>
+          <div style={{ padding: '8px' }}>
             <div className="mb-2 d-flex">
               <div style={{ fontWeight: 'bold', width: '100px', flexShrink: 0 }}>Address</div>
               <div>{project.street_address || 'Not specified'}</div>
@@ -513,9 +513,9 @@ export default function ProjectTab({
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <>
+          <div style={{ padding: '8px' }}>
             <style jsx>{`
               .form-floating > label {
                 opacity: 0.65;
@@ -637,7 +637,7 @@ export default function ProjectTab({
                 </CFormFloating>
               </CCol>
             </CRow>
-          </>
+          </div>
         )}
       </CCardBody>
     </CCard>
@@ -645,7 +645,7 @@ export default function ProjectTab({
 
   const renderProfileCard = () => (
     <CCard>
-      <CCardHeader className="d-flex justify-content-between align-items-center">
+      <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
         <span>Project Profile</span>
         {!editingProfile ? (
           <CButton
@@ -677,9 +677,9 @@ export default function ProjectTab({
           </div>
         )}
       </CCardHeader>
-      <CCardBody>
+      <CCardBody style={{ padding: 0 }}>
         {!editingProfile ? (
-          <>
+          <div style={{ padding: '8px' }}>
             <div className="mb-2 d-flex">
               <div style={{ fontWeight: 'bold', width: '140px', flexShrink: 0 }}>Type</div>
               <div>{project.project_type_code || 'Not specified'}</div>
@@ -760,9 +760,9 @@ export default function ProjectTab({
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <>
+          <div style={{ padding: '8px' }}>
             <style jsx>{`
               .form-floating > label {
                 opacity: 0.65;
@@ -922,7 +922,7 @@ export default function ProjectTab({
               />
               <label htmlFor="project_notes">Notes</label>
             </CFormFloating>
-          </>
+          </div>
         )}
       </CCardBody>
     </CCard>
@@ -949,13 +949,13 @@ export default function ProjectTab({
         <CCard>
           <CCardHeader
             className="d-flex justify-content-between align-items-center"
-            style={{ cursor: 'pointer' }}
+            style={{ padding: '8px 12px', cursor: 'pointer' }}
             onClick={() => setFinancialSummaryExpanded(!financialSummaryExpanded)}
           >
             <span>Financial Summary</span>
             <CIcon icon={financialSummaryExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
           </CCardHeader>
-          <CCardBody style={{ padding: '0.5rem' }}>
+          <CCardBody style={{ padding: '8px' }}>
             {/* Financial Summary Tiles - All in One Row */}
             <CRow className="g-2 mb-0">
               <CCol>
@@ -1176,7 +1176,7 @@ export default function ProjectTab({
       <CCard>
         <CCardHeader
           className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
+          style={{ padding: '8px 12px', cursor: 'pointer' }}
           onClick={() => setMacroExpanded(!macroExpanded)}
         >
           <span className="fw-semibold">
@@ -1190,7 +1190,7 @@ export default function ProjectTab({
           <CIcon icon={macroExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
         {macroExpanded && (
-          <CCardBody style={{ padding: '0.5rem' }}>
+          <CCardBody style={{ padding: '8px' }}>
             {(!macroCity || !macroState) && (
               <div className="mb-2 text-center">
                 <p className="text-xs mb-0" style={{ color: 'var(--cui-warning)' }}>
@@ -1355,14 +1355,14 @@ export default function ProjectTab({
       <CCard>
         <CCardHeader
           className="d-flex justify-content-between align-items-center"
-          style={{ cursor: 'pointer' }}
+          style={{ padding: '8px 12px', cursor: 'pointer' }}
           onClick={() => setContactsExpanded(!contactsExpanded)}
         >
           <span className="fw-semibold">Contacts</span>
           <CIcon icon={contactsExpanded ? cilChevronTop : cilChevronBottom} size="lg" />
         </CCardHeader>
         {contactsExpanded && (
-          <CCardBody style={{ padding: '0.5rem' }}>
+          <CCardBody style={{ padding: '8px' }}>
             {/* Contacts Section - includes listing brokers */}
             <ContactsSection projectId={project.project_id} />
           </CCardBody>

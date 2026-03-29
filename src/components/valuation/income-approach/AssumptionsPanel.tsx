@@ -39,8 +39,6 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
 const INPUT_STYLE: React.CSSProperties = { width: '6rem', flexShrink: 0 };
 const SELECT_STYLE: React.CSSProperties = { width: '7.5rem', flexShrink: 0 };
 
-type ValuationMethodView = 'direct_cap' | 'dcf' | 'both';
-
 interface ExtendedAssumptionsPanelProps extends AssumptionsPanelProps {
   activeMethod?: 'direct_cap' | 'dcf';
   onMethodChange?: (method: 'direct_cap' | 'dcf') => void;
@@ -85,14 +83,7 @@ export function AssumptionsPanel({
   onAssumptionChange,
   isSaving,
   activeMethod = 'direct_cap',
-  onMethodChange,
 }: ExtendedAssumptionsPanelProps) {
-  // Track the view mode (which assumption sections to show)
-  // 'both' shows all sections; 'direct_cap' / 'dcf' show relevant ones only
-  const [viewMode, setViewMode] = useState<ValuationMethodView>(
-    activeMethod === 'dcf' ? 'dcf' : 'direct_cap'
-  );
-
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     income: true,
     expenses: true,
@@ -148,55 +139,18 @@ export function AssumptionsPanel({
           Assumptions
         </h2>
 
-        {/* Method toggle + saving indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          {(['direct_cap', 'dcf', 'both'] as ValuationMethodView[]).map((mode) => {
-            const isActive = viewMode === mode;
-            const label = mode === 'direct_cap' ? 'Direct Cap'
-              : mode === 'dcf' ? 'Cash Flow'
-              : 'Both';
-            return (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => {
-                  setViewMode(mode);
-                  // Switch the right panel to the appropriate method
-                  if (mode === 'direct_cap') onMethodChange?.('direct_cap');
-                  else if (mode === 'dcf') onMethodChange?.('dcf');
-                  // 'both' keeps the current right panel method
-                }}
-                style={{
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  borderRadius: '0.25rem',
-                  border: '1px solid',
-                  cursor: 'pointer',
-                  borderColor: isActive ? 'var(--cui-primary)' : 'var(--cui-border-color)',
-                  backgroundColor: isActive ? 'var(--cui-primary)' : 'transparent',
-                  color: isActive ? 'white' : 'var(--cui-secondary-color)',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-
-          {isSaving && (
-            <div
-              style={{
-                marginLeft: '0.25rem',
-                width: '0.75rem',
-                height: '0.75rem',
-                border: '2px solid var(--cui-primary)',
-                borderTopColor: 'transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-          )}
-        </div>
+        {isSaving && (
+          <div
+            style={{
+              width: '0.75rem',
+              height: '0.75rem',
+              border: '2px solid var(--cui-primary)',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+        )}
       </div>
 
       {/* Sections - no horizontal padding so headers span full width */}
@@ -320,7 +274,7 @@ export function AssumptionsPanel({
         </AccordionSection>
 
         {/* Capitalization Section — hidden when DCF-only */}
-        {viewMode !== 'dcf' && (
+        {activeMethod !== 'dcf' && (
           <AccordionSection
             title="Capitalization"
             isOpen={openSections.capitalization}
@@ -365,7 +319,7 @@ export function AssumptionsPanel({
         )}
 
         {/* Band of Investment — shown only when method = band_investment and not DCF-only */}
-        {viewMode !== 'dcf' && assumptions.market_cap_rate_method === 'band_investment' && (
+        {activeMethod !== 'dcf' && assumptions.market_cap_rate_method === 'band_investment' && (
           <BandOfInvestmentPanel
             assumptions={assumptions}
             onAssumptionChange={onAssumptionChange}
@@ -375,7 +329,7 @@ export function AssumptionsPanel({
         )}
 
         {/* DCF Parameters Section — hidden when Direct Cap only */}
-        {viewMode !== 'direct_cap' && (
+        {activeMethod !== 'direct_cap' && (
           <AccordionSection
             title="DCF Parameters"
             isOpen={openSections.dcf}

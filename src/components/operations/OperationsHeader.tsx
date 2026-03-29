@@ -28,7 +28,7 @@ export function OperationsHeader({
   children
 }: OperationsHeaderProps) {
   return (
-    <CCardHeader className="ops-header d-flex justify-content-between align-items-center">
+    <CCardHeader className="ops-header d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
       <span className="fw-semibold">Operating Statement · {projectName}</span>
       <div className="ops-header-right">
         <div className="ops-header-pills">

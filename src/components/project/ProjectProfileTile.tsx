@@ -180,7 +180,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
           overflow: 'hidden',
         }}
       >
-        <CCardHeader className="d-flex align-items-center justify-content-between">
+        <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px' }}>
           <span className="fw-semibold">Project Profile</span>
           <button
             type="button"

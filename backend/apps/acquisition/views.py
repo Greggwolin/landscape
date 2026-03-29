@@ -265,7 +265,7 @@ class AcquisitionPriceSummaryView(APIView):
         # Check if closing date exists
         has_closing_date = AcquisitionEvent.objects.filter(
             project_id=project_pk,
-            event_type='Closing Date'
+            event_type='CLOSING'
         ).exists()
 
         # Get closing date if exists
@@ -273,41 +273,42 @@ class AcquisitionPriceSummaryView(APIView):
         if has_closing_date:
             closing_event = AcquisitionEvent.objects.filter(
                 project_id=project_pk,
-                event_type='Closing Date'
+                event_type='CLOSING'
             ).order_by('-event_date').first()
             if closing_event and closing_event.event_date:
                 closing_date = closing_event.event_date.isoformat()
 
-        # Calculate total acquisition cost if closing date exists
-        total_acquisition_cost = None
+        # Calculate total acquisition cost from ALL financial ledger events
+        # (not gated on CLOSING — costs should flow through as they are entered)
         land_cost = Decimal('0')
         total_fees = Decimal('0')
         total_deposits = Decimal('0')
         total_credits = Decimal('0')
 
-        if has_closing_date:
-            # Get all applicable events
-            events = AcquisitionEvent.objects.filter(
-                project_id=project_pk,
-                is_applied_to_purchase=True,
-                event_type__in=['Deposit', 'Fee', 'Credit', 'Refund', 'Adjustment', 'Closing Costs']
-            )
+        events = AcquisitionEvent.objects.filter(
+            project_id=project_pk,
+            is_applied_to_purchase=True,
+            event_type__in=['CLOSING', 'DEPOSIT', 'FEE', 'CREDIT', 'REFUND', 'ADJUSTMENT', 'CLOSING_COSTS']
+        )
 
-            for event in events:
-                amount = event.amount or Decimal('0')
-                if event.event_type == 'Closing Costs':
-                    land_cost += amount
-                elif event.event_type == 'Fee':
-                    total_fees += amount
-                elif event.event_type == 'Deposit':
-                    total_deposits += amount
-                elif event.event_type in ['Credit', 'Refund']:
-                    total_credits += amount
-                elif event.event_type == 'Adjustment':
-                    total_deposits += amount  # Adjustments count as positive
+        for event in events:
+            amount = event.amount or Decimal('0')
+            if event.event_type == 'CLOSING':
+                land_cost += amount  # Purchase price
+            elif event.event_type == 'CLOSING_COSTS':
+                land_cost += amount
+            elif event.event_type == 'FEE':
+                total_fees += amount
+            elif event.event_type == 'DEPOSIT':
+                total_deposits += amount
+            elif event.event_type in ['CREDIT', 'REFUND']:
+                total_credits += amount
+            elif event.event_type == 'ADJUSTMENT':
+                total_deposits += amount  # Adjustments count as positive
 
-            # Total = positive amounts - credits/refunds
-            total_acquisition_cost = land_cost + total_fees + total_deposits - total_credits
+        # Total = positive amounts - credits/refunds
+        ledger_total = land_cost + total_fees + total_deposits - total_credits
+        total_acquisition_cost = ledger_total if ledger_total > 0 else None
 
         # Determine effective price (calculated takes precedence)
         asking_price = project.asking_price
@@ -358,7 +359,7 @@ class UpdateAskingPriceView(APIView):
         # Check if closing date exists - if so, asking price shouldn't be editable
         has_closing_date = AcquisitionEvent.objects.filter(
             project_id=project_pk,
-            event_type='Closing Date'
+            event_type='CLOSING'
         ).exists()
 
         if has_closing_date:

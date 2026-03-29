@@ -188,13 +188,13 @@ export function ScenarioCompareView({
 
   return (
     <CCard>
-      <CCardHeader className="d-flex align-items-center justify-content-between">
+      <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px' }}>
         <strong>Scenario Comparison</strong>
         {onClose && (
           <button className="btn btn-sm btn-close" onClick={onClose} aria-label="Close" />
         )}
       </CCardHeader>
-      <CCardBody className="p-0">
+      <CCardBody style={{ padding: 0 }}>
         <CTable bordered hover responsive className="mb-0">
           <CTableHead>
             <CTableRow>

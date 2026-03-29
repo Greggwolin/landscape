@@ -125,10 +125,10 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
   if (unitMixStats.totalUnits === 0) {
     return (
       <CCard>
-        <CCardHeader>
+        <CCardHeader style={{ padding: '8px 12px' }}>
           <h5 style={{ margin: 0 }}>Renovation Assumptions</h5>
         </CCardHeader>
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <div
             style={{
               borderRadius: '0.5rem',
@@ -151,7 +151,7 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {/* Value Add Card */}
       <ValueAddCard
         state={valueAddState}

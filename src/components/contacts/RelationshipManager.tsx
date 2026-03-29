@@ -182,7 +182,7 @@ export default function RelationshipManager({
   return (
     <>
       <CCard className="border-0 shadow-sm">
-        <CCardHeader className="bg-transparent d-flex justify-content-between align-items-center">
+        <CCardHeader className="bg-transparent d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
           <div className="d-flex align-items-center gap-2">
             <CIcon icon={cilLink} />
             <span className="fw-semibold">Relationships</span>
@@ -204,7 +204,7 @@ export default function RelationshipManager({
           </CButton>
         </CCardHeader>
 
-        <CCardBody className="p-0">
+        <CCardBody style={{ padding: 0 }}>
           {!hasRelationships ? (
             <div className="text-center py-4 text-muted">
               <CIcon icon={cilLink} size="xl" className="mb-2 opacity-50" />

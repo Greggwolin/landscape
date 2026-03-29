@@ -82,10 +82,10 @@ export default function ProjectDates({ projectId }: Props) {
 
   return (
     <CCard>
-      <CCardHeader>
+      <CCardHeader style={{ padding: '8px 12px' }}>
         <h5 className="mb-0">Project Timeline</h5>
       </CCardHeader>
-      <CCardBody>
+      <CCardBody style={{ padding: '8px' }}>
         <p className="text-secondary mb-4">
           Configure project dates and analysis timeframe. The analysis start date is used to calculate absolute dates from period indices.
         </p>

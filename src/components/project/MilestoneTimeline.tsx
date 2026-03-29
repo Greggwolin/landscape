@@ -68,7 +68,7 @@ export default function MilestoneTimeline({
   if (isLoading) {
     return (
       <CCard className="milestone-timeline">
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <h6 className="mb-3">Project Milestones</h6>
           <div className="text-muted">Loading...</div>
         </CCardBody>
@@ -79,7 +79,7 @@ export default function MilestoneTimeline({
   if (!milestones || milestones.length === 0) {
     return (
       <CCard className="milestone-timeline">
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <h6 className="mb-3">Project Milestones</h6>
           <div className="text-muted">No milestones defined for this project.</div>
         </CCardBody>
@@ -89,7 +89,7 @@ export default function MilestoneTimeline({
 
   return (
     <CCard className="milestone-timeline">
-      <CCardBody>
+      <CCardBody style={{ padding: '8px' }}>
         <h6 className="mb-3">Project Milestones</h6>
         <div className="timeline">
           {milestones.map((milestone, index) => (

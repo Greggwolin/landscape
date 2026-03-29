@@ -71,7 +71,7 @@ export default function AdviceAdherencePanel({
   return (
     <div className="d-flex flex-column h-100">
       <CCard className="h-100 border-0">
-        <CCardHeader className="bg-transparent border-bottom">
+        <CCardHeader className="bg-transparent border-bottom" style={{ padding: '8px 12px' }}>
           <div className="d-flex justify-content-between align-items-center">
             <h6 className="mb-0">Advice Adherence</h6>
             <SemanticBadge intent="status" value="secondary">
@@ -80,7 +80,7 @@ export default function AdviceAdherencePanel({
           </div>
         </CCardHeader>
 
-        <CCardBody className="p-3 overflow-auto flex-grow-1">
+        <CCardBody className="overflow-auto flex-grow-1" style={{ padding: '8px' }}>
           {/* Threshold slider */}
           <div className="mb-3">
             <label className="form-label small text-muted">

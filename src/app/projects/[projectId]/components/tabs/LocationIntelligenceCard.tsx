@@ -496,7 +496,7 @@ export default function LocationIntelligenceCard({
                       <CIcon icon={isLayersOpen ? cilChevronTop : cilChevronBottom} />
                     </CCardHeader>
                     {isLayersOpen && (
-                      <CCardBody className="p-2 location-intelligence-overlay-body">
+                      <CCardBody className="location-intelligence-overlay-body" style={{ padding: '8px' }}>
                         <MapLayerToggle layers={layers} onToggle={handleLayerToggle} />
                       </CCardBody>
                     )}

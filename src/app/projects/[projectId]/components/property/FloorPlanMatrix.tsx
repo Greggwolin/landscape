@@ -213,7 +213,7 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
         <CCardHeader className="studio-card-header">
           <span className="fw-semibold">Floor Plan Matrix</span>
         </CCardHeader>
-        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center py-5">
+        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center" style={{ padding: '8px' }}>
           <CSpinner size="sm" className="me-2" />
           <span style={{ color: 'var(--studio-text-secondary)' }}>Loading floor plans...</span>
         </CCardBody>
@@ -227,7 +227,7 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
         <CCardHeader className="studio-card-header">
           <span className="fw-semibold">Floor Plan Matrix</span>
         </CCardHeader>
-        <CCardBody className="studio-card-body">
+        <CCardBody className="studio-card-body" style={{ padding: '8px' }}>
           <div className="studio-text-error">{error}</div>
         </CCardBody>
       </CCard>
@@ -251,7 +251,7 @@ export default function FloorPlanMatrix({ projectId }: FloorPlanMatrixProps) {
           {totals.totalUnits} units | {formatCurrency(totals.totalMonthlyIncome)}/mo
         </span>
       </CCardHeader>
-      <CCardBody className="studio-card-body">
+      <CCardBody className="studio-card-body" style={{ padding: 0 }}>
         <div className="table-responsive">
           <CTable hover className="mb-0 studio-table">
             <CTableHead>

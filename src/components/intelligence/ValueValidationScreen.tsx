@@ -191,7 +191,7 @@ export default function ValueValidationScreen({
   if (values.length === 0) {
     return (
       <CCard>
-        <CCardBody className="text-center py-5">
+        <CCardBody className="text-center" style={{ padding: '8px' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>&#128196;</div>
           <div style={{ color: 'var(--cui-secondary-color)' }}>
             No extracted values found for this intake session.
@@ -208,7 +208,7 @@ export default function ValueValidationScreen({
     <div className="d-flex flex-column gap-3">
       {/* Summary header */}
       <CCard>
-        <CCardHeader className="d-flex align-items-center justify-content-between">
+        <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px' }}>
           <div className="d-flex align-items-center gap-2">
             <strong>Value Validation</strong>
             <CBadge color="info" shape="rounded-pill">{stats.total} values</CBadge>
@@ -220,7 +220,7 @@ export default function ValueValidationScreen({
             {stats.conflicts > 0 && <CBadge color="dark">{stats.conflicts} conflicts</CBadge>}
           </div>
         </CCardHeader>
-        <CCardBody className="d-flex gap-2 py-2">
+        <CCardBody className="d-flex gap-2" style={{ padding: '8px' }}>
           <CButton size="sm" color="success" variant="outline" onClick={handleAcceptAll}>
             Accept All Remaining
           </CButton>
@@ -235,7 +235,7 @@ export default function ValueValidationScreen({
 
       {/* Value rows */}
       <CCard>
-        <CCardBody className="p-0">
+        <CCardBody style={{ padding: 0 }}>
           <table className="table table-sm mb-0" style={{ fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>

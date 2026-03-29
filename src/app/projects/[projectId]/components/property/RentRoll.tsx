@@ -310,7 +310,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
         <CCardHeader className="studio-card-header">
           <span className="fw-semibold">Rent Roll</span>
         </CCardHeader>
-        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center py-5">
+        <CCardBody className="studio-card-body d-flex justify-content-center align-items-center" style={{ padding: '8px' }}>
           <CSpinner size="sm" className="me-2" />
           <span style={{ color: 'var(--studio-text-secondary)' }}>Loading rent roll...</span>
         </CCardBody>
@@ -387,7 +387,7 @@ export default function RentRoll({ projectId }: RentRollProps) {
           </CDropdown>
         </div>
       </CCardHeader>
-      <CCardBody className="studio-card-body p-0">
+      <CCardBody className="studio-card-body" style={{ padding: 0 }}>
         <div className="table-responsive">
           <CTable hover className="mb-0 studio-table">
             <CTableHead>

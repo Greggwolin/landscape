@@ -37,7 +37,7 @@ export default function LandUseTab({ project }: LandUseTabProps) {
       <div className="flex items-center justify-center py-12">
         <div className="max-w-2xl mx-auto text-center p-8">
           <CCard>
-            <CCardBody>
+            <CCardBody style={{ padding: '8px' }}>
               <div className="text-6xl mb-6">🏘️</div>
               <h2 className="text-2xl font-semibold mb-3">
                 {projectTypeLabels[project.project_type_code || ''] || 'Commercial'} Land Use Tab Not Available

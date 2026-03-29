@@ -802,6 +802,57 @@ export function aggregateMFCashFlow(
 }
 
 // ============================================================================
+// TIME 0 — ACQUISITION COST
+// ============================================================================
+
+const TIME0_PERIOD_ID = '__time0__';
+
+/**
+ * Prepend a Time 0 period and Acquisition Cost section to grid data.
+ * The acquisition cost appears as a single negative value in the Time 0 column.
+ */
+export function prependAcquisitionCost(
+  result: { periods: CashFlowPeriod[]; sections: CashFlowSection[] },
+  acquisitionPrice: number,
+  label: string = 'Acquisition Price (Incl Costs)',
+): { periods: CashFlowPeriod[]; sections: CashFlowSection[] } {
+  const time0Period: CashFlowPeriod = {
+    id: TIME0_PERIOD_ID,
+    label: 'Time 0',
+  };
+
+  const periods = [time0Period, ...result.periods];
+
+  // Add zero values for Time 0 period to all existing rows
+  const sections = result.sections.map((section) => ({
+    ...section,
+    rows: section.rows.map((row) => ({
+      ...row,
+      values: { [TIME0_PERIOD_ID]: 0, ...row.values },
+      // Recalculate total excluding Time 0
+      ...(row.total !== undefined ? {} : {}),
+    })),
+  }));
+
+  // Prepend acquisition cost section
+  const acqSection: CashFlowSection = {
+    id: 'acquisition',
+    label: 'Acquisition Cost',
+    rows: [
+      {
+        id: 'acquisition_cost',
+        label,
+        isTotal: true,
+        values: { [TIME0_PERIOD_ID]: -acquisitionPrice },
+        total: -acquisitionPrice,
+      },
+    ],
+  };
+
+  return { periods, sections: [acqSection, ...sections] };
+}
+
+// ============================================================================
 // VALUE FORMATTING
 // ============================================================================
 

@@ -195,14 +195,14 @@ export default function CategoryTemplateManager({
           {templates.map(template => (
             <CCol key={`${template.template_name}-${template.project_type_code}`} md={6} lg={4} className="mb-3">
               <CCard className="h-100">
-                <CCardHeader className="d-flex justify-content-between align-items-start">
+                <CCardHeader className="d-flex justify-content-between align-items-start" style={{ padding: '8px 12px' }}>
                   <div>
                     <h6 className="mb-1">{template.template_name}</h6>
                     <PropertyTypeBadge typeCode={template.project_type_code} />
                   </div>
                 </CCardHeader>
 
-                <CCardBody>
+                <CCardBody style={{ padding: '8px' }}>
                   <p className="text-medium-emphasis small mb-3">
                     {template.description}
                   </p>

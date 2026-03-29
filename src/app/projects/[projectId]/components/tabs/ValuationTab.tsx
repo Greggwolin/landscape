@@ -143,8 +143,7 @@ function ValuationTab({ project, activeTab = 'sales' }: ValuationTabProps) {
     return (
       <CCard style={{ borderColor: 'var(--cui-danger)' }}>
         <CCardBody
-          className="p-6 text-center"
-          style={{ backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
+          style={{ padding: '8px', textAlign: 'center', backgroundColor: 'var(--cui-danger-bg)', color: 'var(--cui-danger)' }}
         >
           <div className="text-5xl mb-4">⚠️</div>
           <h3

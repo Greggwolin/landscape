@@ -22,7 +22,9 @@ GENERATOR_REGISTRY = {
     'RPT_06': ('apps.reports.generators.rpt_06_project_summary', 'ProjectSummaryGenerator'),
 
     # MF / Income Property reports
-    'RPT_07': ('apps.reports.generators.rpt_07_rent_roll', 'RentRollPreviewGenerator'),
+    'RPT_07':  ('apps.reports.generators.rpt_07b_rent_roll_detail', 'RentRollDetailGenerator'),
+    'RPT_07a': ('apps.reports.generators.rpt_07a_rent_roll_standard', 'RentRollStandardGenerator'),
+    'RPT_07b': ('apps.reports.generators.rpt_07b_rent_roll_detail', 'RentRollDetailGenerator'),
     'RPT_08': ('apps.reports.generators.rpt_08_unit_mix', 'UnitMixGenerator'),
     'RPT_09': ('apps.reports.generators.rpt_09_operating_statement', 'OperatingStatementGenerator'),
     'RPT_10': ('apps.reports.generators.rpt_10_direct_cap', 'DirectCapGenerator'),

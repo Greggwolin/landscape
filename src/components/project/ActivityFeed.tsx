@@ -109,7 +109,7 @@ export default function ActivityFeed({
   if (isLoading) {
     return (
       <CCard className="activity-feed">
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <h6 className="mb-3">Recent Activity</h6>
           <div className="text-muted">Loading...</div>
         </CCardBody>
@@ -119,7 +119,7 @@ export default function ActivityFeed({
 
   return (
     <CCard className="activity-feed">
-      <CCardBody>
+      <CCardBody style={{ padding: '8px' }}>
         <h6 className="mb-3">Recent Activity</h6>
         <CListGroup flush>
           {mockActivities.map((activity) => (
