@@ -30,7 +30,7 @@ export default function MetricCard({ label, value, status = 'info', subtitle }: 
 
   return (
     <CCard>
-      <CCardBody>
+      <CCardBody style={{ padding: '8px' }}>
         <div className="small mb-2" style={{ color: 'var(--cui-secondary-color)' }}>
           {label}
         </div>

@@ -361,7 +361,7 @@ export function ReconciliationPanel({
 
                 {/* Expanded Detail */}
                 {isExpanded && (
-                  <CCardBody className="pt-2 pb-3 px-3">
+                  <CCardBody style={{ padding: '8px' }}>
                     {/* Key Metrics */}
                     <div className="mb-3">
                       <div
@@ -485,8 +485,9 @@ export function ReconciliationPanel({
       {/* ─── RECONCILIATION SUMMARY ─── */}
       <CCard>
         <div
-          className="px-4 py-3 d-flex align-items-center justify-content-between"
+          className="d-flex align-items-center justify-content-between"
           style={{
+            padding: '8px 12px',
             backgroundColor: 'var(--surface-card-header)',
             borderBottom: '1px solid var(--cui-border-color)',
           }}
@@ -507,7 +508,7 @@ export function ReconciliationPanel({
           </div>
         </div>
 
-        <CCardBody className="p-4">
+        <CCardBody style={{ padding: '8px' }}>
           {/* Weight Summary Table */}
           <table className="w-100 mb-4" style={{ borderCollapse: 'collapse', fontSize: '0.9375rem' }}>
             <thead>

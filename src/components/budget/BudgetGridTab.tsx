@@ -522,7 +522,7 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
 
   return (
     <CCard>
-      <CCardBody>
+      <CCardBody style={{ padding: 0 }}>
         {/* Scope Label - shown when filtering by scope */}
         {scopeFilter && (
           <div className="mb-3 pb-2 border-bottom" style={{ borderColor: 'var(--cui-border-color)' }}>

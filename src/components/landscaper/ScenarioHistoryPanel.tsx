@@ -256,7 +256,7 @@ export function ScenarioHistoryPanel({
 
       {scenarios.map((scenario) => (
         <CCard key={scenario.scenario_log_id} className="mb-2">
-          <CCardHeader className="d-flex align-items-center gap-2 py-2">
+          <CCardHeader className="d-flex align-items-center gap-2" style={{ padding: '8px 12px' }}>
             <input
               type="checkbox"
               checked={selectedIds.has(scenario.scenario_log_id)}
@@ -271,7 +271,7 @@ export function ScenarioHistoryPanel({
               {new Date(scenario.updated_at).toLocaleDateString()}
             </span>
           </CCardHeader>
-          <CCardBody className="py-2">
+          <CCardBody style={{ padding: '8px' }}>
             {scenario.description && (
               <p className="text-body-secondary mb-2" style={{ fontSize: '0.9rem' }}>
                 {scenario.description}

@@ -401,7 +401,7 @@ export default function WaterfallConfigForm({
 
   return (
     <CCard>
-      <div className="card-header d-flex align-items-center gap-2">
+      <div className="card-header d-flex align-items-center gap-2" style={{ padding: '8px 12px' }}>
         <h5 className="mb-0">Equity Waterfall</h5>
         <button
           type="button"
@@ -422,7 +422,7 @@ export default function WaterfallConfigForm({
         </button>
       </div>
       {inputsOpen && (
-      <CCardBody className="pt-2">
+      <CCardBody style={{ padding: '8px' }}>
 
         {saveState.status === 'error' && (
           <CAlert color="danger" className="mb-3">{saveState.message}</CAlert>

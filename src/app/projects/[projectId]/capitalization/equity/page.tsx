@@ -107,8 +107,8 @@ export default function EquityPage() {
   };
 
   return (
-    <div className="d-flex flex-column gap-3">
-      <div className="d-flex flex-column flex-lg-row gap-3 gap-lg-4 mb-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="d-flex flex-column flex-lg-row" style={{ gap: '8px' }}>
         <div className="flex-fill" style={{ minWidth: 0 }}>
           <WaterfallConfigForm
             projectId={projectId}
@@ -141,7 +141,7 @@ export default function EquityPage() {
         </div>
       )}
 
-      <CRow className="g-3 mt-4">
+      <CRow className="g-3" style={{ marginTop: '8px' }}>
         <CCol xs={12} md={4}>
           <MetricCard
             label="Total Equity Committed"
@@ -165,11 +165,11 @@ export default function EquityPage() {
         </CCol>
       </CRow>
 
-      <CCard className="mt-4">
-        <CCardHeader>
+      <CCard>
+        <CCardHeader style={{ padding: '8px 12px' }}>
           <h5 className="mb-0">Equity Partners</h5>
         </CCardHeader>
-        <CCardBody>
+        <CCardBody style={{ padding: 0 }}>
           <EquityPartnersTable
             partners={partners}
             onEdit={() => {}}

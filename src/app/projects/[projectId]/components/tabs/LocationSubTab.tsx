@@ -1047,7 +1047,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
   }
 
   return (
-    <div className="d-flex h-100" style={{ overflow: 'hidden', padding: '0.5rem 0.5rem 0 0.5rem', gap: '0.5rem' }}>
+    <div className="d-flex h-100" style={{ overflow: 'hidden', gap: '8px' }}>
       {/* Left: Economic Indicators CCard */}
       <CCard
         style={{
@@ -1064,7 +1064,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
           marginBottom: 0,
         }}
       >
-        <CCardHeader className="d-flex align-items-center justify-content-between py-1 px-3" style={{ minHeight: 33 }}>
+        <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px', minHeight: 33 }}>
           {!sidebarCollapsed && (
             <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>Economic Indicators</span>
           )}
@@ -1084,7 +1084,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
         </CCardHeader>
 
         {!sidebarCollapsed && (
-          <CCardBody className="p-2" style={{ overflowY: 'auto', flex: 1 }}>
+          <CCardBody style={{ padding: '8px', overflowY: 'auto', flex: 1 }}>
             {geoData?.notice && (
               <div
                 className="rounded p-2 mb-2"
@@ -1151,7 +1151,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
           marginBottom: 0,
         }}
       >
-        <CCardHeader className="d-flex align-items-center justify-content-between py-1 px-3" style={{ minHeight: 33 }}>
+        <CCardHeader className="d-flex align-items-center justify-content-between" style={{ padding: '8px 12px', minHeight: 33 }}>
           <div>
             <span className="fw-semibold" style={{ fontSize: '0.85rem' }}>Location Analysis</span>
             <span
@@ -1179,7 +1179,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
             Generate All
           </CButton>
         </CCardHeader>
-        <CCardBody style={{ padding: '0.5rem', flex: 1, overflowY: 'auto' }}>
+        <CCardBody style={{ padding: '8px', flex: 1, overflowY: 'auto' }}>
         <CAccordion activeItemKey={1} alwaysOpen className="sub-section-accordion">
           {(['t1', 't2', 't3'] as TierKey[]).map((tier, idx) => (
             <React.Fragment key={tier}>

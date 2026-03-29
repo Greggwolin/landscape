@@ -261,7 +261,7 @@ export default function CashFlowTable({ schedule }: Props) {
   if (!sections || sections.length === 0) {
     return (
       <CCard>
-        <CCardBody className="text-center py-4">
+        <CCardBody style={{ padding: '8px', textAlign: 'center' }}>
           <p className="mb-0" style={{ color: 'var(--cui-secondary-color)' }}>No cash flow data available</p>
         </CCardBody>
       </CCard>

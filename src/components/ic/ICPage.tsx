@@ -184,10 +184,10 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
             /* Pre-session state */
             <div className="d-flex flex-column align-items-center justify-content-center h-100 p-4">
               <CCard style={{ maxWidth: 500, width: '100%' }}>
-                <CCardHeader className="text-center fw-semibold">
+                <CCardHeader className="text-center fw-semibold" style={{ padding: '8px 12px' }}>
                   Devil&apos;s Advocate Mode
                 </CCardHeader>
-                <CCardBody className="text-center">
+                <CCardBody className="text-center" style={{ padding: '8px' }}>
                   <p className="text-body-secondary mb-3">
                     Landscaper will scan your assumptions against market benchmarks
                     and challenge the most aggressive ones. Adjust the slider to
@@ -259,7 +259,7 @@ export function ICPage({ projectId, projectName }: ICPageProps) {
           {/* Session Summary (when active) */}
           {sessionActive && (
             <CCard className="mt-3">
-              <CCardBody>
+              <CCardBody style={{ padding: '8px' }}>
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <span className="text-body-secondary" style={{ fontSize: '0.8rem' }}>

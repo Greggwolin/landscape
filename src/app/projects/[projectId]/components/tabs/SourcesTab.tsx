@@ -36,8 +36,8 @@ export default function SourcesTab({ project }: SourcesTabProps) {
   // For non-multifamily projects, show generic sources content
   return (
     <CCard>
-      <CCardHeader>Sources of Funds</CCardHeader>
-      <CCardBody>
+      <CCardHeader style={{ padding: '8px 12px' }}>Sources of Funds</CCardHeader>
+      <CCardBody style={{ padding: '8px' }}>
         <div className="text-center py-8">
           <h5>Sources Tab - Coming Soon</h5>
           <p className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>

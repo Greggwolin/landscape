@@ -15,8 +15,8 @@ interface GISTabProps {
 export default function GISTab({ project }: GISTabProps) {
   return (
     <CCard>
-      <CCardHeader>GIS & Mapping</CCardHeader>
-      <CCardBody>
+      <CCardHeader style={{ padding: '8px 12px' }}>GIS & Mapping</CCardHeader>
+      <CCardBody style={{ padding: '8px' }}>
         <div className="text-center py-8">
           <h5>GIS Tab - Coming Soon</h5>
           <p className="text-sm mt-2" style={{ color: 'var(--cui-secondary-color)' }}>

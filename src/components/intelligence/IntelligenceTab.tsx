@@ -173,7 +173,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
       {/* Override summary with details */}
       {overrides.count > 0 && (
         <CCard className="mb-3 border-warning">
-          <CCardHeader className="d-flex align-items-center gap-2 py-2">
+          <CCardHeader className="d-flex align-items-center gap-2" style={{ padding: '8px 12px' }}>
             <span
               style={{
                 width: 10,
@@ -189,7 +189,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
             </span>
           </CCardHeader>
           {overrides.overrides.length > 0 && (
-            <CCardBody className="py-2">
+            <CCardBody style={{ padding: '8px' }}>
               <div className="d-flex flex-column gap-1">
                 {overrides.overrides.map((ov) => (
                   <div
@@ -250,11 +250,11 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
 
       {/* Session list */}
       <CCard>
-        <CCardHeader className="d-flex justify-content-between align-items-center">
+        <CCardHeader className="d-flex justify-content-between align-items-center" style={{ padding: '8px 12px' }}>
           <strong>Intake Sessions</strong>
           {loading && <CSpinner size="sm" />}
         </CCardHeader>
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           {!loading && sessions.length === 0 ? (
             <p className="text-body-secondary mb-0">
               No intake sessions yet. Upload a document via the Documents tab to start extraction.

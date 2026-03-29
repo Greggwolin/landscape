@@ -196,8 +196,8 @@ export function LandscaperInstructionsPanel({ projectId }: LandscaperInstruction
         <CTabPane visible={activeTab === 'instructions'}>
           {/* Add New Instruction */}
           <CCard className="mb-4">
-            <CCardHeader className="fw-semibold">Add Instruction</CCardHeader>
-            <CCardBody>
+            <CCardHeader className="fw-semibold" style={{ padding: '8px 12px' }}>Add Instruction</CCardHeader>
+            <CCardBody style={{ padding: '8px' }}>
               <div className="d-flex gap-3 mb-3">
                 <CFormSelect
                   value={newType}
@@ -255,7 +255,7 @@ export function LandscaperInstructionsPanel({ projectId }: LandscaperInstruction
                   key={instr.id}
                   className={!instr.is_active ? 'opacity-50' : ''}
                 >
-                  <CCardBody className="d-flex align-items-start gap-3 py-2">
+                  <CCardBody className="d-flex align-items-start gap-3" style={{ padding: '8px' }}>
                     <div className="flex-grow-1">
                       <div className="d-flex align-items-center gap-2 mb-1">
                         <CBadge color={TYPE_COLORS[instr.instruction_type] || 'secondary'} size="sm">
@@ -462,10 +462,10 @@ function KpiDefinitionsTab() {
       </div>
 
       <CCard className="mb-4">
-        <CCardHeader className="fw-semibold">
+        <CCardHeader className="fw-semibold" style={{ padding: '8px 12px' }}>
           &quot;Results&quot; KPI Set for {PROJECT_TYPES.find((p) => p.value === selectedType)?.label}
         </CCardHeader>
-        <CCardBody>
+        <CCardBody style={{ padding: '8px' }}>
           <p className="text-body-secondary mb-3" style={{ fontSize: '0.85rem' }}>
             When you ask Landscaper &quot;what are the results?&quot;, these KPIs are returned.
             Reorder them to control display priority.

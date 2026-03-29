@@ -170,12 +170,12 @@ export function ExpenseTreemap({ opexRows, totalOperatingExpenses }: ExpenseTree
 
   return (
     <CCard>
-      <CCardHeader style={{ padding: '0.5rem 0.75rem' }}>
+      <CCardHeader style={{ padding: '8px 12px' }}>
         <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--cui-body-color)' }}>
           Expenses by Category
         </span>
       </CCardHeader>
-      <CCardBody style={{ padding: '0.5rem' }}>
+      <CCardBody style={{ padding: 0 }}>
         <div
           style={{ position: 'relative', width: '100%', paddingBottom: `${(TREEMAP_H / TREEMAP_W) * 100}%` }}
           onMouseLeave={() => setPopup(null)}
