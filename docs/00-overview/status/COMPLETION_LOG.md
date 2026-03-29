@@ -10,6 +10,8 @@ Historical record of feature and migration completions. For current implementati
 
 | Date | Milestone | Notes |
 |------|-----------|-------|
+| 2026-03-28 | Acquisition DCF Integration + Picklist Event Types | DCF underwriting mode (IRR/NPV/equity multiple vs acquisition cost), Time 0 column, picklist-driven event types, code normalization (uncommitted) |
+| 2026-03-27 | Operations Save Migration | Django endpoints for operations save, frontend wired, data_readiness migration, v0.1.13 |
 | 2026-03-25 | Report System Committed + PDF/Excel Export | 20 generators committed (`a4d1547`), WeasyPrint PDF + openpyxl Excel export, Sales Comparison fully wired, v0.1.12 |
 | 2026-03-25 | Comp Map DB Coordinates | Sales comp map reads lat/lng from DB, uses comp_number for labels |
 | 2026-03-24 | Expense Comparable CRUD | `tbl_expense_comparable` table, Django API, ExpenseCompDetailModal for income approach |

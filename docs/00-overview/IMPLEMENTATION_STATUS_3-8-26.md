@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-27
-**Version:** 4.7
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Save Migration + Inline PDF Reports)
+**Last Updated:** 2026-03-28
+**Version:** 4.8
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Save Migration + Inline PDF Reports + Acquisition DCF Integration)
 
 ---
 
@@ -9,7 +9,18 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Operations Save Migration + Inline PDF Reports (March 27, 2026)**
+### 🆕 **Latest Update: Acquisition DCF Integration + Picklist Event Types (March 28, 2026)**
+
+**v0.1.13 (uncommitted): Acquisition ledger → DCF underwriting, picklist-driven event types, report PDF improvements**
+
+- ⏳ **Acquisition → DCF integration** (uncommitted) — DCF service branches by `analysis_purpose`: VALUATION (implied return at PV) vs UNDERWRITING (IRR/NPV/equity multiple against acquisition cost). New `_fetch_effective_acquisition_cost()` method. Response includes `acquisition.effective_cost` and `acquisition.source`.
+- ⏳ **DCF Time 0 column** (uncommitted) — `DCFView.tsx` fetches acquisition price, `mfCashFlowTransform.ts` prepends Time 0 period with negative acquisition cost. Income cashflow service also builds acquisition section at time=0.
+- ⏳ **Picklist-driven acquisition event types** (uncommitted) — Event types migrated from hardcoded string literals to `tbl_system_picklist`. `AcquisitionLedgerGrid.tsx` consumes picklist with fallback. Event codes normalized to uppercase (`'CLOSING'`, `'DEPOSIT'`, etc.).
+- ⏳ **Acquisition types overhaul** (uncommitted) — `src/types/acquisition.ts` rewritten with `AcquisitionEventTypeOption` interface, fallback constants, group membership helpers.
+- ⏳ **Inline PDF preview + PDF layout improvements** (uncommitted, from 3/27) — `ReportViewer.tsx` rewrite, `preview_base.py` content-aware layout, 7 generator format fixes.
+- 📁 **See:** `docs/09-session-notes/2026-03-28-daily-sync.md`
+
+### Previous Update: Operations Save Migration + Inline PDF Reports (March 27, 2026)
 
 **v0.1.13: Operations save to Django, inline PDF preview, PDF layout improvements**
 
