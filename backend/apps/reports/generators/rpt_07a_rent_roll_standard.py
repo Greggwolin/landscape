@@ -172,7 +172,7 @@ class RentRollStandardGenerator(PreviewBaseGenerator):
 
         # Column widths: 10 columns to fill PORTRAIT_WIDTH (7.0")
         # Unit # | Type | Beds/Bath | SF | Start | End | Rent | $/SF | Market | Loss
-        raw_widths = [0.7, 1.0, 0.8, 0.7, 1.0, 1.0, 0.9, 0.8, 0.9, 0.8]  # Total: 9.6 units
+        raw_widths = [0.6, 0.8, 0.55, 0.5, 0.75, 0.75, 0.75, 0.6, 0.75, 0.65]
         col_widths = scale_cw(raw_widths, PORTRAIT_WIDTH)
 
         # Fetch data again for PDF (to match table structure exactly)
@@ -263,8 +263,8 @@ class RentRollStandardGenerator(PreviewBaseGenerator):
         occupied_count = sum(1 for u in units_data if float(u['current_rent']) > 0)
 
         tbl_data.append([
-            p(f'{total_units_count} units', styles, bold=True, right=False),
             p('', styles, bold=True, right=False),
+            p(f'{total_units_count} units', styles, bold=True, right=False),
             p('', styles, bold=True, right=False),
             p(f'{int(total_sf):,}', styles, bold=True, right=True),
             p('', styles, bold=True, right=True),
@@ -279,8 +279,8 @@ class RentRollStandardGenerator(PreviewBaseGenerator):
         # Occupancy row as part of table
         occ_pct = self.safe_div(occupied_count, total_units_count) * 100 if total_units_count > 0 else 0
         tbl_data.append([
-            p('Occupancy', styles, bold=True, right=False),
             p('', styles, right=False),
+            p('Occupancy', styles, bold=True, right=False),
             p('', styles, right=False),
             p('', styles, right=True),
             p('', styles, right=True),
@@ -290,7 +290,7 @@ class RentRollStandardGenerator(PreviewBaseGenerator):
             p(f'{occupied_count}/{total_units_count}', styles, bold=True, right=True),
             p(f'{occ_pct:.1f}%', styles, bold=True, right=True),
         ])
-        row_styles.append('')
+        row_styles.append('subtotal')
 
         # Build and add table
         t = make_table(tbl_data, col_widths, row_styles, has_header=True)

@@ -823,14 +823,16 @@ export function prependAcquisitionCost(
 
   const periods = [time0Period, ...result.periods];
 
-  // Add zero values for Time 0 period to all existing rows
+  // Add zero values for Time 0 period to all existing rows,
+  // except total_cash_flow which should reflect the acquisition outflow
   const sections = result.sections.map((section) => ({
     ...section,
     rows: section.rows.map((row) => ({
       ...row,
-      values: { [TIME0_PERIOD_ID]: 0, ...row.values },
-      // Recalculate total excluding Time 0
-      ...(row.total !== undefined ? {} : {}),
+      values: {
+        [TIME0_PERIOD_ID]: row.id === 'total_cash_flow' ? -acquisitionPrice : 0,
+        ...row.values,
+      },
     })),
   }));
 

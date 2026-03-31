@@ -419,7 +419,7 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
             p(fmt_currency(self.safe_div(total_project_cost, lot_count)), styles_85, bold=True, right=True),
         ])
 
-        col_widths_2 = scale_cw([3, 1.2, 1, 1.3], 6 * inch)
+        col_widths_2 = scale_cw([3, 1.2, 1, 1.3], 5.5 * inch)
         table2 = make_table(data_rows_2, col_widths_2, has_header=True)
 
         elements.append(Paragraph("Total Project Cost Summary", section_style))

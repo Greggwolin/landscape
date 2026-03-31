@@ -186,6 +186,16 @@ class MultifamilyCashFlowAdapter:
             """, [self.project_id])
             growth_sets = {row[1]: row[0] for row in cursor.fetchall()}
 
+            # Load closing_costs_pct from tbl_property_acquisition
+            cursor.execute("""
+                SELECT closing_costs_pct
+                FROM landscape.tbl_property_acquisition
+                WHERE project_id = %s
+                ORDER BY acquisition_id
+                LIMIT 1
+            """, [self.project_id])
+            acq_row = cursor.fetchone()
+
         # Calculate derived values
         unit_count = int(units[0] or 0) if units else 0
         if mf_prop and mf_prop[0]:
@@ -204,7 +214,7 @@ class MultifamilyCashFlowAdapter:
             vacancy_pct = (Decimal('100') - Decimal(str(mf_prop[3]))) / 100
 
         purchase_price = Decimal(str(mf_prop[2] or 0)) if mf_prop else Decimal('0')
-        closing_pct = Decimal('0.015')  # 1.5% default
+        closing_pct = Decimal(str(acq_row[0])) if acq_row and acq_row[0] is not None else Decimal('0')
 
         loan_amount = Decimal(str(debt[0] or 0)) if debt else Decimal('0')
         interest_rate = Decimal(str(debt[1] or 6.5)) / 100 if debt else Decimal('0.065')

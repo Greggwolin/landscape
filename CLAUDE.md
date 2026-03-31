@@ -12,7 +12,7 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
 - **AI-native features:** Document extraction, market intelligence, persistent knowledge base
 - **Universal container architecture:** Same data model works across all property types (land dev, multifamily, office, retail, industrial)
 
-**Primary test project:** Peoria Lakes MPC (Master Planned Community) - 42 parcels across 4 areas and 8 phases.
+**Primary test project:** Peoria Meadows MPC (Master Planned Community) - 42 parcels across 4 areas and 8 phases.
 
 ---
 
@@ -335,7 +335,7 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 - Location: `migrations/` directory
 - Naming: `NNN_description.sql` (e.g., `017_add_land_use_labels.sql`)
 - Always include rollback section
-- Test on Peoria Lakes project before committing
+- Test on Peoria Meadows project before committing
 
 ---
 
@@ -661,7 +661,7 @@ Before committing changes:
 
 1. [ ] `npm run lint` passes
 2. [ ] `npm run build` succeeds
-3. [ ] Test with Peoria Lakes project
+3. [ ] Test with Peoria Meadows project
 4. [ ] Django migrations applied if schema changed
 5. [ ] API changes documented in relevant README
 

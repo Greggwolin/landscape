@@ -525,14 +525,17 @@ class LandDevCashFlowService:
                 item_inflation
             )
 
+            # Compute inflated total from actual period amounts (accounts for escalation)
+            inflated_total = sum(pv['amount'] for pv in period_values)
+
             # Add to category
-            category_summary[category]['total'] += amount
+            category_summary[category]['total'] += inflated_total
             category_summary[category]['items'].append({
                 'factId': item.get('fact_id'),
                 'description': item.get('description'),
                 'containerId': item.get('container_id'),
                 'containerLabel': item.get('container_label'),
-                'totalAmount': amount,
+                'totalAmount': inflated_total,
                 'periods': period_values,
             })
 
@@ -542,7 +545,7 @@ class LandDevCashFlowService:
                 if 0 <= idx < period_count:
                     period_totals[idx] += pv['amount']
 
-            total_costs += amount
+            total_costs += inflated_total
 
         # Fetch and add acquisition costs from tbl_acquisition
         # These are separate from budget items (e.g., $104M land purchase)
@@ -2028,7 +2031,21 @@ class LandDevCashFlowService:
         cost_schedule: Dict,
         discount_rate: Optional[float]
     ) -> Dict[str, Any]:
-        """Calculate IRR, NPV, equity multiple, peak equity, etc."""
+        """
+        Calculate IRR, NPV, equity multiple, peak equity, etc.
+
+        Summary fields (parity note):
+          Shared with IncomePropertyCashFlowService: peakEquity
+          Land-dev specific: totalGrossRevenue, totalRevenueDeductions,
+              totalNetRevenue, totalSubdivisionCosts, totalCommissions,
+              totalTransactionCosts, totalCosts, costsByCategory,
+              grossProfit, grossMargin, irr, npv, equityMultiple,
+              paybackPeriod, totalCashIn, totalCashOut, netCashFlow,
+              cumulativeCashFlow
+          Income-property only (not applicable here): totalGPR,
+              totalVacancy, totalEGI, totalOpEx, totalNOI
+        If adding a field here, check IncomePropertyCashFlowService for parity.
+        """
 
         # Revenue summary
         total_gross_revenue = absorption_schedule['totalGrossRevenue']

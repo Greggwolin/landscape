@@ -130,3 +130,64 @@ def capture_feedback(
     except Exception as e:
         logger.error(f"Error sending feedback to Discord: {str(e)}", exc_info=True)
         return False
+
+
+def send_login_notification(
+    user_name: str,
+    user_email: Optional[str] = None,
+    user_role: Optional[str] = None,
+    login_ip: Optional[str] = None,
+) -> bool:
+    """
+    Send Discord notification when a non-admin user logs in.
+
+    Args:
+        user_name: Username of the person logging in
+        user_email: User's email address
+        user_role: User's role (e.g., 'alpha_tester')
+        login_ip: Client IP address
+
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    webhook_url = getattr(settings, 'LANDSCAPER_FEEDBACK_WEBHOOK_URL', None)
+
+    if not webhook_url:
+        logger.debug("LANDSCAPER_FEEDBACK_WEBHOOK_URL not configured — login notification skipped")
+        return False
+
+    try:
+        description_parts = []
+        if user_email:
+            description_parts.append(f"**Email:** {user_email}")
+        if user_role:
+            description_parts.append(f"**Role:** {user_role}")
+        if login_ip:
+            description_parts.append(f"**IP:** {login_ip}")
+
+        embed = {
+            "title": f"User Login: {user_name}",
+            "description": "\n".join(description_parts) if description_parts else "No details available",
+            "color": 0x2ECC71,  # Green for logins
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        payload = {"embeds": [embed]}
+
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=5,
+        )
+
+        if response.status_code in (200, 204):
+            logger.info(f"Login notification sent for {user_name}")
+            return True
+        else:
+            logger.warning(f"Login notification failed: {response.status_code}")
+            return False
+
+    except Exception as e:
+        logger.error(f"Error sending login notification: {e}", exc_info=True)
+        return False

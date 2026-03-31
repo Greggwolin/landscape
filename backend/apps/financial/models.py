@@ -61,6 +61,12 @@ from .models_benchmarks import (
     BenchmarkTransactionCost,
     BenchmarkAISuggestion,
 )
+from .models_portfolio import (
+    Portfolio,
+    PortfolioMember,
+    PortfolioWaterfallTier,
+    PortfolioResult,
+)
 
 
 class BudgetItem(models.Model):
