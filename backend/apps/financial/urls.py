@@ -65,6 +65,7 @@ from .views_debt import (
 )
 from .views_debt_schedule import DebtScheduleView
 from .views_operations import operations_inputs, operations_settings
+from .views_portfolio import PortfolioViewSet, PortfolioResultViewSet
 
 router = DefaultRouter()
 
@@ -123,6 +124,10 @@ router.register(r'lookups/building-classes', LkpBuildingClassViewSet, basename='
 router.register(r'unit-costs/tags', CategoryTagLibraryViewSet, basename='categorytags')
 router.register(r'unit-costs/categories', UnitCostCategoryViewSet, basename='unitcostcategories')
 router.register(r'unit-costs/items', UnitCostItemViewSet, basename='unitcostitems')  # Renamed from templates to items in migration 0018
+
+# Portfolio endpoints (Underwriting mode only)
+router.register(r'portfolios', PortfolioViewSet, basename='portfolio')
+router.register(r'portfolio-results', PortfolioResultViewSet, basename='portfolio-result')
 
 urlpatterns = [
     # Income Approach UI endpoints - MUST be before router to avoid conflict with ViewSet

@@ -625,10 +625,13 @@
       "mcp__Desktop_Commander__get_file_info",
       "mcp__Claude_Preview__preview_start",
       "Bash(DJANGO_SETTINGS_MODULE=config.settings PYTHONPATH=. ./venv/bin/python -c \":*)",
-      "Bash(export DATABASE_URL)"
+      "Bash(export DATABASE_URL)",
+      "Bash(./venv/bin/pip install:*)",
+      "Bash(./venv/bin/python -c \":*)"
     ],
     "deny": [],
     "ask": [],
+    "defaultMode": "bypassPermissions",
     "additionalDirectories": [
       "/Users/5150east/landscape/src/app/projects/[projectId]"
     ]

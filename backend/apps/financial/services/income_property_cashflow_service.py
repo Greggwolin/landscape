@@ -122,13 +122,29 @@ class IncomePropertyCashFlowService:
                 loan_payoff = financing_result['loanPayoff']
 
         # Step 5: Build summary
+        # -------------------------------------------------------------------
+        # Summary fields (parity note):
+        #   Shared with LandDevCashFlowService: peakEquity
+        #   Income-property specific: totalGPR, totalVacancy, totalEGI,
+        #       totalOpEx, totalNOI
+        #   Land-dev only (not applicable here): totalGrossRevenue,
+        #       totalNetRevenue, irr, npv, equityMultiple, paybackPeriod,
+        #       totalCashIn, totalCashOut, netCashFlow, cumulativeCashFlow
+        # If adding a field here, check LandDevCashFlowService for parity.
+        # -------------------------------------------------------------------
         total_noi = sum(p.get('noi', 0) for p in projections)
+
+        # Peak equity for income properties: purchase price + closing costs - loan proceeds
+        # Reads closing_costs_pct from tbl_property_acquisition (not hardcoded)
+        peak_equity = self._calculate_peak_equity(project)
+
         summary = {
             'totalGPR': round(sum(p.get('gpr', 0) for p in projections), 2),
             'totalVacancy': round(sum(p.get('vacancy_loss', 0) for p in projections), 2),
             'totalEGI': round(sum(p.get('egi', 0) for p in projections), 2),
             'totalOpEx': round(sum(p.get('total_opex', 0) for p in projections), 2),
             'totalNOI': round(total_noi, 2),
+            'peakEquity': round(peak_equity, 2),
         }
 
         # Step 6: Build exit analysis for frontend
@@ -770,6 +786,54 @@ class IncomePropertyCashFlowService:
     # =========================================================================
     # ACQUISITION COSTS (TIME=0)
     # =========================================================================
+
+    def _get_closing_cost_pct(self, project_id: int) -> 'Decimal':
+        """
+        Read closing_costs_pct from tbl_property_acquisition for this project.
+        Falls back to 0 if no record exists (no silent defaults).
+        """
+        from decimal import Decimal
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT closing_costs_pct
+                FROM landscape.tbl_property_acquisition
+                WHERE project_id = %s
+                ORDER BY acquisition_id
+                LIMIT 1
+            """, [project_id])
+            row = cursor.fetchone()
+        if row and row[0] is not None:
+            return Decimal(str(row[0]))
+        return Decimal('0')
+
+    def _calculate_peak_equity(self, project: 'Project') -> float:
+        """
+        Calculate peak equity for income-producing properties.
+
+        Formula: purchase_price × (1 + closing_costs%) − loan_amount.
+        Reads closing_costs_pct from tbl_property_acquisition (same source as
+        the Acquisition assumptions UI). Falls back to 0% if not set.
+        """
+        from decimal import Decimal
+
+        purchase_price = (
+            getattr(project, 'acquisition_price', None)
+            or getattr(project, 'asking_price', None)
+            or Decimal('0')
+        )
+        purchase_price = Decimal(str(purchase_price or 0))
+
+        closing_pct = self._get_closing_cost_pct(self.project_id)
+
+        # Sum all loan amounts for this project
+        loans = Loan.objects.filter(project_id=self.project_id)
+        total_loan = sum(
+            (l.loan_amount or l.commitment_amount or Decimal('0'))
+            for l in loans
+        )
+
+        equity = purchase_price * (1 + closing_pct) - Decimal(str(total_loan or 0))
+        return float(max(equity, Decimal('0')))
 
     def _build_acquisition_section(
         self, period_count: int

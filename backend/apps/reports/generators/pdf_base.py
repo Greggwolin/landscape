@@ -23,12 +23,12 @@ from reportlab.platypus import (
 
 # ── Brand palette ────────────────────────────────────────────────────────
 
-BRAND_PURPLE = HexColor('#4B3F72')
-HEADER_BG = HexColor('#2D2D3F')
-SUBHEADER_BG = HexColor('#EDEAF4')
-PANEL_HEADER_BG = HexColor('#3a3a4e')
+BRAND_PURPLE = HexColor('#5856d6')
+HEADER_BG = HexColor('#2c2c3e')
+SUBHEADER_BG = HexColor('#e8e8f0')
+PANEL_HEADER_BG = HexColor('#2c2c3e')
 ROW_WHITE = colors.white
-ROW_ALT = HexColor('#F7F7FA')
+ROW_ALT = HexColor('#f8f8fc')
 SEPARATOR_COLOR = HexColor('#CCCCCC')
 
 # ── Page geometry ────────────────────────────────────────────────────────

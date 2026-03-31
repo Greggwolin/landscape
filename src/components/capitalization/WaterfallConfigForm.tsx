@@ -151,6 +151,22 @@ export default function WaterfallConfigForm({
   const [promoteLpPct, setPromoteLpPct] = useState<number | ''>(72);
   const [residualLpPct, setResidualLpPct] = useState<number | ''>(45);
 
+  // Ref to skip promote recalculation on initial mount (don't override DB values)
+  const promoteRecalcMounted = React.useRef(false);
+
+  // Auto-recalculate Hurdle 1 LP/GP split when promote % or GP contribution changes
+  useEffect(() => {
+    if (!promoteRecalcMounted.current) {
+      promoteRecalcMounted.current = true;
+      return;
+    }
+    if (typeof promotePct !== 'number' || typeof gpContributionPct !== 'number') return;
+
+    const lpOwnership = 100 - gpContributionPct;
+    const newPromoteLpPct = Math.round(lpOwnership * (1 - promotePct / 100));
+    setPromoteLpPct(newPromoteLpPct);
+  }, [promotePct, gpContributionPct]);
+
   // Total equity — auto-derived from cash flow summary (peakEquity) when available
   const [totalEquityRequired, setTotalEquityRequired] = useState<number | null>(null);
   const [equityError, setEquityError] = useState<string | null>(null);

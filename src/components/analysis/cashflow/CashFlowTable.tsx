@@ -203,11 +203,13 @@ export default function CashFlowTable({ schedule }: Props) {
   // Calculate totals across all sections (works for both modes)
   const { totalRevenuePerPeriod, totalRevenue, totalCostsPerPeriod, totalCosts } = useMemo(() => {
     if (isByPhaseMode) {
-      // By Phase mode: use the phase section totals
+      // By Phase mode: use the phase section subtotals
       const revenuePerPeriod = phaseNetRevenueSection?.subtotals || periods.map(() => 0);
-      const revenue = phaseNetRevenueSection?.sectionTotal || 0;
+      const revenue = revenuePerPeriod.reduce((sum, val) => sum + val, 0);
       const costsPerPeriod = phaseCostsSection?.subtotals || periods.map(() => 0);
-      const costs = phaseCostsSection?.sectionTotal || 0;
+      // Compute cost total from subtotals (not sectionTotal) to match standard mode
+      // and avoid pre-/post-inflation mismatch when budget items have escalation
+      const costs = costsPerPeriod.reduce((sum, val) => sum + val, 0);
 
       return {
         totalRevenuePerPeriod: revenuePerPeriod,
@@ -218,7 +220,8 @@ export default function CashFlowTable({ schedule }: Props) {
     } else {
       // Standard mode
       const revenuePerPeriod = netRevenueSection ? netRevenueSection.subtotals : periods.map(() => 0);
-      const revenue = netRevenueSection?.sectionTotal || 0;
+      // Compute revenue total from subtotals for consistency with period values
+      const revenue = revenuePerPeriod.reduce((sum, val) => sum + val, 0);
 
       const costsPerPeriod = periods.map((_, idx) => {
         return costSections.reduce((sum, section) => sum + (section.subtotals[idx] || 0), 0);
@@ -479,17 +482,26 @@ export default function CashFlowTable({ schedule }: Props) {
               {/* PROJECT COSTS */}
               <SectionLabel label="PROJECT COSTS" colSpan={colCount} />
               {costSections.length > 0 ? (
-                costSections.map((section, idx) => (
+                <>
+                  {costSections.map((section, idx) => (
+                    <DataRow
+                      key={section.sectionId}
+                      label={section.sectionName}
+                      values={section.subtotals}
+                      total={section.sectionTotal}
+                      hideTotal={overallMode}
+                      indent
+                      bottomBorder={idx === costSections.length - 1}
+                    />
+                  ))}
                   <DataRow
-                    key={section.sectionId}
-                    label={section.sectionName}
-                    values={section.subtotals}
-                    total={section.sectionTotal}
+                    label="Total Project Costs"
+                    values={totalCostsPerPeriod}
+                    total={totalCosts}
                     hideTotal={overallMode}
-                    indent
-                    bottomBorder={idx === costSections.length - 1}
+                    bold
                   />
-                ))
+                </>
               ) : (
                 <DataRow
                   label="No costs"

@@ -29,6 +29,9 @@ from .serializers_auth import (
 from .permissions import IsOwnerOrReadOnly
 from rest_framework.permissions import IsAdminUser
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class UserRegistrationView(generics.CreateAPIView):
     """
@@ -81,6 +84,19 @@ class UserLoginView(generics.GenericAPIView):
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
         
+        # Discord notification for non-admin logins
+        if not user.is_staff:
+            try:
+                from apps.landscaper.feedback_utils import send_login_notification
+                send_login_notification(
+                    user_name=user.username,
+                    user_email=user.email,
+                    user_role=getattr(user, 'role', None),
+                    login_ip=user.last_login_ip,
+                )
+            except Exception as exc:
+                logger.warning("Login notification failed (non-fatal): %s", exc)
+
         return Response({
             'user': UserSerializer(user).data,
             'tokens': {
@@ -88,7 +104,7 @@ class UserLoginView(generics.GenericAPIView):
                 'access': str(refresh.access_token),
             }
         })
-    
+
     def get_client_ip(self, request):
         """Get client IP address."""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

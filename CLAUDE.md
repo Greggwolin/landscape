@@ -12,7 +12,7 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
 - **AI-native features:** Document extraction, market intelligence, persistent knowledge base
 - **Universal container architecture:** Same data model works across all property types (land dev, multifamily, office, retail, industrial)
 
-**Primary test project:** Peoria Lakes MPC (Master Planned Community) - 42 parcels across 4 areas and 8 phases.
+**Primary test project:** Peoria Meadows MPC (Master Planned Community) - 42 parcels across 4 areas and 8 phases.
 
 ---
 
@@ -335,7 +335,7 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 - Location: `migrations/` directory
 - Naming: `NNN_description.sql` (e.g., `017_add_land_use_labels.sql`)
 - Always include rollback section
-- Test on Peoria Lakes project before committing
+- Test on Peoria Meadows project before committing
 
 ---
 
@@ -547,6 +547,7 @@ Two distinct failure modes — treat separately:
 - **Reconciliation:** Complete — weights, narrative versioning, IndicatedValueSummary panel
 - **Financial Engine:** `services/financial_engine_py/` with IRR/NPV/DSCR/waterfall tests
 - **Construction Loan Engine:** Phase 6A complete (draw-repay-redraw validated); Phase 6B land dev conversational parsing complete
+- **Portfolio Analysis:** (WIP) Django models scaffolded — `Portfolio`, `PortfolioMember`, `PortfolioWaterfallTier`, `PortfolioResult` in `models_portfolio.py`. ViewSets + serializers + URL registration complete. Underwriting mode only.
 
 ---
 
@@ -660,7 +661,7 @@ Before committing changes:
 
 1. [ ] `npm run lint` passes
 2. [ ] `npm run build` succeeds
-3. [ ] Test with Peoria Lakes project
+3. [ ] Test with Peoria Meadows project
 4. [ ] Django migrations applied if schema changed
 5. [ ] API changes documented in relevant README
 
@@ -804,8 +805,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-27 (session sync — operations save migrated, reports verified, waterfall confirmed, CLAUDE.md corrected)*
+*Last updated: 2026-03-30 (nightly sync — uncommitted alpha15 work: portfolio models/API scaffolding, S&U report rewrite for property-type branching, rent roll PDF column/layout fixes)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 229*
-*Reports catalog: 20 generators with real SQL (all committed, PDF/Excel export via reportlab + openpyxl)*
+*Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

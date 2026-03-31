@@ -172,7 +172,7 @@ class CashFlowMonthlyGenerator(PreviewBaseGenerator):
             display_months = list(range(1, 13))
 
         # Build header row: Item | Total | Mo1 | Mo2 | ... | Mo12
-        styles = make_styles(7)
+        styles = make_styles(7.5)
 
         header_cells = [hp('Item', styles)]
         header_cells.append(hp('Total', styles, right=True))
