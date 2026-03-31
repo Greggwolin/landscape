@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CCard, CCardHeader, CCardBody, CRow, CCol } from '@coreui/react';
 import { useQuery } from '@tanstack/react-query';
@@ -48,6 +48,7 @@ export default function EquityPage() {
   const [data, setData] = useState<WaterfallApiResponse | null>(null);
   const [waterfallType, setWaterfallType] = useState<WaterfallType>('IRR');
   const hasRunOnce = useRef(false);
+  const handleRunRef = useRef<(() => void) | null>(null);
 
   const handleRun = useCallback(async () => {
     setLoading(true);
@@ -61,9 +62,10 @@ export default function EquityPage() {
       };
       const hurdleMethod = hurdleMethodMap[waterfallType];
 
-      const res = await fetch(`/api/projects/${projectId}/waterfall/calculate?hurdle_method=${hurdleMethod}`, {
+      const res = await fetch(`/api/projects/${projectId}/waterfall/calculate?hurdle_method=${hurdleMethod}&_t=${Date.now()}`, {
         method: 'GET',
         credentials: 'include',
+        cache: 'no-store',
       });
 
       if (!res.ok) {
@@ -82,6 +84,40 @@ export default function EquityPage() {
       setLoading(false);
     }
   }, [projectId, waterfallType]);
+
+  // Keep ref in sync for use in mount effect
+  handleRunRef.current = handleRun;
+
+  // Load last-run waterfall result on mount, or auto-recalculate if stale
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLastResult() {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/waterfall/last-result?_t=${Date.now()}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+
+        // If upstream assumptions changed since last run, auto-recalculate
+        if (!cancelled && json?.stale) {
+          hasRunOnce.current = true;
+          handleRunRef.current?.();
+          return;
+        }
+
+        if (!cancelled && json && !('error' in json)) {
+          setData(json as WaterfallApiResponse);
+          hasRunOnce.current = true;
+        }
+      } catch {
+        // Silently ignore — user can click Run to calculate fresh
+      }
+    }
+    loadLastResult();
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   const handleSaved = useCallback(() => {
     if (hasRunOnce.current && !loading) {

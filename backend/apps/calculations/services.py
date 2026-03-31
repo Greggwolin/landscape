@@ -232,11 +232,18 @@ class CalculationService:
             # Income-property levered CF for waterfall:
             #   net_cf(period) = NOI - Debt Service
             # Then add terminal reversion in the final hold period.
+            # Acquisition cost at time=0 is a negative cash flow (initial investment).
             period_noi = defaultdict(float)
             period_debt_service = defaultdict(float)
+            acquisition_amount = 0.0
 
             for section in sections:
                 sname = section.get('sectionName', '').strip().lower()
+
+                if 'acquisition' in sname:
+                    # Acquisition section: sum subtotals (already negative)
+                    for pv in section.get('subtotals', []):
+                        acquisition_amount += float(pv.get('amount', 0) or 0)
 
                 if sname == 'net operating income':
                     for pv in section.get('subtotals', []):
@@ -254,6 +261,19 @@ class CalculationService:
                         # Ignore loan funding inflows; debt service is cash out only.
                         if amt < 0:
                             period_debt_service[ps] += abs(amt)
+
+            # Fallback: if no acquisition section in cash flow, read from tbl_project
+            if acquisition_amount == 0:
+                from django.db import connection as db_conn
+                with db_conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT COALESCE(acquisition_price, asking_price, 0)
+                        FROM landscape.tbl_project
+                        WHERE project_id = %s
+                    """, [project_id])
+                    acq_row = cur.fetchone()
+                    if acq_row and acq_row[0]:
+                        acquisition_amount = -abs(float(acq_row[0]))  # Negative = cash outflow
 
             # Get period dates from response
             period_dates = {}
@@ -277,6 +297,17 @@ class CalculationService:
             terminal_reversion = float(exit_analysis.get('netReversion', 0) or 0)
 
             rows = []
+
+            # Period 0: acquisition investment (negative cash flow)
+            if acquisition_amount != 0:
+                from datetime import timedelta
+                if period_dates.get(1):
+                    period_0_date = period_dates[1] - timedelta(days=1)
+                else:
+                    from datetime import date as dt_date
+                    period_0_date = dt_date(2025, 1, 1)
+                rows.append((0, period_0_date, acquisition_amount))
+
             for period_seq in range(1, max_period + 1):
                 noi = period_noi.get(period_seq, 0)
                 debt_service = period_debt_service.get(period_seq, 0)
@@ -299,7 +330,7 @@ class CalculationService:
             print(
                 "[waterfall] Non-LAND parsed "
                 f"{len(rows)} periods: contributions=${abs(total_contrib):,.0f}, distributions=${total_dist:,.0f}, "
-                f"terminal_reversion=${terminal_reversion:,.0f}"
+                f"terminal_reversion=${terminal_reversion:,.0f}, acquisition=${acquisition_amount:,.0f}"
             )
 
             return rows
@@ -770,6 +801,16 @@ class CalculationService:
                     ),
                 }
 
+            # Fetch LP ownership for promote derivation
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT ownership_pct FROM landscape.tbl_equity
+                    WHERE project_id = %s AND partner_type = 'LP'
+                    LIMIT 1
+                """, [project_id])
+                lp_row = cursor.fetchone()
+                lp_ownership_pct = float(lp_row[0]) if lp_row and lp_row[0] else 90.0
+
             # Convert to tier dicts with sensible defaults for EMx mode
             # Default EMx thresholds when not set in database:
             # - Tier 1: 1.0x (return of capital)
@@ -784,14 +825,23 @@ class CalculationService:
                 # Apply default EMx if not set and not a residual tier
                 emx_value = emx_from_db if emx_from_db is not None else default_emx_thresholds.get(tier_num)
 
+                lp_split = float(row[4]) if row[4] else 90
+                gp_split = float(row[5]) if row[5] else 10
+                # Derive promote_percent from LP split and LP ownership
+                # Formula: promote = (1 - lp_split / lp_ownership) * 100
+                if lp_ownership_pct > 0 and lp_split < lp_ownership_pct:
+                    promote = round((1 - lp_split / lp_ownership_pct) * 100, 2)
+                else:
+                    promote = 0
+
                 tiers.append({
                     'tier_number': tier_num,
                     'tier_name': row[1] or f"Tier {tier_num}",
                     'irr_hurdle': float(row[2]) if row[2] else None,
                     'emx_hurdle': emx_value,
-                    'promote_percent': 0,  # Calculate from splits
-                    'lp_split_pct': float(row[4]) if row[4] else 90,
-                    'gp_split_pct': float(row[5]) if row[5] else 10,
+                    'promote_percent': promote,
+                    'lp_split_pct': lp_split,
+                    'gp_split_pct': gp_split,
                 })
 
             # Fetch cash flows from authoritative Django service based on project type.
@@ -887,6 +937,20 @@ class CalculationService:
             # Serialize result and include tier configuration
             serialized = CalculationService._serialize_waterfall_result(result)
             serialized['tier_config'] = tiers  # Include database tier config for UI
+
+            # Persist last-run results for page-reload display
+            try:
+                import json
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE landscape.tbl_equity_structure
+                        SET last_waterfall_result = %s::jsonb,
+                            last_waterfall_run_at = NOW()
+                        WHERE project_id = %s
+                    """, [json.dumps(serialized), project_id])
+            except Exception as persist_err:
+                print(f"[waterfall] Warning: failed to persist results: {persist_err}")
+
             return serialized
 
         except Exception as e:

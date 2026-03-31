@@ -406,6 +406,91 @@ class CalculationViewSet(viewsets.ViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='project/(?P<project_id>[0-9]+)/waterfall/last-result',
+        permission_classes=[AllowAny],
+    )
+    def project_waterfall_last_result(self, request, project_id=None):
+        """Return persisted last-run waterfall result (no recalculation).
+
+        Checks freshness: if any upstream assumption table was updated
+        after last_waterfall_run_at, returns {"stale": true} instead of
+        the cached result so the frontend can auto-trigger a fresh run.
+        """
+        from django.db import connection
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT last_waterfall_result, last_waterfall_run_at
+                    FROM landscape.tbl_equity_structure
+                    WHERE project_id = %s
+                      AND last_waterfall_result IS NOT NULL
+                    ORDER BY last_waterfall_run_at DESC NULLS LAST
+                    LIMIT 1
+                """, [project_id])
+                row = cursor.fetchone()
+
+            if not row or not row[0]:
+                return Response(
+                    {'error': 'No persisted waterfall result', 'project_id': project_id},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            last_run_at = row[1]
+
+            # Freshness check: compare against upstream assumption tables
+            if last_run_at:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT MAX(upstream_ts) FROM (
+                            SELECT MAX(updated_at) AS upstream_ts
+                            FROM landscape.tbl_project WHERE project_id = %s
+                            UNION ALL
+                            SELECT MAX(updated_at)
+                            FROM landscape.tbl_waterfall_tier WHERE project_id = %s
+                            UNION ALL
+                            SELECT MAX(updated_at)
+                            FROM landscape.tbl_dcf_analysis WHERE project_id = %s
+                            UNION ALL
+                            SELECT MAX(updated_at)
+                            FROM landscape.tbl_loan WHERE project_id = %s
+                            UNION ALL
+                            SELECT MAX(updated_at)
+                            FROM landscape.tbl_equity WHERE project_id = %s
+                            UNION ALL
+                            SELECT MAX(updated_at)
+                            FROM landscape.core_fin_fact_budget WHERE project_id = %s
+                        ) sub
+                    """, [project_id] * 6)
+                    ts_row = cursor.fetchone()
+                    latest_upstream = ts_row[0] if ts_row else None
+
+                if latest_upstream and latest_upstream > last_run_at:
+                    return Response({
+                        'stale': True,
+                        'last_run_at': last_run_at.isoformat(),
+                        'upstream_changed_at': latest_upstream.isoformat(),
+                        'project_id': project_id,
+                    })
+
+            import json as json_lib
+            raw = row[0]
+            if isinstance(raw, dict):
+                result = raw
+            elif isinstance(raw, str):
+                result = json_lib.loads(raw)
+            else:
+                result = {}
+            result['last_run_at'] = last_run_at.isoformat() if last_run_at else None
+            return Response(result)
+        except Exception as e:
+            return Response(
+                {'error': str(e), 'project_id': project_id},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     # ========================================================================
     # MULTIFAMILY CASH FLOW ENDPOINTS
     # ========================================================================

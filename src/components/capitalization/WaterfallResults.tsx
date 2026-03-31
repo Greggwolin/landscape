@@ -526,7 +526,7 @@ const WaterfallResults: React.FC<WaterfallResultsProps> = ({
                     </tr>
                     {/* Sub-header row with LP/GP split percentages */}
                     <tr style={{ color: 'var(--cui-secondary-color)', fontSize: '0.65rem' }}>
-                      {data.tierDefinitions.map((tier) => {
+                      {tierDefinitions.map((tier) => {
                         const isPrefTier = tier.tierNumber === 1;
                         const isHurdleTier = tier.tierNumber === 2;
                         return (
