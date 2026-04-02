@@ -73,7 +73,14 @@ class FredClient:
             "observation_end": end.isoformat(),
         }
         if frequency:
-            params["frequency"] = str(frequency).lower()
+            # FRED API accepts: d, w, bw, m, q, sa, a — map full words
+            freq_map = {
+                "daily": "d", "weekly": "w", "biweekly": "bw",
+                "monthly": "m", "quarterly": "q",
+                "semiannual": "sa", "annual": "a",
+            }
+            freq_val = str(frequency).lower()
+            params["frequency"] = freq_map.get(freq_val, freq_val)
 
         payload = self._request(params)
 

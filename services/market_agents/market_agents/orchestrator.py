@@ -30,12 +30,11 @@ def build_agent_roster() -> List[BaseAgent]:
     """
     Instantiate all enabled time-series agents (geo/metro-based).
 
-    For now, only FRED. Others will be added as built:
-      - PermitAgent
-      - CensusAgent
-      - BlsAgent
+    These write NormalizedObservation records to public.market_data.
     """
     from .agents.fred_agent import FredAgent
+    from .agents.census_bps_agent import CensusBpsAgent
+    from .agents.hud_agent import HudAgent
 
     config = get_config()
     agents: List[BaseAgent] = []
@@ -45,10 +44,17 @@ def build_agent_roster() -> List[BaseAgent]:
     else:
         logger.warning("FRED_API_KEY not set — FRED agent disabled")
 
-    # Future time-series agents go here as they're built
-    # if config.census_api_key:
-    #     agents.append(CensusAgent(config))
-    # ...
+    if config.census_bps_enabled:
+        agents.append(CensusBpsAgent(config))
+    else:
+        logger.info("Census BPS agent disabled")
+
+    if config.hud_enabled and config.hud_api_token:
+        agents.append(HudAgent(config))
+    elif config.hud_enabled:
+        logger.warning("HUD_API_TOKEN not set — HUD agent disabled")
+    else:
+        logger.info("HUD agent disabled")
 
     return agents
 
@@ -59,12 +65,21 @@ def build_research_roster() -> list:
 
     These run on a separate schedule (early morning) and use a different
     base class (BaseResearchAgent) than the time-series agents.
+    They write to landscape.tbl_research_publication / tbl_research_financial_data.
     """
     from .agents.crefc_agent import CREFCAgent
     from .agents.uli_agent import ULIAgent
+    from .agents.mba_agent import MBAAgent
+    from .agents.kbra_agent import KBRAAgent
+    from .agents.trepp_agent import TreppAgent
+    from .agents.brokerage_research_agent import BrokerageResearchAgent
+    from .agents.construction_cost_agent import ConstructionCostAgent
+    from .agents.naiop_agent import NAIOPAgent
 
     config = get_config()
     agents = []
+
+    # ── Tier 1: High-priority research agents ──
 
     if config.crefc_harvest_enabled:
         agents.append(CREFCAgent(config))
@@ -77,6 +92,40 @@ def build_research_roster() -> list:
         logger.warning("ULI_EMAIL/ULI_PASSWORD not set — ULI agent disabled")
     else:
         logger.info("ULI harvest disabled")
+
+    # ── Tier 2: Lending / CMBS research ──
+
+    if config.mba_harvest_enabled:
+        agents.append(MBAAgent(config))
+    else:
+        logger.info("MBA harvest disabled")
+
+    if config.kbra_harvest_enabled:
+        agents.append(KBRAAgent(config))
+    else:
+        logger.info("KBRA harvest disabled")
+
+    if config.trepp_harvest_enabled:
+        agents.append(TreppAgent(config))
+    else:
+        logger.info("Trepp harvest disabled")
+
+    # ── Tier 3: Brokerage / cost / demand ──
+
+    if config.brokerage_harvest_enabled:
+        agents.append(BrokerageResearchAgent(config))
+    else:
+        logger.info("Brokerage research harvest disabled")
+
+    if config.construction_cost_harvest_enabled:
+        agents.append(ConstructionCostAgent(config))
+    else:
+        logger.info("Construction cost harvest disabled")
+
+    if config.naiop_harvest_enabled:
+        agents.append(NAIOPAgent(config))
+    else:
+        logger.info("NAIOP harvest disabled")
 
     return agents
 
@@ -188,9 +237,19 @@ def run_once_and_digest():
 
 def start_scheduler():
     """
-    Start APScheduler loop:
-      - 6 PM: kick off agents
-      - 6 AM: send digest (agents should be done by then)
+    Start APScheduler loop with staggered cron jobs:
+
+    Time-series agents:
+      - 6 PM: FRED + Census BPS + HUD (overnight run)
+
+    Research agents (staggered 5:00 AM – 7:30 AM):
+      - 5:00 AM: CREFC + ULI (Tier 1)
+      - 5:30 AM: MBA
+      - 5:45 AM: KBRA
+      - 6:00 AM: Trepp
+      - 6:30 AM: Brokerage Research (CBRE/CW/JLL)
+      - 7:15 AM: Construction Cost (ENR/RLB)
+      - 7:30 AM: NAIOP
 
     The scheduler runs indefinitely until killed.
     """
@@ -199,7 +258,7 @@ def start_scheduler():
     config = get_config()
     scheduler = BlockingScheduler()
 
-    # Run time-series agents at 6 PM daily (FRED, etc.)
+    # ── Time-series agents at 6 PM daily ──
     scheduler.add_job(
         run_once_and_digest,
         "cron",
@@ -209,7 +268,9 @@ def start_scheduler():
         name="Overnight Market Intelligence Run",
     )
 
-    # Run research harvesters at 5 AM daily (ULI, CREFC)
+    # ── Research agents: run all in sequence at research_hour ──
+    # For simplicity, the batch runner handles internal ordering.
+    # If individual scheduling is desired, uncomment the staggered jobs below.
     scheduler.add_job(
         run_research_agents,
         "cron",

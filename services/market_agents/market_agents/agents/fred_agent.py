@@ -38,7 +38,12 @@ class FredAgent(BaseAgent):
         return "FRED"
 
     def series_codes(self) -> List[str]:
-        return list(AGENT_BUNDLES["fred_macro"])
+        codes = list(AGENT_BUNDLES["fred_macro"])
+        # Append expanded bundles (treasury, lending, GDP, housing supply)
+        for bundle in ("fred_treasury", "fred_lending", "fred_gdp", "fred_housing_supply"):
+            if bundle in AGENT_BUNDLES:
+                codes.extend(AGENT_BUNDLES[bundle])
+        return codes
 
     @property
     def fred_client(self) -> FredClient:

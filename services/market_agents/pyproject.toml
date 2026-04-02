@@ -15,6 +15,8 @@ tenacity = "^8.3.0"
 pydantic = "^2.9.2"
 loguru = "^0.7.2"
 apscheduler = "^3.10.4"
+beautifulsoup4 = "^4.12.3"
+pdfplumber = "^0.11.0"
 
 # Sibling package for reuse
 market-ingest = { path = "../market_ingest_py", develop = true }

@@ -50,6 +50,35 @@ AGENT_BUNDLES: Dict[str, List[str]] = {
         "EXHOSLUSM495S",     # Existing Home Sales (SA, M)
         "EXHOSLUSM495N",     # Existing Home Sales (NSA, M)
     ],
+    # Treasury yields — for spread analysis and cap rate decomposition
+    "fred_treasury": [
+        "DGS2",              # 2-Year Treasury Constant Maturity Rate (D)
+        "DGS10",             # 10-Year Treasury Constant Maturity Rate (D)
+        "DGS30",             # 30-Year Treasury Constant Maturity Rate (D)
+        "T10Y2Y",            # 10Y minus 2Y Treasury Spread (D)
+    ],
+    # Lending / credit conditions — SLOOS via FRED (quarterly)
+    "fred_lending": [
+        "SOFR",              # Secured Overnight Financing Rate (D)
+        "DRTSCILM",          # Net % banks tightening CRE loan standards (Q, SLOOS)
+        "DRTSCIS",           # Net % banks tightening construction/land dev standards (Q, SLOOS)
+        "DRTSCLCC",          # Net % banks reporting stronger CRE loan demand (Q, SLOOS)
+    ],
+    # GDP and consumer sentiment
+    "fred_gdp": [
+        "GDPC1",             # Real GDP (Q)
+        "A191RL1Q225SBEA",   # Real GDP Growth Rate (Q)
+        "UMCSENT",           # U Michigan Consumer Sentiment (M)
+    ],
+    # Housing supply pipeline (national, via FRED)
+    "fred_housing_supply": [
+        "PERMIT",            # New Housing Units Authorized by Permits (M, SA)
+        "PERMITNSA",         # Same, NSA
+        "PERMIT1",           # Single-family permits (M, SA)
+        "PERMIT5",           # 5+ unit permits (M, SA) — multifamily proxy
+        "HOUST",             # Housing Starts (M, SA)
+        "COMPUTSA",          # Housing Units Completed (M, SA)
+    ],
     # Census/ACS demographic series
     "census_demo": [
         "ACS_POPULATION",
@@ -58,7 +87,7 @@ AGENT_BUNDLES: Dict[str, List[str]] = {
         "ACS_COUNTY_POPULATION",
         "ACS_COUNTY_MEDIAN_HH_INC",
     ],
-    # Building permits
+    # Building permits (via Census BPS API — place-level)
     "permits": [
         "PERMIT_TOTAL",
         "PERMIT_1UNIT",
@@ -70,6 +99,25 @@ AGENT_BUNDLES: Dict[str, List[str]] = {
         "PERSONAL_INCOME_PC_STATE",
     ],
 }
+
+# Phoenix metro cities for place-level Census BPS permit tracking
+PHOENIX_METRO_PLACES = [
+    {"name": "Phoenix", "place_fips": "55000", "state_fips": "04"},
+    {"name": "Peoria", "place_fips": "54050", "state_fips": "04"},
+    {"name": "Glendale", "place_fips": "27400", "state_fips": "04"},
+    {"name": "Surprise", "place_fips": "71510", "state_fips": "04"},
+    {"name": "Buckeye", "place_fips": "07940", "state_fips": "04"},
+    {"name": "Goodyear", "place_fips": "28380", "state_fips": "04"},
+    {"name": "Avondale", "place_fips": "04720", "state_fips": "04"},
+    {"name": "Chandler", "place_fips": "12000", "state_fips": "04"},
+    {"name": "Gilbert", "place_fips": "27820", "state_fips": "04"},
+    {"name": "Mesa", "place_fips": "46000", "state_fips": "04"},
+    {"name": "Scottsdale", "place_fips": "65000", "state_fips": "04"},
+    {"name": "Tempe", "place_fips": "73000", "state_fips": "04"},
+    {"name": "Queen Creek", "place_fips": "57140", "state_fips": "04"},
+    {"name": "Maricopa", "place_fips": "44410", "state_fips": "04"},
+    {"name": "Casa Grande", "place_fips": "10530", "state_fips": "04"},
+]
 
 
 @dataclass
@@ -84,13 +132,27 @@ class AgentConfig:
     uli_email: Optional[str] = None
     uli_password: Optional[str] = None
 
+    # HUD API
+    hud_api_token: Optional[str] = None
+
+    # Time-series agent toggles
+    census_bps_enabled: bool = True
+    hud_enabled: bool = True
+
     # Research agent toggles
     uli_harvest_enabled: bool = True
     crefc_harvest_enabled: bool = True
+    mba_harvest_enabled: bool = True
+    kbra_harvest_enabled: bool = True
+    trepp_harvest_enabled: bool = True
+    brokerage_harvest_enabled: bool = True
+    construction_cost_harvest_enabled: bool = True
+    naiop_harvest_enabled: bool = True
 
     # PDF storage paths
     uli_pdf_storage_path: str = "data/uli/pdfs"
     crefc_pdf_storage_path: str = "data/crefc/pdfs"
+    brokerage_pdf_storage_path: str = "data/brokerage/pdfs"
 
     # Discord webhooks
     discord_log_webhook: str = ""
@@ -141,9 +203,22 @@ def get_config() -> AgentConfig:
         # Research agent toggles
         uli_harvest_enabled=os.environ.get("ULI_HARVEST_ENABLED", "true").lower() == "true",
         crefc_harvest_enabled=os.environ.get("CREFC_HARVEST_ENABLED", "true").lower() == "true",
+        # HUD API
+        hud_api_token=os.environ.get("HUD_API_TOKEN"),
+        # Time-series agent toggles
+        census_bps_enabled=os.environ.get("CENSUS_BPS_ENABLED", "true").lower() == "true",
+        hud_enabled=os.environ.get("HUD_ENABLED", "true").lower() == "true",
+        # Research agent toggles (Track 3)
+        mba_harvest_enabled=os.environ.get("MBA_HARVEST_ENABLED", "true").lower() == "true",
+        kbra_harvest_enabled=os.environ.get("KBRA_HARVEST_ENABLED", "true").lower() == "true",
+        trepp_harvest_enabled=os.environ.get("TREPP_HARVEST_ENABLED", "true").lower() == "true",
+        brokerage_harvest_enabled=os.environ.get("BROKERAGE_HARVEST_ENABLED", "true").lower() == "true",
+        construction_cost_harvest_enabled=os.environ.get("CONSTRUCTION_COST_HARVEST_ENABLED", "true").lower() == "true",
+        naiop_harvest_enabled=os.environ.get("NAIOP_HARVEST_ENABLED", "true").lower() == "true",
         # PDF storage
         uli_pdf_storage_path=os.environ.get("ULI_PDF_STORAGE_PATH", "data/uli/pdfs"),
         crefc_pdf_storage_path=os.environ.get("CREFC_PDF_STORAGE_PATH", "data/crefc/pdfs"),
+        brokerage_pdf_storage_path=os.environ.get("BROKERAGE_PDF_STORAGE_PATH", "data/brokerage/pdfs"),
         discord_log_webhook=os.environ.get(
             "DISCORD_LOG_WEBHOOK",
             "https://discord.com/api/webhooks/1481800183061680315/ZTp4lrIsdiFU2aP_eruxUKCQ2lkv0pv8LBowqNwUM9ZIHJpQDd5EHqLi-0yDHgOsyipx"
