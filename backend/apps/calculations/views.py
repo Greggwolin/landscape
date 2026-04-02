@@ -441,31 +441,31 @@ class CalculationViewSet(viewsets.ViewSet):
             last_run_at = row[1]
 
             # Freshness check: compare against upstream assumption tables
+            # Query each table individually — some may lack updated_at column
             if last_run_at:
-                with connection.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT MAX(upstream_ts) FROM (
-                            SELECT MAX(updated_at) AS upstream_ts
-                            FROM landscape.tbl_project WHERE project_id = %s
-                            UNION ALL
-                            SELECT MAX(updated_at)
-                            FROM landscape.tbl_waterfall_tier WHERE project_id = %s
-                            UNION ALL
-                            SELECT MAX(updated_at)
-                            FROM landscape.tbl_dcf_analysis WHERE project_id = %s
-                            UNION ALL
-                            SELECT MAX(updated_at)
-                            FROM landscape.tbl_loan WHERE project_id = %s
-                            UNION ALL
-                            SELECT MAX(updated_at)
-                            FROM landscape.tbl_equity WHERE project_id = %s
-                            UNION ALL
-                            SELECT MAX(updated_at)
-                            FROM landscape.core_fin_fact_budget WHERE project_id = %s
-                        ) sub
-                    """, [project_id] * 6)
-                    ts_row = cursor.fetchone()
-                    latest_upstream = ts_row[0] if ts_row else None
+                upstream_tables = [
+                    'landscape.tbl_project',
+                    'landscape.tbl_waterfall_tier',
+                    'landscape.tbl_dcf_analysis',
+                    'landscape.tbl_loan',
+                    'landscape.tbl_equity',
+                    'landscape.core_fin_fact_budget',
+                ]
+                latest_upstream = None
+                for tbl in upstream_tables:
+                    try:
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                f"SELECT MAX(updated_at) FROM {tbl} WHERE project_id = %s",
+                                [project_id],
+                            )
+                            row_ts = cursor.fetchone()
+                            ts = row_ts[0] if row_ts else None
+                            if ts and (latest_upstream is None or ts > latest_upstream):
+                                latest_upstream = ts
+                    except Exception:
+                        # Table may lack updated_at column — skip silently
+                        pass
 
                 if latest_upstream and latest_upstream > last_run_at:
                     return Response({

@@ -876,7 +876,14 @@ export default function IngestionWorkbench({
                 ) : conflictsOnly ? (
                   <p className="wb-empty-desc">No conflicts to resolve.</p>
                 ) : (
-                  <p className="wb-empty-desc">No extraction data available for this document.</p>
+                  <>
+                    <p className="wb-empty-title">Extraction returned no fields</p>
+                    <p className="wb-empty-desc">
+                      The extraction pipeline could not extract structured data from this document.
+                      This may happen with scanned PDFs, image-only files, or macro-heavy spreadsheets.
+                      Try asking Landscaper to ingest this document, or upload a different format.
+                    </p>
+                  </>
                 )}
               </div>
             )}

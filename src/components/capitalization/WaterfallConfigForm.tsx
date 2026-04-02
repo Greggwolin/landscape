@@ -272,6 +272,12 @@ export default function WaterfallConfigForm({
           const message = err instanceof Error ? err.message : 'Unable to load data.';
           setEquityError(message);
         }
+      } finally {
+        if (!cancelled) {
+          // Mark DB load complete after a short delay so React state updates settle.
+          // Auto-save only activates after this flag is set.
+          setTimeout(() => { dbLoaded.current = true; }, 300);
+        }
       }
     }
 
@@ -390,30 +396,47 @@ export default function WaterfallConfigForm({
   const showIrrTable = waterfallType === 'IRR' || waterfallType === 'IRR_EM';
   const showEmTable = waterfallType === 'EM' || waterfallType === 'IRR_EM';
 
-  // Auto-save when waterfall type changes (after initial load)
-  const isInitialMount = React.useRef(true);
-  const prevWaterfallType = React.useRef(waterfallType);
+  // Auto-save whenever ANY assumption changes (debounced 1.5s after last change).
+  // Waits until initial DB load is complete (dbLoaded) so we don't save stale
+  // defaults before the real values arrive from the server.
+  const dbLoaded = React.useRef(false);
+  const autoSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSaveRef = React.useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  // Snapshot of values loaded from DB — skip auto-save until user actually changes something
+  const initialSnapshot = React.useRef<string>('');
+
+  const currentSnapshot = JSON.stringify([
+    waterfallType, prefRateIrr, hurdleIrr, prefRateEm, hurdleEm,
+    promotePct, prefLpPct, promoteLpPct, residualLpPct, residualGpPct,
+    gpContributionPct,
+  ]);
 
   useEffect(() => {
-    // Skip on initial mount
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      prevWaterfallType.current = waterfallType;
+    if (!dbLoaded.current) return;
+    if (typeof gpContributionPct !== 'number') return;
+
+    // On first run after DB load, capture baseline — don't save yet
+    if (!initialSnapshot.current) {
+      initialSnapshot.current = currentSnapshot;
       return;
     }
 
-    // Skip if waterfall type hasn't actually changed
-    if (prevWaterfallType.current === waterfallType) {
-      return;
-    }
-    prevWaterfallType.current = waterfallType;
+    // Don't auto-save if values haven't changed from what was loaded
+    if (currentSnapshot === initialSnapshot.current) return;
 
-    // Auto-save the new waterfall type to database
-    // This ensures EMx thresholds are saved when switching to EM mode
-    if (effectiveTotalEquity > 0 && typeof gpContributionPct === 'number') {
-      handleSave();
-    }
-  }, [waterfallType, effectiveTotalEquity, gpContributionPct, handleSave]);
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    autoSaveTimer.current = setTimeout(() => {
+      handleSaveRef.current();
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+     
+  }, [currentSnapshot, gpContributionPct]);
 
   return (
     <CCard>

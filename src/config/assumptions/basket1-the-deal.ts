@@ -26,6 +26,7 @@ export const basket1Config: BasketConfig = {
       tier: 'mid',
       fields: [
         'closing_costs_pct',
+        'acquisition_fee_pct',
         'due_diligence_days',
         'earnest_money'
       ]

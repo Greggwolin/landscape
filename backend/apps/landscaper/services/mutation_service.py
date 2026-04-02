@@ -158,7 +158,7 @@ MUTABLE_FIELDS = {
     "tbl_property_acquisition": [
         "purchase_price", "acquisition_date", "hold_period_years", "exit_cap_rate",
         "sale_date", "closing_costs_pct", "due_diligence_days", "earnest_money",
-        "sale_costs_pct", "broker_commission_pct", "price_per_unit", "price_per_sf",
+        "sale_costs_pct", "broker_commission_pct", "acquisition_fee_pct", "price_per_unit", "price_per_sf",
         "legal_fees", "financing_fees", "third_party_reports", "depreciation_basis",
         "land_pct", "improvement_pct", "is_1031_exchange", "grm",
     ],
@@ -345,6 +345,22 @@ MUTABLE_FIELDS = {
         "total_units", "base_price_per_unit", "price_escalation_pct", "scenario_name",
         "probability_weight", "notes", "scenario_id",
     ],
+    "land_use_pricing": [
+        "price_per_unit", "unit_of_measure", "growth_rate",
+    ],
+    "tbl_parcel_sale_assumptions": [
+        "sale_date", "base_price_per_unit", "price_uom", "inflation_rate",
+        "inflated_price_per_unit", "gross_parcel_price",
+        "improvement_offset_per_uom", "improvement_offset_total",
+        "improvement_offset_source", "improvement_offset_override",
+        "gross_sale_proceeds",
+        "legal_pct", "legal_amount", "legal_override",
+        "commission_pct", "commission_amount", "commission_override",
+        "closing_cost_pct", "closing_cost_amount", "closing_cost_override",
+        "title_insurance_pct", "title_insurance_amount", "title_insurance_override",
+        "custom_transaction_costs", "total_transaction_costs",
+        "net_sale_proceeds", "net_proceeds_per_uom",
+    ],
     "tbl_parcel_sale_event": [
         "project_id", "parcel_id", "phase_id", "sale_type", "buyer_entity",
         "buyer_contact_id", "contract_date", "total_lots_contracted", "base_price_per_lot",
@@ -423,6 +439,8 @@ PK_COLUMNS = {
     "market_assumptions": "project_id",  # Composite key with lu_type_code
     # Part 8: Sales/Absorption tables
     "tbl_absorption_schedule": "absorption_id",
+    "land_use_pricing": "id",
+    "tbl_parcel_sale_assumptions": "assumption_id",
     "tbl_parcel_sale_event": "sale_event_id",
     # Part 8: Knowledge/AI tables
     "ai_extraction_staging": "extraction_id",

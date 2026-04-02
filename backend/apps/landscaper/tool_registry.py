@@ -91,6 +91,7 @@ LAND_ONLY_TOOLS = [
     "get_land_comp_detail", "update_land_comp_detail",
     "get_parcel_sale_assumptions", "update_parcel_sale_assumptions",
     "bulk_update_parcel_sale_assumptions",
+    "update_land_use_pricing",
     "get_parcel_sale_events", "update_parcel_sale_event", "delete_parcel_sale_event",
     # Sale phases
     "get_sale_phases", "update_sale_phase",
@@ -375,6 +376,8 @@ PAGE_TOOLS = {
         "get_parcel_sale_events",
         "update_parcel_sale_event",
         "delete_parcel_sale_event",
+        # Pricing (land_use_pricing is source of truth)
+        "update_land_use_pricing",
         # Market
         "get_competitive_projects",
         "update_competitive_project",

@@ -80,12 +80,25 @@ class AgentConfig:
     census_api_key: Optional[str] = None
     bls_api_key: Optional[str] = None
 
+    # ULI credentials (member login for Knowledge Finder)
+    uli_email: Optional[str] = None
+    uli_password: Optional[str] = None
+
+    # Research agent toggles
+    uli_harvest_enabled: bool = True
+    crefc_harvest_enabled: bool = True
+
+    # PDF storage paths
+    uli_pdf_storage_path: str = "data/uli/pdfs"
+    crefc_pdf_storage_path: str = "data/crefc/pdfs"
+
     # Discord webhooks
     discord_log_webhook: str = ""
     discord_digest_webhook: str = ""
 
     # Schedule
-    start_hour: int = 18   # 6 PM
+    start_hour: int = 18   # 6 PM — existing FRED agents
+    research_hour: int = 5  # 5 AM — ULI/CREFC agents (off-peak)
     end_hour: int = 6      # 6 AM
 
     # Metro areas
@@ -122,6 +135,15 @@ def get_config() -> AgentConfig:
         fred_api_key=os.environ.get("FRED_API_KEY"),
         census_api_key=os.environ.get("CENSUS_API_KEY"),
         bls_api_key=os.environ.get("BLS_API_KEY"),
+        # ULI credentials
+        uli_email=os.environ.get("ULI_EMAIL"),
+        uli_password=os.environ.get("ULI_PASSWORD"),
+        # Research agent toggles
+        uli_harvest_enabled=os.environ.get("ULI_HARVEST_ENABLED", "true").lower() == "true",
+        crefc_harvest_enabled=os.environ.get("CREFC_HARVEST_ENABLED", "true").lower() == "true",
+        # PDF storage
+        uli_pdf_storage_path=os.environ.get("ULI_PDF_STORAGE_PATH", "data/uli/pdfs"),
+        crefc_pdf_storage_path=os.environ.get("CREFC_PDF_STORAGE_PATH", "data/crefc/pdfs"),
         discord_log_webhook=os.environ.get(
             "DISCORD_LOG_WEBHOOK",
             "https://discord.com/api/webhooks/1481800183061680315/ZTp4lrIsdiFU2aP_eruxUKCQ2lkv0pv8LBowqNwUM9ZIHJpQDd5EHqLi-0yDHgOsyipx"

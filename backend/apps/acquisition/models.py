@@ -199,6 +199,13 @@ class PropertyAcquisition(models.Model):
         default=Decimal('0.025'),
         help_text='Broker commission as % of sale price'
     )
+    acquisition_fee_pct = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        help_text='Asset acquisition fee as % of purchase price'
+    )
 
     # Pricing Metrics
     price_per_unit = models.DecimalField(

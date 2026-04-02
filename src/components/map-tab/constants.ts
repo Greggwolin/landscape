@@ -38,6 +38,10 @@ export const LAYER_COLORS = {
   rentComps: '#f97316',
   landSales: '#84cc16',
 
+  // Market layers
+  recentSales: '#22c55e',
+  competitiveProjects: '#f43f5e',
+
   // Annotation layers
   drawnShapes: '#06b6d4',
   measurements: '#a855f7',
@@ -180,6 +184,25 @@ export function getDefaultLayerGroups(): LayerGroup[] {
           label: 'Land Sales',
           visible: false,
           color: LAYER_COLORS.landSales,
+        },
+      ],
+    },
+    {
+      id: 'market',
+      label: 'Market',
+      expanded: true,
+      layers: [
+        {
+          id: 'recent-sales',
+          label: 'Recent Sales',
+          visible: false,
+          color: LAYER_COLORS.recentSales,
+        },
+        {
+          id: 'competitive-projects',
+          label: 'Competitive Projects',
+          visible: false,
+          color: LAYER_COLORS.competitiveProjects,
         },
       ],
     },

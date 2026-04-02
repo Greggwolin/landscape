@@ -169,7 +169,7 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "ingest_document",
-        "description": "Trigger AI extraction pipeline on an uploaded document.",
+        "description": "Extract data from an uploaded document and auto-populate project fields. Triggers extraction automatically if the document hasn't been processed yet. Works with PDF, DOCX, XLSX, XLSM, CSV, and image files (screenshots, photos).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -855,7 +855,7 @@ LANDSCAPER_TOOLS = [
                 "parcel_id": {"type": "integer", "description": "Parcel to set assumptions for"},
                 "sale_date": {"type": "string", "description": "Projected sale date (YYYY-MM-DD)"},
                 "base_price_per_unit": {"type": "number", "description": "Base price per unit (per lot, per SF, etc.)"},
-                "price_uom": {"type": "string", "description": "Price unit of measure: 'per_lot', 'per_sf', 'per_acre', etc."},
+                "price_uom": {"type": "string", "description": "Price unit of measure: 'per_lot', 'per_sf', 'per_acre', 'per_ff' (front foot). Front foot pricing calculates gross price as lot_width × base_price_per_unit."},
                 "inflation_rate": {"type": "number", "description": "Annual price inflation/escalation rate (decimal, e.g. 0.03 for 3%)"},
                 "inflated_price_per_unit": {"type": "number"},
                 "gross_parcel_price": {"type": "number"},
@@ -914,6 +914,57 @@ LANDSCAPER_TOOLS = [
                 "reason": {"type": "string"},
             },
             "required": ["assumptions"],
+        },
+    },
+    {
+        "name": "update_land_use_pricing",
+        "description": "Update lot pricing in the land_use_pricing table (source of truth for all pricing). "
+                       "Use this tool when the user asks to change price per front foot, lot pricing, sale price, "
+                       "or growth rates for any land use type (SFD, MF, BTR, etc.). After writing, automatically "
+                       "triggers recalculate-sfd to propagate changes to all parcel-level assumptions and cash flow. "
+                       "This is the CORRECT tool for changing lot pricing — do NOT use update_parcel_sale_assumptions "
+                       "for pricing changes, as that table is a derived cache.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "updates": {
+                    "type": "array",
+                    "description": "Array of pricing updates. Each must include lu_type_code plus fields to update. Maximum 50 items.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "lu_type_code": {
+                                "type": "string",
+                                "description": "Land use type code (e.g., 'SFD', 'MF', 'BTR', 'COM')"
+                            },
+                            "product_code": {
+                                "type": "string",
+                                "description": "Optional product variant code (e.g., '50', '60' for lot widths). Omit to update the type-level default."
+                            },
+                            "price_per_unit": {
+                                "type": "number",
+                                "description": "Price per unit of measure. For front foot pricing (unit_of_measure='FF'), this is $/FF. Gross lot price = lot_width × price_per_unit."
+                            },
+                            "unit_of_measure": {
+                                "type": "string",
+                                "description": "Unit of measure: 'FF' (front foot), 'AC' (acre), 'EA' (each/per lot). Default is 'FF'."
+                            },
+                            "growth_rate": {
+                                "type": "number",
+                                "description": "Annual price growth/escalation rate (decimal, e.g. 0.035 for 3.5%)"
+                            },
+                        },
+                        "required": ["lu_type_code"],
+                    },
+                    "maxItems": 50,
+                },
+                "trigger_recalc": {
+                    "type": "boolean",
+                    "description": "Whether to trigger recalculate-sfd after updating pricing. Default true. Set false only if making multiple sequential updates."
+                },
+                "reason": {"type": "string"},
+            },
+            "required": ["updates"],
         },
     },
     {

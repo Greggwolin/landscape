@@ -68,6 +68,7 @@ demographics_service = DemographicsService()
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def get_demographics(request):
     """
     GET /api/v1/location-intelligence/demographics/
@@ -151,6 +152,7 @@ def get_demographics(request):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def get_project_demographics(request, project_id):
     """
     GET /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -202,6 +204,7 @@ def get_project_demographics(request, project_id):
     tags=["Location Intelligence"]
 )
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def cache_project_demographics(request, project_id):
     """
     POST /api/v1/location-intelligence/demographics/project/{project_id}/

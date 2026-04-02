@@ -191,6 +191,8 @@ export function useLandscaperThreads({
   const activeThreadRef = useRef<ChatThread | null>(null);
   /** Guards concurrent sendMessage calls */
   const sendingRef = useRef(false);
+  /** Tracks whether at least one full initializeThread cycle has completed */
+  const hasInitializedOnceRef = useRef(false);
 
   // AbortController for cancelling in-flight requests on unmount / context change
   const abortControllerRef = useRef<AbortController>(new AbortController());
@@ -356,17 +358,39 @@ export function useLandscaperThreads({
     initializingRef.current = true;
     setIsThreadLoading(true);
 
+    // Capture the current abort signal so we can detect stale-context races.
+    // If context changes while we're awaiting, the context-change effect aborts
+    // this signal and creates a new one. Checking `mySignal.aborted` after each
+    // async gap prevents us from creating threads for a context we've already
+    // navigated away from.
+    const mySignal = abortControllerRef.current.signal;
+
     try {
       // First, try to get existing active thread
       const loadedThreads = await loadThreads();
+
+      // Bail out if context changed while loading
+      if (mySignal.aborted) return;
+
       const existingActive = loadedThreads.find((t: ChatThread) => t.isActive);
 
       if (existingActive) {
         setActiveThread(existingActive);
         // Load messages for this thread
         await loadThreadMessages(existingActive.threadId);
-      } else {
-        // Create new thread
+      } else if (loadedThreads.length > 0) {
+        // No active thread but threads exist for this context —
+        // pick the most recently updated one instead of creating a blank.
+        // The server-side POST (get_or_create) would reactivate anyway,
+        // but doing it here avoids an unnecessary network round-trip.
+        const mostRecent = [...loadedThreads].sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        )[0];
+
+        if (mySignal.aborted) return;
+
+        // Use the server-side get_or_create which will return this thread
+        // (it reactivates or creates as needed, protected by SELECT FOR UPDATE)
         const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -376,6 +400,37 @@ export function useLandscaperThreads({
             subtab_context: subtabContext || null,
           }),
         });
+
+        if (mySignal.aborted) return;
+
+        if (isAuthError(response)) {
+          recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
+          setError('Authentication failed — please refresh the page or log in again');
+          return;
+        }
+
+        const data = await response.json();
+        if (data.success && data.thread) {
+          setActiveThread(data.thread);
+          // Load messages — the reactivated thread may have history
+          await loadThreadMessages(data.thread.threadId);
+          await loadThreads();
+        }
+      } else {
+        // No threads at all for this context — create new
+        if (mySignal.aborted) return;
+
+        const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            project_id: parseInt(projectId),
+            page_context: pageContext,
+            subtab_context: subtabContext || null,
+          }),
+        });
+
+        if (mySignal.aborted) return;
 
         if (isAuthError(response)) {
           // Auth failure — stop recovery loop, surface immediately
@@ -402,6 +457,7 @@ export function useLandscaperThreads({
     } finally {
       setIsThreadLoading(false);
       initializingRef.current = false;
+      hasInitializedOnceRef.current = true;
     }
   }, [projectId, pageContext, subtabContext, loadThreads, loadThreadMessages, fetchWithTimeout, getAuthHeaders, isAuthError]);
 
@@ -667,6 +723,7 @@ export function useLandscaperThreads({
     abortControllerRef.current = new AbortController();
     setMessages([]);
     setActiveThread(null);
+    hasInitializedOnceRef.current = false;
     initializeThread();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, pageContext, subtabContext]);
@@ -686,6 +743,7 @@ export function useLandscaperThreads({
       !activeThread &&
       !isThreadLoading &&
       !initializingRef.current &&
+      hasInitializedOnceRef.current &&  // Only recover after first init completes
       recoveryAttemptsRef.current < MAX_RECOVERY_ATTEMPTS
     ) {
       // Recover from both error states AND silent failures (no error but no thread)

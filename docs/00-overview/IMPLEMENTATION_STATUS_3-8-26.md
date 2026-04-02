@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-03-30
+**Last Updated:** 2026-04-01
 **Version:** 5.0
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Save Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding)
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening)
 
 ---
 
@@ -9,12 +9,37 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: alpha15 WIP — Portfolio Scaffolding + S&U Rewrite + Rent Roll PDF Fix (March 30, 2026)**
+### 🆕 **Latest Update: Operations GET Migration + Map Market Layers + Extraction Hardening (April 1, 2026)**
 
-**Uncommitted on `alpha15` branch — no new commits today (Sunday)**
+**Uncommitted: Operations GET to Django, map market layers, extraction pipeline hardening, new Landscaper tool, LCF UI polish (30 files, +2,285 lines)**
 
-- ⏳ **Portfolio analysis models** — New Django models: `Portfolio`, `PortfolioMember`, `PortfolioWaterfallTier`, `PortfolioResult` (745 lines total across models/serializers/views). URL registration at `/api/portfolios/` and `/api/portfolio-results/`. Underwriting mode only. Needs migration.
-- ⏳ **Sources & Uses report rewrite** (`rpt_01`) — Property-type branching: LAND (equity + net revenue = costs + distributions) vs MF+ (equity + loan + NOI + sale = costs + DS + payoff + distributions). Treemap removed, replaced with unified section-header table.
+- ⏳ **Operations GET migrated to Django** — Full P&L calculation replicated in `views_operations.py` (+958 lines). `useOperationsData.ts` updated. Legacy Next.js route retained as dead code.
+- ⏳ **New Landscaper tool: `update_land_use_pricing`** — Writes to source-of-truth pricing table + auto-triggers recalculate-sfd. Tool count: 231.
+- ⏳ **`ingest_document` hardened** — Auto-triggers extraction pipeline if document not yet processed. Checks dms_extract_queue + knowledge_embeddings before fallback to DocumentProcessor/batched extraction.
+- ⏳ **Extraction service: direct text extraction fallback** — Vision API for images, caches result in `core_doc.extracted_text`.
+- ⏳ **Map market layers** — Recent Sales (Redfin SF comps, price-tier coloring) + Market Competitors with popups.
+- ⏳ **Leveraged Cash Flow UI** — Accounting-style bottom borders, total column, header alignment.
+- ⏳ **Thread race condition fix** — CamelCase mismatch + server-side guard.
+- 📁 **See:** `docs/09-session-notes/2026-04-01-daily-sync.md`
+
+### Previous Update: v0.1.15 — alpha15 Merged + Waterfall Persist + Marketing Site (March 31, 2026)
+
+**v0.1.15 (committed, merged to main): alpha15 merge, waterfall persist, marketing site, S&U rewrite, portfolio scaffolding**
+
+- ✅ **alpha15 merged to main** (`3f11fa9`) — Version bumped to v0.1.15 (`e627800`).
+- ✅ **Waterfall persist results + promote recalc** (`3b9a97b`) — Calculation results persisted to DB. New `/waterfall/last-result/` endpoint. MF acquisition at time=0 fixed. Equity page recalc triggers.
+- ✅ **transformDjangoResponse shared module** (`f058293`) — 148-line shared utility for waterfall Django response transformation.
+- ✅ **S&U report rewrite** (`9e74a0a`) — Property-type branching: LAND vs MF+. Treemap replaced with unified section-header table. ~1,715 lines.
+- ✅ **Portfolio analysis models** (`9e74a0a`) — Django models + serializers + views + URLs scaffolded. Underwriting mode only. Migration pending.
+- ✅ **Marketing site** (`bce59bd`, `22dfa3f`) — Static site under `marketing-site/` with CoreUI dark theme tokens.
+- 📁 **See:** `docs/09-session-notes/2026-03-31-daily-sync.md`
+
+### Previous Update: alpha15 WIP — Portfolio Scaffolding + S&U Rewrite + Rent Roll PDF Fix (March 30, 2026)
+
+**Uncommitted on `alpha15` branch (Sunday)**
+
+- ✅ **Portfolio analysis models** — Committed in `9e74a0a` on March 31.
+- ✅ **Sources & Uses report rewrite** — Committed in `9e74a0a` on March 31.
 - ✅ **Rent roll PDF fix** (`rpt_07a`) — Column widths tightened for portrait fit. Summary/occupancy labels repositioned. Occupancy row styled as subtotal.
 - 📁 **See:** `docs/09-session-notes/2026-03-30-daily-sync.md`
 

@@ -135,8 +135,8 @@ export default function SalesContent({ projectId }: Props) {
 
       {/* Areas/Phases and Land Use Pricing - Side by Side */}
       <div className="grid grid-cols-12 gap-4 w-full">
-        {/* Left Column: Areas and Phases (wider) */}
-        <div className="col-span-7">
+        {/* Left Column: Areas and Phases */}
+        <div className="col-span-5">
           <CollapsibleSection
             title="Areas and Phases"
             itemCount={1}
@@ -186,8 +186,8 @@ export default function SalesContent({ projectId }: Props) {
           </CollapsibleSection>
         </div>
 
-        {/* Right Column: Land Use Pricing (narrower) */}
-        <div className="col-span-5 w-full">
+        {/* Right Column: Land Use Pricing */}
+        <div className="col-span-7 w-full">
           <CollapsibleSection
             title={
               hasFilters

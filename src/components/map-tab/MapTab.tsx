@@ -52,6 +52,8 @@ import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels
 import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
+import { useSfComps } from '@/hooks/analysis/useSfComps';
+import { useMarketCompetitors } from '@/hooks/useMarketData';
 
 import './map-tab.css';
 
@@ -742,6 +744,133 @@ export function MapTab({ project }: MapTabProps) {
   }, [projectId]);
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Market Layer Data: Recent Sales (Redfin SF Comps)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const recentSalesLayerVisible = useMemo(() => {
+    const marketGroup = layers.find((g) => g.id === 'market');
+    return marketGroup?.layers.find((l) => l.id === 'recent-sales')?.visible ?? false;
+  }, [layers]);
+
+  const { data: sfCompsData } = useSfComps(projectId, {
+    radiusMiles: 5,
+    soldWithinDays: 365,
+  });
+
+  const recentSales = useMemo<FeatureCollection | null>(() => {
+    if (!recentSalesLayerVisible || !sfCompsData?.comps?.length) return null;
+
+    const p25 = sfCompsData.stats.p25Price ?? 0;
+    const p75 = sfCompsData.stats.p75Price ?? Infinity;
+
+    const features = sfCompsData.comps
+      .filter((comp) => Number.isFinite(comp.lat) && Number.isFinite(comp.lng))
+      .map((comp, i) => {
+        // Color by price tier: green = below 25th %ile, yellow = 25-75th, red = above 75th
+        let tierColor = '#eab308'; // yellow (mid)
+        if (comp.salePrice <= p25) tierColor = '#22c55e'; // green (low)
+        else if (comp.salePrice >= p75) tierColor = '#ef4444'; // red (high)
+
+        const priceFmt = comp.salePrice ? `$${comp.salePrice.toLocaleString()}` : '';
+        const psfFmt = comp.pricePerSqft ? `$${Math.round(comp.pricePerSqft)}/sf` : '';
+        const sqftFmt = comp.sqft ? `${comp.sqft.toLocaleString()} sf` : '';
+        const bedBath = [comp.beds ? `${comp.beds}bd` : '', comp.baths ? `${comp.baths}ba` : '']
+          .filter(Boolean)
+          .join(' / ');
+
+        return {
+          type: 'Feature' as const,
+          id: `redfin-${comp.mlsId || i}`,
+          geometry: { type: 'Point' as const, coordinates: [comp.lng, comp.lat] },
+          properties: {
+            name: comp.address || `Sale ${i + 1}`,
+            price: comp.salePrice,
+            price_per_sqft: comp.pricePerSqft,
+            sqft: comp.sqft,
+            beds: comp.beds,
+            baths: comp.baths,
+            year_built: comp.yearBuilt,
+            sale_date: comp.saleDate,
+            color: tierColor,
+            popover_title: escapeHtml(comp.address || `Sale ${i + 1}`),
+            popover_rows: JSON.stringify([
+              { label: 'Price', value: priceFmt + (psfFmt ? ` (${psfFmt})` : '') },
+              { label: 'Size', value: sqftFmt },
+              { label: 'Bed/Bath', value: bedBath },
+              { label: 'Built', value: comp.yearBuilt ? String(comp.yearBuilt) : '' },
+              { label: 'Sold', value: comp.saleDate ? new Date(comp.saleDate).toLocaleDateString() : '' },
+            ]),
+          },
+        };
+      });
+
+    return { type: 'FeatureCollection', features };
+  }, [recentSalesLayerVisible, sfCompsData]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Market Layer Data: Competitive Projects
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const competitiveLayerVisible = useMemo(() => {
+    const marketGroup = layers.find((g) => g.id === 'market');
+    return marketGroup?.layers.find((l) => l.id === 'competitive-projects')?.visible ?? false;
+  }, [layers]);
+
+  const { data: competitorData } = useMarketCompetitors(projectId);
+
+  const competitiveProjects = useMemo<FeatureCollection | null>(() => {
+    if (!competitiveLayerVisible || !competitorData?.length) return null;
+
+    const statusColors: Record<string, string> = {
+      selling: '#22c55e',
+      sold_out: '#6b7280',
+      planned: '#06b6d4',
+    };
+
+    const features = competitorData
+      .filter((c) => {
+        const lat = Number(c.latitude);
+        const lon = Number(c.longitude);
+        return Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && lon !== 0;
+      })
+      .map((comp, i) => {
+        const lat = Number(comp.latitude);
+        const lon = Number(comp.longitude);
+        const color = statusColors[comp.status] || '#f43f5e';
+        const priceRange =
+          comp.price_min && comp.price_max
+            ? `$${Number(comp.price_min).toLocaleString()} – $${Number(comp.price_max).toLocaleString()}`
+            : comp.price_min
+              ? `From $${Number(comp.price_min).toLocaleString()}`
+              : '';
+
+        return {
+          type: 'Feature' as const,
+          id: `competitor-${comp.id || i}`,
+          geometry: { type: 'Point' as const, coordinates: [lon, lat] },
+          properties: {
+            name: comp.comp_name,
+            builder: comp.builder_name || '',
+            status: comp.status,
+            total_units: comp.total_units,
+            absorption_rate: comp.absorption_rate_monthly,
+            color,
+            popover_title: escapeHtml(comp.comp_name),
+            popover_rows: JSON.stringify([
+              { label: 'Builder', value: comp.builder_name || '' },
+              { label: 'Status', value: comp.status ? comp.status.replace('_', ' ') : '' },
+              { label: 'Units', value: comp.total_units ? String(comp.total_units) : '' },
+              { label: 'Price', value: priceRange },
+              { label: 'Absorption', value: comp.absorption_rate_monthly ? `${comp.absorption_rate_monthly}/mo` : '' },
+            ]),
+          },
+        };
+      });
+
+    return { type: 'FeatureCollection', features };
+  }, [competitiveLayerVisible, competitorData]);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Hooks: useMapFeatures (Django CRUD)
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1003,10 +1132,26 @@ export function MapTab({ project }: MapTabProps) {
             }),
           };
         }
+        if (group.id === 'market') {
+          const sfCount = sfCompsData?.comps?.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)).length ?? 0;
+          const compCount = competitorData?.filter((c) => {
+            const lat = Number(c.latitude);
+            const lon = Number(c.longitude);
+            return Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && lon !== 0;
+          }).length ?? 0;
+          return {
+            ...group,
+            layers: group.layers.map((layer) => {
+              if (layer.id === 'recent-sales') return { ...layer, count: sfCount };
+              if (layer.id === 'competitive-projects') return { ...layer, count: compCount };
+              return layer;
+            }),
+          };
+        }
         return group;
       })
     );
-  }, [planParcels, taxParcels, projectBoundary, saleComps, rentComps, projectCenter, resolvedCenter, isDevelopmentProject]);
+  }, [planParcels, taxParcels, projectBoundary, saleComps, rentComps, projectCenter, resolvedCenter, isDevelopmentProject, sfCompsData, competitorData]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Callbacks: Layer Panel
@@ -1683,6 +1828,8 @@ export function MapTab({ project }: MapTabProps) {
           parcelOutlineEnabled={parcelOutlineEnabled}
           saleComps={saleComps}
           rentComps={rentComps}
+          recentSales={recentSales}
+          competitiveProjects={competitiveProjects}
           parcelCollection={parcelCollection}
           parcelSubjectApn={subjectApn || null}
           parcelCompApns={compApns}

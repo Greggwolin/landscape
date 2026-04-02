@@ -28,16 +28,12 @@ from .discord import log_agent_warning, send_digest
 
 def build_agent_roster() -> List[BaseAgent]:
     """
-    Instantiate all enabled agents.
+    Instantiate all enabled time-series agents (geo/metro-based).
 
     For now, only FRED. Others will be added as built:
       - PermitAgent
       - CensusAgent
       - BlsAgent
-      - NewsClipperAgent
-      - AcademicAgent
-      - BrokerReaderAgent
-      - TransactionTrackerAgent
     """
     from .agents.fred_agent import FredAgent
 
@@ -49,10 +45,38 @@ def build_agent_roster() -> List[BaseAgent]:
     else:
         logger.warning("FRED_API_KEY not set — FRED agent disabled")
 
-    # Future agents go here as they're built
+    # Future time-series agents go here as they're built
     # if config.census_api_key:
     #     agents.append(CensusAgent(config))
     # ...
+
+    return agents
+
+
+def build_research_roster() -> list:
+    """
+    Instantiate all enabled research harvesting agents.
+
+    These run on a separate schedule (early morning) and use a different
+    base class (BaseResearchAgent) than the time-series agents.
+    """
+    from .agents.crefc_agent import CREFCAgent
+    from .agents.uli_agent import ULIAgent
+
+    config = get_config()
+    agents = []
+
+    if config.crefc_harvest_enabled:
+        agents.append(CREFCAgent(config))
+    else:
+        logger.info("CREFC harvest disabled")
+
+    if config.uli_harvest_enabled and config.uli_email and config.uli_password:
+        agents.append(ULIAgent(config))
+    elif config.uli_harvest_enabled:
+        logger.warning("ULI_EMAIL/ULI_PASSWORD not set — ULI agent disabled")
+    else:
+        logger.info("ULI harvest disabled")
 
     return agents
 
@@ -115,6 +139,37 @@ def compile_digest(results: List[RunResult]) -> dict:
     }
 
 
+def run_research_agents():
+    """Execute all research harvesting agents and log results."""
+    from .agents.base_research_agent import HarvestStats
+
+    research_agents = build_research_roster()
+    if not research_agents:
+        logger.info("No research agents enabled — skipping")
+        return
+
+    t0 = time.monotonic()
+    logger.info("Starting research harvest at {}", datetime.now().isoformat())
+
+    all_stats = []
+    for agent in research_agents:
+        logger.info("=== Running research agent: {} ===", agent.name)
+        try:
+            stats = agent.run()
+            all_stats.append((agent.name, stats))
+        except Exception as exc:
+            logger.error("Research agent {} crashed: {}", agent.name, exc)
+            log_agent_warning(agent.name, f"Research agent crashed: {exc}")
+
+    elapsed = time.monotonic() - t0
+    total_new = sum(s.publications_new for _, s in all_stats)
+    total_errors = sum(len(s.errors) for _, s in all_stats)
+    logger.info(
+        "Research harvest complete: %d new publications, %d errors in %.1fs",
+        total_new, total_errors, elapsed,
+    )
+
+
 def run_once_and_digest():
     """Single execution: run all agents, compile digest, send to Discord."""
     t0 = time.monotonic()
@@ -144,7 +199,7 @@ def start_scheduler():
     config = get_config()
     scheduler = BlockingScheduler()
 
-    # Run agents at 6 PM daily
+    # Run time-series agents at 6 PM daily (FRED, etc.)
     scheduler.add_job(
         run_once_and_digest,
         "cron",
@@ -154,9 +209,20 @@ def start_scheduler():
         name="Overnight Market Intelligence Run",
     )
 
+    # Run research harvesters at 5 AM daily (ULI, CREFC)
+    scheduler.add_job(
+        run_research_agents,
+        "cron",
+        hour=config.research_hour,
+        minute=0,
+        id="research_harvest",
+        name="Research Publication Harvest",
+    )
+
     logger.info(
-        "Scheduler started — agents will run daily at %d:00",
+        "Scheduler started — time-series agents at %d:00, research agents at %d:00",
         config.start_hour,
+        config.research_hour,
     )
 
     try:
@@ -181,6 +247,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=365,
         help="How many days back to fetch (default: 365)",
     )
+    parser.add_argument(
+        "--research",
+        action="store_true",
+        help="Run research harvest agents only (ULI, CREFC)",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run both time-series and research agents",
+    )
     return parser.parse_args(argv)
 
 
@@ -189,6 +265,11 @@ def main(argv: Optional[Sequence[str]] = None):
 
     if args.loop:
         start_scheduler()
+    elif args.research:
+        run_research_agents()
+    elif args.all:
+        run_once_and_digest()
+        run_research_agents()
     else:
         run_once_and_digest()
 

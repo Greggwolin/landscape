@@ -1,12 +1,16 @@
 """
 Extract text from documents stored in UploadThing.
-Supports PDF, DOCX, TXT, and common text formats.
+Supports PDF, DOCX, TXT, images (via OpenAI Vision), and common text formats.
 """
 import os
+import base64
+import logging
 import tempfile
 import requests
 from typing import Optional, Tuple
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 # PDF extraction
 try:
@@ -77,6 +81,8 @@ def extract_text_from_url(storage_uri: str, mime_type: str = None) -> Tuple[Opti
                 return _extract_xlsx(tmp_path), None
             elif mime_type == 'application/vnd.ms-excel':
                 return None, "Legacy .xls format not supported. Please convert to .xlsx"
+            elif mime_type.startswith('image/'):
+                return _extract_image_via_vision(tmp_path, mime_type), None
             elif mime_type.startswith('text/') or mime_type in ('application/json', 'application/xml'):
                 return _extract_text(tmp_path), None
             else:
@@ -127,6 +133,8 @@ def extract_text_and_page_count_from_url(
                 return _extract_xlsx(tmp_path), None, None
             if mime_type == 'application/vnd.ms-excel':
                 return None, None, "Legacy .xls format not supported. Please convert to .xlsx"
+            if mime_type.startswith('image/'):
+                return _extract_image_via_vision(tmp_path, mime_type), None, None
             if mime_type.startswith('text/') or mime_type in ('application/json', 'application/xml'):
                 return _extract_text(tmp_path), None, None
             return None, None, f"Unsupported mime type: {mime_type}"
@@ -253,6 +261,74 @@ def _extract_xlsx(file_path: str) -> Optional[str]:
     return '\n\n'.join(text_parts).strip() or None
 
 
+def _extract_image_via_vision(file_path: str, mime_type: str) -> Optional[str]:
+    """
+    Extract text/data from an image using OpenAI Vision API.
+    Handles screenshots, photos of documents, tables, etc.
+    """
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        logger.warning("OPENAI_API_KEY not set — cannot extract text from image")
+        return None
+
+    try:
+        with open(file_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+
+        # Map common MIME types for the data URI
+        media_type = mime_type if mime_type.startswith('image/') else 'image/png'
+
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            json={
+                'model': 'gpt-4o',
+                'messages': [
+                    {
+                        'role': 'system',
+                        'content': (
+                            'You are a document data extraction assistant for a real estate analytics platform. '
+                            'Extract ALL text, numbers, labels, and tabular data from this image. '
+                            'Preserve the structure: use tab-separated values for tables, '
+                            'label: value format for key-value pairs. '
+                            'Include every number, percentage, and dollar amount you see. '
+                            'Do not summarize or interpret — transcribe exactly what is shown.'
+                        ),
+                    },
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                'type': 'image_url',
+                                'image_url': {
+                                    'url': f'data:{media_type};base64,{image_data}',
+                                    'detail': 'high',
+                                },
+                            },
+                            {
+                                'type': 'text',
+                                'text': 'Extract all text and data from this image. Preserve the layout structure.',
+                            },
+                        ],
+                    },
+                ],
+                'max_tokens': 4096,
+            },
+            timeout=90,
+        )
+        response.raise_for_status()
+        result = response.json()
+        content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+        return content.strip() or None
+
+    except Exception as e:
+        logger.error(f"Vision extraction failed for {file_path}: {e}")
+        return None
+
+
 def _infer_mime_type(url: str) -> str:
     """Infer MIME type from URL extension."""
     path = urlparse(url).path.lower()
@@ -263,6 +339,8 @@ def _infer_mime_type(url: str) -> str:
         return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     elif path.endswith('.doc'):
         return 'application/msword'
+    elif path.endswith('.xlsm'):
+        return 'application/vnd.ms-excel.sheet.macroEnabled.12'
     elif path.endswith('.xlsx'):
         return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     elif path.endswith('.xls'):
@@ -275,6 +353,14 @@ def _infer_mime_type(url: str) -> str:
         return 'application/json'
     elif path.endswith('.csv'):
         return 'text/csv'
+    elif path.endswith('.png'):
+        return 'image/png'
+    elif path.endswith('.jpg') or path.endswith('.jpeg'):
+        return 'image/jpeg'
+    elif path.endswith('.tiff') or path.endswith('.tif'):
+        return 'image/tiff'
+    elif path.endswith('.webp'):
+        return 'image/webp'
     else:
         return 'application/octet-stream'
 

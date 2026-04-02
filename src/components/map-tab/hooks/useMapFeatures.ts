@@ -106,6 +106,12 @@ export function useMapFeatures(projectId: number | undefined) {
           setFeatures([]);
           return;
         }
+        if (response.status === 401 || response.status === 403) {
+          // Auth failed — degrade gracefully, don't block the map
+          console.warn('Map features: auth failed, showing empty feature set');
+          setFeatures([]);
+          return;
+        }
         if (response.status >= 500) {
           // Server error - degrade gracefully and avoid hard failure
           console.warn('Map features fetch failed with server error:', response.status);

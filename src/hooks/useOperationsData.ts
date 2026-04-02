@@ -98,8 +98,7 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
     setError(null);
 
     try {
-      // For now, use Next.js API route until Django endpoint is ready
-      const response = await fetch(`/api/projects/${projectId}/operations`);
+      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch operations data');

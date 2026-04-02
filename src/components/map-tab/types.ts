@@ -56,6 +56,7 @@ export type LayerGroupId =
   | 'project-boundary'
   | 'location-intel'
   | 'comparables'
+  | 'market'
   | 'annotations';
 
 export interface LayerItem {
@@ -136,6 +137,8 @@ export interface MapCanvasProps {
   parcelOutlineEnabled?: boolean;
   saleComps?: GeoJSON.FeatureCollection | null;
   rentComps?: GeoJSON.FeatureCollection | null;
+  recentSales?: GeoJSON.FeatureCollection | null;
+  competitiveProjects?: GeoJSON.FeatureCollection | null;
   parcelCollection?: GeoJSON.FeatureCollection | null;
   parcelSubjectApn?: string | null;
   parcelCompApns?: string[];

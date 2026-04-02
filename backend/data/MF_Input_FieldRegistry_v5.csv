@@ -277,6 +277,7 @@ is_1031_exchange,Is 1031 Exchange,boolean,acquisition,tbl_property_acquisition,i
 exit_cap_rate_acq,Exit Cap Rate Assumption,percentage,acquisition,tbl_property_acquisition,exit_cap_rate,update,,proforma,validate,input,critical,Exit cap rate from acquisition model
 sale_costs_pct,Disposition Costs %,percentage,acquisition,tbl_property_acquisition,sale_costs_pct,update,,proforma,validate,input,important,Costs to sell as percentage of price
 acq_hold_period,Hold Period,number,acquisition,tbl_property_acquisition,hold_period_years,update,,proforma,validate,input,critical,Projected hold period in years
+acquisition_fee_pct,Asset Acquisition Fee %,percentage,acquisition,tbl_property_acquisition,acquisition_fee_pct,update,,offering_memorandum,validate,input,important,Acquisition fee as percentage of purchase price
 # ============================================================
 # SECTION 13: MARKET DATA (15 fields)
 # ============================================================

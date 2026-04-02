@@ -403,8 +403,8 @@ Django uses DRF serializers with consistent envelope:
 | 3 | Document Management | ✅ WORKS | Full DMS with 30+ API routes |
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
-| 6 | Operations Tab | ⚠️ PARTIAL | Save migrated to Django; GET (P&L) still on legacy Next.js |
-| 7 | Landscaper Chat | ✅ WORKS | 229 tools, thread-based, mutations |
+| 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); legacy Next.js route retained as dead code |
+| 7 | Landscaper Chat | ✅ WORKS | 231 tools, thread-based, mutations |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
@@ -428,7 +428,7 @@ Django uses DRF serializers with consistent envelope:
 - Multiple grid libraries need consolidation (TanStack preferred for new; AG-Grid retained in rent roll)
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
-- Operations GET endpoint (P&L calculation, 1,303-line route) still on legacy Next.js — save endpoints migrated to Django
+- ~~Operations GET endpoint~~ — RESOLVED (Apr 1). P&L GET migrated to Django (`views_operations.py`, +958 lines). Legacy Next.js route retained as dead code pending production confirm
 - Reports system complete: 20 generators with real SQL + PDF/Excel export; data_readiness flags updated
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
@@ -444,7 +444,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **229 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026
+- Claude AI with **231 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` added Apr 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -805,8 +805,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-03-30 (nightly sync — uncommitted alpha15 work: portfolio models/API scaffolding, S&U report rewrite for property-type branching, rent roll PDF column/layout fixes)*
+*Last updated: 2026-04-01 (nightly sync — Operations GET migrated to Django (+958 lines); new update_land_use_pricing Landscaper tool; map market layers (recent sales + competitors); extraction pipeline hardening (auto-trigger, image/Vision fallback); leveraged cash flow accounting borders + total column; thread race condition fix; S&U report refinement)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: 229*
+*Landscaper tool count: 231*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

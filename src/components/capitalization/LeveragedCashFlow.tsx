@@ -125,6 +125,7 @@ interface DisplayRow {
   loanName?: string;
   valueFormat?: 'currency' | 'percent';
   showDashForZero?: boolean;
+  bottomBorder?: boolean; // accounting-style underline (row ABOVE a subtotal)
 }
 
 /* ---------- Props ---------- */
@@ -1064,6 +1065,20 @@ export default function LeveragedCashFlow({
       });
     }
 
+    // Post-process: mark the last data row before each subtotal with bottomBorder
+    for (let i = 1; i < displayRows.length; i++) {
+      if (displayRows[i].rowType === 'subtotal') {
+        // Walk back to find the last indent/data row
+        for (let j = i - 1; j >= 0; j--) {
+          if (displayRows[j].rowType === 'indent') {
+            displayRows[j].bottomBorder = true;
+            break;
+          }
+          if (displayRows[j].rowType === 'section-header' || displayRows[j].rowType === 'divider') break;
+        }
+      }
+    }
+
     return { rows: displayRows, headers: hdrs };
   }, [
     cfData,
@@ -1129,10 +1144,9 @@ export default function LeveragedCashFlow({
 
   return (
     <div>
-      {/* Header controls - left-aligned to match CashFlowAnalysisTab */}
+      {/* Header controls - match CashFlowAnalysisTab card header padding */}
       <div
-        className="d-flex flex-wrap align-items-center gap-4"
-        style={{ marginBottom: '12px' }}
+        className="d-flex flex-wrap align-items-center gap-4 py-3"
       >
         <div className="d-flex align-items-center gap-2">
           <span
@@ -1188,6 +1202,7 @@ export default function LeveragedCashFlow({
             {headers.map((_, i) => (
               <col key={i} style={{ width: `${LCF_DATA_WIDTH}px` }} />
             ))}
+            <col style={{ width: `${LCF_DATA_WIDTH}px` }} />
           </colgroup>
           <thead>
             <tr>
@@ -1244,6 +1259,22 @@ export default function LeveragedCashFlow({
                   {h}
                 </th>
               ))}
+              <th
+                style={{
+                  backgroundColor: 'var(--cui-secondary-bg)',
+                  color: 'var(--cui-body-color)',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  borderBottom: '3px solid var(--cui-border-color)',
+                  borderLeft: '2px solid var(--cui-border-color)',
+                }}
+              >
+                TOTAL
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1253,7 +1284,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
+                      colSpan={headers.length + (isUnderwriting ? 3 : 2)}
                       style={{ height: '4px', padding: 0, borderBottom: '1px solid var(--cui-border-color)' }}
                     />
                   </tr>
@@ -1265,7 +1296,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
+                      colSpan={headers.length + (isUnderwriting ? 3 : 2)}
                       style={{
                         fontWeight: 700,
                         fontSize: '0.8125rem',
@@ -1296,7 +1327,7 @@ export default function LeveragedCashFlow({
                 return (
                   <tr key={rowIdx}>
                     <td
-                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
+                      colSpan={headers.length + (isUnderwriting ? 3 : 2)}
                       style={{
                         fontWeight: 700,
                         fontSize: '0.8125rem',
@@ -1327,7 +1358,7 @@ export default function LeveragedCashFlow({
                       {row.label}
                     </td>
                     <td
-                      colSpan={headers.length + 1}
+                      colSpan={headers.length + (isUnderwriting ? 2 : 1)}
                       style={{
                         textAlign: 'center',
                         color: 'var(--cui-text-muted)',
@@ -1422,6 +1453,24 @@ export default function LeveragedCashFlow({
                         </td>
                       );
                     })}
+                    {/* TOTAL column for reversion */}
+                    {(() => {
+                      const totalVal = row.values.reduce((s, v) => s + v, 0) + (row.time0Value || 0);
+                      return (
+                        <td
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                            fontWeight: 700,
+                            paddingTop: '6px',
+                            borderTop: '1px solid var(--cui-border-color)',
+                            borderLeft: '2px solid var(--cui-border-color)',
+                          }}
+                        >
+                          {formatLCFCurrency(totalVal)}
+                        </td>
+                      );
+                    })()}
                   </tr>
                 );
               }
@@ -1477,6 +1526,16 @@ export default function LeveragedCashFlow({
                         -
                       </td>
                     ))}
+                    {/* TOTAL column for loan-proceeds */}
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontVariantNumeric: 'tabular-nums',
+                        borderLeft: '2px solid var(--cui-border-color)',
+                      }}
+                    >
+                      {row.time0Value != null ? formatLCFCurrency(row.time0Value) : '-'}
+                    </td>
                   </tr>
                 );
               }
@@ -1488,7 +1547,7 @@ export default function LeveragedCashFlow({
               const isGrandTotal = row.rowType === 'grand-total';
               const isSubtotal = row.rowType === 'subtotal';
               const isNetCf = row.rowType === 'net-cf';
-              const bottomBorder = isSubtotal; // accounting-style underline before totals
+              const bottomBorder = row.bottomBorder || false; // accounting-style underline on row above subtotals
 
               return (
                 <tr key={rowIdx}>
@@ -1550,6 +1609,42 @@ export default function LeveragedCashFlow({
                       </td>
                     );
                   })}
+                  {/* TOTAL column */}
+                  {(() => {
+                    if (row.valueFormat === 'percent') {
+                      return (
+                        <td
+                          style={{
+                            textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                            borderLeft: '2px solid var(--cui-border-color)',
+                            borderTop: (isNoi || isGrandTotal) ? '2px solid var(--cui-border-color)' : isSubtotal ? '1px solid var(--cui-border-color)' : undefined,
+                            backgroundColor: isNoi ? 'rgba(var(--cui-primary-rgb), 0.04)' : undefined,
+                          }}
+                        >
+                          -
+                        </td>
+                      );
+                    }
+                    const totalVal = row.values.reduce((s, v) => s + v, 0) + (row.time0Value || 0);
+                    return (
+                      <td
+                        style={{
+                          textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: isBold ? 600 : 400,
+                          color: totalVal < 0 ? 'var(--cui-danger)' : undefined,
+                          textDecoration: bottomBorder ? 'underline' : undefined,
+                          borderTop: (isNoi || isGrandTotal) ? '2px solid var(--cui-border-color)' : isSubtotal ? '1px solid var(--cui-border-color)' : undefined,
+                          fontSize: isGrandTotal ? '0.875rem' : undefined,
+                          backgroundColor: isNoi ? 'rgba(var(--cui-primary-rgb), 0.04)' : undefined,
+                          borderLeft: '2px solid var(--cui-border-color)',
+                        }}
+                      >
+                        {formatLCFCurrency(totalVal)}
+                      </td>
+                    );
+                  })()}
                 </tr>
               );
             })}

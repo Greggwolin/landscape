@@ -1638,12 +1638,29 @@ Never guess or make up values - only extract what is explicitly stated.""",
             # Fallback to extracted_text if no embeddings
             if not content:
                 cursor.execute("""
-                    SELECT COALESCE(extracted_text, '')
+                    SELECT COALESCE(extracted_text, ''), storage_uri, mime_type
                     FROM landscape.core_doc
                     WHERE doc_id = %s
                 """, [doc_id])
                 row = cursor.fetchone()
                 content = row[0] if row and row[0] else ''
+
+                # If still no content, try direct text extraction from the file
+                # (handles images via Vision API, fresh uploads with no embeddings yet)
+                if not content and row and row[1]:
+                    try:
+                        from .text_extraction import extract_text_from_url
+                        extracted_text, _err = extract_text_from_url(row[1], row[2])
+                        if extracted_text:
+                            content = extracted_text
+                            # Cache in core_doc.extracted_text for subsequent calls
+                            cursor.execute("""
+                                UPDATE landscape.core_doc
+                                SET extracted_text = %s
+                                WHERE doc_id = %s AND (extracted_text IS NULL OR extracted_text = '')
+                            """, [extracted_text[:100000], doc_id])
+                    except Exception as e:
+                        logger.warning(f"Direct extraction fallback failed for doc {doc_id}: {e}")
 
             doc_info['text'] = content
             return doc_info
@@ -3253,62 +3270,115 @@ Include a note in source_quote indicating whether value is monthly or annual."""
                     status = 'conflict' if conflict else 'pending'
                     conflict_extraction_id = conflict['existing_extraction_id'] if conflict else None
 
-                    # Use ON CONFLICT to dedupe: update if new confidence is higher
+                    # Check if a non-pending row already exists for this field
+                    # (ON CONFLICT WHERE status='pending' silently drops INSERTs
+                    # when existing row is accepted/applied/rejected)
                     cursor.execute("""
-                        INSERT INTO landscape.ai_extraction_staging (
-                            project_id, doc_id, field_key, extracted_value,
-                            confidence_score, source_snippet, status, scope,
-                            scope_label, array_index,
-                            target_table, target_field, db_write_type, selector_json,
-                            property_type, extraction_type, conflict_with_extraction_id, created_at
-                        ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
-                        )
-                        ON CONFLICT (project_id, field_key, COALESCE(scope_label, ''), COALESCE(array_index, 0))
-                        WHERE status = 'pending'
-                        DO UPDATE SET
-                            extracted_value = CASE
-                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
-                                THEN EXCLUDED.extracted_value
-                                ELSE landscape.ai_extraction_staging.extracted_value
-                            END,
-                            confidence_score = GREATEST(EXCLUDED.confidence_score, landscape.ai_extraction_staging.confidence_score),
-                            source_snippet = CASE
-                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
-                                THEN EXCLUDED.source_snippet
-                                ELSE landscape.ai_extraction_staging.source_snippet
-                            END,
-                            doc_id = CASE
-                                WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
-                                THEN EXCLUDED.doc_id
-                                ELSE landscape.ai_extraction_staging.doc_id
-                            END,
-                            conflict_with_extraction_id = COALESCE(EXCLUDED.conflict_with_extraction_id, landscape.ai_extraction_staging.conflict_with_extraction_id),
-                            status = CASE
-                                WHEN EXCLUDED.conflict_with_extraction_id IS NOT NULL THEN 'conflict'
-                                ELSE landscape.ai_extraction_staging.status
-                            END,
-                            created_at = NOW()
-                    """, [
-                        self.project_id,
-                        doc_id,
-                        field_key,
-                        json_value,
-                        conf_score,
-                        source_quote[:500] if source_quote else None,
-                        status,
-                        field.scope,
-                        None,  # scope_label for single values
-                        None,  # array_index for single values
-                        field.table_name,
-                        field.column_name,
-                        field.db_write_type,
-                        json.dumps(field.selector_json) if field.selector_json else None,
-                        self.property_type,
-                        extraction_type,
-                        conflict_extraction_id,
-                    ])
-                    staged_count += 1
+                        SELECT extraction_id, status, doc_id
+                        FROM landscape.ai_extraction_staging
+                        WHERE project_id = %s
+                          AND field_key = %s
+                          AND COALESCE(scope_label, '') = COALESCE(%s, '')
+                          AND COALESCE(array_index, 0) = COALESCE(%s, 0)
+                        LIMIT 1
+                    """, [self.project_id, field_key, None, None])
+                    existing = cursor.fetchone()
+
+                    if existing and existing[1] != 'pending':
+                        # Row exists with non-pending status — create as conflict
+                        # referencing the existing row
+                        if not conflict_extraction_id:
+                            conflict_extraction_id = existing[0]
+                        status = 'conflict'
+                        # Insert WITHOUT the unique constraint columns conflicting
+                        # by using a direct INSERT with a distinct scope_label
+                        cursor.execute("""
+                            INSERT INTO landscape.ai_extraction_staging (
+                                project_id, doc_id, field_key, extracted_value,
+                                confidence_score, source_snippet, status, scope,
+                                scope_label, array_index,
+                                target_table, target_field, db_write_type, selector_json,
+                                property_type, extraction_type, conflict_with_extraction_id, created_at
+                            ) VALUES (
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                            )
+                        """, [
+                            self.project_id,
+                            doc_id,
+                            field_key,
+                            json_value,
+                            conf_score,
+                            source_quote[:500] if source_quote else None,
+                            status,
+                            field.scope,
+                            f'__conflict_doc{doc_id}__',  # Unique scope_label to avoid constraint
+                            None,
+                            field.table_name,
+                            field.column_name,
+                            field.db_write_type,
+                            json.dumps(field.selector_json) if field.selector_json else None,
+                            self.property_type,
+                            extraction_type,
+                            conflict_extraction_id,
+                        ])
+                        staged_count += 1
+                    else:
+                        # No existing row or existing is pending — use ON CONFLICT to dedupe
+                        cursor.execute("""
+                            INSERT INTO landscape.ai_extraction_staging (
+                                project_id, doc_id, field_key, extracted_value,
+                                confidence_score, source_snippet, status, scope,
+                                scope_label, array_index,
+                                target_table, target_field, db_write_type, selector_json,
+                                property_type, extraction_type, conflict_with_extraction_id, created_at
+                            ) VALUES (
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                            )
+                            ON CONFLICT (project_id, field_key, COALESCE(scope_label, ''), COALESCE(array_index, 0))
+                            WHERE status = 'pending'
+                            DO UPDATE SET
+                                extracted_value = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.extracted_value
+                                    ELSE landscape.ai_extraction_staging.extracted_value
+                                END,
+                                confidence_score = GREATEST(EXCLUDED.confidence_score, landscape.ai_extraction_staging.confidence_score),
+                                source_snippet = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.source_snippet
+                                    ELSE landscape.ai_extraction_staging.source_snippet
+                                END,
+                                doc_id = CASE
+                                    WHEN EXCLUDED.confidence_score > landscape.ai_extraction_staging.confidence_score
+                                    THEN EXCLUDED.doc_id
+                                    ELSE landscape.ai_extraction_staging.doc_id
+                                END,
+                                conflict_with_extraction_id = COALESCE(EXCLUDED.conflict_with_extraction_id, landscape.ai_extraction_staging.conflict_with_extraction_id),
+                                status = CASE
+                                    WHEN EXCLUDED.conflict_with_extraction_id IS NOT NULL THEN 'conflict'
+                                    ELSE landscape.ai_extraction_staging.status
+                                END,
+                                created_at = NOW()
+                        """, [
+                            self.project_id,
+                            doc_id,
+                            field_key,
+                            json_value,
+                            conf_score,
+                            source_quote[:500] if source_quote else None,
+                            status,
+                            field.scope,
+                            None,  # scope_label for single values
+                            None,  # array_index for single values
+                            field.table_name,
+                            field.column_name,
+                            field.db_write_type,
+                            json.dumps(field.selector_json) if field.selector_json else None,
+                            self.property_type,
+                            extraction_type,
+                            conflict_extraction_id,
+                        ])
+                        staged_count += 1
 
         logger.info(f"Staged {staged_count} extractions for doc {doc_id}")
         return staged_count

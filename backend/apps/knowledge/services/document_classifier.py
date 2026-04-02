@@ -732,12 +732,29 @@ class DocumentClassifier:
             # If no embeddings, try to get from raw text
             if not content:
                 cursor.execute("""
-                    SELECT COALESCE(extracted_text, '')
+                    SELECT COALESCE(extracted_text, ''), storage_uri, mime_type
                     FROM landscape.core_doc
                     WHERE doc_id = %s
                 """, [doc_id])
                 row = cursor.fetchone()
                 content = row[0] if row and row[0] else ''
+
+                # If still no content, try direct text extraction from the file
+                # (handles images via Vision API, fresh uploads with no embeddings yet)
+                if not content and row and row[1]:
+                    try:
+                        from .text_extraction import extract_text_from_url
+                        extracted_text, _err = extract_text_from_url(row[1], row[2])
+                        if extracted_text:
+                            content = extracted_text
+                            # Cache in core_doc.extracted_text for subsequent calls
+                            cursor.execute("""
+                                UPDATE landscape.core_doc
+                                SET extracted_text = %s
+                                WHERE doc_id = %s AND (extracted_text IS NULL OR extracted_text = '')
+                            """, [extracted_text[:100000], doc_id])
+                    except Exception as e:
+                        logger.warning(f"Direct extraction fallback failed for doc {doc_id}: {e}")
 
             doc_info['content'] = content
             return doc_info

@@ -335,6 +335,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     parcelOutlineEnabled,
     saleComps,
     rentComps,
+    recentSales,
+    competitiveProjects,
     parcelCollection,
     parcelSubjectApn,
     parcelCompApns,
@@ -354,6 +356,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const saleCompMarkersRef = useRef<maplibregl.Marker[]>([]);
   const rentCompMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const recentSalesMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const competitorMarkersRef = useRef<maplibregl.Marker[]>([]);
   const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
@@ -1396,6 +1400,126 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     };
      
   }, [mapLoaded, styleRevision, rentComps, layers]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render Recent Sales (Redfin comps — green/yellow/red price tiers)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    clearMarkers(recentSalesMarkersRef);
+
+    const recentSalesLayer = layers.groups
+      .find((g) => g.id === 'market')
+      ?.layers.find((l) => l.id === 'recent-sales');
+
+    if (!recentSalesLayer?.visible || !recentSales || !recentSales.features?.length) return;
+
+    recentSales.features.forEach((feature) => {
+      if (!map.current || feature.geometry?.type !== 'Point') return;
+      const coords = feature.geometry.coordinates as [number, number];
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const color = (props.color as string) || LAYER_COLORS.recentSales;
+
+      const title = typeof props.popover_title === 'string' ? props.popover_title : (typeof props.name === 'string' ? props.name : 'Recent Sale');
+      let rows: Array<{ label: string; value: string }> = [];
+      try { rows = JSON.parse(String(props.popover_rows || '[]')); } catch { /* ignore */ }
+
+      const popup = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: false,
+        className: 'map-tab-popover',
+        maxWidth: '320px',
+      });
+
+      popup.setHTML(buildPopoverHtml(title, rows));
+
+      // Smaller circle marker for density
+      const markerEl = document.createElement('div');
+      markerEl.className = 'map-tab-marker';
+      markerEl.style.width = '14px';
+      markerEl.style.height = '14px';
+      markerEl.style.borderRadius = '50%';
+      markerEl.style.backgroundColor = color;
+      markerEl.style.border = '2px solid rgba(255,255,255,0.9)';
+      markerEl.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
+      markerEl.style.cursor = 'pointer';
+
+      const marker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat(coords)
+        .setPopup(popup)
+        .addTo(map.current!);
+
+      markerEl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        marker.togglePopup();
+      });
+
+      recentSalesMarkersRef.current.push(marker);
+    });
+
+    return () => {
+      clearMarkers(recentSalesMarkersRef);
+    };
+  }, [mapLoaded, styleRevision, recentSales, layers]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render Competitive Projects (status-colored markers)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    clearMarkers(competitorMarkersRef);
+
+    const competitorLayer = layers.groups
+      .find((g) => g.id === 'market')
+      ?.layers.find((l) => l.id === 'competitive-projects');
+
+    if (!competitorLayer?.visible || !competitiveProjects || !competitiveProjects.features?.length) return;
+
+    competitiveProjects.features.forEach((feature) => {
+      if (!map.current || feature.geometry?.type !== 'Point') return;
+      const coords = feature.geometry.coordinates as [number, number];
+      const props = (feature.properties ?? {}) as Record<string, unknown>;
+      const color = (props.color as string) || LAYER_COLORS.competitiveProjects;
+
+      const title = typeof props.popover_title === 'string' ? props.popover_title : (typeof props.name === 'string' ? props.name : 'Competitor');
+      let rows: Array<{ label: string; value: string }> = [];
+      try { rows = JSON.parse(String(props.popover_rows || '[]')); } catch { /* ignore */ }
+
+      const popup = new maplibregl.Popup({
+        closeButton: true,
+        closeOnClick: false,
+        className: 'map-tab-popover',
+        maxWidth: '320px',
+      });
+
+      popup.setHTML(buildPopoverHtml(title, rows));
+
+      const markerEl = document.createElement('div');
+      markerEl.className = 'map-tab-marker';
+      markerEl.innerHTML = buildPinSvg(color, 'var(--cui-white)');
+      markerEl.style.cursor = 'pointer';
+
+      const marker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat(coords)
+        .setPopup(popup)
+        .addTo(map.current!);
+
+      markerEl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        marker.togglePopup();
+      });
+
+      competitorMarkersRef.current.push(marker);
+    });
+
+    return () => {
+      clearMarkers(competitorMarkersRef);
+    };
+  }, [mapLoaded, styleRevision, competitiveProjects, layers]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Project Center Marker (always visible, independent of demo-rings)

@@ -98,6 +98,7 @@ class SourcesAndUsesGenerator(PreviewBaseGenerator):
         sources_total = preview['_sources_total']
 
         unit_label, unit_count = self._get_unit_info(ptype)
+        total_acres = self._get_acres() if ptype == 'LAND' else None
 
         styles = make_styles(8.5)
         elements = []
@@ -113,19 +114,29 @@ class SourcesAndUsesGenerator(PreviewBaseGenerator):
             subtitle = f"{name} | {unit_count} {unit_label}s | {today} | RPT-01 | {type_label} | {hold}-Year Hold"
         add_header(elements, 'Sources & Uses of Funds', subtitle)
 
-        col_widths = scale_cw([2.8, 1.1, 1.1, 1.0], PORTRAIT_WIDTH)
-        unit_hdr = f'$/{unit_label} ({unit_count:,})'
+        # 5-column layout when acres available, 4-column otherwise
+        has_acres = total_acres is not None
+        if has_acres:
+            col_widths = scale_cw([2.5, 1.0, 1.0, 0.9, 0.9], PORTRAIT_WIDTH)
+        else:
+            col_widths = scale_cw([2.8, 1.1, 1.1, 1.0], PORTRAIT_WIDTH)
+
+        unit_hdr = f'$/Unit ({unit_count:,})'
+        acres_hdr = f'$/Acre ({total_acres:,.0f})' if has_acres else ''
 
         tbl_data = []
         row_styles_list = []
 
         # ─── USES SECTION ───────────────────────────────────────────
-        tbl_data.append([
+        hdr_cells = [
             hp('Uses of Funds', styles),
             hp('Amount', styles, right=True),
             hp('% of Total', styles, right=True),
             hp(unit_hdr, styles, right=True),
-        ])
+        ]
+        if has_acres:
+            hdr_cells.append(hp(acres_hdr, styles, right=True))
+        tbl_data.append(hdr_cells)
         row_styles_list.append('header')
 
         for row in uses:
@@ -134,38 +145,50 @@ class SourcesAndUsesGenerator(PreviewBaseGenerator):
             amt = row['amount']
             pct = self.safe_div(amt, uses_total) * 100 if uses_total else 0
             per_unit = self.safe_div(amt, unit_count) if unit_count else 0
+            per_acre = self.safe_div(amt, total_acres) if has_acres else 0
 
-            # Only show $/unit for header-level (category totals), not children
             show_per_unit = is_bold and amt != 0
-            tbl_data.append([
+            show_per_acre = is_bold and amt != 0 and has_acres
+            cells = [
                 p(row['category'], styles, bold=is_bold),
                 p(fmt_currency(amt), styles, bold=is_bold, right=True),
                 p(fmt_pct(pct, decimals=1), styles, bold=is_bold, right=True),
                 p(fmt_currency(per_unit) if show_per_unit else '', styles, bold=is_bold, right=True),
-            ])
+            ]
+            if has_acres:
+                cells.append(p(fmt_currency(per_acre) if show_per_acre else '', styles, bold=is_bold, right=True))
+            tbl_data.append(cells)
             row_styles_list.append('indent' if rs == 'indent' else '')
 
         # Total Uses
         per_unit_total = self.safe_div(uses_total, unit_count) if unit_count else 0
-        tbl_data.append([
+        total_cells = [
             p('TOTAL USES', styles, bold=True),
             p(fmt_currency(uses_total), styles, bold=True, right=True),
             p('100.0%', styles, bold=True, right=True),
             p(fmt_currency(per_unit_total), styles, bold=True, right=True),
-        ])
+        ]
+        if has_acres:
+            acres_total_val = self.safe_div(uses_total, total_acres)
+            total_cells.append(p(fmt_currency(acres_total_val), styles, bold=True, right=True))
+        tbl_data.append(total_cells)
         row_styles_list.append('total')
 
         # Blank separator
-        tbl_data.append(['', '', '', ''])
+        sep = ['', '', '', '', ''] if has_acres else ['', '', '', '']
+        tbl_data.append(sep)
         row_styles_list.append('separator')
 
         # ─── SOURCES SECTION ────────────────────────────────────────
-        tbl_data.append([
+        hdr_cells = [
             hp('Sources of Funds', styles),
             hp('Amount', styles, right=True),
             hp('% of Total', styles, right=True),
             hp(unit_hdr, styles, right=True),
-        ])
+        ]
+        if has_acres:
+            hdr_cells.append(hp(acres_hdr, styles, right=True))
+        tbl_data.append(hdr_cells)
         row_styles_list.append('header')
 
         for row in sources:
@@ -174,50 +197,66 @@ class SourcesAndUsesGenerator(PreviewBaseGenerator):
             amt = row['amount']
             pct = self.safe_div(amt, sources_total) * 100 if sources_total else 0
             per_unit = self.safe_div(amt, unit_count) if unit_count else 0
+            per_acre = self.safe_div(amt, total_acres) if has_acres else 0
 
-            # Show $/unit for header-level rows; skip for indent and zero-amount info rows
             show_per_unit = is_bold and amt != 0
-            tbl_data.append([
+            show_per_acre = is_bold and amt != 0 and has_acres
+            cells = [
                 p(row['category'], styles, bold=is_bold),
                 p(fmt_currency(amt), styles, bold=is_bold, right=True),
                 p(fmt_pct(pct, decimals=1), styles, bold=is_bold, right=True),
                 p(fmt_currency(per_unit) if show_per_unit else '', styles, bold=is_bold, right=True),
-            ])
+            ]
+            if has_acres:
+                cells.append(p(fmt_currency(per_acre) if show_per_acre else '', styles, bold=is_bold, right=True))
+            tbl_data.append(cells)
             row_styles_list.append('indent' if rs == 'indent' else '')
 
         # Total Sources
         src_per_unit = self.safe_div(sources_total, unit_count) if unit_count else 0
-        tbl_data.append([
+        total_cells = [
             p('TOTAL SOURCES', styles, bold=True),
             p(fmt_currency(sources_total), styles, bold=True, right=True),
             p('100.0%', styles, bold=True, right=True),
             p(fmt_currency(src_per_unit), styles, bold=True, right=True),
-        ])
+        ]
+        if has_acres:
+            src_acres_val = self.safe_div(sources_total, total_acres)
+            total_cells.append(p(fmt_currency(src_acres_val), styles, bold=True, right=True))
+        tbl_data.append(total_cells)
         row_styles_list.append('total')
 
         # ─── MEMO SECTION (Land Dev financing summary) ──────────────
         if memo:
-            tbl_data.append(['', '', '', ''])
+            tbl_data.append(sep)
             row_styles_list.append('separator')
 
-            tbl_data.append([
+            memo_hdr = [
                 hp('Financing Summary (Memo)', styles),
                 hp('', styles, right=True),
                 hp('', styles, right=True),
                 hp('', styles, right=True),
-            ])
+            ]
+            if has_acres:
+                memo_hdr.append(hp('', styles, right=True))
+            tbl_data.append(memo_hdr)
             row_styles_list.append('header')
 
             for row in memo:
                 rs = row.get('_rowStyle', '')
                 is_bold = rs in ('header', 'bold')
                 note = row.get('_note', '')
-                tbl_data.append([
+                cells = [
                     p(row['category'], styles, bold=is_bold),
                     p(fmt_currency(row['amount']), styles, bold=is_bold, right=True),
                     p('', styles, right=True),
-                    p(note, styles, right=True),
-                ])
+                    p('', styles, right=True),
+                ]
+                if has_acres:
+                    cells.append(p(note, styles, right=True))
+                else:
+                    cells[3] = p(note, styles, right=True)
+                tbl_data.append(cells)
                 row_styles_list.append('indent' if rs == 'indent' else '')
 
         # ─── BUILD TABLE ────────────────────────────────────────────
@@ -486,15 +525,31 @@ class SourcesAndUsesGenerator(PreviewBaseGenerator):
             return 'Unit', count
 
     def _get_lot_count(self):
-        """Count parcels for land dev projects."""
+        """Sum of units_total across all parcels for land dev projects."""
         try:
             result = self.execute_scalar("""
-                SELECT COUNT(*) FROM landscape.tbl_parcel WHERE project_id = %s
+                SELECT COALESCE(SUM(units_total), 0)
+                FROM landscape.tbl_parcel
+                WHERE project_id = %s
             """, [self.project_id])
             return int(result or 0) or 1
         except Exception as e:
             logger.warning("Lot count query failed: %s", e)
             return 1
+
+    def _get_acres(self):
+        """Total gross acres from tbl_parcel."""
+        try:
+            result = self.execute_scalar("""
+                SELECT COALESCE(SUM(acres_gross), 0)
+                FROM landscape.tbl_parcel
+                WHERE project_id = %s
+            """, [self.project_id])
+            val = float(result or 0)
+            return val if val > 0 else None
+        except Exception as e:
+            logger.warning("Acres query failed: %s", e)
+            return None
 
     def _get_unit_count(self):
         """Count units for MF projects."""

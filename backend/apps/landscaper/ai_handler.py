@@ -828,6 +828,38 @@ def get_tools_for_context(
 
     return filtered_tools
 
+_PAGE_MUTATION_HINTS = {
+    "sales": (
+        "MUTATION TOOLS FOR THIS PAGE:\n"
+        "- To change lot pricing / price per FF / growth rate: update_land_use_pricing\n"
+        "  This writes to land_use_pricing (source of truth) and auto-triggers recalculate-sfd.\n"
+        "  Pass an 'updates' array where each item has lu_type_code, price_per_unit, unit_of_measure.\n"
+        "  Example: updates=[dict(lu_type_code='SFD', price_per_unit=3000, unit_of_measure='FF')]\n"
+        "- To update sale events/contracts: update_parcel_sale_event\n"
+        "- To update absorption schedule: update_absorption_schedule\n"
+        "- To update individual parcel transaction costs (commission, closing, etc.): update_parcel_sale_assumptions\n"
+        "You HAVE these tools. Use them. Do NOT say you lack access to update pricing."
+    ),
+    "land_schedule": (
+        "MUTATION TOOLS FOR THIS PAGE:\n"
+        "- To change lot pricing / price per FF / growth rate: update_land_use_pricing\n"
+        "  This writes to land_use_pricing (source of truth) and auto-triggers recalculate-sfd.\n"
+        "  Pass updates array with lu_type_code + price_per_unit + unit_of_measure.\n"
+        "- To update sale events/contracts: update_parcel_sale_event\n"
+        "- To update absorption schedule: update_absorption_schedule\n"
+        "You HAVE these tools. Use them. Do NOT say you lack access to update pricing."
+    ),
+    "schedule": (
+        "MUTATION TOOLS FOR THIS PAGE:\n"
+        "- To change lot pricing / price per FF / growth rate: update_land_use_pricing\n"
+        "  This writes to land_use_pricing (source of truth) and auto-triggers recalculate-sfd.\n"
+        "- To update sale events/contracts: update_parcel_sale_event\n"
+        "- To update absorption schedule: update_absorption_schedule\n"
+        "You HAVE these tools. Use them. Do NOT say you lack access to update pricing."
+    ),
+}
+
+
 def _build_scope_and_authority(current_tab: str = "home") -> str:
     """
     Generate the SCOPE AND AUTHORITY section for the system prompt.
@@ -835,6 +867,11 @@ def _build_scope_and_authority(current_tab: str = "home") -> str:
     Injected on every turn so the model understands its full-context permissions
     regardless of which page the user is on.
     """
+    # Page-specific mutation hints reduce tool-blindness in 200+ tool contexts
+    tab_lower = (current_tab or "home").strip().lower()
+    mutation_hint = _PAGE_MUTATION_HINTS.get(tab_lower, "")
+    mutation_block = f"\n\n{mutation_hint}" if mutation_hint else ""
+
     return f"""
 SCOPE AND AUTHORITY:
 
@@ -892,6 +929,7 @@ and visible in the current grid/table:
 - When retrieving from uploaded documents (RAG), cross-reference against project tables
   before presenting. If a comp or data point already exists in the project database,
   skip it in your response — the user already has it.
+{mutation_block}
 """
 
 
@@ -929,6 +967,17 @@ WRITABLE assumption fields (examples):
   - discount_rate, exit_cap_rate, hold_period_years (DCF assumptions)
   - annual_amount on non-auto-calculated operating expenses
   - current_market_rent, lot_count, net_acres (property inputs)
+  - price_per_unit, unit_of_measure, growth_rate on land_use_pricing — these are
+    the source-of-truth pricing inputs. Use update_land_use_pricing to write them.
+    This tool auto-triggers recalculate-sfd to propagate to parcel assumptions.
+  - Transaction cost fields on tbl_parcel_sale_assumptions (commission_pct,
+    closing_cost_pct, legal_pct, title_insurance_pct, sale_date) — per-parcel
+    overrides. Use update_parcel_sale_assumptions for these.
+
+NOTE: land_use_pricing is the SOURCE OF TRUTH for lot pricing. tbl_parcel_sale_assumptions
+is a DERIVED CACHE populated by the recalculate-sfd pipeline. To change pricing, always
+write to land_use_pricing via update_land_use_pricing — never write base_price_per_unit
+directly to tbl_parcel_sale_assumptions.
 
 If you are unsure whether a field is an input or output, call get_field_schema
 to check is_calculated before proposing a write.
@@ -1849,6 +1898,32 @@ Example: "Metrostudy Q4 2025 Phoenix MSA", "Builder interview — Taylor Morriso
 - **units_total**: Holds the count of individual lots/units of that type.
 - **Legacy hierarchy**: Area → Phase → Parcel (tbl_area, tbl_phase, tbl_parcel tables).
 - **Land use budget**: Stored in tbl_container.attributes JSONB as interim storage.
+
+## Lot Pricing Mutations (CRITICAL)
+
+When the user asks to change, update, or set lot pricing, sale prices, price per front foot,
+or growth rates:
+
+Use `update_land_use_pricing` — this writes to `land_use_pricing` (the source of truth)
+and automatically triggers recalculate-sfd to propagate changes to all parcel-level
+assumptions and downstream cash flow.
+
+Front foot pricing: Set `price_per_unit` to the $/FF amount and `unit_of_measure` to `FF`.
+The recalculate pipeline computes gross lot price as lot_width × price_per_unit.
+
+Example — "Set all SFD lots to $3,000/FF":
+1. Call `update_land_use_pricing` with updates array containing one item:
+   lu_type_code='SFD', price_per_unit=3000, unit_of_measure='FF'
+2. The tool auto-triggers recalculate-sfd — parcel assumptions update automatically.
+3. Verify with `get_parcel_sale_assumptions` to confirm values propagated.
+
+Supported unit_of_measure values: FF (front foot), AC (acre), EA (each/per lot).
+
+For per-parcel transaction cost overrides (commission_pct, closing_cost_pct, etc.),
+use `update_parcel_sale_assumptions` — those are parcel-level settings, not pricing.
+
+NEVER say "I don't have access to update pricing" — you have update_land_use_pricing.
+Execute the change, then verify.
 {BASE_INSTRUCTIONS}""",
 
     'multifamily': f"""You are Landscaper, an AI assistant specialized in multifamily real estate analysis.

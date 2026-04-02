@@ -120,7 +120,8 @@ export default function EquityPage() {
   }, [projectId]);
 
   const handleSaved = useCallback(() => {
-    if (hasRunOnce.current && !loading) {
+    // Always recalculate waterfall after assumptions are saved
+    if (!loading) {
       handleRun();
     }
   }, [handleRun, loading]);

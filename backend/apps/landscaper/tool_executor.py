@@ -2111,16 +2111,77 @@ def handle_ingest_document(
     project_id: int,
     **kwargs
 ) -> Dict[str, Any]:
-    """Auto-populate project fields from a document."""
+    """Auto-populate project fields from a document.
+
+    If extraction has not yet been completed for this document,
+    triggers the extraction pipeline first before attempting ingestion.
+    """
     doc_id = tool_input.get('doc_id')
     if not doc_id:
         return {'success': False, 'error': 'doc_id is required'}
+
+    # Check if extraction has already completed; if not, trigger it
+    try:
+        _ensure_extraction_complete(int(doc_id), project_id)
+    except Exception as e:
+        logger.warning(f"ingest_document: extraction trigger failed for doc {doc_id}: {e}")
+        # Continue anyway — ingestion will fail gracefully if no content
+
     return ingest_document(
         doc_id=doc_id,
         project_id=project_id,
         overwrite_existing=tool_input.get('overwrite_existing', False),
         field_filter=tool_input.get('field_filter')
     )
+
+
+def _ensure_extraction_complete(doc_id: int, project_id: int) -> None:
+    """
+    Check if extraction exists for this document. If not, trigger
+    the text extraction + RAG processing pipeline synchronously.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        # Check dms_extract_queue for completed extraction
+        cursor.execute("""
+            SELECT status FROM landscape.dms_extract_queue
+            WHERE doc_id = %s
+            ORDER BY processed_at DESC NULLS LAST
+            LIMIT 1
+        """, [doc_id])
+        row = cursor.fetchone()
+
+        if row and row[0] == 'completed':
+            return  # Already extracted, nothing to do
+
+        # Also check if knowledge_embeddings exist as fallback
+        cursor.execute("""
+            SELECT COUNT(*) FROM landscape.knowledge_embeddings
+            WHERE source_type = 'document_chunk' AND source_id = %s
+        """, [doc_id])
+        embed_count = cursor.fetchone()[0]
+        if embed_count > 0:
+            return  # Embeddings exist, content is available
+
+    # No extraction found — trigger it
+    logger.info(f"ingest_document: No extraction found for doc {doc_id}, triggering pipeline")
+
+    try:
+        from apps.knowledge.services.document_ingestion import DocumentProcessor
+        processor = DocumentProcessor()
+        processor.process_document(doc_id)
+        logger.info(f"ingest_document: Extraction completed for doc {doc_id}")
+    except Exception as e:
+        logger.error(f"ingest_document: DocumentProcessor failed for doc {doc_id}: {e}")
+        # Try the batched extraction as fallback
+        try:
+            from apps.knowledge.services.extraction_service import extract_document_batched
+            result = extract_document_batched(doc_id, project_id)
+            logger.info(f"ingest_document: Batched extraction completed for doc {doc_id}: {result.get('success')}")
+        except Exception as e2:
+            logger.error(f"ingest_document: Batched extraction also failed for doc {doc_id}: {e2}")
+            raise
 
 
 @register_tool('get_document_media_summary')
@@ -5757,6 +5818,204 @@ def handle_bulk_update_parcel_sale_assumptions(
 
     except Exception as e:
         logger.error(f"Error in bulk update parcel sale assumptions: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Land Use Pricing Tools (writes to land_use_pricing — source of truth)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# land_use_pricing columns (verified against schema)
+# PK: id, project_id + lu_type_code + product_code is the logical key
+LAND_USE_PRICING_COLUMNS = [
+    'price_per_unit', 'unit_of_measure', 'growth_rate',
+]
+
+
+@register_tool('update_land_use_pricing', is_mutation=True)
+def handle_update_land_use_pricing(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Update pricing in land_use_pricing (source of truth) for one or more land
+    use types, then trigger recalculate-sfd to propagate to parcel-level
+    assumptions and cash flow.
+
+    Accepts a list of pricing updates keyed by lu_type_code (+ optional
+    product_code). After writing, calls the recalculate-sfd pipeline so
+    tbl_parcel_sale_assumptions and all downstream calculations reflect the
+    new pricing immediately.
+    """
+    updates = tool_input.get('updates', [])
+    reason = tool_input.get('reason', 'Update land use pricing')
+    trigger_recalc = tool_input.get('trigger_recalc', True)
+
+    if not updates:
+        return {'success': False, 'error': 'updates array required'}
+
+    if len(updates) > 50:
+        return {
+            'success': False,
+            'error': f'Maximum 50 items per request. Received {len(updates)}. Split into smaller batches.'
+        }
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='land_use_pricing_update',
+            table_name='land_use_pricing',
+            field_name=None,
+            record_id=None,
+            proposed_value={'count': len(updates), 'updates': updates},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    succeeded = 0
+    failed = []
+    type_codes_touched = set()
+
+    try:
+        with connection.cursor() as cursor:
+            for item in updates:
+                lu_type_code = item.get('lu_type_code')
+                if not lu_type_code:
+                    failed.append({'lu_type_code': None, 'error': 'lu_type_code required'})
+                    continue
+
+                product_code = item.get('product_code', None)
+                price_per_unit = item.get('price_per_unit')
+                unit_of_measure = item.get('unit_of_measure')
+                growth_rate = item.get('growth_rate')
+
+                if price_per_unit is None and unit_of_measure is None and growth_rate is None:
+                    failed.append({
+                        'lu_type_code': lu_type_code,
+                        'error': 'At least one of price_per_unit, unit_of_measure, or growth_rate required'
+                    })
+                    continue
+
+                try:
+                    # Check if row exists
+                    if product_code is not None:
+                        cursor.execute("""
+                            SELECT id FROM landscape.land_use_pricing
+                            WHERE project_id = %s AND lu_type_code = %s AND product_code = %s
+                        """, [project_id, lu_type_code, product_code])
+                    else:
+                        cursor.execute("""
+                            SELECT id FROM landscape.land_use_pricing
+                            WHERE project_id = %s AND lu_type_code = %s
+                              AND (product_code IS NULL OR product_code = '')
+                        """, [project_id, lu_type_code])
+
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        # Build dynamic UPDATE
+                        set_parts = []
+                        values = []
+                        if price_per_unit is not None:
+                            set_parts.append("price_per_unit = %s")
+                            values.append(price_per_unit)
+                        if unit_of_measure is not None:
+                            set_parts.append("unit_of_measure = %s")
+                            values.append(unit_of_measure)
+                        if growth_rate is not None:
+                            set_parts.append("growth_rate = %s")
+                            values.append(growth_rate)
+                        set_parts.append("updated_at = NOW()")
+
+                        values.append(existing[0])
+                        cursor.execute(f"""
+                            UPDATE landscape.land_use_pricing
+                            SET {', '.join(set_parts)}
+                            WHERE id = %s
+                        """, values)
+                    else:
+                        # INSERT new row
+                        cursor.execute("""
+                            INSERT INTO landscape.land_use_pricing
+                                (project_id, lu_type_code, product_code,
+                                 price_per_unit, unit_of_measure, growth_rate,
+                                 created_at, updated_at)
+                            VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        """, [
+                            project_id, lu_type_code, product_code,
+                            price_per_unit or 0,
+                            unit_of_measure or 'FF',
+                            growth_rate or 0.035,
+                        ])
+
+                    succeeded += 1
+                    type_codes_touched.add(lu_type_code)
+
+                except Exception as item_error:
+                    failed.append({
+                        'lu_type_code': lu_type_code,
+                        'error': str(item_error)
+                    })
+
+        if succeeded > 0:
+            _log_comparables_activity(
+                project_id, 'land_use_pricing', 'update', succeeded, reason
+            )
+
+        # Trigger recalculate-sfd to propagate to tbl_parcel_sale_assumptions
+        recalc_result = None
+        if trigger_recalc and succeeded > 0:
+            try:
+                from django.test import RequestFactory
+                from apps.sales_absorption.views import recalculate_sfd_parcels
+
+                factory = RequestFactory()
+                type_codes_csv = ','.join(type_codes_touched)
+                # RequestFactory with query string; @api_view wraps into DRF Request
+                # which exposes request.query_params from the GET params
+                fake_request = factory.post(
+                    f'/api/projects/{project_id}/recalculate-sfd/?type_codes={type_codes_csv}',
+                    content_type='application/json',
+                )
+
+                response = recalculate_sfd_parcels(fake_request, project_id)
+                if response.status_code == 200:
+                    recalc_data = response.data if hasattr(response, 'data') else {}
+                    recalc_result = {
+                        'triggered': True,
+                        'parcels_updated': recalc_data.get('updated_count', 'unknown'),
+                        'type_codes': list(type_codes_touched),
+                    }
+                else:
+                    recalc_result = {
+                        'triggered': True,
+                        'warning': f'Recalculate returned status {response.status_code}',
+                    }
+            except Exception as recalc_error:
+                logger.warning(f"Recalculate-sfd failed after pricing update: {recalc_error}")
+                recalc_result = {
+                    'triggered': False,
+                    'error': str(recalc_error),
+                    'note': 'Pricing was saved but parcel-level recalculation failed. '
+                            'Manually trigger recalculate-sfd to propagate.',
+                }
+
+        return {
+            'success': True,
+            'succeeded': succeeded,
+            'failed': failed,
+            'total': len(updates),
+            'type_codes_updated': list(type_codes_touched),
+            'recalculation': recalc_result,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating land use pricing: {e}")
         return {'success': False, 'error': str(e)}
 
 
@@ -14024,6 +14283,9 @@ AUTO_EXECUTE_TOOLS = {
     'delete_units',       # Unit deletion - user explicitly requested in chat (2-phase: confirm → execute)
     'create_land_dev_containers',  # Land dev hierarchy bulk create from document intake
     'update_lot_mix',     # Lot mix batch from document intake
+    'update_parcel_sale_assumptions',  # Parcel pricing - user explicitly requested
+    'bulk_update_parcel_sale_assumptions',  # Parcel pricing batch - user explicitly requested
+    'update_land_use_pricing',  # Land use pricing - user explicitly requested, triggers recalc
 }
 
 

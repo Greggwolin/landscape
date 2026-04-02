@@ -4,6 +4,18 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Tier 1 Open Items — 2026-04-01
+
+**What changed:**
+- Rebuilt `LANDSCAPE_TEMPLATES_COWORK_BRIEF.docx` with finalized seed numbers (GPR $1,824K, NOI $1,230K, cap 5.0% → $24.6M) — full spec with schema change, clone API design, and implementation steps
+- CC executed `CC_OPERATIONS_GET_MIGRATION.md` — Operations GET (1,303-line P&L route) migrated from Next.js to Django; `useOperationsData.ts` updated to call Django
+- CC executed `CC_THREAD_RACE_CONDITION_DEBUG.md` — thread auto-selection race condition fixed; blank thread accumulation resolved
+
+**Open items:**
+- Operations GET: legacy Next.js route (`src/app/api/projects/[projectId]/operations/route.ts`) retained as dead code — delete after confirming Django route stable in production
+
+---
+
 ## Alpha Cleanup + CLAUDE.md Sync — 2026-03-27
 
 **What changed:**
@@ -25,28 +37,28 @@
 - Salman Ahmad docs color matching — blocked on: need MF user guide .docx with color metadata uploaded — last touched: 3/24 (from Claude Projects) ⚠️ stale
 
 🟡 In Progress (started but incomplete):
-- Operations GET migration — status: save endpoints migrated to Django, GET (1,303-line P&L) still on Next.js — next step: draft CC prompt to migrate GET route — last touched: 3/27
+- ~~Operations GET migration~~ — ✅ RESOLVED 4/1: CC executed `CC_OPERATIONS_GET_MIGRATION.md`; Django GET route live, `useOperationsData.ts` updated; legacy Next.js route kept as dead code pending production confirm
 - Scanned PDF / OCR pipeline — status: OCRmyPDF identified as solution, not yet implemented — next step: build preprocessing step in `backend/apps/documents/` before `core_doc_text` ingestion — last touched: 3/20
 - User guide production — status: MF Operations chapter complete, master outline done — next step: execute `COWORK_USER_GUIDE_BUILD_XK14.md` for full 14-chapter build — last touched: 3/16 (from Claude Projects, session XK) ⚠️ stale
 - Conversational UI redesign — status: concept/spec complete, 6 HTML mockups produced — next step: begin Phase 1 layout shell implementation — artifact: `LANDSCAPE_CONVERSATIONAL_UI_CONCEPT_RX.md` — last touched: 3/23 (from Claude Projects, session RX)
-- Thread list UI missing from Landscaper panel — status: no browse/switch thread capability — next step: build thread list sidebar in LandscaperPanel — last touched: 3/18
-- Thread auto-selection race condition — status: new blank threads created before API returns existing threads — next step: debug mount sequence in Landscaper panel — last touched: 3/18
+- ~~Thread list UI missing from Landscaper panel~~ — ✅ RESOLVED: `ThreadList.tsx` present and integrated in `LandscaperChatThreaded.tsx` (auto-resolved, shipped prior to 4/1)
+- ~~Thread auto-selection race condition~~ — ✅ RESOLVED 4/1: CC executed `CC_THREAD_RACE_CONDITION_DEBUG.md`; camelCase mismatch fixed + server-side guard added
 
 🟠 Queued (designed/specified but not started):
 - DMS version control — artifact: `CC_DMS_VERSION_CONTROL_XR2.md` — waiting for: CC execution (from Claude Projects, session XR) ⚠️ stale
 - Rent comp harvester implementation — artifact: `CC_RENTAL_COMP_HARVESTER_REDFIN_GR30.md` — waiting for: schema migration on `tbl_rental_comparable` + CC execution (from Claude Projects, session GR)
 - DMS Intelligence Layer — artifact: `COWORK_DMS_INTELLIGENCE_LAYER_KR17.md` — waiting for: Cowork execution (from Claude Projects, session KR)
-- Acquisition picklist migration — artifact: `COWORK_ACQUISITION_PICKLIST_MIGRATION_GX5.md` — waiting for: Cowork/CC execution (from Claude Projects, session GX)
+- ~~Acquisition picklist migration~~ — ✅ RESOLVED 3/29: shipped in commit `9d510ab` (feat: acquisition event type picklist + CLOSING cost fix)
 - Platform Intelligence Agents — artifact: `QWEN_MARKET_INTELLIGENCE_AGENT_PL1.md` — waiting for: Gern/Qwen execution (from Claude Projects, session PL) ⚠️ stale
 - Platform knowledge audit — artifact: `CC_PLATFORM_KNOWLEDGE_AUDIT_XK18.md` — waiting for: CC execution (from Claude Projects, session XK) ⚠️ stale
 - CoreUI audit — artifact: `COREUI_AUDIT_SKILL.md` — waiting for: OpenClaw/Qwen execution (from Claude Projects, session WX) ⚠️ stale
-- Project templates seed — status: full design done (50-unit LA MF), brief needs regeneration with final numbers — waiting for: Cowork rebuild of `LANDSCAPE_TEMPLATES_COWORK_BRIEF.docx` (from Claude Projects) ⚠️ stale
+- ~~Project templates seed~~ — ✅ RESOLVED 4/1: `LANDSCAPE_TEMPLATES_COWORK_BRIEF.docx` rebuilt with finalized numbers
 
 🔵 Verify (completed but unverified):
 - Dropzone fix (Landscaper Panel + Content Area) — needs: live test on all tabs — last touched: 3/19
 - Redfin SFD pricing fix for land dev — needs: live test on Weyyakin project — last touched: 3/19 (from Claude Projects)
-- Equity waterfall input components — needs: confirm restoration — last touched: 3/11 (from Claude Projects, session VF) ⚠️ stale
-- Loan scope UI save round-trip — needs: browser test (save → reload → verify containerIds) — last touched: 3/11
+- ~~Equity waterfall input components~~ — ✅ RESOLVED 4/1: `WaterfallConfigForm.tsx` present + actively extended through alpha15 (`3b9a97b`)
+- ~~Loan scope UI save round-trip~~ — ✅ RESOLVED 4/1: code-verified — `containerIds` hydrates from `loan.containers` on mount (LoanCard.tsx:401-403), saves via payload (line 509)
 - Geo auto-seeding end-to-end — needs: live test with Ketchum project (Census API calls need network) — last touched: 3/20
 - Image reclassification — needs: "Rescan All PDFs" to run through updated classification prompt — last touched: 3/19
 
