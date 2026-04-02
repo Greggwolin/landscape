@@ -1,74 +1,131 @@
 """
 Census Building Permits Survey Agent — place-level permit tracking.
 
-Fetches monthly building permit data from Census BPS Excel downloads for
-individual cities in monitored metro areas. Provides granular supply pipeline
-visibility that FRED's national-level PERMIT series cannot — critical for
-land development absorption analysis.
+Downloads monthly building permit CSV files from the Census Bureau's
+public file server and extracts permit counts for monitored cities.
+This provides granular supply pipeline visibility that FRED's national-
+level PERMIT series cannot — critical for land development absorption.
 
-Source: https://www2.census.gov/econ/bps/Place/{Region}/footnote{YYYYMM}.xls
+Source: https://www2.census.gov/econ/bps/Place/{Region}/we{YY}{MM}c.txt
 Auth: None (public download)
 Frequency: Monthly
 Geography: Place (city), County
-Format: Excel (.xls) — one file per month per region, ~2 MB each
-
-Note: Census does NOT offer a REST API for place-level BPS data. The
-      api.census.gov/data/{year}/bps endpoint does not exist. Place-level
-      data is only available as regional Excel file downloads.
+Format: CSV text — one file per month per region
 """
 
 from __future__ import annotations
 
+import csv
 import io
-import re
 import time
 from datetime import date, timedelta
-from decimal import Decimal
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from loguru import logger
 from market_ingest.normalize import NormalizedObservation, parse_decimal
 
 from ..base_agent import BaseAgent
-from ..config import PHOENIX_METRO_PLACES, AgentConfig
+from ..config import AgentConfig
+
+# State FIPS → abbreviation for coverage notes
+_STATE_ABBR = {"04": "AZ", "06": "CA", "08": "CO", "32": "NV", "49": "UT"}
 
 
-# Census BPS file download URL pattern
-# Format: https://www2.census.gov/econ/bps/Place/{Region}/footnote{YYYYMM}.xls
-BPS_DOWNLOAD_BASE = "https://www2.census.gov/econ/bps/Place"
+# ── Census BPS file structure ────────────────────────────────────────────
 
-# Phoenix metro is in the West Region
-WEST_REGION = "West Region"
+BPS_BASE_URL = "https://www2.census.gov/econ/bps"
 
-# Column mapping from Census BPS Excel to our series codes.
-# The Census Excel files have varying column headers, but the structure
-# is consistent: place identifiers, then permit counts by unit type.
-# We'll map by position after identifying the header row.
-SERIES_MAP = {
-    "PERMIT_TOTAL":    "total_buildings",
-    "PERMIT_UNITS":    "total_units",
-    "PERMIT_1UNIT":    "1_unit_bldgs",
-    "PERMIT_1UNIT_U":  "1_unit_units",
-    "PERMIT_2TO4":     "2_to_4_unit_bldgs",
-    "PERMIT_5PLUS":    "5plus_unit_bldgs",
-    "PERMIT_5PLUS_U":  "5plus_unit_units",
+# Regional file prefixes — Arizona is in the West
+REGION_PREFIXES = {
+    "west": "we",
+    "south": "so",
+    "midwest": "mw",
+    "northeast": "ne",
 }
 
-# Series codes this agent publishes
-SERIES_CODES = list(SERIES_MAP.keys())
+# Default region — West covers AZ, CA, CO, etc.
+DEFAULT_REGION = "west"
 
-# Rate limit between downloads
-DOWNLOAD_DELAY_SEC = 3.0
+# Column indices in the place-level CSV (0-based, from header inspection)
+# Row format:
+#   Survey Date, State Code, 6-Digit ID, County Code, Census Place,
+#   FIPS Place, FIPS MCD, Pop, CSA, CBSA, Footnote, Central City,
+#   Zip, Region, Division, Source, Place Name,
+#   1-unit Bldgs, 1-unit Units, 1-unit Value,
+#   2-unit Bldgs, 2-unit Units, 2-unit Value,
+#   3-4 unit Bldgs, 3-4 unit Units, 3-4 unit Value,
+#   5+ unit Bldgs, 5+ unit Units, 5+ unit Value
+COL_STATE = 1
+COL_FIPS_PLACE = 5
+COL_PLACE_NAME = 16
+COL_1UNIT_BLDGS = 17
+COL_1UNIT_UNITS = 18
+COL_1UNIT_VALUE = 19
+COL_2UNIT_BLDGS = 20
+COL_5PLUS_BLDGS = 26
+COL_5PLUS_UNITS = 27
+COL_5PLUS_VALUE = 28
 
-# How many months back to look (rolling window)
+# County-level column indices (different format, fewer columns)
+# Survey Date, FIPS State, FIPS County, Region, Division, County Name,
+# 1-unit Bldgs, 1-unit Units, 1-unit Value, ...
+CO_COL_STATE = 1
+CO_COL_COUNTY = 2
+CO_COL_NAME = 5
+CO_COL_1UNIT_BLDGS = 6
+CO_COL_1UNIT_UNITS = 7
+CO_COL_5PLUS_BLDGS = 15
+CO_COL_5PLUS_UNITS = 16
+
+# Series codes this agent writes to (must exist in public.market_series)
+SERIES_CODES = ["BPS_TOTAL", "BPS_ONEUNIT", "BPS_FIVEPLUS"]
+
+# Rate limit between file downloads (Census asks for courtesy)
+DOWNLOAD_DELAY_SEC = 2.0
+
+# How many months back on first run
 DEFAULT_LOOKBACK_MONTHS = 24
+
+# ── Target geographies ──────────────────────────────────────────────────
+# State FIPS → { place_fips: place_name }
+# Configurable: add new states/places here
+
+TARGET_PLACES: Dict[str, Dict[str, str]] = {
+    "04": {  # Arizona
+        "55000": "Phoenix",
+        "54050": "Peoria",
+        "27400": "Glendale",
+        "71510": "Surprise",
+        "07940": "Buckeye",
+        "28380": "Goodyear",
+        "27820": "Gilbert",
+        "12000": "Chandler",
+        "46000": "Mesa",
+        "65000": "Scottsdale",
+        "73000": "Tempe",
+        "57380": "Queen Creek",
+        "44410": "Maricopa",
+        "09950": "Casa Grande",
+        "23620": "Florence",
+        "15250": "Coolidge",
+        "77000": "Tucson",
+    },
+}
+
+TARGET_COUNTIES: Dict[str, Dict[str, str]] = {
+    "04": {  # Arizona
+        "013": "Maricopa",
+        "021": "Pinal",
+        "019": "Pima",
+    },
+}
 
 
 class CensusBpsAgent(BaseAgent):
     """
-    Downloads monthly Census BPS Excel files and extracts permit data
-    for Phoenix metro places and Maricopa County.
+    Downloads monthly Census BPS CSV files and extracts place-level
+    and county-level permit data for monitored geographies.
     """
 
     def __init__(self, config: Optional[AgentConfig] = None):
@@ -93,335 +150,383 @@ class CensusBpsAgent(BaseAgent):
         end: date,
     ) -> List[NormalizedObservation]:
         """
-        Download BPS Excel files for each month in range and extract
-        permit data for monitored places.
+        Download BPS CSV files for each month in range and extract
+        permit data for monitored places and counties.
         """
         observations: List[NormalizedObservation] = []
 
-        # Build list of (year, month) tuples to fetch
-        months_to_fetch = self._get_month_range(start, end)
+        months = self._month_range(start, end)
+        if not months:
+            return []
+
+        # Ensure all target places exist in geo_xwalk
+        self._ensure_geo_xwalk_entries()
+
         logger.info(
-            "[CENSUS_BPS] Fetching %d months of permit data (%s to %s)",
-            len(months_to_fetch),
-            months_to_fetch[0] if months_to_fetch else "none",
-            months_to_fetch[-1] if months_to_fetch else "none",
+            "[CENSUS_BPS] Fetching %d months (%04d-%02d to %04d-%02d)",
+            len(months), months[0][0], months[0][1],
+            months[-1][0], months[-1][1],
         )
 
-        # Build FIPS lookup for our target places
-        place_lookup = self._build_place_lookup()
-
-        for year, month in months_to_fetch:
+        # ── Place-level files ───────────────────────────────────────
+        for year, month in months:
             try:
-                month_obs = self._fetch_month(year, month, place_lookup, series_meta)
-                observations.extend(month_obs)
+                place_obs = self._download_and_parse_places(
+                    year, month, series_meta,
+                )
+                observations.extend(place_obs)
             except Exception as exc:
-                logger.warning("[CENSUS_BPS] Failed for %d/%02d: %s", year, month, exc)
+                logger.warning(
+                    "[CENSUS_BPS] Place file failed %d/%02d: %s",
+                    year, month, exc,
+                )
+            time.sleep(DOWNLOAD_DELAY_SEC)
 
-            # Rate limit
+        # ── County-level files ──────────────────────────────────────
+        for year, month in months:
+            try:
+                county_obs = self._download_and_parse_counties(
+                    year, month, series_meta,
+                )
+                observations.extend(county_obs)
+            except Exception as exc:
+                logger.warning(
+                    "[CENSUS_BPS] County file failed %d/%02d: %s",
+                    year, month, exc,
+                )
             time.sleep(DOWNLOAD_DELAY_SEC)
 
         return observations
 
-    def _get_month_range(self, start: date, end: date) -> List[Tuple[int, int]]:
-        """Generate list of (year, month) tuples in the date range."""
-        months = []
-        current = date(start.year, start.month, 1)
-        end_first = date(end.year, end.month, 1)
+    # ── File download ────────────────────────────────────────────────
 
-        while current <= end_first:
-            months.append((current.year, current.month))
-            # Advance to next month
-            if current.month == 12:
-                current = date(current.year + 1, 1, 1)
-            else:
-                current = date(current.year, current.month + 1, 1)
-
-        return months
-
-    def _build_place_lookup(self) -> Dict[str, Dict]:
-        """
-        Build a lookup dict from FIPS codes to place info.
-        Key is "state_fips+place_fips" (e.g., "0427400" for Glendale, AZ).
-        """
-        lookup = {}
-        for place in PHOENIX_METRO_PLACES:
-            key = f"{place['state_fips']}{place['place_fips']}"
-            lookup[key] = place
-        return lookup
-
-    def _fetch_month(
-        self,
-        year: int,
-        month: int,
-        place_lookup: Dict[str, Dict],
-        series_meta: Dict,
-    ) -> List[NormalizedObservation]:
-        """Download and parse one month's BPS Excel file."""
-        url = f"{BPS_DOWNLOAD_BASE}/{WEST_REGION}/footnote{year}{month:02d}.xls"
-        logger.debug("[CENSUS_BPS] Downloading %s", url)
-
+    def _download_file(self, url: str) -> Optional[str]:
+        """Download a text file, returning its content or None on 404."""
         try:
             resp = self._session.get(url, timeout=60)
         except requests.RequestException as exc:
-            logger.warning("[CENSUS_BPS] Download failed for %d/%02d: %s", year, month, exc)
-            return []
+            logger.warning("[CENSUS_BPS] Download error: %s — %s", url, exc)
+            return None
 
         if resp.status_code == 404:
-            logger.debug("[CENSUS_BPS] No file for %d/%02d (404)", year, month)
-            return []
+            logger.debug("[CENSUS_BPS] 404: %s (not yet published)", url)
+            return None
 
         if resp.status_code != 200:
-            logger.warning("[CENSUS_BPS] HTTP %d for %d/%02d", resp.status_code, year, month)
-            return []
+            logger.warning("[CENSUS_BPS] HTTP %d: %s", resp.status_code, url)
+            return None
 
-        # Parse the Excel file
-        return self._parse_bps_excel(
-            resp.content, year, month, place_lookup, series_meta
+        return resp.text
+
+    # ── Place-level parsing ──────────────────────────────────────────
+
+    def _place_file_url(self, year: int, month: int) -> str:
+        """Build URL for a monthly place-level file."""
+        prefix = REGION_PREFIXES[DEFAULT_REGION]
+        yy = year % 100
+        return (
+            f"{BPS_BASE_URL}/Place/"
+            f"{DEFAULT_REGION.capitalize()}%20Region/"
+            f"{prefix}{yy:02d}{month:02d}c.txt"
         )
 
-    def _parse_bps_excel(
+    def _download_and_parse_places(
         self,
-        content: bytes,
         year: int,
         month: int,
-        place_lookup: Dict[str, Dict],
         series_meta: Dict,
     ) -> List[NormalizedObservation]:
-        """
-        Parse a Census BPS Excel file and extract rows for our target places.
-
-        The BPS Excel files have a non-trivial structure:
-        - Several header/title rows at the top
-        - A header row with column names
-        - Data rows with FIPS codes + permit counts
-        - Footnote rows at the bottom
-        """
-        try:
-            import openpyxl
-        except ImportError:
-            try:
-                import xlrd
-                return self._parse_xls_xlrd(content, year, month, place_lookup, series_meta)
-            except ImportError:
-                logger.error("[CENSUS_BPS] Neither openpyxl nor xlrd installed")
-                return []
-
-        # Try openpyxl first (.xlsx), fall back to xlrd (.xls)
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            ws = wb.active
-            rows = list(ws.iter_rows(values_only=True))
-            wb.close()
-        except Exception:
-            try:
-                import xlrd
-                return self._parse_xls_xlrd(content, year, month, place_lookup, series_meta)
-            except ImportError:
-                logger.error("[CENSUS_BPS] Failed to parse Excel — install xlrd for .xls support")
-                return []
-
-        return self._extract_observations(rows, year, month, place_lookup, series_meta)
-
-    def _parse_xls_xlrd(
-        self,
-        content: bytes,
-        year: int,
-        month: int,
-        place_lookup: Dict[str, Dict],
-        series_meta: Dict,
-    ) -> List[NormalizedObservation]:
-        """Parse old-format .xls files using xlrd."""
-        import xlrd
-        wb = xlrd.open_workbook(file_contents=content)
-        ws = wb.sheet_by_index(0)
-        rows = []
-        for row_idx in range(ws.nrows):
-            rows.append(tuple(ws.cell_value(row_idx, col) for col in range(ws.ncols)))
-        return self._extract_observations(rows, year, month, place_lookup, series_meta)
-
-    def _extract_observations(
-        self,
-        rows: List[Tuple],
-        year: int,
-        month: int,
-        place_lookup: Dict[str, Dict],
-        series_meta: Dict,
-    ) -> List[NormalizedObservation]:
-        """
-        Walk rows, find the header, then extract data for our target places.
-
-        Census BPS Excel structure (typical):
-        - Row 0-4: Title text ("Building Permits Survey", date, etc.)
-        - Row ~5: Column headers (State, County, Place, Name, 1-unit, 2-unit, ...)
-        - Row 6+: Data rows
-        - Footer: Footnotes
-
-        We detect the header row by looking for a row containing "1-unit" or
-        "Total" plus a FIPS-like pattern.
-        """
-        observations = []
-        obs_date = date(year, month, 1)
-
-        # Find header row
-        header_idx = None
-        col_map = {}
-
-        for idx, row in enumerate(rows):
-            row_str = [str(c).lower().strip() if c else "" for c in row]
-            joined = " ".join(row_str)
-
-            # Header row typically contains these keywords
-            if ("1-unit" in joined or "1 unit" in joined) and \
-               ("total" in joined or "bldgs" in joined or "units" in joined):
-                header_idx = idx
-                col_map = self._map_columns(row)
-                break
-
-        if header_idx is None:
-            logger.debug("[CENSUS_BPS] Could not find header row in %d/%02d file", year, month)
+        """Download one month's place-level file and parse target rows."""
+        url = self._place_file_url(year, month)
+        text = self._download_file(url)
+        if text is None:
             return []
 
-        # Process data rows
-        for row in rows[header_idx + 1:]:
-            if not row or len(row) < 5:
+        lines = text.strip().splitlines()
+        if len(lines) < 3:
+            logger.warning("[CENSUS_BPS] File too short: %s (%d lines)", url, len(lines))
+            return []
+
+        # Log first data line for format confirmation
+        logger.debug("[CENSUS_BPS] Header: %s", lines[0][:120])
+        logger.debug("[CENSUS_BPS] Sample:  %s", lines[3][:120] if len(lines) > 3 else "N/A")
+
+        # Build lookup set for fast FIPS matching: "SS-PPPPP"
+        target_set: Set[str] = set()
+        for state_fips, places in TARGET_PLACES.items():
+            for place_fips in places:
+                target_set.add(f"{state_fips}-{place_fips}")
+
+        observations: List[NormalizedObservation] = []
+        obs_date = date(year, month, 1)
+
+        # Skip header rows (2 header lines + 1 blank line)
+        reader = csv.reader(io.StringIO(text))
+        row_num = 0
+        for row in reader:
+            row_num += 1
+            if row_num <= 3:  # 2 header rows + blank
+                continue
+            if len(row) < COL_5PLUS_VALUE + 1:
                 continue
 
-            # Extract FIPS identifiers
-            state_fips, place_fips, place_name = self._extract_fips(row, col_map)
-            if not state_fips or not place_fips:
+            state_fips = row[COL_STATE].strip()
+            raw_place_fips = row[COL_FIPS_PLACE].strip()
+            place_name = row[COL_PLACE_NAME].strip()
+
+            # Skip unincorporated areas and non-matching codes
+            if not raw_place_fips or raw_place_fips == "99990":
                 continue
 
-            # Check if this place is one we monitor
-            fips_key = f"{state_fips}{place_fips}"
-            if fips_key not in place_lookup:
+            key = f"{state_fips}-{raw_place_fips}"
+            if key not in target_set:
                 continue
 
-            place_info = place_lookup[fips_key]
+            # Total units = 1-unit + 2-unit + 3-4 unit + 5+ units
+            units_1 = self._parse_int(row[COL_1UNIT_UNITS])
+            units_5plus = self._parse_int(row[COL_5PLUS_UNITS])
 
-            # Extract permit values for each series
-            for series_code, col_key in [
-                ("PERMIT_TOTAL", "total_bldgs"),
-                ("PERMIT_UNITS", "total_units"),
-                ("PERMIT_1UNIT", "1unit_bldgs"),
-                ("PERMIT_1UNIT_U", "1unit_units"),
-                ("PERMIT_2TO4", "2to4_bldgs"),
-                ("PERMIT_5PLUS", "5plus_bldgs"),
-                ("PERMIT_5PLUS_U", "5plus_units"),
-            ]:
-                if series_code not in series_meta:
-                    continue
+            # Total = all unit types' units columns
+            # Column layout: 1-unit(bldgs,units,val), 2-unit(b,u,v), 3-4(b,u,v), 5+(b,u,v)
+            units_2 = self._parse_int(row[COL_2UNIT_BLDGS + 1]) if len(row) > COL_2UNIT_BLDGS + 1 else 0
+            units_34 = self._parse_int(row[COL_2UNIT_BLDGS + 4]) if len(row) > COL_2UNIT_BLDGS + 4 else 0
+            total_units = (units_1 or 0) + (units_2 or 0) + (units_34 or 0) + (units_5plus or 0)
 
-                col_idx = col_map.get(col_key)
-                if col_idx is None:
-                    continue
+            # geo_xwalk uses "SS-PPPPP" format for cities
+            geo_id = f"{state_fips}-{raw_place_fips}"
+            display_name = TARGET_PLACES.get(state_fips, {}).get(raw_place_fips, place_name)
+            st_abbr = _STATE_ABBR.get(state_fips, state_fips)
+            coverage = f"{display_name}, {st_abbr}"
 
-                try:
-                    raw = row[col_idx] if col_idx < len(row) else None
-                    if raw is None or str(raw).strip() in ("", ".", "N/A", "-"):
-                        continue
+            # BPS_TOTAL — total units across all types
+            if "BPS_TOTAL" in series_meta and total_units > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_TOTAL",
+                    geo_id=geo_id,
+                    geo_level="CITY",
+                    date=obs_date,
+                    value=parse_decimal(str(total_units)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
 
-                    value = parse_decimal(str(raw).replace(",", ""))
-                    if value is not None and value >= 0:
-                        geo_id = f"PLACE{state_fips}{place_fips}"
-                        observations.append(NormalizedObservation(
-                            series_code=series_code,
-                            geo_id=geo_id,
-                            geo_level="CITY",
-                            date=obs_date,
-                            value=value,
-                            units="count",
-                            seasonal="NSA",
-                            source="BPS",
-                            revision_tag=f"bps:{year}{month:02d}",
-                            coverage_note=f"{place_info['name']}, AZ",
-                        ))
-                except (ValueError, TypeError, IndexError):
-                    continue
+            # BPS_ONEUNIT — single-family units
+            if "BPS_ONEUNIT" in series_meta and units_1 is not None and units_1 > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_ONEUNIT",
+                    geo_id=geo_id,
+                    geo_level="CITY",
+                    date=obs_date,
+                    value=parse_decimal(str(units_1)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
+
+            # BPS_FIVEPLUS — 5+ unit (multifamily) units
+            if "BPS_FIVEPLUS" in series_meta and units_5plus is not None and units_5plus > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_FIVEPLUS",
+                    geo_id=geo_id,
+                    geo_level="CITY",
+                    date=obs_date,
+                    value=parse_decimal(str(units_5plus)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
 
         logger.info(
-            "[CENSUS_BPS] %d/%02d: %d observations from %d target places",
-            year, month, len(observations), len(place_lookup),
+            "[CENSUS_BPS] Place %d/%02d: %d observations for %d target places",
+            year, month, len(observations), len(target_set),
         )
         return observations
 
-    def _map_columns(self, header_row: Tuple) -> Dict[str, int]:
-        """
-        Map Census BPS column headers to standardized keys.
+    # ── County-level parsing ─────────────────────────────────────────
 
-        Census headers vary by year but follow patterns like:
-        - "1-unit Bldgs", "1-unit Units", "2-units Bldgs", "3-4 units", "5+ units"
-        - "Total", "State FIPS", "County FIPS", "Place FIPS", "Name"
-        """
-        col_map = {}
-        for idx, val in enumerate(header_row):
-            if val is None:
+    def _county_file_url(self, year: int, month: int) -> str:
+        """Build URL for a monthly county-level file."""
+        yy = year % 100
+        return f"{BPS_BASE_URL}/County/co{yy:02d}{month:02d}c.txt"
+
+    def _download_and_parse_counties(
+        self,
+        year: int,
+        month: int,
+        series_meta: Dict,
+    ) -> List[NormalizedObservation]:
+        """Download one month's county-level file and parse target rows."""
+        url = self._county_file_url(year, month)
+        text = self._download_file(url)
+        if text is None:
+            return []
+
+        lines = text.strip().splitlines()
+        if len(lines) < 3:
+            return []
+
+        target_set: Set[str] = set()
+        for state_fips, counties in TARGET_COUNTIES.items():
+            for county_fips in counties:
+                target_set.add(f"{state_fips}-{county_fips}")
+
+        observations: List[NormalizedObservation] = []
+        obs_date = date(year, month, 1)
+
+        reader = csv.reader(io.StringIO(text))
+        row_num = 0
+        for row in reader:
+            row_num += 1
+            if row_num <= 3:
                 continue
-            h = str(val).lower().strip()
+            if len(row) < CO_COL_5PLUS_UNITS + 1:
+                continue
 
-            # FIPS identifiers
-            if "state" in h and ("fips" in h or "code" in h):
-                col_map["state_fips"] = idx
-            elif "county" in h and ("fips" in h or "code" in h):
-                col_map["county_fips"] = idx
-            elif "place" in h and ("fips" in h or "code" in h):
-                col_map["place_fips"] = idx
-            elif h in ("name", "place name", "area name"):
-                col_map["name"] = idx
+            state_fips = row[CO_COL_STATE].strip()
+            county_fips = row[CO_COL_COUNTY].strip().zfill(3)
+            county_name = row[CO_COL_NAME].strip()
 
-            # Permit counts — match flexibly
-            elif "1-unit" in h or "1 unit" in h:
-                if "bldg" in h:
-                    col_map["1unit_bldgs"] = idx
-                elif "unit" in h and "bldg" not in h and "1unit_units" not in col_map:
-                    col_map["1unit_units"] = idx
-            elif "2-unit" in h or "2 unit" in h or "2-" in h:
-                col_map["2to4_bldgs"] = idx
-            elif "3-4" in h or "3 and 4" in h:
-                col_map.setdefault("2to4_bldgs", idx)
-            elif "5+" in h or "5 unit" in h or "5-" in h:
-                if "bldg" in h:
-                    col_map["5plus_bldgs"] = idx
-                elif "unit" in h:
-                    col_map["5plus_units"] = idx
-                else:
-                    col_map.setdefault("5plus_bldgs", idx)
+            key = f"{state_fips}-{county_fips}"
+            if key not in target_set:
+                continue
 
-            # Totals
-            if h == "total" or (h.startswith("total") and "bldg" in h):
-                col_map.setdefault("total_bldgs", idx)
-            elif h.startswith("total") and "unit" in h:
-                col_map["total_units"] = idx
+            units_1 = self._parse_int(row[CO_COL_1UNIT_UNITS])
+            units_5plus = self._parse_int(row[CO_COL_5PLUS_UNITS])
+            # County files have more columns for "reported" values
+            # Total = sum of 1-unit + 2-unit + 3-4 + 5+ (units columns)
+            units_2 = self._parse_int(row[CO_COL_1UNIT_BLDGS + 3 + 1]) if len(row) > CO_COL_1UNIT_BLDGS + 4 else 0
+            units_34 = self._parse_int(row[CO_COL_1UNIT_BLDGS + 6 + 1]) if len(row) > CO_COL_1UNIT_BLDGS + 7 else 0
+            total_units = (units_1 or 0) + (units_2 or 0) + (units_34 or 0) + (units_5plus or 0)
 
-        return col_map
+            # geo_xwalk uses "SSCCC" format for counties
+            geo_id = f"{state_fips}{county_fips}"
+            display_name = TARGET_COUNTIES.get(state_fips, {}).get(county_fips, county_name)
+            st_abbr = _STATE_ABBR.get(state_fips, state_fips)
+            coverage = f"{display_name} County, {st_abbr}"
 
-    def _extract_fips(
-        self, row: Tuple, col_map: Dict[str, int]
-    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-        """Extract state/place FIPS from a data row."""
-        state_idx = col_map.get("state_fips")
-        place_idx = col_map.get("place_fips")
-        name_idx = col_map.get("name")
+            if "BPS_TOTAL" in series_meta and total_units > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_TOTAL",
+                    geo_id=geo_id,
+                    geo_level="COUNTY",
+                    date=obs_date,
+                    value=parse_decimal(str(total_units)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
 
-        if state_idx is None or place_idx is None:
-            return None, None, None
+            if "BPS_ONEUNIT" in series_meta and units_1 is not None and units_1 > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_ONEUNIT",
+                    geo_id=geo_id,
+                    geo_level="COUNTY",
+                    date=obs_date,
+                    value=parse_decimal(str(units_1)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
 
+            if "BPS_FIVEPLUS" in series_meta and units_5plus is not None and units_5plus > 0:
+                observations.append(NormalizedObservation(
+                    series_code="BPS_FIVEPLUS",
+                    geo_id=geo_id,
+                    geo_level="COUNTY",
+                    date=obs_date,
+                    value=parse_decimal(str(units_5plus)),
+                    units="count",
+                    seasonal="NSA",
+                    source="BPS",
+                    revision_tag=f"bps:{year}{month:02d}",
+                    coverage_note=coverage,
+                ))
+
+        logger.info(
+            "[CENSUS_BPS] County %d/%02d: %d observations",
+            year, month, len(observations),
+        )
+        return observations
+
+    # ── Geo bootstrap ──────────────────────────────────────────────────
+
+    def _ensure_geo_xwalk_entries(self):
+        """
+        Ensure all target places and counties exist in geo_xwalk.
+        Inserts missing entries so the market_data FK constraint passes.
+        """
+        import psycopg2
+
+        with self.db.connection() as conn, conn.cursor() as cur:
+            # Places
+            for state_fips, places in TARGET_PLACES.items():
+                st_abbr = _STATE_ABBR.get(state_fips, state_fips)
+                for place_fips, place_name in places.items():
+                    geo_id = f"{state_fips}-{place_fips}"
+                    try:
+                        cur.execute("""
+                            INSERT INTO public.geo_xwalk
+                                (geo_id, geo_level, geo_name, state_fips, place_fips)
+                            VALUES (%s, 'CITY', %s, %s, %s)
+                            ON CONFLICT (geo_id) DO NOTHING
+                        """, (geo_id, f"{place_name} city", state_fips, place_fips))
+                    except psycopg2.Error:
+                        conn.rollback()
+
+            # Counties
+            for state_fips, counties in TARGET_COUNTIES.items():
+                st_abbr = _STATE_ABBR.get(state_fips, state_fips)
+                for county_fips, county_name in counties.items():
+                    geo_id = f"{state_fips}{county_fips}"
+                    try:
+                        cur.execute("""
+                            INSERT INTO public.geo_xwalk
+                                (geo_id, geo_level, geo_name, state_fips, county_fips)
+                            VALUES (%s, 'COUNTY', %s, %s, %s)
+                            ON CONFLICT (geo_id) DO NOTHING
+                        """, (geo_id, f"{county_name} County", state_fips, county_fips))
+                    except psycopg2.Error:
+                        conn.rollback()
+
+        logger.debug("[CENSUS_BPS] Ensured geo_xwalk entries for target places/counties")
+
+    # ── Helpers ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _month_range(start: date, end: date) -> List[Tuple[int, int]]:
+        """Generate (year, month) tuples for the date range."""
+        months = []
+        cur = date(start.year, start.month, 1)
+        end_m = date(end.year, end.month, 1)
+        while cur <= end_m:
+            months.append((cur.year, cur.month))
+            if cur.month == 12:
+                cur = date(cur.year + 1, 1, 1)
+            else:
+                cur = date(cur.year, cur.month + 1, 1)
+        return months
+
+    @staticmethod
+    def _parse_int(val: str) -> Optional[int]:
+        """Parse a string to int, returning None on failure."""
         try:
-            state_raw = row[state_idx] if state_idx < len(row) else None
-            place_raw = row[place_idx] if place_idx < len(row) else None
-            name_raw = row[name_idx] if name_idx is not None and name_idx < len(row) else None
-
-            if state_raw is None or place_raw is None:
-                return None, None, None
-
-            # FIPS codes may be numeric or string
-            state_fips = str(int(float(str(state_raw)))).zfill(2)
-            place_fips = str(int(float(str(place_raw)))).zfill(5)
-            place_name = str(name_raw).strip() if name_raw else ""
-
-            return state_fips, place_fips, place_name
-
+            v = val.strip().replace(",", "")
+            if not v or v in (".", "-", "N/A", ""):
+                return None
+            return int(v)
         except (ValueError, TypeError):
-            return None, None, None
+            return None
 
 
 # ── Standalone entry point ───────────────────────────────────────────
