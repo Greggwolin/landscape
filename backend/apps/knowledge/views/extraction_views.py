@@ -821,23 +821,35 @@ def extract_document_batched(request, doc_id: int):
     if hasattr(request, 'user') and hasattr(request.user, 'id'):
         user_id = request.user.id
 
-    try:
-        result = do_extract_batched(
-            project_id=project_id_int,
-            doc_id=int(doc_id),
-            batches=batches,
-            property_type=property_type,
-            user_id=user_id
-        )
+    # Run extraction in a background thread so the request returns immediately.
+    # The frontend polls for staging rows via useExtractionStaging — it doesn't
+    # need the extraction result inline. This prevents Railway/proxy request
+    # timeouts from killing multi-batch extractions (which take 60-120s).
+    import threading
 
-        status = 200 if result.get('success') else 400
-        return JsonResponse(result, status=status)
-    except Exception as e:
-        logger.exception(f"Extraction failed for doc_id={doc_id}, project_id={project_id}: {e}")
-        return JsonResponse(
-            {'success': False, 'error': f'Extraction failed: {str(e)}'},
-            status=500
-        )
+    def _run_extraction():
+        try:
+            do_extract_batched(
+                project_id=project_id_int,
+                doc_id=int(doc_id),
+                batches=batches,
+                property_type=property_type,
+                user_id=user_id,
+            )
+        except Exception:
+            logger.exception(
+                "Background extraction failed for doc_id=%s, project_id=%s",
+                doc_id, project_id_int,
+            )
+
+    thread = threading.Thread(target=_run_extraction, daemon=True)
+    thread.start()
+
+    return JsonResponse({
+        'status': 'accepted',
+        'message': 'Extraction started in background',
+        'doc_id': int(doc_id),
+    }, status=202)
 
 
 @csrf_exempt

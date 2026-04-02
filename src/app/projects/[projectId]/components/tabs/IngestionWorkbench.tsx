@@ -154,7 +154,7 @@ function FieldRow({
     conflict: 'fd-danger',
     waiting: 'fd-info',
     empty: 'fd-muted',
-  }[uiStatus];
+  }[uiStatus]; // Use raw uiStatus for dot — phantom conflicts recalculated below
 
   const conflictRows = allRowsForKey.filter(
     (r) =>
@@ -162,11 +162,16 @@ function FieldRow({
       r._uiStatus === 'conflict'
   );
 
+  // A conflict with no competing values is a phantom — treat as editable pending
+  const isPhantomConflict = uiStatus === 'conflict' && conflictRows.length === 0 && !row.conflict_existing;
+  const effectiveStatus = isPhantomConflict ? 'pending' : uiStatus;
+
   const handleStartEdit = useCallback(() => {
-    if (uiStatus === 'conflict' || uiStatus === 'waiting' || uiStatus === 'empty') return;
+    // Allow editing for pending, accepted, phantom-conflict, and empty fields
+    if (effectiveStatus === 'conflict' || effectiveStatus === 'waiting') return;
     setEditVal(formatValue(row.extracted_value));
     setEditing(true);
-  }, [row.extracted_value, uiStatus]);
+  }, [row.extracted_value, effectiveStatus]);
 
   const handleCommitEdit = useCallback(() => {
     setEditing(false);
@@ -197,9 +202,9 @@ function FieldRow({
 
   return (
     <>
-      <div className={`wb-field-row${uiStatus === 'conflict' ? ' conflict-row' : ''}${isUnmapped ? ' unmapped-row' : ''}`}>
+      <div className={`wb-field-row${effectiveStatus === 'conflict' ? ' conflict-row' : ''}${isUnmapped ? ' unmapped-row' : ''}`}>
         <div className="fd-name">
-          <span className={`fd-dot ${dotClass}`} />
+          <span className={`fd-dot ${isPhantomConflict ? 'fd-warn' : dotClass}`} />
           {row.field_label}
           {isUnmapped && (
             <span
@@ -221,16 +226,16 @@ function FieldRow({
         </div>
         <div
           className={`fd-value${
-            uiStatus === 'conflict'
+            effectiveStatus === 'conflict'
               ? ' conflict-val'
-              : uiStatus === 'waiting'
+              : effectiveStatus === 'waiting'
                 ? ' waiting-val'
-                : uiStatus === 'empty'
+                : effectiveStatus === 'empty'
                   ? ' empty-val'
                   : ' editable'
           }`}
           onDoubleClick={handleStartEdit}
-          title={uiStatus !== 'conflict' && uiStatus !== 'waiting' && uiStatus !== 'empty' ? 'Double-click to edit' : undefined}
+          title={effectiveStatus !== 'conflict' && effectiveStatus !== 'waiting' ? 'Double-click to edit' : undefined}
         >
           {editing ? (
             <input
@@ -241,19 +246,19 @@ function FieldRow({
               onBlur={handleCommitEdit}
               onKeyDown={handleEditKeyDown}
             />
-          ) : uiStatus === 'conflict' ? (
+          ) : effectiveStatus === 'conflict' ? (
             `\u26A0 Conflict \u2014 ${conflictRows.length} values`
-          ) : uiStatus === 'waiting' ? (
+          ) : effectiveStatus === 'waiting' ? (
             'Awaiting extraction\u2026'
-          ) : uiStatus === 'empty' ? (
-            'Not found in documents'
+          ) : effectiveStatus === 'empty' ? (
+            <span className="empty-val-text">Double-click to enter value</span>
           ) : (
-            formatValue(row.extracted_value)
+            formatValue(row.extracted_value) || <span className="empty-val-text">Double-click to enter value</span>
           )}
         </div>
         <div className="fd-source">{row.source_label || '\u2014'}</div>
         <div className="fd-actions">
-          {uiStatus === 'pending' && (
+          {(effectiveStatus === 'pending' || effectiveStatus === 'empty') && (
             <>
               <button
                 className="btn-action accept"
@@ -271,7 +276,7 @@ function FieldRow({
               </button>
             </>
           )}
-          {uiStatus === 'conflict' && (
+          {effectiveStatus === 'conflict' && (
             <button
               className="btn-action expand"
               title="Resolve conflict"
@@ -282,7 +287,7 @@ function FieldRow({
           )}
         </div>
       </div>
-      {uiStatus === 'conflict' && expanded && (
+      {effectiveStatus === 'conflict' && expanded && (
         <div className="wb-conf-expand">
           {/* Show existing DB value if available (the value that triggered the conflict) */}
           {row.conflict_existing && (
