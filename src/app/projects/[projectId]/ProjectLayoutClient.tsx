@@ -16,7 +16,7 @@
 'use client';
 
 import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CCard, CCardHeader, CCardBody, CToast, CToastBody, CToaster } from '@coreui/react';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
@@ -176,6 +176,45 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   const queryClient = useQueryClient();
   const { pendingCount: stagingPendingCount } = useExtractionStagingCount(projectId);
 
+  // Draft intake sessions — detect paused ingestion sessions for "Resume" banner
+  const djangoApi = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+  const { data: draftSessions } = useQuery<{
+    intakeUuid: string;
+    docId: number | null;
+    docName: string | null;
+    documentType: string | null;
+    status: string;
+    updatedAt: string | null;
+  }[]>({
+    queryKey: ['intake-sessions', projectId],
+    queryFn: async () => {
+      const res = await fetch(`${djangoApi}/api/intake/start?project_id=${projectId}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.sessions || []).filter((s: { status: string }) => s.status === 'draft');
+    },
+    enabled: !!projectId && !workbenchOpen,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Resume a paused ingestion session
+  const handleResumeDraft = useCallback((session: {
+    intakeUuid: string;
+    docId: number | null;
+    docName: string | null;
+    documentType: string | null;
+  }) => {
+    if (!session.docId) return;
+    openWorkbench({
+      docId: session.docId,
+      docName: session.docName || 'Unknown document',
+      docType: session.documentType,
+      intakeUuid: session.intakeUuid,
+    });
+    setLocalWorkbenchOpen(true);
+  }, [openWorkbench]);
+
   // File drop notification state
   const [dropToast, setDropToast] = useState<string | null>(null);
   const { pendingFiles } = useFileDrop();
@@ -207,7 +246,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       // Modern browsers show a generic message; returnValue is required for legacy
-      e.returnValue = 'You have an active ingestion session. Changes will be lost.';
+      e.returnValue = 'You have an active ingestion session. Use "Finish Later" to save progress before leaving.';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
@@ -432,6 +471,86 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
         </button>
       )}
 
+      {/* Resume ingestion banner — shown when a paused draft session exists */}
+      {!workbenchOpen && draftSessions && draftSessions.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            zIndex: 50,
+            background: 'var(--cui-body-bg, #1e1e2e)',
+            border: '1px solid var(--cui-info)',
+            borderRadius: '10px',
+            padding: '14px 20px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            maxWidth: '420px',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600, color: 'var(--cui-body-color)' }}>
+              Paused ingestion session
+            </p>
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--cui-secondary-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {draftSessions[0].docName || 'Document'} — {draftSessions[0].documentType || 'extraction in progress'}
+            </p>
+          </div>
+          <button
+            onClick={() => handleResumeDraft(draftSessions[0])}
+            style={{
+              padding: '6px 16px',
+              border: 'none',
+              borderRadius: '6px',
+              background: 'var(--cui-info)',
+              color: '#fff',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Resume
+          </button>
+          <button
+            onClick={async () => {
+              // Dismiss = abandon the draft session
+              const session = draftSessions[0];
+              try {
+                await fetch(`${djangoApi}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    doc_id: session.docId,
+                    intake_uuid: session.intakeUuid,
+                  }),
+                });
+              } catch { /* best-effort */ }
+              if (session.docId) {
+                fetch(`/api/dms/documents/${session.docId}/delete`, { method: 'DELETE' }).catch(() => {});
+              }
+              queryClient.invalidateQueries({ queryKey: ['intake-sessions', projectId] });
+              queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
+            }}
+            style={{
+              padding: '6px 10px',
+              border: '1px solid var(--cui-border-color)',
+              borderRadius: '6px',
+              background: 'transparent',
+              color: 'var(--cui-secondary-color)',
+              fontSize: '12px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+            title="Discard this paused session"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Floating Workbench Panel */}
       {workbenchOpen && (
         <IngestionWorkbenchPanel
@@ -479,6 +598,14 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
             }
           }}
+          onPause={() => {
+            // "Finish Later" — close UI but preserve all progress
+            // (staging rows, doc, intake session stay as-is in 'draft' status)
+            closeWorkbench();
+            setLocalWorkbenchOpen(false);
+            // Refetch so the resume banner can detect the draft session
+            queryClient.invalidateQueries({ queryKey: ['intake-sessions', projectId] });
+          }}
           onDone={() => {
             // Successful commit — just close the modal, no abandon/cleanup.
             // The document and staging rows are already committed to production.
@@ -488,6 +615,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
             queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
             queryClient.invalidateQueries({ queryKey: ['dms', projectId] });
             queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+            queryClient.invalidateQueries({ queryKey: ['intake-sessions', projectId] });
           }}
         />
       )}
@@ -531,7 +659,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
               Active ingestion session
             </p>
             <p style={{ fontSize: '13px', color: 'var(--cui-secondary-color)', margin: '0 0 20px', lineHeight: 1.4 }}>
-              You have an active ingestion session. Navigating away will cancel it and discard all pending extractions.
+              You have an active ingestion session. You can save your progress and come back later, or discard everything.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
               <button
@@ -548,6 +676,29 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
                 }}
               >
                 Stay
+              </button>
+              <button
+                onClick={() => {
+                  const nav = pendingNavigation;
+                  setPendingNavigation(null);
+                  // "Finish Later" — close UI, preserve progress
+                  closeWorkbench();
+                  setLocalWorkbenchOpen(false);
+                  queryClient.invalidateQueries({ queryKey: ['intake-sessions', projectId] });
+                  setFolderTab(nav.folder, nav.tab);
+                }}
+                style={{
+                  padding: '8px 18px',
+                  border: '1px solid var(--cui-info)',
+                  borderRadius: '6px',
+                  background: 'transparent',
+                  color: 'var(--cui-info)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Save &amp; Leave
               </button>
               <button
                 onClick={async () => {
@@ -587,7 +738,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
                   cursor: 'pointer',
                 }}
               >
-                Leave &amp; Cancel
+                Discard &amp; Leave
               </button>
             </div>
           </div>

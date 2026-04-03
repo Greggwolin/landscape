@@ -261,8 +261,8 @@ function FilterDropRow({
           Edit
         </button>
 
-        {/* Delete button for custom (non-template) types */}
-        {filter.is_from_template === false && filter.custom_id && onDeleteFilter && (
+        {/* Delete filter — available on all filters, triggers reassignment if docs exist */}
+        {onDeleteFilter && (
           <div className="relative" style={{ marginLeft: '2px' }}>
             {showDeleteConfirm ? (
               <div
@@ -270,28 +270,50 @@ function FilterDropRow({
                 style={{
                   backgroundColor: 'var(--cui-body-bg)',
                   borderColor: 'var(--cui-border-color)',
-                  minWidth: '200px',
+                  minWidth: '220px',
                   whiteSpace: 'nowrap'
                 }}
               >
-                <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
-                  Remove &lsquo;{filter.doc_type}&rsquo;?<br />
-                  <span style={{ color: 'var(--cui-secondary-color)' }}>
-                    Documents move to Misc.
-                  </span>
-                </p>
+                {filter.count > 0 ? (
+                  <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                    &lsquo;{filter.doc_type}&rsquo; has {filter.count} document{filter.count !== 1 ? 's' : ''}.<br />
+                    <span style={{ color: 'var(--cui-danger)' }}>
+                      Choose a new filter for them before deleting.
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mb-2" style={{ color: 'var(--cui-body-color)' }}>
+                    Remove &lsquo;{filter.doc_type}&rsquo;?
+                  </p>
+                )}
                 <div className="flex gap-2">
-                  <button
-                    className="px-2 py-0.5 rounded text-white"
-                    style={{ backgroundColor: 'var(--cui-danger)', fontSize: '0.7rem' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteFilter(filter.custom_id!, filter.doc_type);
-                      setShowDeleteConfirm(false);
-                    }}
-                  >
-                    Remove
-                  </button>
+                  {filter.count === 0 && (
+                    <button
+                      className="px-2 py-0.5 rounded text-white"
+                      style={{ backgroundColor: 'var(--cui-danger)', fontSize: '0.7rem' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteFilter(filter.custom_id ?? 0, filter.doc_type);
+                        setShowDeleteConfirm(false);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {filter.count > 0 && (
+                    <button
+                      className="px-2 py-0.5 rounded text-white"
+                      style={{ backgroundColor: 'var(--cui-primary)', fontSize: '0.7rem' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Trigger reassignment modal — parent handles this
+                        onDeleteFilter(filter.custom_id ?? 0, filter.doc_type);
+                        setShowDeleteConfirm(false);
+                      }}
+                    >
+                      Reassign &amp; Remove
+                    </button>
+                  )}
                   <button
                     className="px-2 py-0.5 rounded border"
                     style={{
@@ -313,7 +335,7 @@ function FilterDropRow({
                 className={styles.filterDeleteButton}
                 style={{
                   color: 'var(--cui-secondary-color)',
-                  fontSize: '0.9rem',
+                  fontSize: '0.85rem',
                   lineHeight: 1,
                   padding: '2px 4px',
                   borderRadius: '3px'
@@ -324,7 +346,7 @@ function FilterDropRow({
                 }}
                 title={`Remove "${filter.doc_type}"`}
               >
-                ×
+                🗑
               </button>
             )}
           </div>

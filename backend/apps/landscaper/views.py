@@ -2000,13 +2000,14 @@ class IntakeStartView(APIView):
         if not project_id:
             return Response({'error': 'project_id query param is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        sessions = IntakeSession.objects.filter(project_id=project_id).order_by('-created_at')
+        sessions = IntakeSession.objects.filter(project_id=project_id).select_related('doc').order_by('-created_at')
         return Response({
             'sessions': [
                 {
                     'intakeUuid': str(s.intake_uuid),
                     'projectId': s.project_id,
                     'docId': s.doc_id,
+                    'docName': s.doc.doc_name if s.doc else None,
                     'documentType': s.document_type,
                     'status': s.status,
                     'createdAt': s.created_at.isoformat() if s.created_at else None,

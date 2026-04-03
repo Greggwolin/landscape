@@ -10,7 +10,7 @@
  *   4. Structured Ingestion — calls intake/start, opens Ingestion Workbench panel
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CModal,
   CModalHeader,
@@ -38,6 +38,12 @@ interface IntakeChoiceModalProps {
   onClose: () => void;
 }
 
+interface ProjectDocType {
+  id: number;
+  doc_type_name: string;
+  is_from_template: boolean;
+}
+
 type IntakeIntent = 'global_intelligence' | 'dms_only' | 'structured_ingestion';
 
 export default function IntakeChoiceModal({
@@ -48,6 +54,28 @@ export default function IntakeChoiceModal({
 }: IntakeChoiceModalProps) {
   const { openWorkbench } = useWorkbench();
   const [submitting, setSubmitting] = useState(false);
+  const [projectDocTypes, setProjectDocTypes] = useState<ProjectDocType[]>([]);
+  const [selectedDocType, setSelectedDocType] = useState<string>('');
+
+  // Fetch project doc types for the profile selector
+  useEffect(() => {
+    if (!visible || !projectId) return;
+    fetch(`${DJANGO_API_URL}/api/dms/projects/${projectId}/doc-types/`)
+      .then((res) => (res.ok ? res.json() : { results: [] }))
+      .then((data) => {
+        const types = data.results || data.doc_types || [];
+        setProjectDocTypes(types);
+        // Pre-select based on auto-detection if it matches a project type
+        if (docs.length > 0 && docs[0].docType) {
+          const autoDetected = docs[0].docType.toLowerCase();
+          const match = types.find(
+            (t: ProjectDocType) => t.doc_type_name.toLowerCase() === autoDetected
+          );
+          setSelectedDocType(match ? match.doc_type_name : docs[0].docType || '');
+        }
+      })
+      .catch((err) => console.error('Failed to fetch project doc types:', err));
+  }, [visible, projectId, docs]);
 
   const handleChoice = async (intent: IntakeIntent) => {
     if (intent === 'dms_only') {
@@ -61,6 +89,7 @@ export default function IntakeChoiceModal({
       if (intent === 'structured_ingestion') {
         // Structured ingestion: call intake/start for the first doc, then open the workbench.
         const doc = docs[0];
+        const docTypeToUse = selectedDocType || doc.docType;
         try {
           const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
             method: 'POST',
@@ -69,7 +98,7 @@ export default function IntakeChoiceModal({
               project_id: projectId,
               doc_id: doc.docId,
               intent,
-              document_type: doc.docType,
+              document_type: docTypeToUse,
             }),
           });
           const data = await res.json();
@@ -80,7 +109,7 @@ export default function IntakeChoiceModal({
             openWorkbench({
               docId: doc.docId,
               docName: doc.docName,
-              docType: doc.docType,
+              docType: docTypeToUse,
               intakeUuid: data.intakeUuid,
             });
 
@@ -112,7 +141,7 @@ export default function IntakeChoiceModal({
               project_id: projectId,
               doc_id: doc.docId,
               intent,
-              document_type: doc.docType,
+              document_type: selectedDocType || doc.docType,
             }),
           }).catch((err) =>
             console.warn(`[IntakeChoice] Failed to create intake for doc ${doc.docId}:`, err)
@@ -144,19 +173,43 @@ export default function IntakeChoiceModal({
         <CModalTitle>What would you like to do with {docLabel}?</CModalTitle>
       </CModalHeader>
       <CModalBody>
-        {/* Show detected document type(s) */}
-        {docs.some(d => d.docType) && (
-          <div className="mb-3 p-2 rounded" style={{ background: 'var(--cui-tertiary-bg)' }}>
-            <small className="text-body-secondary d-block mb-1">Detected as:</small>
-            <div className="d-flex flex-wrap gap-2">
-              {docs.map((d, i) => (
-                <span key={i} className="badge bg-primary">
-                  {d.docType || 'Unknown'}{docs.length > 1 ? `: ${d.docName}` : ''}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Document profile selector */}
+        <div className="mb-3 p-2 rounded" style={{ background: 'var(--cui-tertiary-bg)' }}>
+          <small className="text-body-secondary d-block mb-1">
+            File to:
+            {docs.some(d => d.docType) && (
+              <span className="ms-1" style={{ color: 'var(--cui-secondary-color)' }}>
+                (auto-detected: {docs[0].docType})
+              </span>
+            )}
+          </small>
+          <select
+            className="form-select form-select-sm"
+            style={{
+              backgroundColor: 'var(--cui-input-bg)',
+              color: 'var(--cui-body-color)',
+              borderColor: 'var(--cui-border-color)',
+            }}
+            value={selectedDocType}
+            onChange={(e) => setSelectedDocType(e.target.value)}
+          >
+            <option value="">Select document type...</option>
+            {projectDocTypes.map((dt) => (
+              <option key={dt.id || dt.doc_type_name} value={dt.doc_type_name}>
+                {dt.doc_type_name}
+              </option>
+            ))}
+            {/* If auto-detected type isn't in project types, show it as an option */}
+            {docs[0]?.docType &&
+              !projectDocTypes.some(
+                (dt) => dt.doc_type_name.toLowerCase() === (docs[0].docType || '').toLowerCase()
+              ) && (
+                <option value={docs[0].docType}>
+                  {docs[0].docType} (detected)
+                </option>
+              )}
+          </select>
+        </div>
         <p className="text-body-secondary mb-4">
           Choose how Landscape should process {docs.length === 1 ? 'this document' : 'these documents'}:
         </p>
