@@ -85,49 +85,71 @@ MAX_REQUESTS_PER_RUN = 60
 # Header matching is case-insensitive substring. First match wins.
 
 CW_COLUMN_MAP = [
-    # Inventory / supply
+    # ── Inventory / supply ───────────────────────────────────────
+    # "INVENTORY (SF)" or "INVENTORY (UNITS)" — unit resolved dynamically
     (["inventory", "total sf", "total supply"],
-     "inventory", "total_inventory_sf", "sf"),
+     "inventory", "total_inventory", None),  # unit = sf or units, resolved from header
 
-    # Vacancy
-    (["vacancy rate", "vacancy", "vac rate", "vac."],
+    # ── Vacancy ──────────────────────────────────────────────────
+    # "OVERALL VACANCY RATE", "VACANCY RATE"
+    (["vacancy rate", "overall vacancy"],
      "vacancy", "vacancy_rate", "percent"),
 
-    # YoY vacancy change
+    # "DIRECT VACANT" — direct vacancy SF or %
+    (["direct vacant", "direct vacancy"],
+     "vacancy", "direct_vacancy", None),  # unit from cell content
+
+    # "SUBLET VACANT" — sublease vacancy SF or %
+    (["sublet vacant", "sublet vacancy", "sublease vacant"],
+     "vacancy", "sublet_vacancy", None),  # unit from cell content
+
+    # "YOY VACANCY CHANGE", "PP CHANGE"
     (["yoy vacancy", "yoy vac", "vacancy change", "vac change", "pp change"],
      "vacancy", "yoy_vacancy_change", "percent"),
 
-    # Effective rent per unit
-    (["rent/unit", "rent per unit", "eff rent/unit", "eff. rent/unit", "avg eff rent/unit",
-      "avg effective rent/unit"],
-     "rent", "effective_rent_per_unit", "usd"),
+    # ── Rent ─────────────────────────────────────────────────────
+    # "WEIGHTED AVG NET RENT" — industrial net rent per SF
+    (["weighted avg", "net rent", "avg net rent"],
+     "rent", "weighted_avg_net_rent", "usd_psf"),
 
-    # Asking rent (office/industrial/retail — typically $/SF)
+    # "ASKING RENT" — office/industrial/retail $/SF
     (["asking rent", "avg asking", "overall avg asking"],
      "rent", "asking_rent_psf", "usd_psf"),
 
-    # Effective rent PSF
+    # "AVG EFFECTIVE RENT/UNIT", "EFF RENT/UNIT"
+    (["rent/unit", "rent / unit", "rent per unit", "eff rent/unit", "eff. rent/unit",
+      "avg eff rent/unit", "avg effective rent/unit", "effective rent / unit"],
+     "rent", "effective_rent_per_unit", "usd"),
+
+    # "AVG EFFECTIVE RENT PSF", "EFF RENT/SF"
     (["rent psf", "rent/sf", "rent per sf", "eff rent psf", "eff. rent/sf",
       "avg eff rent psf", "avg effective rent psf", "effective rent psf"],
      "rent", "effective_rent_psf", "usd_psf"),
 
-    # YoY rent growth
+    # "AVG EFFECTIVE RENT" — MF generic (no PSF/unit suffix)
+    # MUST be after the more specific rent/unit and rent psf entries
+    (["effective rent", "avg eff rent", "avg effective"],
+     "rent", "avg_effective_rent", "usd"),
+
+    # "YOY RENT GROWTH", "RENT GROWTH"
     (["rent growth", "yoy rent", "yoy growth"],
      "rent", "yoy_rent_growth", "percent"),
 
-    # Absorption
+    # ── Absorption ───────────────────────────────────────────────
+    # "NET ABSORPTION" — SF or units, resolved dynamically
     (["net absorption", "absorption"],
-     "absorption", "net_absorption_sf", "sf"),
+     "absorption", "net_absorption", None),  # unit from property_type
 
-    # Under construction
-    (["under const", "under cnstr", "construction", "uc sf"],
-     "construction", "under_construction_sf", "sf"),
+    # ── Construction ─────────────────────────────────────────────
+    # "UNDER CNSTR", "UNDER CONST", "UNDER CONSTRUCTION"
+    (["under cn", "under co", "uc sf"],
+     "construction", "under_construction", None),
 
-    # Deliveries
-    (["deliveries", "delivered", "completions"],
-     "construction", "deliveries_sf", "sf"),
+    # "DELIVERIES", "CNSTR COMPLETIONS"
+    (["deliveries", "delivered", "completions", "cnstr completions"],
+     "construction", "deliveries", None),
 
-    # Cap rate
+    # ── Cap rate ─────────────────────────────────────────────────
     (["cap rate", "capitalization"],
      "sale_price", "cap_rate", "percent"),
 ]
@@ -633,7 +655,7 @@ class BrokerageResearchAgent(BaseResearchAgent):
         pub_id: str,
         headers: List[str],
         rows: List[List[str]],
-        col_mapping: Dict[int, Tuple[str, str, str]],
+        col_mapping: Dict[int, Tuple[str, str, Optional[str]]],
         page: int,
         property_type: Optional[str],
         market: Optional[str],
@@ -645,6 +667,7 @@ class BrokerageResearchAgent(BaseResearchAgent):
         Each row = one submarket. Each mapped column = one metric.
         Row[0] is the submarket name (used as geography).
         """
+        is_mf = property_type in ("multifamily", "apartment")
         records_created = 0
 
         for row in rows:
@@ -656,7 +679,11 @@ class BrokerageResearchAgent(BaseResearchAgent):
             if not submarket:
                 continue
             # Skip summary/total rows and header repeats
-            if submarket.lower() in ("total", "overall", "market", "submarket", "metro"):
+            sub_lower = submarket.lower()
+            if sub_lower in ("total", "overall", "market", "submarket", "metro", ""):
+                continue
+            # Skip rows that look like repeated headers
+            if "submarket" in sub_lower and "inventory" in sub_lower:
                 continue
 
             # Build geography: "Phoenix > Scottsdale" or just submarket
@@ -667,10 +694,18 @@ class BrokerageResearchAgent(BaseResearchAgent):
                     continue
 
                 cell = (row[col_idx] or "").strip()
-                if not cell or cell in ("-", "N/A", "—", "", "*"):
+                if not cell or cell in ("-", "N/A", "—", "", "*", "–"):
                     continue
 
-                value, parsed_unit = self._parse_cw_cell(cell, expected_unit)
+                # Resolve unit when the column map left it as None
+                resolved_unit = expected_unit
+                if resolved_unit is None:
+                    resolved_unit = self._resolve_unit(
+                        metric_name, headers[col_idx] if col_idx < len(headers) else "",
+                        cell, is_mf,
+                    )
+
+                value, parsed_unit = self._parse_cw_cell(cell, resolved_unit)
                 if value is None:
                     continue
 
@@ -682,7 +717,7 @@ class BrokerageResearchAgent(BaseResearchAgent):
                         data_category=category,
                         metric_name=metric_name,
                         metric_value=value,
-                        metric_unit=expected_unit,
+                        metric_unit=resolved_unit,
                         property_type=property_type,
                         geography=geography,
                         reference_period=ref_period,
@@ -694,6 +729,37 @@ class BrokerageResearchAgent(BaseResearchAgent):
                     records_created += 1
                 except Exception:
                     pass
+
+    @staticmethod
+    def _resolve_unit(metric_name: str, header: str, cell: str,
+                      is_mf: bool) -> Optional[str]:
+        """Resolve unit for columns where CW_COLUMN_MAP has unit=None.
+
+        Uses header text, cell content, and property type to determine the unit.
+        """
+        h = header.lower()
+        c = cell.lower()
+
+        # Header explicitly says (SF) or (UNITS)
+        if "(sf)" in h or "sf" in h.split():
+            return "sf"
+        if "(units)" in h or "units" in h.split():
+            return "units"
+
+        # Cell content clues
+        if "%" in c:
+            return "percent"
+        if "$" in c:
+            return "usd"
+
+        # Metric-specific defaults
+        if metric_name in ("total_inventory", "net_absorption", "under_construction", "deliveries"):
+            return "units" if is_mf else "sf"
+        if metric_name in ("direct_vacancy", "sublet_vacancy"):
+            # Could be SF count or percent — check cell for %
+            return "percent" if "%" in cell else "sf"
+
+        return None
 
         return records_created
 
