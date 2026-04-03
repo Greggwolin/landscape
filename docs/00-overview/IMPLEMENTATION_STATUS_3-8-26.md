@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-04-01
+**Last Updated:** 2026-04-03
 **Version:** 5.0
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening)
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening + Market Agent Fleet + DMS Filter Management)
 
 ---
 
@@ -9,17 +9,31 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Operations GET Migration + Map Market Layers + Extraction Hardening (April 1, 2026)**
+### 🆕 **Latest Update: v0.1.17 — Market Agent Fleet + DMS Filter Management + Ingestion Finish-Later (April 2-3, 2026)**
 
-**Uncommitted: Operations GET to Django, map market layers, extraction pipeline hardening, new Landscaper tool, LCF UI polish (30 files, +2,285 lines)**
+**v0.1.17 (committed): Market intelligence agent fleet, Census BPS agent, async extraction, phantom conflict fix**
+**Uncommitted: DMS doc type reassignment, doc type combobox, ingestion finish-later/resume, brokerage agent enhancements (22 files, +826 lines)**
 
-- ⏳ **Operations GET migrated to Django** — Full P&L calculation replicated in `views_operations.py` (+958 lines). `useOperationsData.ts` updated. Legacy Next.js route retained as dead code.
-- ⏳ **New Landscaper tool: `update_land_use_pricing`** — Writes to source-of-truth pricing table + auto-triggers recalculate-sfd. Tool count: 231.
-- ⏳ **`ingest_document` hardened** — Auto-triggers extraction pipeline if document not yet processed. Checks dms_extract_queue + knowledge_embeddings before fallback to DocumentProcessor/batched extraction.
-- ⏳ **Extraction service: direct text extraction fallback** — Vision API for images, caches result in `core_doc.extracted_text`.
-- ⏳ **Map market layers** — Recent Sales (Redfin SF comps, price-tier coloring) + Market Competitors with popups.
-- ⏳ **Leveraged Cash Flow UI** — Accounting-style bottom borders, total column, header alignment.
-- ⏳ **Thread race condition fix** — CamelCase mismatch + server-side guard.
+- ✅ **Market intelligence agent fleet** (`dfc1f87`) — 8 new research agents (Census BPS, HUD, MBA, KBRA, Trepp, Brokerage Research, Construction Cost, NAIOP) + orchestrator upgrades.
+- ✅ **Census BPS agent rewritten** (`a65dd82`) — REST API → CSV file download. 25 months backfilled, 17 AZ places + 3 counties, 1,119 rows.
+- ✅ **Async extraction** (`a65dd82`) — `extract_document_batched` returns 202 immediately, runs in background thread. Prevents Railway timeout.
+- ✅ **Workbench phantom conflict fix** (`a65dd82`) — Single-source conflicts with no competing values treated as editable pending.
+- ⏳ **DMS doc type reassignment** — New `POST .../doc-types/{id}/reassign/` endpoint. Frontend modal for reassign-before-delete when filter has documents.
+- ⏳ **Doc type combobox** — New `DocTypeCombobox.tsx` + `GET /api/dms/templates/all-doc-types` for autocomplete across templates.
+- ⏳ **Ingestion "Finish Later" + Resume** — 3-way cancel choice (Go Back / Finish Later / Discard). Floating resume banner for paused draft sessions.
+- ⏳ **IntakeChoiceModal doc type selector** — Fetches project doc types, pre-selects from auto-detection, allows override.
+- ⏳ **Brokerage agent column mapping rewrite** — Dynamic unit resolution, direct/sublet vacancy, weighted avg net rent.
+- 📁 **See:** `docs/09-session-notes/2026-04-03-daily-sync.md`
+
+### Previous Update: Operations GET Migration + Map Market Layers + Extraction Hardening (April 1, 2026)
+
+**Committed in v0.1.16/v0.1.17: Operations GET to Django, map market layers, extraction pipeline hardening, new Landscaper tool, LCF UI polish**
+
+- ✅ **Operations GET migrated to Django** — Full P&L calculation replicated in `views_operations.py` (+958 lines). `useOperationsData.ts` updated. Legacy Next.js route retained as dead code.
+- ✅ **New Landscaper tool: `update_land_use_pricing`** — Writes to source-of-truth pricing table + auto-triggers recalculate-sfd. Tool count: 231.
+- ✅ **`ingest_document` hardened** — Auto-triggers extraction pipeline if document not yet processed.
+- ✅ **Map market layers** — Recent Sales (Redfin SF comps, price-tier coloring) + Market Competitors with popups.
+- ✅ **Thread race condition fix** — CamelCase mismatch + server-side guard.
 - 📁 **See:** `docs/09-session-notes/2026-04-01-daily-sync.md`
 
 ### Previous Update: v0.1.15 — alpha15 Merged + Waterfall Persist + Marketing Site (March 31, 2026)

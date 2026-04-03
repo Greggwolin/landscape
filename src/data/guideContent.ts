@@ -197,88 +197,116 @@ export const guideChapters: GuideChapter[] = [
   {
     id: '5',
     number: '5',
-    title: 'Document Management System',
-    subtitle: 'Upload, classify, and organize project documents',
+    title: 'Document Management & Intelligence',
+    subtitle: 'Upload, profile, extract, and commit',
     group: 'Landscaper AI',
     sections: [
       {
-        id: '5.1',
-        title: 'What the DMS Is',
+        id: '5.0',
+        title: 'Overview',
         content: [
-          { type: 'prose', text: 'The Document Management System (DMS) provides enterprise-grade document management for your projects. It supports custom metadata attributes, document type templates, full-text search with faceted filtering, and a complete audit trail for all profile changes.' },
+          { type: 'prose', text: 'The Document Management System (DMS) is one of Landscape\'s most powerful differentiators. It\'s not just a file cabinet — it\'s the primary mechanism through which Landscaper learns about your deal. Every document you upload is a potential source of structured data, and every extraction you commit deepens Landscaper\'s understanding of your project.' },
+          { type: 'prose', text: 'The core philosophy: upload everything. Offering memorandums, rent rolls, T-12 operating statements, appraisals, old leases, broker emails, survey reports, environmental records, tax bills — all of it. You don\'t need to know in advance which documents will be useful. Landscape\'s AI extracts what it can from each one, and the document itself remains available for Landscaper to query at any time, even if extraction was partial.' },
+          { type: 'callout', label: 'Filters, Not Folders', text: 'The DMS doesn\'t use folders. There\'s no hierarchy of directories to maintain. Instead, every document has a type, a status, and one or more tags — and you navigate your document library through filters. Search by type, filter by tag, narrow by date. The result is a library that stays organized without the overhead of deciding where things "live." Any combination of filters gives you a clean, targeted view.' },
+          { type: 'prose', text: 'This chapter covers the full DMS workflow: navigating the library, uploading and profiling documents, how the AI extractor works, the Ingestion Workbench where you review and commit extracted data, and the administration tools that shape extraction behavior over time. For how committed data feeds Landscaper\'s persistent knowledge about your project, see the Platform Knowledge chapter.' },
+        ],
+      },
+      {
+        id: '5.1',
+        title: 'Navigating the DMS',
+        content: [
+          { type: 'prose', text: 'The Documents tab is your full document library for the current project. By default it shows all documents sorted by most recently uploaded. The filter bar at the top lets you narrow by document type (Offering Memorandum, Rent Roll, T-12, Appraisal, Lease, and more), processing status (Pending, Extracted, Committed, Error), or any tags you\'ve applied.' },
+          { type: 'screenshot', src: '/guide/images/chapter-05-dms/dms-overview.png', alt: 'DMS tab showing document list with filter bar, type badges, and status indicators', caption: 'The DMS tab: filter bar at top, document list with type and status badges, right panel for document details.' },
+          { type: 'prose', text: 'The search box performs full-text search across document names, profile metadata, and — for documents that have been extracted — across the content of the documents themselves. This means you can search for a specific tenant name, address, or dollar figure and find the documents that contain it.' },
+          { type: 'prose', text: 'Click any document row to open its detail panel on the right. The detail panel shows the document\'s profile fields, extraction status, version history, and a direct link to open the document itself. From here you can edit the profile, trigger re-extraction, or upload a new version.' },
+          { type: 'callout', label: 'Why No Folders?', text: 'Traditional file systems force you to decide where a document lives before you need it. A rent roll might live in "Due Diligence" or "Property" or "Financials" — and the wrong choice means you can\'t find it later. Tags let a document belong to multiple categories simultaneously, and filters let you query across any combination of them. The library stays clean without maintenance.' },
         ],
       },
       {
         id: '5.2',
-        title: 'Document Scope — Upload Everything',
+        title: 'Uploading Documents',
         content: [
-          { type: 'prose', text: 'Upload everything you have for a deal — offering memorandums, rent rolls, T-12 operating statements, appraisals, leases, surveys, environmental reports, tax records. Landscaper can extract structured data from all of these, and having more context makes its analysis more accurate.' },
-          { type: 'callout', label: 'Tip', text: 'PDFs work best for extraction. Images (JPEG/PNG) are supported. Word and Excel files should be converted to PDF first for optimal extraction results.' },
+          { type: 'prose', text: 'Drag files into the upload zone on the Documents tab, or click the upload button to open a file picker. Multiple files can be uploaded at once. Supported formats and limits:' },
           { type: 'table', headers: ['File Type', 'Max Size', 'Extraction Support'], rows: [
-            ['PDF', '32 MB', 'Full extraction (native text only in alpha)'],
+            ['PDF (native/text-based)', '32 MB', 'Full extraction — all fields'],
+            ['PDF (scanned/image)', '32 MB', 'Alpha limitation: OCR not yet available; upload for storage and manual review'],
             ['Word (.doc, .docx)', '16 MB', 'Upload and storage; convert to PDF for extraction'],
             ['Excel (.xls, .xlsx)', '16 MB', 'Upload and storage; convert to PDF for extraction'],
             ['Images (.jpg, .png)', '8 MB', 'Basic extraction supported'],
             ['Text (.txt, .csv)', '4 MB', 'Upload and storage'],
           ]},
+          { type: 'prose', text: 'After files are selected, Landscape presents an Intake Choice: send the document through Structured Ingestion (AI extraction + Workbench review) or store it in the DMS without extraction. Choose Structured Ingestion for any document that contains structured data you want in your project — rent rolls, financials, appraisals. Choose store-only for reference documents (maps, photos, correspondence) where there\'s nothing to extract.' },
+          { type: 'callout', label: 'When in Doubt, Extract', text: 'If you\'re unsure whether a document has useful data, choose Structured Ingestion. The worst case is that extraction finds nothing, and you commit zero fields. The document is still stored and searchable. The cost of a failed extraction is a few seconds of your time. The cost of skipping extraction on a document that had useful data is that Landscaper doesn\'t know about it.' },
         ],
       },
       {
         id: '5.3',
-        title: 'Navigating the DMS',
+        title: 'Document Profiles',
         content: [
-          { type: 'prose', text: 'The Documents tab shows all uploaded documents for the current project. Use the search box for full-text queries and apply filters in the sidebar by document type, status, priority, or tags. Click any document row to view its details in the right panel.' },
-          { type: 'screenshot', src: '/guide/images/chapter-05-dms/dms-overview.png', alt: 'DMS tab showing document list with classification badges and action buttons', caption: 'The DMS tab displays all uploaded documents with classification, status, and quick actions.' },
+          { type: 'prose', text: 'Every document in the DMS has a profile — a structured set of metadata fields that describe the document itself, separate from the data extracted from its contents. The profile answers: what is this document, when is it from, who produced it, and what is its current status in your workflow.' },
+          { type: 'prose', text: 'Profile fields are defined by document type templates. Each template specifies which fields are required (must be filled before saving) and which are optional. Standard fields across all types include Document Name, Document Type, Document Date, and Status. Document types like Appraisal or Offering Memorandum add type-specific fields such as Effective Date, Appraiser Name, or Broker.' },
+          { type: 'prose', text: 'Why profiles matter for extraction: Landscaper uses the profile — especially the document type and date — to select the right extraction template and to weight confidence scores correctly. An Appraisal dated 2019 should not be treated the same as one dated 2024. Getting the profile right improves extraction accuracy and helps Landscaper give you better advice.' },
+          { type: 'prose', text: 'Custom attributes extend profiles for your organization\'s specific needs. Administrators can create attributes of any data type (text, number, date, currency, dropdown, tags) and assign them to document type templates. All profile changes are logged to an audit trail for compliance.' },
         ],
       },
       {
         id: '5.4',
-        title: 'Uploading Documents',
+        title: 'Tags and Versions',
         content: [
-          { type: 'prose', text: 'Navigate to the Documents tab, then drag files into the upload zone or click to select files. After upload completes, click an uploaded file in the queue and fill the required profile fields in the right panel. Click Save Profile to complete the upload.' },
-          { type: 'prose', text: 'When you upload a document, Landscape presents an intake choice: you can send the document through Structured Ingestion (which opens the Ingestion Workbench for AI-powered data extraction) or simply store it in the DMS without extraction.' },
+          { type: 'prose', text: 'Tags are free-form labels that you apply to documents for cross-cutting organization. A single document can carry multiple tags, and the filter bar lets you combine tags with type and status filters to build precise views of your library.' },
+          { type: 'prose', text: 'Common tagging patterns: by deal phase ("Due Diligence", "Closing", "Post-Close"), by source ("Broker Provided", "Seller Provided", "Third Party", "Public Record"), by review status ("Needs Review", "Reviewed", "Flagged"), or by subject ("Unit Mix", "Capital Expenditures", "Market Data"). There\'s no wrong approach — the goal is that any document is findable in under 10 seconds using filters.' },
+          { type: 'prose', text: 'When a document is updated — a new rent roll from the seller, a revised appraisal — upload the new version from the document\'s detail panel rather than uploading a separate file. The DMS links the new file to the same document record and preserves the original as a prior version. Extraction data is tied to the specific version that produced it, so you always know which file each data point came from.' },
+          { type: 'prose', text: 'Deleted documents are soft-deleted: hidden from the default view but retained in the database for audit purposes. If the document was processed through Structured Ingestion, deletion also cleans up associated staging records and removes the file from storage.' },
         ],
       },
       {
         id: '5.5',
-        title: 'Document Classification',
+        title: 'The AI Extractor',
         content: [
-          { type: 'prose', text: 'Every document is assigned a type (e.g., Offering Memorandum, Rent Roll, T-12, Appraisal) that determines which extraction templates Landscaper uses. Classification happens automatically during upload based on content analysis, but you can override it manually from the document profile.' },
+          { type: 'prose', text: 'When you choose Structured Ingestion, Landscape\'s AI extractor analyzes the document and attempts to identify and pull every structured data field it knows about for that document type. For a rent roll, that means unit numbers, unit types, square footage, lease dates, contract rents, and market rents. For a T-12, that means every line of income and expense, plus totals and per-unit figures.' },
+          { type: 'prose', text: 'The extractor produces a confidence score for each field based on how clearly the value appeared in the source document, how well it matched expected patterns, and whether it found corroborating evidence elsewhere in the document. High-confidence fields (clearly labeled, consistently formatted) are extracted cleanly. Low-confidence fields flag for your review.' },
+          { type: 'prose', text: 'Two distinct document types require different handling. Native PDFs — documents created digitally and exported as PDF — have a text layer that the extractor reads directly. These produce the best results. Scanned PDFs — physical documents photographed or photocopied into PDF — have no text layer; the extractor sees only an image.' },
+          { type: 'callout', label: 'Alpha Limitation: Scanned PDFs', text: 'OCR (optical character recognition) preprocessing for scanned PDFs is not yet available in the alpha release. If you upload a scanned document and extraction returns empty or near-zero results, the document is likely scanned. Convert it to a searchable PDF using Adobe Acrobat, Google Drive, or a similar tool before re-uploading. The document is still stored and available for reference in the meantime.' },
+          { type: 'prose', text: 'Partial extraction is still useful. If the extractor pulls 60% of the fields from a complex document, that\'s 60% you don\'t have to enter manually. The remaining fields either weren\'t present in the document, were in a format the extractor didn\'t recognize, or fell below the confidence threshold. The Ingestion Workbench shows you exactly what was and wasn\'t extracted so you can fill gaps manually.' },
         ],
       },
       {
         id: '5.6',
-        title: 'Document Profiles',
+        title: 'The Ingestion Workbench',
         content: [
-          { type: 'prose', text: 'Each document has a profile — a set of metadata fields defined by the document type template. Profiles can include standard fields (name, type, date, status) and custom attributes configured by your administrator. All profile changes are tracked in the audit log for compliance.' },
+          { type: 'prose', text: 'The Ingestion Workbench is a split-panel interface that opens automatically after Structured Ingestion begins. The left panel is a Landscaper chat with ingestion-specific tools. The right panel is a field review table showing every field the extractor found, organized into tabs by category.' },
+          { type: 'screenshot', src: '/guide/images/chapter-06-ingestion/workbench-overview.png', alt: 'Ingestion Workbench split panel showing Landscaper chat on left and field review table on right', caption: 'The Ingestion Workbench: Landscaper chat (left) and field review table (right). Fields populate in real time as extraction completes.' },
+          { type: 'prose', text: 'Each field row shows the extracted value, a source snippet from the document (the exact text the extractor found it in), and a status badge. Fields are organized into tabs that vary by property type. For multifamily: Project, Property, Operations, Valuation, and All. For land development: Project, Planning, Budget, Valuation, and All. Each tab shows a badge with the count of fields it contains.' },
+          { type: 'table', headers: ['Status', 'Color', 'Meaning'], rows: [
+            ['Accepted', 'Green', 'Value confirmed — will be written to your project on commit'],
+            ['Pending', 'Yellow', 'Extracted but not yet reviewed — will also commit unless you reject it'],
+            ['Conflict', 'Orange', 'Extracted value differs from data already in your project — requires your decision'],
+            ['Waiting', 'Gray', 'Extraction still in progress for this field'],
+            ['Empty', 'Light Gray', 'No value extracted — field was not found or fell below confidence threshold'],
+          ]},
+          { type: 'prose', text: 'To accept a field, click the checkmark. To edit before accepting, click the value and type a correction, then accept. To reject a field (skip it entirely on commit), click the X. Conflicts require an explicit choice: accept the new extracted value, keep the existing project value, or edit to something different.' },
+          { type: 'prose', text: 'The Workbench Chat on the left gives you a Landscaper session with five ingestion-specific tools. Ask it to explain an extraction ("Why did it extract $1,500 for average rent — I expected $1,650"), ask it to approve all fields in a category, ask for a summary of what\'s been extracted so far, or ask it to flag anything that looks inconsistent. The chat has live visibility into the field review table state.' },
+          { type: 'prose', text: 'When you\'re ready, click Commit. All Accepted and Pending fields are written to your project. Rejected fields are skipped. The Workbench closes, the DMS record is finalized, and the committed data becomes part of your project — visible in the relevant tabs and available to Landscaper for analysis and advice.' },
+          { type: 'prose', text: 'This is where "upload everything" pays off. A broker email that contained an off-market cap rate. A year-old appraisal with a rent schedule. A survey that confirmed the lot dimensions. Each committed extraction adds a data point that Landscaper can reference, cross-check, and reason about. Over time, the document library becomes a structured knowledge base about your deal, not just a pile of files.' },
+          { type: 'callout', label: 'Abandoning a Session', text: 'Closing the Workbench via the X button or Cancel abandons the session. Staging rows are rejected, the uploaded file is deleted from storage, and the document record is soft-deleted. No partial data reaches your project. If you need to stop mid-review, commit what you\'ve accepted so far — partial commits are fine — rather than abandoning.' },
         ],
       },
       {
         id: '5.7',
-        title: 'Organizing with Tags',
+        title: 'Administration',
         content: [
-          { type: 'prose', text: 'Apply tags to documents for cross-cutting organization that goes beyond type-based classification. Tags are free-form and filterable from the sidebar. Common patterns include tagging by deal phase ("Due Diligence", "Closing"), source ("Broker", "Seller", "Public Record"), or priority ("Review Needed", "Final").' },
-        ],
-      },
-      {
-        id: '5.8',
-        title: 'Document Versioning',
-        content: [
-          { type: 'prose', text: 'When you upload a revised version of an existing document, the DMS preserves the original and links the new version to the same document record. Previous versions remain accessible through the version history panel. Extracted data is tied to the specific version that produced it.' },
-        ],
-      },
-      {
-        id: '5.9',
-        title: 'Deleting Documents',
-        content: [
-          { type: 'prose', text: 'Documents can be soft-deleted from the DMS. Deleted documents are hidden from the default view but remain in the database for audit purposes. If a document was processed through the Ingestion Workbench, deleting it also cleans up associated staging records and uploaded files.' },
-        ],
-      },
-      {
-        id: '5.10',
-        title: 'Scanned Documents and OCR',
-        content: [
-          { type: 'callout', label: 'Alpha Limitation', text: 'Scanned PDF support (OCR) is not available in the alpha release. Extraction will return empty results for scanned documents. Native (text-based) PDFs work correctly. If you have scanned documents, convert them to searchable PDFs using a tool like Adobe Acrobat before uploading.' },
+          { type: 'prose', text: 'Two administration panels control how the DMS behaves for your organization: Document Templates and AI Extraction Mappings. Both are accessible via the Documents tab for users with administrator access.' },
+          { type: 'prose', text: 'Document Templates define the profile fields for each document type. Navigate to Documents > Document Templates to create or edit templates. For each template, you specify which attributes are required, which are optional, and the display order. Attributes are managed separately under Documents > Manage Attributes — each attribute has a display name, data type (text, number, date, boolean, currency, enum, lookup, tags, or JSON), and optional constraints for required or searchable behavior. For enum attributes, define the dropdown values in the Options field.' },
+          { type: 'prose', text: 'AI Extraction Mappings control how the extractor maps what it finds in a document to database fields in your project. Navigate to System Administration > Landscaper to view and manage mappings. Each mapping ties a source label (the text pattern found in documents, with optional aliases) to a target database field, with a configured confidence level and active/inactive toggle.' },
+          { type: 'table', headers: ['Column', 'Description'], rows: [
+            ['Active', 'Enable or disable this mapping — inactive mappings are ignored during extraction'],
+            ['Doc Type', 'The document type this mapping applies to (OM, Rent Roll, T-12, Appraisal)'],
+            ['Pattern', 'The source label — what the extractor looks for in the document, plus any aliases'],
+            ['Target', 'The database table and field where the value is written, plus any transform rule'],
+            ['Confidence', 'High, Medium, or Low — determines how the field is flagged in the Workbench'],
+            ['Actions', 'Edit or Delete (system mappings cannot be deleted)'],
+          ]},
+          { type: 'prose', text: 'Use extraction mappings when a label in your documents has changed (e.g., "Year Built" became "Construction Year" in a new template you receive), when you want to map a field that isn\'t currently extracted, or when reviewing low-confidence mappings that are producing poor results. Toggle the Stats view to see how many times each mapping has triggered and its write success rate — the ratio of triggers to successful database writes.' },
         ],
       },
     ],
@@ -286,80 +314,19 @@ export const guideChapters: GuideChapter[] = [
   {
     id: '6',
     number: '6',
-    title: 'Ingestion Workbench',
-    subtitle: 'Review and commit AI-extracted data',
-    group: 'Landscaper AI',
-    sections: [
-      {
-        id: '6.1',
-        title: 'What the Ingestion Workbench Is',
-        content: [
-          { type: 'prose', text: 'The Ingestion Workbench is a split-panel modal where you review data that Landscaper extracted from an uploaded document before committing it to your project. The left panel shows a Landscaper chat with ingestion-specific tools; the right panel shows a field-by-field review table organized by category.' },
-          { type: 'screenshot', src: '/guide/images/chapter-06-ingestion/workbench-overview.png', alt: 'Ingestion Workbench split panel showing Landscaper chat on left and field review table on right', caption: 'The Ingestion Workbench: Landscaper chat (left) and field review table (right).' },
-        ],
-      },
-      {
-        id: '6.2',
-        title: 'Opening the Workbench',
-        content: [
-          { type: 'prose', text: 'When you drop a file, Landscape presents an Intake Choice modal. Select "Structured Ingestion" to upload the file and open the Workbench. The file uploads immediately, extraction begins in the background, and the Workbench opens with fields populating as they\'re extracted.' },
-          { type: 'prose', text: 'Canceling the Workbench (via X or the cancel button) abandons the session — staging rows are rejected, the uploaded file is deleted, and the document record is soft-deleted. No partial data reaches your project.' },
-        ],
-      },
-      {
-        id: '6.3',
-        title: 'The Field Review Table',
-        content: [
-          { type: 'prose', text: 'The right panel shows every extracted field with its value, source snippet from the document, and current status. Fields are organized into tabs that vary by property type — for multifamily: Project, Property, Operations, Valuation, and All.' },
-          { type: 'table', headers: ['Status', 'Color', 'Meaning'], rows: [
-            ['Accepted', 'Green', 'Value confirmed and ready to commit'],
-            ['Pending', 'Yellow', 'Extracted but not yet reviewed'],
-            ['Conflict', 'Orange', 'Extracted value differs from existing project data'],
-            ['Waiting', 'Gray', 'Extraction in progress'],
-            ['Empty', 'Light Gray', 'No value extracted for this field'],
-          ]},
-          { type: 'prose', text: 'Each tab shows a badge with the count of fields in that category. Review fields from Pending to Accepted by clicking the checkmark, or edit the value inline before accepting.' },
-        ],
-      },
-      {
-        id: '6.4',
-        title: 'Resolving Conflicts',
-        content: [
-          { type: 'prose', text: 'A conflict occurs when the extracted value differs from a value already in your project. The field row shows both the existing value and the newly extracted value side by side. You choose which to keep — accept the new extraction, keep the existing value, or edit to a different value entirely.' },
-        ],
-      },
-      {
-        id: '6.5',
-        title: 'The Workbench Chat',
-        content: [
-          { type: 'prose', text: 'The left panel is a Landscaper chat with five ingestion-specific tools. You can ask Landscaper to explain an extraction ("Why did it extract $1,500 for average rent?"), update a staging field, approve or reject fields, or get a summary of what\'s been extracted so far. The chat sees the live state of the field review table.' },
-        ],
-      },
-      {
-        id: '6.6',
-        title: 'Committing Extractions',
-        content: [
-          { type: 'prose', text: 'When you\'re satisfied with the reviewed fields, click Commit to write all accepted values to your project. Fields left in Pending status are also committed. Fields you explicitly rejected are skipped. After commit, the Workbench closes and the DMS record is created for the uploaded document.' },
-        ],
-      },
-    ],
-  },
-  {
-    id: '7',
-    number: '7',
     title: 'Chat Interface',
     subtitle: 'Conversing with Landscaper',
     group: 'Landscaper AI',
     sections: [
       {
-        id: '7.1',
+        id: '6.1',
         title: 'The Chat Interface',
         content: [
           { type: 'prose', text: 'The Landscaper chat panel persists messages and returns assistant responses within the context of your current project and page. Chat history is preserved and reloads (last 100 messages) when you return to a project. The panel is page-aware — Landscaper knows which tab you\'re on and adjusts its responses accordingly.' },
         ],
       },
       {
-        id: '7.2',
+        id: '6.2',
         title: 'Asking Questions About Your Project',
         content: [
           { type: 'prose', text: 'You can ask Landscaper about any data in your project. It has access to all project tables, financial calculations, container hierarchy, and uploaded documents. Questions can be broad ("Give me a summary of this deal") or specific ("What\'s the per-unit operating expense in the T-12?").' },
@@ -367,14 +334,14 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '7.3',
+        id: '6.3',
         title: 'Asking Questions About Documents',
         content: [
           { type: 'prose', text: 'Landscaper can answer questions about uploaded documents using RAG (retrieval-augmented generation). Ask "What does the rent roll say about unit mix?" or "Summarize the key assumptions in this OM" and Landscaper will search the document content and respond with cited answers.' },
         ],
       },
       {
-        id: '7.4',
+        id: '6.4',
         title: 'Property-Type Expertise',
         content: [
           { type: 'prose', text: 'Landscaper adapts its expertise to your property type. For multifamily projects, it understands rent rolls, unit mixes, NOI, and cap rates. For land development, it speaks in terms of lot yields, absorption schedules, development budgets, and residual land value. It uses the correct terminology and calculation methods for your deal type.' },
@@ -383,28 +350,28 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: '8',
-    number: '8',
+    id: '7',
+    number: '7',
     title: 'Assumption Validation',
     subtitle: 'How Landscaper checks your work',
     group: 'Landscaper AI',
     sections: [
       {
-        id: '8.1',
+        id: '7.1',
         title: 'How Landscaper Validates Assumptions',
         content: [
           { type: 'prose', text: 'Landscaper continuously compares your project assumptions against market data, extracted document values, and internal consistency checks. When it detects a variance above a configurable threshold (default 0-50%), it surfaces an advice item in the right-side panel.' },
         ],
       },
       {
-        id: '8.2',
+        id: '7.2',
         title: 'The Advice Panel',
         content: [
           { type: 'prose', text: 'The advice panel displays alongside the chat interface and lists variance items when available. Each item shows the field in question, the current value, the reference value (market data or document source), and the percentage variance. Items are ordered by severity.' },
         ],
       },
       {
-        id: '8.3',
+        id: '7.3',
         title: 'Acting on Advice',
         content: [
           { type: 'prose', text: 'You can act on advice directly from the panel — click to navigate to the relevant field, or ask Landscaper in chat to explain the variance further. Landscaper can also update the value for you if you agree with the suggested adjustment. Advice items are informational, not mandatory — you may have good reasons to deviate from market.' },
@@ -413,21 +380,21 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: '9',
-    number: '9',
+    id: '8',
+    number: '8',
     title: 'Activity Feed',
     subtitle: 'Tracking Landscaper actions and extractions',
     group: 'Landscaper AI',
     sections: [
       {
-        id: '9.1',
+        id: '8.1',
         title: 'What the Feed Shows',
         content: [
           { type: 'prose', text: 'The activity feed highlights what Landscaper has found or changed in your project. Items include document extractions, data mutations, advice generated, and system events. The feed refreshes automatically every 60 seconds and shows unread counts.' },
         ],
       },
       {
-        id: '9.2',
+        id: '8.2',
         title: 'Navigating from the Feed',
         content: [
           { type: 'prose', text: 'Click any activity item to navigate to the related page and field. If a field is highlighted, Landscape scrolls to it and applies a visual highlight so you can verify the change in context. Clicking an item also marks it as read.' },
@@ -438,57 +405,57 @@ export const guideChapters: GuideChapter[] = [
 
   // ─── Group: Multifamily Workflows ─────────────────────────────
   {
-    id: '10',
-    number: '10',
+    id: '9',
+    number: '9',
     title: 'Property Setup',
     subtitle: 'Configuring a multifamily project',
     group: 'Multifamily Workflows',
     sections: [
       {
-        id: '10.1',
+        id: '9.1',
         title: 'Property Details',
         content: [
           { type: 'prose', text: placeholder('Property Details') },
         ],
       },
       {
-        id: '10.2',
+        id: '9.2',
         title: 'Unit Mix Setup',
         content: [
           { type: 'prose', text: placeholder('Unit Mix Setup') },
-          { type: 'screenshot', src: '/guide/images/chapter-10-property-setup/unit-mix.png', alt: 'Unit mix table showing unit types, counts, and square footages', caption: 'The unit mix table defines your property\'s unit types and counts.' },
+          { type: 'screenshot', src: '/guide/images/chapter-09-property-setup/unit-mix.png', alt: 'Unit mix table showing unit types, counts, and square footages', caption: 'The unit mix table defines your property\'s unit types and counts.' },
         ],
       },
     ],
   },
   {
-    id: '11',
-    number: '11',
+    id: '10',
+    number: '10',
     title: 'Rent Roll',
     subtitle: 'Unit-level lease and rent data',
     group: 'Multifamily Workflows',
     sections: [
       {
-        id: '11.1',
+        id: '10.1',
         title: 'Unit-Level Lease Data',
         content: [{ type: 'prose', text: placeholder('Unit-Level Lease Data') }],
       },
       {
-        id: '11.2',
+        id: '10.2',
         title: 'Rent Roll Extraction',
         content: [{ type: 'prose', text: placeholder('Rent Roll Extraction') }],
       },
     ],
   },
   {
-    id: '12',
-    number: '12',
+    id: '11',
+    number: '11',
     title: 'Operations',
     subtitle: 'The unified operating statement',
     group: 'Multifamily Workflows',
     sections: [
       {
-        id: '12.1',
+        id: '11.1',
         title: 'The Unified Operating Statement',
         content: [
           { type: 'prose', text: 'The Operations tab is the financial nerve center of a multifamily project. It presents a unified operating statement — a single grid that combines rental income, vacancy and loss deductions, and operating expenses into one continuous P&L view. Unlike traditional tools that scatter income and expense inputs across separate screens, Landscape keeps everything in one place so you can see the full picture from Gross Potential Rent down to Net Operating Income without switching tabs.' },
@@ -496,7 +463,7 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '12.2',
+        id: '11.2',
         title: 'Three NOI Bases',
         content: [
           { type: 'prose', text: 'Landscape calculates NOI across three distinct bases, each occupying its own column in the grid for side-by-side comparison without duplicating data entry:' },
@@ -508,7 +475,7 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '12.3',
+        id: '11.3',
         title: 'Operating Income',
         content: [
           { type: 'prose', text: 'The top section displays rental income. These values are read-only on the Operations tab because they are calculated from the Rent Roll on the Property tab. You\'ll see a lock icon next to each rental income line item, indicating the value is sourced from unit-level data.' },
@@ -517,7 +484,7 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '12.4',
+        id: '11.4',
         title: 'Vacancy and Loss',
         content: [
           { type: 'prose', text: 'Below Operating Income, the vacancy section shows all deductions from gross revenue. Landscape supports multiple vacancy and loss line items, each as a percentage of GPR: Physical Vacancy (unleased units — calculated automatically from occupancy data when a Rent Roll exists), Economic Vacancy (occupied-but-non-paying units), Concessions (rent discounts and free-rent periods), and Bad Debt / Collection Loss.' },
@@ -525,12 +492,12 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '12.5',
+        id: '11.5',
         title: 'Operating Expenses',
         content: [
           { type: 'prose', text: 'Operating expenses occupy the bottom portion of the grid, organized into parent categories (Taxes, Insurance, Utilities, Repairs & Maintenance, Management, Other) with child line items underneath. Category filter pills at the top let you isolate a single category for focused review.' },
           { type: 'prose', text: 'Expense values are entered in the $/Unit column. When you change a per-unit value, the Annual Total recalculates immediately ($/Unit × unit count). The $/SF column also updates in real time. You can drag expense line items between categories, add new items via the "+" button, or double-click any row\'s label to reassign its category from a dropdown.' },
-          { type: 'subsection', number: '12.5.1', title: 'Data Provenance Icons', blocks: [
+          { type: 'subsection', number: '11.5.1', title: 'Data Provenance Icons', blocks: [
             { type: 'prose', text: 'Landscape tracks where every value came from. Ingested values display a lock icon (source-backed), manually entered values display an input icon, and overridden extractions display an input icon that can revert to the original. This transparency helps distinguish between values extracted from documents and your own assumptions — critical for audit trails and USPAP compliance.' },
             { type: 'table', headers: ['Icon', 'State', 'Click Behavior'], rows: [
               ['Lock', 'Ingested from document', 'Breaks document link, switches to manual entry'],
@@ -538,7 +505,7 @@ export const guideChapters: GuideChapter[] = [
               ['Input', 'User-modified (was extracted)', 'Reverts to original extracted value (confirms if >10% difference)'],
             ]},
           ]},
-          { type: 'subsection', number: '12.5.2', title: 'Working with Ingested Data', blocks: [
+          { type: 'subsection', number: '11.5.2', title: 'Working with Ingested Data', blocks: [
             { type: 'prose', text: 'After ingesting a T-12 or offering memorandum, review the Operations tab by scanning the lock icons to see which fields were populated. Verify key figures against the source document, override where needed by clicking the lock, add missing items, then check the NOI row at the bottom. Fields you have manually overridden will not be silently replaced if you ingest a second document — you\'ll be prompted to accept or reject each conflict.' },
           ]},
         ],
@@ -546,31 +513,31 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: '13',
-    number: '13',
+    id: '12',
+    number: '12',
     title: 'Valuation',
     subtitle: 'Three approaches to value',
     group: 'Multifamily Workflows',
     sections: [
       {
-        id: '13.1',
+        id: '12.1',
         title: 'Sales Comparison Approach',
         content: [{ type: 'prose', text: placeholder('Sales Comparison Approach') }],
       },
       {
-        id: '13.2',
+        id: '12.2',
         title: 'Cost Approach',
         content: [{ type: 'prose', text: placeholder('Cost Approach') }],
       },
       {
-        id: '13.3',
+        id: '12.3',
         title: 'Income Approach',
         content: [
           { type: 'prose', text: 'The Income Approach derives value from the property\'s operating income using Direct Capitalization and Discounted Cash Flow (DCF) methods. The 3-column P&L reflects the three NOI bases (F-12 Current, F-12 Market, Stabilized) with visibility toggles. The value tiles — three Direct Cap tiles plus a DCF tile — each derive their NOI from the corresponding Operations tab column. Changes to operating assumptions are reflected in real time.' },
         ],
       },
       {
-        id: '13.4',
+        id: '12.4',
         title: 'Reconciliation',
         content: [
           { type: 'prose', text: placeholder('Reconciliation') },
@@ -580,24 +547,24 @@ export const guideChapters: GuideChapter[] = [
     ],
   },
   {
-    id: '14',
-    number: '14',
+    id: '13',
+    number: '13',
     title: 'Capitalization',
     subtitle: 'Equity, debt, and waterfall',
     group: 'Multifamily Workflows',
     sections: [
       {
-        id: '14.1',
+        id: '13.1',
         title: 'Equity Partners',
         content: [{ type: 'prose', text: placeholder('Equity Partners') }],
       },
       {
-        id: '14.2',
+        id: '13.2',
         title: 'Debt Facilities',
         content: [{ type: 'prose', text: placeholder('Debt Facilities') }],
       },
       {
-        id: '14.3',
+        id: '13.3',
         title: 'Waterfall',
         content: [{ type: 'prose', text: placeholder('Waterfall') }],
       },
@@ -606,14 +573,14 @@ export const guideChapters: GuideChapter[] = [
 
   // ─── Group: Land Development Workflows ────────────────────────
   {
-    id: '15',
-    number: '15',
+    id: '14',
+    number: '14',
     title: 'Project Setup',
     subtitle: 'Configuring a land development project',
     group: 'Land Development Workflows',
     sections: [
       {
-        id: '15.1',
+        id: '14.1',
         title: 'Land Use Taxonomy',
         content: [
           { type: 'prose', text: 'Every land development project in Landscape is organized by a three-level land use taxonomy: Family (e.g., Residential), Type (e.g., Single Family), and Product (e.g., 50\' Lot). This taxonomy drives lot pricing, absorption schedules, and budget rollups across the project.' },
@@ -625,84 +592,84 @@ export const guideChapters: GuideChapter[] = [
         ],
       },
       {
-        id: '15.2',
+        id: '14.2',
         title: 'Parcel Inventory',
         content: [{ type: 'prose', text: placeholder('Parcel Inventory') }],
       },
       {
-        id: '15.3',
+        id: '14.3',
         title: 'Planning Hierarchy',
         content: [{ type: 'prose', text: placeholder('Planning Hierarchy') }],
       },
     ],
   },
   {
-    id: '16',
-    number: '16',
+    id: '15',
+    number: '15',
     title: 'Budget',
     subtitle: 'Cost categories, line items, and scheduling',
     group: 'Land Development Workflows',
     sections: [
       {
-        id: '16.1',
+        id: '15.1',
         title: 'Cost Categories',
         content: [{ type: 'prose', text: placeholder('Cost Categories') }],
       },
       {
-        id: '16.2',
+        id: '15.2',
         title: 'Line Items and Draw Schedule',
         content: [{ type: 'prose', text: placeholder('Line Items and Draw Schedule') }],
       },
       {
-        id: '16.3',
+        id: '15.3',
         title: 'Absorption Schedule',
         content: [{ type: 'prose', text: placeholder('Absorption Schedule') }],
       },
     ],
   },
   {
-    id: '17',
-    number: '17',
+    id: '16',
+    number: '16',
     title: 'Feasibility',
     subtitle: 'Residual land value and return metrics',
     group: 'Land Development Workflows',
     sections: [
       {
-        id: '17.1',
+        id: '16.1',
         title: 'Residual Land Value',
         content: [{ type: 'prose', text: placeholder('Residual Land Value') }],
       },
       {
-        id: '17.2',
+        id: '16.2',
         title: 'Cash Flow Projections',
         content: [{ type: 'prose', text: placeholder('Cash Flow Projections') }],
       },
       {
-        id: '17.3',
+        id: '16.3',
         title: 'Return Metrics',
         content: [{ type: 'prose', text: placeholder('Return Metrics') }],
       },
     ],
   },
   {
-    id: '18',
-    number: '18',
+    id: '17',
+    number: '17',
     title: 'Capitalization',
     subtitle: 'Equity, construction loans, and waterfall',
     group: 'Land Development Workflows',
     sections: [
       {
-        id: '18.1',
+        id: '17.1',
         title: 'Equity Partners',
         content: [{ type: 'prose', text: placeholder('Equity Partners') }],
       },
       {
-        id: '18.2',
+        id: '17.2',
         title: 'Construction Loan',
         content: [{ type: 'prose', text: placeholder('Construction Loan') }],
       },
       {
-        id: '18.3',
+        id: '17.3',
         title: 'Waterfall',
         content: [{ type: 'prose', text: placeholder('Waterfall') }],
       },
@@ -711,41 +678,8 @@ export const guideChapters: GuideChapter[] = [
 
   // ─── Group: Administration ────────────────────────────────────
   {
-    id: '19',
-    number: '19',
-    title: 'DMS Administration',
-    subtitle: 'Profile templates and extraction mappings',
-    group: 'Administration',
-    sections: [
-      {
-        id: '19.1',
-        title: 'Profile Templates',
-        content: [
-          { type: 'prose', text: 'Profile templates define which metadata fields are required or optional for each document type. Navigate to Documents (DMS) > Document Templates to create or edit templates. Enter a template name, optionally filter by doc type, and drag attributes from the Available pool into Required or Optional columns. Set the display order with up/down arrows and save.' },
-          { type: 'prose', text: 'To manage the attributes themselves, go to Documents (DMS) > Manage Attributes. Each attribute has a display name, key (auto-generated), data type (text, number, date, boolean, currency, enum, lookup, tags, or JSON), and optional settings for required/searchable. For enum types, add dropdown values in the Options field.' },
-        ],
-      },
-      {
-        id: '19.2',
-        title: 'Extraction Mappings',
-        content: [
-          { type: 'prose', text: 'The AI Extraction Mappings panel (found in System Administration > Landscaper tab) controls how extracted document fields map into database tables. You can search and filter mappings by document type, target table, confidence level, or status.' },
-          { type: 'table', headers: ['Column', 'Description'], rows: [
-            ['Active', 'Enable/disable the mapping'],
-            ['Doc Type', 'Document type badge (OM, RENT_ROLL, T12, APPRAISAL)'],
-            ['Pattern', 'Source label from the document, with aliases shown below'],
-            ['Target', 'Database table.field plus transform rule if configured'],
-            ['Confidence', 'High, Medium, or Low badge'],
-            ['Actions', 'Edit or Delete (Delete hidden for system mappings)'],
-          ]},
-          { type: 'prose', text: 'Use this panel when a label in documents changes (e.g., "Year Built" becomes "Construction Year"), when you want to map a new field into the database, or when reviewing low-confidence mappings that need attention. Toggle the Stats button to see usage data: how many times each mapping has been triggered and its write success rate.' },
-        ],
-      },
-    ],
-  },
-  {
-    id: '20',
-    number: '20',
+    id: '18',
+    number: '18',
     title: 'Workspace Settings',
     group: 'Administration',
     sections: [],

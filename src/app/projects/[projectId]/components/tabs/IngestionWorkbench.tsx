@@ -36,6 +36,8 @@ interface IngestionWorkbenchProps {
   onClose?: () => void;
   /** Called instead of onClose after a successful commit — skips the abandon flow */
   onDone?: () => void;
+  /** Called when user chooses "Finish Later" — closes UI but preserves all progress */
+  onPause?: () => void;
 }
 
 // ─────────────────────────────────────────────────
@@ -451,6 +453,7 @@ export default function IngestionWorkbench({
   docType,
   onClose,
   onDone,
+  onPause,
 }: IngestionWorkbenchProps) {
   const {
     sections,
@@ -753,9 +756,9 @@ export default function IngestionWorkbench({
       {showCancelConfirm && (
         <div className="wb-cancel-overlay">
           <div className="wb-cancel-dialog">
-            <p className="wb-cancel-title">Cancel this ingestion?</p>
+            <p className="wb-cancel-title">Close ingestion session?</p>
             <p className="wb-cancel-desc">
-              All pending extractions will be discarded and the uploaded file will be deleted.
+              You can save your progress and finish later, or discard everything.
             </p>
             <div className="wb-cancel-actions">
               <button
@@ -764,6 +767,16 @@ export default function IngestionWorkbench({
                 disabled={isCancelling}
               >
                 Go Back
+              </button>
+              <button
+                className="wb-cancel-pause"
+                disabled={isCancelling}
+                onClick={() => {
+                  onPause?.();
+                  setShowCancelConfirm(false);
+                }}
+              >
+                Finish Later
               </button>
               <button
                 className="wb-cancel-confirm"
@@ -779,7 +792,7 @@ export default function IngestionWorkbench({
                   setIsCancelling(false);
                 }}
               >
-                {isCancelling ? 'Cancelling...' : 'Discard & Close'}
+                {isCancelling ? 'Discarding...' : 'Discard & Delete'}
               </button>
             </div>
           </div>

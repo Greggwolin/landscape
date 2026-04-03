@@ -263,8 +263,22 @@
 .wb-cancel-confirm:hover {
   filter: brightness(1.1);
 }
+.wb-cancel-pause {
+  padding: 8px 18px;
+  border: 1px solid var(--cui-info);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cui-info);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wb-cancel-pause:hover {
+  background: color-mix(in srgb, var(--cui-info) 12%, transparent);
+}
 .wb-cancel-confirm:disabled,
-.wb-cancel-back:disabled {
+.wb-cancel-back:disabled,
+.wb-cancel-pause:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

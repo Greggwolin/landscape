@@ -29,6 +29,8 @@ interface IngestionWorkbenchPanelProps {
   onClose: () => void;
   /** Called instead of onClose after a successful commit — skips the abandon flow */
   onDone?: () => void;
+  /** Called when user chooses "Finish Later" — closes UI but preserves all progress */
+  onPause?: () => void;
 }
 
 /**
@@ -47,6 +49,7 @@ export default function IngestionWorkbenchPanel({
   docType,
   onClose,
   onDone,
+  onPause,
 }: IngestionWorkbenchPanelProps) {
   return (
     <>
@@ -67,6 +70,7 @@ export default function IngestionWorkbenchPanel({
           docType={docType}
           onClose={onClose}
           onDone={onDone}
+          onPause={onPause}
         />
       </div>
     </>

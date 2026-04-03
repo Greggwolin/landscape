@@ -5,13 +5,14 @@ import { CCard, CCardHeader, CCardBody, CModal, CModalHeader, CModalTitle, CModa
 import CIcon from '@coreui/icons-react';
 import { cilLayers, cilTrash, cilActionRedo, cilPlus } from '@coreui/icons';
 import AccordionFilters, { type FilterAccordion } from '@/components/dms/filters/AccordionFilters';
+import DocTypeCombobox from '@/components/dms/filters/DocTypeCombobox';
 import DocumentPreviewPanel from '@/components/dms/views/DocumentPreviewPanel';
 import { type DmsPendingVersionLink } from '@/components/dms/panels/DmsLandscaperPanel';
 import ProfileForm from '@/components/dms/profile/ProfileForm';
 import { DeleteConfirmModal, RenameModal, RestoreConfirmModal } from '@/components/dms/modals';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import StagingTray from '@/components/dms/staging/StagingTray';
-import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
+import IntakeChoiceModal, { type PendingIntakeDoc } from '@/components/intelligence/IntakeChoiceModal';
 import { UploadStagingProvider, useUploadStaging } from '@/contexts/UploadStagingContext';
 import { useFileDrop } from '@/contexts/FileDropContext';
 import type { DMSDocument } from '@/types/dms';
@@ -68,6 +69,7 @@ function DMSViewInner({
   const [newTypeName, setNewTypeName] = useState('');
   const [addTypeError, setAddTypeError] = useState<string | null>(null);
   const [isSubmittingType, setIsSubmittingType] = useState(false);
+  const [allTemplateSuggestions, setAllTemplateSuggestions] = useState<string[]>([]);
 
   // Save-to-template prompt state
   const [saveToTemplatePrompt, setSaveToTemplatePrompt] = useState<{
@@ -93,6 +95,18 @@ function DMSViewInner({
       })
       .catch(err => console.error('Failed to fetch project template info:', err));
   }, [projectId]);
+
+  // Fetch all doc type suggestions from all templates for autocomplete
+  useEffect(() => {
+    fetch(`/api/dms/templates/all-doc-types`)
+      .then(res => res.ok ? res.json() : { doc_types: [] })
+      .then(data => {
+        if (Array.isArray(data.doc_types)) {
+          setAllTemplateSuggestions(data.doc_types);
+        }
+      })
+      .catch(err => console.error('Failed to fetch template doc type suggestions:', err));
+  }, []);
 
   // Documents state
   const [selectedDocument, setSelectedDocument] = useState<DMSDocument | null>(null);
@@ -121,6 +135,9 @@ function DMSViewInner({
   const [showMediaPreview, setShowMediaPreview] = useState(false);
   const [mediaPreviewDocId, setMediaPreviewDocId] = useState<number | null>(null);
   const [mediaPreviewDocName, setMediaPreviewDocName] = useState<string>('');
+
+  // Re-ingest existing DMS documents
+  const [reIngestDocs, setReIngestDocs] = useState<PendingIntakeDoc[]>([]);
 
   // Fetch filter data
   useEffect(() => {
@@ -848,7 +865,28 @@ function DMSViewInner({
     }
   }, [newTypeName, allFilters, projectId, handleCloseAddTypeModal, projectTemplate]);
 
+  // Reassignment modal state
+  const [reassignModal, setReassignModal] = useState<{
+    customId: number;
+    docTypeName: string;
+    docCount: number;
+    targetDocType: string;
+  } | null>(null);
+
   const handleDeleteFilter = useCallback(async (customId: number, docTypeName: string) => {
+    // Find the filter to check document count
+    const filter = allFilters.find(
+      (f) => f.doc_type === docTypeName || f.custom_id === customId
+    );
+    const docCount = filter?.count ?? 0;
+
+    if (docCount > 0) {
+      // Has documents — show reassignment modal, don't delete yet
+      setReassignModal({ customId, docTypeName, docCount, targetDocType: '' });
+      return;
+    }
+
+    // No documents — safe to delete directly
     try {
       const response = await fetch(
         `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${customId}/`,
@@ -856,9 +894,7 @@ function DMSViewInner({
       );
 
       if (response.ok) {
-        // Remove from local state immediately
         setAllFilters((prev) => prev.filter((f) => !(f.custom_id === customId)));
-        // If the deleted filter was expanded, collapse it
         if (expandedFilter === docTypeName) {
           setExpandedFilter(null);
         }
@@ -868,7 +904,54 @@ function DMSViewInner({
     } catch (error) {
       console.error('Error deleting custom doc type:', error);
     }
-  }, [projectId, expandedFilter]);
+  }, [projectId, expandedFilter, allFilters]);
+
+  const handleReassignAndDelete = useCallback(async () => {
+    if (!reassignModal || !reassignModal.targetDocType) return;
+
+    try {
+      // Reclassify documents to the new type, then delete the old type
+      const reclassifyResponse = await fetch(
+        `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${reassignModal.customId}/reassign/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_doc_type: reassignModal.targetDocType }),
+        }
+      );
+
+      if (!reclassifyResponse.ok) {
+        console.error('Failed to reassign documents:', reclassifyResponse.status);
+        return;
+      }
+
+      // Now delete the empty filter
+      const deleteResponse = await fetch(
+        `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${reassignModal.customId}/`,
+        { method: 'DELETE' }
+      );
+
+      if (deleteResponse.ok) {
+        // Update local state: move doc counts and remove the deleted filter
+        setAllFilters((prev) => {
+          const updated = prev.map((f) => {
+            if (f.doc_type === reassignModal.targetDocType) {
+              return { ...f, count: f.count + reassignModal.docCount };
+            }
+            return f;
+          });
+          return updated.filter((f) => !(f.custom_id === reassignModal.customId));
+        });
+        if (expandedFilter === reassignModal.docTypeName) {
+          setExpandedFilter(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error reassigning and deleting filter:', error);
+    } finally {
+      setReassignModal(null);
+    }
+  }, [reassignModal, projectId, expandedFilter]);
 
   // Save a custom doc type back to the project's template
   const handleSaveToTemplate = useCallback(async () => {
@@ -1040,7 +1123,27 @@ function DMSViewInner({
                               Move/Copy
                             </button>
                             <button className="hover:opacity-70 cursor-not-allowed opacity-50" style={{ color: 'var(--cui-secondary-color)' }} disabled>
-                              📧 Email copy
+                              📧 Share
+                            </button>
+                            <button
+                              className={`hover:opacity-70 ${selectedDocIds.size < 1 ? 'cursor-not-allowed opacity-50' : ''}`}
+                              style={{ color: 'var(--cui-primary)' }}
+                              disabled={selectedDocIds.size < 1}
+                              onClick={() => {
+                                // Build PendingIntakeDoc[] from selected documents
+                                const allDocs = allFilters.flatMap((f) => f.documents || []);
+                                const selected = allDocs.filter((d) => selectedDocIds.has(d.doc_id));
+                                const intakeDocs: PendingIntakeDoc[] = selected.map((d) => ({
+                                  docId: parseInt(d.doc_id, 10),
+                                  docName: d.doc_name,
+                                  docType: d.doc_type || null,
+                                }));
+                                if (intakeDocs.length > 0) {
+                                  setReIngestDocs(intakeDocs);
+                                }
+                              }}
+                            >
+                              🧩 Ingest
                             </button>
                             <button
                               className={`hover:opacity-70 ${selectedDocIds.size !== 1 ? 'cursor-not-allowed opacity-50' : ''}`}
@@ -1252,26 +1355,24 @@ function DMSViewInner({
                                 </CModalHeader>
                                 <CModalBody>
                                   <CFormLabel htmlFor="newDocTypeName">Type Name</CFormLabel>
-                                  <CFormInput
-                                    id="newDocTypeName"
-                                    type="text"
-                                    placeholder="e.g. Offering, Leases, Title & Survey"
+                                  <DocTypeCombobox
                                     value={newTypeName}
-                                    onChange={(e) => {
-                                      setNewTypeName(e.target.value);
+                                    onChange={(val) => {
+                                      setNewTypeName(val);
                                       if (addTypeError) setAddTypeError(null);
                                     }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        void handleSubmitAddType();
-                                      }
-                                    }}
+                                    suggestions={allTemplateSuggestions}
+                                    existingTypes={allFilters.map((f) => f.doc_type)}
+                                    placeholder="Type to search or create..."
                                     disabled={isSubmittingType}
-                                    invalid={!!addTypeError}
-                                    feedbackInvalid={addTypeError || undefined}
                                     autoFocus
+                                    onSubmit={() => void handleSubmitAddType()}
                                   />
+                                  {addTypeError && (
+                                    <div className="text-xs mt-1" style={{ color: 'var(--cui-danger)' }}>
+                                      {addTypeError}
+                                    </div>
+                                  )}
                                 </CModalBody>
                                 <CModalFooter>
                                   <CButton
@@ -1288,6 +1389,69 @@ function DMSViewInner({
                                     disabled={isSubmittingType || !newTypeName.trim()}
                                   >
                                     {isSubmittingType ? 'Adding...' : 'Add Type'}
+                                  </CButton>
+                                </CModalFooter>
+                              </CModal>
+
+                              {/* Reassignment Modal — shown when deleting a filter with documents */}
+                              <CModal
+                                visible={!!reassignModal}
+                                onClose={() => setReassignModal(null)}
+                                alignment="center"
+                                size="sm"
+                              >
+                                <CModalHeader>
+                                  <CModalTitle>Reassign Documents</CModalTitle>
+                                </CModalHeader>
+                                <CModalBody>
+                                  {reassignModal && (
+                                    <>
+                                      <p className="text-sm mb-3" style={{ color: 'var(--cui-body-color)' }}>
+                                        <strong>&ldquo;{reassignModal.docTypeName}&rdquo;</strong> contains{' '}
+                                        {reassignModal.docCount} document{reassignModal.docCount !== 1 ? 's' : ''}.
+                                        Choose a new filter to move them to before deleting.
+                                      </p>
+                                      <CFormLabel>Move documents to:</CFormLabel>
+                                      <select
+                                        className="form-select"
+                                        style={{
+                                          backgroundColor: 'var(--cui-input-bg)',
+                                          color: 'var(--cui-body-color)',
+                                          borderColor: 'var(--cui-border-color)',
+                                        }}
+                                        value={reassignModal.targetDocType}
+                                        onChange={(e) =>
+                                          setReassignModal((prev) =>
+                                            prev ? { ...prev, targetDocType: e.target.value } : null
+                                          )
+                                        }
+                                      >
+                                        <option value="">Select a filter...</option>
+                                        {allFilters
+                                          .filter((f) => f.doc_type !== reassignModal.docTypeName)
+                                          .map((f) => (
+                                            <option key={f.doc_type} value={f.doc_type}>
+                                              {f.doc_type} (~{f.count} docs)
+                                            </option>
+                                          ))}
+                                      </select>
+                                    </>
+                                  )}
+                                </CModalBody>
+                                <CModalFooter>
+                                  <CButton
+                                    color="secondary"
+                                    variant="ghost"
+                                    onClick={() => setReassignModal(null)}
+                                  >
+                                    Cancel
+                                  </CButton>
+                                  <CButton
+                                    color="danger"
+                                    onClick={() => void handleReassignAndDelete()}
+                                    disabled={!reassignModal?.targetDocType}
+                                  >
+                                    Move &amp; Delete Filter
                                   </CButton>
                                 </CModalFooter>
                               </CModal>
@@ -1490,6 +1654,14 @@ function DMSViewInner({
         projectId={projectId}
         docs={pendingIntakeDocs}
         onClose={clearPendingIntakeDocs}
+      />
+
+      {/* Re-ingest existing documents — triggered from toolbar Ingest button */}
+      <IntakeChoiceModal
+        visible={reIngestDocs.length > 0}
+        projectId={projectId}
+        docs={reIngestDocs}
+        onClose={() => setReIngestDocs([])}
       />
     </div>
   );

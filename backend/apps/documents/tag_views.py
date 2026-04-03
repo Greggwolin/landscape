@@ -347,6 +347,50 @@ def project_doc_types(request, project_id):
             })
 
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reassign_project_doc_type(request, project_id, pk):
+    """
+    POST /api/dms/projects/{project_id}/doc-types/{pk}/reassign/
+    Reassign all documents from one doc_type to another before deletion.
+    Body: { "target_doc_type": "Property Data" }
+    """
+    target_doc_type = request.data.get('target_doc_type', '').strip()
+    if not target_doc_type:
+        return Response({'error': 'target_doc_type is required'}, status=400)
+
+    with connection.cursor() as cursor:
+        # Look up the source doc type name
+        cursor.execute("""
+            SELECT doc_type_name FROM landscape.dms_project_doc_types
+            WHERE id = %s AND project_id = %s
+        """, [pk, project_id])
+        row = cursor.fetchone()
+        if not row:
+            return Response({'error': 'Source doc type not found'}, status=404)
+        source_doc_type = row[0]
+
+        if source_doc_type.lower() == target_doc_type.lower():
+            return Response({'error': 'Source and target doc types are the same'}, status=400)
+
+        # Reassign all documents with this doc_type in the project
+        cursor.execute("""
+            UPDATE landscape.core_doc
+            SET doc_type = %s, updated_at = NOW()
+            WHERE project_id = %s
+              AND LOWER(doc_type) = LOWER(%s)
+              AND deleted_at IS NULL
+        """, [target_doc_type, project_id, source_doc_type])
+        moved_count = cursor.rowcount
+
+    return Response({
+        'success': True,
+        'moved_count': moved_count,
+        'from': source_doc_type,
+        'to': target_doc_type,
+    })
+
+
 @api_view(['DELETE', 'PUT'])
 @permission_classes([AllowAny])
 def project_doc_type_detail(request, project_id, pk):

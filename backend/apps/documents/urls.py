@@ -44,6 +44,7 @@ from .tag_views import (
     document_tags,
     project_doc_types,
     project_doc_type_detail,
+    reassign_project_doc_type,
 )
 
 router = DefaultRouter()
@@ -97,4 +98,5 @@ urlpatterns = [
     # Project doc type overrides
     path('projects/<int:project_id>/doc-types/', project_doc_types, name='dms_project_doc_types'),
     path('projects/<int:project_id>/doc-types/<int:pk>/', project_doc_type_detail, name='dms_project_doc_type_detail'),
+    path('projects/<int:project_id>/doc-types/<int:pk>/reassign/', reassign_project_doc_type, name='dms_reassign_doc_type'),
 ]
