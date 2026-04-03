@@ -4,6 +4,64 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Ingestion Workbench "Finish Later" + DMS Filter Endpoints — 2026-04-02
+
+**What was discussed:**
+- Implemented "Finish Later" option on Ingestion Workbench cancel — replaces destructive-only cancel with 3-way choice: Go Back, Finish Later (preserves all progress), Discard & Delete
+- Updated navigation guard dialog to match: Stay, Save & Leave, Discard & Leave
+- Added draft session resume capability — floating banner at bottom-right detects paused `draft` intake sessions, shows doc name, offers Resume or Dismiss
+- Enhanced `IntakeStartView.get()` to return `docName` from `core_doc` for resume banner display
+- Created `GET /api/dms/templates/all-doc-types` (Next.js) — deduplicated doc type names across all templates for combobox autocomplete
+- Created `POST /api/dms/projects/{pid}/doc-types/{id}/reassign/` (Django) — reassigns all documents from one doc type to another before filter deletion, case-insensitive matching
+- Both new endpoints verified working in local dev
+
+**Open items:**
+- Race condition when rejecting staging rows during active extraction still needs investigation (user reported "gets stuck" — likely polling/optimistic update interaction)
+
+---
+
+## Market Agents Round 2 + Extraction Pipeline Fix — 2026-04-02
+
+**What was discussed:**
+- Set up and tested 8 new market intelligence agents (Census BPS, HUD, MBA, KBRA, Trepp, Brokerage Research, Construction Cost, NAIOP)
+- Fixed missing `beautifulsoup4` and `pdfplumber` dependencies in `pyproject.toml`
+- Fixed FRED API frequency mapping bug — FRED rejects `daily`/`quarterly` as frequency params, only accepts `d`/`q`/`m`; added mapping in `fred_client.py`
+- Rewrote seed SQL (`seed_bps_hud_series.sql`) to match actual `market_series` schema columns (`series_code`/`series_name`/`source`/`coverage_level`)
+- Created migration `037_research_harvest_tables.sql` for `tbl_research_publication`, `tbl_research_financial_data`, `tbl_research_harvest_log`
+- Rewrote Census BPS agent from broken REST API to CSV file downloads from `https://www2.census.gov/econ/bps/Place/West%20Region/`. 25 months backfilled, 17 AZ places + 3 counties, 1,119 rows
+- Converted `extract_document_batched` endpoint to async (threading) — returns 202 immediately, runs extraction in background thread to prevent Railway timeout
+- Fixed Workbench phantom conflict bug — single-source conflicts with no competing values treated as editable pending
+- Brokerage research agent updated with JLL API integration
+- Verified pdfplumber table extraction on C&W MarketBeat PDFs — structured submarket tables extract cleanly (vacancy, rent, absorption, cap rates)
+- Deployed v0.1.17 — Vercel + Railway both healthy
+
+**Open items:**
+- HUD agent skipped — needs free API token registration at huduser.gov
+- KBRA, NAIOP, RLB sites return HTTP errors (bot protection) — expected for scraping agents
+- Trepp finds 0 articles — CSS selector mismatch with current site structure
+- Census BPS agent only covers West Region (Arizona) — adding states requires downloading from other regional subdirectories
+- Brokerage agent PDF table extraction works but `_extract_market_data` method needs wiring to parse extracted tables into `tbl_research_financial_data` records
+
+---
+
+## Agent Architecture — Phase 0 Discovery — 2026-04-02
+
+**What was discussed:**
+- Completed full Phase 0 discovery audit for production agent infrastructure (user-configurable autonomous tasks running within Vercel/Railway/Neon stack)
+- Audited all existing scheduled task patterns (1 Vercel cron, 31 management commands, zero task queue), data pipelines (Redfin, FRED/BLS/Census, market agents, document extraction), and Railway deployment config
+- Recommended **Django-Q2** as task queue — uses PostgreSQL as broker (no new infrastructure), adds `worker:` process to Railway Procfile, includes built-in scheduler + Django admin UI
+- Proposed 3-table agent schema: `tbl_agent_definition` (config), `tbl_agent_run` (execution log), `tbl_agent_output` (audit trail) — JSONB config per agent type
+- Drafted CC prompts for Phase 1 (install Django-Q2, create agents app, wire Redfin comp scan as proof-of-concept) and Phase 2 (REST API + Next.js agent management UI)
+
+**Open items:**
+- Railway worker billing — confirm plan tier supports second container for worker process
+- Agent scope decision — project-scoped only vs. global agents across projects (schema supports both)
+- LLM budget for agents — Phase 1 agents are deterministic; decide if Level 1 agents (report drafter, field validator) should include Claude calls
+- Notification channel — Landscaper thread post sufficient for Phase 1, or need email/push?
+- CC prompts ready to execute: `cc-prompt-agent-phase1-infrastructure.md`, `cc-prompt-agent-phase2-api-ui.md` (in Landscape app folder)
+
+---
+
 ## Tier 1 Open Items — 2026-04-01
 
 **What changed:**
