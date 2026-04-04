@@ -16,6 +16,8 @@
 'use client';
 
 import React, { memo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { AppraisalLayout } from '@/components/appraisal/AppraisalLayout';
 
 // Import existing tab components
 import ProjectTab from './components/tabs/ProjectTab';
@@ -116,6 +118,13 @@ function ProjectContentRouter({
   currentTab,
   setFolderTab,
 }: ProjectContentRouterProps) {
+  const searchParams = useSearchParams();
+
+  // Appraisal conversational UI — activated via ?ui=appraisal
+  if (searchParams.get('ui') === 'appraisal') {
+    return <AppraisalLayout project={project} />;
+  }
+
   // Route based on folder and tab combination
   const renderContent = () => {
     switch (currentFolder) {

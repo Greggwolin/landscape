@@ -1,0 +1,1260 @@
+/**
+ * Appraisal Conversational UI Styles
+ * All colors use CoreUI CSS variables — no hardcoded hex.
+ *
+ * @version 1.0
+ * @created 2026-04-04
+ */
+
+/* ===== LAYOUT ===== */
+
+.appraisal-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+}
+
+.appraisal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+/* ===== TOPBAR ===== */
+
+.appraisal-topbar {
+  height: 46px;
+  background: var(--cui-dark);
+  border-bottom: 1px solid var(--cui-border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.appraisal-tb-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  margin-right: 4px;
+}
+
+.appraisal-tb-toggle:hover {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-tb-logo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+  letter-spacing: 0.04em;
+}
+
+.appraisal-tb-logo em {
+  font-style: normal;
+  color: var(--cui-primary);
+}
+
+.appraisal-tb-slash {
+  color: var(--cui-border-color);
+  margin: 0 4px;
+}
+
+.appraisal-tb-project {
+  font-size: 13px;
+  color: var(--cui-body-color);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.appraisal-tb-chevron {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  margin-left: 2px;
+}
+
+.appraisal-tb-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--cui-border-color);
+  margin: 0 6px;
+}
+
+.appraisal-tb-spacer {
+  flex: 1;
+}
+
+.appraisal-tb-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--cui-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ===== APPROACH TABS ===== */
+
+.approach-nav {
+  display: flex;
+  gap: 2px;
+  background: var(--cui-tertiary-bg);
+  border-radius: 7px;
+  padding: 3px;
+}
+
+.approach-tab {
+  font-size: 11px;
+  padding: 5px 14px;
+  border-radius: 5px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+}
+
+.approach-tab:hover {
+  color: var(--cui-secondary-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.approach-tab.active {
+  background: color-mix(in srgb, var(--cui-primary) 20%, transparent);
+  color: var(--cui-primary);
+  font-weight: 600;
+}
+
+.approach-tab-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+
+.approach-tab-dot.green {
+  background: var(--cui-success);
+}
+
+.approach-tab-dot.yellow {
+  background: var(--cui-warning);
+}
+
+.approach-tab-dot.gray {
+  background: var(--cui-tertiary-color);
+  opacity: 0.3;
+}
+
+/* ===== LEFT PANEL ===== */
+
+.appraisal-left {
+  width: 220px;
+  background: var(--cui-dark);
+  border-right: 1px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.2s ease;
+}
+
+.appraisal-left.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+.appraisal-left.collapsed * {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.appraisal-left-top {
+  padding: 12px;
+}
+
+.appraisal-left-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.appraisal-left-btn:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.appraisal-left-btn.primary {
+  color: var(--cui-primary);
+  font-weight: 500;
+}
+
+.appraisal-left-divider {
+  height: 1px;
+  background: var(--cui-border-color);
+  margin: 4px 12px;
+}
+
+.appraisal-left-section {
+  padding: 8px 12px;
+}
+
+.appraisal-ls-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 6px;
+  font-weight: 600;
+  padding: 0 4px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.appraisal-ls-label-action {
+  color: var(--cui-primary);
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.appraisal-ls-item {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1px;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.appraisal-ls-item:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.appraisal-ls-item.active {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  font-weight: 500;
+}
+
+.appraisal-ls-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.appraisal-ls-dot.green {
+  background: var(--cui-success);
+}
+
+.appraisal-ls-dot.purple {
+  background: var(--cui-primary);
+}
+
+.appraisal-ls-dot.gray {
+  background: var(--cui-tertiary-color);
+  opacity: 0.3;
+}
+
+.appraisal-ls-item-badge {
+  margin-left: auto;
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.appraisal-ls-item-badge.running {
+  background: color-mix(in srgb, var(--cui-success) 12%, transparent);
+  color: var(--cui-success);
+}
+
+.appraisal-ls-item-badge.idle {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-tertiary-color);
+}
+
+.appraisal-ls-item-date {
+  margin-left: auto;
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+}
+
+/* ===== CENTER — CHAT ===== */
+
+.appraisal-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--cui-body-bg);
+}
+
+.appraisal-chat-header {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--cui-border-color);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.appraisal-ch-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+}
+
+.appraisal-ch-approach {
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  color: var(--cui-primary);
+  font-weight: 500;
+}
+
+.appraisal-chat-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== RIGHT PANEL ===== */
+
+.appraisal-right {
+  width: 320px;
+  background: var(--cui-dark);
+  border-left: 1px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.appraisal-right-hdr {
+  padding: 10px 14px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.appraisal-rh-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+}
+
+/* ===== TILES ===== */
+
+.appraisal-tile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px 14px 6px;
+  flex-shrink: 0;
+}
+
+.appraisal-tile {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  padding: 7px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+}
+
+.appraisal-tile:hover {
+  border-color: var(--cui-secondary-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.appraisal-tile.active {
+  border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 8%, transparent);
+}
+
+.appraisal-tile.wide {
+  grid-column: span 2;
+}
+
+.appraisal-tile.docs-tile {
+  background: color-mix(in srgb, var(--cui-primary) 4%, transparent);
+  border-color: color-mix(in srgb, var(--cui-primary) 12%, transparent);
+}
+
+.appraisal-tile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.appraisal-tile-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-tile.active .appraisal-tile-name {
+  color: var(--cui-primary);
+}
+
+.appraisal-tile-status {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.appraisal-tile-status.green {
+  background: var(--cui-success);
+}
+
+.appraisal-tile-sub {
+  font-size: 8px;
+  color: var(--cui-tertiary-color);
+  margin-top: 1px;
+}
+
+.appraisal-tile-link {
+  font-size: 8px;
+  color: var(--cui-primary);
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-top: 1px;
+}
+
+.appraisal-tile:hover .appraisal-tile-link {
+  opacity: 1;
+}
+
+/* ===== PILLS ===== */
+
+.appraisal-pill-nav {
+  display: flex;
+  gap: 4px;
+  padding: 8px 14px 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.appraisal-pill {
+  font-size: 9px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  background: transparent;
+}
+
+.appraisal-pill:hover {
+  border-color: var(--cui-secondary-color);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-pill.active {
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  color: var(--cui-primary);
+  font-weight: 500;
+}
+
+.appraisal-pill.flyout-trigger {
+  border-style: dashed;
+}
+
+.appraisal-pill.flyout-trigger:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+  color: var(--cui-primary);
+}
+
+/* ===== VIEW AREA ===== */
+
+.appraisal-view-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  min-height: 0;
+}
+
+/* ===== SECTION DIVIDER ===== */
+
+.appraisal-section-div {
+  height: 1px;
+  background: var(--cui-border-color);
+  margin: 0 14px;
+  flex-shrink: 0;
+}
+
+/* ===== PROFORMA ROWS ===== */
+
+.pf-row {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  cursor: default;
+}
+
+.pf-row:hover {
+  background: var(--cui-tertiary-bg);
+  border-radius: 4px;
+}
+
+.pf-row.subtotal {
+  border-top: 1px solid var(--cui-border-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  margin-top: 2px;
+  padding: 6px 0;
+}
+
+.pf-row.waiting {
+  opacity: 0.4;
+}
+
+.pf-row.waiting:hover {
+  opacity: 0.7;
+}
+
+.pf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.pf-dot.green {
+  background: var(--cui-success);
+}
+
+.pf-dot.blue {
+  background: var(--cui-primary);
+}
+
+.pf-dot.yellow {
+  background: var(--cui-warning);
+}
+
+.pf-dot.empty {
+  border: 1px solid var(--cui-tertiary-color);
+  background: transparent;
+}
+
+.pf-dot.hidden {
+  visibility: hidden;
+}
+
+.pf-label {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.pf-row.subtotal .pf-label {
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.pf-input {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  width: 55px;
+  text-align: right;
+  margin-right: 8px;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.12s;
+}
+
+.pf-input.has {
+  color: var(--cui-primary);
+}
+
+.pf-row:hover .pf-input {
+  border-bottom-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+}
+
+.pf-val {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+  width: 80px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.12s;
+}
+
+.pf-row:hover .pf-val {
+  border-bottom-color: color-mix(in srgb, var(--cui-border-color) 60%, transparent);
+}
+
+.pf-val.neg {
+  color: var(--cui-danger);
+}
+
+.pf-val.grn {
+  color: var(--cui-success);
+}
+
+.pf-val.wait {
+  color: var(--cui-tertiary-color);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.pf-row.subtotal .pf-val {
+  font-weight: 600;
+}
+
+.pf-detail {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  padding: 1px 0 1px 14px;
+}
+
+/* ===== VALUE BOX ===== */
+
+.val-box {
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--cui-primary) 20%, transparent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--cui-primary) 5%, transparent);
+}
+
+.val-box .vb-eye {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 3px;
+}
+
+.val-box .vb-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.val-box .vb-sub {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  margin-top: 1px;
+}
+
+.val-box .vb-wait {
+  font-size: 13px;
+  color: var(--cui-tertiary-color);
+  font-style: italic;
+}
+
+.val-box.dim {
+  opacity: 0.4;
+}
+
+/* ===== UNIT MIX GRID ===== */
+
+.um-row {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+}
+
+.um-row.header {
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.um-row.header span {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  font-weight: 500;
+}
+
+.um-row:not(.header):hover {
+  background: var(--cui-tertiary-bg);
+  border-radius: 4px;
+}
+
+.um-type {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  width: 50px;
+}
+
+.um-beds,
+.um-baths {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  width: 30px;
+  text-align: center;
+}
+
+.um-units {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  width: 45px;
+  text-align: right;
+}
+
+.um-sf {
+  font-size: 11px;
+  color: var(--cui-tertiary-color);
+  width: 50px;
+  text-align: right;
+}
+
+.um-rent {
+  font-size: 11px;
+  color: var(--cui-primary);
+  width: 60px;
+  text-align: right;
+}
+
+.um-total {
+  font-size: 11px;
+  color: var(--cui-body-color);
+  font-weight: 500;
+  flex: 1;
+  text-align: right;
+}
+
+.um-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.um-source.manual {
+  background: color-mix(in srgb, var(--cui-success) 8%, transparent);
+  color: var(--cui-success);
+}
+
+.um-source.rentroll {
+  background: color-mix(in srgb, var(--cui-primary) 8%, transparent);
+  color: var(--cui-primary);
+}
+
+.um-drop {
+  border: 1px dashed var(--cui-border-color);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.um-drop:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 3%, transparent);
+}
+
+.um-drop-icon {
+  font-size: 18px;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 4px;
+}
+
+.um-drop-text {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  line-height: 1.5;
+}
+
+.um-drop-types {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  opacity: 0.6;
+  margin-top: 4px;
+}
+
+.um-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  font-size: 10px;
+  color: var(--cui-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+}
+
+.um-add-row:hover {
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
+}
+
+/* ===== EXPENSE ROWS ===== */
+
+.exp-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  cursor: default;
+}
+
+.exp-row:hover {
+  background: var(--cui-tertiary-bg);
+  border-radius: 4px;
+}
+
+.exp-label {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.exp-amt {
+  font-size: 10px;
+  color: var(--cui-body-color);
+  width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.exp-pct {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  width: 40px;
+  text-align: right;
+}
+
+.exp-row.total {
+  border-top: 1px solid var(--cui-border-color);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.exp-row.total .exp-label,
+.exp-row.total .exp-amt,
+.exp-row.total .exp-pct {
+  font-weight: 600;
+}
+
+/* ===== DETAIL PANEL ===== */
+
+.detail-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  z-index: 200;
+  display: none;
+}
+
+.detail-overlay.show {
+  display: block;
+}
+
+.detail-panel {
+  width: 380px;
+  background: var(--cui-secondary-bg);
+  border-left: 1px solid var(--cui-border-color);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: detailSlide 0.2s ease-out;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes detailSlide {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.dp-hdr {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cui-border-color);
+  flex-shrink: 0;
+}
+
+.dp-hdr-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.dp-hdr-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.dp-hdr-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+}
+
+.dp-hdr-close:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.dp-hdr-meta {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+}
+
+.dp-hdr-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-top: 4px;
+}
+
+.dp-hdr-source.user {
+  background: color-mix(in srgb, var(--cui-success) 10%, transparent);
+  color: var(--cui-success);
+}
+
+.dp-hdr-source.landscaper {
+  background: color-mix(in srgb, var(--cui-primary) 10%, transparent);
+  color: var(--cui-primary);
+}
+
+.dp-hdr-source.calculated {
+  background: color-mix(in srgb, var(--cui-warning) 10%, transparent);
+  color: var(--cui-warning);
+}
+
+.dp-body {
+  flex: 1;
+  padding: 14px 18px;
+  overflow-y: auto;
+}
+
+.dp-current {
+  padding: 12px;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.dp-current-label {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.dp-current-val {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.dp-current-basis {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  margin-top: 2px;
+}
+
+.dp-section-title {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 12px 0 6px;
+  font-weight: 600;
+}
+
+.dp-sub-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.dp-sub-row:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.dp-sub-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.dp-sub-dot.green {
+  background: var(--cui-success);
+}
+
+.dp-sub-dot.blue {
+  background: var(--cui-primary);
+}
+
+.dp-sub-dot.empty {
+  border: 1px solid var(--cui-tertiary-color);
+}
+
+.dp-sub-dot.hidden {
+  visibility: hidden;
+}
+
+.dp-sub-label {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.dp-sub-input {
+  font-size: 10px;
+  color: var(--cui-primary);
+  width: 55px;
+  text-align: right;
+  margin-right: 8px;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+
+.dp-sub-row:hover .dp-sub-input {
+  border-bottom-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+}
+
+.dp-sub-val {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+  width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+
+.dp-sub-row:hover .dp-sub-val {
+  border-bottom-color: color-mix(in srgb, var(--cui-border-color) 60%, transparent);
+}
+
+.dp-sub-total {
+  border-top: 1px solid var(--cui-border-color);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.dp-sub-total .dp-sub-label {
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.dp-sub-total .dp-sub-val {
+  font-weight: 600;
+}
+
+.dp-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--cui-primary);
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+}
+
+.dp-add-row:hover {
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
+}
+
+.dp-chat-hint {
+  margin-top: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--cui-primary) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cui-primary) 12%, transparent);
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  line-height: 1.5;
+}
+
+.dp-chat-hint strong {
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+}
+
+.dp-footer {
+  padding: 12px 18px;
+  border-top: 1px solid var(--cui-border-color);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dp-btn {
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+}
+
+.dp-btn.primary {
+  background: var(--cui-primary);
+  color: #fff;
+}
+
+.dp-btn.secondary {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+}
+
+/* ===== BOTTOM SECTION ===== */
+
+.appraisal-bottom-section {
+  flex-shrink: 0;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--cui-border-color);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.appraisal-rs-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.appraisal-rpt-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.appraisal-rpt-mini:hover {
+  background: var(--cui-tertiary-bg);
+}
+
+.appraisal-rpt-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.appraisal-rpt-dot.green {
+  background: var(--cui-success);
+}
+
+.appraisal-rpt-dot.yellow {
+  background: var(--cui-warning);
+}
+
+.appraisal-rpt-dot.gray {
+  background: var(--cui-tertiary-color);
+  opacity: 0.3;
+}
+
+.appraisal-rpt-name {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.appraisal-rpt-pct {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+}
+
+/* ===== SCROLLBAR ===== */
+
+.appraisal-layout * {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.appraisal-layout *:hover {
+  scrollbar-color: color-mix(in srgb, var(--cui-body-color) 15%, transparent) transparent;
+}
