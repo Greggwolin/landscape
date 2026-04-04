@@ -423,6 +423,15 @@ class ExtractionWriter:
         elif mapping.db_write_type == 'row_land_use_budget':
             return self._write_land_use_budget(mapping, value, scope_id)
 
+        elif mapping.db_write_type == 'row_budget_detail':
+            return self._write_budget_detail(mapping, value)
+
+        elif mapping.db_write_type == 'row_closing':
+            return self._write_closing_events(mapping, value)
+
+        elif mapping.db_write_type == 'composite':
+            return self._write_capital_structure(mapping, value)
+
         return False, f"Unknown row-based write type: {mapping.db_write_type}"
 
     def _write_assumption(
@@ -909,6 +918,381 @@ class ExtractionWriter:
             return row[0]
 
         return 'other'
+
+    # ── Land Dev Proforma Writers (budget detail, absorption, capital) ───
+
+    def _write_budget_detail(
+        self,
+        mapping: FieldMapping,
+        value: Any
+    ) -> Tuple[bool, str]:
+        """Write detailed budget line items to core_fin_fact_budget with fuzzy cost library matching.
+
+        Each line item is matched against core_unit_cost_item using Python-side
+        difflib fuzzy matching (no pg_trgm dependency). Matched items get the
+        cost library category_id; unmatched items (similarity < 0.3) are still
+        written but flagged with confidence_level='pending_review'.
+        """
+        from difflib import SequenceMatcher
+
+        if not isinstance(value, list):
+            value = [value] if isinstance(value, dict) else []
+
+        # Pre-load cost library items for fuzzy matching
+        cost_items = []
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT item_id, item_name, category_id, default_uom_code, typical_mid_value
+                FROM landscape.core_unit_cost_item
+                WHERE is_active = true
+            """)
+            cost_items = cursor.fetchall()
+
+        # Build lookup for quick matching
+        item_names = [(row[0], row[1], row[2], row[3], row[4]) for row in cost_items]
+
+        wrote = 0
+        pending_review = 0
+
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+
+            line_item_name = entry.get('line_item_name', '').strip()
+            if not line_item_name:
+                continue
+
+            # Fuzzy match against cost library
+            best_match = None
+            best_score = 0.0
+            for item_id, iname, cat_id, uom, mid_val in item_names:
+                score = SequenceMatcher(None, line_item_name.lower(), iname.lower()).ratio()
+                if score > best_score:
+                    best_score = score
+                    best_match = (item_id, iname, cat_id, uom, mid_val)
+
+            # Determine category and confidence
+            category_id = None
+            confidence = 'high'
+            matched_item_name = None
+
+            if best_match and best_score >= 0.3:
+                category_id = best_match[2]
+                matched_item_name = best_match[1]
+                if best_score < 0.5:
+                    confidence = 'medium'
+            else:
+                confidence = 'pending_review'
+                pending_review += 1
+
+            # Parse amounts
+            try:
+                total_amount = Decimal(str(entry.get('total_amount', 0)).replace(',', '').replace('$', ''))
+            except (InvalidOperation, ValueError):
+                total_amount = Decimal('0')
+
+            unit_cost = entry.get('unit_cost')
+            qty = None
+            rate = None
+            uom_code = entry.get('unit_cost_uom', 'EA')
+
+            if unit_cost is not None:
+                try:
+                    rate = Decimal(str(unit_cost).replace(',', '').replace('$', ''))
+                    # Calculate qty from total / rate if possible
+                    if rate and rate != 0 and total_amount:
+                        qty = float(total_amount / rate)
+                except (InvalidOperation, ValueError):
+                    rate = None
+
+            # Map lifecycle_stage to activity
+            lifecycle_stage = entry.get('lifecycle_stage', '')
+            cost_type = entry.get('cost_type', '')
+            section = entry.get('section', '')
+
+            # Build notes with provenance
+            notes_parts = []
+            if section:
+                notes_parts.append(f"Section: {section}")
+            if matched_item_name and matched_item_name != line_item_name:
+                notes_parts.append(f"Matched to: {matched_item_name} (score: {best_score:.2f})")
+            notes = '; '.join(notes_parts) if notes_parts else None
+
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO landscape.core_fin_fact_budget
+                        (project_id, category_id, uom_code, qty, rate, amount,
+                         notes, confidence_level, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                """, [
+                    self.project_id, category_id, uom_code,
+                    qty, rate, total_amount,
+                    notes, confidence
+                ])
+                wrote += 1
+
+        msg = f"Wrote {wrote} budget line items"
+        if pending_review:
+            msg += f" ({pending_review} flagged for category review)"
+        return True, msg
+
+    def _write_closing_events(
+        self,
+        mapping: FieldMapping,
+        value: Any
+    ) -> Tuple[bool, str]:
+        """Write absorption schedule data as parcel sale events + closing events.
+
+        Each product/schedule entry creates a tbl_parcel_sale_event (master),
+        and each year-period creates a tbl_closing_event (takedown).
+        """
+        if not isinstance(value, list):
+            value = [value] if isinstance(value, dict) else []
+
+        events_created = 0
+        closings_created = 0
+
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+
+            product_name = entry.get('product_name', 'Unknown Product')
+            schedule_type = entry.get('schedule_type', 'sales')
+            total_units = entry.get('total_units', 0)
+            price_per_unit = entry.get('price_per_unit')
+            periods = entry.get('periods', [])
+
+            if not periods:
+                continue
+
+            # Only create sale events for sales schedules (not buildout)
+            if schedule_type != 'sales':
+                continue
+
+            base_price = None
+            if price_per_unit is not None:
+                try:
+                    base_price = Decimal(str(price_per_unit).replace(',', '').replace('$', ''))
+                except (InvalidOperation, ValueError):
+                    base_price = None
+
+            # Create master sale event
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO landscape.tbl_parcel_sale_event
+                        (project_id, sale_type, buyer_entity,
+                         total_lots_contracted, base_price_per_lot,
+                         sale_status, notes, created_at, updated_at)
+                    VALUES (%s, 'multi_closing', %s, %s, %s, 'pending', %s, NOW(), NOW())
+                    RETURNING sale_event_id
+                """, [
+                    self.project_id,
+                    product_name,
+                    total_units,
+                    base_price,
+                    f"Extracted absorption schedule: {product_name}"
+                ])
+                sale_event_id = cursor.fetchone()[0]
+                events_created += 1
+
+                # Create closing events for each period
+                cumulative = 0
+                for seq, period in enumerate(periods, 1):
+                    if not isinstance(period, dict):
+                        continue
+
+                    year = period.get('year')
+                    units = period.get('units', 0)
+                    if not units or units == 0:
+                        continue
+
+                    cumulative += units
+                    closing_date = f"{year}-07-01" if year else None
+                    gross_proceeds = None
+                    if base_price and units:
+                        gross_proceeds = base_price * units
+
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_closing_event
+                            (sale_event_id, closing_sequence, closing_date,
+                             lots_closed, base_price_per_unit,
+                             gross_proceeds, cumulative_lots_closed,
+                             lots_remaining, notes, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    """, [
+                        sale_event_id, seq, closing_date,
+                        units, base_price,
+                        gross_proceeds, cumulative,
+                        max(0, total_units - cumulative),
+                        f"Year {year}" if year else None
+                    ])
+                    closings_created += 1
+
+        return True, f"Created {events_created} sale events with {closings_created} closing events"
+
+    def _write_capital_structure(
+        self,
+        mapping: FieldMapping,
+        value: Any
+    ) -> Tuple[bool, str]:
+        """Write capital structure to tbl_equity, tbl_loan, and tbl_project_assumption.
+
+        This is a composite writer that routes extracted fields to multiple tables:
+        - Equity fields → tbl_equity (LP and GP rows)
+        - Debt fields → tbl_loan (via existing loan infrastructure)
+        - Return metrics and fees → tbl_project_assumption
+        """
+        if not isinstance(value, dict):
+            return False, "Capital structure value must be a dict"
+
+        results = []
+
+        # --- Equity (LP) ---
+        equity_amount = value.get('equity_amount')
+        preferred_return = value.get('preferred_return_pct')
+        lp_split = value.get('lp_split_pct')
+
+        if equity_amount is not None:
+            try:
+                eq_amt = Decimal(str(equity_amount).replace(',', '').replace('$', ''))
+            except (InvalidOperation, ValueError):
+                eq_amt = None
+
+            if eq_amt:
+                pref_pct = None
+                if preferred_return is not None:
+                    try:
+                        pref_pct = Decimal(str(preferred_return))
+                        # Normalize: if > 1, it's already a percentage like 8.0 → convert to 8.00
+                        if pref_pct > 1:
+                            pass  # keep as-is, DB stores as percentage
+                        else:
+                            pref_pct = pref_pct * 100  # 0.08 → 8.00
+                    except (InvalidOperation, ValueError):
+                        pref_pct = None
+
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_equity
+                            (project_id, equity_name, equity_class,
+                             commitment_amount, preferred_return_pct,
+                             created_at, updated_at)
+                        VALUES (%s, 'LP Equity', 'LP', %s, %s, NOW(), NOW())
+                        ON CONFLICT (project_id, equity_class)
+                        DO UPDATE SET
+                            commitment_amount = EXCLUDED.commitment_amount,
+                            preferred_return_pct = EXCLUDED.preferred_return_pct,
+                            updated_at = NOW()
+                    """, [self.project_id, eq_amt, pref_pct])
+                results.append("LP equity written")
+
+        # --- GP Equity (if split info available) ---
+        gp_split = value.get('gp_split_pct')
+        if gp_split is not None:
+            try:
+                promote_pct = Decimal(str(gp_split))
+                if promote_pct <= 1:
+                    promote_pct = promote_pct * 100
+            except (InvalidOperation, ValueError):
+                promote_pct = None
+
+            if promote_pct:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_equity
+                            (project_id, equity_name, equity_class,
+                             promote_pct, created_at, updated_at)
+                        VALUES (%s, 'GP Equity', 'GP', %s, NOW(), NOW())
+                        ON CONFLICT (project_id, equity_class)
+                        DO UPDATE SET
+                            promote_pct = EXCLUDED.promote_pct,
+                            updated_at = NOW()
+                    """, [self.project_id, promote_pct])
+                results.append("GP equity written")
+
+        # --- Debt/Loan ---
+        debt_amount = value.get('debt_amount')
+        interest_rate = value.get('interest_rate')
+
+        if debt_amount is not None:
+            try:
+                debt_amt = Decimal(str(debt_amount).replace(',', '').replace('$', ''))
+            except (InvalidOperation, ValueError):
+                debt_amt = None
+
+            rate_pct = None
+            if interest_rate is not None:
+                try:
+                    rate_pct = Decimal(str(interest_rate))
+                    if rate_pct <= 1:
+                        rate_pct = rate_pct * 100
+                except (InvalidOperation, ValueError):
+                    rate_pct = None
+
+            origination_fee = value.get('loan_origination_fee_pct')
+            orig_pct = None
+            if origination_fee is not None:
+                try:
+                    orig_pct = Decimal(str(origination_fee))
+                    if orig_pct <= 1:
+                        orig_pct = orig_pct * 100
+                except (InvalidOperation, ValueError):
+                    orig_pct = None
+
+            if debt_amt:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_loan
+                            (project_id, loan_name, commitment_amount,
+                             interest_rate, origination_fee_pct,
+                             created_at, updated_at)
+                        VALUES (%s, 'Construction Loan', %s, %s, %s, NOW(), NOW())
+                        ON CONFLICT (project_id, loan_name)
+                        DO UPDATE SET
+                            commitment_amount = EXCLUDED.commitment_amount,
+                            interest_rate = EXCLUDED.interest_rate,
+                            origination_fee_pct = EXCLUDED.origination_fee_pct,
+                            updated_at = NOW()
+                    """, [self.project_id, debt_amt, rate_pct, orig_pct])
+                results.append("Loan written")
+
+        # --- Return metrics and fees → tbl_project_assumption ---
+        assumption_fields = {
+            'project_irr': 'project_irr',
+            'equity_multiple': 'equity_multiple',
+            'ltc_ratio': 'ltc_ratio',
+            'ltv_ratio': 'ltv_ratio',
+            'lp_irr': 'lp_irr',
+            'lp_equity_multiple': 'lp_equity_multiple',
+            'developer_overhead_pct': 'developer_overhead_pct',
+            'disposition_fee_pct': 'disposition_fee_pct',
+        }
+
+        assumption_count = 0
+        for src_key, assumption_key in assumption_fields.items():
+            val = value.get(src_key)
+            if val is not None:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO landscape.tbl_project_assumption
+                            (project_id, assumption_key, assumption_value,
+                             assumption_type, scope, created_at, updated_at)
+                        VALUES (%s, %s, %s, 'extracted', 'project', NOW(), NOW())
+                        ON CONFLICT (project_id, assumption_key)
+                        DO UPDATE SET
+                            assumption_value = EXCLUDED.assumption_value,
+                            assumption_type = 'extracted',
+                            updated_at = NOW()
+                    """, [self.project_id, assumption_key, str(val)])
+                    assumption_count += 1
+
+        if assumption_count:
+            results.append(f"{assumption_count} return metrics as assumptions")
+
+        if not results:
+            return False, "No capital structure data written"
+
+        return True, f"Capital structure: {', '.join(results)}"
 
     def _write_assumption_upsert(
         self,

@@ -148,6 +148,63 @@ export const guideChapters: GuideChapter[] = [
 
   // ─── Group: Landscaper AI ─────────────────────────────────────
   {
+    id: '3b',
+    number: '3b',
+    title: 'Platform Intelligence',
+    subtitle: 'How Landscaper knows what it knows',
+    group: 'Landscaper AI',
+    sections: [
+      {
+        id: '3b.1',
+        title: 'The Intelligence Layer',
+        content: [
+          { type: 'prose', text: 'Landscaper doesn\'t work from a blank slate. Every time you ask a question, request an analysis, or upload a document, Landscaper draws on three distinct sources of information to assemble an informed answer. Understanding where that knowledge comes from — and what feeds it — is the key to getting the most out of the platform.' },
+          { type: 'screenshot', src: '/guide/images/chapter-03b-platform-intelligence/intelligence-architecture.svg', alt: 'Platform Intelligence architecture diagram showing three data sources feeding Landscaper', caption: 'Platform Intelligence: Landscaper draws from three sources — your projects, market intelligence, and your benchmarks and preferences.' },
+        ],
+      },
+      {
+        id: '3b.2',
+        title: 'Your Projects',
+        content: [
+          { type: 'prose', text: 'The first place Landscaper looks is your project data. For the project you\'re currently working in, Landscaper has full access to everything: budgets, units, leases, comps, assumptions, uploaded documents, and calculated results like cash flows and return metrics. It reads from the same data you see in the workspace tabs.' },
+          { type: 'prose', text: 'Landscaper can also reference your other projects in read-only mode. If you\'ve underwritten similar deals before, Landscaper can pull assumptions and summary metrics from those projects to inform its recommendations on the current one. It won\'t modify past projects — just learn from them.' },
+        ],
+      },
+      {
+        id: '3b.3',
+        title: 'Market Intelligence & Reference',
+        content: [
+          { type: 'prose', text: 'The second source is market data and industry reference material. Landscape maintains a library of market time-series data — interest rates from FRED, building permits from Census, HUD housing data, and research reports from industry sources. This data is refreshed automatically overnight, so Landscaper always has current market context when you ask about rates, trends, or comparisons.' },
+          { type: 'prose', text: 'Alongside market data, Landscaper has access to a reference library of industry standards and methodology: USPAP appraisal standards, IREM operating expense benchmarks, BOMA measurement standards, and core appraisal methodology. When Landscaper recommends an approach or validates your assumptions, it draws on these authoritative sources.' },
+        ],
+      },
+      {
+        id: '3b.4',
+        title: 'Benchmarks & Preferences',
+        content: [
+          { type: 'prose', text: 'The third source is your platform configuration — the benchmarks and preferences that shape how Landscaper thinks about every project. This includes the cost library (unit costs, construction benchmarks, and planning standards set up in the Admin panel), IREM expense benchmarks, and absorption velocity data. These are shared across all your projects and give Landscaper a baseline for evaluating whether your assumptions are reasonable.' },
+          { type: 'prose', text: 'Your preferences matter too. Custom instructions you set in Landscaper\'s profile — your communication style, your role, how you approach analysis — are applied to every conversation. If you prefer conservative underwriting assumptions or always want Landscaper to flag vacancy rates above a certain threshold, those preferences carry across projects.' },
+        ],
+      },
+      {
+        id: '3b.5',
+        title: 'The Document Management System',
+        content: [
+          { type: 'prose', text: 'Connecting your projects and market intelligence to Landscaper is the Document Management System. When you upload a document, the DMS stores it, classifies it, and runs AI extraction to pull structured data into your project. The extracted data feeds your project\'s knowledge base, and the original document remains available for Landscaper to query at any time.' },
+          { type: 'prose', text: 'Benchmarks and preferences bypass the DMS — they feed Landscaper directly as configuration, not as documents. But for everything else — offering memorandums, rent rolls, appraisals, market studies, broker correspondence — the DMS is the pipeline that turns unstructured files into structured intelligence that Landscaper can act on.' },
+          { type: 'callout', label: 'Upload Everything', text: 'The more documents you feed the DMS, the richer Landscaper\'s understanding of your deal. Even documents that don\'t extract cleanly remain searchable — Landscaper can read and reason about any uploaded file, not just the ones with successful extractions.' },
+        ],
+      },
+      {
+        id: '3b.6',
+        title: 'How It Comes Together',
+        content: [
+          { type: 'prose', text: 'When you ask Landscaper a question, it doesn\'t search all three sources equally. It checks your project data first — that\'s the most specific and current information. If the answer isn\'t there, it checks market data and document embeddings. Industry reference material is consulted last, primarily for methodology and standards questions. This priority order means Landscaper\'s answers are grounded in your actual deal data, supplemented by market context, and backed by industry standards.' },
+        ],
+      },
+    ],
+  },
+  {
     id: '4',
     number: '4',
     title: 'Introduction to Landscaper',

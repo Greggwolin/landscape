@@ -6,6 +6,13 @@ Historical record of feature and migration completions. For current implementati
 
 ## 2026
 
+### April
+
+| Date | Milestone | Notes |
+|------|-----------|-------|
+| 2026-04-03 | v0.1.18 — DMS Filter Management + Ingestion Finish-Later + Brokerage Agent | DocTypeCombobox, doc type reassignment endpoint, ingestion finish-later/resume, brokerage agent rewrite + 40 MarketBeat PDFs, guide content rewrite. Merged alpha18 to main. |
+| 2026-04-02 | v0.1.17 — Market Agent Fleet | 8 new research agents, Census BPS CSV rewrite, async extraction, phantom conflict fix |
+
 ### March
 
 | Date | Milestone | Notes |

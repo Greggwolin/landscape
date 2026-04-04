@@ -1,102 +1,94 @@
 # Daily Sync — April 3, 2026
 
 **Date**: Thursday, April 3, 2026
-**Generated**: Nightly automated sync
+**Generated**: Nightly automated sync (updated — all work now committed as v0.1.18)
 
 ---
 
 ## Work Completed Today
 
-**No new commits on April 3.** Last commit was `d161a46` (v0.1.17 bump, April 2). However, substantial uncommitted work exists from April 2 sessions (22 files changed, +826 / -300 lines). Summary of uncommitted work below.
+5 commits landed on April 3, completing the previously-uncommitted DMS and market agent work and merging alpha18 to main.
 
 ### Features Added or Progressed
 
-- **Ingestion Workbench "Finish Later" + Draft Resume** — Replaced destructive-only cancel with 3-way choice (Go Back / Finish Later / Discard & Delete). Floating resume banner at bottom-right detects paused `draft` intake sessions, shows doc name, and offers Resume or Dismiss buttons. `IntakeStartView.get()` now returns `docName` via `select_related('doc')`.
-- **DMS Doc Type Reassignment Endpoint** — New `POST /api/dms/projects/{pid}/doc-types/{id}/reassign/` (Django) reassigns all documents from one doc type to another before filter deletion. Case-insensitive matching. Frontend wired with reassignment modal that appears when deleting a filter that has documents.
-- **Doc Type Combobox** — New `DocTypeCombobox.tsx` component for autocomplete selection from all template doc types. New `GET /api/dms/templates/all-doc-types` Next.js endpoint serves deduplicated doc types across templates.
-- **IntakeChoiceModal Doc Type Selector** — Fetches project doc types on open, pre-selects based on auto-detection, allows user override before starting ingestion.
-- **Brokerage Research Agent Enhancements** — Major rewrite of CW column mapping (`CW_COLUMN_MAP`) with dynamic unit resolution, support for direct/sublet vacancy, weighted avg net rent, and more granular absorption metrics. New brokerage PDF data directory.
+- **DMS Doc Type Combobox** (`dfe8587`) — New `DocTypeCombobox.tsx` autocomplete component + `GET /api/dms/templates/all-doc-types` endpoint for deduped doc type list across templates. IntakeChoiceModal wired with doc type pre-selection.
+- **DMS Tag Views** (`dfe8587`) — New `tag_views.py` in Django documents app (44 lines), registered in `urls.py`.
+- **Ingestion Workbench Updates** (`dfe8587`) — IngestionWorkbench and IngestionWorkbenchPanel updated for finish-later flow. CSS refinements.
+- **DMSView Enhancements** (`dfe8587`) — +210 lines to DMSView.tsx, +66 to AccordionFilters.tsx for doc type reassignment and filter management.
+- **Brokerage Research Agent Rewrite** (`ba11c66`) — Major column mapping overhaul (+118 lines) with dynamic unit resolution, direct/sublet vacancy, weighted avg net rent. New `data/brokerage/` directory with 40 Cushman & Wakefield MarketBeat PDFs (Phoenix + Tucson, Q4 2024 through Q4 2025, all property types).
+- **Guide Content Rewrite** (`4bbb317`) — `guideContent.ts` rewritten (+332/-210 lines). New `gen_ch5_pdf.py` script (410 lines).
+- **Session Log Updates** (`4bbb317`) — 3 new entries added to `docs/daily-context/session-log.md`.
 
-### Bugs Fixed
+### Infrastructure
 
-- **Navigation guard message updated** — BeforeUnload dialog now says "Use Finish Later to save progress" instead of generic "Changes will be lost."
-- **Workbench phantom conflict handling** — Carried forward from v0.1.17 commit.
+- **Version bump to v0.1.18** (`314c6aa`) — package.json + package-lock.json.
+- **alpha18 merged to main** (`a7175fa`) — Clean merge.
+- **Nightly health check** (`97ec22c`) — Health report JSON generated.
 
-### Documentation Updated
+### Previously Committed (April 2, included in merge)
 
-- Session log (`docs/daily-context/session-log.md`) — 3 new entries: Ingestion Workbench Finish Later, Market Agents Round 2, Agent Architecture Phase 0.
+- **Market intelligence agent fleet** (`dfc1f87`) — 8 new research agents (Census BPS, HUD, MBA, KBRA, Trepp, Brokerage Research, Construction Cost, NAIOP) + orchestrator upgrades.
+- **Census BPS agent CSV rewrite** (`a65dd82`) — REST API → CSV download. 25 months backfilled, 17 AZ places + 3 counties, 1,119 rows.
+- **Async extraction** (`a65dd82`) — `extract_document_batched` returns 202 immediately, background thread.
+- **Phantom conflict fix** (`a65dd82`) — Single-source conflicts treated as editable pending.
 
-### Known Issues Introduced or Discovered
-
-- Race condition when rejecting staging rows during active extraction (user-reported "gets stuck").
-- Brokerage agent `_extract_market_data` needs wiring to parse extracted tables into `tbl_research_financial_data` records.
-
-### Pending/Incomplete Work
-
-- Guide content rewrite (`guideContent.ts`) — 332 lines changed, unclear if complete.
-- Ingestion workbench CSS tweaks — 16 lines changed.
-
-## Files Modified (Uncommitted)
+## Files Modified
 
 ```
-backend/apps/documents/tag_views.py                (+44)
-backend/apps/documents/urls.py                     (+2)
-backend/apps/landscaper/views.py                   (+3, -1)
-services/market_agents/.../brokerage_research_agent.py (+118)
-src/app/projects/[projectId]/ProjectLayoutClient.tsx (+159)
-src/app/projects/[projectId]/.../IngestionWorkbenchPanel.tsx (+4)
-src/app/projects/[projectId]/.../IngestionWorkbench.tsx (+19)
-src/components/dms/DMSView.tsx                     (+210)
-src/components/dms/filters/AccordionFilters.tsx    (+66)
-src/components/intelligence/IntakeChoiceModal.tsx  (+87)
-src/data/guideContent.ts                           (+332, -300 rewrite)
-src/styles/ingestion-workbench.css                 (+16)
-docs/daily-context/session-log.md                  (+58)
+dfe8587 (DMS improvements):
+  backend/apps/documents/tag_views.py                (+44)
+  backend/apps/documents/urls.py                     (+2)
+  backend/apps/landscaper/views.py                   (+3, -1)
+  src/app/api/dms/templates/all-doc-types/route.ts   (+31, new)
+  src/app/projects/[projectId]/ProjectLayoutClient.tsx (+159)
+  src/components/dms/DMSView.tsx                     (+210)
+  src/components/dms/filters/AccordionFilters.tsx    (+66)
+  src/components/dms/filters/DocTypeCombobox.tsx     (+226, new)
+  src/components/intelligence/IntakeChoiceModal.tsx  (+87)
+  src/styles/ingestion-workbench.css                 (+16)
+  + IngestionWorkbench.tsx, IngestionWorkbenchPanel.tsx
+
+ba11c66 (Brokerage agent):
+  services/market_agents/.../brokerage_research_agent.py (+118)
+  + 40 MarketBeat PDF data files
+
+4bbb317 (Docs + guide):
+  docs/daily-context/session-log.md                  (+58)
+  src/data/guideContent.ts                           (+332, -210)
+  scripts/guide/gen_ch5_pdf.py                       (+410, new)
+  + IMPLEMENTATION_STATUS_3-8-26.md update
 ```
 
-**New files (untracked):**
-```
-src/components/dms/filters/DocTypeCombobox.tsx
-src/app/api/dms/templates/all-doc-types/route.ts
-services/market_agents/data/brokerage/ (PDF data directory)
-scripts/guide/gen_ch5_pdf.py
-```
-
-## Git Commits (Last 3 Days)
+## Git Commits
 
 ```
-d161a46 chore: bump version to v0.1.17 (Apr 2)
-a65dd82 fix: Census BPS agent CSV rewrite, async extraction, phantom conflict handling (Apr 2)
-1a19fee chore: bump version to v0.1.16 (Apr 2)
-dfc1f87 Add market intelligence agent fleet (8 new research agents + orchestrator upgrades) (Apr 2)
-8e5ec78 docs: nightly health check 2026-04-02 (Apr 2)
-22dfa3f Update marketing site to CoreUI dark theme tokens (Apr 1)
-bce59bd Add static marketing site (Apr 1)
-e627800 chore: bump version to v0.1.15 (Apr 1)
-f058293 fix: add missing transformDjangoResponse shared module (Apr 1)
-9e74a0a feat: S&U report rewrite, portfolio models, cash flow fixes (Apr 1)
-3b9a97b fix: waterfall promote recalc, MF acquisition at time=0, persist results (Apr 1)
-e9ed55c docs: nightly sync 2026-03-30 (Mar 31)
+97ec22c docs: nightly health check 2026-04-03
+314c6aa chore: bump version to v0.1.18
+a7175fa Merge alpha18 into main
+4bbb317 docs: session log, implementation status, guide content updates
+ba11c66 feat: brokerage research agent updates + data directory
+dfe8587 feat: DMS improvements — doc type combobox, tag views, ingestion workbench updates
 ```
 
 ## Active To-Do / Carry-Forward
 
-- [ ] **Uncommitted work (22 files)** — DMS reassignment, doc type combobox, finish-later flow, brokerage agent, guide content rewrite. Needs commit.
 - [ ] **Re-run demo project clones on host:** `cd backend && ./venv/bin/python manage.py clone_demo_projects` — cloner now includes MF units, leases, and cost approach but existing clones (projects 125, 126) were created before the fix. Need to delete and re-clone.
 - [ ] **PropertyTab.tsx floor plan double-counting fix** (commit fd54a3e or similar) — deployed? Verify "Units: 113 / 178" no longer appears on Chadron Terrace Rent Roll.
 - [ ] **Staging race condition** — User reported "gets stuck" when rejecting staging rows during active extraction. Likely polling/optimistic update interaction.
 - [ ] **Brokerage agent table→DB wiring** — PDF table extraction works but `_extract_market_data` needs wiring to parse into `tbl_research_financial_data`.
 - [ ] **Agent infrastructure Phase 1** — Django-Q2 install, agents app scaffold, Redfin comp scan proof-of-concept (prompts drafted).
+- [ ] **Guide content verification** — Major rewrite of `guideContent.ts` committed. Needs visual QA to confirm chapter content renders correctly.
 
 ## Alpha Readiness Impact
 
-No movement on formal alpha blockers today. The DMS doc type management improvements (reassignment, combobox, finish-later) strengthen the Document Upload & Extraction workflow (Step 2-3 in alpha readiness). The extraction pipeline remains the primary open blocker (scanned PDF/OCR not implemented).
+No movement on formal alpha blockers. The DMS doc type management improvements (combobox, reassignment, finish-later) strengthen Document Upload & Extraction workflow (Steps 2-3). The market agent fleet adds long-term market intelligence capability but isn't on the alpha critical path.
 
 **Overall: ~90% alpha-ready** (unchanged).
 
 ## Notes for Next Session
 
-1. **22 files uncommitted** — Review and commit the DMS + ingestion workbench changes. Consider splitting into 2 commits: (a) DMS filter management (reassign endpoint, combobox, delete-with-docs modal), (b) Ingestion finish-later + resume banner.
+1. **All work committed as v0.1.18** — No uncommitted changes. Clean slate.
 2. **Agent architecture decision pending** — Phase 0 discovery complete, CC prompts drafted. Next step is Phase 1 execution (Django-Q2 + agents app). Confirm Railway billing supports worker process.
-3. **Brokerage agent** — Table extraction proven on C&W MarketBeat PDFs. Next: wire `_extract_market_data` to persist structured data.
-4. **Guide content** — Major rewrite in progress. Verify completeness before committing.
+3. **Brokerage agent** — 40 PDFs ingested as data. Next: wire `_extract_market_data` to persist structured data to `tbl_research_financial_data`.
+4. **Guide content** — Major rewrite committed. Needs visual QA.
+5. **Demo project clones** — Still using pre-fix clones. Delete projects 125/126 and re-run `clone_demo_projects`.

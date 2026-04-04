@@ -1154,3 +1154,171 @@
   color: #fff;
   font-weight: 600;
 }
+
+/* ────────────────────────────────────────────────
+   Four-Status Classification — Row & Badge Styles
+   new=blue, match=green, pending=yellow, conflict=red
+   ──────────────────────────────────────────────── */
+
+/* Status dot colors (used inside fd-dot) */
+.fd-new      { background: var(--cui-info); }
+.fd-match    { background: var(--cui-success); }
+.fd-pending  { background: var(--cui-warning); }
+.fd-conflict { background: var(--cui-danger); }
+.fd-accepted { background: var(--cui-success); }
+
+/* Row-level status tinting */
+.wb-field-row.wb-status-new {
+  background: rgba(0, 180, 255, 0.03);
+}
+.wb-field-row.wb-status-new:hover {
+  background: rgba(0, 180, 255, 0.07);
+}
+.wb-field-row.wb-status-match {
+  background: rgba(46, 184, 92, 0.03);
+}
+.wb-field-row.wb-status-match:hover {
+  background: rgba(46, 184, 92, 0.07);
+}
+.wb-field-row.wb-status-pending {
+  background: rgba(249, 177, 21, 0.03);
+}
+.wb-field-row.wb-status-pending:hover {
+  background: rgba(249, 177, 21, 0.07);
+}
+.wb-field-row.wb-status-conflict {
+  background: rgba(229, 83, 83, 0.04);
+}
+.wb-field-row.wb-status-conflict:hover {
+  background: rgba(229, 83, 83, 0.08);
+}
+.wb-field-row.wb-status-accepted {
+  background: rgba(46, 184, 92, 0.03);
+  opacity: 0.7;
+}
+
+/* Section header status badges */
+.wb-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.wb-badge-new {
+  background: var(--cui-info-bg-subtle, rgba(0, 180, 255, 0.12));
+  color: var(--cui-info);
+}
+.wb-badge-match {
+  background: rgba(46, 184, 92, 0.12);
+  color: var(--cui-success);
+}
+.wb-badge-pending {
+  background: rgba(249, 177, 21, 0.12);
+  color: var(--cui-warning);
+}
+.wb-badge-conflict {
+  background: rgba(229, 83, 83, 0.12);
+  color: var(--cui-danger);
+}
+.wb-badge-accepted {
+  background: rgba(46, 184, 92, 0.12);
+  color: var(--cui-success);
+}
+
+/* Match group — collapsed block showing grouped match rows */
+.wb-match-group {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(46, 184, 92, 0.04);
+  border-bottom: 1px solid var(--cui-border-color-translucent, rgba(0, 0, 0, 0.06));
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+.wb-match-group:hover {
+  background: rgba(46, 184, 92, 0.08);
+}
+.wb-match-group .match-count {
+  font-weight: 600;
+  color: var(--cui-success);
+}
+.wb-match-group .match-action {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cui-success);
+  padding: 3px 10px;
+  border: 1px solid var(--cui-success);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+.wb-match-group .match-action:hover {
+  background: var(--cui-success);
+  color: #fff;
+}
+
+/* Conflict panel — side-by-side existing vs extracted */
+.wb-conflict-panel {
+  padding: 10px 16px 10px 204px;
+  display: flex;
+  gap: 10px;
+  border-bottom: 1px solid var(--cui-border-color-translucent, rgba(0, 0, 0, 0.06));
+  background: var(--cui-body-bg);
+}
+.wb-conflict-existing,
+.wb-conflict-extracted {
+  flex: 1;
+  padding: 10px 12px;
+  border: 2px solid var(--cui-border-color);
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.wb-conflict-existing {
+  border-style: dashed;
+}
+.wb-conflict-extracted {
+  border-color: var(--cui-info);
+}
+.wb-conflict-existing:hover {
+  border-color: var(--cui-secondary-color);
+  background: var(--cui-tertiary-bg);
+}
+.wb-conflict-extracted:hover {
+  border-color: var(--cui-primary);
+  background: var(--cui-primary-bg-subtle, rgba(88, 86, 214, 0.06));
+}
+.wb-conflict-existing.selected,
+.wb-conflict-extracted.selected {
+  border-color: var(--cui-primary);
+  background: var(--cui-primary-bg-subtle, rgba(88, 86, 214, 0.06));
+}
+.wb-conflict-label {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+  margin-bottom: 4px;
+}
+.wb-conflict-value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wb-conflict-source {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+  margin-top: 4px;
+}
+.wb-conflict-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px 6px 204px;
+  border-bottom: 1px solid var(--cui-border-color-translucent, rgba(0, 0, 0, 0.06));
+  background: var(--cui-body-bg);
+}

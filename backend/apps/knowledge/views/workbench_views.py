@@ -297,6 +297,7 @@ def list_staging(request, project_id: int):
             LEFT JOIN landscape.core_doc d ON e.doc_id = d.doc_id
             WHERE e.project_id = %s
               AND e.scope NOT IN ('unit', 'unit_type')
+              AND (d.doc_id IS NOT NULL AND d.deleted_at IS NULL)
         """
         params = [int(project_id)]
 

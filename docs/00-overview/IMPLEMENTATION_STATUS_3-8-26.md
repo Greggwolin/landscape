@@ -9,21 +9,25 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: v0.1.17 — Market Agent Fleet + DMS Filter Management + Ingestion Finish-Later (April 2-3, 2026)**
+### 🆕 **Latest Update: v0.1.18 — DMS Filter Management + Ingestion Finish-Later + Brokerage Agent (April 3, 2026)**
 
-**v0.1.17 (committed): Market intelligence agent fleet, Census BPS agent, async extraction, phantom conflict fix**
-**Uncommitted: DMS doc type reassignment, doc type combobox, ingestion finish-later/resume, brokerage agent enhancements (22 files, +826 lines)**
+**v0.1.18 (committed, merged to main): All previously-uncommitted DMS and market agent work now landed.**
+
+- ✅ **DMS doc type combobox** (`dfe8587`) — New `DocTypeCombobox.tsx` + `GET /api/dms/templates/all-doc-types` for autocomplete across templates.
+- ✅ **DMS doc type reassignment** (`dfe8587`) — New `POST .../doc-types/{id}/reassign/` endpoint. Frontend modal for reassign-before-delete.
+- ✅ **Ingestion "Finish Later" + Resume** (`dfe8587`) — 3-way cancel choice (Go Back / Finish Later / Discard). Floating resume banner for paused draft sessions.
+- ✅ **IntakeChoiceModal doc type selector** (`dfe8587`) — Fetches project doc types, pre-selects from auto-detection, allows override.
+- ✅ **DMS tag views** (`dfe8587`) — New Django tag_views.py for document tag management.
+- ✅ **Brokerage agent column mapping rewrite** (`ba11c66`) — Dynamic unit resolution, direct/sublet vacancy, weighted avg net rent. +40 MarketBeat PDFs (Phoenix + Tucson).
+- ✅ **Guide content rewrite** (`4bbb317`) — guideContent.ts rewritten (+332/-210 lines). New gen_ch5_pdf.py script.
+- 📁 **See:** `docs/09-session-notes/2026-04-03-daily-sync.md`
+
+### Previous Update: v0.1.17 — Market Agent Fleet + Async Extraction (April 2, 2026)
 
 - ✅ **Market intelligence agent fleet** (`dfc1f87`) — 8 new research agents (Census BPS, HUD, MBA, KBRA, Trepp, Brokerage Research, Construction Cost, NAIOP) + orchestrator upgrades.
 - ✅ **Census BPS agent rewritten** (`a65dd82`) — REST API → CSV file download. 25 months backfilled, 17 AZ places + 3 counties, 1,119 rows.
 - ✅ **Async extraction** (`a65dd82`) — `extract_document_batched` returns 202 immediately, runs in background thread. Prevents Railway timeout.
 - ✅ **Workbench phantom conflict fix** (`a65dd82`) — Single-source conflicts with no competing values treated as editable pending.
-- ⏳ **DMS doc type reassignment** — New `POST .../doc-types/{id}/reassign/` endpoint. Frontend modal for reassign-before-delete when filter has documents.
-- ⏳ **Doc type combobox** — New `DocTypeCombobox.tsx` + `GET /api/dms/templates/all-doc-types` for autocomplete across templates.
-- ⏳ **Ingestion "Finish Later" + Resume** — 3-way cancel choice (Go Back / Finish Later / Discard). Floating resume banner for paused draft sessions.
-- ⏳ **IntakeChoiceModal doc type selector** — Fetches project doc types, pre-selects from auto-detection, allows override.
-- ⏳ **Brokerage agent column mapping rewrite** — Dynamic unit resolution, direct/sublet vacancy, weighted avg net rent.
-- 📁 **See:** `docs/09-session-notes/2026-04-03-daily-sync.md`
 
 ### Previous Update: Operations GET Migration + Map Market Layers + Extraction Hardening (April 1, 2026)
 

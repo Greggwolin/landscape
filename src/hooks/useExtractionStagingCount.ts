@@ -5,6 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 interface StagingCountData {
+  /** Count of rows needing user action (new + pending + conflict) */
+  actionableCount: number;
+  /** Backwards-compat alias — same as actionableCount */
   pendingCount: number;
   totalCount: number;
   isLoading: boolean;
@@ -39,8 +42,12 @@ export function useExtractionStagingCount(projectId: number): StagingCountData {
   });
 
   const statusCounts = data?.status_counts || {};
-  const pendingCount = statusCounts['pending'] || 0;
+  // Actionable = anything the user needs to review (excludes matches)
+  const actionableCount =
+    (statusCounts['new'] || 0) +
+    (statusCounts['pending'] || 0) +
+    (statusCounts['conflict'] || 0);
   const totalCount = data?.count || 0;
 
-  return { pendingCount, totalCount, isLoading };
+  return { actionableCount, pendingCount: actionableCount, totalCount, isLoading };
 }

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 580" font-family="Inter, -apple-system, sans-serif">
+  <defs>
+    <filter id="sh" x="-4%" y="-4%" width="108%" height="110%">
+      <feDropShadow dx="1" dy="2" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+    <marker id="a" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/>
+    </marker>
+    <marker id="aw" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#e2e8f0"/>
+    </marker>
+  </defs>
+
+  <rect width="740" height="580" rx="14" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="370" y="38" text-anchor="middle" fill="#e2e8f0" font-size="20" font-weight="700">Platform Intelligence</text>
+  <text x="370" y="60" text-anchor="middle" fill="#64748b" font-size="12">How Landscaper knows what it knows</text>
+
+  <!-- ═══ YOU — rounded rect matching other boxes ═══ -->
+  <rect x="230" y="82" width="280" height="52" rx="10" fill="#1e293b" stroke="#e2e8f0" stroke-width="2" filter="url(#sh)"/>
+  <text x="370" y="106" text-anchor="middle" fill="#e2e8f0" font-size="15" font-weight="700">You</text>
+  <text x="370" y="122" text-anchor="middle" fill="#94a3b8" font-size="10">questions, edits, uploads</text>
+
+  <!-- ═══ LANDSCAPER ═══ -->
+  <rect x="30" y="184" width="680" height="64" rx="12" fill="#1a1a2e" stroke="#e2e8f0" stroke-width="2" filter="url(#sh)"/>
+  <text x="370" y="214" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700">Landscaper</text>
+  <text x="370" y="234" text-anchor="middle" fill="#94a3b8" font-size="10">your AI analyst — draws from everything below</text>
+
+  <!-- You ↔ Landscaper -->
+  <line x1="340" y1="134" x2="340" y2="180" stroke="#e2e8f0" stroke-width="1.5" marker-end="url(#aw)"/>
+  <line x1="400" y1="180" x2="400" y2="138" stroke="#e2e8f0" stroke-width="1.5" marker-end="url(#aw)"/>
+
+  <!-- ═══ DMS — spans width of boxes 1 & 2 ═══ -->
+  <rect x="30" y="298" width="445" height="56" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="252" y="322" text-anchor="middle" fill="#10b981" font-size="14" font-weight="700">Document Management System</text>
+  <text x="252" y="340" text-anchor="middle" fill="#94a3b8" font-size="10">stores, extracts, and organizes uploaded files</text>
+
+  <!-- DMS → Landscaper (vertical) -->
+  <line x1="252" y1="298" x2="252" y2="252" stroke="#10b981" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a)"/>
+
+  <!-- Benchmarks → Landscaper (vertical) -->
+  <line x1="605" y1="410" x2="605" y2="252" stroke="#8b5cf6" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a)"/>
+
+  <!-- ═══ THREE SOURCES ═══ -->
+
+  <!-- 1. Your Projects -->
+  <rect x="30" y="410" width="210" height="130" rx="10" fill="#1e293b" stroke="#22c55e" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="135" y="440" text-anchor="middle" fill="#22c55e" font-size="14" font-weight="700">Your Projects</text>
+  <text x="135" y="464" text-anchor="middle" fill="#cbd5e1" font-size="10.5">Current project: full access</text>
+  <text x="135" y="480" text-anchor="middle" fill="#cbd5e1" font-size="10.5">to everything — budgets, units,</text>
+  <text x="135" y="496" text-anchor="middle" fill="#cbd5e1" font-size="10.5">leases, comps, documents</text>
+  <text x="135" y="518" text-anchor="middle" fill="#94a3b8" font-size="10">Past projects: assumptions</text>
+  <text x="135" y="532" text-anchor="middle" fill="#94a3b8" font-size="10">and metrics (read-only)</text>
+
+  <!-- 2. Market & Reference -->
+  <rect x="265" y="410" width="210" height="130" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="370" y="434" text-anchor="middle" fill="#f59e0b" font-size="14" font-weight="700">Market Intelligence</text>
+  <text x="370" y="448" text-anchor="middle" fill="#f59e0b" font-size="14" font-weight="700">&amp; Reference</text>
+  <text x="370" y="472" text-anchor="middle" fill="#cbd5e1" font-size="10.5">Rates, permits, absorption,</text>
+  <text x="370" y="488" text-anchor="middle" fill="#cbd5e1" font-size="10.5">research reports</text>
+  <text x="370" y="510" text-anchor="middle" fill="#94a3b8" font-size="10">USPAP, IREM, appraisal</text>
+  <text x="370" y="524" text-anchor="middle" fill="#94a3b8" font-size="10">methodology, best practices</text>
+
+  <!-- 3. Benchmarks & Preferences -->
+  <rect x="500" y="410" width="210" height="130" rx="10" fill="#1e293b" stroke="#8b5cf6" stroke-width="1.5" filter="url(#sh)"/>
+  <text x="605" y="434" text-anchor="middle" fill="#8b5cf6" font-size="14" font-weight="700">Benchmarks</text>
+  <text x="605" y="448" text-anchor="middle" fill="#8b5cf6" font-size="14" font-weight="700">&amp; Preferences</text>
+  <text x="605" y="472" text-anchor="middle" fill="#cbd5e1" font-size="10.5">Cost library, unit costs,</text>
+  <text x="605" y="488" text-anchor="middle" fill="#cbd5e1" font-size="10.5">construction benchmarks</text>
+  <text x="605" y="510" text-anchor="middle" fill="#94a3b8" font-size="10">Your instructions, style,</text>
+  <text x="605" y="524" text-anchor="middle" fill="#94a3b8" font-size="10">planning standards</text>
+
+  <!-- ═══ Sources → DMS (vertical) ═══ -->
+  <line x1="135" y1="410" x2="135" y2="358" stroke="#22c55e" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a)"/>
+  <line x1="370" y1="410" x2="370" y2="358" stroke="#f59e0b" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#a)"/>
+
+  <!-- Footer -->
+  <text x="370" y="568" text-anchor="middle" fill="#475569" font-size="10">Projects and market data flow through the DMS. Benchmarks and preferences feed Landscaper directly.</text>
+
+</svg>

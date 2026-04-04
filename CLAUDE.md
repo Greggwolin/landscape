@@ -805,7 +805,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-01 (nightly sync — Operations GET migrated to Django (+958 lines); new update_land_use_pricing Landscaper tool; map market layers (recent sales + competitors); extraction pipeline hardening (auto-trigger, image/Vision fallback); leveraged cash flow accounting borders + total column; thread race condition fix; S&U report refinement)*
+*Last updated: 2026-04-03 (nightly sync — v0.1.18: DMS doc type combobox + reassignment endpoint; ingestion workbench finish-later/resume flow; brokerage research agent rewrite + PDF data directory; market agent fleet (8 agents); Census BPS agent CSV rewrite; async extraction; phantom conflict fix; guide content rewrite)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 231*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*

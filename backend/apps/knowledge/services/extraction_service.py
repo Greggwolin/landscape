@@ -2425,6 +2425,21 @@ EXTRACTION_BATCHES_LAND = [
         'scopes': ['acquisition', 'market'],
         'description': 'Acquisition terms and market demographics',
     },
+    {
+        'name': 'budget_detail',
+        'scopes': ['budget_line_item'],
+        'description': 'Detailed development budget: infrastructure hard costs, soft costs, professional fees, sales costs, taxes, municipality fees, development fees — individual line items with per-unit costs and totals',
+    },
+    {
+        'name': 'absorption_schedule',
+        'scopes': ['absorption_schedule'],
+        'description': 'Phased buildout and sales schedule: product types with lot/unit counts per year, pricing per unit, and sales timing',
+    },
+    {
+        'name': 'capital_structure',
+        'scopes': ['capital_structure'],
+        'description': 'Sources of capital (equity contributions, debt), LP/GP structure, preferred return rates, profit splits, and project-level return metrics (IRR, equity multiple, LTC, LTV)',
+    },
 ]
 
 # Legacy alias — default to MF batches for backward compatibility
@@ -2987,6 +3002,109 @@ Return format — each as a separate key:
 
 NOTE: Return monthly amounts if shown monthly, annual if shown annual.
 Include a note in source_quote indicating whether value is monthly or annual.""")
+
+        if 'budget_line_item' in scopes:
+            instructions.append("""
+### Budget Line Items (scope=budget_line_item)
+
+Extract ALL individual cost line items from the USES / budget sections.
+For each line item, extract:
+- section: The parent section (e.g., "Hard Costs - Infrastructure", "Soft Costs - Professionals")
+- line_item_name: Exact name from the document (e.g., "Gas Lines - per lot", "Civil Engineering - Final Plat & Design")
+- unit_cost: Per-unit cost (the number in column C, e.g., 5208.33)
+- unit_cost_uom: Unit of measure if stated (per lot, per SF, /EA, % of costs)
+- total_amount: Total for that line item (column E or rightmost total)
+- cost_type: "hard" or "soft" based on section
+- lifecycle_stage: One of: Acquisition, Planning & Engineering, Improvements, Operations, Disposition, Financing
+
+Return as array under key "budget_line_items":
+```json
+{
+  "budget_line_items": {
+    "value": [
+      {"section": "Hard Costs - Infrastructure", "line_item_name": "Gas Lines - per lot", "unit_cost": 5208.33, "unit_cost_uom": "per lot", "total_amount": 625000, "cost_type": "hard", "lifecycle_stage": "Improvements"},
+      {"section": "Soft Costs - Professionals", "line_item_name": "Civil Engineering - Final Plat & Design", "unit_cost": 0.075, "unit_cost_uom": "pct_of_hard", "total_amount": 598477, "cost_type": "soft", "lifecycle_stage": "Planning & Engineering"}
+    ],
+    "confidence": "high",
+    "source_quote": "USES section rows 60-170"
+  }
+}
+```
+
+IMPORTANT:
+- Include EVERY line item, not just subtotals
+- Skip subtotal/summary rows (rows that repeat the section header)
+- Preserve the exact line item name from the document
+- For percentage-based items (e.g., "0.075" meaning 7.5% of hard costs), set unit_cost to the percentage as decimal and unit_cost_uom to "pct_of_hard" or "pct_of_costs"
+""")
+
+        if 'absorption_schedule' in scopes:
+            instructions.append("""
+### Absorption Schedule (scope=absorption_schedule)
+
+Extract the buildout and sales schedule matrices.
+For each product type, extract the number of units started/sold per year.
+
+Return as array under key "absorption_schedule":
+```json
+{
+  "absorption_schedule": {
+    "value": [
+      {"product_name": "1 Acre Lots (Valley Club Comps)", "schedule_type": "buildout", "total_units": 120, "lot_size_sf": 43560, "periods": [{"year": 2028, "units": 30}, {"year": 2029, "units": 0}, {"year": 2030, "units": 30}]},
+      {"product_name": "1 Acre Lots (Valley Club Comps)", "schedule_type": "sales", "total_units": 120, "price_per_unit": 750000, "price_uom": "per_lot", "periods": [{"year": 2028, "units": 15}, {"year": 2029, "units": 15}]}
+    ],
+    "confidence": "high",
+    "source_quote": "Lot Buildout Schedule and Lot Sales Schedule sections"
+  }
+}
+```
+
+IMPORTANT:
+- Separate buildout (starts) from sales — they may have different timing
+- Include the price per unit and UOM (per_lot, per_sf)
+- Include lot/unit size if available
+- Extract ALL product types (lots AND homes if both present)
+""")
+
+        if 'capital_structure' in scopes:
+            instructions.append("""
+### Capital Structure (scope=capital_structure)
+
+Extract the capital structure, LP/GP terms, and project return metrics.
+
+Return as object under key "capital_structure":
+```json
+{
+  "capital_structure": {
+    "value": {
+      "equity_amount": 28500000,
+      "debt_amount": 12000000,
+      "preferred_return_pct": 0.08,
+      "lp_split_pct": 0.75,
+      "gp_split_pct": 0.25,
+      "interest_rate": 0.06,
+      "loan_origination_fee_pct": 0.01,
+      "project_irr": 0.1316,
+      "equity_multiple": 2.177,
+      "ltc_ratio": 0.2963,
+      "ltv_ratio": 0,
+      "lp_irr": 0.1207,
+      "lp_equity_multiple": 2.014,
+      "developer_overhead_pct": 0.04,
+      "disposition_fee_pct": 0.02
+    },
+    "confidence": "high",
+    "source_quote": "Returns Lot Only sheet + Project Financing Analysis"
+  }
+}
+```
+
+IMPORTANT:
+- Extract ALL return metrics found (IRR, equity multiple, LTC, LTV)
+- Percentages should be decimals (8% = 0.08)
+- Include both LP and GP metrics if available
+- Include financing terms (interest rate, origination fees)
+""")
 
         return "\n".join(instructions)
 
@@ -3935,6 +4053,7 @@ RULES:
         excel_types = [
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'application/vnd.ms-excel',
+            'application/vnd.ms-excel.sheet.macroEnabled.12',  # .xlsm
             'text/csv',
             'application/csv',
         ]
@@ -3948,7 +4067,7 @@ RULES:
                 response.raise_for_status()
 
                 # Save to temp file
-                suffix = '.xlsx' if 'spreadsheet' in mime_type else '.csv'
+                suffix = '.xlsx' if ('spreadsheet' in mime_type or 'macroEnabled' in mime_type) else '.csv'
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                     tmp.write(response.content)
                     tmp_path = tmp.name
@@ -3988,22 +4107,89 @@ RULES:
         return None
 
     def _parse_excel_to_text(self, file_path: str) -> Optional[str]:
-        """Parse Excel file to text format for extraction."""
+        """Parse Excel file to text format with multi-sheet and section awareness.
+
+        Reads ALL sheets (not just the active one) and annotates the output with:
+        - Sheet markers: === SHEET: <name> ===
+        - Section markers: [SECTION: <name>]
+        - Year column markers: [YEAR COLUMNS: Year 0=2027, Year 1=2028, ...]
+
+        Section detection uses heuristics:
+        - Column B has text, columns C-E are empty or non-numeric
+        - Text is mostly uppercase or matches known section patterns
+        - Year header rows have sequential integers (2020-2040 range) in later columns
+        """
         try:
             from openpyxl import load_workbook
+            import re
 
             wb = load_workbook(file_path, read_only=True, data_only=True)
-            sheet = wb.active
+            all_output = []
 
-            lines = []
-            for row in sheet.iter_rows(values_only=True):
-                # Convert row to tab-separated string
-                row_vals = [str(cell) if cell is not None else '' for cell in row]
-                if any(v.strip() for v in row_vals):  # Skip empty rows
-                    lines.append('\t'.join(row_vals))
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+                all_output.append(f"\n=== SHEET: {sheet_name} ===\n")
+
+                year_header_emitted = False
+
+                for row in sheet.iter_rows(values_only=True):
+                    cells = list(row)
+                    row_vals = [str(cell) if cell is not None else '' for cell in cells]
+
+                    # Skip fully empty rows
+                    if not any(v.strip() for v in row_vals):
+                        continue
+
+                    # --- Year header detection ---
+                    # Look for rows with sequential integers in the 2020-2050 range
+                    if not year_header_emitted:
+                        numeric_vals = []
+                        for c in cells[3:]:  # skip first few label columns
+                            if isinstance(c, (int, float)) and 2020 <= c <= 2050:
+                                numeric_vals.append(int(c))
+                        if len(numeric_vals) >= 3:
+                            # Check if roughly sequential
+                            diffs = [numeric_vals[i+1] - numeric_vals[i] for i in range(len(numeric_vals)-1)]
+                            if all(0 < d <= 2 for d in diffs):
+                                year_parts = [f"Year {i}={y}" for i, y in enumerate(numeric_vals)]
+                                all_output.append(f"[YEAR COLUMNS: {', '.join(year_parts)}]")
+                                year_header_emitted = True
+
+                    # --- Section header detection ---
+                    # Heuristic: column B (index 1) has text, columns C-E are empty/non-numeric,
+                    # and text is mostly uppercase or longish label
+                    col_b = str(cells[1]).strip() if len(cells) > 1 and cells[1] is not None else ''
+                    if col_b and len(col_b) >= 4:
+                        # Check if columns C through E are empty or non-numeric
+                        later_cols_empty = True
+                        for c in cells[2:5]:
+                            if c is not None:
+                                try:
+                                    float(str(c).replace(',', '').replace('$', ''))
+                                    later_cols_empty = False
+                                    break
+                                except (ValueError, TypeError):
+                                    pass  # non-numeric text is ok
+
+                        # Count uppercase chars
+                        alpha_chars = [ch for ch in col_b if ch.isalpha()]
+                        upper_ratio = sum(1 for ch in alpha_chars if ch.isupper()) / max(len(alpha_chars), 1)
+
+                        is_section = (
+                            later_cols_empty
+                            and (upper_ratio >= 0.7 or col_b.isupper())
+                            and len(col_b) >= 6
+                            and not col_b.startswith('$')
+                        )
+
+                        if is_section:
+                            all_output.append(f"\n[SECTION: {col_b}]")
+
+                    # Emit the row as tab-separated values
+                    all_output.append('\t'.join(row_vals))
 
             wb.close()
-            return '\n'.join(lines)
+            return '\n'.join(all_output)
 
         except Exception as e:
             logger.error(f"Error parsing Excel: {e}")
