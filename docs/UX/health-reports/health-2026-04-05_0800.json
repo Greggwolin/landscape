@@ -1,0 +1,55 @@
+{
+  "report": "Landscape Platform Health Check",
+  "timestamp": "2026-04-05T15:00:58Z",
+  "mode": "all",
+  "branch": "feature/appraisal-ui",
+  "results": [
+    {
+  "agent": "coreui-compliance-auditor",
+  "timestamp": "2026-04-05T15:00:23Z",
+  "status": "FAIL",
+  "total_violations": 7055,
+  "breakdown": {
+    "mui_imports": 139,
+    "hardcoded_hex_css": 793,
+    "forbidden_tailwind": 843,
+    "dark_variants": 80,
+    "inline_styles": 5200
+  }
+}
+,
+    {
+  "agent": "django-api-route-enforcer",
+  "timestamp": "2026-04-05T15:00:26Z",
+  "status": "PASS",
+  "new_nextjs_violations": 0,
+  "violation_files": [],
+  "context": {
+    "total_nextjs_routes": 420,
+    "total_django_viewsets": 22
+  }
+}
+,
+    {
+  "agent": "claudemd-sync-checker",
+  "timestamp": "2026-04-05T15:00:26Z",
+  "status": "PASS",
+  "stale_file_count": 0,
+  "stale_files": []
+}
+,
+    {"agent":"extraction-queue-monitor","status":"SKIP","message":"Extraction table not found"}
+,
+    {"agent": "dead-tool-detector", "status": "ERROR", "message": "Could not query tables"}
+,
+    {
+  "agent": "allowed-updates-auditor",
+  "timestamp": "2026-04-05T15:00:58.570452+00:00",
+  "status": "PASS",
+  "tools_checked": 0,
+  "critical_mismatches": 0,
+  "details": []
+}
+
+  ]
+}
