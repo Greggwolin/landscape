@@ -4,8 +4,9 @@
  * Slide-over detail panel shell. Overlays the right panel (does not push layout).
  * Renders specific detail content based on detailId.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-04
+ * @updated 2026-04-05 — Added DetailUnitMix, DetailNarrative
  */
 
 'use client';
@@ -17,6 +18,8 @@ import { DetailPGI } from './DetailPGI';
 import { DetailOpEx } from './DetailOpEx';
 import { DetailCapRate } from './DetailCapRate';
 import { DetailMaintenance } from './DetailMaintenance';
+import { DetailUnitMix } from './DetailUnitMix';
+import { DetailNarrative } from './DetailNarrative';
 import { DetailGeneric } from './DetailGeneric';
 
 interface DetailPanelProps {
@@ -32,6 +35,8 @@ const DETAIL_MAP: Record<string, React.FC<{ onClose: () => void }>> = {
   opex: DetailOpEx,
   caprate: DetailCapRate,
   maint: DetailMaintenance,
+  unitmix: DetailUnitMix,
+  narrative: DetailNarrative,
 };
 
 export function DetailPanel({ open, detailId, detailLabel, onClose }: DetailPanelProps) {

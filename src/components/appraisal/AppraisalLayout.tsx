@@ -97,7 +97,7 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
   return (
     <div className="appraisal-layout">
       <AppraisalTopbar
-        projectName={project.project_name || 'Untitled Project'}
+        project={project}
         activeApproach={activeApproach}
         onApproachChange={handleApproachChange}
         onToggleLeft={handleToggleLeft}

@@ -4,8 +4,9 @@
  * Router for approach summary views. Renders the correct view
  * based on the active pill ID.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-04
+ * @updated 2026-04-05 — Added PropertyLocation, IncomeRentRoll; removed Site/Improvements/UnitMix
  */
 
 'use client';
@@ -15,15 +16,14 @@ import type { DetailId } from '../appraisal.types';
 
 // Income views
 import { IncomeProforma } from './IncomeProforma';
-import { IncomeUnitMix } from './IncomeUnitMix';
+import { IncomeRentRoll } from './IncomeRentRoll';
 import { IncomeExpenses } from './IncomeExpenses';
 import { IncomeOtherIncome } from './IncomeOtherIncome';
 import { IncomeDCF } from './IncomeDCF';
 
 // Property views
+import { PropertyLocation } from './PropertyLocation';
 import { PropertySummary } from './PropertySummary';
-import { PropertySite } from './PropertySite';
-import { PropertyImprovements } from './PropertyImprovements';
 
 // Market views
 import { MarketOverview } from './MarketOverview';
@@ -52,14 +52,13 @@ interface ApproachSummaryProps {
 const VIEW_MAP: Record<string, React.FC<{ onOpenDetail: (id: DetailId | string, label?: string) => void }>> = {
   // Income
   'income-proforma': IncomeProforma,
-  'income-unitmix': IncomeUnitMix,
+  'income-rentroll': IncomeRentRoll,
   'income-expenses': IncomeExpenses,
   'income-otherinc': IncomeOtherIncome,
   'income-dcf': IncomeDCF,
   // Property
+  'property-location': PropertyLocation,
   'property-summary': PropertySummary,
-  'property-site': PropertySite,
-  'property-improvements': PropertyImprovements,
   // Market
   'market-overview': MarketOverview,
   'market-supply': MarketSupply,
@@ -75,7 +74,7 @@ const VIEW_MAP: Record<string, React.FC<{ onOpenDetail: (id: DetailId | string, 
   'cost-depreciation': CostDepreciation,
   // Reconciliation
   'reconciliation-summary': ReconciliationSummary,
-  'reconciliation-narrative': ReconciliationSummary, // Same component, different mode (future)
+  'reconciliation-narrative': ReconciliationSummary,
 };
 
 export function ApproachSummary({ activePill, onOpenDetail }: ApproachSummaryProps) {

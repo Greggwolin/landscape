@@ -1,16 +1,17 @@
 /**
  * AppraisalRightPanel
  *
- * Right panel (320px): Tiles, sub-nav pills, approach summary views,
- * reports strip, and detail panel overlay.
+ * Right panel (320px default, draggable 260–600px): Tiles, sub-nav pills,
+ * approach summary views, reports strip, and detail panel overlay.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-04
+ * @updated 2026-04-05 — Added draggable resize handle
  */
 
 'use client';
 
-import React from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import type { ApproachId, BottomView, DetailId } from './appraisal.types';
 import { ApproachPills } from './approach/ApproachPills';
 import { ApproachSummary } from './approach/ApproachSummary';
@@ -48,8 +49,44 @@ export function AppraisalRightPanel({
   onBottomViewChange,
   onBottomViewReset,
 }: AppraisalRightPanelProps) {
+  const [width, setWidth] = useState(320);
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragRef.current) return;
+    const delta = dragRef.current.startX - e.clientX;
+    const newWidth = Math.min(600, Math.max(260, dragRef.current.startWidth + delta));
+    setWidth(newWidth);
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    dragRef.current = null;
+    document.body.classList.remove('resizing');
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }, [onMouseMove]);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    dragRef.current = { startX: e.clientX, startWidth: width };
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [width, onMouseMove, onMouseUp]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.classList.remove('resizing');
+    };
+  }, [onMouseMove, onMouseUp]);
+
   return (
-    <div className="appraisal-right">
+    <div className="appraisal-right" style={{ width, minWidth: 260, maxWidth: 600 }}>
+      {/* Drag handle */}
+      <div className="right-resize" onMouseDown={onMouseDown} />
+
       {/* Header */}
       <div className="appraisal-right-hdr">
         <div className="appraisal-rh-title">Studio</div>

@@ -47,8 +47,27 @@ function getTabContextHint(tab: string): string {
     'capitalization': 'Capital Structure & Financing',
     'reports': 'Reports & Analytics',
     'documents': 'Document Management',
+    // Appraisal approach contexts
+    'market': 'Market Analysis',
+    'sales': 'Sales Comparison',
+    'income': 'Income Approach',
+    'cost': 'Cost Approach',
+    'reconciliation': 'Reconciliation',
   };
   return hints[tab] || 'General';
+}
+
+/** Dot color for appraisal approach tabs (matches APPROACH_TABS config). */
+function getApproachDotColor(tab: string): string | null {
+  const dots: Record<string, string> = {
+    'property': 'var(--cui-success)',
+    'market': 'var(--cui-success)',
+    'sales': 'var(--cui-warning)',
+    'income': 'var(--cui-success)',
+    'cost': 'var(--cui-tertiary-color)',
+    'reconciliation': 'var(--cui-tertiary-color)',
+  };
+  return dots[tab] || null;
 }
 
 export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ingestionProgress = 0, ingestionMessage, isExpanded = true, onToggleExpand, onReviewMedia }: LandscaperChatProps) {
@@ -59,6 +78,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
   const prevMessageCount = useRef(0);
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
   const tabContextHint = getTabContextHint(activeTab);
+  const approachDotColor = getApproachDotColor(activeTab);
 
   const { messages, sendMessage, isLoading, loadThreadMessages, error } = useLandscaperThreads({
     projectId: projectId.toString(),
@@ -216,13 +236,25 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
         {/* Context indicator - shows which tab Landscaper is focused on */}
         {!isIngesting && (
           <span
-            className="ms-auto badge rounded-pill"
+            className="ms-auto badge rounded-pill d-inline-flex align-items-center gap-1"
             style={{
               color: 'var(--cui-secondary-color)',
               backgroundColor: 'var(--cui-tertiary-bg)',
               fontSize: '0.75rem',
             }}
           >
+            {approachDotColor && (
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor: approachDotColor,
+                  display: 'inline-block',
+                  flexShrink: 0,
+                }}
+              />
+            )}
             {tabContextHint}
           </span>
         )}

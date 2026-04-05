@@ -9,7 +9,7 @@ export type ApproachId = 'property' | 'market' | 'sales' | 'income' | 'cost' | '
 
 export type ApproachStatus = 'green' | 'yellow' | 'gray';
 
-export type DotColor = 'green' | 'blue' | 'yellow' | 'empty';
+export type DotColor = 'green' | 'blue' | 'yellow' | 'gray' | 'purple' | 'empty';
 
 export type InputSource = 'user' | 'landscaper' | 'default' | 'calculated';
 
@@ -30,6 +30,8 @@ export type DetailId =
   | 'utilities'
   | 'reserves'
   | 'other-exp'
+  | 'unitmix'
+  | 'narrative'
   | 'generic';
 
 export interface ApproachTab {

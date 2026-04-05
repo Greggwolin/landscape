@@ -1,12 +1,13 @@
 /**
  * Configuration for the Appraisal Conversational UI
- * Defines approach tabs, pill sets, and default views
+ * Defines approach tabs, pill sets, dot colors, and default views
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-04
+ * @updated 2026-04-05 — Property/Income pills restructured, DOT_COLORS added
  */
 
-import type { ApproachTab, ApproachPillSet } from './appraisal.types';
+import type { ApproachId, ApproachTab, ApproachPillSet, DotColor } from './appraisal.types';
 
 export const APPROACH_TABS: ApproachTab[] = [
   { id: 'property', label: 'Property', status: 'green' },
@@ -23,21 +24,18 @@ export const APPROACH_PILLS: ApproachPillSet[] = [
     defaultPill: 'income-proforma',
     pills: [
       { id: 'income-proforma', label: 'Proforma' },
-      { id: 'income-unitmix', label: 'Unit mix' },
+      { id: 'income-rentroll', label: 'Rent Roll' },
       { id: 'income-expenses', label: 'Expenses' },
       { id: 'income-otherinc', label: 'Other income' },
       { id: 'income-dcf', label: 'DCF' },
-      { id: 'income-rentroll', label: 'Rent roll', isFlyout: true },
     ],
   },
   {
     approachId: 'property',
-    defaultPill: 'property-summary',
+    defaultPill: 'property-location',
     pills: [
-      { id: 'property-summary', label: 'Summary' },
-      { id: 'property-site', label: 'Site' },
-      { id: 'property-improvements', label: 'Improvements' },
-      { id: 'property-fulldetail', label: 'Full detail', isFlyout: true },
+      { id: 'property-location', label: 'Location' },
+      { id: 'property-summary', label: 'Property Details' },
     ],
   },
   {
@@ -86,6 +84,15 @@ export const APPROACH_LABELS: Record<string, string> = {
   income: 'Income approach',
   cost: 'Cost approach',
   reconciliation: 'Reconciliation',
+};
+
+export const APPROACH_DOT_COLORS: Record<ApproachId, DotColor> = {
+  property: 'green',
+  market: 'green',
+  sales: 'yellow',
+  income: 'green',
+  cost: 'gray',
+  reconciliation: 'gray',
 };
 
 export function getPillsForApproach(approachId: string): ApproachPillSet | undefined {

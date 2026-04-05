@@ -28,7 +28,7 @@
 
 .appraisal-topbar {
   height: 46px;
-  background: var(--cui-dark);
+  background: var(--cui-tertiary-bg);
   border-bottom: 1px solid var(--cui-border-color);
   display: flex;
   align-items: center;
@@ -74,17 +74,33 @@
   margin: 0 4px;
 }
 
-.appraisal-tb-project {
+.appraisal-tb-select {
   font-size: 13px;
-  color: var(--cui-body-color);
   font-weight: 500;
+  color: var(--cui-body-color);
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  padding: 3px 24px 3px 8px;
+  height: 28px;
   cursor: pointer;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  appearance: auto;
 }
 
-.appraisal-tb-chevron {
+.appraisal-tb-select:focus {
+  outline: none;
+  border-color: var(--cui-primary);
+}
+
+.appraisal-tb-pill {
   font-size: 10px;
-  color: var(--cui-tertiary-color);
-  margin-left: 2px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .appraisal-tb-sep {
@@ -170,7 +186,7 @@
 
 .appraisal-left {
   width: 220px;
-  background: var(--cui-dark);
+  background: var(--cui-secondary-bg);
   border-right: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
@@ -368,11 +384,14 @@
 
 .appraisal-right {
   width: 320px;
-  background: var(--cui-dark);
+  background: var(--cui-secondary-bg);
   border-left: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
+  min-width: 260px;
+  max-width: 600px;
 }
 
 .appraisal-right-hdr {
@@ -625,9 +644,10 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--cui-body-color);
-  width: 80px;
+  min-width: 120px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   cursor: pointer;
   border-bottom: 1px dashed transparent;
   transition: border-color 0.12s;
@@ -1257,4 +1277,225 @@
 
 .appraisal-layout *:hover {
   scrollbar-color: color-mix(in srgb, var(--cui-body-color) 15%, transparent) transparent;
+}
+
+/* ===== RIGHT PANEL RESIZE HANDLE ===== */
+
+.right-resize {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 100;
+}
+
+.right-resize:hover,
+.right-resize.active {
+  background: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+}
+
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* ===== ACCORDION (UNIVERSAL) ===== */
+
+.accordion-section {
+  margin-bottom: 2px;
+}
+
+.accordion-hdr {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  user-select: none;
+}
+
+.accordion-hdr:hover {
+  background: color-mix(in srgb, var(--cui-body-color) 2%, transparent);
+}
+
+.accordion-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color-high-emphasis, var(--cui-body-color));
+  flex: 1;
+}
+
+.accordion-chevron {
+  font-size: 8px;
+  color: color-mix(in srgb, var(--cui-body-color) 25%, transparent);
+  margin-left: auto;
+  padding-left: 6px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.accordion-section.collapsed .accordion-chevron {
+  transform: rotate(-90deg);
+}
+
+.accordion-body {
+  padding-left: 16px;
+  overflow: hidden;
+}
+
+.accordion-section.collapsed .accordion-body {
+  display: none;
+}
+
+/* ===== ACCORDION PROGRESS BAR ===== */
+
+.accordion-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.accordion-bar {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  overflow: hidden;
+}
+
+.accordion-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.accordion-bar-fill.full {
+  background: var(--cui-success);
+}
+
+.accordion-bar-fill.partial {
+  background: var(--cui-warning);
+}
+
+.accordion-bar-fill.low {
+  background: var(--cui-primary);
+}
+
+.accordion-bar-fill.empty {
+  background: color-mix(in srgb, var(--cui-body-color) 8%, transparent);
+}
+
+.accordion-count {
+  font-size: 9px;
+  color: color-mix(in srgb, var(--cui-body-color) 30%, transparent);
+  white-space: nowrap;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ===== CHAT HEADER DOT ===== */
+
+.ch-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ch-dot.green {
+  background: var(--cui-success);
+}
+
+.ch-dot.yellow {
+  background: var(--cui-warning);
+}
+
+.ch-dot.gray {
+  background: color-mix(in srgb, var(--cui-body-color) 15%, transparent);
+}
+
+.ch-dot.purple {
+  background: var(--cui-primary);
+}
+
+/* ===== ECONOMIC INDICATORS ===== */
+
+.econ-group {
+  margin-bottom: 10px;
+}
+
+.econ-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color-high-emphasis, var(--cui-body-color));
+  padding: 6px 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 40%, transparent);
+}
+
+.econ-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 15%, transparent);
+}
+
+.econ-geo {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--cui-body-color) 45%, transparent);
+  flex: 1;
+  min-width: 0;
+}
+
+.econ-val {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cui-body-color-high-emphasis, var(--cui-body-color));
+  width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.econ-chg {
+  font-size: 10px;
+  width: 65px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.econ-chg.pos {
+  color: var(--cui-success);
+}
+
+.econ-chg.neg {
+  color: var(--cui-danger);
+}
+
+.econ-chg.flat {
+  color: color-mix(in srgb, var(--cui-body-color) 30%, transparent);
+}
+
+.econ-narrative-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border: 1px dashed color-mix(in srgb, var(--cui-primary) 25%, transparent);
+  border-radius: 6px;
+  font-size: 10px;
+  color: var(--cui-primary);
+  cursor: pointer;
+}
+
+.econ-narrative-link:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 50%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 4%, transparent);
 }

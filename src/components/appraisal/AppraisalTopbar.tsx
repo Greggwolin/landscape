@@ -1,42 +1,85 @@
 /**
  * AppraisalTopbar
  *
- * Top bar with hamburger toggle, logo, project name, approach tabs, and avatar.
+ * Top bar with hamburger toggle, project selector dropdown, property type pill,
+ * approach tabs, and avatar.
  *
- * @version 1.0
+ * @version 2.0
  * @created 2026-04-04
+ * @updated 2026-04-05 — Real project selector + property type pill
  */
 
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { useProjectContext } from '@/app/components/ProjectProvider';
+import { getPropertyTypeTokenRef, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import type { ApproachId } from './appraisal.types';
+import type { Project } from './appraisal.types';
 import { ApproachTabs } from './approach/ApproachTabs';
 
 interface AppraisalTopbarProps {
-  projectName: string;
+  project: Project;
   activeApproach: ApproachId;
   onApproachChange: (id: ApproachId) => void;
   onToggleLeft: () => void;
 }
 
 export function AppraisalTopbar({
-  projectName,
+  project,
   activeApproach,
   onApproachChange,
   onToggleLeft,
 }: AppraisalTopbarProps) {
+  const router = useRouter();
+  const { projects, selectProject } = useProjectContext();
+
+  const handleProjectChange = (newProjectId: number) => {
+    selectProject(newProjectId);
+    // Preserve ?ui=appraisal when switching projects
+    router.push(`/projects/${newProjectId}?ui=appraisal`);
+  };
+
+  // Resolve property type pill
+  const ptCandidates = [project?.project_type, project?.project_type_code, project?.property_subtype];
+  const ptMatch = ptCandidates.find((v) => v && getPropertyTypeTokenRef(v));
+  const ptTokenRef = getPropertyTypeTokenRef(ptMatch);
+  const ptLabelSource = ptCandidates.find((v) => !!v) || ptMatch;
+  const ptLabel = getPropertyTypeLabel(ptLabelSource);
+
   return (
     <div className="appraisal-topbar">
       <button className="appraisal-tb-toggle" onClick={onToggleLeft} aria-label="Toggle left panel">
         ☰
       </button>
-      <div className="appraisal-tb-logo">
-        <em>Landscape</em>
-      </div>
-      <span className="appraisal-tb-slash">/</span>
-      <span className="appraisal-tb-project">{projectName}</span>
-      <span className="appraisal-tb-chevron">▾</span>
+
+      {/* Project selector dropdown */}
+      <select
+        value={project?.project_id || ''}
+        onChange={(e) => handleProjectChange(Number(e.target.value))}
+        className="appraisal-tb-select"
+      >
+        {projects.map((proj) => (
+          <option key={proj.project_id} value={proj.project_id}>
+            {proj.project_name}
+          </option>
+        ))}
+      </select>
+
+      {/* Property type pill */}
+      {ptTokenRef && ptLabel && (
+        <span
+          className="appraisal-tb-pill"
+          style={{
+            backgroundColor: ptTokenRef.bgVar,
+            color: ptTokenRef.textVar,
+          }}
+        >
+          {ptLabel}
+        </span>
+      )}
+
       <div className="appraisal-tb-sep" />
       <ApproachTabs activeApproach={activeApproach} onApproachChange={onApproachChange} />
       <div className="appraisal-tb-spacer" />
