@@ -2,17 +2,19 @@
  * AppraisalTopbar
  *
  * Top bar with hamburger toggle, project selector dropdown, property type pill,
- * approach tabs, and avatar.
+ * approach tabs, and avatar. Uses CoreUI icons.
  *
- * @version 2.0
+ * @version 2.1
  * @created 2026-04-04
- * @updated 2026-04-05 — Real project selector + property type pill
+ * @updated 2026-04-05 — CoreUI icons, font bump
  */
 
 'use client';
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import CIcon from '@coreui/icons-react';
+import { cilMenu } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 import { getPropertyTypeTokenRef, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import type { ApproachId } from './appraisal.types';
@@ -37,7 +39,6 @@ export function AppraisalTopbar({
 
   const handleProjectChange = (newProjectId: number) => {
     selectProject(newProjectId);
-    // Preserve ?ui=appraisal when switching projects
     router.push(`/projects/${newProjectId}?ui=appraisal`);
   };
 
@@ -51,7 +52,7 @@ export function AppraisalTopbar({
   return (
     <div className="appraisal-topbar">
       <button className="appraisal-tb-toggle" onClick={onToggleLeft} aria-label="Toggle left panel">
-        ☰
+        <CIcon icon={cilMenu} size="sm" />
       </button>
 
       {/* Project selector dropdown */}

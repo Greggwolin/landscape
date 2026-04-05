@@ -75,7 +75,7 @@
 }
 
 .appraisal-tb-select {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--cui-body-color);
   background: var(--cui-tertiary-bg);
@@ -95,7 +95,7 @@
 }
 
 .appraisal-tb-pill {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
@@ -138,7 +138,7 @@
 }
 
 .approach-tab {
-  font-size: 11px;
+  font-size: 12px;
   padding: 5px 14px;
   border-radius: 5px;
   color: var(--cui-tertiary-color);
@@ -186,7 +186,7 @@
 
 .appraisal-left {
   width: 220px;
-  background: var(--cui-secondary-bg);
+  background: var(--cui-dark);
   border-right: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
@@ -215,7 +215,7 @@
   align-items: center;
   gap: 8px;
   padding: 7px 10px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--cui-secondary-color);
   cursor: pointer;
   border-radius: 6px;
@@ -247,7 +247,7 @@
 }
 
 .appraisal-ls-label {
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--cui-tertiary-color);
@@ -262,7 +262,7 @@
 
 .appraisal-ls-label-action {
   color: var(--cui-primary);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
@@ -270,7 +270,7 @@
 }
 
 .appraisal-ls-item {
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 10px;
   border-radius: 6px;
   color: var(--cui-secondary-color);
@@ -318,7 +318,7 @@
 
 .appraisal-ls-item-badge {
   margin-left: auto;
-  font-size: 8px;
+  font-size: 9px;
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -335,7 +335,7 @@
 
 .appraisal-ls-item-date {
   margin-left: auto;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--cui-tertiary-color);
 }
 
@@ -384,7 +384,7 @@
 
 .appraisal-right {
   width: 320px;
-  background: var(--cui-secondary-bg);
+  background: var(--cui-dark);
   border-left: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
@@ -403,7 +403,7 @@
 }
 
 .appraisal-rh-title {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--cui-secondary-color);
 }
@@ -501,36 +501,38 @@
 }
 
 .appraisal-pill {
-  font-size: 9px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--cui-border-color);
-  color: var(--cui-tertiary-color);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: none;
+  color: var(--cui-secondary-color);
   cursor: pointer;
   transition: all 0.12s;
   white-space: nowrap;
-  background: transparent;
+  background: color-mix(in srgb, var(--cui-body-color) 8%, transparent);
 }
 
 .appraisal-pill:hover {
-  border-color: var(--cui-secondary-color);
-  color: var(--cui-secondary-color);
+  background: color-mix(in srgb, var(--cui-body-color) 14%, transparent);
+  color: var(--cui-body-color);
 }
 
 .appraisal-pill.active {
-  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
-  border-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 22%, transparent);
   color: var(--cui-primary);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .appraisal-pill.flyout-trigger {
-  border-style: dashed;
+  border: 1px dashed color-mix(in srgb, var(--cui-border-color) 60%, transparent);
+  background: transparent;
 }
 
 .appraisal-pill.flyout-trigger:hover {
   border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
   color: var(--cui-primary);
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
 }
 
 /* ===== VIEW AREA ===== */
@@ -926,7 +928,7 @@
 
 .detail-panel {
   width: 380px;
-  background: var(--cui-secondary-bg);
+  background: var(--cui-dark);
   border-left: 1px solid var(--cui-border-color);
   height: 100%;
   display: flex;
@@ -1215,7 +1217,7 @@
 }
 
 .appraisal-rs-title {
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--cui-tertiary-color);
@@ -1258,13 +1260,13 @@
 }
 
 .appraisal-rpt-name {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--cui-secondary-color);
   flex: 1;
 }
 
 .appraisal-rpt-pct {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--cui-tertiary-color);
 }
 

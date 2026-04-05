@@ -2,18 +2,18 @@
  * AppraisalChatPanel
  *
  * Center panel wrapping the existing Landscaper chat components.
- * Shows a small colored dot (matching topbar tab status) + thread title.
+ * LandscaperChat owns the full UI including header, thread management,
+ * and conversation — no custom header overlay.
  *
- * @version 1.1
+ * @version 1.2
  * @created 2026-04-04
- * @updated 2026-04-05 — pill replaced with colored dot
+ * @updated 2026-04-05 — Removed custom chat header; LandscaperChat renders its own
  */
 
 'use client';
 
 import React from 'react';
 import type { ApproachId } from './appraisal.types';
-import { APPROACH_DOT_COLORS } from './appraisal.config';
 import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
 
 interface AppraisalChatPanelProps {
@@ -22,21 +22,13 @@ interface AppraisalChatPanelProps {
 }
 
 export function AppraisalChatPanel({ projectId, activeApproach }: AppraisalChatPanelProps) {
-  const dotColor = APPROACH_DOT_COLORS[activeApproach] || 'gray';
-
   return (
     <div className="appraisal-center">
-      <div className="appraisal-chat-header">
-        <div className={`ch-dot ${dotColor}`} />
-        <div className="appraisal-ch-title">New conversation</div>
-      </div>
-      <div className="appraisal-chat-body">
-        <LandscaperChat
-          projectId={projectId}
-          activeTab={activeApproach}
-          isExpanded={true}
-        />
-      </div>
+      <LandscaperChat
+        projectId={projectId}
+        activeTab={activeApproach}
+        isExpanded={true}
+      />
     </div>
   );
 }
