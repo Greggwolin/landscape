@@ -25,19 +25,14 @@ export function DetailOpEx({ onClose }: Props) {
         </div>
 
         <div className="dp-section-title">Input method</div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <div className="opex-toggle-row">
           {['% of EGI', '$/unit', 'Total $', 'Line items'].map((method, i) => (
-            <div
+            <button
               key={method}
-              style={{
-                fontSize: 9, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
-                ...(i === 0
-                  ? { background: 'color-mix(in srgb, var(--cui-primary) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--cui-primary) 30%, transparent)', color: 'var(--cui-primary)' }
-                  : { border: '1px solid var(--cui-border-color)', color: 'var(--cui-tertiary-color)' }),
-              }}
+              className={`appraisal-toggle-btn square${i === 0 ? ' active' : ''}`}
             >
               {method}
-            </div>
+            </button>
           ))}
         </div>
 

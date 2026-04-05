@@ -38,7 +38,7 @@ export function IncomeProforma({ onOpenDetail }: Props) {
       <ProformaRow
         dot="empty" label="Net operating income" value="600,776" valueType="positive" isSubtotal
       />
-      <div style={{ height: 6 }} />
+      <div className="appraisal-spacer-md" />
       <ProformaRow
         dot="green" label="Going-in cap rate" input="5.25%" inputHasValue value="—"
         onDoubleClick={() => onOpenDetail('caprate', 'Going-in Cap Rate')}

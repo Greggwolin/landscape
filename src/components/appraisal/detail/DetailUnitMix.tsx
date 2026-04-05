@@ -38,7 +38,7 @@ export function DetailUnitMix({ onClose }: Props) {
         </div>
         <div className="dp-hdr-meta">Property · Physical description</div>
         <div className="dp-hdr-source user">
-          <span style={{ fontSize: 7 }}>●</span>
+          <span className="um-source-dot">●</span>
           Manual entry (no rent roll)
         </div>
       </div>
@@ -57,7 +57,7 @@ export function DetailUnitMix({ onClose }: Props) {
         {/* Unit rows */}
         {UNIT_TYPES.map((u) => (
           <div key={u.type} className="um-row">
-            <span className="um-type" style={{ color: 'var(--cui-body-color)' }}>{u.type}</span>
+            <span className="um-type strong">{u.type}</span>
             <span className="um-beds">{u.bd}</span>
             <span className="um-baths">{u.ba}</span>
             <span className="um-units">{u.units}</span>
@@ -66,11 +66,11 @@ export function DetailUnitMix({ onClose }: Props) {
         ))}
 
         {/* Total */}
-        <div className="um-row" style={{ borderTop: '1px solid var(--cui-border-color)', paddingTop: 6, marginTop: 2 }}>
-          <span className="um-type" style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>Total</span>
+        <div className="um-row total-row">
+          <span className="um-type strong">Total</span>
           <span className="um-beds" />
           <span className="um-baths" />
-          <span className="um-units" style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>{TOTAL_UNITS}</span>
+          <span className="um-units strong">{TOTAL_UNITS}</span>
           <span className="um-sf" />
         </div>
 

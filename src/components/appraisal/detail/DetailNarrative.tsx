@@ -4,8 +4,9 @@
  * Narrative flyout for location/market T1/T2/T3 tiers.
  * AI-generated analysis with per-tier regeneration.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-05
+ * @updated 2026-04-05 — Inline styles → CSS classes
  */
 
 'use client';
@@ -68,89 +69,36 @@ export function DetailNarrative({ onClose }: Props) {
           <button className="dp-hdr-close" onClick={onClose}>✕</button>
         </div>
         <div className="dp-hdr-meta">AI-generated analysis · Hawthorne, CA</div>
-        <div style={{ marginTop: 8 }}>
-          <button
-            style={{
-              fontSize: 10,
-              padding: '4px 10px',
-              borderRadius: 5,
-              border: '1px solid var(--cui-border-color)',
-              background: 'transparent',
-              color: 'var(--cui-secondary-color)',
-              cursor: 'pointer',
-            }}
-          >
-            ⟳ Generate All
-          </button>
+        <div className="nar-generate-row">
+          <button className="appraisal-outline-btn md">⟳ Generate All</button>
         </div>
       </div>
 
       {/* Body — narrative tiers */}
       <div className="dp-body">
         {TIERS.map((tier) => (
-          <div key={tier.id} style={{ marginBottom: 12 }}>
+          <div key={tier.id} className="nar-tier">
             {/* Tier header */}
-            <div
-              onClick={() => toggleTier(tier.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 0',
-                cursor: 'pointer',
-                borderBottom: '1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent)',
-                userSelect: 'none',
-              }}
-            >
+            <div className="nar-tier-header" onClick={() => toggleTier(tier.id)}>
               <span
+                className="nar-tier-badge"
                 style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  padding: '2px 6px',
-                  borderRadius: 3,
                   background: `color-mix(in srgb, ${tier.badgeColor} 15%, transparent)`,
                   color: tier.badgeColor,
                 }}
               >
                 {tier.badge}
               </span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--cui-body-color)', flex: 1 }}>
-                {tier.title}
-              </span>
-              <span style={{ fontSize: 9, color: 'var(--cui-tertiary-color)' }}>
-                {tier.timestamp}
-              </span>
-              <span
-                style={{
-                  fontSize: 8,
-                  color: 'color-mix(in srgb, var(--cui-body-color) 25%, transparent)',
-                  transition: 'transform 0.15s',
-                  transform: openTiers[tier.id] ? 'rotate(0deg)' : 'rotate(-90deg)',
-                }}
-              >
-                ▾
-              </span>
+              <span className="nar-tier-title">{tier.title}</span>
+              <span className="nar-tier-timestamp">{tier.timestamp}</span>
+              <span className={`nar-tier-chevron ${openTiers[tier.id] ? 'open' : 'closed'}`}>▾</span>
             </div>
 
             {/* Tier body */}
             {openTiers[tier.id] && (
-              <div style={{ padding: '10px 0 10px 0' }}>
-                <div style={{ fontSize: 11, color: 'var(--cui-secondary-color)', lineHeight: 1.6, marginBottom: 8 }}>
-                  {tier.text}
-                </div>
-                <button
-                  style={{
-                    fontSize: 9,
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    border: '1px solid var(--cui-border-color)',
-                    background: 'transparent',
-                    color: 'var(--cui-tertiary-color)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ⟳ Update
-                </button>
+              <div className="nar-tier-body">
+                <div className="nar-tier-text">{tier.text}</div>
+                <button className="appraisal-outline-btn">⟳ Update</button>
               </div>
             )}
           </div>

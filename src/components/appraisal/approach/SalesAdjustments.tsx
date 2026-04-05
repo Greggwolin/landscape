@@ -16,7 +16,7 @@ const CATEGORIES = [
 export function SalesAdjustments({ onOpenDetail }: Props) {
   return (
     <>
-      <div style={{ fontSize: 9, color: 'var(--cui-tertiary-color)', marginBottom: 6 }}>Adjustment categories</div>
+      <div className="appraisal-meta">Adjustment categories</div>
       {CATEGORIES.map((cat) => (
         <ProformaRow
           key={cat} dot="yellow" label={cat} value="—" valueType="waiting"

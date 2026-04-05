@@ -45,7 +45,7 @@ export function AppraisalLeftPanel({ projectId, projectName, collapsed }: Apprai
           <CIcon icon={cilPlus} size="sm" />
           New project
         </button>
-        <div className="appraisal-left-divider" style={{ margin: '4px 0' }} />
+        <div className="appraisal-left-divider compact" />
         <button className="appraisal-left-btn">
           <CIcon icon={cilSearch} size="sm" />
           Search
@@ -56,7 +56,7 @@ export function AppraisalLeftPanel({ projectId, projectName, collapsed }: Apprai
 
       {/* Projects */}
       <div className="appraisal-left-section">
-        <div className="appraisal-ls-label" style={{ cursor: 'pointer' }}>
+        <div className="appraisal-ls-label clickable">
           Projects ›
         </div>
         <div className="appraisal-ls-item active">
@@ -75,7 +75,7 @@ export function AppraisalLeftPanel({ projectId, projectName, collapsed }: Apprai
       <div className="appraisal-left-section">
         <div className="appraisal-ls-label">Starred</div>
         <div className="appraisal-ls-item">
-          <CIcon icon={cilStar} size="sm" style={{ color: 'var(--cui-warning)', flexShrink: 0 }} />
+          <CIcon icon={cilStar} size="sm" className="appraisal-ls-icon warning" />
           {projectName}
         </div>
       </div>
@@ -89,35 +89,35 @@ export function AppraisalLeftPanel({ projectId, projectName, collapsed }: Apprai
           <span className="appraisal-ls-label-action">+ New</span>
         </div>
         <div className="appraisal-ls-item active">
-          <CIcon icon={cilCommentSquare} size="sm" style={{ flexShrink: 0, color: 'var(--cui-success)' }} />
+          <CIcon icon={cilCommentSquare} size="sm" className="appraisal-ls-icon success" />
           Income approach setup
           <span className="appraisal-ls-item-date">Today</span>
         </div>
         <div className="appraisal-ls-item">
-          <CIcon icon={cilCommentSquare} size="sm" style={{ flexShrink: 0, opacity: 0.4 }} />
+          <CIcon icon={cilCommentSquare} size="sm" className="appraisal-ls-icon muted" />
           Rent comp analysis
           <span className="appraisal-ls-item-date">Today</span>
         </div>
       </div>
 
       {/* Spacer pushes Agents to bottom */}
-      <div style={{ flex: 1 }} />
+      <div className="appraisal-flex-spacer" />
 
       <div className="appraisal-left-divider" />
 
       {/* Agents — future function set, pinned at bottom */}
-      <div className="appraisal-left-section" style={{ paddingBottom: 12 }}>
+      <div className="appraisal-left-section bottom">
         <div className="appraisal-ls-label">
           <span>Agents</span>
           <span className="appraisal-ls-label-action">+ New</span>
         </div>
         <div className="appraisal-ls-item">
-          <CIcon icon={cilSpeedometer} size="sm" style={{ flexShrink: 0, color: 'var(--cui-success)' }} />
+          <CIcon icon={cilSpeedometer} size="sm" className="appraisal-ls-icon success" />
           Market intelligence
           <span className="appraisal-ls-item-badge running">Running</span>
         </div>
         <div className="appraisal-ls-item">
-          <CIcon icon={cilBolt} size="sm" style={{ flexShrink: 0, opacity: 0.4 }} />
+          <CIcon icon={cilBolt} size="sm" className="appraisal-ls-icon muted" />
           Comp monitor
           <span className="appraisal-ls-item-badge idle">Idle</span>
         </div>

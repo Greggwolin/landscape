@@ -5,8 +5,9 @@
  * Shows unit-level grid with contract vs market rent,
  * loss-to-lease callout, and upload drop zone.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-05
+ * @updated 2026-04-05 — Inline styles → CSS classes
  */
 
 'use client';
@@ -30,7 +31,7 @@ export function IncomeRentRoll({ onOpenDetail }: Props) {
     <>
       {/* Source indicator */}
       <div className="um-source rentroll">
-        <span style={{ fontSize: 7 }}>●</span>
+        <span className="um-source-dot">●</span>
         Source: rent roll (uploaded)
       </div>
 
@@ -46,83 +47,41 @@ export function IncomeRentRoll({ onOpenDetail }: Props) {
 
       {SAMPLE_UNITS.map((u) => (
         <div key={u.unit} className="um-row">
-          <span className="um-type" style={{ color: 'var(--cui-body-color)' }}>{u.unit}</span>
+          <span className="um-type strong">{u.unit}</span>
           <span className="um-beds">{u.bd}</span>
           <span className="um-baths">{u.ba}</span>
           <span className="um-sf">{u.sf.toLocaleString()}</span>
           <span className="um-rent">{u.contract}</span>
-          <span className="um-rent" style={{ color: 'var(--cui-success)' }}>{u.market}</span>
+          <span className="um-rent market">{u.market}</span>
         </div>
       ))}
 
       {/* Truncation row */}
-      <div
-        className="um-row"
-        style={{ justifyContent: 'center', opacity: 0.5, cursor: 'pointer' }}
-      >
-        <span style={{ fontSize: 10, color: 'var(--cui-tertiary-color)' }}>...60 more</span>
+      <div className="um-row truncation">
+        <span>...60 more</span>
       </div>
 
       {/* Total row */}
-      <div className="um-row" style={{ borderTop: '1px solid var(--cui-border-color)', paddingTop: 6, marginTop: 2 }}>
-        <span className="um-type" style={{ fontWeight: 600, color: 'var(--cui-body-color)' }}>Total</span>
+      <div className="um-row total-row">
+        <span className="um-type strong">Total</span>
         <span className="um-beds" />
         <span className="um-baths" />
         <span className="um-sf" />
-        <span className="um-rent" style={{ fontWeight: 600 }}>$88,640</span>
-        <span className="um-rent" style={{ fontWeight: 600, color: 'var(--cui-success)' }}>$90,120</span>
+        <span className="um-rent strong">$88,640</span>
+        <span className="um-rent strong market">$90,120</span>
       </div>
 
       {/* Toggle buttons */}
-      <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-        <button
-          style={{
-            fontSize: 9,
-            padding: '4px 10px',
-            borderRadius: 12,
-            border: '1px solid color-mix(in srgb, var(--cui-primary) 30%, transparent)',
-            background: 'color-mix(in srgb, var(--cui-primary) 15%, transparent)',
-            color: 'var(--cui-primary)',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          Summary
-        </button>
-        <button
-          style={{
-            fontSize: 9,
-            padding: '4px 10px',
-            borderRadius: 12,
-            border: '1px dashed var(--cui-border-color)',
-            background: 'transparent',
-            color: 'var(--cui-tertiary-color)',
-            cursor: 'pointer',
-          }}
-        >
-          Full rent roll ↗
-        </button>
+      <div className="appraisal-toggle-row">
+        <button className="appraisal-toggle-btn active">Summary</button>
+        <button className="appraisal-toggle-btn">Full rent roll ↗</button>
       </div>
 
       {/* Loss-to-lease callout */}
-      <div
-        style={{
-          marginTop: 10,
-          padding: '10px 12px',
-          borderRadius: 8,
-          background: 'color-mix(in srgb, var(--cui-success) 6%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--cui-success) 15%, transparent)',
-        }}
-      >
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: 2 }}>
-          Loss-to-Lease
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--cui-secondary-color)' }}>
-          $1,480/mo ($17,760/yr) · 1.6% of PGI
-        </div>
-        <div style={{ fontSize: 10, color: 'var(--cui-tertiary-color)', marginTop: 3 }}>
-          Occupancy: 62/64 units (96.9%) · 2 vacant
-        </div>
+      <div className="appraisal-callout success">
+        <div className="appraisal-callout-title">Loss-to-Lease</div>
+        <div className="appraisal-callout-value">$1,480/mo ($17,760/yr) · 1.6% of PGI</div>
+        <div className="appraisal-callout-meta">Occupancy: 62/64 units (96.9%) · 2 vacant</div>
       </div>
 
       {/* Upload drop zone */}

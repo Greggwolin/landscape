@@ -20,7 +20,7 @@ const EXPENSE_DATA = [
 export function IncomeExpenses({ onOpenDetail }: Props) {
   return (
     <>
-      <div style={{ fontSize: 9, color: 'var(--cui-tertiary-color)', marginBottom: 6 }}>
+      <div className="appraisal-meta">
         40% of EGI · $400,518 total · $6,258/unit
       </div>
 

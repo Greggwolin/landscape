@@ -1,20 +1,24 @@
 /**
  * AppraisalChatPanel
  *
- * Center panel wrapping the existing Landscaper chat components.
- * LandscaperChat owns the full UI including header, thread management,
- * and conversation — no custom header overlay.
+ * Center panel wrapping LandscaperChatThreaded — the full Landscaper UI
+ * with header (branding, approach pill, +, notifications), thread list
+ * (new/edit/delete), and conversation.
  *
- * @version 1.2
+ * Uses LandscaperChatThreaded (NOT LandscaperChat) because the threaded
+ * version has built-in thread management matching the existing app.
+ *
+ * @version 1.3
  * @created 2026-04-04
- * @updated 2026-04-05 — Removed custom chat header; LandscaperChat renders its own
+ * @updated 2026-04-05 — Swapped LandscaperChat → LandscaperChatThreaded
  */
 
 'use client';
 
 import React from 'react';
 import type { ApproachId } from './appraisal.types';
-import { LandscaperChat } from '@/components/landscaper/LandscaperChat';
+import { APPROACH_LABELS } from './appraisal.config';
+import { LandscaperChatThreaded } from '@/components/landscaper/LandscaperChatThreaded';
 
 interface AppraisalChatPanelProps {
   projectId: number;
@@ -22,11 +26,14 @@ interface AppraisalChatPanelProps {
 }
 
 export function AppraisalChatPanel({ projectId, activeApproach }: AppraisalChatPanelProps) {
+  const contextLabel = APPROACH_LABELS[activeApproach] || 'General';
+
   return (
     <div className="appraisal-center">
-      <LandscaperChat
+      <LandscaperChatThreaded
         projectId={projectId}
-        activeTab={activeApproach}
+        pageContext={activeApproach}
+        contextPillLabel={contextLabel}
         isExpanded={true}
       />
     </div>

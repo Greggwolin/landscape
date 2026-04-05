@@ -186,7 +186,7 @@
 
 .appraisal-left {
   width: 220px;
-  background: var(--cui-dark);
+  background: var(--cui-secondary-bg);
   border-right: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
@@ -384,7 +384,7 @@
 
 .appraisal-right {
   width: 320px;
-  background: var(--cui-dark);
+  background: var(--cui-secondary-bg);
   border-left: 1px solid var(--cui-border-color);
   display: flex;
   flex-direction: column;
@@ -928,7 +928,7 @@
 
 .detail-panel {
   width: 380px;
-  background: var(--cui-dark);
+  background: var(--cui-secondary-bg);
   border-left: 1px solid var(--cui-border-color);
   height: 100%;
   display: flex;
@@ -1268,6 +1268,443 @@
 .appraisal-rpt-pct {
   font-size: 10px;
   color: var(--cui-tertiary-color);
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+.appraisal-spacer-sm { height: 4px; }
+.appraisal-spacer-md { height: 6px; }
+.appraisal-spacer-lg { height: 8px; }
+.appraisal-flex-spacer { flex: 1; }
+
+.appraisal-meta {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 6px;
+}
+
+.approach-empty {
+  font-size: 11px;
+  color: var(--cui-tertiary-color);
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* ===== LEFT PANEL MODIFIERS ===== */
+
+.appraisal-left-divider.compact { margin: 4px 0; }
+.appraisal-ls-label.clickable { cursor: pointer; }
+.appraisal-left-section.bottom { padding-bottom: 12px; }
+
+.appraisal-ls-icon {
+  flex-shrink: 0;
+}
+
+.appraisal-ls-icon.warning { color: var(--cui-warning); }
+.appraisal-ls-icon.success { color: var(--cui-success); }
+.appraisal-ls-icon.muted { opacity: 0.4; }
+
+/* ===== BOTTOM SECTION VIEWS ===== */
+
+.bs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.bs-close {
+  font-size: 9px;
+  color: var(--cui-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.bs-doc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+
+.bs-doc-item {
+  font-size: 9px;
+  padding: 3px 6px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  color: var(--cui-tertiary-color);
+}
+
+.bs-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  font-size: 9px;
+}
+
+.bs-layer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.bs-layer-label {
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.bs-layer-count {
+  color: var(--cui-tertiary-color);
+}
+
+.bs-nb-date {
+  font-size: 9px;
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+}
+
+.bs-nb-body {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* ===== TOGGLE BUTTONS (shared) ===== */
+
+.appraisal-toggle-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.appraisal-toggle-btn {
+  font-size: 9px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px dashed var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-tertiary-color);
+}
+
+.appraisal-toggle-btn.active {
+  border: 1px solid color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  color: var(--cui-primary);
+  font-weight: 500;
+  border-style: solid;
+}
+
+/* Pill-style variant (square corners) */
+.appraisal-toggle-btn.square {
+  border-radius: 4px;
+}
+
+/* ===== OUTLINE BUTTON (shared) ===== */
+
+.appraisal-outline-btn {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+}
+
+.appraisal-outline-btn:hover {
+  border-color: var(--cui-secondary-color);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-outline-btn.md {
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  color: var(--cui-secondary-color);
+}
+
+/* ===== RENT ROLL ===== */
+
+.um-source-dot { font-size: 7px; }
+
+.um-row.truncation {
+  justify-content: center;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.um-row.truncation span {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+}
+
+.um-row.total-row {
+  border-top: 1px solid var(--cui-border-color);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.um-type.strong,
+.um-units.strong {
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.um-rent.strong { font-weight: 600; }
+.um-rent.market { color: var(--cui-success); }
+
+/* ===== CALLOUT BOX ===== */
+
+.appraisal-callout {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.appraisal-callout.success {
+  background: color-mix(in srgb, var(--cui-success) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cui-success) 15%, transparent);
+}
+
+.appraisal-callout-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin-bottom: 2px;
+}
+
+.appraisal-callout-value {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-callout-meta {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  margin-top: 3px;
+}
+
+/* ===== MAP PLACEHOLDER ===== */
+
+.map-placeholder {
+  height: 180px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--cui-tertiary-bg) 0%, var(--cui-secondary-bg) 100%);
+  border: 1px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.map-pin {
+  font-size: 20px;
+  margin-bottom: 4px;
+  opacity: 0.3;
+}
+
+.map-address {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+}
+
+.map-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--cui-border-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cui-border-color) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.map-toggle-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+.map-toggle-btn {
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+}
+
+.map-toggle-btn.active {
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  color: var(--cui-primary);
+}
+
+.map-link {
+  font-size: 9px;
+  color: var(--cui-primary);
+  cursor: pointer;
+}
+
+/* ===== NARRATIVE TIERS ===== */
+
+.nar-generate-row { margin-top: 8px; }
+
+.nar-tier { margin-bottom: 12px; }
+
+.nar-tier-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 30%, transparent);
+  user-select: none;
+}
+
+.nar-tier-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.nar-tier-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  flex: 1;
+}
+
+.nar-tier-timestamp {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+}
+
+.nar-tier-chevron {
+  font-size: 8px;
+  color: color-mix(in srgb, var(--cui-body-color) 25%, transparent);
+  transition: transform 0.15s;
+}
+
+.nar-tier-chevron.open { transform: rotate(0deg); }
+.nar-tier-chevron.closed { transform: rotate(-90deg); }
+
+.nar-tier-body { padding: 10px 0; }
+
+.nar-tier-text {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+/* ===== DETAIL PGI ===== */
+
+.pgi-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pgi-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pgi-option.active {
+  border-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
+}
+
+.pgi-radio {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--cui-tertiary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pgi-radio.active {
+  border-color: var(--cui-primary);
+}
+
+.pgi-radio-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--cui-primary);
+}
+
+.pgi-label {
+  font-size: 10px;
+  color: var(--cui-secondary-color);
+}
+
+.pgi-label.active {
+  color: var(--cui-body-color);
+}
+
+.pgi-sublabel {
+  font-size: 8px;
+  color: var(--cui-tertiary-color);
+}
+
+.pgi-value {
+  font-size: 9px;
+  color: var(--cui-tertiary-color);
+}
+
+.pgi-value.success {
+  color: var(--cui-success);
+}
+
+/* ===== DETAIL OPEX TOGGLE ===== */
+
+.opex-toggle-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* ===== SECTION TITLE (PropertySummary) ===== */
+
+.ps-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+  margin-bottom: 8px;
+}
+
+/* ===== DETAIL VACANCY ===== */
+
+.dv-meta {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+  margin-bottom: 8px;
+}
+
+/* ===== DARK MODE OVERRIDES ===== */
+
+[data-coreui-theme="dark"] .appraisal-left,
+[data-coreui-theme="dark"] .appraisal-right,
+[data-coreui-theme="dark"] .detail-panel {
+  background: color-mix(in srgb, var(--cui-secondary-bg) 85%, black);
 }
 
 /* ===== SCROLLBAR ===== */

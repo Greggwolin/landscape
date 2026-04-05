@@ -228,6 +228,8 @@ All assumption/form panels inside CCards must follow the Loan Card padding stand
 - **Dark mode** — supported via CoreUI theme provider; use CSS vars so it works automatically
 - Path aliases: `@/*` → `./src/*`
 
+**Appraisal UI — strict CoreUI-only rule:** All components in `src/components/appraisal/` must use ONLY CoreUI CSS variables, CoreUI utility classes (`d-flex`, `align-items-center`, `gap-*`, etc.), and dedicated CSS classes in `appraisal.css`. Zero Tailwind utility classes. Zero hardcoded hex colors. Minimal inline `style={{}}` — only for truly dynamic values (drag widths, data-driven colors). All layout, spacing, typography, and visual styling must be in `appraisal.css` classes. Dark-mode panel darkening uses `[data-coreui-theme="dark"]` selector overrides — not `color-mix` applied to both themes.
+
 ### File Naming
 
 ```
@@ -549,6 +551,23 @@ Two distinct failure modes — treat separately:
 - **Construction Loan Engine:** Phase 6A complete (draw-repay-redraw validated); Phase 6B land dev conversational parsing complete
 - **Portfolio Analysis:** (WIP) Django models scaffolded — `Portfolio`, `PortfolioMember`, `PortfolioWaterfallTier`, `PortfolioResult` in `models_portfolio.py`. ViewSets + serializers + URL registration complete. Underwriting mode only.
 
+### Appraisal Conversational UI (Scaffold — Apr 2026)
+
+**Branch:** `feature/appraisal-ui` — activated via `?ui=appraisal` query param on project pages.
+
+**Layout:** Three-panel conversational appraisal interface replacing the folder-tab UI when activated:
+- Left panel (280px collapsible): approach navigation + document/map/notebook tiles
+- Center panel: Landscaper chat (appraisal-scoped)
+- Right panel: approach-specific data views with detail drill-in
+
+**Approach tabs:** Property, Market, Sales Comparison, Income, Cost, Reconciliation — each with sub-pills (e.g., Income → Unit Mix, Proforma, Expenses, Other Income, DCF).
+
+**Components:** 45 files in `src/components/appraisal/` — types, config, CSS, layout, topbar, panels, 6 detail panels, 20 approach views, 3 tiles, reports strip, 4 shared components. No new API endpoints or DB changes.
+
+**Router integration:** `ProjectContentRouter.tsx` checks `useSearchParams` for `?ui=appraisal` and renders `AppraisalLayout` via early return. Default folder-tab UI completely unaffected.
+
+**Status:** Scaffold only — static/placeholder data. Not yet wired to real APIs or Landscaper backend.
+
 ---
 
 ## Deployment (Alpha)
@@ -805,7 +824,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-03 (nightly sync — v0.1.18: DMS doc type combobox + reassignment endpoint; ingestion workbench finish-later/resume flow; brokerage research agent rewrite + PDF data directory; market agent fleet (8 agents); Census BPS agent CSV rewrite; async extraction; phantom conflict fix; guide content rewrite)*
+*Last updated: 2026-04-04 (nightly sync — appraisal conversational UI scaffold (45 components, feature/appraisal-ui branch); extraction_writer.py refactor; ingestion workbench CSS + staging hook improvements)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 231*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*

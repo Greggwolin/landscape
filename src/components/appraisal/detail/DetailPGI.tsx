@@ -25,44 +25,34 @@ export function DetailPGI({ onClose }: Props) {
         </div>
 
         <div className="dp-section-title">PGI source</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+        <div className="pgi-options">
           {/* Active source */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-            border: '1px solid color-mix(in srgb, var(--cui-primary) 30%, transparent)',
-            borderRadius: 6, background: 'color-mix(in srgb, var(--cui-primary) 6%, transparent)',
-          }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--cui-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--cui-primary)' }} />
+          <div className="pgi-option active">
+            <div className="pgi-radio active">
+              <div className="pgi-radio-dot" />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--cui-body-color)' }}>Blended rate</div>
-              <div style={{ fontSize: 8, color: 'var(--cui-tertiary-color)' }}>Single avg rent × total units</div>
+            <div className="appraisal-flex-spacer">
+              <div className="pgi-label active">Blended rate</div>
+              <div className="pgi-sublabel">Single avg rent × total units</div>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--cui-success)' }}>Active</div>
+            <div className="pgi-value success">Active</div>
           </div>
           {/* Other sources */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-            border: '1px solid var(--cui-border-color)', borderRadius: 6, cursor: 'pointer',
-          }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--cui-tertiary-color)' }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--cui-secondary-color)' }}>Unit mix / floor plan matrix</div>
-              <div style={{ fontSize: 8, color: 'var(--cui-tertiary-color)' }}>Per-type rent × unit count. Supersedes blended rate.</div>
+          <div className="pgi-option">
+            <div className="pgi-radio" />
+            <div className="appraisal-flex-spacer">
+              <div className="pgi-label">Unit mix / floor plan matrix</div>
+              <div className="pgi-sublabel">Per-type rent × unit count. Supersedes blended rate.</div>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--cui-tertiary-color)' }}>4 types entered</div>
+            <div className="pgi-value">4 types entered</div>
           </div>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-            border: '1px solid var(--cui-border-color)', borderRadius: 6, cursor: 'pointer',
-          }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--cui-tertiary-color)' }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 10, color: 'var(--cui-secondary-color)' }}>Rent roll</div>
-              <div style={{ fontSize: 8, color: 'var(--cui-tertiary-color)' }}>Actual unit-level rents. Supersedes unit mix and blended.</div>
+          <div className="pgi-option">
+            <div className="pgi-radio" />
+            <div className="appraisal-flex-spacer">
+              <div className="pgi-label">Rent roll</div>
+              <div className="pgi-sublabel">Actual unit-level rents. Supersedes unit mix and blended.</div>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--cui-tertiary-color)' }}>Not uploaded</div>
+            <div className="pgi-value">Not uploaded</div>
           </div>
         </div>
 
@@ -74,7 +64,7 @@ export function DetailPGI({ onClose }: Props) {
         <div className="dp-section-title">Market context</div>
         <div className="dp-sub-row"><div className="dp-sub-dot blue" /><div className="dp-sub-label">CoStar submarket avg</div><div className="dp-sub-input" /><div className="dp-sub-val">$1,340/mo</div></div>
         <div className="dp-sub-row"><div className="dp-sub-dot blue" /><div className="dp-sub-label">Submarket range</div><div className="dp-sub-input" /><div className="dp-sub-val">$1,180–$1,510</div></div>
-        <div className="dp-sub-row"><div className="dp-sub-dot blue" /><div className="dp-sub-label">Subject vs. market</div><div className="dp-sub-input" /><div className="dp-sub-val" style={{ color: 'var(--cui-success)' }}>+3.4%</div></div>
+        <div className="dp-sub-row"><div className="dp-sub-dot blue" /><div className="dp-sub-label">Subject vs. market</div><div className="dp-sub-input" /><div className="dp-sub-val pgi-value success">+3.4%</div></div>
 
         <div className="dp-chat-hint">
           <strong>Chat-enabled:</strong> &quot;Switch to unit mix&quot; · &quot;Upload the rent roll&quot; · &quot;Break this out by unit type&quot; · &quot;Use CoStar rents as market&quot; · &quot;Add a studio type at $950&quot;

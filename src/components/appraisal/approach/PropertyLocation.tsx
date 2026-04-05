@@ -4,8 +4,9 @@
  * Location pill view under the Property tab.
  * Map accordion + Economy accordion with EconIndicators.
  *
- * @version 1.0
+ * @version 1.1
  * @created 2026-04-05
+ * @updated 2026-04-05 — Inline styles → CSS classes
  */
 
 'use client';
@@ -53,60 +54,23 @@ export function PropertyLocation({ onOpenDetail }: Props) {
     <>
       {/* Map accordion */}
       <AccordionSection title="Map" defaultOpen={true}>
-        <div
-          style={{
-            height: 180,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, var(--cui-tertiary-bg) 0%, var(--cui-secondary-bg) 100%)',
-            border: '1px solid var(--cui-border-color)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            overflow: 'hidden',
-            marginBottom: 8,
-          }}
-        >
-          <div style={{ fontSize: 20, marginBottom: 4, opacity: 0.3 }}>📍</div>
-          <div style={{ fontSize: 10, color: 'var(--cui-tertiary-color)' }}>
-            14105 Chadron Ave, Hawthorne CA
-          </div>
-          {/* Fake grid overlay */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage:
-                'linear-gradient(var(--cui-border-color) 1px, transparent 1px), linear-gradient(90deg, var(--cui-border-color) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-              opacity: 0.08,
-              pointerEvents: 'none',
-            }}
-          />
+        <div className="map-placeholder">
+          <div className="map-pin">📍</div>
+          <div className="map-address">14105 Chadron Ave, Hawthorne CA</div>
+          <div className="map-grid-overlay" />
         </div>
         {/* Map mode toggles */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+        <div className="map-toggle-row">
           {['Satellite', 'Street', 'Comps'].map((mode) => (
             <button
               key={mode}
-              style={{
-                fontSize: 9,
-                padding: '3px 8px',
-                borderRadius: 4,
-                border: '1px solid var(--cui-border-color)',
-                background: mode === 'Street' ? 'color-mix(in srgb, var(--cui-primary) 15%, transparent)' : 'transparent',
-                color: mode === 'Street' ? 'var(--cui-primary)' : 'var(--cui-tertiary-color)',
-                cursor: 'pointer',
-              }}
+              className={`map-toggle-btn${mode === 'Street' ? ' active' : ''}`}
             >
               {mode}
             </button>
           ))}
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 9, color: 'var(--cui-primary)', cursor: 'pointer' }}>
-            Open full map →
-          </span>
+          <div className="appraisal-flex-spacer" />
+          <span className="map-link">Open full map →</span>
         </div>
       </AccordionSection>
 

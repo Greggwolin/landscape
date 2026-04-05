@@ -23,7 +23,7 @@ interface Props {
 export function PropertySummary({ onOpenDetail }: Props) {
   return (
     <>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: 8 }}>
+      <div className="ps-section-title">
         Physical Description
       </div>
 

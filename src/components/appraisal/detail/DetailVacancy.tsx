@@ -25,7 +25,7 @@ export function DetailVacancy({ onClose }: Props) {
         </div>
 
         <div className="dp-section-title">Breakdown (optional)</div>
-        <div style={{ fontSize: 10, color: 'var(--cui-tertiary-color)', marginBottom: 8 }}>
+        <div className="dv-meta">
           Split vacancy into sub-categories. If added, the parent value becomes calculated from these.
         </div>
         <div className="dp-sub-row"><div className="dp-sub-dot empty" /><div className="dp-sub-label">Physical vacancy</div><div className="dp-sub-input">—</div><div className="dp-sub-val">—</div></div>

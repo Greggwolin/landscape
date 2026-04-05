@@ -82,7 +82,7 @@ export function ApproachSummary({ activePill, onOpenDetail }: ApproachSummaryPro
 
   if (!ViewComponent) {
     return (
-      <div style={{ fontSize: 11, color: 'var(--cui-tertiary-color)', padding: '20px 0', textAlign: 'center' }}>
+      <div className="approach-empty">
         Select a view from the pills above.
       </div>
     );
