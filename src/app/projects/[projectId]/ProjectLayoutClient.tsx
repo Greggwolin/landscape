@@ -331,6 +331,10 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   const intakeModals = (
     <>
       <UnifiedIntakeModal
+        // key={projectId} forces the modal (and useIntakeStaging's
+        // useUploadThing hook inside it) to remount when the user navigates
+        // between projects. Same Bug 3 pattern as UploadStagingProvider.
+        key={projectId}
         visible={intakeVisible}
         projectId={projectId}
         projectName={currentProject?.project_name ?? ''}

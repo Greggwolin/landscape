@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { classifyFile, CollisionInfo } from '@/components/dms/staging/classifyFile';
 import { getAuthHeaders } from '@/lib/authHeaders';
 import { useUploadThing } from '@/lib/uploadthing';
@@ -120,6 +120,22 @@ export function useIntakeStaging(projectId: number, workspaceId?: number) {
       'x-doc-type': 'Property Data',
     },
   });
+
+  // Bug 3 tripwire: useUploadThing's headers are captured in a closure at first
+  // mount. If projectId changes WITHOUT a parent remount (missing key={projectId}),
+  // uploads will silently land on the original project. Loud-fail in dev so any
+  // future regression is caught immediately. See discovery report 2026-04-05.
+  const prevProjectIdRef = useRef(projectId);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && prevProjectIdRef.current !== projectId) {
+      console.error(
+        `[useIntakeStaging] projectId changed from ${prevProjectIdRef.current} to ${projectId} ` +
+        `without remount. The host component is missing key={projectId}. ` +
+        `Uploads WILL land on project ${prevProjectIdRef.current}, not ${projectId}.`
+      );
+    }
+    prevProjectIdRef.current = projectId;
+  }, [projectId]);
 
   // Add files and begin analysis
   const addFiles = useCallback(
