@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     const workspaceId = workspaceIdStr ? parseInt(workspaceIdStr, 10) : 1;
 
     // Auth: identify uploader and verify project ownership
-    const requestUser = getUserFromRequest(req);
+    const requestUser = await getUserFromRequest(req);
     if (!requestUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }

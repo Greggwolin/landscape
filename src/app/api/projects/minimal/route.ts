@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     const jurisdictionCounty = county
 
     // Extract authenticated user (if present) for ownership tagging
-    const requestUser = getUserFromRequest(request)
+    const requestUser = await getUserFromRequest(request)
     const createdById = requestUser?.userId ?? null
 
     // Resolve DMS template: use provided value, or look up the workspace default

@@ -252,12 +252,15 @@ class Project(models.Model):
         help_text='Flat underwriting fee at close ($). Only when analysis_type=LOTBANK.'
     )
 
-    # Ownership - links to user who created/owns this project
+    # Ownership - links to user who created/owns this project.
+    # NOT NULL enforced at DB level by migration 0009_not_null_created_by.
+    # on_delete=PROTECT was required when flipping to null=False: SET_NULL
+    # would try to write NULL into a NOT NULL column on user deletion.
+    # Ownership must be transferred before a user can be deleted.
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
+        on_delete=models.PROTECT,
+        null=False,
         related_name='projects',
         db_column='created_by_id'
     )
