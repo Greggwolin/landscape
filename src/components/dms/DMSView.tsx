@@ -46,7 +46,12 @@ const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8
 
 export default function DMSView(props: DMSViewProps) {
   return (
-    <UploadStagingProvider projectId={props.projectId} workspaceId={1}>
+    // key={props.projectId} forces UploadStagingProvider (and the
+    // useUploadThing hook inside it) to remount when the user navigates
+    // between projects. Without this, the x-project-id header captured at
+    // first mount stays pinned and subsequent uploads land on the original
+    // project. See discovery report for Bug 3 (2026-04-05).
+    <UploadStagingProvider key={props.projectId} projectId={props.projectId} workspaceId={1}>
       <DMSViewInner {...props} />
     </UploadStagingProvider>
   );

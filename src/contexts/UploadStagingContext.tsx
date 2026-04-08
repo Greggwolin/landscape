@@ -110,6 +110,22 @@ export function UploadStagingProvider({
   const [docTypes, setDocTypes] = React.useState<string[]>([]);
   const [pendingIntakeDocs, setPendingIntakeDocs] = React.useState<PendingIntakeDoc[]>([]);
 
+  // Bug 3 tripwire: useUploadThing's headers are captured in a closure at first
+  // mount. If projectId changes WITHOUT a parent remount (missing key={projectId}),
+  // uploads will silently land on the original project. Loud-fail in dev so any
+  // future regression is caught immediately. See discovery report 2026-04-05.
+  const prevProjectIdRef = useRef(projectId);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && prevProjectIdRef.current !== projectId) {
+      console.error(
+        `[UploadStagingProvider] projectId changed from ${prevProjectIdRef.current} to ${projectId} ` +
+        `without remount. This indicates a missing key={projectId} on a parent. ` +
+        `Uploads WILL land on project ${prevProjectIdRef.current}, not ${projectId}.`
+      );
+    }
+    prevProjectIdRef.current = projectId;
+  }, [projectId]);
+
   const clearPendingIntakeDocs = useCallback(() => {
     setPendingIntakeDocs([]);
   }, []);
