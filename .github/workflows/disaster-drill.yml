@@ -70,7 +70,7 @@ jobs:
           CONNECTION_STRING=$(neonctl connection-string \
             --project-id "$NEON_PROJECT_ID" \
             --branch "${{ steps.create-branch.outputs.branch_name }}" \
-            --role landscape_app \
+            --role neondb_owner \
             --database land_v2 \
             --pooled)
 
@@ -144,9 +144,9 @@ EOF
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           RESTORE_BRANCH="restore-${TIMESTAMP}"
 
-          echo "🔄 Creating restore branch from main (pre-corruption)..."
+          echo "🔄 Creating restore branch from production (pre-corruption)..."
 
-          # Create new branch from main (simulates PITR)
+          # Create new branch from production (simulates PITR)
           RESTORE_RESPONSE=$(neonctl branches create \
             --project-id "$NEON_PROJECT_ID" \
             --name "$RESTORE_BRANCH" \
@@ -165,7 +165,7 @@ EOF
           RESTORE_CONNECTION=$(neonctl connection-string \
             --project-id "$NEON_PROJECT_ID" \
             --branch "${{ steps.restore.outputs.restore_name }}" \
-            --role landscape_app \
+            --role neondb_owner \
             --database land_v2 \
             --pooled)
 

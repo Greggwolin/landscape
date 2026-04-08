@@ -40,15 +40,19 @@ if [ -n "$EXISTING_BRANCH" ]; then
   echo "Using existing branch..."
   BRANCH_ID=$EXISTING_BRANCH
 else
-  # Create new branch from main
-  echo "📝 Creating branch $BRANCH_NAME from main..."
+  # Create new branch from production (Neon's default branch name)
+  echo "📝 Creating branch $BRANCH_NAME from production..."
   BRANCH_RESPONSE=$(neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$BRANCH_NAME" \
     --parent production \
     --output json)
 
-  BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id')
+  BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id // .branch.id // empty')
+  if [ -z "$BRANCH_ID" ]; then
+    echo "⚠️  WARNING: Could not extract branch ID from Neon response. Cleanup may fail."
+    echo "Raw response: $BRANCH_RESPONSE"
+  fi
   echo "✅ Branch created: $BRANCH_ID"
 fi
 
@@ -57,7 +61,7 @@ echo "🔗 Retrieving connection string..."
 CONNECTION_STRING=$(neonctl connection-string \
   --project-id "$NEON_PROJECT" \
   --branch "$BRANCH_NAME" \
-  --role landscape_app \
+  --role neondb_owner \
   --database land_v2 \
   --pooled)
 
