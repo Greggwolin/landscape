@@ -16,8 +16,10 @@
 'use client';
 
 import React, { Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CCard, CCardHeader, CCardBody, CToast, CToastBody, CToaster } from '@coreui/react';
+import { AppraisalLayout } from '@/components/appraisal/AppraisalLayout';
 import { usePendingRentRollExtractions } from '@/hooks/usePendingRentRollExtractions';
 import { useExtractionJobStatus } from '@/hooks/useExtractionJobStatus';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
@@ -58,6 +60,9 @@ const COLLAPSE_THRESHOLD = 100;
 const COLLAPSED_WIDTH = 64;
 
 function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientProps) {
+  const searchParams = useSearchParams();
+  const isAppraisalUI = searchParams.get('ui') === 'appraisal';
+
   const { projects, activeProject, isLoading } = useProjectContext();
 
   // Find current project from SWR-cached list
@@ -439,6 +444,16 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
       </div>
       </>
     );
+  }
+
+  // Appraisal conversational UI — activated via ?ui=appraisal.
+  // Bypasses the entire project chrome (ActiveProjectBar, FolderTabs,
+  // LandscaperPanel, resizable splitter) and renders AppraisalLayout
+  // directly. ProjectSummary → AppraisalProject shapes are structurally
+  // compatible at runtime; the cast mirrors page.tsx:121.
+  if (isAppraisalUI) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return <AppraisalLayout project={currentProject as any} />;
   }
 
   return (

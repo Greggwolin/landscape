@@ -11,8 +11,8 @@
 .appraisal-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
   background: var(--cui-body-bg);
   color: var(--cui-body-color);
 }
@@ -22,6 +22,7 @@
   display: flex;
   min-height: 0;
   position: relative;
+  /* Provides positioning context for .appraisal-center.docked */
 }
 
 /* ===== TOPBAR ===== */
@@ -185,7 +186,7 @@
 /* ===== LEFT PANEL ===== */
 
 .appraisal-left {
-  width: 220px;
+  /* Width is set inline from AppraisalLayout state (220–400px, default 220) */
   background: var(--cui-secondary-bg);
   border-right: 1px solid var(--cui-border-color);
   display: flex;
@@ -193,7 +194,19 @@
   flex-shrink: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width 0.2s ease;
+  position: relative;
+}
+
+/* Right-edge drag handle for left panel width resize */
+.appraisal-layout .appraisal-left-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 5;
+  background: transparent;
 }
 
 .appraisal-left.collapsed {
@@ -347,6 +360,86 @@
   flex-direction: column;
   min-width: 0;
   background: var(--cui-body-bg);
+}
+
+/* ===== CENTER — DOCKED MODE (detail view) =====
+ * In detail mode, .appraisal-center repositions via absolute positioning
+ * to a bottom strip inside .appraisal-body. The React instance is preserved
+ * across the summary ↔ detail transition so threads, scroll, and draft
+ * input state survive the toggle. The `left` and `height` values are set
+ * inline from AppraisalLayout state (left panel width, dock height).
+ */
+.appraisal-layout .appraisal-center.docked {
+  position: absolute;
+  right: 48px; /* icon rail width */
+  bottom: 0;
+  flex: none;
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+  z-index: 10;
+  min-height: 48px;
+  max-height: 500px;
+}
+
+/* Collapsed docked chat — only the Landscaper header band shows */
+.appraisal-layout .appraisal-center.docked.collapsed {
+  height: 48px !important;
+  overflow: hidden;
+}
+
+/* Top-edge drag handle for docked chat height resize */
+.appraisal-layout .appraisal-chat-dock-resize {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appraisal-layout .appraisal-chat-dock-resize-bar {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cui-body-color) 12%, transparent);
+  transition: background 0.15s;
+}
+
+.appraisal-layout .appraisal-chat-dock-resize:hover .appraisal-chat-dock-resize-bar {
+  background: color-mix(in srgb, var(--cui-body-color) 30%, transparent);
+}
+
+/* Collapse chevron — top-right overlay inside docked chat */
+.appraisal-layout .appraisal-chat-dock-toggle {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  z-index: 12;
+}
+
+.appraisal-layout .appraisal-chat-dock-toggle:hover {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+}
+
+/* Dark-mode background override for docked mode */
+[data-coreui-theme="dark"] .appraisal-center.docked {
+  background: color-mix(in srgb, var(--cui-secondary-bg) 85%, black);
 }
 
 .appraisal-chat-header {
@@ -1937,4 +2030,525 @@ body.resizing * {
 .econ-narrative-link:hover {
   border-color: color-mix(in srgb, var(--cui-primary) 50%, transparent);
   background: color-mix(in srgb, var(--cui-primary) 4%, transparent);
+}
+
+/* ============================================================
+ * LEFT PANEL — v4 additions (Client/Jobs section variants)
+ * ============================================================ */
+
+.appraisal-ls-item.stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  cursor: default;
+}
+
+.appraisal-ls-stacked-primary {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+}
+
+.appraisal-ls-stacked-secondary {
+  font-size: 10px;
+  color: var(--cui-tertiary-color);
+}
+
+.appraisal-ls-label-chevron {
+  font-size: 12px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+/* ============================================================
+ * STUDIO — Detail view button (v4)
+ * ============================================================ */
+
+.appraisal-layout .appraisal-detail-btn-wrap {
+  padding: 4px 14px 6px;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-detail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.appraisal-layout .appraisal-detail-btn:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+  color: var(--cui-primary);
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
+}
+
+/* ============================================================
+ * DETAIL CONTENT AREA — full-width detail mode (v4)
+ * ============================================================ */
+
+.appraisal-layout .appraisal-detail-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--cui-body-bg);
+}
+
+/* Detail pill nav (top of detail area) */
+.appraisal-layout .appraisal-det-pills {
+  display: flex;
+  gap: 4px;
+  padding: 10px 20px 8px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-det-pill {
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cui-border-color);
+  color: var(--cui-tertiary-color);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.appraisal-layout .appraisal-det-pill:hover {
+  border-color: color-mix(in srgb, var(--cui-body-color) 25%, transparent);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-layout .appraisal-det-pill.active {
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--cui-primary) 30%, transparent);
+  color: var(--cui-primary);
+  font-weight: 500;
+}
+
+/* Detail header */
+.appraisal-layout .appraisal-det-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--cui-border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-det-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.appraisal-layout .appraisal-det-meta {
+  font-size: 12px;
+  color: var(--cui-tertiary-color);
+  margin-left: auto;
+}
+
+.appraisal-layout .appraisal-summary-btn {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.appraisal-layout .appraisal-summary-btn:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+  color: var(--cui-primary);
+  background: color-mix(in srgb, var(--cui-primary) 6%, transparent);
+}
+
+/* Detail toolbar */
+.appraisal-layout .appraisal-det-toolbar {
+  padding: 10px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 60%, transparent);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-det-tool-btn {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.appraisal-layout .appraisal-det-tool-btn:hover {
+  border-color: color-mix(in srgb, var(--cui-primary) 40%, transparent);
+  color: var(--cui-primary);
+}
+
+.appraisal-layout .appraisal-det-search {
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--cui-border-color);
+  background: transparent;
+  color: var(--cui-body-color);
+  outline: none;
+  margin-left: auto;
+  width: 220px;
+}
+
+/* Detail body (scrollable content area) */
+.appraisal-layout .appraisal-det-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  min-height: 0;
+}
+
+.appraisal-layout .appraisal-det-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--cui-tertiary-color);
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.appraisal-layout .appraisal-det-empty p {
+  margin: 4px 0;
+}
+
+/* Detail body table */
+.appraisal-layout .appraisal-det-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.appraisal-layout .appraisal-det-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cui-tertiary-color);
+  font-weight: 500;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--cui-border-color);
+  position: sticky;
+  top: 0;
+  background: var(--cui-secondary-bg);
+  white-space: normal;
+  z-index: 1;
+}
+
+.appraisal-layout .appraisal-det-table th.r {
+  text-align: right;
+}
+
+.appraisal-layout .appraisal-det-table td {
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--cui-border-color) 40%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.appraisal-layout .appraisal-det-table td.r {
+  text-align: right;
+}
+
+.appraisal-layout .appraisal-det-table td.neg {
+  color: var(--cui-danger);
+}
+
+.appraisal-layout .appraisal-det-table td.pos {
+  color: var(--cui-success);
+}
+
+.appraisal-layout .appraisal-det-table td.muted {
+  color: var(--cui-tertiary-color);
+}
+
+.appraisal-layout .appraisal-det-table tr:hover td {
+  background: var(--cui-tertiary-bg);
+}
+
+.appraisal-layout .appraisal-det-table tr.subtotal td,
+.appraisal-layout .appraisal-det-table tr.total td {
+  border-top: 1px solid var(--cui-border-color);
+  font-weight: 600;
+  color: var(--cui-body-color);
+  background: var(--cui-secondary-bg);
+}
+
+.appraisal-layout .appraisal-det-status {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.appraisal-layout .appraisal-det-status.occupied {
+  background: color-mix(in srgb, var(--cui-success) 12%, transparent);
+  color: var(--cui-success);
+}
+
+.appraisal-layout .appraisal-det-status.vacant {
+  background: color-mix(in srgb, var(--cui-danger) 12%, transparent);
+  color: var(--cui-danger);
+}
+
+/* ============================================================
+ * DOCKED CHAT — bottom of detail content area (v4)
+ * ============================================================ */
+
+.appraisal-layout .appraisal-docked-chat {
+  border-top: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+  min-height: 48px;
+  max-height: 500px;
+}
+
+.appraisal-layout .appraisal-docked-chat.collapsed {
+  height: 48px !important;
+}
+
+.appraisal-layout .appraisal-dock-resize {
+  height: 6px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-dock-resize-bar {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cui-body-color) 12%, transparent);
+  transition: background 0.15s;
+}
+
+.appraisal-layout .appraisal-dock-resize:hover .appraisal-dock-resize-bar {
+  background: color-mix(in srgb, var(--cui-body-color) 30%, transparent);
+}
+
+.appraisal-layout .appraisal-dock-header {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 34px;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.appraisal-layout .appraisal-dock-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cui-primary);
+}
+
+.appraisal-layout .appraisal-dock-title {
+  font-size: 13px;
+  color: var(--cui-secondary-color);
+  font-weight: 500;
+  flex: 1;
+}
+
+.appraisal-layout .appraisal-dock-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.appraisal-layout .appraisal-dock-toggle:hover {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-layout .appraisal-dock-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 12px;
+  min-height: 0;
+}
+
+.appraisal-layout .appraisal-dock-msg {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 3px 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.appraisal-layout .appraisal-dock-role {
+  font-weight: 600;
+  color: var(--cui-tertiary-color);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-dock-msg.user .appraisal-dock-role {
+  color: var(--cui-primary);
+}
+
+.appraisal-layout .appraisal-dock-text {
+  color: var(--cui-secondary-color);
+  flex: 1;
+}
+
+.appraisal-layout .appraisal-dock-input-wrap {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px 8px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-dock-input {
+  flex: 1;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--cui-tertiary-bg);
+  font-size: 13px;
+  color: var(--cui-body-color);
+  outline: none;
+}
+
+.appraisal-layout .appraisal-dock-send {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: var(--cui-primary);
+  color: var(--cui-white, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  border: none;
+}
+
+/* ============================================================
+ * ICON RAIL — 48px right edge, detail mode only (v4)
+ * ============================================================ */
+
+.appraisal-layout .appraisal-icon-rail {
+  width: 48px;
+  background: var(--cui-secondary-bg);
+  border-left: 1px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.appraisal-layout .appraisal-rail-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--cui-tertiary-color);
+  cursor: pointer;
+  transition: all 0.12s;
+  position: relative;
+  background: transparent;
+  border: none;
+}
+
+.appraisal-layout .appraisal-rail-icon:hover {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+}
+
+.appraisal-layout .appraisal-rail-icon.active {
+  background: color-mix(in srgb, var(--cui-primary) 15%, transparent);
+  color: var(--cui-primary);
+}
+
+.appraisal-layout .appraisal-rail-tip {
+  position: absolute;
+  right: 48px;
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-secondary-color);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  border: 1px solid var(--cui-border-color);
+  z-index: 50;
+}
+
+.appraisal-layout .appraisal-rail-icon:hover .appraisal-rail-tip {
+  opacity: 1;
+}
+
+.appraisal-layout .appraisal-rail-divider {
+  width: 24px;
+  height: 1px;
+  background: color-mix(in srgb, var(--cui-body-color) 8%, transparent);
+  margin: 4px 0;
+}
+
+/* ============================================================
+ * DARK MODE OVERRIDES for detail mode + docked chat + icon rail
+ * ============================================================ */
+
+[data-coreui-theme="dark"] .appraisal-detail-content-area,
+[data-coreui-theme="dark"] .appraisal-docked-chat,
+[data-coreui-theme="dark"] .appraisal-icon-rail {
+  background: color-mix(in srgb, var(--cui-secondary-bg) 85%, black);
+}
+
+[data-coreui-theme="dark"] .appraisal-det-table th {
+  background: color-mix(in srgb, var(--cui-secondary-bg) 85%, black);
+}
+
+[data-coreui-theme="dark"] .appraisal-det-table tr.subtotal td,
+[data-coreui-theme="dark"] .appraisal-det-table tr.total td {
+  background: color-mix(in srgb, var(--cui-secondary-bg) 85%, black);
 }

@@ -30,6 +30,7 @@ interface AppraisalLayoutProps {
 export function AppraisalLayout({ project }: AppraisalLayoutProps) {
   // Layout state
   const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(220);
 
   // Approach navigation state
   const [activeApproach, setActiveApproach] = useState<ApproachId>('income');
@@ -45,10 +46,16 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
     return defaults;
   });
 
-  // Detail panel state
+  // Detail panel state (existing overlay-drawer pattern — unchanged)
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState<DetailId | string>('generic');
   const [detailLabel, setDetailLabel] = useState('Line Item Detail');
+
+  // Detail mode state (new full-width content area, replaces chat + Studio)
+  const [detailMode, setDetailMode] = useState(false);
+  const [activeDetailPill, setActiveDetailPill] = useState<string | null>(null);
+  const [dockedChatHeight, setDockedChatHeight] = useState(200);
+  const [dockedChatCollapsed, setDockedChatCollapsed] = useState(false);
 
   // Bottom section state
   const [bottomView, setBottomView] = useState<BottomView>('reports');
@@ -58,6 +65,10 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
     setLeftCollapsed((prev) => !prev);
   }, []);
 
+  const handleLeftWidthChange = useCallback((w: number) => {
+    setLeftWidth(Math.max(220, Math.min(400, w)));
+  }, []);
+
   const handleApproachChange = useCallback((id: ApproachId) => {
     setActiveApproach(id);
     // Reset to default pill for the new approach
@@ -65,6 +76,9 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
     if (pillSet) {
       setActivePills((prev) => ({ ...prev, [id]: pillSet.defaultPill }));
     }
+    // Auto-exit detail mode on approach change (per spec — sticky mode is post-alpha)
+    setDetailMode(false);
+    setActiveDetailPill(null);
   }, []);
 
   const handlePillChange = useCallback(
@@ -82,6 +96,34 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
 
   const handleCloseDetail = useCallback(() => {
     setDetailOpen(false);
+  }, []);
+
+  // Detail mode handlers
+  const handleEnterDetailMode = useCallback((pillId: string) => {
+    setActiveDetailPill(pillId);
+    setDetailMode(true);
+  }, []);
+
+  const handleExitDetailMode = useCallback(() => {
+    setDetailMode(false);
+    setActiveDetailPill(null);
+  }, []);
+
+  const handleDetailPillChange = useCallback((pillId: string) => {
+    setActiveDetailPill(pillId);
+  }, []);
+
+  const handleDockedChatHeightChange = useCallback((h: number) => {
+    setDockedChatHeight(h);
+    setDockedChatCollapsed(h <= 48);
+  }, []);
+
+  const handleDockedChatToggle = useCallback(() => {
+    setDockedChatCollapsed((prev) => {
+      const next = !prev;
+      setDockedChatHeight(next ? 48 : 200);
+      return next;
+    });
   }, []);
 
   const handleBottomViewChange = useCallback((view: BottomView) => {
@@ -107,10 +149,18 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
           projectId={project.project_id}
           projectName={project.project_name || 'Untitled Project'}
           collapsed={leftCollapsed}
+          width={leftWidth}
+          onWidthChange={handleLeftWidthChange}
         />
         <AppraisalChatPanel
           projectId={project.project_id}
           activeApproach={activeApproach}
+          detailMode={detailMode}
+          leftWidth={leftWidth}
+          dockedChatHeight={dockedChatHeight}
+          dockedChatCollapsed={dockedChatCollapsed}
+          onDockedChatHeightChange={handleDockedChatHeightChange}
+          onDockedChatToggle={handleDockedChatToggle}
         />
         <AppraisalRightPanel
           activeApproach={activeApproach}
@@ -124,6 +174,13 @@ export function AppraisalLayout({ project }: AppraisalLayoutProps) {
           bottomView={bottomView}
           onBottomViewChange={handleBottomViewChange}
           onBottomViewReset={handleBottomViewReset}
+          detailMode={detailMode}
+          activeDetailPill={activeDetailPill}
+          onEnterDetailMode={handleEnterDetailMode}
+          onExitDetailMode={handleExitDetailMode}
+          onDetailPillChange={handleDetailPillChange}
+          dockedChatHeight={dockedChatHeight}
+          dockedChatCollapsed={dockedChatCollapsed}
         />
       </div>
     </div>
