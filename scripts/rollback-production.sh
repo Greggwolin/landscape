@@ -87,7 +87,7 @@ else
   neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$ROLLBACK_BRANCH" \
-    --parent main
+    --parent production
 
   echo "⚠️  Manual PITR required - Neon CLI doesn't support timestamp directly"
   echo "Use Neon Console to create branch at timestamp: $RESTORE_POINT"

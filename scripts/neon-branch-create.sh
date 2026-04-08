@@ -45,7 +45,7 @@ else
   BRANCH_RESPONSE=$(neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$BRANCH_NAME" \
-    --parent main \
+    --parent production \
     --output json)
 
   BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id')

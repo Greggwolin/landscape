@@ -91,7 +91,7 @@ jobs:
           SNAPSHOT_RESPONSE=$(neonctl branches create \
             --project-id "$NEON_PROJECT_ID" \
             --name "$SNAPSHOT_NAME" \
-            --parent main \
+            --parent production \
             --output json)
 
           SNAPSHOT_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.id')
