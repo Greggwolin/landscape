@@ -465,7 +465,7 @@ The Ingestion Workbench is a fully implemented split-panel modal replacing Mappi
 4. User reviews fields → commits → DMS record created, fields written to project tables
 5. Cancel / X close → abandon endpoint called (bulk-reject staging rows, mark session abandoned) + UploadThing file deleted + `core_doc` soft-deleted
 
-**Field status model:** `accepted` (green) / `pending` (yellow) / `conflict` (orange) / `waiting` (gray) / `empty` (light gray)
+**Field status model (four-status, WIP):** Backend now classifies rows at read time into `new` / `match` / `conflict` / `pending`, replacing client-side `detectConflicts()`. Terminal statuses: `accepted` / `rejected`. New `existing_value` and `existing_source` fields on staging rows enable inline conflict resolution (choose extracted vs existing). New mutations: `resolveConflict`, `acceptAllMatches`, `acceptAllNew`.
 
 **Tile tabs:** Property-type-aware. Multifamily: Project / Property / Operations / Valuation / All. Land Dev: Project / Planning / Budget / Valuation / All. Each tab shows field count badge.
 
@@ -482,8 +482,11 @@ The Ingestion Workbench is a fully implemented split-panel modal replacing Mappi
 - `src/app/.../tabs/IngestionWorkbench.tsx` — main panel component
 - `src/app/.../IngestionWorkbenchPanel.tsx` — pass-through wrapper
 - `src/components/intelligence/IntakeChoiceModal.tsx` — entry point
-- `src/hooks/useExtractionStaging.ts` — staging data + mutations
-- `backend/apps/knowledge/views/workbench_views.py` — list, update, commit, abandon endpoints
+- `src/hooks/useExtractionStaging.ts` — staging data + mutations (four-status model, conflict resolution, bulk accept)
+- `src/components/ingestion/IngestionRightPanel.tsx` — refactored right panel (extraction summary + diff + field table)
+- `src/components/ingestion/ExtractionSummary.tsx` — extraction summary stats
+- `src/components/ingestion/ExtractionDiffPanel.tsx` — extracted vs existing diff view
+- `backend/apps/knowledge/views/workbench_views.py` — list, update, commit, abandon, resolve endpoints
 - `backend/apps/landscaper/tools/ingestion_tools.py` — 5 ingestion tools (NEW)
 - `src/app/api/dms/documents/[id]/delete/route.ts` — UploadThing delete + core_doc soft-delete
 
@@ -805,7 +808,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-01 (nightly sync — Operations GET migrated to Django (+958 lines); new update_land_use_pricing Landscaper tool; map market layers (recent sales + competitors); extraction pipeline hardening (auto-trigger, image/Vision fallback); leveraged cash flow accounting borders + total column; thread race condition fix; S&U report refinement)*
+*Last updated: 2026-04-10 (nightly sync — Ingestion Workbench four-status model refactor (WIP): backend classification replaces client-side detectConflicts; new resolve/acceptAllMatches/acceptAllNew mutations; IngestionRightPanel + ExtractionSummary + ExtractionDiffPanel components; LandscaperChatThreaded setInputText imperative handle)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: 231*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*

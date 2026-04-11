@@ -18,25 +18,35 @@ export interface StagingRow {
   scope: string;
   extracted_value: unknown;
   confidence_score: number | null;
-  status: 'pending' | 'accepted' | 'applied' | 'rejected';
+  /** Four-status classification set by backend at read time */
+  status: 'new' | 'match' | 'pending' | 'conflict' | 'accepted' | 'applied' | 'rejected';
   source_label: string | null;
+  source_snippet: string | null;
   doc_id: number | null;
   source_page: number | null;
   created_at: string;
+  target_table: string | null;
+  target_field: string | null;
   conflict_with_extraction_id?: number | null;
-  /** Enriched conflict data: the existing DB value that this row conflicts with */
+  /** Existing DB value for this field (populated by backend classification) */
+  existing_value?: unknown;
+  /** Source of existing value: "manual", "ingestion", or null */
+  existing_source?: string | null;
+  /** @deprecated — replaced by existing_value in four-status model */
   conflict_existing?: {
     existing_value: unknown;
     existing_confidence: number | null;
     existing_source: string | null;
   } | null;
-  /** Internal UI enrichment (set by detectConflicts) */
-  _uiStatus?: 'conflict' | undefined;
   /** Folder ID assigned by scope→folder mapping (set by buildSections) */
   _folderId?: string;
 }
 
-export type FieldStatus = 'accepted' | 'pending' | 'conflict' | 'waiting' | 'empty';
+/** The four input statuses + terminal statuses */
+export type FieldStatus = 'new' | 'match' | 'pending' | 'conflict' | 'accepted' | 'rejected';
+
+/** Counts per status for section headers */
+export type StatusCounts = Record<FieldStatus, number>;
 
 export interface StagingSection {
   id: string;
@@ -44,7 +54,7 @@ export interface StagingSection {
   /** DB scopes that map to this section (used for commit/accept-all calls) */
   scopes: string[];
   rows: StagingRow[];
-  statusCounts: Record<FieldStatus, number>;
+  statusCounts: StatusCounts;
   authority: { source: string; color: string } | null;
 }
 
@@ -109,34 +119,8 @@ const UNMAPPED_FOLDER_LABEL = 'Other';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function detectConflicts(rows: StagingRow[]): StagingRow[] {
-  const byKey = new Map<string, StagingRow[]>();
-  for (const row of rows) {
-    const key = row.field_key;
-    if (!byKey.has(key)) byKey.set(key, []);
-    byKey.get(key)!.push(row);
-  }
-
-  return rows.map(row => {
-    // Honor backend conflict detection (conflict_with_extraction_id set by extraction_service)
-    if (row.conflict_with_extraction_id) {
-      return { ...row, _uiStatus: 'conflict' as const };
-    }
-    // Also check DB status for rows already marked as conflict
-    if (row.status === 'conflict') {
-      return { ...row, _uiStatus: 'conflict' as const };
-    }
-    const group = byKey.get(row.field_key) || [];
-    const pendingInGroup = group.filter(r => r.status === 'pending');
-    if (pendingInGroup.length >= 2) {
-      const values = new Set(pendingInGroup.map(r => JSON.stringify(r.extracted_value)));
-      if (values.size >= 2) {
-        return { ...row, _uiStatus: 'conflict' as const };
-      }
-    }
-    return row;
-  });
-}
+// detectConflicts() removed — backend now classifies rows into
+// new/match/pending/conflict at read time (four-status model).
 
 function computeAuthority(rows: StagingRow[]): { source: string; color: string } | null {
   const sourceCounts = new Map<string, number>();
@@ -183,7 +167,7 @@ function buildSections(
   folders: FolderTab[],
   isLandDev: boolean,
 ): StagingSection[] {
-  const enriched = detectConflicts(rows);
+  // Backend now classifies rows — no client-side detectConflicts() needed
   const activeFolderIds = new Set(folders.map(f => f.id));
 
   // Only include folders that could contain extractable data
@@ -192,7 +176,7 @@ function buildSections(
 
   // Group rows by folder ID
   const grouped = new Map<string, { rows: StagingRow[]; scopes: Set<string> }>();
-  for (const row of enriched) {
+  for (const row of rows) {
     if (row.status === 'rejected') continue;
     const folderId = scopeToFolderId(row.scope || '', activeFolderIds, isLandDev);
     if (!grouped.has(folderId)) grouped.set(folderId, { rows: [], scopes: new Set() });
@@ -209,16 +193,15 @@ function buildSections(
     const group = grouped.get(folder.id);
     if (!group || group.rows.length === 0) continue;
 
-    const statusCounts: Record<FieldStatus, number> = {
-      accepted: 0, pending: 0, conflict: 0, waiting: 0, empty: 0,
+    const statusCounts: StatusCounts = {
+      new: 0, match: 0, pending: 0, conflict: 0, accepted: 0, rejected: 0,
     };
     for (const row of group.rows) {
-      if (row._uiStatus === 'conflict') {
-        statusCounts.conflict++;
-      } else if (row.status === 'accepted' || row.status === 'applied') {
+      const s = row.status;
+      if (s === 'applied') {
         statusCounts.accepted++;
-      } else if (row.status === 'pending') {
-        statusCounts.pending++;
+      } else if (s in statusCounts) {
+        statusCounts[s as FieldStatus]++;
       }
     }
 
@@ -235,16 +218,15 @@ function buildSections(
   // Append "Other" catch-all for unmapped scopes
   const otherGroup = grouped.get(UNMAPPED_FOLDER_ID);
   if (otherGroup && otherGroup.rows.length > 0) {
-    const statusCounts: Record<FieldStatus, number> = {
-      accepted: 0, pending: 0, conflict: 0, waiting: 0, empty: 0,
+    const statusCounts: StatusCounts = {
+      new: 0, match: 0, pending: 0, conflict: 0, accepted: 0, rejected: 0,
     };
     for (const row of otherGroup.rows) {
-      if (row._uiStatus === 'conflict') {
-        statusCounts.conflict++;
-      } else if (row.status === 'accepted' || row.status === 'applied') {
+      const s = row.status;
+      if (s === 'applied') {
         statusCounts.accepted++;
-      } else if (row.status === 'pending') {
-        statusCounts.pending++;
+      } else if (s in statusCounts) {
+        statusCounts[s as FieldStatus]++;
       }
     }
 
@@ -506,6 +488,70 @@ export function useExtractionStaging(
     },
   });
 
+  /**
+   * Resolve a conflict — choose extracted value ("extracted") or keep existing ("existing").
+   * Backend endpoint: POST .../extraction-staging/{id}/resolve/
+   */
+  const resolveConflict = useMutation({
+    mutationFn: async ({ extractionId, choice }: { extractionId: number; choice: 'extracted' | 'existing' }) => {
+      const res = await fetch(
+        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/${extractionId}/resolve/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choice }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to resolve conflict');
+      return res.json();
+    },
+    onMutate: ({ extractionId, choice }) => {
+      // Optimistic: mark as accepted (chose extracted) or rejected (kept existing)
+      optimisticUpdate(extractionId, choice === 'extracted' ? 'accepted' : 'rejected');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  /** Bulk-accept all rows with status='match' (optionally scoped) */
+  const acceptAllMatches = useMutation({
+    mutationFn: async (scopes?: string[]) => {
+      const res = await fetch(
+        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/accept-all-matches/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: scopes ? JSON.stringify({ scopes }) : '{}',
+        },
+      );
+      if (!res.ok) throw new Error('Failed to accept all matches');
+      return res.json();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  /** Bulk-accept all rows with status='new' (optionally scoped) */
+  const acceptAllNew = useMutation({
+    mutationFn: async (scopes?: string[]) => {
+      const res = await fetch(
+        `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/accept-all-new/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: scopes ? JSON.stringify({ scopes }) : '{}',
+        },
+      );
+      if (!res.ok) throw new Error('Failed to accept all new');
+      return res.json();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   /** Abandon session — bulk-reject pending rows and mark intake session abandoned */
   const abandonSession = useMutation({
     mutationFn: async (params: { docId?: number | null; intakeUuid?: string | null }) => {
@@ -545,7 +591,10 @@ export function useExtractionStaging(
     // Mutations
     approveField: approveField.mutate,
     rejectField: rejectField.mutate,
+    resolveConflict: resolveConflict.mutate,
     acceptAllPending: acceptAllPending.mutate,
+    acceptAllMatches: acceptAllMatches.mutate,
+    acceptAllNew: acceptAllNew.mutate,
     commitSection: commitSection.mutateAsync,
     commitAllAccepted: commitAllAccepted.mutateAsync,
     updateFieldValue: updateFieldValue.mutate,
@@ -553,6 +602,7 @@ export function useExtractionStaging(
     // Loading states
     isApproving: approveField.isPending,
     isRejecting: rejectField.isPending,
+    isResolving: resolveConflict.isPending,
     isCommitting: commitAllAccepted.isPending || commitSection.isPending,
     isCommitSuccess: commitAllAccepted.isSuccess,
     commitError: commitAllAccepted.error || commitSection.error,

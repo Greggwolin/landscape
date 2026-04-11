@@ -48,6 +48,8 @@ const DB_TABLE_TO_EVENT_TABLES: Record<string, string[]> = {
 
 export interface LandscaperChatHandle {
   sendMessage: (msg: string, options?: SendMessageOptions) => Promise<void>;
+  /** Pre-fill the chat input without sending — used by 💬 discuss buttons */
+  setInputText: (text: string) => void;
 }
 
 interface LandscaperChatThreadedProps {
@@ -305,8 +307,8 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   const { setIsThinking } = useLandscaperThinking();
   useEffect(() => { setIsThinking(isLoading); }, [isLoading, setIsThinking]);
 
-  // Expose sendMessage to parent via imperative handle (for programmatic chat injection)
-  useImperativeHandle(ref, () => ({ sendMessage }), [sendMessage]);
+  // Expose sendMessage and setInputText to parent via imperative handle
+  useImperativeHandle(ref, () => ({ sendMessage, setInputText: setInput }), [sendMessage, setInput]);
 
   // Collision handling via context
   const { pendingCollision, setOnCollisionResolved } = useLandscaperCollision();
