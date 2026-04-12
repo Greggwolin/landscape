@@ -1,5 +1,5 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-04-10
+**Last Updated:** 2026-04-11
 **Version:** 5.0
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening + Market Agent Fleet + DMS Filter Management)
 
@@ -9,16 +9,17 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Ingestion Workbench Four-Status Model (April 10, 2026)**
+### 🆕 **Latest Update: Ingestion Workbench Four-Status Model (April 10-11, 2026)**
 
-**Uncommitted WIP: Backend four-status classification, conflict resolution UI, bulk accept mutations, component extraction (7 files, +962/-445 lines)**
+**Committed `9642d2c`: Backend four-status classification, conflict resolution UI, bulk accept mutations, component extraction (15 files, +1800/-451 lines)**
 
-- ⏳ **Four-status classification model** — Backend classifies staging rows at read time: `new`/`match`/`conflict`/`pending`. Replaces client-side `detectConflicts()`. Eliminates phantom conflict bugs.
-- ⏳ **Conflict resolution UI** — Inline extracted-vs-existing display with click-to-resolve. New `resolveConflict` mutation.
-- ⏳ **Bulk accept mutations** — `acceptAllMatches` and `acceptAllNew` for efficient triage of non-conflicting fields.
-- ⏳ **Component extraction** — `IngestionRightPanel`, `ExtractionSummary`, `ExtractionDiffPanel` split out from monolithic workbench.
-- ⏳ **`setInputText` on LandscaperChatThreaded** — Imperative handle for pre-filling chat from conflict "discuss" buttons.
-- 📁 **See:** `docs/session-notes/2026-04-10-daily-sync.md`
+- ✅ **Four-status classification model** — Backend classifies staging rows at read time: `new`/`match`/`conflict`/`pending`. Replaces client-side `detectConflicts()`. Eliminates phantom conflict bugs.
+- ✅ **Conflict resolution UI** — Inline extracted-vs-existing display with click-to-resolve. New `resolveConflict` mutation.
+- ✅ **Bulk accept mutations** — `acceptAllMatches` and `acceptAllNew` for efficient triage of non-conflicting fields.
+- ✅ **Component extraction** — `IngestionRightPanel`, `ExtractionSummary`, `ExtractionDiffPanel` split out from monolithic workbench.
+- ✅ **`setInputText` on LandscaperChatThreaded** — Imperative handle for pre-filling chat from conflict "discuss" buttons.
+- ⚠️ **Backend endpoint verification pending** — `resolve`, `accept-all-matches`, `accept-all-new` routes need end-to-end testing.
+- 📁 **See:** `docs/session-notes/2026-04-11-daily-sync.md`
 
 ### Previous Update: v0.1.17 — Market Agent Fleet + DMS Filter Management + Ingestion Finish-Later (April 2-3, 2026)
 
