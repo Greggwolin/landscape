@@ -1,5 +1,5 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-04-12
 **Version:** 5.0
 **Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening + Market Agent Fleet + DMS Filter Management)
 
@@ -9,7 +9,20 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Ingestion Workbench Four-Status Model (April 10-11, 2026)**
+### 🆕 **Latest Update: Extraction Pipeline Hardening + Skills Library (April 12, 2026)**
+
+**Committed `b21788e`: Nightly health check, skills/reference library reorganization, excel model archive**
+**Uncommitted: Extraction writer hardening, JWT user tracking, workbench auth (7 files, +252/-84 lines)**
+
+- ✅ **Skills/reference library** — Excel model audit skill v2/v3 documented. 18+ Excel models consolidated under `skills/excel-models/`. Reference materials added (Appraisal of Real Estate 14th Ed, MIT AI Valuation, waterfall structures, build-to-rent white paper).
+- ⏳ **Double-encoded JSON fix** — `extraction_writer.py` now detects and parses double-encoded jsonb values before DB write. Fixes comp/unit scope extraction failures.
+- ⏳ **Null-like string coercion** — Values like `"null"`, `"none"`, `"n/a"` converted to actual `None` before write.
+- ⏳ **Acquisition scope upsert** — Changed from UPDATE-only to INSERT-or-UPDATE. New projects without seeded acquisition rows no longer fail silently.
+- ⏳ **JWT user tracking** — `ExtractionWriter` accepts `user_id`, passed to `FactService`/`EntitySyncService` for `created_by` audit trail. `workbench_views.py` extracts user via SimpleJWT.
+- ⚠️ **Backend endpoint verification still pending** — `resolve`, `accept-all-matches`, `accept-all-new` routes need end-to-end testing.
+- 📁 **See:** `docs/session-notes/2026-04-12-daily-sync.md`
+
+### Previous Update: Ingestion Workbench Four-Status Model (April 10-11, 2026)
 
 **Committed `9642d2c`: Backend four-status classification, conflict resolution UI, bulk accept mutations, component extraction (15 files, +1800/-451 lines)**
 
@@ -18,7 +31,6 @@ The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL ap
 - ✅ **Bulk accept mutations** — `acceptAllMatches` and `acceptAllNew` for efficient triage of non-conflicting fields.
 - ✅ **Component extraction** — `IngestionRightPanel`, `ExtractionSummary`, `ExtractionDiffPanel` split out from monolithic workbench.
 - ✅ **`setInputText` on LandscaperChatThreaded** — Imperative handle for pre-filling chat from conflict "discuss" buttons.
-- ⚠️ **Backend endpoint verification pending** — `resolve`, `accept-all-matches`, `accept-all-new` routes need end-to-end testing.
 - 📁 **See:** `docs/session-notes/2026-04-11-daily-sync.md`
 
 ### Previous Update: v0.1.17 — Market Agent Fleet + DMS Filter Management + Ingestion Finish-Later (April 2-3, 2026)

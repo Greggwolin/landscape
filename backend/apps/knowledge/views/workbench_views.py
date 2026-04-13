@@ -16,8 +16,27 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db import connection
 from django.core.cache import cache
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 logger = logging.getLogger(__name__)
+
+
+def _get_user_from_jwt(request):
+    """
+    Manually authenticate a raw Django request using SimpleJWT.
+    Returns the User instance if a valid Bearer token is present, else None.
+    DRF's authentication classes don't run on @csrf_exempt raw views,
+    so we invoke JWTAuthentication directly.
+    """
+    try:
+        auth_result = JWTAuthentication().authenticate(request)
+        if auth_result is not None:
+            user, token = auth_result
+            return user
+    except (InvalidToken, TokenError, Exception):
+        pass
+    return None
 
 
 def json_errors(view_fn):
@@ -1002,6 +1021,14 @@ def commit_staging(request, project_id: int):
     failed = 0
     errors = []
 
+    # Extract user_id once for entity/fact created_by tracking
+    _user_id = None
+    jwt_user = _get_user_from_jwt(request)
+    if jwt_user is not None:
+        _user_id = jwt_user.id
+    elif hasattr(request, 'user') and hasattr(request.user, 'id') and request.user.is_authenticated:
+        _user_id = request.user.id
+
     for row in rows:
         eid = row['extraction_id']
         field_key = row['field_key']
@@ -1016,6 +1043,7 @@ def commit_staging(request, project_id: int):
             writer = ExtractionWriter(
                 project_id=int(project_id),
                 property_type=prop_type,
+                user_id=_user_id,
             )
             success, message = writer.write_extraction(
                 extraction_id=eid,

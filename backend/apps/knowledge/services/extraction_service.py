@@ -3943,14 +3943,12 @@ RULES:
             try:
                 logger.info(f"Reading Excel/CSV file directly for doc {doc_id}")
 
-                # Download file
-                response = requests.get(storage_uri, timeout=60)
-                response.raise_for_status()
-
-                # Save to temp file
+                # Read file via Django storage (handles local disk + S3/R2)
+                from django.core.files.storage import default_storage
                 suffix = '.xlsx' if 'spreadsheet' in mime_type else '.csv'
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                    tmp.write(response.content)
+                    with default_storage.open(storage_uri, 'rb') as f:
+                        tmp.write(f.read())
                     tmp_path = tmp.name
 
                 try:
@@ -3988,22 +3986,29 @@ RULES:
         return None
 
     def _parse_excel_to_text(self, file_path: str) -> Optional[str]:
-        """Parse Excel file to text format for extraction."""
+        """Parse Excel file to text format for extraction.
+
+        Reads ALL sheets (not just the active one) so multi-tab offering
+        memos with Property Summary, Unit Mix, T-12, Rent Roll, etc.
+        are fully captured.  Matches the pattern in text_extraction.py.
+        """
         try:
             from openpyxl import load_workbook
 
             wb = load_workbook(file_path, read_only=True, data_only=True)
-            sheet = wb.active
 
-            lines = []
-            for row in sheet.iter_rows(values_only=True):
-                # Convert row to tab-separated string
-                row_vals = [str(cell) if cell is not None else '' for cell in row]
-                if any(v.strip() for v in row_vals):  # Skip empty rows
-                    lines.append('\t'.join(row_vals))
+            all_lines = []
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+                all_lines.append(f"=== Sheet: {sheet_name} ===")
+
+                for row in sheet.iter_rows(values_only=True):
+                    row_vals = [str(cell) if cell is not None else '' for cell in row]
+                    if any(v.strip() for v in row_vals):  # Skip empty rows
+                        all_lines.append('\t'.join(row_vals))
 
             wb.close()
-            return '\n'.join(lines)
+            return '\n'.join(all_lines)
 
         except Exception as e:
             logger.error(f"Error parsing Excel: {e}")

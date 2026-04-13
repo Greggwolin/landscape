@@ -1,0 +1,1222 @@
+{
+  "batch": "QP_BATCH_002",
+  "project_id": 768,
+  "timestamp": "2026-04-12T15:43:31.396929",
+  "upload": {
+    "total": 118,
+    "uploaded": 118,
+    "collisions": 118,
+    "errors": []
+  },
+  "extraction": {
+    "triggered": 118,
+    "errors": []
+  },
+  "accept": {
+    "success": true,
+    "updated": 329
+  },
+  "commit": {
+    "success": true,
+    "committed": 319,
+    "failed": 10,
+    "errors": [
+      {
+        "extraction_id": 9481,
+        "field_key": "population_1mi",
+        "error": "Write failed: invalid input syntax for type integer: \"null\"\nLINE 3:                 SET population_1mi = 'null', updated_at = NO...\n                                             ^\n"
+      },
+      {
+        "extraction_id": 9486,
+        "field_key": "population_3mi",
+        "error": "Write failed: invalid input syntax for type integer: \"null\"\nLINE 3:                 SET population_3mi = 'null', updated_at = NO...\n                                             ^\n"
+      },
+      {
+        "extraction_id": 9492,
+        "field_key": "population_5mi",
+        "error": "Write failed: invalid input syntax for type integer: \"null\"\nLINE 3:                 SET population_5mi = 'null', updated_at = NO...\n                                             ^\n"
+      },
+      {
+        "extraction_id": 9499,
+        "field_key": "median_hh_income_1mi",
+        "error": "Write failed: invalid input syntax for type numeric: \"null\"\nLINE 3:                 SET median_hh_income_1mi = 'null', updated_a...\n                                                   ^\n"
+      },
+      {
+        "extraction_id": 9507,
+        "field_key": "median_hh_income_3mi",
+        "error": "Write failed: invalid input syntax for type numeric: \"null\"\nLINE 3:                 SET median_hh_income_3mi = 'null', updated_a...\n                                                   ^\n"
+      },
+      {
+        "extraction_id": 9513,
+        "field_key": "avg_hh_income_5mi",
+        "error": "Write failed: invalid input syntax for type numeric: \"null\"\nLINE 3:                 SET avg_hh_income_5mi = 'null', updated_at =...\n                                                ^\n"
+      },
+      {
+        "extraction_id": 9520,
+        "field_key": "employment_5mi",
+        "error": "Write failed: invalid input syntax for type integer: \"null\"\nLINE 3:                 SET employment_5mi = 'null', updated_at = NO...\n                                             ^\n"
+      },
+      {
+        "extraction_id": 9527,
+        "field_key": "submarket_vacancy",
+        "error": "Write failed: invalid input syntax for type numeric: \"null\"\nLINE 3:                 SET submarket_vacancy = 'null', updated_at =...\n                                                ^\n"
+      },
+      {
+        "extraction_id": 9531,
+        "field_key": "submarket_rent_growth",
+        "error": "Write failed: invalid input syntax for type numeric: \"null\"\nLINE 3:                 SET submarket_rent_growth = 'null', updated_...\n                                                    ^\n"
+      },
+      {
+        "extraction_id": 9542,
+        "field_key": "new_supply_pipeline",
+        "error": "Write failed: invalid input syntax for type integer: \"null\"\nLINE 3:                 SET new_supply_pipeline = 'null', updated_at...\n                                                  ^\n"
+      }
+    ]
+  },
+  "doc_map": {
+    "OM_PROP-0006_Heights_Sage.xlsx": {
+      "doc_id": 602,
+      "collision": true,
+      "properties": [
+        "PROP-0006"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0018_Avion_Palms_by_the_Lake.xlsx": {
+      "doc_id": 603,
+      "collision": true,
+      "properties": [
+        "PROP-0018"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0021_Heights_Modera_at_the_District.xlsx": {
+      "doc_id": 604,
+      "collision": true,
+      "properties": [
+        "PROP-0021"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0023_Montage_Park_at_the_District.xlsx": {
+      "doc_id": 605,
+      "collision": true,
+      "properties": [
+        "PROP-0023"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0025_Encore_Sonoma.xlsx": {
+      "doc_id": 606,
+      "collision": true,
+      "properties": [
+        "PROP-0025"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0027_Residences_Circa.xlsx": {
+      "doc_id": 607,
+      "collision": true,
+      "properties": [
+        "PROP-0027"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0030_Park_Onyx.xlsx": {
+      "doc_id": 608,
+      "collision": true,
+      "properties": [
+        "PROP-0030"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0036_Haven_Onyx.xlsx": {
+      "doc_id": 609,
+      "collision": true,
+      "properties": [
+        "PROP-0036"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0038_Park_Novel.xlsx": {
+      "doc_id": 610,
+      "collision": true,
+      "properties": [
+        "PROP-0038"
+      ],
+      "type": "offering_memo",
+      "metro": "PHX"
+    },
+    "OM_PROP-0044_Azure_Broadstone.xlsx": {
+      "doc_id": 611,
+      "collision": true,
+      "properties": [
+        "PROP-0044"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0048_Heights_Place.xlsx": {
+      "doc_id": 612,
+      "collision": true,
+      "properties": [
+        "PROP-0048"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0053_Summit_Sage_on_Camelback.xlsx": {
+      "doc_id": 613,
+      "collision": true,
+      "properties": [
+        "PROP-0053"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0054_Residences_Stone_on_Central.xlsx": {
+      "doc_id": 614,
+      "collision": true,
+      "properties": [
+        "PROP-0054"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0055_Vista_Flats_at_Midtown.xlsx": {
+      "doc_id": 615,
+      "collision": true,
+      "properties": [
+        "PROP-0055"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0070_Crossing_Gardens_at_Midtown.xlsx": {
+      "doc_id": 616,
+      "collision": true,
+      "properties": [
+        "PROP-0070"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0072_Desert_Alexan_on_the_Park.xlsx": {
+      "doc_id": 617,
+      "collision": true,
+      "properties": [
+        "PROP-0072"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0075_Canyon_Creek.xlsx": {
+      "doc_id": 618,
+      "collision": true,
+      "properties": [
+        "PROP-0075"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0079_Camden_Elan.xlsx": {
+      "doc_id": 619,
+      "collision": true,
+      "properties": [
+        "PROP-0079"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0095_Soleil_Sonoma.xlsx": {
+      "doc_id": 620,
+      "collision": true,
+      "properties": [
+        "PROP-0095"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0097_Desert_Aria.xlsx": {
+      "doc_id": 621,
+      "collision": true,
+      "properties": [
+        "PROP-0097"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0099_Pointe_Alexan_at_Midtown.xlsx": {
+      "doc_id": 622,
+      "collision": true,
+      "properties": [
+        "PROP-0099"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0105_Park_Springs_at_Kierland.xlsx": {
+      "doc_id": 623,
+      "collision": true,
+      "properties": [
+        "PROP-0105"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0113_MAA_Grove_on_the_Park.xlsx": {
+      "doc_id": 624,
+      "collision": true,
+      "properties": [
+        "PROP-0113"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0115_Liv_Palms.xlsx": {
+      "doc_id": 625,
+      "collision": true,
+      "properties": [
+        "PROP-0115"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0117_Station_Catalina_on_Main.xlsx": {
+      "doc_id": 626,
+      "collision": true,
+      "properties": [
+        "PROP-0117"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0124_Station_Sage_at_Midtown.xlsx": {
+      "doc_id": 627,
+      "collision": true,
+      "properties": [
+        "PROP-0124"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0134_Camden_Locale.xlsx": {
+      "doc_id": 628,
+      "collision": true,
+      "properties": [
+        "PROP-0134"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0135_Villas_Moderna_at_Scottsdale.xlsx": {
+      "doc_id": 629,
+      "collision": true,
+      "properties": [
+        "PROP-0135"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0136_Crossing_Stone.xlsx": {
+      "doc_id": 630,
+      "collision": true,
+      "properties": [
+        "PROP-0136"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0138_MAA_Catalina_at_Midtown.xlsx": {
+      "doc_id": 631,
+      "collision": true,
+      "properties": [
+        "PROP-0138"
+      ],
+      "type": "offering_memo",
+      "metro": "LA"
+    },
+    "OM_PROP-0141_Montage_Oaks.xlsx": {
+      "doc_id": 632,
+      "collision": true,
+      "properties": [
+        "PROP-0141"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0148_Soleil_Novel_at_Kierland.xlsx": {
+      "doc_id": 633,
+      "collision": true,
+      "properties": [
+        "PROP-0148"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0155_Haven_Lumen_by_the_Lake.xlsx": {
+      "doc_id": 634,
+      "collision": true,
+      "properties": [
+        "PROP-0155"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0157_Lofts_Catalina_at_Midtown.xlsx": {
+      "doc_id": 635,
+      "collision": true,
+      "properties": [
+        "PROP-0157"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0161_Lofts_Ascent_on_Central.xlsx": {
+      "doc_id": 636,
+      "collision": true,
+      "properties": [
+        "PROP-0161"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0162_Terraces_Crest_on_Central.xlsx": {
+      "doc_id": 637,
+      "collision": true,
+      "properties": [
+        "PROP-0162"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0164_Broadstone_Aria_at_Scottsdale.xlsx": {
+      "doc_id": 638,
+      "collision": true,
+      "properties": [
+        "PROP-0164"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0168_Canyon_Walk_at_Scottsdale.xlsx": {
+      "doc_id": 639,
+      "collision": true,
+      "properties": [
+        "PROP-0168"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0170_Pointe_Creek.xlsx": {
+      "doc_id": 640,
+      "collision": true,
+      "properties": [
+        "PROP-0170"
+      ],
+      "type": "offering_memo",
+      "metro": "AUS"
+    },
+    "OM_PROP-0171_MAA_Sonoma_on_Main.xlsx": {
+      "doc_id": 641,
+      "collision": true,
+      "properties": [
+        "PROP-0171"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0179_Terraces_Lake.xlsx": {
+      "doc_id": 642,
+      "collision": true,
+      "properties": [
+        "PROP-0179"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0189_Summit_Elan_at_Legacy.xlsx": {
+      "doc_id": 643,
+      "collision": true,
+      "properties": [
+        "PROP-0189"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0190_Azure_Aria.xlsx": {
+      "doc_id": 644,
+      "collision": true,
+      "properties": [
+        "PROP-0190"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0191_Avion_Canyon_on_Central.xlsx": {
+      "doc_id": 645,
+      "collision": true,
+      "properties": [
+        "PROP-0191"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0192_Encore_Willow_on_the_Park.xlsx": {
+      "doc_id": 646,
+      "collision": true,
+      "properties": [
+        "PROP-0192"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0198_Heights_Palms_at_Town_Center.xlsx": {
+      "doc_id": 647,
+      "collision": true,
+      "properties": [
+        "PROP-0198"
+      ],
+      "type": "offering_memo",
+      "metro": "DFW"
+    },
+    "OM_PROP-0004_Legacy_Park.xlsx": {
+      "doc_id": 648,
+      "collision": true,
+      "properties": [
+        "PROP-0004"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0012_Liv_Place_at_Legacy.xlsx": {
+      "doc_id": 649,
+      "collision": true,
+      "properties": [
+        "PROP-0012"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0013_Station_Stone_on_Camelback.xlsx": {
+      "doc_id": 650,
+      "collision": true,
+      "properties": [
+        "PROP-0013"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0014_MAA_Elan_at_Town_Center.xlsx": {
+      "doc_id": 651,
+      "collision": true,
+      "properties": [
+        "PROP-0014"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0015_Broadstone_Stone_on_the_Park.xlsx": {
+      "doc_id": 652,
+      "collision": true,
+      "properties": [
+        "PROP-0015"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0024_Summit_Park_at_Kierland.xlsx": {
+      "doc_id": 653,
+      "collision": true,
+      "properties": [
+        "PROP-0024"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0032_Avion_Landing_at_the_District.xlsx": {
+      "doc_id": 654,
+      "collision": true,
+      "properties": [
+        "PROP-0032"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0037_Park_Ridge.xlsx": {
+      "doc_id": 655,
+      "collision": true,
+      "properties": [
+        "PROP-0037"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0039_Summit_Sage_at_Town_Center.xlsx": {
+      "doc_id": 656,
+      "collision": true,
+      "properties": [
+        "PROP-0039"
+      ],
+      "type": "broker_package",
+      "metro": "PHX"
+    },
+    "OM_PROP-0043_Camden_Aria.xlsx": {
+      "doc_id": 657,
+      "collision": true,
+      "properties": [
+        "PROP-0043"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0045_Park_Park_on_the_Park.xlsx": {
+      "doc_id": 658,
+      "collision": true,
+      "properties": [
+        "PROP-0045"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0060_Soleil_Kenzie_on_the_Park.xlsx": {
+      "doc_id": 659,
+      "collision": true,
+      "properties": [
+        "PROP-0060"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0067_Montage_Locale.xlsx": {
+      "doc_id": 660,
+      "collision": true,
+      "properties": [
+        "PROP-0067"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0068_Azure_Oaks_at_the_District.xlsx": {
+      "doc_id": 661,
+      "collision": true,
+      "properties": [
+        "PROP-0068"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0073_Residences_Sage_at_Town_Center.xlsx": {
+      "doc_id": 662,
+      "collision": true,
+      "properties": [
+        "PROP-0073"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0100_Vista_Alexan.xlsx": {
+      "doc_id": 663,
+      "collision": true,
+      "properties": [
+        "PROP-0100"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0103_Azure_Oaks.xlsx": {
+      "doc_id": 664,
+      "collision": true,
+      "properties": [
+        "PROP-0103"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0116_Station_Gardens.xlsx": {
+      "doc_id": 665,
+      "collision": true,
+      "properties": [
+        "PROP-0116"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0121_Summit_Onyx.xlsx": {
+      "doc_id": 666,
+      "collision": true,
+      "properties": [
+        "PROP-0121"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0126_Canyon_Lumen_at_Town_Center.xlsx": {
+      "doc_id": 667,
+      "collision": true,
+      "properties": [
+        "PROP-0126"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0129_Soleil_Mesa_on_Main.xlsx": {
+      "doc_id": 668,
+      "collision": true,
+      "properties": [
+        "PROP-0129"
+      ],
+      "type": "broker_package",
+      "metro": "LA"
+    },
+    "OM_PROP-0149_MAA_Sienna_on_Camelback.xlsx": {
+      "doc_id": 669,
+      "collision": true,
+      "properties": [
+        "PROP-0149"
+      ],
+      "type": "broker_package",
+      "metro": "AUS"
+    },
+    "OM_PROP-0156_Broadstone_Broadstone_at_Legac.xlsx": {
+      "doc_id": 670,
+      "collision": true,
+      "properties": [
+        "PROP-0156"
+      ],
+      "type": "broker_package",
+      "metro": "AUS"
+    },
+    "OM_PROP-0167_Canyon_Palms_on_Central.xlsx": {
+      "doc_id": 671,
+      "collision": true,
+      "properties": [
+        "PROP-0167"
+      ],
+      "type": "broker_package",
+      "metro": "AUS"
+    },
+    "OM_PROP-0169_Camden_Stone.xlsx": {
+      "doc_id": 672,
+      "collision": true,
+      "properties": [
+        "PROP-0169"
+      ],
+      "type": "broker_package",
+      "metro": "AUS"
+    },
+    "OM_PROP-0174_Park_Crest.xlsx": {
+      "doc_id": 673,
+      "collision": true,
+      "properties": [
+        "PROP-0174"
+      ],
+      "type": "broker_package",
+      "metro": "DFW"
+    },
+    "Broker_Survey_PHX_73.xlsx": {
+      "doc_id": 674,
+      "collision": true,
+      "properties": [
+        "PROP-0003",
+        "PROP-0016",
+        "PROP-0022",
+        "PROP-0026",
+        "PROP-0028",
+        "PROP-0031",
+        "PROP-0035",
+        "PROP-0040"
+      ],
+      "type": "broker_survey",
+      "metro": "PHX"
+    },
+    "Broker_Survey_LA_74.xlsx": {
+      "doc_id": 675,
+      "collision": true,
+      "properties": [
+        "PROP-0042",
+        "PROP-0047",
+        "PROP-0049",
+        "PROP-0052",
+        "PROP-0064",
+        "PROP-0065",
+        "PROP-0074",
+        "PROP-0076",
+        "PROP-0081",
+        "PROP-0082",
+        "PROP-0084",
+        "PROP-0086",
+        "PROP-0089",
+        "PROP-0094",
+        "PROP-0096",
+        "PROP-0098",
+        "PROP-0109",
+        "PROP-0112",
+        "PROP-0119"
+      ],
+      "type": "broker_survey",
+      "metro": "LA"
+    },
+    "Broker_Survey_LA_75.xlsx": {
+      "doc_id": 676,
+      "collision": true,
+      "properties": [
+        "PROP-0132",
+        "PROP-0137",
+        "PROP-0139"
+      ],
+      "type": "broker_survey",
+      "metro": "LA"
+    },
+    "Broker_Survey_AUS_76.xlsx": {
+      "doc_id": 677,
+      "collision": true,
+      "properties": [
+        "PROP-0142",
+        "PROP-0144",
+        "PROP-0145",
+        "PROP-0147",
+        "PROP-0152",
+        "PROP-0153"
+      ],
+      "type": "broker_survey",
+      "metro": "AUS"
+    },
+    "Broker_Survey_DFW_77.xlsx": {
+      "doc_id": 678,
+      "collision": true,
+      "properties": [
+        "PROP-0173",
+        "PROP-0175",
+        "PROP-0181",
+        "PROP-0183",
+        "PROP-0185",
+        "PROP-0186",
+        "PROP-0187",
+        "PROP-0197"
+      ],
+      "type": "broker_survey",
+      "metro": "DFW"
+    },
+    "Market_Report_PHX_South_Scottsdale_78.xlsx": {
+      "doc_id": 679,
+      "collision": true,
+      "properties": [
+        "PROP-0001",
+        "PROP-0007",
+        "PROP-0010"
+      ],
+      "type": "market_report",
+      "metro": "PHX"
+    },
+    "Market_Report_PHX_Glendale_79.xlsx": {
+      "doc_id": 680,
+      "collision": true,
+      "properties": [
+        "PROP-0017"
+      ],
+      "type": "market_report",
+      "metro": "PHX"
+    },
+    "Market_Report_PHX_Mesa_East_80.xlsx": {
+      "doc_id": 681,
+      "collision": true,
+      "properties": [
+        "PROP-0033"
+      ],
+      "type": "market_report",
+      "metro": "PHX"
+    },
+    "Market_Report_LA_San_Fernando_Valley_81.xlsx": {
+      "doc_id": 682,
+      "collision": true,
+      "properties": [
+        "PROP-0041",
+        "PROP-0083",
+        "PROP-0125"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Orange_County_North_82.xlsx": {
+      "doc_id": 683,
+      "collision": true,
+      "properties": [
+        "PROP-0051",
+        "PROP-0140"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_North_Hollywood_83.xlsx": {
+      "doc_id": 684,
+      "collision": true,
+      "properties": [
+        "PROP-0058",
+        "PROP-0123"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_San_Gabriel_Valley_84.xlsx": {
+      "doc_id": 685,
+      "collision": true,
+      "properties": [
+        "PROP-0063",
+        "PROP-0122"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Pasadena_85.xlsx": {
+      "doc_id": 686,
+      "collision": true,
+      "properties": [
+        "PROP-0078"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Orange_County_South_86.xlsx": {
+      "doc_id": 687,
+      "collision": true,
+      "properties": [
+        "PROP-0080"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Westside_87.xlsx": {
+      "doc_id": 688,
+      "collision": true,
+      "properties": [
+        "PROP-0090"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Koreatown_88.xlsx": {
+      "doc_id": 689,
+      "collision": true,
+      "properties": [
+        "PROP-0106"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_DTLA_89.xlsx": {
+      "doc_id": 690,
+      "collision": true,
+      "properties": [
+        "PROP-0114",
+        "PROP-0118"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_LA_Inglewood_90.xlsx": {
+      "doc_id": 691,
+      "collision": true,
+      "properties": [
+        "PROP-0127"
+      ],
+      "type": "market_report",
+      "metro": "LA"
+    },
+    "Market_Report_AUS_South_Austin_91.xlsx": {
+      "doc_id": 692,
+      "collision": true,
+      "properties": [
+        "PROP-0158",
+        "PROP-0160"
+      ],
+      "type": "market_report",
+      "metro": "AUS"
+    },
+    "Market_Report_AUS_Pflugerville_92.xlsx": {
+      "doc_id": 693,
+      "collision": true,
+      "properties": [
+        "PROP-0166"
+      ],
+      "type": "market_report",
+      "metro": "AUS"
+    },
+    "Market_Report_DFW_Arlington_93.xlsx": {
+      "doc_id": 694,
+      "collision": true,
+      "properties": [
+        "PROP-0172",
+        "PROP-0193"
+      ],
+      "type": "market_report",
+      "metro": "DFW"
+    },
+    "Market_Report_DFW_Deep_Ellum_94.xlsx": {
+      "doc_id": 695,
+      "collision": true,
+      "properties": [
+        "PROP-0178"
+      ],
+      "type": "market_report",
+      "metro": "DFW"
+    },
+    "Market_Report_DFW_Plano_95.xlsx": {
+      "doc_id": 696,
+      "collision": true,
+      "properties": [
+        "PROP-0182",
+        "PROP-0194",
+        "PROP-0196",
+        "PROP-0200"
+      ],
+      "type": "market_report",
+      "metro": "DFW"
+    },
+    "Market_Report_DFW_Irving_Las_Colinas_96.xlsx": {
+      "doc_id": 697,
+      "collision": true,
+      "properties": [
+        "PROP-0184",
+        "PROP-0195"
+      ],
+      "type": "market_report",
+      "metro": "DFW"
+    },
+    "Personal_Tracker_97.xlsx": {
+      "doc_id": 698,
+      "collision": true,
+      "properties": [
+        "PROP-0066",
+        "PROP-0088",
+        "PROP-0120",
+        "PROP-0087",
+        "PROP-0050",
+        "PROP-0071",
+        "PROP-0046",
+        "PROP-0154",
+        "PROP-0077",
+        "PROP-0133",
+        "PROP-0199",
+        "PROP-0034",
+        "PROP-0029",
+        "PROP-0062"
+      ],
+      "type": "personal_tracker",
+      "metro": "mixed"
+    },
+    "Personal_Tracker_98.xlsx": {
+      "doc_id": 699,
+      "collision": true,
+      "properties": [
+        "PROP-0092",
+        "PROP-0177",
+        "PROP-0108",
+        "PROP-0110",
+        "PROP-0128",
+        "PROP-0005",
+        "PROP-0180",
+        "PROP-0176",
+        "PROP-0151",
+        "PROP-0165",
+        "PROP-0188"
+      ],
+      "type": "personal_tracker",
+      "metro": "mixed"
+    },
+    "Personal_Tracker_99.xlsx": {
+      "doc_id": 700,
+      "collision": true,
+      "properties": [
+        "PROP-0102",
+        "PROP-0107",
+        "PROP-0002",
+        "PROP-0069",
+        "PROP-0011",
+        "PROP-0059",
+        "PROP-0091"
+      ],
+      "type": "personal_tracker",
+      "metro": "mixed"
+    },
+    "Flyer_PROP-0008_Park_Kenzie_at_the_D.xlsx": {
+      "doc_id": 701,
+      "collision": true,
+      "properties": [
+        "PROP-0008"
+      ],
+      "type": "property_flyer",
+      "metro": "PHX"
+    },
+    "Flyer_PROP-0009_Desert_Hill_on_Centr.xlsx": {
+      "doc_id": 702,
+      "collision": true,
+      "properties": [
+        "PROP-0009"
+      ],
+      "type": "property_flyer",
+      "metro": "PHX"
+    },
+    "Flyer_PROP-0019_Vista_Stone_at_Town_.xlsx": {
+      "doc_id": 703,
+      "collision": true,
+      "properties": [
+        "PROP-0019"
+      ],
+      "type": "property_flyer",
+      "metro": "PHX"
+    },
+    "Flyer_PROP-0020_Soleil_Stone_on_the_.xlsx": {
+      "doc_id": 704,
+      "collision": true,
+      "properties": [
+        "PROP-0020"
+      ],
+      "type": "property_flyer",
+      "metro": "PHX"
+    },
+    "Flyer_PROP-0056_Avion_Circa.xlsx": {
+      "doc_id": 705,
+      "collision": true,
+      "properties": [
+        "PROP-0056"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0057_Camden_Lumen.xlsx": {
+      "doc_id": 706,
+      "collision": true,
+      "properties": [
+        "PROP-0057"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0061_Broadstone_Lake.xlsx": {
+      "doc_id": 707,
+      "collision": true,
+      "properties": [
+        "PROP-0061"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0085_Station_Riviera_on_M.xlsx": {
+      "doc_id": 708,
+      "collision": true,
+      "properties": [
+        "PROP-0085"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0093_Residences_Lumen_at_.xlsx": {
+      "doc_id": 709,
+      "collision": true,
+      "properties": [
+        "PROP-0093"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0101_Liv_Catalina_at_Scot.xlsx": {
+      "doc_id": 710,
+      "collision": true,
+      "properties": [
+        "PROP-0101"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0104_Avion_Place.xlsx": {
+      "doc_id": 711,
+      "collision": true,
+      "properties": [
+        "PROP-0104"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0111_Terraces_Palms.xlsx": {
+      "doc_id": 712,
+      "collision": true,
+      "properties": [
+        "PROP-0111"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0130_Montage_Crest_on_Cam.xlsx": {
+      "doc_id": 713,
+      "collision": true,
+      "properties": [
+        "PROP-0130"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0131_Summit_Sage_on_Main.xlsx": {
+      "doc_id": 714,
+      "collision": true,
+      "properties": [
+        "PROP-0131"
+      ],
+      "type": "property_flyer",
+      "metro": "LA"
+    },
+    "Flyer_PROP-0143_Station_Springs_at_M.xlsx": {
+      "doc_id": 715,
+      "collision": true,
+      "properties": [
+        "PROP-0143"
+      ],
+      "type": "property_flyer",
+      "metro": "AUS"
+    },
+    "Flyer_PROP-0146_Pointe_Moderna.xlsx": {
+      "doc_id": 716,
+      "collision": true,
+      "properties": [
+        "PROP-0146"
+      ],
+      "type": "property_flyer",
+      "metro": "AUS"
+    },
+    "Flyer_PROP-0150_Desert_Gardens_on_Ce.xlsx": {
+      "doc_id": 717,
+      "collision": true,
+      "properties": [
+        "PROP-0150"
+      ],
+      "type": "property_flyer",
+      "metro": "AUS"
+    },
+    "Flyer_PROP-0159_Pointe_Oaks_at_Town_.xlsx": {
+      "doc_id": 718,
+      "collision": true,
+      "properties": [
+        "PROP-0159"
+      ],
+      "type": "property_flyer",
+      "metro": "AUS"
+    },
+    "Flyer_PROP-0163_Avion_Broadstone.xlsx": {
+      "doc_id": 719,
+      "collision": true,
+      "properties": [
+        "PROP-0163"
+      ],
+      "type": "property_flyer",
+      "metro": "AUS"
+    }
+  }
+}

@@ -40,9 +40,10 @@ def _should_create_fact(field_key: str) -> bool:
 class ExtractionWriter:
     """Writes validated extractions to production tables per registry contract."""
 
-    def __init__(self, project_id: int, property_type: str = 'multifamily'):
+    def __init__(self, project_id: int, property_type: str = 'multifamily', user_id: Optional[int] = None):
         self.project_id = project_id
         self.property_type = property_type
+        self.user_id = user_id
         self.registry = get_registry()
 
     @transaction.atomic
@@ -62,6 +63,23 @@ class ExtractionWriter:
 
         Returns: (success: bool, message: str)
         """
+        # --- Fix: coerce double-encoded JSON strings back to dicts --------
+        # ai_extraction_staging.extracted_value is jsonb, but some rows are
+        # double-encoded (a JSON string inside jsonb) which psycopg2 returns
+        # as a Python str.  Comp/unit scopes need a real dict, so parse here.
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, (dict, list)):
+                    value = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass  # genuinely a text value — leave as-is
+        # ------------------------------------------------------------------
+
+        # Coerce common null-like strings to actual None before any DB write
+        if isinstance(value, str) and value.strip().lower() in ('null', 'none', 'n/a', 'na', '-'):
+            value = None
+
         mapping = self.registry.get_mapping(field_key, self.property_type)
 
         if not mapping:
@@ -109,7 +127,7 @@ class ExtractionWriter:
             from .fact_service import FactService
             from decimal import Decimal
 
-            fact_service = FactService()
+            fact_service = FactService(user_id=self.user_id)
             fact_service.create_assumption_fact(
                 project_id=self.project_id,
                 assumption_key=field_key,
@@ -140,7 +158,7 @@ class ExtractionWriter:
         if not doc:
             return
 
-        sync_service = EntitySyncService()
+        sync_service = EntitySyncService(user_id=self.user_id)
         doc_entity = sync_service.ensure_document_entity(
             document_id=doc.doc_id,
             document_name=doc.doc_name,
@@ -157,7 +175,7 @@ class ExtractionWriter:
                 project_name=project_name,
             )
 
-        FactService().create_relationship_fact(
+        FactService(user_id=self.user_id).create_relationship_fact(
             subject_entity=project_entity,
             predicate='extracted_from',
             object_entity=doc_entity,
@@ -288,22 +306,34 @@ class ExtractionWriter:
             params = [self.project_id, converted_value]
 
         elif mapping.scope == 'acquisition':
-            # Property acquisition - update existing row (seeded on project creation)
-            sql = f"""
-                UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW(){vs_clause}
-                WHERE project_id = %s
-            """
-            params = [converted_value] + vs_params + [self.project_id]
+            # Property acquisition - upsert (row may not exist for new projects)
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    UPDATE landscape.{table}
+                    SET {column} = %s, updated_at = NOW(){vs_clause}
+                    WHERE project_id = %s
+                """, [converted_value] + vs_params + [self.project_id])
+                if cursor.rowcount == 0:
+                    cursor.execute(f"""
+                        INSERT INTO landscape.{table} (project_id, {column}, created_at, updated_at)
+                        VALUES (%s, %s, NOW(), NOW())
+                    """, [self.project_id, converted_value])
+            return True, f"Acquisition field {column} saved"
 
         elif mapping.scope == 'market':
-            # Market rate analysis - update existing row (seeded on project creation)
-            sql = f"""
-                UPDATE landscape.{table}
-                SET {column} = %s, updated_at = NOW(){vs_clause}
-                WHERE project_id = %s
-            """
-            params = [converted_value] + vs_params + [self.project_id]
+            # Market rate analysis - upsert (row may not exist for new projects)
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    UPDATE landscape.{table}
+                    SET {column} = %s, updated_at = NOW(){vs_clause}
+                    WHERE project_id = %s
+                """, [converted_value] + vs_params + [self.project_id])
+                if cursor.rowcount == 0:
+                    cursor.execute(f"""
+                        INSERT INTO landscape.{table} (project_id, {column}, created_at, updated_at)
+                        VALUES (%s, %s, NOW(), NOW())
+                    """, [self.project_id, converted_value])
+            return True, f"Market field {column} saved"
 
         elif mapping.scope == 'unit':
             # Individual unit - upsert from chunked rent roll extraction
@@ -411,6 +441,8 @@ class ExtractionWriter:
                 return self._write_income_upsert(mapping, value)
             elif 'assumption' in target_table:
                 return self._write_assumption(mapping, value, mapping.selector_json or {})
+            elif 'market_rate' in target_table:
+                return self._write_market_rate_upsert(mapping, value)
             return False, f"Unknown upsert target table: {target_table}"
 
         # ── Land Development write types ─────────────────────────────────────
@@ -450,6 +482,30 @@ class ExtractionWriter:
             cursor.execute(sql, [self.project_id, assumption_key, str(value), scope])
 
         return True, f"Wrote assumption: {assumption_key}"
+
+    def _write_market_rate_upsert(
+        self,
+        mapping: FieldMapping,
+        value: Any,
+    ) -> Tuple[bool, str]:
+        """Upsert a column on tbl_market_rate_analysis."""
+        table = mapping.table_name
+        column = mapping.column_name
+        converted = self._convert_value(value, mapping.field_type)
+
+        with connection.cursor() as cursor:
+            cursor.execute(f"""
+                UPDATE landscape.{table}
+                SET {column} = %s, updated_at = NOW()
+                WHERE project_id = %s
+            """, [converted, self.project_id])
+            if cursor.rowcount == 0:
+                cursor.execute(f"""
+                    INSERT INTO landscape.{table} (project_id, {column}, created_at, updated_at)
+                    VALUES (%s, %s, NOW(), NOW())
+                """, [self.project_id, converted])
+
+        return True, f"Market rate {column} saved"
 
     def _write_opex(
         self,
@@ -1183,8 +1239,14 @@ class ExtractionWriter:
     def _insert_full_unit(self, data: Dict[str, Any]) -> Tuple[bool, str]:
         """Insert or update a rent roll unit row from extracted dict."""
 
-        # Extract unit number for matching
-        unit_number = data.get('unit_number')
+        # Extract unit number for matching — try several key names
+        unit_number = (
+            data.get('unit_number')
+            or data.get('unit_id')
+            or data.get('number')
+            or data.get('unit')
+            or data.get('unit_unit_type')  # Flyer unit-type summaries use this
+        )
         if not unit_number:
             return False, "No unit_number found in data"
 
@@ -1349,6 +1411,7 @@ class ExtractionWriter:
                 'address': 'address',
                 'city': 'city',
                 'state': 'state',
+                'zip': 'zip',
                 'sale_date': 'sale_date',
                 'sale_price': 'sale_price',
                 'price_per_unit': 'price_per_unit',
@@ -1358,9 +1421,12 @@ class ExtractionWriter:
                 'unit_count': 'unit_count',
                 'year_built': 'year_built',
                 'building_sf': 'building_sf',
-                'distance_miles': 'distance_miles',
-                'buyer': 'buyer',
-                'seller': 'seller',
+                'distance_miles': 'distance_from_subject',
+                'buyer': 'true_buyer',
+                'seller': 'true_seller',
+                'buyer_type': 'buyer_type',
+                'seller_type': 'seller_type',
+                'notes': 'notes',
             }
 
             for ext_key, col in field_map.items():
@@ -1402,16 +1468,22 @@ class ExtractionWriter:
             field_map = {
                 'property_name': 'property_name',
                 'address': 'address',
-                'city': 'city',
-                'state': 'state',
                 'distance_miles': 'distance_miles',
                 'year_built': 'year_built',
-                'unit_count': 'unit_count',
-                'units': 'unit_count',
-                'occupancy': 'occupancy',
-                'avg_rent': 'avg_rent',
-                'avg_rent_psf': 'avg_rent_psf',
+                'total_units': 'total_units',
+                'unit_count': 'total_units',
+                'units': 'total_units',
+                'unit_type': 'unit_type',
+                'bedrooms': 'bedrooms',
+                'bathrooms': 'bathrooms',
+                'avg_sqft': 'avg_sqft',
+                'asking_rent': 'asking_rent',
+                'avg_rent': 'asking_rent',
+                'effective_rent': 'effective_rent',
                 'concessions': 'concessions',
+                'amenities': 'amenities',
+                'notes': 'notes',
+                'data_source': 'data_source',
             }
 
             for ext_key, col in field_map.items():
@@ -1422,6 +1494,31 @@ class ExtractionWriter:
 
             if not columns:
                 return False, "No valid fields in rent comp data"
+
+            # Ensure NOT NULL columns have defaults
+            if 'unit_type' not in columns:
+                columns.append('unit_type')
+                values.append('%s')
+                params.append('Unknown')
+            if 'bedrooms' not in columns:
+                columns.append('bedrooms')
+                values.append('%s')
+                params.append(0)
+            if 'bathrooms' not in columns:
+                columns.append('bathrooms')
+                values.append('%s')
+                params.append(0)
+            if 'avg_sqft' not in columns:
+                columns.append('avg_sqft')
+                values.append('%s')
+                params.append(0)
+            if 'asking_rent' not in columns:
+                columns.append('asking_rent')
+                values.append('%s')
+                params.append(0)
+            if 'as_of_date' not in columns:
+                columns.append('as_of_date')
+                values.append('CURRENT_DATE')
 
             columns_str = ', '.join(['project_id'] + columns + ['created_at', 'updated_at'])
             values_str = ', '.join(['%s'] + values + ['NOW()', 'NOW()'])
@@ -1503,7 +1600,7 @@ class ExtractionWriter:
         state = data.get('state') or ''
         property_type = self.property_type or 'unknown'
 
-        sync_service = EntitySyncService()
+        sync_service = EntitySyncService(user_id=self.user_id)
         comp_entity = sync_service.ensure_property_entity(
             name=name,
             address=address,
@@ -1514,7 +1611,7 @@ class ExtractionWriter:
             year_built=data.get('year_built'),
         )
 
-        fact_service = FactService()
+        fact_service = FactService(user_id=self.user_id)
         normalized_type = 'sale' if comp_type == 'sales' else 'rent'
         fact_service.create_comparable_facts(
             comp_entity=comp_entity,
@@ -1711,17 +1808,19 @@ def write_validated_extraction(
     extraction_id: int,
     field_key: str,
     value: Any,
+    user_id: Optional[int] = None,
     **kwargs
 ) -> Tuple[bool, str]:
     """Convenience function to write a single extraction."""
-    writer = ExtractionWriter(project_id, property_type)
+    writer = ExtractionWriter(project_id, property_type, user_id=user_id)
     return writer.write_extraction(extraction_id, field_key, value, **kwargs)
 
 
 def write_multiple_extractions(
     project_id: int,
     property_type: str,
-    extractions: List[Dict[str, Any]]
+    extractions: List[Dict[str, Any]],
+    user_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Write multiple extractions in a single transaction.
@@ -1730,11 +1829,12 @@ def write_multiple_extractions(
         project_id: The project ID
         property_type: 'multifamily' or 'land_development'
         extractions: List of dicts with keys: field_key, value, scope_id, source_doc_id, source_page
+        user_id: Optional user ID for created_by tracking on entities/facts
 
     Returns:
         Dict with 'success', 'failed', 'results' keys
     """
-    writer = ExtractionWriter(project_id, property_type)
+    writer = ExtractionWriter(project_id, property_type, user_id=user_id)
     results = {'success': [], 'failed': [], 'total': len(extractions)}
 
     for i, ext in enumerate(extractions):

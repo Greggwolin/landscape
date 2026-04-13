@@ -11,8 +11,25 @@ import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 logger = logging.getLogger(__name__)
+
+
+def _get_user_from_jwt(request):
+    """
+    Manually authenticate a raw Django request using SimpleJWT.
+    Returns the User instance if a valid Bearer token is present, else None.
+    """
+    try:
+        auth_result = JWTAuthentication().authenticate(request)
+        if auth_result is not None:
+            user, token = auth_result
+            return user
+    except (InvalidToken, TokenError, Exception):
+        pass
+    return None
 
 
 @csrf_exempt
@@ -816,9 +833,12 @@ def extract_document_batched(request, doc_id: int):
     if not property_type:
         property_type = 'multifamily'
 
-    # Get user_id if available
+    # Get user_id if available (JWT first, session fallback)
     user_id = None
-    if hasattr(request, 'user') and hasattr(request.user, 'id'):
+    jwt_user = _get_user_from_jwt(request)
+    if jwt_user is not None:
+        user_id = jwt_user.id
+    elif hasattr(request, 'user') and hasattr(request.user, 'id') and request.user.is_authenticated:
         user_id = request.user.id
 
     # Run extraction in a background thread so the request returns immediately.
@@ -1021,9 +1041,9 @@ def extract_rent_roll(request, doc_id: int):
 
     property_type = body.get('property_type', 'multifamily')
 
-    # Get user if available
-    user = None
-    if hasattr(request, 'user') and request.user.is_authenticated:
+    # Get user if available (JWT first, session fallback)
+    user = _get_user_from_jwt(request)
+    if user is None and hasattr(request, 'user') and request.user.is_authenticated:
         user = request.user
 
     # Check for existing active job for this project/scope

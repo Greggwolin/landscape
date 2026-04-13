@@ -1,0 +1,606 @@
+{
+  "timestamp": "2026-04-12T17:19:43.786220",
+  "original_project_id": 768,
+  "docs_retried": 59,
+  "ok": 59,
+  "partial": 0,
+  "failed": 0,
+  "total_committed": 2552,
+  "total_failed_rows": 2,
+  "entities_before": 155,
+  "entities_after": 246,
+  "facts_before": 499,
+  "facts_after": 867,
+  "per_doc": [
+    {
+      "doc_id": 603,
+      "doc_name": "OM_PROP-0018_Avion_Palms_by_the_Lake.xlsx",
+      "project_id": 769,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 48,
+      "committed": 48,
+      "failed": 0
+    },
+    {
+      "doc_id": 607,
+      "doc_name": "OM_PROP-0027_Residences_Circa.xlsx",
+      "project_id": 770,
+      "status": "ok",
+      "staging_rows": 40,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 611,
+      "doc_name": "OM_PROP-0044_Azure_Broadstone.xlsx",
+      "project_id": 771,
+      "status": "ok",
+      "staging_rows": 47,
+      "accepted": 51,
+      "committed": 51,
+      "failed": 0
+    },
+    {
+      "doc_id": 614,
+      "doc_name": "OM_PROP-0054_Residences_Stone_on_Central.xlsx",
+      "project_id": 772,
+      "status": "ok",
+      "staging_rows": 40,
+      "accepted": 50,
+      "committed": 50,
+      "failed": 0
+    },
+    {
+      "doc_id": 615,
+      "doc_name": "OM_PROP-0055_Vista_Flats_at_Midtown.xlsx",
+      "project_id": 773,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 616,
+      "doc_name": "OM_PROP-0070_Crossing_Gardens_at_Midtown.xlsx",
+      "project_id": 774,
+      "status": "ok",
+      "staging_rows": 40,
+      "accepted": 44,
+      "committed": 44,
+      "failed": 0
+    },
+    {
+      "doc_id": 617,
+      "doc_name": "OM_PROP-0072_Desert_Alexan_on_the_Park.xlsx",
+      "project_id": 775,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 44,
+      "committed": 44,
+      "failed": 0
+    },
+    {
+      "doc_id": 619,
+      "doc_name": "OM_PROP-0079_Camden_Elan.xlsx",
+      "project_id": 776,
+      "status": "ok",
+      "staging_rows": 40,
+      "accepted": 44,
+      "committed": 44,
+      "failed": 0
+    },
+    {
+      "doc_id": 620,
+      "doc_name": "OM_PROP-0095_Soleil_Sonoma.xlsx",
+      "project_id": 777,
+      "status": "ok",
+      "staging_rows": 44,
+      "accepted": 49,
+      "committed": 49,
+      "failed": 0
+    },
+    {
+      "doc_id": 621,
+      "doc_name": "OM_PROP-0097_Desert_Aria.xlsx",
+      "project_id": 778,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 622,
+      "doc_name": "OM_PROP-0099_Pointe_Alexan_at_Midtown.xlsx",
+      "project_id": 779,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 623,
+      "doc_name": "OM_PROP-0105_Park_Springs_at_Kierland.xlsx",
+      "project_id": 780,
+      "status": "ok",
+      "staging_rows": 37,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 625,
+      "doc_name": "OM_PROP-0115_Liv_Palms.xlsx",
+      "project_id": 781,
+      "status": "ok",
+      "staging_rows": 42,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 626,
+      "doc_name": "OM_PROP-0117_Station_Catalina_on_Main.xlsx",
+      "project_id": 782,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 43,
+      "committed": 43,
+      "failed": 0
+    },
+    {
+      "doc_id": 627,
+      "doc_name": "OM_PROP-0124_Station_Sage_at_Midtown.xlsx",
+      "project_id": 783,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 48,
+      "committed": 48,
+      "failed": 0
+    },
+    {
+      "doc_id": 628,
+      "doc_name": "OM_PROP-0134_Camden_Locale.xlsx",
+      "project_id": 784,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 49,
+      "committed": 49,
+      "failed": 0
+    },
+    {
+      "doc_id": 631,
+      "doc_name": "OM_PROP-0138_MAA_Catalina_at_Midtown.xlsx",
+      "project_id": 785,
+      "status": "ok",
+      "staging_rows": 44,
+      "accepted": 49,
+      "committed": 49,
+      "failed": 0
+    },
+    {
+      "doc_id": 632,
+      "doc_name": "OM_PROP-0141_Montage_Oaks.xlsx",
+      "project_id": 786,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 634,
+      "doc_name": "OM_PROP-0155_Haven_Lumen_by_the_Lake.xlsx",
+      "project_id": 787,
+      "status": "ok",
+      "staging_rows": 42,
+      "accepted": 56,
+      "committed": 56,
+      "failed": 0
+    },
+    {
+      "doc_id": 636,
+      "doc_name": "OM_PROP-0161_Lofts_Ascent_on_Central.xlsx",
+      "project_id": 788,
+      "status": "ok",
+      "staging_rows": 44,
+      "accepted": 51,
+      "committed": 51,
+      "failed": 0
+    },
+    {
+      "doc_id": 637,
+      "doc_name": "OM_PROP-0162_Terraces_Crest_on_Central.xlsx",
+      "project_id": 789,
+      "status": "ok",
+      "staging_rows": 44,
+      "accepted": 51,
+      "committed": 51,
+      "failed": 0
+    },
+    {
+      "doc_id": 638,
+      "doc_name": "OM_PROP-0164_Broadstone_Aria_at_Scottsdale.xlsx",
+      "project_id": 790,
+      "status": "ok",
+      "staging_rows": 49,
+      "accepted": 54,
+      "committed": 54,
+      "failed": 0
+    },
+    {
+      "doc_id": 640,
+      "doc_name": "OM_PROP-0170_Pointe_Creek.xlsx",
+      "project_id": 791,
+      "status": "ok",
+      "staging_rows": 52,
+      "accepted": 59,
+      "committed": 59,
+      "failed": 0
+    },
+    {
+      "doc_id": 642,
+      "doc_name": "OM_PROP-0179_Terraces_Lake.xlsx",
+      "project_id": 792,
+      "status": "ok",
+      "staging_rows": 37,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 643,
+      "doc_name": "OM_PROP-0189_Summit_Elan_at_Legacy.xlsx",
+      "project_id": 793,
+      "status": "ok",
+      "staging_rows": 42,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 644,
+      "doc_name": "OM_PROP-0190_Azure_Aria.xlsx",
+      "project_id": 794,
+      "status": "ok",
+      "staging_rows": 40,
+      "accepted": 55,
+      "committed": 55,
+      "failed": 0
+    },
+    {
+      "doc_id": 646,
+      "doc_name": "OM_PROP-0192_Encore_Willow_on_the_Park.xlsx",
+      "project_id": 795,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 44,
+      "committed": 44,
+      "failed": 0
+    },
+    {
+      "doc_id": 647,
+      "doc_name": "OM_PROP-0198_Heights_Palms_at_Town_Center.xlsx",
+      "project_id": 796,
+      "status": "ok",
+      "staging_rows": 45,
+      "accepted": 59,
+      "committed": 59,
+      "failed": 0
+    },
+    {
+      "doc_id": 648,
+      "doc_name": "OM_PROP-0004_Legacy_Park.xlsx",
+      "project_id": 797,
+      "status": "ok",
+      "staging_rows": 38,
+      "accepted": 42,
+      "committed": 42,
+      "failed": 0
+    },
+    {
+      "doc_id": 650,
+      "doc_name": "OM_PROP-0013_Station_Stone_on_Camelback.xlsx",
+      "project_id": 798,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 55,
+      "committed": 54,
+      "failed": 1
+    },
+    {
+      "doc_id": 651,
+      "doc_name": "OM_PROP-0014_MAA_Elan_at_Town_Center.xlsx",
+      "project_id": 799,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 49,
+      "committed": 49,
+      "failed": 0
+    },
+    {
+      "doc_id": 652,
+      "doc_name": "OM_PROP-0015_Broadstone_Stone_on_the_Park.xlsx",
+      "project_id": 800,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 653,
+      "doc_name": "OM_PROP-0024_Summit_Park_at_Kierland.xlsx",
+      "project_id": 801,
+      "status": "ok",
+      "staging_rows": 42,
+      "accepted": 47,
+      "committed": 46,
+      "failed": 1
+    },
+    {
+      "doc_id": 654,
+      "doc_name": "OM_PROP-0032_Avion_Landing_at_the_District.xlsx",
+      "project_id": 802,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 655,
+      "doc_name": "OM_PROP-0037_Park_Ridge.xlsx",
+      "project_id": 803,
+      "status": "ok",
+      "staging_rows": 47,
+      "accepted": 55,
+      "committed": 55,
+      "failed": 0
+    },
+    {
+      "doc_id": 657,
+      "doc_name": "OM_PROP-0043_Camden_Aria.xlsx",
+      "project_id": 804,
+      "status": "ok",
+      "staging_rows": 42,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 658,
+      "doc_name": "OM_PROP-0045_Park_Park_on_the_Park.xlsx",
+      "project_id": 805,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 45,
+      "committed": 45,
+      "failed": 0
+    },
+    {
+      "doc_id": 662,
+      "doc_name": "OM_PROP-0073_Residences_Sage_at_Town_Center.xlsx",
+      "project_id": 806,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 663,
+      "doc_name": "OM_PROP-0100_Vista_Alexan.xlsx",
+      "project_id": 807,
+      "status": "ok",
+      "staging_rows": 48,
+      "accepted": 62,
+      "committed": 62,
+      "failed": 0
+    },
+    {
+      "doc_id": 664,
+      "doc_name": "OM_PROP-0103_Azure_Oaks.xlsx",
+      "project_id": 808,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 48,
+      "committed": 48,
+      "failed": 0
+    },
+    {
+      "doc_id": 665,
+      "doc_name": "OM_PROP-0116_Station_Gardens.xlsx",
+      "project_id": 809,
+      "status": "ok",
+      "staging_rows": 41,
+      "accepted": 46,
+      "committed": 46,
+      "failed": 0
+    },
+    {
+      "doc_id": 667,
+      "doc_name": "OM_PROP-0126_Canyon_Lumen_at_Town_Center.xlsx",
+      "project_id": 810,
+      "status": "ok",
+      "staging_rows": 44,
+      "accepted": 48,
+      "committed": 48,
+      "failed": 0
+    },
+    {
+      "doc_id": 668,
+      "doc_name": "OM_PROP-0129_Soleil_Mesa_on_Main.xlsx",
+      "project_id": 811,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 50,
+      "committed": 50,
+      "failed": 0
+    },
+    {
+      "doc_id": 669,
+      "doc_name": "OM_PROP-0149_MAA_Sienna_on_Camelback.xlsx",
+      "project_id": 812,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 43,
+      "committed": 43,
+      "failed": 0
+    },
+    {
+      "doc_id": 670,
+      "doc_name": "OM_PROP-0156_Broadstone_Broadstone_at_Legac.xlsx",
+      "project_id": 813,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 47,
+      "committed": 47,
+      "failed": 0
+    },
+    {
+      "doc_id": 671,
+      "doc_name": "OM_PROP-0167_Canyon_Palms_on_Central.xlsx",
+      "project_id": 814,
+      "status": "ok",
+      "staging_rows": 39,
+      "accepted": 44,
+      "committed": 44,
+      "failed": 0
+    },
+    {
+      "doc_id": 672,
+      "doc_name": "OM_PROP-0169_Camden_Stone.xlsx",
+      "project_id": 815,
+      "status": "ok",
+      "staging_rows": 43,
+      "accepted": 48,
+      "committed": 48,
+      "failed": 0
+    },
+    {
+      "doc_id": 673,
+      "doc_name": "OM_PROP-0174_Park_Crest.xlsx",
+      "project_id": 816,
+      "status": "ok",
+      "staging_rows": 37,
+      "accepted": 51,
+      "committed": 51,
+      "failed": 0
+    },
+    {
+      "doc_id": 702,
+      "doc_name": "Flyer_PROP-0009_Desert_Hill_on_Centr.xlsx",
+      "project_id": 817,
+      "status": "ok",
+      "staging_rows": 12,
+      "accepted": 19,
+      "committed": 19,
+      "failed": 0
+    },
+    {
+      "doc_id": 707,
+      "doc_name": "Flyer_PROP-0061_Broadstone_Lake.xlsx",
+      "project_id": 818,
+      "status": "ok",
+      "staging_rows": 12,
+      "accepted": 20,
+      "committed": 20,
+      "failed": 0
+    },
+    {
+      "doc_id": 709,
+      "doc_name": "Flyer_PROP-0093_Residences_Lumen_at_.xlsx",
+      "project_id": 819,
+      "status": "ok",
+      "staging_rows": 11,
+      "accepted": 21,
+      "committed": 21,
+      "failed": 0
+    },
+    {
+      "doc_id": 710,
+      "doc_name": "Flyer_PROP-0101_Liv_Catalina_at_Scot.xlsx",
+      "project_id": 820,
+      "status": "ok",
+      "staging_rows": 11,
+      "accepted": 21,
+      "committed": 21,
+      "failed": 0
+    },
+    {
+      "doc_id": 711,
+      "doc_name": "Flyer_PROP-0104_Avion_Place.xlsx",
+      "project_id": 821,
+      "status": "ok",
+      "staging_rows": 11,
+      "accepted": 16,
+      "committed": 16,
+      "failed": 0
+    },
+    {
+      "doc_id": 713,
+      "doc_name": "Flyer_PROP-0130_Montage_Crest_on_Cam.xlsx",
+      "project_id": 822,
+      "status": "ok",
+      "staging_rows": 12,
+      "accepted": 20,
+      "committed": 20,
+      "failed": 0
+    },
+    {
+      "doc_id": 714,
+      "doc_name": "Flyer_PROP-0131_Summit_Sage_on_Main.xlsx",
+      "project_id": 823,
+      "status": "ok",
+      "staging_rows": 16,
+      "accepted": 24,
+      "committed": 24,
+      "failed": 0
+    },
+    {
+      "doc_id": 715,
+      "doc_name": "Flyer_PROP-0143_Station_Springs_at_M.xlsx",
+      "project_id": 824,
+      "status": "ok",
+      "staging_rows": 12,
+      "accepted": 22,
+      "committed": 22,
+      "failed": 0
+    },
+    {
+      "doc_id": 717,
+      "doc_name": "Flyer_PROP-0150_Desert_Gardens_on_Ce.xlsx",
+      "project_id": 825,
+      "status": "ok",
+      "staging_rows": 11,
+      "accepted": 18,
+      "committed": 18,
+      "failed": 0
+    },
+    {
+      "doc_id": 718,
+      "doc_name": "Flyer_PROP-0159_Pointe_Oaks_at_Town_.xlsx",
+      "project_id": 826,
+      "status": "ok",
+      "staging_rows": 12,
+      "accepted": 20,
+      "committed": 20,
+      "failed": 0
+    },
+    {
+      "doc_id": 719,
+      "doc_name": "Flyer_PROP-0163_Avion_Broadstone.xlsx",
+      "project_id": 827,
+      "status": "ok",
+      "staging_rows": 11,
+      "accepted": 21,
+      "committed": 21,
+      "failed": 0
+    }
+  ]
+}

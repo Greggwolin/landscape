@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landscape — Badge &amp; Pill Audit (v2)</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222632;
+    --border: #2d3348;
+    --text: #e1e4ed;
+    --text-muted: #8b90a0;
+    --accent: #6c8aff;
+    --green: #2eb85c;
+    --yellow: #f9b115;
+    --red: #e55353;
+    --blue: #321fdb;
+    --info: #3399ff;
+    --orange: #fb923c;
+    --purple: #a78bfa;
+    --cyan: #22d3ee;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .grid-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2.5rem; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; text-align: center; }
+  .stat-card .num { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .stat-card .label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.25rem; }
+  .section { margin-bottom: 2.5rem; }
+  .section-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+  .section-title .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+  .card-header { background: var(--surface2); padding: 0.75rem 1rem; font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 0.5rem; }
+  .card-header .file-path { font-size: 0.7rem; color: var(--text-muted); font-weight: 400; font-family: 'SF Mono', Menlo, monospace; }
+  .card-body { padding: 1rem; }
+  .badge-row { display: flex; align-items: flex-start; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+  .badge-row:last-child { border-bottom: none; }
+  .badge-preview { min-width: 200px; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .badge-meta { flex: 1; font-size: 0.8rem; color: var(--text-muted); }
+  .badge-meta strong { color: var(--text); font-weight: 500; }
+
+  /* Sample badge base styles */
+  .sample-badge { display: inline-flex; align-items: center; justify-content: center; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .sample-pill { display: inline-flex; align-items: center; justify-content: center; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .sample-circle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 0.7rem; font-weight: 700; }
+  .sample-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Exact Property Type token colors from tokens.css */
+  .pt-land { background: #1f2a37; color: #ffffff; }
+  .pt-mf { background: #f37021; color: #ffffff; }
+  .pt-ret { background: #cc004c; color: #ffffff; }
+  .pt-off { background: #6460aa; color: #ffffff; }
+  .pt-ind { background: #0089d0; color: #ffffff; }
+  .pt-htl { background: #0db14b; color: #ffffff; }
+  .pt-mxu { background: #fcb711; color: #000000; }
+
+  /* CoreUI semantic colors (dark theme values) */
+  .cui-success { background: #2eb85c; color: #fff; }
+  .cui-info { background: #3399ff; color: #fff; }
+  .cui-primary { background: #321fdb; color: #fff; }
+  .cui-warning { background: #f9b115; color: #000; }
+  .cui-danger { background: #e55353; color: #fff; }
+  .cui-secondary { background: #4b5068; color: #e1e4ed; }
+
+  /* Translucent status badges (StatusChip style) */
+  .b-success { background: rgba(46,184,92,0.15); color: #2eb85c; border: 1px solid rgba(46,184,92,0.3); }
+  .b-warning { background: rgba(249,177,21,0.15); color: #f9b115; border: 1px solid rgba(249,177,21,0.3); }
+  .b-danger { background: rgba(229,83,83,0.15); color: #e55353; border: 1px solid rgba(229,83,83,0.3); }
+  .b-info { background: rgba(51,153,255,0.15); color: #3399ff; border: 1px solid rgba(51,153,255,0.3); }
+  .b-primary { background: rgba(50,31,219,0.15); color: #6c8aff; border: 1px solid rgba(50,31,219,0.3); }
+  .b-secondary { background: rgba(75,80,108,0.15); color: #8b90a0; border: 1px solid rgba(75,80,108,0.3); }
+
+  /* Semantic category chip tokens from tokens.css */
+  .chip-horizontal { background: rgba(37,99,235,0.24); color: #60a5fa; border: 1px solid rgba(37,99,235,0.7); }
+  .chip-vertical { background: rgba(124,58,237,0.24); color: #a78bfa; border: 1px solid rgba(124,58,237,0.7); }
+  .chip-systems { background: rgba(5,150,105,0.24); color: #34d399; border: 1px solid rgba(5,150,105,0.7); }
+  .chip-finishes { background: rgba(219,39,119,0.24); color: #f472b6; border: 1px solid rgba(219,39,119,0.7); }
+  .chip-soft-costs { background: rgba(217,119,6,0.24); color: #fbbf24; border: 1px solid rgba(217,119,6,0.7); }
+  .chip-offsite { background: rgba(14,165,233,0.24); color: #38bdf8; border: 1px solid rgba(14,165,233,0.7); }
+  .chip-contingency { background: rgba(244,63,94,0.24); color: #fb7185; border: 1px solid rgba(244,63,94,0.75); }
+  .chip-other { background: rgba(148,163,184,0.24); color: #94a3b8; border: 1px solid rgba(148,163,184,0.7); }
+
+  /* Ops badge colors */
+  .ops-global { background: rgba(75,80,108,0.2); color: #8b90a0; border: 1px solid rgba(75,80,108,0.4); }
+  .ops-custom { background: rgba(246,173,85,0.08); color: #f6ad55; border: 1px solid #f6ad55; }
+  .ops-fee { background: rgba(104,211,145,0.08); color: #68d391; border: 1px solid #68d391; }
+
+  /* Workbench badges */
+  .wb-new { background: rgba(51,153,255,0.15); color: #3399ff; border: 1px solid rgba(51,153,255,0.3); }
+  .wb-match { background: rgba(46,184,92,0.15); color: #2eb85c; border: 1px solid rgba(46,184,92,0.3); }
+  .wb-conflict { background: rgba(249,177,21,0.15); color: #f9b115; border: 1px solid rgba(249,177,21,0.3); }
+  .wb-pending { background: rgba(75,80,108,0.15); color: #8b90a0; border: 1px solid rgba(75,80,108,0.3); }
+  .wb-accepted { background: rgba(46,184,92,0.25); color: #2eb85c; border: 1px solid rgba(46,184,92,0.5); }
+
+  /* Landscaper review version badges */
+  .ver-draft { background: rgba(75,80,108,0.2); color: #8b90a0; }
+  .ver-review { background: rgba(249,177,21,0.2); color: #f9b115; }
+  .ver-final { background: rgba(46,184,92,0.2); color: #2eb85c; }
+
+  /* Sub-tab count badges */
+  .tab-default { background: rgba(249,177,21,0.15); color: #f9b115; }
+  .tab-processing { background: rgba(51,153,255,0.15); color: #3399ff; }
+  .tab-error { background: rgba(229,83,83,0.15); color: #e55353; }
+
+  /* Swatch table */
+  .swatch-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .swatch-table th { text-align: left; padding: 0.5rem 0.75rem; background: var(--surface2); color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .swatch-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .swatch-table tr:last-child td { border-bottom: none; }
+  .swatch { display: inline-block; width: 28px; height: 18px; border-radius: 3px; vertical-align: middle; }
+  .hex { font-family: 'SF Mono', Menlo, monospace; font-size: 0.7rem; color: var(--text-muted); }
+
+  .consistency-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .consistency-table th { text-align: left; padding: 0.5rem 0.75rem; background: var(--surface2); color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  .consistency-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .consistency-table tr:last-child td { border-bottom: none; }
+
+  .tag { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.6rem; font-weight: 600; text-transform: uppercase; margin-left: 0.4rem; }
+  .tag-coreui { background: rgba(51,153,255,0.2); color: #3399ff; }
+  .tag-custom { background: rgba(167,139,250,0.2); color: var(--purple); }
+  .tag-css { background: rgba(251,146,60,0.2); color: var(--orange); }
+  .tag-token { background: rgba(46,184,92,0.2); color: #2eb85c; }
+
+  .flag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+  .flag-ok { background: rgba(46,184,92,0.12); color: #2eb85c; }
+  .flag-warn { background: rgba(249,177,21,0.12); color: #f9b115; }
+  .flag-issue { background: rgba(229,83,83,0.12); color: #e55353; }
+
+  .findings { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; margin-top: 1.5rem; }
+  .findings h3 { font-size: 1rem; margin-bottom: 0.75rem; }
+  .finding-item { padding: 0.6rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; display: flex; gap: 0.75rem; align-items: flex-start; }
+  .finding-item:last-child { border-bottom: none; }
+  .finding-num { min-width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; }
+  .fn-warn { background: rgba(249,177,21,0.15); color: #f9b115; }
+  .fn-info { background: rgba(51,153,255,0.15); color: #3399ff; }
+  .fn-good { background: rgba(46,184,92,0.15); color: #2eb85c; }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Badge &amp; Pill Audit (v2)</h1>
+<p class="subtitle">Landscape App &middot; alpha19 &middot; April 12, 2026 &nbsp;|&nbsp; 22 distinct patterns &middot; 8 color systems &middot; ~70+ instances</p>
+
+<div class="grid-summary">
+  <div class="stat-card"><div class="num">22</div><div class="label">Distinct Patterns</div></div>
+  <div class="stat-card"><div class="num">8</div><div class="label">Color Systems</div></div>
+  <div class="stat-card"><div class="num">70+</div><div class="label">Total Instances</div></div>
+  <div class="stat-card"><div class="num">7</div><div class="label">CoreUI CBadge</div></div>
+  <div class="stat-card"><div class="num">6</div><div class="label">Custom React</div></div>
+  <div class="stat-card"><div class="num">9</div><div class="label">CSS-Only</div></div>
+</div>
+
+<!-- ============================================ -->
+<!-- 1. PROPERTY TYPE TOKENS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:#f37021"></span> Property Type Tokens</div>
+  <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem">Source: <code>src/styles/tokens.css</code> lines 48–65 &nbsp;|&nbsp; Resolver: <code>src/config/propertyTypeTokens.ts</code> &nbsp;|&nbsp; 50+ aliases supported</p>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="swatch-table">
+        <thead><tr><th>Type</th><th>Code</th><th>Background</th><th>Text</th><th>Swatch</th><th>Preview</th></tr></thead>
+        <tbody>
+          <tr><td>Land Development</td><td>LAND</td><td class="hex">#1F2A37</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#1f2a37"></span></td><td><span class="sample-pill pt-land">Land Development</span></td></tr>
+          <tr><td>Multifamily</td><td>MF</td><td class="hex">#F37021</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#f37021"></span></td><td><span class="sample-pill pt-mf">Multifamily</span></td></tr>
+          <tr><td>Retail</td><td>RET</td><td class="hex">#CC004C</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#cc004c"></span></td><td><span class="sample-pill pt-ret">Retail</span></td></tr>
+          <tr><td>Office</td><td>OFF</td><td class="hex">#6460AA</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#6460aa"></span></td><td><span class="sample-pill pt-off">Office</span></td></tr>
+          <tr><td>Industrial</td><td>IND</td><td class="hex">#0089D0</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#0089d0"></span></td><td><span class="sample-pill pt-ind">Industrial</span></td></tr>
+          <tr><td>Hospitality</td><td>HTL</td><td class="hex">#0DB14B</td><td class="hex">#FFFFFF</td><td><span class="swatch" style="background:#0db14b"></span></td><td><span class="sample-pill pt-htl">Hospitality</span></td></tr>
+          <tr><td>Mixed Use</td><td>MXU</td><td class="hex">#FCB711</td><td class="hex">#000000</td><td><span class="swatch" style="background:#fcb711"></span></td><td><span class="sample-pill pt-mxu">Mixed Use</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">PropertyTypeBadge <span class="tag tag-token">Token System</span><span class="file-path">src/components/ui/landscape/PropertyTypeBadge.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill pt-land">Land Development</span>
+          <span class="sample-pill pt-mf">Multifamily</span>
+          <span class="sample-pill pt-ret">Retail</span>
+          <span class="sample-pill pt-off">Office</span>
+          <span class="sample-pill pt-ind">Industrial</span>
+          <span class="sample-pill pt-htl">Hospitality</span>
+          <span class="sample-pill pt-mxu">Mixed Use</span>
+        </div>
+        <div class="badge-meta"><strong>Solid fill pills</strong> — resolves via <code>getPropertyTypeTokenRef()</code>. Pill shape (999px). Font-weight 600. Used on dashboard cards, ActiveProjectBar, DashboardMap markers.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 2. LIFECYCLE STAGE COLORS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:#2eb85c"></span> Lifecycle Stage Badges</div>
+  <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem">Source: <code>STAGE_COLORS</code> in ActivityFilter.tsx &amp; CategoryTreeItem.tsx &nbsp;|&nbsp; CSS: <code>category-taxonomy.css</code></p>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="swatch-table">
+        <thead><tr><th>Stage</th><th>CoreUI Color</th><th>Letter</th><th>Stage Card</th><th>Letter Badge</th></tr></thead>
+        <tbody>
+          <tr><td>Acquisition</td><td>success</td><td>A</td><td><span class="sample-badge cui-success" style="min-width:32px;text-align:center">20</span></td><td><span class="sample-circle cui-success">A</span></td></tr>
+          <tr><td>Planning &amp; Engineering</td><td>info</td><td>P</td><td><span class="sample-badge cui-info" style="min-width:32px;text-align:center">21</span></td><td><span class="sample-circle cui-info">P</span></td></tr>
+          <tr><td>Improvements</td><td>primary</td><td>I</td><td><span class="sample-badge cui-primary" style="min-width:32px;text-align:center">115</span></td><td><span class="sample-circle cui-primary">I</span></td></tr>
+          <tr><td>Operations</td><td>info</td><td>O</td><td><span class="sample-badge cui-info" style="min-width:32px;text-align:center">107</span></td><td><span class="sample-circle cui-info">O</span></td></tr>
+          <tr><td>Disposition</td><td>warning</td><td>D</td><td><span class="sample-badge cui-warning" style="min-width:32px;text-align:center">12</span></td><td><span class="sample-circle cui-warning">D</span></td></tr>
+          <tr><td>Financing</td><td>danger</td><td>F</td><td><span class="sample-badge cui-danger" style="min-width:32px;text-align:center">17</span></td><td><span class="sample-circle cui-danger">F</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Letter badges render first character of stage name via <code>stage.charAt(0)</code> in CategoryTreeItem. Count pills appear on sidebar stage cards. 24×24px, border-radius 4px (square) or 50% (circle).</div>
+</div>
+
+<!-- ============================================ -->
+<!-- 3. SEMANTIC CATEGORY CHIPS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:rgba(124,58,237,0.8)"></span> Semantic Category Chips (Cost Classification)</div>
+  <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem">Source: <code>src/styles/tokens.css</code> lines 67–106 (light) / 216–247 (dark) &nbsp;|&nbsp; CSS: <code>component-patterns.css</code> .semantic-category-chip</p>
+  <div class="card">
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill chip-horizontal">Horizontal</span>
+          <span class="sample-pill chip-vertical">Vertical</span>
+          <span class="sample-pill chip-systems">Systems</span>
+          <span class="sample-pill chip-finishes">Finishes</span>
+        </div>
+        <div class="badge-meta"><strong>Top row</strong> — Blue (#2563eb), Purple (#7c3aed), Teal-green (#059669), Pink (#db2777). Each has bg/border/text/outline token set.</div>
+      </div>
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill chip-soft-costs">Soft Costs</span>
+          <span class="sample-pill chip-offsite">Offsite</span>
+          <span class="sample-pill chip-contingency">Contingency</span>
+          <span class="sample-pill chip-other">Other</span>
+        </div>
+        <div class="badge-meta"><strong>Bottom row</strong> — Amber (#d97706), Sky (#0ea5e9), Rose (#f43f5e), Slate (#0f172a). Pill shape (999px). Data-attribute driven selected/unselected states. Dot indicator inherits currentColor.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 4. STATUS BADGES -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:#3399ff"></span> Status Indicator Badges</div>
+
+  <div class="card">
+    <div class="card-header">StatusChip <span class="tag tag-custom">Custom + CBadge</span><span class="file-path">src/components/ui/landscape/StatusChip.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge b-success">Complete</span>
+          <span class="sample-badge b-success">Active</span>
+          <span class="sample-badge b-success">Approved</span>
+        </div>
+        <div class="badge-meta"><strong>success</strong> — positive terminal states</div>
+      </div>
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge b-warning">Partial</span>
+          <span class="sample-badge b-warning">Pending</span>
+        </div>
+        <div class="badge-meta"><strong>warning</strong> — in-progress / awaiting action</div>
+      </div>
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge b-danger">Error</span>
+          <span class="sample-badge b-danger">Rejected</span>
+        </div>
+        <div class="badge-meta"><strong>danger</strong> — failures and rejections</div>
+      </div>
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge b-secondary">Inactive</span>
+          <span class="sample-badge b-secondary">Draft</span>
+          <span class="sample-badge b-info">Info</span>
+        </div>
+        <div class="badge-meta"><strong>secondary + info</strong> — dormant, draft, informational. 10 status types total. Supports solid/outline/ghost variants.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Ingestion Workbench Badges <span class="tag tag-css">CSS</span><span class="file-path">src/styles/ingestion-workbench.css :1204–1229</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge wb-new">new</span>
+          <span class="sample-badge wb-match">match</span>
+          <span class="sample-badge wb-conflict">conflict</span>
+          <span class="sample-badge wb-pending">pending</span>
+          <span class="sample-badge wb-accepted">accepted</span>
+        </div>
+        <div class="badge-meta"><strong>Four-status model</strong> — backend classifies staging rows at read time. Terminal: accepted/rejected. Used in IngestionRightPanel field table.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Landscaper Version Badges <span class="tag tag-css">CSS</span><span class="file-path">src/styles/landscaper-review.css :150–172</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge ver-draft">Draft</span>
+          <span class="sample-badge ver-review">Under Review</span>
+          <span class="sample-badge ver-final">Final</span>
+        </div>
+        <div class="badge-meta"><strong>Document workflow state</strong> — three-stage pipeline for Landscaper analysis documents.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Sub-Tab Count Badges <span class="tag tag-css">CSS</span><span class="file-path">src/styles/folder-tabs.css :417–456</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill tab-default" style="min-width:18px;height:18px;padding:0 6px;font-size:0.7rem">3</span>
+          <span class="sample-pill tab-processing" style="min-width:18px;height:18px;padding:0 6px;font-size:0.7rem">2</span>
+          <span class="sample-pill tab-error" style="min-width:18px;height:18px;padding:0 6px;font-size:0.7rem">1</span>
+        </div>
+        <div class="badge-meta"><strong>Folder tab counts</strong> — default (warning/pending), processing (info), error (danger). Pill shape 999px. Min-width 18px.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 5. MEDIA & DMS BADGES -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:#321fdb"></span> Media &amp; Document Badges</div>
+
+  <div class="card">
+    <div class="card-header">MediaBadgeChips <span class="tag tag-coreui">CoreUI CBadge</span><span class="file-path">src/components/dms/MediaBadgeChips.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge cui-primary" style="border-radius:4px">Photos 5</span>
+          <span class="sample-badge cui-success" style="border-radius:4px">Plans 3</span>
+          <span class="sample-badge cui-danger" style="border-radius:4px">Maps 2</span>
+          <span class="sample-badge cui-warning" style="border-radius:4px">Charts</span>
+          <span class="sample-badge cui-info" style="border-radius:4px">Renderings</span>
+          <span class="sample-badge cui-secondary" style="border-radius:4px">Other</span>
+        </div>
+        <div class="badge-meta"><strong>6-color cyclic</strong> — solid when extracted, outline when partial (fraction e.g. "3/5"), checkmark when complete. Scan states: unscanned → scanning → extracting → complete/error.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Sales Comparison Narrative Badge <span class="tag tag-css">CSS</span><span class="file-path">src/styles/sales-comparison.css :137–144</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview"><span class="sample-badge b-info">v3</span></div>
+        <div class="badge-meta"><strong>Narrative version</strong> — info-colored, 4px radius. Shows version number in sales comparison narrative canvas header.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Unclassified Cost Badge <span class="tag tag-css">CSS</span><span class="file-path">src/styles/operations-tab.css :644–651</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview"><span class="sample-badge cui-danger" style="padding:2px 6px">Unclassified</span></div>
+        <div class="badge-meta"><strong>Danger flag</strong> — solid red. Highlights cost items lacking proper classification.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 6. OPERATIONS & GROWTH BADGES -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:#68d391"></span> Operations &amp; Growth Badges</div>
+
+  <div class="card">
+    <div class="card-header">GrowthBadge / FeeBadge <span class="tag tag-css">CSS</span><span class="file-path">src/components/operations/GrowthBadge.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge ops-global">Global 3.0%</span>
+          <span class="sample-badge ops-custom">Custom 4.5%</span>
+          <span class="sample-badge ops-fee">Fee 2.0%</span>
+        </div>
+        <div class="badge-meta"><strong>3 variants</strong> — global (gray, --cui-tertiary-bg), custom (amber #f6ad55 border + 8% fill), fee (green #68d391 border + 8% fill). FeeBadge companion shows "% of EGI". Radius 2px.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 7. NAVIGATION & FILTER PILLS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:var(--accent)"></span> Navigation &amp; Filter Patterns</div>
+
+  <div class="card">
+    <div class="card-header">ActiveProjectBar Pills <span class="tag tag-coreui">CBadge</span><span class="file-path">src/app/projects/[projectId]/components/ActiveProjectBar.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill pt-mf">Multifamily</span>
+          <span class="sample-badge b-info" style="padding:0.2rem 0.4rem">INVESTMENT</span>
+          <span class="sample-badge b-primary" style="padding:0.2rem 0.4rem">VALUATION</span>
+        </div>
+        <div class="badge-meta"><strong>3 pills in sticky nav</strong> — Property type (token-resolved), Perspective (info = Investment/Development), Purpose (primary = Valuation/Underwriting). Adaptive font: 0.68–0.78rem based on text length.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">ExtractionFilterPills <span class="tag tag-css">CSS-in-JS</span><span class="file-path">src/components/reports/ExtractionFilterPills.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill" style="background:#321fdb;color:#fff;font-size:0.7rem">project 12</span>
+          <span class="sample-pill" style="background:transparent;color:var(--text-muted);border:1px solid var(--border);font-size:0.7rem">physical 8</span>
+        </div>
+        <div class="badge-meta"><strong>7 categories</strong> — project, physical, pricing, income, expenses, market, debt. Pill toggle: filled (selected) / transparent (unselected). 0.15s transition.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Channel Pills <span class="tag tag-css">CSS</span><span class="file-path">src/styles/channel-pills.css</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-pill" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);font-size:0.7rem">Channel</span>
+          <span class="sample-pill" style="background:#3399ff;color:#fff;font-size:0.7rem">Active</span>
+        </div>
+        <div class="badge-meta"><strong>Toggle pills</strong> — tertiary bg default, fills with --pill-color when active. Pill shape 999px, 0.8125rem font. Dark mode overrides.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Knowledge Library Filter Chips + Geo Tags <span class="tag tag-css">CSS</span><span class="file-path">src/components/admin/knowledge-library/knowledge-library.css</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.7rem">Filter <span style="background:rgba(75,80,108,0.3);padding:0 4px;border-radius:2px;margin-left:4px;font-size:0.65rem">24</span></span>
+          <span class="sample-badge" style="background:#321fdb;color:#fff;border-radius:4px;font-size:0.7rem">Active <span style="background:rgba(255,255,255,0.25);padding:0 4px;border-radius:2px;margin-left:4px;font-size:0.65rem">12</span></span>
+          <span class="sample-pill" style="background:var(--surface2);color:var(--text-muted);font-size:0.65rem;border:1px solid var(--border)">Phoenix MSA &times;</span>
+        </div>
+        <div class="badge-meta"><strong>Filter chips</strong> (4px radius) with embedded count sub-badge. <strong>Geo tags</strong> (10px pill) with remove button + dashed "add" variant.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Map Layer Toggles <span class="tag tag-css">CSS</span><span class="file-path">src/components/location-intelligence/location-map.css</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-dot" style="background:#6b7280"></span> <span style="font-size:0.75rem;color:var(--text-muted)">Off</span>
+          &nbsp;&nbsp;
+          <span class="sample-dot" style="background:#22c55e"></span> <span style="font-size:0.75rem;color:var(--text)">On</span>
+          &nbsp;&nbsp;&nbsp;
+          <span class="sample-badge" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:0.7rem"><span class="sample-dot" style="background:#e55353;margin-right:4px"></span>Hazards</span>
+        </div>
+        <div class="badge-meta"><strong>Layer dot indicators</strong> — 8px circles, gray (off) / green (on). <strong>Category buttons</strong> with 10px color dot using --category-color variable + color-mix for selected bg.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- 8. GENERIC WRAPPERS -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:var(--text-muted)"></span> Generic Wrappers</div>
+
+  <div class="card">
+    <div class="card-header">SemanticBadge <span class="tag tag-custom">Custom + CBadge</span><span class="file-path">src/components/ui/landscape/SemanticBadge.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview">
+          <span class="sample-badge b-secondary">user-tag</span>
+          <span class="sample-badge b-info">status</span>
+          <span class="sample-badge b-primary">category</span>
+        </div>
+        <div class="badge-meta"><strong>Intent router</strong> — 3 intents resolve to different variant logic. Data attributes for debugging. Used in AdviceAdherencePanel.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">Badge (Generic) <span class="tag tag-coreui">CBadge Passthrough</span><span class="file-path">src/components/ui/badge.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview"><span class="sample-badge b-secondary">Generic</span></div>
+        <div class="badge-meta"><strong>Thin wrapper</strong> — passes children, className, color (default: secondary) to CBadge. Fallback for ad-hoc needs.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">VersionBadge <span class="tag tag-custom">Interactive</span><span class="file-path">src/components/changelog/VersionBadge.tsx</span></div>
+    <div class="card-body">
+      <div class="badge-row">
+        <div class="badge-preview"><span class="sample-badge b-secondary" style="cursor:pointer">v2.4.1</span></div>
+        <div class="badge-meta"><strong>Button-badge</strong> — fetches version from Django API, opens changelog modal on click. Dashboard header + ActiveProjectBar.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- REMAINING CSS-ONLY -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:var(--orange)"></span> CSS-Only Patterns (No React Component)</div>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="consistency-table">
+        <thead><tr><th>Class</th><th>File</th><th>Shape</th><th>Usage</th></tr></thead>
+        <tbody>
+          <tr><td><code>.studio-badge-*</code></td><td style="font-family:monospace;font-size:0.65rem;color:var(--text-muted)">coreui-theme.css</td><td>Badge (4px)</td><td>4 variants: info, success, warning, error. Translucent fill + colored text.</td></tr>
+          <tr><td><code>.budget-category-badge</code></td><td style="font-family:monospace;font-size:0.65rem;color:var(--text-muted)">component-patterns.css</td><td>Badge (4px)</td><td>Info-colored, 0.75rem. Budget expense categorization labels.</td></tr>
+          <tr><td><code>.filter-badge</code></td><td style="font-family:monospace;font-size:0.65rem;color:var(--text-muted)">component-patterns.css</td><td>Pill (1rem)</td><td>Primary tint, 0.8125rem. Selected filter indicator.</td></tr>
+          <tr><td><code>.budget-mode-badge</code></td><td style="font-family:monospace;font-size:0.65rem;color:var(--text-muted)">component-patterns.css</td><td>Badge (6px)</td><td>Mode selector with hover/active/remove-button states.</td></tr>
+          <tr><td><code>.lifecycle-badge</code></td><td style="font-family:monospace;font-size:0.65rem;color:var(--text-muted)">category-taxonomy.css</td><td>Square (4px) / Large (6px)</td><td>24×24 small + padded large variant. Stage-colored via CoreUI semantic vars.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ============================================ -->
+<!-- CONSISTENCY MATRIX -->
+<!-- ============================================ -->
+<div class="section">
+  <div class="section-title"><span class="dot" style="background:var(--cyan)"></span> Consistency Matrix</div>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <table class="consistency-table">
+        <thead><tr><th>Dimension</th><th>Assessment</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Property type colors</td>
+            <td><span class="flag flag-ok">Centralized</span></td>
+            <td>Single source of truth in tokens.css. All consumers resolve via getPropertyTypeTokenRef(). 50+ aliases mapped.</td>
+          </tr>
+          <tr>
+            <td>Lifecycle stage colors</td>
+            <td><span class="flag flag-ok">Consistent</span></td>
+            <td>STAGE_COLORS object shared between ActivityFilter and CategoryTreeItem. Maps to CoreUI semantic names.</td>
+          </tr>
+          <tr>
+            <td>Semantic chip tokens</td>
+            <td><span class="flag flag-ok">Centralized</span></td>
+            <td>8 intents defined in tokens.css with light/dark variants. All use CSS variable pattern: --chip-{intent}-{bg|border|text|outline}.</td>
+          </tr>
+          <tr>
+            <td>Status color mapping</td>
+            <td><span class="flag flag-ok">Consistent</span></td>
+            <td>success=green, warning=amber, danger=red, info=blue, secondary=gray. Uniform across StatusChip, workbench, tab badges, version badges.</td>
+          </tr>
+          <tr>
+            <td>Border radius</td>
+            <td><span class="flag flag-warn">3 conventions</span></td>
+            <td>4px (status badges, studio, lifecycle), 6px (budget-mode), 999px (property type pills, channel pills, extraction filters, semantic chips). No documented rule for when to use which.</td>
+          </tr>
+          <tr>
+            <td>Implementation approach</td>
+            <td><span class="flag flag-warn">Fragmented</span></td>
+            <td>4 methods: CoreUI CBadge, custom React wrappers, CSS-only classes, CSS-in-JS inline. StatusChip and SemanticBadge both wrap CBadge but expose different APIs.</td>
+          </tr>
+          <tr>
+            <td>Growth/ops badge colors</td>
+            <td><span class="flag flag-warn">Hardcoded</span></td>
+            <td>GrowthBadge uses hardcoded hex (#f6ad55, #68d391) instead of CoreUI variables or tokens. Works but bypasses theme system.</td>
+          </tr>
+          <tr>
+            <td>Naming convention</td>
+            <td><span class="flag flag-warn">Inconsistent</span></td>
+            <td>"Badge" vs "Chip" vs "Pill" used interchangeably. StatusChip is a badge. MediaBadgeChips renders badges. ExtractionFilterPills are toggles.</td>
+          </tr>
+          <tr>
+            <td>Dark mode</td>
+            <td><span class="flag flag-ok">Mostly covered</span></td>
+            <td>CSS-variable components auto-adapt. Semantic chips have explicit dark overrides in tokens.css. GrowthBadge hardcoded colors need verification.</td>
+          </tr>
+          <tr>
+            <td>Accessibility</td>
+            <td><span class="flag flag-issue">Gaps</span></td>
+            <td>Color-only differentiation in MediaBadgeChips and lifecycle letter badges. Most status badges lack role="status" or aria-label.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- FINDINGS -->
+<!-- ============================================ -->
+<div class="findings">
+  <h3>Key Findings</h3>
+
+  <div class="finding-item">
+    <span class="finding-num fn-good">1</span>
+    <div><strong>Three well-governed color systems.</strong> Property type tokens (7 types, 50+ aliases), lifecycle stages (6 stages via STAGE_COLORS), and semantic category chips (8 intents with light/dark) are all centralized and consistent. These are the models to follow.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-warn">2</span>
+    <div><strong>GrowthBadge bypasses the theme.</strong> Hardcoded #f6ad55 and #68d391 instead of CoreUI variables. If the theme ever changes, these badges won't follow. Low risk but easy to fix.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-warn">3</span>
+    <div><strong>Border radius has no rule.</strong> 4px, 6px, and 999px all appear for status indicators. Suggest: 999px = identity pills (property type, channel), 4px = status/state badges, 6px reserved for interactive mode selectors.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-warn">4</span>
+    <div><strong>Two competing CBadge wrappers.</strong> StatusChip (status enum API) and SemanticBadge (intent routing API) both wrap CBadge. Could unify under SemanticBadge with a "status" intent.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-warn">5</span>
+    <div><strong>Badge/Chip/Pill naming is ad-hoc.</strong> No semantic distinction. StatusChip renders badges. MediaBadgeChips renders chips. ExtractionFilterPills are toggles. A naming convention would help onboarding.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-info">6</span>
+    <div><strong>9 CSS-only patterns lack React wrappers.</strong> No TypeScript safety net if classes are renamed. Low priority — most are stable and domain-specific.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-issue">7</span>
+    <div><strong>Accessibility gaps.</strong> Lifecycle letter badges and MediaBadgeChips rely on color alone. No role="status" on state-communicating badges. VersionBadge is the only one with proper button semantics.</div>
+  </div>
+
+  <div class="finding-item">
+    <span class="finding-num fn-good">8</span>
+    <div><strong>No dead badge code detected.</strong> All 22 patterns have active consumers. No orphaned components.</div>
+  </div>
+</div>
+
+<p style="color:var(--text-muted);font-size:0.65rem;text-align:center;margin-top:2rem">Badge &amp; Pill Audit v2 — Landscape App alpha19 — April 12, 2026</p>
+
+</body>
+</html>

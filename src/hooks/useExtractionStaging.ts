@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -392,7 +393,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/accept-all-pending/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: scopes ? JSON.stringify({ scopes }) : '{}',
         },
       );
@@ -410,7 +411,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/commit/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ scopes }),
         }
       );
@@ -434,7 +435,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/${extractionId}/update-value/`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ value: newValue }),
         }
       );
@@ -466,7 +467,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/commit/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ commit_all_accepted: true }),
         }
       );
@@ -498,7 +499,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/${extractionId}/resolve/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ choice }),
         }
       );
@@ -521,7 +522,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/accept-all-matches/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: scopes ? JSON.stringify({ scopes }) : '{}',
         },
       );
@@ -540,7 +541,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/accept-all-new/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: scopes ? JSON.stringify({ scopes }) : '{}',
         },
       );
@@ -559,7 +560,7 @@ export function useExtractionStaging(
         `${DJANGO_API}/api/knowledge/projects/${projectId}/extraction-staging/abandon/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({
             doc_id: params.docId ?? undefined,
             intake_uuid: params.intakeUuid ?? undefined,

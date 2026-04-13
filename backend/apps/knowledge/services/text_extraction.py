@@ -41,6 +41,27 @@ except ImportError:
     HAS_OPENPYXL = False
 
 
+def _download_to_temp(storage_uri: str, mime_type: str) -> str:
+    """Download a file to a temp path, handling both URLs and Django storage paths."""
+    parsed = urlparse(storage_uri)
+    suffix = _get_extension(mime_type)
+
+    if parsed.scheme in ('http', 'https'):
+        # Full URL — download via HTTP
+        response = requests.get(storage_uri, timeout=60)
+        response.raise_for_status()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(response.content)
+            return tmp.name
+    else:
+        # Relative path — read via Django storage (local disk or S3/R2)
+        from django.core.files.storage import default_storage
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            with default_storage.open(storage_uri, 'rb') as f:
+                tmp.write(f.read())
+            return tmp.name
+
+
 def extract_text_from_url(storage_uri: str, mime_type: str = None) -> Tuple[Optional[str], Optional[str]]:
     """
     Download document from URL and extract text.
@@ -61,12 +82,7 @@ def extract_text_from_url(storage_uri: str, mime_type: str = None) -> Tuple[Opti
 
     try:
         # Download file to temp location
-        response = requests.get(storage_uri, timeout=60)
-        response.raise_for_status()
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=_get_extension(mime_type)) as tmp:
-            tmp.write(response.content)
-            tmp_path = tmp.name
+        tmp_path = _download_to_temp(storage_uri, mime_type)
 
         try:
             # Extract based on type
@@ -113,12 +129,7 @@ def extract_text_and_page_count_from_url(
         mime_type = _infer_mime_type(storage_uri)
 
     try:
-        response = requests.get(storage_uri, timeout=60)
-        response.raise_for_status()
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=_get_extension(mime_type)) as tmp:
-            tmp.write(response.content)
-            tmp_path = tmp.name
+        tmp_path = _download_to_temp(storage_uri, mime_type)
 
         try:
             if mime_type == 'application/pdf':

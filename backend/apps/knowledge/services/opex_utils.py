@@ -590,14 +590,9 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
     category_id = resolved.get('category_id')
     parent_category = resolved.get('parent_category', 'unclassified')
 
-    # If legacy account_id is not present in deprecated table, null it to avoid FK violation
-    if account_id:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT 1 FROM landscape.tbl_opex_accounts_deprecated WHERE account_id = %s
-            """, [account_id])
-            if cursor.fetchone() is None:
-                account_id = None
+    # Legacy account_id references tbl_opex_accounts_deprecated which no longer
+    # exists.  Always null it to avoid FK / relation-not-found errors.
+    account_id = None
 
     # ── Derive unit_amount (source of truth) and annual_amount ─────────
     # Priority: explicit unit_amount/per_unit from selector > computed from amount ÷ unit_count.
@@ -710,6 +705,14 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
                 'FIXED_PERCENT', 0.03, 1, 'MONTHLY', NULL,
                 %s, 'FIXED_AMOUNT', %s, FALSE, %s, %s, %s, NOW(), NOW()
             )
+            ON CONFLICT (project_id, category_id, statement_discriminator)
+                WHERE category_id IS NOT NULL
+            DO UPDATE SET
+                annual_amount = EXCLUDED.annual_amount,
+                unit_amount = EXCLUDED.unit_amount,
+                amount_per_sf = EXCLUDED.amount_per_sf,
+                expense_category = EXCLUDED.expense_category,
+                updated_at = NOW()
             RETURNING opex_id
         """, [
             project_id,
@@ -724,7 +727,7 @@ def upsert_opex_entry(conn, project_id: int, category_label: str, amount: Any, s
             parent_category
         ])
         new_id = cursor.fetchone()[0]
-        return {'success': True, 'action': 'inserted', 'opex_id': new_id, 'parent_category': parent_category}
+        return {'success': True, 'action': 'upserted', 'opex_id': new_id, 'parent_category': parent_category}
 
 
 def persist_parsed_scenarios(
