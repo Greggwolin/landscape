@@ -29,13 +29,13 @@ import { ActiveProjectBar } from './components/ActiveProjectBar';
 import FolderTabs from '@/components/navigation/FolderTabs';
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
-import { FileDropProvider, useFileDrop } from '@/contexts/FileDropContext';
-import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
+import { useFileDrop } from '@/contexts/FileDropContext';
+import { ProjectContextShell } from '@/components/wrapper/ProjectContextShell';
 import { DropZoneWrapper } from '@/components/ui/DropZoneWrapper';
 import { useExtractionStagingCount } from '@/hooks/useExtractionStagingCount';
 import { useProjectCreation } from '@/hooks/useProjectCreation';
 import IngestionWorkbenchPanel from './components/IngestionWorkbenchPanel';
-import { WorkbenchProvider, useWorkbench } from '@/contexts/WorkbenchContext';
+import { useWorkbench } from '@/contexts/WorkbenchContext';
 import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
 import { UnifiedIntakeModal } from '@/components/intake/UnifiedIntakeModal';
 import ProjectKnowledgeModal from '@/components/intake/ProjectKnowledgeModal';
@@ -912,9 +912,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 
 export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClientProps) {
   return (
-    <FileDropProvider>
-    <WorkbenchProvider>
-    <LandscaperCollisionProvider>
+    <ProjectContextShell>
     <Suspense
       fallback={
         <div
@@ -971,8 +969,6 @@ export function ProjectLayoutClient({ projectId, children }: ProjectLayoutClient
         {children}
       </ProjectLayoutClientInner>
     </Suspense>
-    </LandscaperCollisionProvider>
-    </WorkbenchProvider>
-    </FileDropProvider>
+    </ProjectContextShell>
   );
 }

@@ -66,6 +66,8 @@ interface LandscaperChatThreadedProps {
   onCollapsePanel?: () => void;
   onReviewMedia?: (docId: number, docName: string) => void;
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
+  /** When provided, activates this thread on mount (used by URL-based thread switching) */
+  initialThreadId?: string;
 }
 
 /**
@@ -247,6 +249,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onCollapsePanel,
     onReviewMedia,
     onToolResult,
+    initialThreadId,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -302,6 +305,24 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   // Load all project threads on mount so the badge count is available immediately
   useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
+
+  // URL-based thread activation — when initialThreadId is provided, select that thread
+  const initialThreadAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialThreadId && !initialThreadAppliedRef.current && !isThreadLoading && threads.length > 0) {
+      if (activeThread?.threadId !== initialThreadId) {
+        // Thread might be in allThreads or threads — try both
+        const found = threads.find(t => t.threadId === initialThreadId)
+          || allThreads.find(t => t.threadId === initialThreadId);
+        if (found) {
+          selectThread(initialThreadId);
+          initialThreadAppliedRef.current = true;
+        }
+      } else {
+        initialThreadAppliedRef.current = true;
+      }
+    }
+  }, [initialThreadId, isThreadLoading, threads, allThreads, activeThread?.threadId, selectThread]);
 
   // Sync project landscaper loading state to global context (drives HelpIcon propeller)
   const { setIsThinking } = useLandscaperThinking();

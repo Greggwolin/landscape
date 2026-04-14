@@ -1,34 +1,33 @@
 import React from 'react';
 import { CBadge } from '@coreui/react';
 import type { CBadgeProps } from '@coreui/react';
-import { getPropertyTypeLabel, getPropertyTypeTokenRef } from '@/config/propertyTypeTokens';
+import { getPropertyTypeLabel, getPropertyTypeBadgeStyle, type BadgeVariant } from '@/config/propertyTypeTokens';
 
 export interface PropertyTypeBadgeProps extends Omit<CBadgeProps, 'color'> {
   typeCode?: string | null;
   label?: string;
+  variant?: BadgeVariant;
 }
 
 export function PropertyTypeBadge({
   typeCode,
   label,
+  variant = 'solid',
   style,
   className,
-  shape = 'rounded-pill',
   ...rest
 }: PropertyTypeBadgeProps) {
-  const tokenRef = getPropertyTypeTokenRef(typeCode);
   const displayLabel = label ?? getPropertyTypeLabel(typeCode);
+  const badgeStyle = getPropertyTypeBadgeStyle(typeCode, variant);
 
   return (
     <CBadge
       {...rest}
-      shape={shape}
       className={className}
       style={{
-        backgroundColor: tokenRef?.bgVar ?? 'var(--cui-tertiary-bg)',
-        color: tokenRef?.textVar ?? 'var(--cui-body-color)',
-        border: tokenRef ? '1px solid transparent' : '1px solid var(--cui-border-color)',
+        ...badgeStyle,
         fontWeight: 600,
+        borderRadius: 4,
         ...style,
       }}
     >

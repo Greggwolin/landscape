@@ -187,7 +187,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
             style={{
               fontSize: '0.7rem',
               padding: '0.25rem 0.75rem',
-              borderRadius: '999px',
+              borderRadius: '4px',
               lineHeight: 1,
               fontWeight: 600,
               backgroundColor: 'var(--cui-primary)',

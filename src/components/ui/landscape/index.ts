@@ -11,8 +11,12 @@
 export { LandscapeButton, ButtonVariants, ButtonSizes } from './LandscapeButton';
 export type { LandscapeButtonProps } from './LandscapeButton';
 
-export { StatusChip, Status } from './StatusChip';
-export type { StatusChipProps, StatusType } from './StatusChip';
+export { StatusBadge, Status } from './StatusBadge';
+export type { StatusBadgeProps, StatusType } from './StatusBadge';
+// Backwards-compatible re-exports
+export { StatusChip } from './StatusChip';
+export type { StatusChipProps } from './StatusChip';
+
 export { SemanticBadge } from './SemanticBadge';
 export type { SemanticBadgeProps, SemanticIntent } from './SemanticBadge';
 export { PropertyTypeBadge } from './PropertyTypeBadge';

@@ -1503,6 +1503,50 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             'deleted_message_count': msg_count,
         }, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='recent')
+    def recent(self, request):
+        """
+        List recent threads across all accessible projects for the current user.
+        Returns threads sorted by updated_at desc, with project name included.
+        """
+        from .models import ChatThread
+        from django.db.models import Count
+
+        limit = int(request.query_params.get('limit', 50))
+        include_closed = request.query_params.get('include_closed', 'false').lower() == 'true'
+
+        queryset = ChatThread.objects.select_related('project').annotate(
+            msg_count=Count('messages')
+        ).order_by('-updated_at')
+
+        if not include_closed:
+            queryset = queryset.filter(is_active=True)
+
+        queryset = queryset[:limit]
+
+        threads = []
+        for t in queryset:
+            threads.append({
+                'threadId': str(t.id),
+                'projectId': t.project_id,
+                'projectName': t.project.project_name if t.project else 'Unknown',
+                'propertyType': t.project.project_type_code if t.project else None,
+                'pageContext': t.page_context,
+                'subtabContext': t.subtab_context,
+                'title': t.title,
+                'isActive': t.is_active,
+                'messageCount': t.msg_count,
+                'createdAt': t.created_at.isoformat(),
+                'updatedAt': t.updated_at.isoformat(),
+                'closedAt': t.closed_at.isoformat() if t.closed_at else None,
+            })
+
+        return Response({
+            'success': True,
+            'threads': threads,
+            'count': len(threads),
+        })
+
     @action(detail=False, methods=['post'], url_path='new')
     def start_new(self, request):
         """POST start a new thread (closes existing active thread first)."""

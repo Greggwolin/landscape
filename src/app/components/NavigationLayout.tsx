@@ -37,10 +37,11 @@ export default function NavigationLayout({
   const { isOpen: isHelpOpen } = useHelpLandscaper();
 
 
-  // Auto-hide navigation on auth routes
+  // Auto-hide navigation on auth routes and wrapper layout (has its own sidebar)
   const isAuthRoute = AUTH_ROUTES.some(route => pathname?.startsWith(route));
+  const isWrapperRoute = pathname?.startsWith('/w');
 
-  if (hideNavigation || isAuthRoute) {
+  if (hideNavigation || isAuthRoute || isWrapperRoute) {
     return <>{children}</>;
   }
 

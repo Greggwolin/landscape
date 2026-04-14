@@ -444,7 +444,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **231 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` added Apr 2026
+- Claude AI with **232 registered tools** (`@register_tool` decorator) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` added Apr 2026 + `open_input_modal` added Apr 2026
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -808,8 +808,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-10 (nightly sync — Ingestion Workbench four-status model refactor (WIP): backend classification replaces client-side detectConflicts; new resolve/acceptAllMatches/acceptAllNew mutations; IngestionRightPanel + ExtractionSummary + ExtractionDiffPanel components; LandscaperChatThreaded setInputText imperative handle)*
+*Last updated: 2026-04-13 (nightly sync — `open_input_modal` Landscaper tool added (tool count 232) + new `GET /landscaper/threads/recent/` endpoint; Cowork "unified wrapper" UI scaffolded under `src/app/w/` and `src/components/wrapper/` with WrapperProjectContext/WrapperChatContext/ModalRegistryContext and useRecentThreads hook (uncommitted); badge/chip consolidation: MediaBadges, StatusBadge, ExtractionFilterToggles extracted from their chip/pill counterparts)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: 231*
+*Landscaper tool count: 232*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

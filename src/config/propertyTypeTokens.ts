@@ -5,6 +5,8 @@
  * These are not semantic intent colors and must remain separate from status/intent systems.
  */
 
+import type React from 'react';
+
 export type CanonicalPropertyTypeCode = 'LAND' | 'MF' | 'RET' | 'OFF' | 'IND' | 'HTL' | 'MXU';
 
 export interface PropertyTypeTokenRef {
@@ -13,6 +15,8 @@ export interface PropertyTypeTokenRef {
   textToken: string;
   bgVar: string;
   textVar: string;
+  rgb: string;
+  rgbToken: string;
 }
 
 export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTypeTokenRef> = {
@@ -22,6 +26,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-land-dev-text',
     bgVar: 'var(--pt-land-dev-bg)',
     textVar: 'var(--pt-land-dev-text)',
+    rgb: '59, 79, 107',
+    rgbToken: '--pt-land-dev-rgb',
   },
   MF: {
     label: 'Multifamily',
@@ -29,6 +35,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-multifamily-text',
     bgVar: 'var(--pt-multifamily-bg)',
     textVar: 'var(--pt-multifamily-text)',
+    rgb: '13, 177, 75',
+    rgbToken: '--pt-multifamily-rgb',
   },
   RET: {
     label: 'Retail',
@@ -36,6 +44,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-retail-text',
     bgVar: 'var(--pt-retail-bg)',
     textVar: 'var(--pt-retail-text)',
+    rgb: '204, 0, 76',
+    rgbToken: '--pt-retail-rgb',
   },
   OFF: {
     label: 'Office',
@@ -43,6 +53,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-office-text',
     bgVar: 'var(--pt-office-bg)',
     textVar: 'var(--pt-office-text)',
+    rgb: '100, 96, 170',
+    rgbToken: '--pt-office-rgb',
   },
   IND: {
     label: 'Industrial',
@@ -50,6 +62,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-industrial-text',
     bgVar: 'var(--pt-industrial-bg)',
     textVar: 'var(--pt-industrial-text)',
+    rgb: '0, 137, 208',
+    rgbToken: '--pt-industrial-rgb',
   },
   HTL: {
     label: 'Hospitality',
@@ -57,6 +71,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-hospitality-text',
     bgVar: 'var(--pt-hospitality-bg)',
     textVar: 'var(--pt-hospitality-text)',
+    rgb: '243, 112, 33',
+    rgbToken: '--pt-hospitality-rgb',
   },
   MXU: {
     label: 'Mixed Use',
@@ -64,6 +80,8 @@ export const propertyTypeTokenMap: Record<CanonicalPropertyTypeCode, PropertyTyp
     textToken: '--pt-mixed-use-text',
     bgVar: 'var(--pt-mixed-use-bg)',
     textVar: 'var(--pt-mixed-use-text)',
+    rgb: '252, 183, 17',
+    rgbToken: '--pt-mixed-use-rgb',
   },
 };
 
@@ -248,4 +266,46 @@ export function getPropertyTypeLabel(value?: string | null): string {
   if (tokenRef) return tokenRef.label;
 
   return value || 'Not specified';
+}
+
+export type BadgeVariant = 'solid' | 'soft' | 'outline';
+
+export function getPropertyTypeBadgeStyle(
+  typeCode: string | null | undefined,
+  variant: BadgeVariant = 'solid',
+  isDark: boolean = false
+): React.CSSProperties {
+  const ref = getPropertyTypeTokenRef(typeCode);
+  if (!ref) {
+    return { background: '#6b7280', color: '#ffffff' };
+  }
+
+  switch (variant) {
+    case 'solid':
+      return {
+        background: ref.bgVar,
+        color: ref.textVar,
+        border: '1px solid transparent',
+      };
+    case 'soft': {
+      const fillOpacity = isDark ? 0.18 : 0.20;
+      const borderOpacity = isDark ? 0.30 : 0.35;
+      return {
+        background: `rgba(${ref.rgb}, ${fillOpacity})`,
+        color: ref.bgVar,
+        border: `1px solid rgba(${ref.rgb}, ${borderOpacity})`,
+      };
+    }
+    case 'outline':
+      return {
+        background: 'transparent',
+        color: ref.bgVar,
+        border: `1px solid ${ref.bgVar}`,
+      };
+    default:
+      return {
+        background: ref.bgVar,
+        color: ref.textVar,
+      };
+  }
 }

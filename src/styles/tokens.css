@@ -49,20 +49,61 @@
      PROPERTY TYPE TOKENS (domain-level, governed)
      These are canonical domain colors, not semantic intent colors.
      ========================================================================== */
-  --pt-land-dev-bg: #1f2a37;
+  --pt-land-dev-bg: #3B4F6B;
   --pt-land-dev-text: #ffffff;
-  --pt-multifamily-bg: #f37021;
+  --pt-land-dev-rgb: 59, 79, 107;
+
+  --pt-multifamily-bg: #0DB14B;
   --pt-multifamily-text: #ffffff;
+  --pt-multifamily-rgb: 13, 177, 75;
+
   --pt-retail-bg: #cc004c;
   --pt-retail-text: #ffffff;
+  --pt-retail-rgb: 204, 0, 76;
+
   --pt-office-bg: #6460aa;
   --pt-office-text: #ffffff;
+  --pt-office-rgb: 100, 96, 170;
+
   --pt-industrial-bg: #0089d0;
   --pt-industrial-text: #ffffff;
-  --pt-hospitality-bg: #0db14b;
+  --pt-industrial-rgb: 0, 137, 208;
+
+  --pt-hospitality-bg: #F37021;
   --pt-hospitality-text: #ffffff;
+  --pt-hospitality-rgb: 243, 112, 33;
+
   --pt-mixed-use-bg: #fcb711;
   --pt-mixed-use-text: #000000;
+  --pt-mixed-use-rgb: 252, 183, 17;
+
+  /* ==========================================================================
+     TOOL TYPE TOKENS (Ocean scheme)
+     Monochromatic blue ramp for Landscaper tool categories.
+     ========================================================================== */
+  --tt-skills-bg: #0E3B6F;
+  --tt-skills-text: #ffffff;
+  --tt-skills-rgb: 14, 59, 111;
+
+  --tt-analysis-bg: #1565A8;
+  --tt-analysis-text: #ffffff;
+  --tt-analysis-rgb: 21, 101, 168;
+
+  --tt-reports-bg: #2196C8;
+  --tt-reports-text: #ffffff;
+  --tt-reports-rgb: 33, 150, 200;
+
+  --tt-datasources-bg: #4FC3D8;
+  --tt-datasources-text: #000000;
+  --tt-datasources-rgb: 79, 195, 216;
+
+  --tt-document-bg: #0B1D3A;
+  --tt-document-text: #ffffff;
+  --tt-document-rgb: 11, 29, 58;
+
+  --tt-custom-bg: #B2EBF2;
+  --tt-custom-text: #004D5E;
+  --tt-custom-rgb: 178, 235, 242;
 
   /* Semantic category chips */
   --chip-horizontal-bg: rgba(37, 99, 235, 0.12);

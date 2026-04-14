@@ -45,7 +45,7 @@
   padding: 0.25rem 0.625rem;
   background: rgba(var(--cui-success-rgb), 0.15);
   color: var(--cui-success);
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
   margin-left: 0.75rem;
@@ -94,7 +94,7 @@
   color: var(--cui-tertiary-color);
   background: var(--cui-tertiary-bg);
   padding: 0.125rem 0.5rem;
-  border-radius: 999px;
+  border-radius: 4px;
 }
 
 /* ==========================================================================

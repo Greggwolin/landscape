@@ -6,7 +6,7 @@ import { cilLayers } from '@coreui/icons';
 import { useDropzone } from 'react-dropzone';
 import type { DMSDocument } from '@/types/dms';
 import { useUploadStaging } from '@/contexts/UploadStagingContext';
-import MediaBadgeChips from '@/components/dms/MediaBadgeChips';
+import MediaBadges from '@/components/dms/MediaBadges';
 
 export interface FilterAccordion {
   doc_type: string;
@@ -452,7 +452,7 @@ function FilterDropRow({
                 </div>
                 {/* Media badge chips — color-coded by media category */}
                 {onReviewMedia && (
-                  <MediaBadgeChips
+                  <MediaBadges
                     mediaScanJson={doc.media_scan_json}
                     scanStatus={doc.media_scan_status}
                     compact={true}

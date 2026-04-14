@@ -2165,7 +2165,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
                 style={{
                   fontSize: '0.75rem',
                   padding: '0.125rem 0.5rem',
-                  borderRadius: '999px',
+                  borderRadius: '4px',
                   backgroundColor: 'var(--cui-info-bg)',
                   color: 'var(--cui-info)',
                   border: '1px solid var(--cui-info)',

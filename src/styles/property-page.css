@@ -316,7 +316,7 @@
   padding: 0.125rem 0.5rem;
   font-size: 0.7rem;
   font-weight: 500;
-  border-radius: 9999px;
+  border-radius: 4px;
 }
 
 .completion-badge.high {

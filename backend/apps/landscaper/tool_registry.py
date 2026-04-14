@@ -69,6 +69,8 @@ UNIVERSAL_TOOLS = [
     "get_portfolio_summary", "get_portfolio_assumptions", "get_project_assumptions_detail",
     # Misc
     "log_alpha_feedback",
+    # UI navigation
+    "open_input_modal",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,

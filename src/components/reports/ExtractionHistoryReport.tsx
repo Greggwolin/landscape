@@ -49,7 +49,7 @@ import {
   bulkUpdateStatus,
   approveHighConfidence,
 } from '@/hooks/useExtractionHistory';
-import { ExtractionFilterPills } from './ExtractionFilterPills';
+import { ExtractionFilterToggles } from './ExtractionFilterToggles';
 
 interface ExtractionHistoryReportProps {
   projectId: number;
@@ -198,7 +198,7 @@ function CategoryPill({ category }: { category: ExtractionCategory }) {
         backgroundColor: config.color,
         color: '#fff',
         padding: '0.125rem 0.5rem',
-        borderRadius: '999px',
+        borderRadius: '4px',
         fontSize: '0.75rem',
         fontWeight: 500,
       }}
@@ -688,7 +688,7 @@ export function ExtractionHistoryReport({ projectId }: ExtractionHistoryReportPr
       {/* Filter Pills */}
       <CCard className="mb-3">
         <CCardBody style={{ padding: '8px' }}>
-          <ExtractionFilterPills
+          <ExtractionFilterToggles
             selectedCategories={selectedCategories}
             categoryCounts={categoryCounts}
             onToggleCategory={handleToggleCategory}
