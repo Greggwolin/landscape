@@ -145,15 +145,23 @@ def run_formula_integrity(doc_id: int = None, **kwargs):
     """
     Formula integrity checks:
       2a error cells, 2b broken refs, 2c hardcoded overrides,
-      2e range consistency (critical — catches truncated SUM/XIRR).
-    Returns a findings list with Sheet!Cell refs and severity.
+      2e range consistency (critical — catches truncated SUM/XIRR),
+      2f downstream impact trace (auto for full_model tier — reports
+         which errors reach headline outputs like IRR, equity multiple,
+         DSCR, net cash flow).
+    Returns a findings list with Sheet!Cell refs, severity, and
+    impact_summary showing errors_reaching_headline vs errors_quarantined.
     """
     doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
     if err:
         return err
     try:
         with _open_workbook(doc_id_int) as (values_wb, formulas_wb):
-            result = xa.formula_integrity_check(values_wb, formulas_wb)
+            # Classify inline (cheap) to determine tier for impact trace
+            classification = xa.classify(values_wb, formulas_wb)
+            tier = classification.get("tier")
+            result = xa.formula_integrity_check(values_wb, formulas_wb, tier=tier)
+            result["tier"] = tier
         result.update({"ok": True, "doc_id": doc_id_int})
         return result
     except Exception as e:

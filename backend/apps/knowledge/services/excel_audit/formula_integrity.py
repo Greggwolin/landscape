@@ -10,6 +10,10 @@ Checks:
   2e. Range consistency   - SUM / XIRR / NPV / AVERAGE formulas across adjacent
                             columns that reference *different* row spans.
                             Catches truncated SUMs that miss newly-added rows.
+  2f. Downstream impact   - (auto for full_model tier) BFS forward from error
+                            cells through the formula dependency graph to
+                            determine which errors reach headline output cells
+                            (IRR, equity multiple, DSCR, net CF, etc.).
 
 Circular dependency detection (2d) deferred — openpyxl does not resolve the
 dependency graph natively, and the workbook's recomputed values already
@@ -184,7 +188,14 @@ def _check_range_consistency(formulas_wb: Workbook) -> List[Dict]:
     return findings
 
 
-def check(values_wb: Workbook, formulas_wb: Workbook) -> Dict:
+def check(values_wb: Workbook, formulas_wb: Workbook, tier: str = None) -> Dict:
+    """
+    Run all formula integrity checks.
+
+    When tier == "full_model" and error/ref findings exist, automatically
+    runs the downstream impact tracer (Phase 2f) to determine which errors
+    reach headline output cells (IRR, equity multiple, DSCR, etc.).
+    """
     findings: List[Dict] = []
     findings.extend(_check_errors(values_wb))
     findings.extend(_check_broken_refs(formulas_wb))
@@ -197,9 +208,18 @@ def check(values_wb: Workbook, formulas_wb: Workbook) -> Dict:
         by_check[f["check"]] = by_check.get(f["check"], 0) + 1
         by_severity[f["severity"]] = by_severity.get(f["severity"], 0) + 1
 
-    return {
+    result = {
         "findings": findings,
         "finding_count": len(findings),
         "by_check": by_check,
         "by_severity": by_severity,
     }
+
+    # Phase 2f: downstream impact trace for full_model tier
+    if tier == "full_model" and findings:
+        from .impact_tracer import run_impact_analysis
+        impact = run_impact_analysis(values_wb, formulas_wb, findings)
+        result["impact_summary"] = impact["summary"]
+        result["sinks_detected"] = impact["sinks_detected"]
+
+    return result
