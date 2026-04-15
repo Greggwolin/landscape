@@ -1340,7 +1340,7 @@ function UnifiedUnitCostTable({
               <button
                 type="button"
                 onClick={() => onDeleteRow(row.original)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-chip-error/40 text-chip-error hover:bg-chip-error/10 focus:outline-none focus:ring-2 focus:ring-chip-error/40"
                 title="Archive row"
               >
                 <Trash2 size={12} />
@@ -1609,7 +1609,7 @@ function UnitCostCategoryTable({
               <button
                 type="button"
                 onClick={() => onDeleteRow(row.original)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded border border-red-300 text-chip-error hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-chip-error/40 text-chip-error hover:bg-chip-error/10 focus:outline-none focus:ring-2 focus:ring-chip-error/40"
                 title="Archive row"
               >
                 <Trash2 size={12} />
@@ -1674,7 +1674,7 @@ function UnitCostCategoryTable({
           <div className="mt-4">
             <button
               onClick={onAddRow}
-              className="inline-flex items-center gap-2 rounded border border-blue-500 bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+              className="inline-flex items-center gap-2 rounded border border-brand-primary bg-brand-primary px-3 py-2 text-xs font-medium text-text-inverse hover:bg-brand-primary/80 focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
             >
               <Plus size={14} />
               Add Row
@@ -1704,7 +1704,7 @@ function UnitCostCategoryTable({
             <tbody>
               {table.getRowModel().rows.map((row) => (
                 <React.Fragment key={row.id}>
-                  <tr className="hover:bg-blue-50/50">
+                  <tr className="hover:bg-brand-primary/10">
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="border border-line-soft bg-surface-card px-1.5 py-0.5 text-sm text-text-primary">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -1714,7 +1714,7 @@ function UnitCostCategoryTable({
                   {row.original.rowError && (
                     <tr>
                       <td colSpan={table.getVisibleLeafColumns().length} className="border-x border-b border-line-soft px-3 py-2">
-                        <div className="rounded border border-red-500/50 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        <div className="rounded border border-chip-error/50 bg-chip-error/10 px-3 py-2 text-xs text-chip-error">
                           {row.original.rowError}
                         </div>
                       </td>
@@ -1784,7 +1784,7 @@ function IndeterminateCheckbox({
       type="checkbox"
       ref={ref}
       className={clsx(
-        'h-4 w-4 rounded border border-slate-400 bg-surface-card text-blue-600 focus:ring-brand-primary/40',
+        'h-4 w-4 rounded border border-line-strong bg-surface-card text-brand-primary focus:ring-brand-primary/40',
         className
       )}
       {...rest}
@@ -1903,7 +1903,7 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
           className={clsx(
             'w-full border bg-surface-card px-1.5 py-0.5 text-sm text-text-primary focus:outline-none focus:ring-2',
             alignClass,
-            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-brand-primary/40'
+            error ? 'border-chip-error focus:ring-chip-error/40' : 'border-brand-primary focus:ring-brand-primary/40'
           )}
           inputMode={type === 'number' || type === 'currency' ? 'decimal' : undefined}
           type={type === 'date' ? 'date' : 'text'}
@@ -1927,7 +1927,7 @@ function EditableCell({ context, field, type, align = 'left', meta = {} }: Edita
       {(error || isSaving) && (
         <div className="flex items-center justify-between px-1.5">
           {error && <span className="text-xs text-chip-error">{error}</span>}
-          {isSaving && <span className="text-xs text-green-600">Saving…</span>}
+          {isSaving && <span className="text-xs text-chip-success">Saving…</span>}
         </div>
       )}
     </div>
@@ -2034,7 +2034,7 @@ function EditableSelectCell({
           className={clsx(
             'w-full border bg-surface-card px-1.5 py-0.5 text-sm text-text-primary focus:outline-none focus:ring-2',
             alignClass,
-            error ? 'border-red-500 focus:ring-red-300' : 'border-blue-500 focus:ring-brand-primary/40'
+            error ? 'border-chip-error focus:ring-chip-error/40' : 'border-brand-primary focus:ring-brand-primary/40'
           )}
         >
           {!required && <option value="">—</option>}
@@ -2052,7 +2052,7 @@ function EditableSelectCell({
       {(error || isSaving) && (
         <div className="flex items-center justify-between px-1.5">
           {error && <span className="text-xs text-chip-error">{error}</span>}
-          {isSaving && <span className="text-xs text-green-600">Saving…</span>}
+          {isSaving && <span className="text-xs text-chip-success">Saving…</span>}
         </div>
       )}
     </div>

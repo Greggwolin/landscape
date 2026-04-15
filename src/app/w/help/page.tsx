@@ -1,10 +1,11 @@
 'use client';
 
-import { PageShell } from '@/components/wrapper/PageShell';
+import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
+
 
 export default function WrapperHelpPage() {
   return (
-    <PageShell title="Help">
+    <RightContentPanel title="Help">
       <div className="w-help-sections">
         <div className="w-help-section">
           <h3>Report a Bug</h3>
@@ -70,6 +71,6 @@ export default function WrapperHelpPage() {
           </button>
         </div>
       </div>
-    </PageShell>
+    </RightContentPanel>
   );
 }

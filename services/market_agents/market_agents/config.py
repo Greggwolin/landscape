@@ -64,11 +64,16 @@ AGENT_BUNDLES: Dict[str, List[str]] = {
         "DRTSCIS",           # Net % banks tightening construction/land dev standards (Q, SLOOS)
         "DRTSCLCC",          # Net % banks reporting stronger CRE loan demand (Q, SLOOS)
     ],
-    # GDP and consumer sentiment
+    # GDP (consumer sentiment series are pulled directly from UMich, not FRED)
     "fred_gdp": [
         "GDPC1",             # Real GDP (Q)
         "A191RL1Q225SBEA",   # Real GDP Growth Rate (Q)
-        "UMCSENT",           # U Michigan Consumer Sentiment (M)
+    ],
+    # UMich Surveys of Consumers (pulled from sca.isr.umich.edu, not FRED)
+    "umich_sentiment": [
+        "UMCSENT",           # Consumer Sentiment composite (M)
+        "UMICC",             # Current Economic Conditions (M)
+        "UMICE",             # Consumer Expectations (M)
     ],
     # Housing supply pipeline (national, via FRED)
     "fred_housing_supply": [

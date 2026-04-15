@@ -4099,4 +4099,78 @@ LANDSCAPER_TOOLS = [
             "required": ["modal_name"],
         },
     },
+    # ── Excel Model Audit tools ────────────────────────────────────────────────
+    {
+        "name": "classify_excel_file",
+        "description": (
+            "Classify an uploaded Excel workbook (.xlsx/.xlsm) into one of three audit tiers: "
+            "'flat' (tabular data, no formulas worth auditing), 'assumption_heavy' "
+            "(labeled inputs across sheets, limited model logic), or 'full_model' "
+            "(waterfall/debt/cash flow with interdependent formulas). Always call this "
+            "first after an Excel upload so you know how deep to audit. Returns tier, "
+            "sheet_count, formula_count, and the sheet names that triggered the tier."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer",
+                    "description": "core_doc.doc_id of the uploaded Excel file",
+                },
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "run_structural_scan",
+        "description": (
+            "Phase 1 of the Excel audit. Returns sheet inventory (names, dimensions, "
+            "hidden flag), named ranges, and any external workbook links. External "
+            "links are a portability red flag. Run after classify_excel_file on "
+            "assumption_heavy or full_model tiers."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "run_formula_integrity",
+        "description": (
+            "Phase 2 of the Excel audit. Runs four integrity checks and returns a "
+            "findings list with Sheet!Cell references: (2a) error cells like #REF!/#DIV/0!, "
+            "(2b) broken references inside formulas, (2c) hardcoded numeric overrides "
+            "surrounded by formulas, (2e) range consistency — siblings in the same row "
+            "using range-based aggregates (SUM/XIRR/NPV/AVERAGE) that reference different "
+            "row spans. Use this to catch truncated SUMs and silently-broken models."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "extract_assumptions",
+        "description": (
+            "Phase 3 of the Excel audit. Scans the workbook for labeled input values "
+            "(label-left-of-value heuristic) and writes them to ai_extraction_staging "
+            "as pending rows with extraction_type='excel_audit_assumption'. Requires a "
+            "project_id to stage; if called from a pre-project chat (no project_id), "
+            "returns extractions inline only. Results become visible in the Ingestion "
+            "Workbench for review and commit."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+            },
+            "required": ["doc_id"],
+        },
+    },
 ]

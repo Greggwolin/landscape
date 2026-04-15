@@ -1,288 +1,427 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Menu, Plus, Search, FolderOpen, FileText, Map, Wrench, BarChart3, Sparkles, Settings, Moon, Sun, ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { HelpIcon } from '@/components/icons/HelpIcon';
 
 interface Thread {
   id: string;
   name: string;
-  timestamp: string;
-  isActive: boolean;
+  isActive?: boolean;
+  onClick?: () => void;
 }
 
 interface ScheduledAgent {
   id: string;
+  emoji: string;
   name: string;
-  status: 'running' | 'scheduled' | 'idle';
-  nextRun?: string;
+  status: 'active' | 'paused';
 }
 
 interface RecentProject {
   id: string;
   name: string;
-  type: string;
+  onClick?: () => void;
 }
 
-interface WrapperSidebarProps {
+export interface WrapperSidebarProps {
+  // Layout integration
+  activePage: string;
+  onNavigate: (page: string) => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  sidebarWidth: number;
+  onResizeStart: (e: React.PointerEvent) => void;
+
+  // Project context
+  projectId?: number;
   projectName?: string;
-  projectType?: string;
-  userEmail?: string;
-  userPlan?: string;
-  onThemeToggle?: () => void;
-  currentTheme?: 'light' | 'dark';
-  onNewChat?: () => void;
+  propertyType?: string;
+  analysisType?: string;
+
+  // Data
   threads?: Thread[];
   scheduledAgents?: ScheduledAgent[];
   recentProjects?: RecentProject[];
+
+  // Actions
+  onNewChat?: () => void;
+  onProjectSelect?: () => void;
+  onThemeToggle?: () => void;
+  currentTheme?: 'light' | 'dark';
+
+  // User
+  userName?: string;
+  userPlan?: string;
+  userInitials?: string;
+
+  // Help flyout
+  isHelpThinking?: boolean;
 }
 
-const MOUNTAIN_LOGO = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHN0eWxlPgouc3Qwey5maWxsOiN3aGl0ZTt9Cjwvc3R5bGU+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMiAwQzEyIDAgMCA4IDAgMjRoMjRjMC0xNi04LTI0LTEyLTI0eiIvPgo8L3N2Zz4=';
+// Simple inline SVG icon component
+const NavIcon: React.FC<{ d: string | string[] }> = ({ d }) => (
+  <span className="sb-nav-icon">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      {(Array.isArray(d) ? d : [d]).map((path, i) => (
+        <path key={i} d={path} />
+      ))}
+    </svg>
+  </span>
+);
+
+const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: string }> = [
+  { id: 'projects', label: 'Projects', paths: ['M4 20h16a2 2 0 002-2V8a2 2 0 00-2-2h-7.93a2 2 0 01-1.66-.9l-.82-1.2A2 2 0 007.93 3H4a2 2 0 00-2 2v13c0 1.1.9 2 2 2z'] },
+  { id: 'documents', label: 'Documents', paths: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2 14 8 20 8'] },
+  { id: 'map', label: 'Map', paths: ['M1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6Z', 'M8 2V18', 'M16 6V22'] },
+  { id: 'tools', label: 'Tools', paths: ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.22.532.68.918 1.241 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z'], badge: '12' },
+  { id: 'reports', label: 'Reports', paths: ['M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2', 'M8 2h8v4H8z'], badge: '15' },
+  { id: 'landscaper', label: 'Landscaper AI', paths: ['M11 20A7 7 0 019.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10z', 'M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12'] },
+  { id: 'admin', label: 'Admin', paths: ['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2', 'M12 11a4 4 0 100-8 4 4 0 000 8z'] },
+  { id: 'help', label: 'Help', paths: [] },
+];
+
+// Propeller-beanie icon for Help nav item (reuses shared HelpIcon)
+// Static by default; spin state is driven by help chat's thinking status.
+const PropellerBeanieIcon: React.FC<{ isThinking?: boolean }> = ({ isThinking = false }) => (
+  <span className="sb-nav-icon sb-nav-icon-help">
+    <HelpIcon isThinking={isThinking} style={{ width: 22, height: 22 }} />
+  </span>
+);
+
+// Mountain logo PNG (inverted white version for dark sidebar)
+const LOGO_SVG = '/logo-invert.png';
 
 export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
-  projectName = 'Brownstone Apartments',
-  projectType = 'Multifamily',
-  userEmail = 'user@example.com',
-  userPlan = 'Pro',
+  activePage,
+  onNavigate,
+  collapsed,
+  onToggleCollapse,
+  sidebarWidth,
+  onResizeStart,
+  projectId,
+  projectName,
+  propertyType,
+  analysisType,
+  threads = [],
+  scheduledAgents = [],
+  recentProjects = [],
+  onNewChat,
+  onProjectSelect,
   onThemeToggle,
   currentTheme = 'dark',
-  onNewChat,
-  threads = [
-    { id: 'thread1', name: 'Budget Analysis', timestamp: '2m ago', isActive: false },
-    { id: 'thread2', name: 'Market Research', timestamp: '15m ago', isActive: true },
-    { id: 'thread3', name: 'Finance Review', timestamp: '1h ago', isActive: false },
-  ],
-  scheduledAgents = [
-    { id: 'agent1', name: 'Market Analysis', status: 'running', nextRun: '5 min' },
-    { id: 'agent2', name: 'Report Generator', status: 'scheduled', nextRun: 'tomorrow' },
-  ],
-  recentProjects = [
-    { id: 'proj1', name: 'Peoria Meadows', type: 'Land Dev' },
-    { id: 'proj2', name: 'Downtown Tower', type: 'Office' },
-  ],
+  userName = 'Gregg Wolin',
+  userPlan = 'Crescent Bay Holdings',
+  userInitials = 'GW',
+  isHelpThinking = false,
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
-  const [activeNav, setActiveNav] = useState('projects');
-  const [expandedSection, setExpandedSection] = useState<'threads' | 'agents' | 'projects' | null>('threads');
+  const effectiveProjectName = projectName || 'Select project';
+  const effectivePropertyType = propertyType || '';
+  const effectiveAnalysisType = analysisType || 'Active';
 
-  const navItems = [
-    { id: 'projects', label: 'Projects', icon: FolderOpen },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'map', label: 'Map', icon: Map },
-    { id: 'tools', label: 'Tools', icon: Wrench },
-    { id: 'reports', label: 'Reports', icon: BarChart3 },
-    { id: 'landscaper', label: 'Landscaper AI', icon: Sparkles },
-    { id: 'admin', label: 'Admin', icon: Settings },
-  ];
-
-  const toggleCollapsed = () => setCollapsed(!collapsed);
-
-  const handleNavClick = (navId: string) => {
-    setActiveNav(navId);
+  const handleNewChat = () => {
+    if (onNewChat) onNewChat();
+    else onNavigate('landscaper');
   };
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case 'running':
-        return '#10b981'; // green
-      case 'scheduled':
-        return '#f59e0b'; // amber
-      case 'idle':
-        return '#6b7280'; // gray
-      default:
-        return '#6b7280';
-    }
+  const router = useRouter();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerProjects, setPickerProjects] = useState<Array<{ project_id: number; project_name: string; project_type_code?: string | null }>>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerFilter, setPickerFilter] = useState('');
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleProjectSelect = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPickerOpen((v) => !v);
   };
 
-  const statusLabel = (status: string) => {
-    switch (status) {
-      case 'running':
-        return '🟢';
-      case 'scheduled':
-        return '🟡';
-      case 'idle':
-        return '⚪';
-      default:
-        return '⚪';
-    }
-  };
+  useEffect(() => {
+    if (!pickerOpen || pickerProjects.length > 0) return;
+    setPickerLoading(true);
+    fetch('/api/projects')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : data?.results || data?.projects || [];
+        setPickerProjects(rows);
+        setPickerLoading(false);
+      })
+      .catch(() => setPickerLoading(false));
+  }, [pickerOpen, pickerProjects.length]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [pickerOpen]);
+
+  const filteredPickerProjects = pickerFilter
+    ? pickerProjects.filter((p) =>
+        (p.project_name || '').toLowerCase().includes(pickerFilter.toLowerCase())
+      )
+    : pickerProjects;
 
   return (
-    <div className={`sb-container ${collapsed ? 'collapsed' : ''}`} style={{ '--theme': currentTheme } as any}>
-      {/* Header */}
-      <div className="sb-header">
-        <div className="sb-logo-wrapper">
-          {!collapsed && (
-            <img src={MOUNTAIN_LOGO} alt="Landscape" className="sb-logo" />
+    <>
+      <div
+        className={`wrapper-sidebar${collapsed ? ' collapsed' : ''}`}
+        style={{ width: collapsed ? 48 : sidebarWidth }}
+      >
+        {/* Header */}
+        <div className="sb-header">
+          <div className="sb-logo" onClick={() => onNavigate('projects')} style={{ cursor: 'pointer' }}>
+            <img src={LOGO_SVG} alt="Landscape" className="sb-logo-img" />
+          </div>
+          <div className="sb-collapse" onClick={onToggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            ☰
+          </div>
+        </div>
+
+        {/* Project Selector - always visible */}
+        <div ref={pickerRef} style={{ position: 'relative' }}>
+        <div className="sb-project-select" onClick={handleProjectSelect} style={{ cursor: 'pointer' }}>
+          <div className="sb-ps-top">
+            <span className="sb-ps-name">{projectId ? effectiveProjectName : 'Select project'}</span>
+            <span className="sb-ps-chevron">▾</span>
+          </div>
+          {projectId && effectivePropertyType && (
+            <div className="sb-ps-type">
+              {effectivePropertyType} · {effectiveAnalysisType}
+            </div>
+          )}
+          {projectId && (
+            <div className="sb-ps-badges">
+              {effectivePropertyType && (
+                <span className="sb-ps-badge" style={{ background: '#F37021', color: '#fff' }}>
+                  {effectivePropertyType}
+                </span>
+              )}
+              <span
+                className="sb-ps-badge"
+                style={{
+                  background: 'var(--w-success-dim)',
+                  color: 'var(--w-success-text)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                {effectiveAnalysisType}
+              </span>
+            </div>
           )}
         </div>
-        <button
-          className="sb-collapse-btn"
-          onClick={toggleCollapsed}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
-          {collapsed ? '▶' : '☰'}
-        </button>
-      </div>
 
-      {!collapsed && (
-        <>
-          {/* Project Selector */}
-          <div className="sb-project-select">
-            <div className="sb-project-info">
-              <div className="sb-project-name">{projectName}</div>
-              <div className="sb-project-badges">
-                <span className="sb-badge sb-badge-type">{projectType}</span>
-                <span className="sb-badge sb-badge-status">Active</span>
-              </div>
-            </div>
-            <ChevronDown size={16} />
-          </div>
-
-          {/* New Chat Button */}
-          <button
-            className="sb-new-chat-btn"
-            onClick={onNewChat}
-            title="Start new chat"
+        {pickerOpen && (
+          <div
+            className="sb-project-picker"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              right: 0,
+              zIndex: 1000,
+              background: 'var(--w-bg-panel, #1a1e27)',
+              border: '1px solid var(--w-border, rgba(255,255,255,0.1))',
+              borderRadius: 6,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              maxHeight: 360,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
           >
-            <Plus size={18} />
-            <span>New Chat</span>
-          </button>
-
-          {/* Search Bar */}
-          <div className="sb-search-wrapper">
-            <Search size={16} />
             <input
               type="text"
-              placeholder="Search..."
-              className="sb-search-input"
+              autoFocus
+              placeholder="Search projects…"
+              value={pickerFilter}
+              onChange={(e) => setPickerFilter(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                padding: '8px 10px',
+                background: 'var(--w-bg-input, rgba(255,255,255,0.05))',
+                border: 'none',
+                borderBottom: '1px solid var(--w-border, rgba(255,255,255,0.1))',
+                color: 'var(--w-text-primary, #fff)',
+                fontSize: 13,
+                outline: 'none',
+              }}
             />
-          </div>
-
-          {/* Navigation Items */}
-          <nav className="sb-nav">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeNav === item.id;
-              return (
-                <button
-                  key={item.id}
-                  className={`sb-nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => handleNavClick(item.id)}
-                  title={item.label}
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              {pickerLoading && (
+                <div style={{ padding: 12, fontSize: 12, color: 'var(--w-text-secondary, #94a3b8)' }}>Loading…</div>
+              )}
+              {!pickerLoading && filteredPickerProjects.length === 0 && (
+                <div style={{ padding: 12, fontSize: 12, color: 'var(--w-text-secondary, #94a3b8)' }}>No projects.</div>
+              )}
+              {filteredPickerProjects.map((p) => (
+                <div
+                  key={p.project_id}
+                  onClick={() => {
+                    setPickerOpen(false);
+                    setPickerFilter('');
+                    router.push(`/w/projects/${p.project_id}/documents`);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    fontSize: 13,
+                    color: 'var(--w-text-primary, #fff)',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid var(--w-border, rgba(255,255,255,0.06))',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Scrollable Sections */}
-          <div className="sb-sections">
-            {/* Threads Section */}
-            <div className="sb-section">
-              <button
-                className="sb-section-header"
-                onClick={() => setExpandedSection(expandedSection === 'threads' ? null : 'threads')}
-              >
-                <span>Threads</span>
-                <ChevronDown
-                  size={14}
-                  className={`sb-section-chevron ${expandedSection === 'threads' ? 'expanded' : ''}`}
-                />
-              </button>
-              {expandedSection === 'threads' && (
-                <div className="sb-section-content">
-                  {threads.map((thread) => (
-                    <div key={thread.id} className={`sb-thread-item ${thread.isActive ? 'active' : ''}`}>
-                      <div className="sb-thread-dot" style={{
-                        backgroundColor: thread.isActive ? '#10b981' : '#6b7280'
-                      }} />
-                      <div className="sb-thread-info">
-                        <div className="sb-thread-name">{thread.name}</div>
-                        <div className="sb-thread-time">{thread.timestamp}</div>
-                      </div>
-                    </div>
-                  ))}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.project_name}
+                  </span>
+                  {p.project_type_code && (
+                    <span style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>{p.project_type_code}</span>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-
-            {/* Scheduled Agents Section */}
-            <div className="sb-section">
-              <button
-                className="sb-section-header"
-                onClick={() => setExpandedSection(expandedSection === 'agents' ? null : 'agents')}
-              >
-                <span>Scheduled Agents</span>
-                <ChevronDown
-                  size={14}
-                  className={`sb-section-chevron ${expandedSection === 'agents' ? 'expanded' : ''}`}
-                />
-              </button>
-              {expandedSection === 'agents' && (
-                <div className="sb-section-content">
-                  {scheduledAgents.map((agent) => (
-                    <div key={agent.id} className="sb-agent-item">
-                      <div className="sb-agent-dot" style={{
-                        backgroundColor: statusColor(agent.status)
-                      }}>
-                        {statusLabel(agent.status)}
-                      </div>
-                      <div className="sb-agent-info">
-                        <div className="sb-agent-name">{agent.name}</div>
-                        <div className="sb-agent-status">{agent.status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Recent Projects Section */}
-            <div className="sb-section">
-              <button
-                className="sb-section-header"
-                onClick={() => setExpandedSection(expandedSection === 'projects' ? null : 'projects')}
-              >
-                <span>Recent Projects</span>
-                <ChevronDown
-                  size={14}
-                  className={`sb-section-chevron ${expandedSection === 'projects' ? 'expanded' : ''}`}
-                />
-              </button>
-              {expandedSection === 'projects' && (
-                <div className="sb-section-content">
-                  {recentProjects.map((project) => (
-                    <div key={project.id} className="sb-project-item">
-                      <div className="sb-project-item-name">{project.name}</div>
-                      <div className="sb-project-item-type">{project.type}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div
+              onClick={() => {
+                setPickerOpen(false);
+                router.push('/w/projects');
+              }}
+              style={{
+                padding: '8px 10px',
+                fontSize: 12,
+                color: 'var(--w-accent-text, #60a5fa)',
+                cursor: 'pointer',
+                borderTop: '1px solid var(--w-border, rgba(255,255,255,0.1))',
+                textAlign: 'center',
+              }}
+            >
+              View all projects →
             </div>
           </div>
+        )}
+        </div>
 
-          {/* Footer */}
-          <div className="sb-footer">
-            <div className="sb-user-info">
-              <div className="sb-avatar">👤</div>
-              <div className="sb-user-details">
-                <div className="sb-user-name">User</div>
-                <div className="sb-user-plan">{userPlan}</div>
+        {/* New Chat */}
+        <div className="sb-new-chat" onClick={handleNewChat}>
+          <span className="sb-new-icon">＋</span>
+          <span className="sb-nav-label">New chat</span>
+        </div>
+
+        {/* Search */}
+        <div className="sb-search">
+          <span>🔍</span>
+          <span className="sb-nav-label"> Search chats &amp; documents…</span>
+        </div>
+
+        <div className="sb-divider" />
+
+        {/* Navigation */}
+        <div className="sb-nav">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activePage === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`sb-nav-item${isActive ? ' active' : ''}`}
+                data-label={item.label}
+                onClick={() => onNavigate(item.id)}
+                title={item.label}
+              >
+                {item.id === 'help' ? <PropellerBeanieIcon isThinking={isHelpThinking} /> : <NavIcon d={item.paths} />}
+                <span className="sb-nav-label">{item.label}</span>
+                {item.badge && <span className="sb-nav-badge">{item.badge}</span>}
               </div>
+            );
+          })}
+        </div>
+
+        <div className="sb-divider" />
+
+        {/* Scrollable sections */}
+        <div className="sb-scroll">
+          {threads.length > 0 && (
+            <div className="sb-section">
+              <div className="sb-section-label">Threads</div>
+              {threads.map((t) => (
+                <div
+                  key={t.id}
+                  className={`sb-thread${t.isActive ? ' active' : ''}`}
+                  onClick={t.onClick}
+                >
+                  <span className={`sb-thread-dot ${t.isActive ? 'active' : 'idle'}`} />
+                  {t.name}
+                </div>
+              ))}
             </div>
-            <button
-              className="sb-theme-toggle"
+          )}
+
+          {scheduledAgents.length > 0 && (
+            <div className="sb-section">
+              <div className="sb-section-label">Scheduled</div>
+              {scheduledAgents.map((a) => (
+                <div key={a.id} className="sb-agent">
+                  <span>{a.emoji}</span> {a.name}
+                  <span className={`sb-agent-status ${a.status}`}>
+                    {a.status === 'active' ? 'Active' : 'Paused'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {recentProjects.length > 0 && (
+            <div className="sb-section">
+              <div className="sb-section-label">Recent Projects</div>
+              {recentProjects.map((p) => (
+                <div key={p.id} className="sb-thread" onClick={p.onClick}>
+                  <span className="sb-thread-dot idle" />
+                  {p.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="sb-footer">
+          <div className="sb-avatar">{userInitials}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sb-user-name">{userName}</div>
+            <div className="sb-user-plan">{userPlan}</div>
+          </div>
+          <div className="sb-footer-actions">
+            <div
+              className="sb-footer-btn"
               onClick={onThemeToggle}
               title={`Switch to ${currentTheme === 'light' ? 'dark' : 'light'} mode`}
             >
-              {currentTheme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
+              {currentTheme === 'light' ? '🌙' : '☀️'}
+            </div>
           </div>
-        </>
-      )}
-    </div>
+        </div>
+      </div>
+
+      {/* Drag handle (sibling of sidebar so it sits at the boundary) */}
+      <div
+        className="wrapper-drag-handle"
+        onPointerDown={onResizeStart}
+        style={{
+          cursor: 'col-resize',
+          width: 4,
+          flexShrink: 0,
+          background: 'transparent',
+        }}
+      />
+    </>
   );
 };
+
+export default WrapperSidebar;

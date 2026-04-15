@@ -16,6 +16,15 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
 import { useFileDrop } from '@/contexts/FileDropContext';
+import { useUploadThing } from '@/lib/uploadthing';
+import { getAuthHeaders } from '@/lib/authHeaders';
+
+// File extensions routed to the Excel audit pipeline on Landscaper-panel drop.
+const EXCEL_EXTENSIONS = ['.xlsx', '.xlsm', '.xls'];
+const isExcelFile = (file: File): boolean => {
+  const name = file.name.toLowerCase();
+  return EXCEL_EXTENSIONS.some(ext => name.endsWith(ext));
+};
 
 interface LandscaperPanelProps {
   projectId: number;
@@ -92,14 +101,110 @@ export function LandscaperPanel({
   const { pendingCount: rentRollPendingCount, documentId: pendingDocumentId, refresh: refreshPendingExtractions } = usePendingRentRollExtractions(projectId);
   const [extractionBannerDismissed, setExtractionBannerDismissed] = useState(false);
 
-  // File drop — forward to FileDropContext → triggers UnifiedIntakeModal
+  // File drop — forward non-Excel files to FileDropContext → triggers UnifiedIntakeModal.
+  // Excel files dropped directly on the Landscaper panel bypass the ingestion
+  // workbench and route through the Excel audit pipeline instead.
   const { addFiles } = useFileDrop();
+  const [auditUploading, setAuditUploading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const { startUpload: startAuditUpload } = useUploadThing('documentUploader', {
+    headers: {
+      'x-project-id': String(projectId),
+      'x-workspace-id': '1',
+      'x-doc-type': 'Financial Model',
+    },
+  });
+
+  /**
+   * Upload an Excel file via the existing UploadThing + /api/dms/docs path,
+   * then ask Landscaper to run the audit on the resulting doc_id. This does
+   * NOT enqueue the file into the ingestion workbench.
+   */
+  const uploadAndAuditExcel = useCallback(async (file: File) => {
+    setAuditUploading(true);
+    setAuditError(null);
+    try {
+      const uploadResult = await startAuditUpload([file]);
+      if (!uploadResult || uploadResult.length === 0) {
+        throw new Error('UploadThing returned no result');
+      }
+      const uploaded = uploadResult[0] as { serverData?: Record<string, unknown>; url?: string };
+      const storage_uri = (uploaded.serverData?.storage_uri as string) ?? uploaded.url ?? '';
+      const sha256 = (uploaded.serverData?.sha256 as string) ?? '';
+
+      if (!storage_uri || sha256.length !== 64) {
+        throw new Error(`UploadThing response missing storage_uri or sha256 (sha256 len=${sha256.length})`);
+      }
+
+      const createRes = await fetch('/api/dms/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          system: {
+            project_id: projectId,
+            workspace_id: 1,
+            doc_name: file.name,
+            doc_type: 'Financial Model',
+            status: 'draft',
+            storage_uri,
+            sha256,
+            file_size_bytes: file.size,
+            mime_type: file.type || 'application/vnd.ms-excel.sheet.macroEnabled.12',
+            version_no: 1,
+            // Route through DMS only; audit is invoked directly by the chat
+            // message below — do not trigger the structured-ingestion pipeline.
+            intent: 'dms_only',
+          },
+          profile: {},
+          ai: { source: 'landscaper_panel_drop' },
+        }),
+      });
+
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        const detail = err.detail || err.error || err.details || createRes.statusText;
+        const hasAuth = Boolean(getAuthHeaders().Authorization);
+        throw new Error(
+          `Failed to register document [${createRes.status}]: ${detail}` +
+          (createRes.status === 403 ? ` (auth header present: ${hasAuth}; project_id=${projectId})` : '')
+        );
+      }
+      const docData = await createRes.json();
+      const docId: number | null =
+        docData.doc?.doc_id ?? docData.existing_doc?.doc_id ?? null;
+      if (!docId) throw new Error('No doc_id returned from /api/dms/docs');
+
+      // Ask Landscaper to run the audit. The four registered audit tools
+      // (classify_excel_file, run_structural_scan, run_formula_integrity,
+      // extract_assumptions) will be invoked by the model.
+      const prompt =
+        `Please audit the Excel model I just uploaded: "${file.name}" (doc_id=${docId}). ` +
+        `Start with classify_excel_file to determine the tier, then run run_structural_scan, ` +
+        `run_formula_integrity, and extract_assumptions as appropriate. Summarize the findings.`;
+      await chatRef.current?.sendMessage(prompt);
+    } catch (e) {
+      console.error('Excel audit drop failed', e);
+      setAuditError(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setAuditUploading(false);
+    }
+  }, [projectId, startAuditUpload]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      addFiles(acceptedFiles);
+    if (acceptedFiles.length === 0) return;
+    const excelFiles = acceptedFiles.filter(isExcelFile);
+    const otherFiles = acceptedFiles.filter(f => !isExcelFile(f));
+
+    if (otherFiles.length > 0) {
+      // Non-Excel drops on the Landscaper panel fall back to the existing
+      // ingestion workbench flow.
+      addFiles(otherFiles);
     }
-  }, [addFiles]);
+    for (const f of excelFiles) {
+      void uploadAndAuditExcel(f);
+    }
+  }, [addFiles, uploadAndAuditExcel]);
 
   const {
     getRootProps,
@@ -312,7 +417,7 @@ export function LandscaperPanel({
             Drop documents for Landscaper
           </div>
           <div className="mt-1" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9rem' }}>
-            Drop rent roll, T-12, or OM documents
+            Excel (.xlsx / .xlsm) → model audit. Other files → ingestion workbench.
           </div>
         </div>
       )}
@@ -435,6 +540,20 @@ export function LandscaperPanel({
             >
               View in Grid
             </CButton>
+          </CAlert>
+        )}
+
+        {/* Excel audit upload status */}
+        {auditUploading && (
+          <CAlert color="info" className="mb-2 d-flex align-items-center gap-2 py-2">
+            <CSpinner size="sm" />
+            <span className="small">Uploading Excel model for audit…</span>
+          </CAlert>
+        )}
+        {auditError && (
+          <CAlert color="danger" className="mb-2 d-flex align-items-center gap-2 py-2" dismissible onClose={() => setAuditError(null)}>
+            <CIcon icon={cilWarning} size="sm" />
+            <span className="small">Audit upload failed: {auditError}</span>
           </CAlert>
         )}
 

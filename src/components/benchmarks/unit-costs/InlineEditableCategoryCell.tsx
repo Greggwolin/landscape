@@ -117,7 +117,7 @@ export default function InlineEditableCategoryCell({
             w-full px-2 py-1
             border-2 rounded
             text-sm focus:outline-none
-            ${error ? 'border-red-500' : 'border-blue-500'}
+            ${error ? 'border-chip-error' : 'border-brand-primary'}
             ${isSaving ? 'opacity-50 cursor-wait' : ''}
             ${className}
           `}

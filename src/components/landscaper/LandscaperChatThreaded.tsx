@@ -68,6 +68,8 @@ interface LandscaperChatThreadedProps {
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
   /** When provided, activates this thread on mount (used by URL-based thread switching) */
   initialThreadId?: string;
+  /** When true, suppresses the internal header (used when parent provides its own header, e.g. `/w/` CenterChatPanel) */
+  hideInternalHeader?: boolean;
 }
 
 /**
@@ -250,6 +252,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onReviewMedia,
     onToolResult,
     initialThreadId,
+    hideInternalHeader = false,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -555,6 +558,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   return (
     <div className="d-flex h-100 flex-column">
       {/* Header */}
+      {!hideInternalHeader && (
       <div
         className="d-flex align-items-center gap-2 border-bottom"
         style={{
@@ -709,6 +713,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
         {/* Activity feed toggle chevron removed — feed has its own header toggle */}
       </div>
+      )}
 
       {/* Thread List (collapsible) — shows ALL project threads across pages */}
       {showThreadList && (

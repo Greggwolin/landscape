@@ -1,6 +1,6 @@
 'use client';
 
-import { PageShell } from '@/components/wrapper/PageShell';
+import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import ReportsTab from '@/app/projects/[projectId]/components/tabs/ReportsTab';
 import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 
@@ -8,15 +8,10 @@ export default function WrapperReportsPage() {
   const project = useWrapperProject();
 
   return (
-    <PageShell
-      title="Reports"
-      subtitle={project.project_name}
-      showChat
-      chatPageContext="reports"
-      projectId={project.project_id}
-      hideHeader={true}
-    >
-      <ReportsTab project={project} />
-    </PageShell>
+    <RightContentPanel title="Reports" subtitle={project.project_name}>
+      <div className="w-page-body">
+        <ReportsTab project={project} />
+      </div>
+    </RightContentPanel>
   );
 }

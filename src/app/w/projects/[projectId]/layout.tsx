@@ -6,7 +6,6 @@ import { ProjectContextShell } from '@/components/wrapper/ProjectContextShell';
 import { WrapperChatProvider } from '@/contexts/WrapperChatContext';
 import { ModalRegistryProvider, type ModalProject } from '@/contexts/ModalRegistryContext';
 import { WrapperProjectProvider, type WrapperProject } from '@/contexts/WrapperProjectContext';
-import { ProjectContentWrapper } from '@/components/wrapper/ProjectContentWrapper';
 import '@/components/wrapper/modals'; // Side-effect: registers modal definitions
 
 /**
@@ -52,9 +51,7 @@ export default function WrapperProjectLayout({
       <WrapperChatProvider>
         <WrapperProjectProvider project={project}>
           <ModalRegistryProvider project={modalProject}>
-            <ProjectContentWrapper>
-              {children}
-            </ProjectContentWrapper>
+            {children}
           </ModalRegistryProvider>
         </WrapperProjectProvider>
       </WrapperChatProvider>

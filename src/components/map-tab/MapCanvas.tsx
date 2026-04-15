@@ -501,7 +501,17 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     map.current.on('moveend', emitViewState);
     map.current.on('zoomend', emitViewState);
 
+    // Observe container size changes (e.g. `/w/` chat toggle) and resize map canvas
+    let resizeObserver: ResizeObserver | null = null;
+    if (mapContainer.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        map.current?.resize();
+      });
+      resizeObserver.observe(mapContainer.current);
+    }
+
     return () => {
+      resizeObserver?.disconnect();
       rasterDimCleanupRef.current?.();
       rasterDimCleanupRef.current = null;
       map.current?.remove();

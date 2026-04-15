@@ -24,6 +24,7 @@ market-ingest = { path = "../market_ingest_py", develop = true }
 [tool.poetry.scripts]
 market-agents = "market_agents.orchestrator:main"
 fred-agent = "market_agents.agents.fred_agent:run_standalone"
+umich-agent = "market_agents.agents.umich_sentiment_agent:run_standalone"
 test-discord = "market_agents.discord:test_send"
 
 [build-system]

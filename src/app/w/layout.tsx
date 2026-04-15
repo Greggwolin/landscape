@@ -3,6 +3,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
+import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
+import { WrapperUIProvider } from '@/contexts/WrapperUIContext';
+import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
+import { HelpLandscaperProvider, useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
+import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
+import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import '@/styles/wrapper.css';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -18,9 +24,11 @@ interface ProjectData {
   analysis_type?: string;
 }
 
-export default function WrapperLayout({ children }: { children: React.ReactNode }) {
+function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
+  const { theme, toggleTheme } = useTheme();
 
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -28,8 +36,7 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
   const startX = useRef(0);
   const startWidth = useRef(0);
 
-  // Determine active page from pathname
-  // Order matters — check specific sub-pages before /projects
+  // Derive active nav page from URL
   const activePage = (() => {
     if (pathname.includes('/documents')) return 'documents';
     if (pathname.includes('/reports')) return 'reports';
@@ -42,20 +49,22 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
     return 'projects';
   })();
 
-  // Extract projectId from URL if present
+  // Extract current projectId from URL
   const projectIdMatch = pathname.match(/\/projects\/(\d+)/);
   const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined;
 
-  // Fetch real project data when projectId is present
+  // Persist last projectId so project-scoped nav items resume from any page
+  const [lastProjectId, setLastProjectId] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (projectId) setLastProjectId(projectId);
+  }, [projectId]);
+
+  // Fetch project data when inside a project
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const lastFetchedId = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (!projectId) {
-      setProjectData(null);
-      lastFetchedId.current = undefined;
-      return;
-    }
+    if (!projectId) return;
     if (lastFetchedId.current === projectId) return;
     lastFetchedId.current = projectId;
 
@@ -76,27 +85,31 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
 
   const handleNavigate = useCallback(
     (page: string) => {
+      // Help is a flyout overlay — never navigate, just toggle the panel
+      if (page === 'help') {
+        toggleHelp();
+        return;
+      }
+
       const projectScoped = ['documents', 'reports', 'map'];
+      // Use current projectId if present; otherwise fall back to last-visited
+      const pid = projectId ?? lastProjectId;
 
       if (page === 'projects') {
-        router.push(projectId ? `/w/projects/${projectId}` : '/w/projects');
+        router.push('/w/projects');
       } else if (projectScoped.includes(page)) {
-        if (projectId) {
-          router.push(`/w/projects/${projectId}/${page}`);
-        } else {
-          router.push('/w/projects');
-        }
+        if (pid) router.push(`/w/projects/${pid}/${page}`);
+        else router.push('/w/projects');
       } else {
         const routeMap: Record<string, string> = {
           landscaper: 'landscaper-ai',
           admin: 'admin',
           tools: 'tools',
-          help: 'help',
         };
         router.push(`/w/${routeMap[page] || page}`);
       }
     },
-    [router, projectId]
+    [router, projectId, lastProjectId, toggleHelp]
   );
 
   const handleToggleCollapse = useCallback(() => {
@@ -139,6 +152,24 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
     [sidebarWidth]
   );
 
+  // Mock data for sidebar sections until real sources wired
+  const mockThreads = [
+    { id: 't1', name: 'OM ingestion — Brownstone', isActive: true },
+    { id: 't2', name: 'Bridge rate sensitivity analysis' },
+    { id: 't3', name: 'Model integrity audit' },
+    { id: 't4', name: 'Comp survey — Bellflower' },
+  ];
+  const mockScheduled = [
+    { id: 's1', emoji: '📊', name: 'FRED market data pull', status: 'active' as const },
+    { id: 's2', emoji: '🏗️', name: 'Bellflower permit monitor', status: 'active' as const },
+    { id: 's3', emoji: '🏠', name: 'Redfin comp tracker', status: 'paused' as const },
+  ];
+  const mockRecent = [
+    { id: 'r1', name: 'Old River School — UW' },
+    { id: 'r2', name: 'Red Valley Ranch' },
+    { id: 'r3', name: 'Peoria Meadows' },
+  ];
+
   return (
     <div className="wrapper-layout">
       <WrapperSidebar
@@ -152,8 +183,28 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
         projectName={projectData?.project_name}
         propertyType={projectData?.project_type_code}
         analysisType={projectData?.analysis_type}
+        threads={mockThreads}
+        scheduledAgents={mockScheduled}
+        recentProjects={mockRecent}
+        isHelpThinking={isHelpLoading}
+        currentTheme={theme === 'light' ? 'light' : 'dark'}
+        onThemeToggle={toggleTheme}
       />
+      <CenterChatPanel projectId={projectId ?? lastProjectId} />
       <main className="wrapper-main">{children}</main>
+      <HelpLandscaperPanel />
     </div>
+  );
+}
+
+export default function WrapperLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <WrapperUIProvider>
+      <LandscaperCollisionProvider>
+        <HelpLandscaperProvider>
+          <WrapperLayoutInner>{children}</WrapperLayoutInner>
+        </HelpLandscaperProvider>
+      </LandscaperCollisionProvider>
+    </WrapperUIProvider>
   );
 }

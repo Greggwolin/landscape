@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
-import { MessageSquare, Maximize2 } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import React, { useState, useCallback } from 'react';
+import { MessageSquare } from 'lucide-react';
+import { useParams, usePathname } from 'next/navigation';
 import { WrapperHeader } from './WrapperHeader';
 import { ChatTogglePanel } from './ChatTogglePanel';
 
@@ -22,16 +22,26 @@ interface ProjectContentWrapperProps {
  */
 export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) {
   const params = useParams();
+  const pathname = usePathname();
   const projectId = parseInt(params.projectId as string);
 
   const [chatOpen, setChatOpen] = useState(false);
   const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
 
-  // Map route segments to human-readable titles
-  // This will be enhanced when route context is available
+  // Derive page title from route
   const getPageTitle = () => {
-    // For now, a placeholder. In future, derive from route or context.
-    return 'Project Content';
+    if (pathname.includes('/documents')) return 'Documents';
+    if (pathname.includes('/reports')) return 'Reports';
+    if (pathname.includes('/map')) return 'Map';
+    return 'Project';
+  };
+
+  // Derive page context for chat
+  const getPageContext = () => {
+    if (pathname.includes('/documents')) return 'documents';
+    if (pathname.includes('/reports')) return 'reports';
+    if (pathname.includes('/map')) return 'map';
+    return 'default';
   };
 
   return (
@@ -59,7 +69,7 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
             projectId={projectId}
             isOpen={chatOpen}
             onToggle={toggleChat}
-            pageContext="default"
+            pageContext={getPageContext()}
           />
         )}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

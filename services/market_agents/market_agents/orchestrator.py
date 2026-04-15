@@ -35,6 +35,7 @@ def build_agent_roster() -> List[BaseAgent]:
     from .agents.fred_agent import FredAgent
     from .agents.census_bps_agent import CensusBpsAgent
     from .agents.hud_agent import HudAgent
+    from .agents.umich_sentiment_agent import UMichSentimentAgent
 
     config = get_config()
     agents: List[BaseAgent] = []
@@ -43,6 +44,8 @@ def build_agent_roster() -> List[BaseAgent]:
         agents.append(FredAgent(config))
     else:
         logger.warning("FRED_API_KEY not set — FRED agent disabled")
+
+    agents.append(UMichSentimentAgent(config))
 
     if config.census_bps_enabled:
         agents.append(CensusBpsAgent(config))

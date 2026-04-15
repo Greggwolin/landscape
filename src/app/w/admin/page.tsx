@@ -2,53 +2,50 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { PageShell } from '@/components/wrapper/PageShell';
+import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 
-// Dynamic imports to avoid SSR issues with admin panels
-const PreferencesPanel = dynamic(() => import('@/components/admin/PreferencesPanel'), { ssr: false });
-const BenchmarksPanel = dynamic(() => import('@/components/admin/BenchmarksPanel'), { ssr: false });
+// Legacy admin panels — full CRUD
+const PreferencesPanel = dynamic(() => import('@/components/wrapper/admin/PreferencesPanelNew'), { ssr: false });
+const BenchmarksPanel = dynamic(() => import('@/components/wrapper/admin/BenchmarksPanelNew'), { ssr: false });
 const CostLibraryPanel = dynamic(() => import('@/components/admin/CostLibraryPanel'), { ssr: false });
-const DMSAdminPanel = dynamic(() => import('@/components/admin/DMSAdminPanel'), { ssr: false });
-const ReportConfiguratorPanel = dynamic(() => import('@/components/admin/ReportConfiguratorPanel'), { ssr: false });
-const UserManagementPanel = dynamic(() => import('@/components/admin/UserManagementPanel'), { ssr: false });
+const DMSAdminPanel = dynamic(() => import('@/components/wrapper/admin/DmsAdminPanelNew'), { ssr: false });
+const UserManagementPanel = dynamic(() => import('@/components/wrapper/admin/UsersPanelNew'), { ssr: false });
 
-type AdminTab = 'preferences' | 'benchmarks' | 'cost-library' | 'dms-admin' | 'report-configurator' | 'users';
+type AdminTab = 'preferences' | 'benchmarks' | 'costlib' | 'dmsadmin' | 'users';
 
 const TABS: { key: AdminTab; label: string }[] = [
   { key: 'preferences', label: 'Preferences' },
   { key: 'benchmarks', label: 'Benchmarks' },
-  { key: 'cost-library', label: 'Cost Library' },
-  { key: 'dms-admin', label: 'DMS Admin' },
-  { key: 'report-configurator', label: 'Report Configurator' },
+  { key: 'costlib', label: 'Cost Library' },
+  { key: 'dmsadmin', label: 'DMS Admin' },
   { key: 'users', label: 'Users' },
 ];
 
 export default function WrapperAdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('preferences');
+  const [tab, setTab] = useState<AdminTab>('preferences');
 
   return (
-    <PageShell title="Admin">
+    <RightContentPanel title="Admin">
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div className="w-admin-tabs">
-          {TABS.map((tab) => (
+          {TABS.map((t) => (
             <button
-              key={tab.key}
-              className={`w-admin-tab${activeTab === tab.key ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              key={t.key}
+              className={`w-admin-tab${tab === t.key ? ' active' : ''}`}
+              onClick={() => setTab(t.key)}
             >
-              {tab.label}
+              {t.label}
             </button>
           ))}
         </div>
         <div className="w-admin-body">
-          {activeTab === 'preferences' && <PreferencesPanel />}
-          {activeTab === 'benchmarks' && <BenchmarksPanel />}
-          {activeTab === 'cost-library' && <CostLibraryPanel />}
-          {activeTab === 'dms-admin' && <DMSAdminPanel />}
-          {activeTab === 'report-configurator' && <ReportConfiguratorPanel />}
-          {activeTab === 'users' && <UserManagementPanel />}
+          {tab === 'preferences' && <PreferencesPanel />}
+          {tab === 'benchmarks' && <BenchmarksPanel />}
+          {tab === 'costlib' && <CostLibraryPanel />}
+          {tab === 'dmsadmin' && <DMSAdminPanel />}
+          {tab === 'users' && <UserManagementPanel />}
         </div>
       </div>
-    </PageShell>
+    </RightContentPanel>
   );
 }

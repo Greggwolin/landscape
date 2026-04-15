@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { PageShell } from '@/components/wrapper/PageShell';
+import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 
 const LandscaperAdminPanel = dynamic(
   () => import('@/components/admin/LandscaperAdminPanel'),
@@ -10,8 +10,10 @@ const LandscaperAdminPanel = dynamic(
 
 export default function WrapperLandscaperAIPage() {
   return (
-    <PageShell title="Landscaper AI">
-      <LandscaperAdminPanel />
-    </PageShell>
+    <RightContentPanel title="Landscaper AI">
+      <div className="w-page-body">
+        <LandscaperAdminPanel />
+      </div>
+    </RightContentPanel>
   );
 }

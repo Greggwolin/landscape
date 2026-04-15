@@ -131,7 +131,7 @@ export default function InlineEditableUOMCell({
             w-full px-2 py-1
             border-2 rounded
             text-sm text-center focus:outline-none
-            ${error ? 'border-red-500' : 'border-blue-500'}
+            ${error ? 'border-chip-error' : 'border-brand-primary'}
             ${isSaving ? 'opacity-50 cursor-wait' : ''}
             ${className}
           `}
