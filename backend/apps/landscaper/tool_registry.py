@@ -71,6 +71,11 @@ UNIVERSAL_TOOLS = [
     "log_alpha_feedback",
     # UI navigation
     "open_input_modal",
+    # Excel model audit (cross-cutting — any project type)
+    "classify_excel_file",
+    "run_structural_scan",
+    "run_formula_integrity",
+    "extract_assumptions",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
