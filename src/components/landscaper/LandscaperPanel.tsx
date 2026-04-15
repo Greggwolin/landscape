@@ -164,11 +164,22 @@ export function LandscaperPanel({
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({}));
         const detail = err.detail || err.error || err.details || createRes.statusText;
-        const hasAuth = Boolean(getAuthHeaders().Authorization);
-        throw new Error(
-          `Failed to register document [${createRes.status}]: ${detail}` +
-          (createRes.status === 403 ? ` (auth header present: ${hasAuth}; project_id=${projectId})` : '')
-        );
+
+        // 403 here means tbl_project.created_by_id for this project doesn't
+        // match the JWT's user_id. This is a project-ownership data problem,
+        // not a bug in the drop wiring. Fall back to the existing ingestion
+        // path so the user still has a way to handle the file, and surface
+        // the real cause in the banner.
+        if (createRes.status === 403) {
+          addFiles([file]);
+          throw new Error(
+            `Project ownership check failed for project_id=${projectId} (${detail}). ` +
+            `Falling back to ingestion workbench — audit pipeline skipped. ` +
+            `Fix: ensure tbl_project.created_by_id for this project matches the logged-in user, or is NULL.`
+          );
+        }
+
+        throw new Error(`Failed to register document [${createRes.status}]: ${detail}`);
       }
       const docData = await createRes.json();
       const docId: number | null =

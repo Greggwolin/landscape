@@ -14,9 +14,11 @@ File resolution:
 
 import logging
 import os
+import shutil
 import tempfile
 from typing import Tuple, Optional
 
+import requests
 from django.core.files.storage import default_storage
 from django.db import connection
 from openpyxl import load_workbook
@@ -74,15 +76,27 @@ def load_workbook_from_doc(doc_id: int) -> Tuple[Workbook, Workbook, str]:
     if not storage_uri:
         raise UnsupportedFileError(f"core_doc {doc_id} has no storage_uri")
 
-    suffix = ".xlsm" if "macroEnabled" in (mime_type or "") else ".xlsx"
+    is_xlsm = "macroEnabled" in (mime_type or "")
+    suffix = ".xlsm" if is_xlsm else ".xlsx"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        with default_storage.open(storage_uri, "rb") as src:
-            tmp.write(src.read())
+        if storage_uri.startswith(("http://", "https://")):
+            # UploadThing / any HTTP(S) URL — fetch directly
+            resp = requests.get(storage_uri, stream=True, timeout=30)
+            resp.raise_for_status()
+            shutil.copyfileobj(resp.raw, tmp)
+        else:
+            # S3 key or local path — route through Django storage backend
+            with default_storage.open(storage_uri, "rb") as src:
+                tmp.write(src.read())
         tmp_path = tmp.name
 
     try:
-        values_wb = load_workbook(tmp_path, data_only=True, read_only=False)
-        formulas_wb = load_workbook(tmp_path, data_only=False, read_only=False)
+        values_wb = load_workbook(
+            tmp_path, data_only=True, read_only=False, keep_vba=is_xlsm
+        )
+        formulas_wb = load_workbook(
+            tmp_path, data_only=False, read_only=False, keep_vba=is_xlsm
+        )
     except Exception:
         try:
             os.unlink(tmp_path)
