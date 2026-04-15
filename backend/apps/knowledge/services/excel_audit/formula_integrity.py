@@ -141,50 +141,91 @@ def _check_range_consistency(formulas_wb: Workbook) -> List[Dict]:
 
     We group formulas by (sheet, row) and compare row-span of the first
     range reference in each. Any mismatch in the same row → flag.
+
+    Important: only compare formulas of the same *orientation*.
+    Vertical formulas (=SUM(E38:E44), same column, different rows) and
+    horizontal formulas (=SUM(E46:Q46), same row, different columns)
+    serve structurally different purposes. A row-total across columns
+    and a column-subtotal down rows will always have different row-spans
+    — that's by design, not a truncation bug. Mixing orientations
+    produced ~300+ false positives on typical proforma models.
     """
     findings = []
     for sheet in formulas_wb.worksheets:
-        # Gather formulas by row
+        # Gather formulas by row, classified by orientation AND function
         by_row: Dict[int, List[Dict]] = {}
         for row in sheet.iter_rows(values_only=False):
             for cell in row:
                 v = cell.value
                 if not (isinstance(v, str) and v.startswith("=")):
                     continue
-                # Only track formulas that contain a range-based function
-                if not RANGE_FUNC_RE.search(v):
+                func_match = RANGE_FUNC_RE.search(v)
+                if not func_match:
                     continue
                 m = CELL_RANGE_RE.search(v)
                 if not m:
                     continue
                 r1 = int(m.group("row1"))
                 r2 = int(m.group("row2"))
+                c1 = m.group("col1")
+                c2 = m.group("col2")
+                func_name = func_match.group("func").upper()
+
+                # Classify orientation
+                if c1 == c2 and r1 != r2:
+                    orientation = "vertical"
+                elif r1 == r2 and c1 != c2:
+                    orientation = "horizontal"
+                else:
+                    orientation = "vertical"  # default: multi-row, multi-col → treat as vertical
+
                 by_row.setdefault(cell.row, []).append(
                     {
                         "coord": cell.coordinate,
                         "formula": v,
                         "span": (r1, r2),
+                        "orientation": orientation,
+                        "func": func_name,
                     }
                 )
 
         for row_num, items in by_row.items():
             if len(items) < 2:
                 continue
-            spans = {it["span"] for it in items}
-            if len(spans) > 1:
-                # Inconsistent row-spans in the same row — flag each cell
-                for it in items:
-                    findings.append(
-                        {
-                            "check": "2e_range_consistency",
-                            "severity": "high",
-                            "ref": _cell_ref(sheet.title, it["coord"]),
-                            "detail": (
-                                f"row-span {it['span']} differs from siblings in row "
-                                f"{row_num}: {sorted(spans)}"
-                            ),
-                        }
-                    )
+            # Compare only within the same orientation + function group
+            groups: Dict[str, List[Dict]] = {}
+            for it in items:
+                key = f"{it['orientation']}:{it['func']}"
+                groups.setdefault(key, []).append(it)
+
+            for group_key, group in groups.items():
+                # Require ≥3 formulas in the group to flag — a pair
+                # with different spans is weak signal, easily a different
+                # section of the model reusing the same row.
+                if len(group) < 3:
+                    continue
+                spans = {it["span"] for it in group}
+                if len(spans) > 1:
+                    # Majority rule: identify the most common span and
+                    # only flag the minority (outlier) formulas.
+                    from collections import Counter
+                    span_counts = Counter(it["span"] for it in group)
+                    majority_span, _majority_count = span_counts.most_common(1)[0]
+                    outliers = [it for it in group if it["span"] != majority_span]
+                    for it in outliers:
+                        orient, func = group_key.split(":")
+                        findings.append(
+                            {
+                                "check": "2e_range_consistency",
+                                "severity": "high",
+                                "ref": _cell_ref(sheet.title, it["coord"]),
+                                "detail": (
+                                    f"{func} row-span {it['span']} differs from "
+                                    f"majority span {majority_span} in {orient} "
+                                    f"group ({len(group)} formulas, row {row_num})"
+                                ),
+                            }
+                        )
     return findings
 
 
