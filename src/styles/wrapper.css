@@ -978,11 +978,18 @@
   background: var(--w-bg-body);
 }
 
+/* Narrow right panel — project home artifacts sidebar */
+.wrapper-layout .wrapper-main-narrow {
+  flex: 0 0 auto;
+  max-width: 380px;
+}
+
 /* ─── Center Chat Panel ─── */
 .wrapper-chat-center {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   border-right: 1px solid var(--w-border);
   background: var(--w-bg-body);
   overflow: hidden;

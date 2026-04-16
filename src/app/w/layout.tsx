@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
-import { WrapperUIProvider } from '@/contexts/WrapperUIContext';
+import { WrapperUIProvider, useWrapperUI } from '@/contexts/WrapperUIContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { HelpLandscaperProvider, useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
@@ -29,6 +29,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { theme, toggleTheme } = useTheme();
+  const { rightPanelNarrow } = useWrapperUI();
 
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -199,7 +200,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         projectId={initialThreadId ? undefined : (projectId ?? lastProjectId)}
         initialThreadId={initialThreadId}
       />
-      <main className="wrapper-main">{children}</main>
+      <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
       <HelpLandscaperPanel />
     </div>
   );

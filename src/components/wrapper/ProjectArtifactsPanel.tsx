@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
+import { useWrapperUI } from '@/contexts/WrapperUIContext';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -57,6 +59,7 @@ function docTypeLabel(docType: string): string {
 
 export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps) {
   const router = useRouter();
+  const { chatOpen, toggleChat } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -83,6 +86,13 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', width: '320px' }}>
       {/* Header */}
       <div className="wrapper-header">
+        <button
+          className="wrapper-btn-icon"
+          onClick={toggleChat}
+          title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
+        >
+          <LandscaperIcon style={{ width: 32, height: 32 }} />
+        </button>
         <span className="wrapper-header-title">Project Documents</span>
         <div className="wrapper-header-spacer" />
         <button

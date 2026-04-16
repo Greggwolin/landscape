@@ -264,7 +264,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                   onClick={() => {
                     setPickerOpen(false);
                     setPickerFilter('');
-                    router.push(`/w/projects/${p.project_id}/documents`);
+                    router.push(`/w/projects/${p.project_id}`);
                   }}
                   style={{
                     padding: '8px 10px',

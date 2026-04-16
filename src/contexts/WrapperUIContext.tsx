@@ -7,6 +7,9 @@ interface WrapperUIContextValue {
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
+  /** When true, <main> shrinks to fit its content (e.g. 320px artifacts sidebar). */
+  rightPanelNarrow: boolean;
+  setRightPanelNarrow: (v: boolean) => void;
 }
 
 const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
@@ -18,13 +21,14 @@ const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
  */
 export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(true);
+  const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
 
   const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
   const openChat = useCallback(() => setChatOpen(true), []);
   const closeChat = useCallback(() => setChatOpen(false), []);
 
   return (
-    <WrapperUIContext.Provider value={{ chatOpen, toggleChat, openChat, closeChat }}>
+    <WrapperUIContext.Provider value={{ chatOpen, toggleChat, openChat, closeChat, rightPanelNarrow, setRightPanelNarrow }}>
       {children}
     </WrapperUIContext.Provider>
   );

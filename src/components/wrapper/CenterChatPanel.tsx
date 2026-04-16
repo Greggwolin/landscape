@@ -23,7 +23,6 @@ function getAuthHeaders(): Record<string, string> {
 
 interface CenterChatPanelProps {
   projectId?: number;
-  width?: number;
   /** When provided, mounts the chat with this thread pre-selected (used by /w/chat/[threadId]). */
   initialThreadId?: string;
 }
@@ -36,7 +35,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, width = 420, initialThreadId }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelProps) {
   const { chatOpen, closeChat } = useWrapperUI();
   const pathname = usePathname();
 
@@ -138,7 +137,7 @@ export function CenterChatPanel({ projectId, width = 420, initialThreadId }: Cen
   };
 
   return (
-    <div className="wrapper-chat-center" style={{ width }}>
+    <div className="wrapper-chat-center">
       <div className="wrapper-header">
         <span className="wrapper-header-title">Landscaper</span>
         <div className="wrapper-header-spacer" />
