@@ -1347,9 +1347,10 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        """Retrieve a thread and enforce project-level access."""
+        """Retrieve a thread and enforce project-level access (if scoped)."""
         instance = super().get_object()
-        _require_project_access(self.request.user, int(instance.project_id))
+        if instance.project_id is not None:
+            _require_project_access(self.request.user, int(instance.project_id))
         return instance
 
     def get_queryset(self):
@@ -1358,11 +1359,14 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
 
         queryset = ChatThread.objects.all()
 
-        # Filter by project_id (required for list)
-        project_id = self.request.query_params.get('project_id')
-        if project_id:
-            _require_project_access(self.request.user, int(project_id))
-            queryset = queryset.filter(project_id=project_id)
+        unassigned = self.request.query_params.get('unassigned', '').lower() == 'true'
+        if unassigned:
+            queryset = queryset.filter(project_id__isnull=True)
+        else:
+            project_id = self.request.query_params.get('project_id')
+            if project_id:
+                _require_project_access(self.request.user, int(project_id))
+                queryset = queryset.filter(project_id=project_id)
 
         # Filter by page_context
         page_context = self.request.query_params.get('page_context')
@@ -1382,14 +1386,15 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-updated_at')
 
     def list(self, request, *args, **kwargs):
-        """GET list of threads for a project."""
+        """GET list of threads. Requires project_id or unassigned=true."""
         from .serializers import ChatThreadSerializer
 
         project_id = request.query_params.get('project_id')
-        if not project_id:
+        unassigned = request.query_params.get('unassigned', '').lower() == 'true'
+        if not project_id and not unassigned:
             return Response({
                 'success': False,
-                'error': 'project_id query parameter is required',
+                'error': 'project_id or unassigned=true query parameter is required',
             }, status=status.HTTP_400_BAD_REQUEST)
 
         queryset = self.get_queryset()
@@ -1414,25 +1419,34 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         })
 
     def create(self, request, *args, **kwargs):
-        """POST create new thread (or get existing active one)."""
+        """POST create new thread (or get existing active one).
+
+        Project-scoped: project_id + page_context required (existing behavior).
+        Unassigned (Chat Canvas): project_id omitted/null; page_context defaults
+        to 'general' if absent.
+        """
         from .services.thread_service import ThreadService
         from .serializers import ChatThreadSerializer
 
         project_id = request.data.get('project_id')
         page_context = request.data.get('page_context')
 
-        if not project_id or not page_context:
-            return Response({
-                'success': False,
-                'error': 'project_id and page_context are required',
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        _require_project_access(request.user, int(project_id))
+        if project_id is None:
+            if page_context is None:
+                page_context = 'general'
+            resolved_project_id = None
+        else:
+            if not page_context:
+                return Response({
+                    'success': False,
+                    'error': 'page_context is required for project-scoped threads',
+                }, status=status.HTTP_400_BAD_REQUEST)
+            _require_project_access(request.user, int(project_id))
+            resolved_project_id = int(project_id)
 
         try:
-            # Get or create active thread for this context
             thread = ThreadService.get_or_create_active_thread(
-                project_id=int(project_id),
+                project_id=resolved_project_id,
                 page_context=page_context,
                 subtab_context=request.data.get('subtab_context')
             )
@@ -1440,7 +1454,7 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             return Response({
                 'success': True,
                 'thread': ChatThreadSerializer(thread).data,
-                'created': thread.messages.count() == 0,  # True if newly created
+                'created': thread.messages.count() == 0,
             }, status=status.HTTP_201_CREATED if thread.messages.count() == 0 else status.HTTP_200_OK)
 
         except Exception as e:
@@ -1529,8 +1543,8 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             threads.append({
                 'threadId': str(t.id),
                 'projectId': t.project_id,
-                'projectName': t.project.project_name if t.project else 'Unknown',
-                'propertyType': t.project.project_type_code if t.project else None,
+                'projectName': t.project.project_name if t.project_id else None,
+                'propertyType': t.project.project_type_code if t.project_id else None,
                 'pageContext': t.page_context,
                 'subtabContext': t.subtab_context,
                 'title': t.title,
@@ -1549,24 +1563,32 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='new')
     def start_new(self, request):
-        """POST start a new thread (closes existing active thread first)."""
+        """POST start a new thread (closes existing active thread first).
+
+        Unassigned mode: project_id omitted/null, page_context defaults to 'general'.
+        """
         from .services.thread_service import ThreadService
         from .serializers import ChatThreadSerializer
 
         project_id = request.data.get('project_id')
         page_context = request.data.get('page_context')
 
-        if not project_id or not page_context:
-            return Response({
-                'success': False,
-                'error': 'project_id and page_context are required',
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        _require_project_access(request.user, int(project_id))
+        if project_id is None:
+            if page_context is None:
+                page_context = 'general'
+            resolved_project_id = None
+        else:
+            if not page_context:
+                return Response({
+                    'success': False,
+                    'error': 'page_context is required for project-scoped threads',
+                }, status=status.HTTP_400_BAD_REQUEST)
+            _require_project_access(request.user, int(project_id))
+            resolved_project_id = int(project_id)
 
         try:
             thread = ThreadService.start_new_thread(
-                project_id=int(project_id),
+                project_id=resolved_project_id,
                 page_context=page_context,
                 subtab_context=request.data.get('subtab_context')
             )
@@ -1577,6 +1599,59 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='promote')
+    def promote(self, request, pk=None):
+        """POST reparent an unassigned thread (and its docs) to a project."""
+        from .services.thread_service import ThreadService
+        from .serializers import ChatThreadSerializer
+        from .models import ChatThread
+
+        project_id = request.data.get('project_id')
+        move_thread = bool(request.data.get('move_thread', True))
+
+        if project_id is None:
+            return Response({
+                'success': False,
+                'error': 'project_id is required',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project_id_int = int(project_id)
+        except (TypeError, ValueError):
+            return Response({
+                'success': False,
+                'error': 'project_id must be an integer',
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        _require_project_access(request.user, project_id_int)
+
+        try:
+            thread = ThreadService.promote_thread(
+                thread_id=pk,
+                project_id=project_id_int,
+                move_thread=move_thread,
+            )
+            return Response({
+                'success': True,
+                'thread': ChatThreadSerializer(thread).data,
+            })
+        except ValueError as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except ChatThread.DoesNotExist:
+            return Response({
+                'success': False,
+                'error': 'Thread not found',
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(f"Error promoting thread {pk}: {e}")
             return Response({
                 'success': False,
                 'error': str(e),
@@ -1600,12 +1675,13 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def _get_authorized_thread(self):
-        """Load thread and enforce project access."""
+        """Load thread and enforce project access (skipped for unassigned threads)."""
         from .models import ChatThread
 
         thread_id = self.kwargs.get('thread_id')
         thread = get_object_or_404(ChatThread, id=thread_id)
-        _require_project_access(self.request.user, int(thread.project_id))
+        if thread.project_id is not None:
+            _require_project_access(self.request.user, int(thread.project_id))
         return thread
 
     def get_queryset(self):
@@ -1677,12 +1753,14 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                         None
                     )
                 
-                try:
-                    project_obj = Project.objects.filter(project_id=thread.project_id).first()
-                    project_name = project_obj.project_name if project_obj else None
-                except Exception:
-                    project_name = None
-                
+                project_name = None
+                if thread.project_id is not None:
+                    try:
+                        project_obj = Project.objects.filter(project_id=thread.project_id).first()
+                        project_name = project_obj.project_name if project_obj else None
+                    except Exception:
+                        project_name = None
+
                 capture_feedback(
                     user_message=original_content,
                     user_email=user_email,
@@ -1720,43 +1798,61 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 f"roles={[m.get('role') for m in message_history]}"
             )
 
-            # Get project context
-            project = Project.objects.get(project_id=thread.project_id)
-            project_context = {
-                'project_id': project.project_id,
-                'project_name': project.project_name,
-                'project_type': project.project_type or 'Unknown',
-                'project_type_code': project.project_type_code,
-                'thread_id': str(thread.id),
-                'subtab_context': getattr(thread, 'subtab_context', None),
-                'analysis_perspective': getattr(project, 'analysis_perspective', None),
-                'analysis_purpose': getattr(project, 'analysis_purpose', None),
-                'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
-                'project_details': {
-                    'address': getattr(project, 'address', None),
-                    'city': getattr(project, 'city', None),
-                    'state': getattr(project, 'state', None),
-                    'county': getattr(project, 'county', None),
-                    'zip_code': getattr(project, 'zip_code', None),
-                    'total_acres': getattr(project, 'total_acres', None),
-                    'total_lots': getattr(project, 'total_lots', None),
+            # Get project context (or a minimal stub for unassigned threads)
+            if thread.project_id is not None:
+                project = Project.objects.get(project_id=thread.project_id)
+                project_context = {
+                    'project_id': project.project_id,
+                    'project_name': project.project_name,
+                    'project_type': project.project_type or 'Unknown',
+                    'project_type_code': project.project_type_code,
+                    'thread_id': str(thread.id),
+                    'subtab_context': getattr(thread, 'subtab_context', None),
+                    'analysis_perspective': getattr(project, 'analysis_perspective', None),
+                    'analysis_purpose': getattr(project, 'analysis_purpose', None),
+                    'value_add_enabled': bool(getattr(project, 'value_add_enabled', False)),
+                    'project_details': {
+                        'address': getattr(project, 'address', None),
+                        'city': getattr(project, 'city', None),
+                        'state': getattr(project, 'state', None),
+                        'county': getattr(project, 'county', None),
+                        'zip_code': getattr(project, 'zip_code', None),
+                        'total_acres': getattr(project, 'total_acres', None),
+                        'total_lots': getattr(project, 'total_lots', None),
+                    }
                 }
-            }
+            else:
+                project = None
+                project_context = {
+                    'project_id': None,
+                    'project_name': None,
+                    'project_type': None,
+                    'project_type_code': None,
+                    'thread_id': str(thread.id),
+                    'subtab_context': getattr(thread, 'subtab_context', None),
+                    'unassigned': True,
+                }
 
-            # Get past conversation context for RAG
-            chat_context = EmbeddingService.get_thread_context_for_rag(
-                query=request.data.get('content', ''),
-                project_id=thread.project_id,
-                current_thread_id=thread.id,
-                max_results=3
-            )
+            # Get past conversation context for RAG — only for project-scoped threads
+            # (unassigned threads don't generate embeddings — see EmbeddingService.embed_message)
+            if thread.project_id is not None:
+                chat_context = EmbeddingService.get_thread_context_for_rag(
+                    query=request.data.get('content', ''),
+                    project_id=thread.project_id,
+                    current_thread_id=thread.id,
+                    max_results=3
+                )
+            else:
+                chat_context = None
 
-            # Create tool executor bound to this project and thread
+            # Create tool executor bound to this project (or None) and thread
             _uid = request.user.id if hasattr(request, 'user') and request.user.is_authenticated else None
+            _bound_project_id = project.project_id if project is not None else None
+
             def tool_executor_fn(tool_name, tool_input, project_id=None):
                 return execute_tool(
                     tool_name, tool_input,
-                    project_id or project.project_id,
+                    project_id if project_id is not None else _bound_project_id,
                     thread_id=str(thread.id),
                     user_id=_uid,
                 )

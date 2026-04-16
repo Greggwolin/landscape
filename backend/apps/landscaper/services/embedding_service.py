@@ -73,16 +73,20 @@ class EmbeddingService:
             ChatEmbedding instance, or None on failure
         """
         try:
+            # Skip embedding for unassigned threads — landscaper_chat_embedding.project_id
+            # is NOT NULL. Cross-thread RAG for unassigned threads is deferred until
+            # the thread is promoted to a project.
+            thread = message.thread
+            project_id = thread.project_id
+            if project_id is None:
+                return None
+
             # Combine role and content for richer embedding
             text = f"{message.role}: {message.content}"
 
             embedding = EmbeddingService.generate_embedding(text)
             if not embedding:
                 return None
-
-            # Get project_id from thread (denormalized for faster queries)
-            thread = message.thread
-            project_id = thread.project_id
 
             # Use raw SQL to insert with vector type
             with connection.cursor() as cursor:

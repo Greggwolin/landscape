@@ -14329,6 +14329,26 @@ def execute_tool(
             'available_tools': list(TOOL_REGISTRY.keys())
         }
 
+    # Guard: block project-requiring tools when project_id is None (unassigned threads)
+    if project_id is None:
+        from .tool_registry import UNASSIGNED_SAFE_TOOLS
+        if tool_name not in UNASSIGNED_SAFE_TOOLS:
+            logger.warning(
+                f"Tool '{tool_name}' requires a project but was called "
+                f"from an unassigned thread (thread_id={thread_id})"
+            )
+            return {
+                'success': False,
+                'error': 'project_required',
+                'message': (
+                    f"The tool '{tool_name}' requires a project context. "
+                    "You can create a project from this chat using create_project "
+                    "or convert_draft_to_project, then try again."
+                ),
+                'tool': tool_name,
+                'suggested_tools': ['create_project', 'convert_draft_to_project'],
+            }
+
     # Auto-execute rent roll batch tools without requiring confirmation
     # User explicitly asked for this action (e.g., "read document and populate rent roll")
     if tool_name in AUTO_EXECUTE_TOOLS:

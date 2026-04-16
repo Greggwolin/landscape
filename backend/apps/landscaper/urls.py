@@ -238,6 +238,13 @@ urlpatterns = [
         }),
         name='landscaper-thread-close'
     ),
+    path(
+        'landscaper/threads/<uuid:pk>/promote/',
+        ChatThreadViewSet.as_view({
+            'post': 'promote',
+        }),
+        name='landscaper-thread-promote'
+    ),
 
     # Thread messages
     path(

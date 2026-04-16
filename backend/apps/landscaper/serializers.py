@@ -49,8 +49,9 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     """Serializer for ChatThread model."""
 
     threadId = serializers.UUIDField(source='id', read_only=True)
-    projectId = serializers.IntegerField(source='project_id', read_only=True)
-    pageContext = serializers.CharField(source='page_context')
+    projectId = serializers.IntegerField(source='project_id', read_only=True, allow_null=True)
+    projectName = serializers.SerializerMethodField()
+    pageContext = serializers.CharField(source='page_context', allow_null=True, required=False)
     subtabContext = serializers.CharField(source='subtab_context', allow_null=True, required=False)
     isActive = serializers.BooleanField(source='is_active', read_only=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
@@ -63,6 +64,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
         fields = [
             'threadId',
             'projectId',
+            'projectName',
             'pageContext',
             'subtabContext',
             'title',
@@ -73,11 +75,18 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'closedAt',
             'messageCount',
         ]
-        read_only_fields = ['threadId', 'projectId', 'isActive', 'createdAt', 'updatedAt', 'closedAt', 'messageCount']
+        read_only_fields = [
+            'threadId', 'projectId', 'projectName', 'isActive',
+            'createdAt', 'updatedAt', 'closedAt', 'messageCount',
+        ]
 
     def get_messageCount(self, obj):
         """Return the number of messages in this thread."""
         return obj.messages.count()
+
+    def get_projectName(self, obj):
+        """Return the parent project's name, or None for unassigned threads."""
+        return obj.project.project_name if obj.project_id else None
 
 
 class ChatThreadDetailSerializer(ChatThreadSerializer):
@@ -95,6 +104,10 @@ class ChatThreadCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatThread
         fields = ['project', 'page_context', 'subtab_context', 'title']
+        extra_kwargs = {
+            'project': {'required': False, 'allow_null': True},
+            'page_context': {'required': False, 'allow_null': True},
+        }
 
 
 class ChatThreadUpdateSerializer(serializers.ModelSerializer):

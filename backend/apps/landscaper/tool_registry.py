@@ -186,6 +186,35 @@ ADMIN_TOOLS = [
 ]
 
 
+# Tools safe to use without a project context (unassigned/general threads).
+# These either operate on doc_id (not project_id), read platform-global data,
+# or create new projects (the path out of unassigned mode).
+UNASSIGNED_SAFE_TOOLS = [
+    # Excel model audit (operate on doc_id only)
+    "classify_excel_file", "run_structural_scan",
+    "run_formula_integrity", "extract_assumptions",
+    # UI affordance
+    "open_input_modal",
+    # Platform knowledge / reference data
+    "query_platform_knowledge", "search_irem_benchmarks",
+    "get_knowledge_entities", "get_knowledge_facts", "get_knowledge_insights",
+    "acknowledge_insight",
+    # Project creation (the way out of unassigned mode)
+    "create_project", "create_analysis_draft", "update_analysis_draft",
+    "run_draft_calculations", "convert_draft_to_project",
+    # Alpha feedback
+    "log_alpha_feedback",
+    # Ingestion tools (operate on doc_id + session, not project)
+    "get_ingestion_staging", "update_staging_field",
+    "approve_staging_field", "reject_staging_field", "explain_extraction",
+]
+
+
+def get_tools_for_unassigned() -> List[str]:
+    """Return tool names available in unassigned (pre-project) threads."""
+    return list(UNASSIGNED_SAFE_TOOLS)
+
+
 # =============================================================================
 # PROPERTY TYPE → TOOL MAP
 # =============================================================================

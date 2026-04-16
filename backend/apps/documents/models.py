@@ -88,6 +88,15 @@ class Document(models.Model):
     # Soft delete fields
     deleted_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.CharField(max_length=255, null=True, blank=True)
+    # Chat Canvas: docs uploaded in unassigned Landscaper threads
+    thread = models.ForeignKey(
+        'landscaper.ChatThread',
+        on_delete=models.SET_NULL,
+        db_column='thread_id',
+        null=True,
+        blank=True,
+        related_name='documents',
+    )
 
     class Meta:
         managed = False

@@ -40,30 +40,29 @@ class ThreadService:
     @staticmethod
     @transaction.atomic
     def get_or_create_active_thread(
-        project_id: int,
-        page_context: str,
+        project_id: Optional[int],
+        page_context: Optional[str] = None,
         subtab_context: Optional[str] = None
     ) -> ChatThread:
         """
         Get the active thread for a project/page context, or create one if none exists.
 
+        Passing project_id=None returns (or creates) an unassigned thread — the
+        Chat Canvas pre-project holding area. Unassigned threads are not
+        segmented by page_context, so the page_context filter is only applied
+        when project_id is set.
+
         Uses SELECT ... FOR UPDATE to prevent race conditions where concurrent
         requests both see "no active thread" and both create new ones.
-
-        Args:
-            project_id: Project ID
-            page_context: Page context (e.g., 'property', 'operations')
-            subtab_context: Optional subtab context
-
-        Returns:
-            Active ChatThread instance
         """
-        # Try to find existing active thread with row-level lock
-        lookup = {
-            'project_id': project_id,
-            'page_context': page_context,
-            'is_active': True,
-        }
+        lookup = {'is_active': True}
+        if project_id is None:
+            lookup['project_id__isnull'] = True
+        else:
+            lookup['project_id'] = project_id
+            if page_context:
+                lookup['page_context'] = page_context
+
         if subtab_context:
             lookup['subtab_context'] = subtab_context
         else:
@@ -73,15 +72,14 @@ class ThreadService:
         if thread:
             return thread
 
-        # Create new thread — still inside the atomic block so concurrent
-        # callers will block on the select_for_update until we commit
         thread = ChatThread.objects.create(
             project_id=project_id,
             page_context=page_context,
             subtab_context=subtab_context,
             is_active=True
         )
-        logger.info(f"Created new thread {thread.id} for project {project_id}, page {page_context}")
+        owner = f"project {project_id}" if project_id is not None else 'unassigned'
+        logger.info(f"Created new thread {thread.id} for {owner}, page {page_context or '-'}")
         return thread
 
     @staticmethod
@@ -114,6 +112,16 @@ class ThreadService:
             queryset = queryset.filter(is_active=True)
 
         return list(queryset.order_by('-updated_at'))
+
+    @staticmethod
+    def get_unassigned_threads(include_closed: bool = False):
+        """
+        Return unassigned (project_id IS NULL) threads for the Chat Canvas.
+        """
+        qs = ChatThread.objects.filter(project_id__isnull=True)
+        if not include_closed:
+            qs = qs.filter(is_active=True)
+        return qs.order_by('-updated_at')
 
     @staticmethod
     def get_thread_with_messages(thread_id: UUID) -> Optional[ChatThread]:
@@ -167,27 +175,24 @@ class ThreadService:
     @staticmethod
     @transaction.atomic
     def start_new_thread(
-        project_id: int,
-        page_context: str,
+        project_id: Optional[int],
+        page_context: Optional[str] = None,
         subtab_context: Optional[str] = None
     ) -> ChatThread:
         """
         Start a new thread, closing any existing active thread for the same context.
 
-        Args:
-            project_id: Project ID
-            page_context: Page context
-            subtab_context: Optional subtab context
-
-        Returns:
-            New ChatThread instance
+        When project_id is None (unassigned thread), the previous active
+        unassigned thread is closed but NOT archived to ActivityItem —
+        ActivityItem.project is non-nullable.
         """
-        # Close existing active thread(s) for this context
-        existing_lookup = {
-            'project_id': project_id,
-            'page_context': page_context,
-            'is_active': True,
-        }
+        existing_lookup = {'is_active': True}
+        if project_id is None:
+            existing_lookup['project_id__isnull'] = True
+        else:
+            existing_lookup['project_id'] = project_id
+            if page_context:
+                existing_lookup['page_context'] = page_context
         if subtab_context:
             existing_lookup['subtab_context'] = subtab_context
         else:
@@ -197,35 +202,73 @@ class ThreadService:
         for thread in existing:
             ThreadService.close_thread(thread.id, generate_summary=True)
 
-            # Archive to activity log
+            # ActivityItem.project is non-nullable — only archive project-scoped threads.
+            if project_id is None:
+                continue
+
             try:
                 from ..models import ActivityItem
                 msg_count = thread.messages.count()
                 if msg_count > 0:
                     summary_text = thread.summary or f"Chat thread with {msg_count} messages"
+                    title_suffix = page_context or 'general'
                     ActivityItem.objects.create(
                         project_id=project_id,
                         activity_type='status',
-                        title=thread.title or f"Landscaper: {page_context}" + (f" / {subtab_context}" if subtab_context else ""),
+                        title=thread.title or f"Landscaper: {title_suffix}" + (f" / {subtab_context}" if subtab_context else ""),
                         summary=f"Archived chat ({msg_count} messages): {summary_text[:200]}",
                         status='complete',
                         source_type='thread',
                         source_id=str(thread.id),
-                        details=[f"Page: {page_context}", f"Tab: {subtab_context or 'general'}", f"Messages: {msg_count}"],
+                        details=[f"Page: {title_suffix}", f"Tab: {subtab_context or 'general'}", f"Messages: {msg_count}"],
                     )
                     logger.info(f"Archived thread {thread.id} to activity log ({msg_count} messages)")
             except Exception as e:
                 logger.warning(f"Failed to archive thread {thread.id} to activity: {e}")
 
-        # Create new thread
         new_thread = ChatThread.objects.create(
             project_id=project_id,
             page_context=page_context,
             subtab_context=subtab_context,
             is_active=True
         )
-        logger.info(f"Started new thread {new_thread.id} for project {project_id}, page {page_context}")
+        owner = f"project {project_id}" if project_id is not None else 'unassigned'
+        logger.info(f"Started new thread {new_thread.id} for {owner}, page {page_context or '-'}")
         return new_thread
+
+    @staticmethod
+    @transaction.atomic
+    def promote_thread(
+        thread_id,
+        project_id: int,
+        move_thread: bool = True,
+    ) -> ChatThread:
+        """
+        Reparent an unassigned thread to a project.
+
+        When move_thread=True (default), the thread itself gets reparented. When
+        False, only documents linked to the thread are reparented — the thread
+        stays unassigned (useful if the user wants to keep the general chat but
+        move attachments into the new project).
+        """
+        thread = ChatThread.objects.select_for_update().get(id=thread_id)
+
+        if thread.project_id is not None:
+            raise ValueError(
+                f"Thread {thread_id} already belongs to project {thread.project_id}"
+            )
+
+        if move_thread:
+            thread.project_id = project_id
+            thread.save(update_fields=['project_id', 'updated_at'])
+
+        from apps.documents.models import Document
+        Document.objects.filter(
+            thread_id=thread_id,
+            project_id__isnull=True,
+        ).update(project_id=project_id)
+
+        return thread
 
     @staticmethod
     def generate_thread_title(

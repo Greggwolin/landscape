@@ -40,6 +40,7 @@ class ChatThread(models.Model):
         ('capitalization', 'Capitalization'),
         ('reports', 'Reports'),
         ('documents', 'Documents'),
+        ('general', 'General'),
     ]
 
     id = models.UUIDField(
@@ -51,12 +52,16 @@ class ChatThread(models.Model):
         'projects.Project',
         on_delete=models.CASCADE,
         db_column='project_id',
-        related_name='chat_threads'
+        related_name='chat_threads',
+        null=True,
+        blank=True,
     )
     page_context = models.CharField(
         max_length=50,
         choices=PAGE_CONTEXT_CHOICES,
-        help_text='Folder/page context: home, property, operations, etc.'
+        null=True,
+        blank=True,
+        help_text='Soft tag for UI awareness; not required for unassigned threads.'
     )
     subtab_context = models.CharField(
         max_length=50,
@@ -100,8 +105,9 @@ class ChatThread(models.Model):
         verbose_name_plural = 'Chat Threads'
 
     def __str__(self):
-        title = self.title or f"Thread in {self.page_context}"
-        return f"{self.project.project_name} - {title}"
+        title = self.title or f"Thread in {self.page_context or 'general'}"
+        owner = self.project.project_name if self.project_id else 'Unassigned'
+        return f"{owner} - {title}"
 
 
 class ThreadMessage(models.Model):

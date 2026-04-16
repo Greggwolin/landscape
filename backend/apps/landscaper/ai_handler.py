@@ -129,6 +129,7 @@ def _truncate_tool_result(result, max_chars=4000, tool_name=None):
 
 from .tool_registry import (
     get_tools_for_page,
+    get_tools_for_unassigned,
     normalize_page_context,
     should_include_extraction_tools,
 )
@@ -2530,11 +2531,26 @@ def get_landscaper_response(
 
     full_system = f"{system_prompt}\n{scope_section}\n{field_rules}{user_instructions_section}\n---\n{project_context_msg}"
 
+    # Unassigned thread context hint
+    project_id = project_context.get('project_id')
+    if project_id is None:
+        full_system += (
+            "\n\n=== GENERAL CHAT (NO PROJECT) ===\n"
+            "You are in a general chat with no project selected. You can:\n"
+            "- Analyze uploaded Excel files (classify, audit formulas, extract assumptions)\n"
+            "- Answer questions using platform knowledge and benchmarks\n"
+            "- Help the user think through a deal before committing to a project\n"
+            "- Create a new project when the user is ready (use create_project or create_analysis_draft)\n\n"
+            "You cannot access project-specific data (budgets, rent rolls, valuations, comps, etc.) "
+            "until a project is created or selected. If the user asks for something that requires "
+            "a project, explain what you need and offer to create one.\n"
+            "=== END GENERAL CHAT ===\n"
+        )
+
     # Add rich project context (structured data from relevant tables only)
     # Pass page_context so only sections relevant to the current page are included.
     # This keeps the system prompt compact and preserves model attention for
     # conversation history.
-    project_id = project_context.get('project_id')
     if project_id:
         try:
             from apps.knowledge.services.project_context import get_project_context
@@ -2777,15 +2793,20 @@ def get_landscaper_response(
         _pid = project_context.get('project_id')
 
         if tool_executor:
-            include_extraction = should_include_extraction_tools(last_user_message or "")
-            available_tool_names = get_tools_for_page(
-                page_context=normalized_context,
-                include_extraction=include_extraction,
-                is_admin=is_admin,
-                project_id=_pid,
-                project_type_code=project_context.get('project_type_code'),
-                project_type=project_context.get('project_type'),
-            )
+            if _pid is None:
+                # Unassigned thread — only safe tools (no project context)
+                available_tool_names = get_tools_for_unassigned()
+            else:
+                # Project-scoped thread — full property-type-gated set
+                include_extraction = should_include_extraction_tools(last_user_message or "")
+                available_tool_names = get_tools_for_page(
+                    page_context=normalized_context,
+                    include_extraction=include_extraction,
+                    is_admin=is_admin,
+                    project_id=_pid,
+                    project_type_code=project_context.get('project_type_code'),
+                    project_type=project_context.get('project_type'),
+                )
             _allowed = set(available_tool_names)
             filtered_tools = [
                 tool for tool in LANDSCAPER_TOOLS
