@@ -90,7 +90,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
           onClick={toggleArtifacts}
           title="Open artifacts panel"
         >
-          ◀
+          ☰
         </button>
       </div>
     );
@@ -107,9 +107,9 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
           className="wrapper-btn-ghost"
           onClick={toggleArtifacts}
           title="Collapse artifacts panel"
-          style={{ fontSize: '12px', padding: '2px 6px' }}
+          style={{ fontSize: '14px', padding: '2px 6px' }}
         >
-          ▶
+          ☰
         </button>
       </div>
 

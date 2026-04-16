@@ -57,6 +57,7 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
 
   // threadId selected/created from the homepage (null = homepage mode)
   const [homepageThreadId, setHomepageThreadId] = useState<string | null>(null);
+  const [threadTitle, setThreadTitle] = useState<string | null>(null);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
   // Ref to the chat component so we can auto-send the initial message
@@ -89,8 +90,9 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
 
   const showHomepage = isProjectRoot && !homepageThreadId && !initialThreadId;
 
-  const handleSelectThread = useCallback((threadId: string) => {
+  const handleSelectThread = useCallback((threadId: string, title?: string) => {
     setHomepageThreadId(threadId);
+    setThreadTitle(title ?? null);
   }, []);
 
   const handleStartChat = useCallback(
@@ -119,6 +121,7 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
 
   const handleBackToHomepage = useCallback(() => {
     setHomepageThreadId(null);
+    setThreadTitle(null);
     pendingMessageRef.current = null;
   }, []);
 
@@ -139,7 +142,9 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
   return (
     <div className="wrapper-chat-center">
       <div className="wrapper-header">
-        <span className="wrapper-header-title">Landscaper</span>
+        <span className="wrapper-header-title">
+          {showHomepage ? '' : (threadTitle || 'New conversation')}
+        </span>
         <div className="wrapper-header-spacer" />
         {/* Back button when a thread is active from the homepage */}
         {isProjectRoot && homepageThreadId && (

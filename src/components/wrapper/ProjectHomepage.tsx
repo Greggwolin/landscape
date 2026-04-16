@@ -38,7 +38,7 @@ interface ProjectInfo {
 
 interface ProjectHomepageProps {
   projectId: number;
-  onSelectThread: (threadId: string) => void;
+  onSelectThread: (threadId: string, title?: string) => void;
   onStartChat: (message: string) => void;
   isStartingChat?: boolean;
 }
@@ -385,7 +385,7 @@ export function ProjectHomepage({
               <button
                 key={thread.threadId}
                 type="button"
-                onClick={() => onSelectThread(thread.threadId)}
+                onClick={() => onSelectThread(thread.threadId, thread.title ?? undefined)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
