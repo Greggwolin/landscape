@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { useParams, usePathname } from 'next/navigation';
-import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { WrapperHeader } from './WrapperHeader';
 import { ChatTogglePanel } from './ChatTogglePanel';
 
@@ -53,7 +52,7 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
           onClick={toggleChat}
           title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
         >
-          <LandscaperIcon style={{ width: 26, height: 26 }} />
+          <span style={{ fontSize: '18px' }}>☰</span>
         </button>
         <span className="wrapper-header-title">{getPageTitle()}</span>
         <div className="wrapper-header-spacer" />

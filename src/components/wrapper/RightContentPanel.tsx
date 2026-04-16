@@ -2,8 +2,6 @@
 
 import React from 'react';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
-import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-
 interface RightContentPanelProps {
   title: string;
   subtitle?: string;
@@ -30,7 +28,7 @@ export function RightContentPanel({ title, subtitle, actions, children }: RightC
           onClick={toggleChat}
           title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
         >
-          <LandscaperIcon style={{ width: 26, height: 26 }} />
+          <span style={{ fontSize: '18px' }}>☰</span>
         </button>
         <span className="wrapper-header-title">{title}</span>
         {subtitle && <span className="wrapper-header-subtitle">{subtitle}</span>}
