@@ -53,7 +53,8 @@ export interface LandscaperChatHandle {
 }
 
 interface LandscaperChatThreadedProps {
-  projectId: number;
+  /** Project ID. Omit/undefined = unassigned (Chat Canvas) thread. */
+  projectId?: number;
   pageContext: string;
   subtabContext?: string;
   contextPillLabel?: string;
@@ -286,7 +287,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     loadThreads,
     loadAllThreads,
   } = useLandscaperThreads({
-    projectId: projectId.toString(),
+    projectId: projectId !== undefined ? projectId.toString() : undefined,
     pageContext,
     subtabContext,
     onToolResult,
@@ -353,14 +354,16 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
         // Emit mutation event so page components refresh without reload
         const pid = data.project_id || projectId;
-        const tableName = data.table_name || '';
-        const eventTables = DB_TABLE_TO_EVENT_TABLES[tableName] || [tableName.replace('tbl_', '')];
-        emitMutationComplete({
-          projectId: typeof pid === 'string' ? parseInt(pid) : pid,
-          mutationType: data.mutation_type || 'confirm',
-          tables: eventTables,
-          counts: { updated: 1, total: 1 },
-        });
+        if (pid) {
+          const tableName = data.table_name || '';
+          const eventTables = DB_TABLE_TO_EVENT_TABLES[tableName] || [tableName.replace('tbl_', '')];
+          emitMutationComplete({
+            projectId: typeof pid === 'string' ? parseInt(pid) : pid,
+            mutationType: data.mutation_type || 'confirm',
+            tables: eventTables,
+            counts: { updated: 1, total: 1 },
+          });
+        }
       }
     } catch (error) {
       console.error('Error confirming mutation:', error);
@@ -408,9 +411,9 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
             totalConfirmed++;
           }
         }
-        if (affectedTables.size > 0) {
+        if (affectedTables.size > 0 && projectId) {
           emitMutationComplete({
-            projectId: typeof projectId === 'string' ? parseInt(projectId as string) : projectId,
+            projectId,
             mutationType: 'batch_confirm',
             tables: Array.from(affectedTables),
             counts: { updated: totalConfirmed, total: totalConfirmed },

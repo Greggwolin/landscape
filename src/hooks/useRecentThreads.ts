@@ -7,10 +7,10 @@ const POLL_INTERVAL_MS = 30_000;
 
 export interface RecentThread {
   threadId: string;
-  projectId: number;
-  projectName: string;
+  projectId: number | null;
+  projectName: string | null;
   propertyType: string | null;
-  pageContext: string;
+  pageContext: string | null;
   subtabContext: string | null;
   title: string | null;
   isActive: boolean;

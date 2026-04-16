@@ -45,6 +45,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     if (pathname.includes('/admin')) return 'admin';
     if (pathname.includes('/tools')) return 'tools';
     if (pathname.includes('/help')) return 'help';
+    if (pathname.includes('/chat')) return 'chat';
     if (pathname.includes('/projects')) return 'projects';
     return 'projects';
   })();
@@ -52,6 +53,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   // Extract current projectId from URL
   const projectIdMatch = pathname.match(/\/projects\/(\d+)/);
   const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined;
+
+  // Extract threadId from /w/chat/[threadId] routes (Chat Canvas unassigned threads)
+  const chatThreadIdMatch = pathname.match(/\/chat\/([0-9a-fA-F-]{36})$/);
+  const initialThreadId = chatThreadIdMatch ? chatThreadIdMatch[1] : undefined;
 
   // Persist last projectId so project-scoped nav items resume from any page
   const [lastProjectId, setLastProjectId] = useState<number | undefined>(undefined);
@@ -190,7 +195,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         currentTheme={theme === 'light' ? 'light' : 'dark'}
         onThemeToggle={toggleTheme}
       />
-      <CenterChatPanel projectId={projectId ?? lastProjectId} />
+      <CenterChatPanel
+        projectId={initialThreadId ? undefined : (projectId ?? lastProjectId)}
+        initialThreadId={initialThreadId}
+      />
       <main className="wrapper-main">{children}</main>
       <HelpLandscaperPanel />
     </div>

@@ -8,14 +8,18 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
 interface CenterChatPanelProps {
   projectId?: number;
   width?: number;
+  /** When provided, mounts the chat with this thread pre-selected (used by /w/chat/[threadId]). */
+  initialThreadId?: string;
 }
 
 /**
  * Center Landscaper chat panel — three-panel layout middle column.
  * Own dark header: left = page badge, center = "Landscaper" title, right = Close button.
  * Open by default. Fully hidden when closed (not collapsed).
+ *
+ * Always renders the threaded chat (unassigned/general when no projectId).
  */
-export function CenterChatPanel({ projectId, width = 420 }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, width = 420, initialThreadId }: CenterChatPanelProps) {
   const { chatOpen, closeChat } = useWrapperUI();
   const pathname = usePathname();
 
@@ -54,19 +58,13 @@ export function CenterChatPanel({ projectId, width = 420 }: CenterChatPanelProps
         </button>
       </div>
       <div className="wrapper-chat-body">
-        {projectId ? (
-          <LandscaperChatThreaded
-            projectId={projectId}
-            pageContext={getPageContext()}
-            isExpanded={true}
-            hideInternalHeader={true}
-          />
-        ) : (
-          <div className="wrapper-chat-empty">
-            <div className="wrapper-chat-empty-icon">📁</div>
-            <div>Ask Landscaper about your projects, portfolio, or to create a new project.</div>
-          </div>
-        )}
+        <LandscaperChatThreaded
+          projectId={projectId}
+          pageContext={projectId ? getPageContext() : 'general'}
+          isExpanded={true}
+          hideInternalHeader={true}
+          initialThreadId={initialThreadId}
+        />
       </div>
     </div>
   );

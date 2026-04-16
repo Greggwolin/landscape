@@ -99,11 +99,17 @@ export interface SendMessageOptions {
 }
 
 interface UseLandscaperThreadsOptions {
-  projectId: string;
+  /** Project ID as a string. Omit/undefined/empty string = unassigned (Chat Canvas) mode. */
+  projectId?: string;
   pageContext: string;
   subtabContext?: string;
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
+}
+
+/** True when the projectId string represents a real project (not unassigned mode). */
+function hasProjectId(pid: string | undefined): pid is string {
+  return !!pid && pid !== '0' && parseInt(pid) > 0;
 }
 
 // Map tool names to the tables they affect
@@ -259,17 +265,17 @@ export function useLandscaperThreads({
    * Load threads for the current project/page context (used for initialization).
    */
   const loadThreads = useCallback(async () => {
-    // Guard: skip API call for invalid project IDs
-    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
-      return [];
-    }
-
     try {
       const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
-      url.searchParams.set('project_id', projectId);
-      url.searchParams.set('page_context', pageContext);
-      if (subtabContext) {
-        url.searchParams.set('subtab_context', subtabContext);
+      if (hasProjectId(projectId)) {
+        url.searchParams.set('project_id', projectId);
+        url.searchParams.set('page_context', pageContext);
+        if (subtabContext) {
+          url.searchParams.set('subtab_context', subtabContext);
+        }
+      } else {
+        // Unassigned mode — list Chat Canvas threads (no project attached)
+        url.searchParams.set('unassigned', 'true');
       }
       url.searchParams.set('include_closed', 'true');
 
@@ -296,14 +302,14 @@ export function useLandscaperThreads({
    */
   const [allThreads, setAllThreads] = useState<ChatThread[]>([]);
   const loadAllThreads = useCallback(async () => {
-    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
-      return [];
-    }
-
     try {
       const url = new URL(`${DJANGO_API_URL}/api/landscaper/threads/`);
-      url.searchParams.set('project_id', projectId);
-      // No page_context filter — get ALL threads for the project
+      if (hasProjectId(projectId)) {
+        url.searchParams.set('project_id', projectId);
+        // No page_context filter — get ALL threads for the project
+      } else {
+        url.searchParams.set('unassigned', 'true');
+      }
       url.searchParams.set('include_closed', 'true');
 
       const response = await fetchWithTimeout(url.toString(), {
@@ -349,11 +355,6 @@ export function useLandscaperThreads({
    * Get or create an active thread for the current page context.
    */
   const initializeThread = useCallback(async () => {
-    // Guard: skip initialization for invalid project IDs
-    if (!projectId || projectId === '0' || parseInt(projectId) <= 0) {
-      return;
-    }
-
     if (initializingRef.current) return;
     initializingRef.current = true;
     setIsThreadLoading(true);
@@ -395,7 +396,7 @@ export function useLandscaperThreads({
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            project_id: parseInt(projectId),
+            ...(hasProjectId(projectId) ? { project_id: parseInt(projectId) } : {}),
             page_context: pageContext,
             subtab_context: subtabContext || null,
           }),
@@ -424,7 +425,7 @@ export function useLandscaperThreads({
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            project_id: parseInt(projectId),
+            ...(hasProjectId(projectId) ? { project_id: parseInt(projectId) } : {}),
             page_context: pageContext,
             subtab_context: subtabContext || null,
           }),
@@ -670,8 +671,11 @@ export function useLandscaperThreads({
           );
         }
 
-        // Emit mutation events for auto-refresh
-        emitMutationEventsIfNeeded(parseInt(projectId), data.assistant_message?.metadata);
+        // Emit mutation events for auto-refresh (project-scoped threads only;
+        // unassigned threads run no mutation tools via the executor guard)
+        if (hasProjectId(projectId)) {
+          emitMutationEventsIfNeeded(parseInt(projectId), data.assistant_message?.metadata);
+        }
 
         // Emit tool result callbacks (for IC page data flow)
         if (onToolResult && data.assistant_message?.metadata?.tool_executions) {

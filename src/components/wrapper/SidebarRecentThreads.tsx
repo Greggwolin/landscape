@@ -14,7 +14,11 @@ export function SidebarRecentThreads() {
   const router = useRouter();
 
   const handleClick = (thread: RecentThread) => {
-    router.push(`/w/projects/${thread.projectId}?thread=${thread.threadId}`);
+    if (thread.projectId) {
+      router.push(`/w/projects/${thread.projectId}?thread=${thread.threadId}`);
+    } else {
+      router.push(`/w/chat/${thread.threadId}`);
+    }
   };
 
   if (isLoading && threads.length === 0) {

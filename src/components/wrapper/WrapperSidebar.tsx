@@ -119,12 +119,12 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   const effectivePropertyType = propertyType || '';
   const effectiveAnalysisType = analysisType || 'Active';
 
+  const router = useRouter();
   const handleNewChat = () => {
     if (onNewChat) onNewChat();
-    else onNavigate('landscaper');
+    else router.push('/w/chat');
   };
 
-  const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerProjects, setPickerProjects] = useState<Array<{ project_id: number; project_name: string; project_type_code?: string | null }>>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
