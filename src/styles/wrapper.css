@@ -1414,9 +1414,13 @@
 .w-doc-type-list-check {
   width: 14px;
   height: 14px;
-  border: 1px solid var(--w-border);
-  border-radius: 3px;
   flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--cui-primary);
+}
+
+.w-doc-type-list-item.is-checked {
+  background: color-mix(in srgb, var(--cui-primary) 12%, transparent);
 }
 
 .w-doc-type-list-dot {

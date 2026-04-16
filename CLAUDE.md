@@ -462,6 +462,10 @@ Server-side port of the Cowork `excel-model-audit` skill. Purpose: on any Excel 
 
 **Scope locked in (gx27–gx31):** Universal Landscaper tool, works pre- and post-project. Scenario mode runs against DB inputs via Landscape financial engine only — LibreOffice-backed what-if on the uploaded workbook is deferred. Project creation gate (Excel-vs-engine cross-comparison) is explicitly out of scope.
 
+**Phases implemented (as of Apr 15, 2026):** 0 (classifier), 1 (structural_scan), 2 (formula_integrity — 2a error cells, 2b broken refs, 2c hardcoded overrides, 2e range consistency), **2f (downstream impact tracer — new `impact_tracer.py`; BFS forward from errors to headline outputs IRR/EM/DSCR/net CF, auto-run for `full_model` tier; returns `impact_summary` with `errors_reaching_headline` vs `errors_quarantined`)**, 3 (assumption_extractor). Phases 4–7 (waterfall classifier, Python replication, Sources & Uses balance check, trust score aggregation, HTML report) remain follow-on work.
+
+**Apr 15 hardening:** Phase 2e false-positive rate reduced ~92% via tighter heuristics in `formula_integrity.py`. Loader hardened to accept HTTPS UploadThing URIs in addition to `ut://` refs, and `LandscaperPanel.tsx` now falls back to a direct Excel drop path when doc metadata is unavailable. Excel audit tools registered in `UNIVERSAL_TOOLS` (`tool_registry.py`) — Landscaper can invoke `classify_excel_file` / `run_structural_scan` / `run_formula_integrity` / `extract_assumptions` from any page, not just the Ingestion Workbench.
+
 ### Ingestion Workbench (Implemented — Mar 2026)
 
 The Ingestion Workbench is a fully implemented split-panel modal replacing MappingScreen and the old `dms_extract_queue` intake flow.
@@ -818,8 +822,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-13 (nightly sync — `open_input_modal` Landscaper tool added (tool count 232) + new `GET /landscaper/threads/recent/` endpoint; Cowork "unified wrapper" UI scaffolded under `src/app/w/` and `src/components/wrapper/` with WrapperProjectContext/WrapperChatContext/ModalRegistryContext and useRecentThreads hook (uncommitted); badge/chip consolidation: MediaBadges, StatusBadge, ExtractionFilterToggles extracted from their chip/pill counterparts)*
+*Last updated: 2026-04-15 (nightly sync — Excel Model Audit Phase 2f impact tracer landed (`impact_tracer.py` +397 lines; BFS forward from errors to headline outputs); Phase 2e false-positive rate reduced ~92%; Excel audit tools exposed via `UNIVERSAL_TOOLS` so Landscaper can invoke them from any page; loader accepts HTTPS UploadThing URIs + `LandscaperPanel` Excel drop fallback; ongoing uncommitted DocumentsPanel refactor in `src/components/wrapper/documents/` (+630 lines))*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **232** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools: `classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions`. Phases 4-7 (waterfall, replication, S&U, trust score) land in follow-on turns.*
+*Landscaper tool count: **232** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools: `classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions` (now exposed via UNIVERSAL_TOOLS). Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
