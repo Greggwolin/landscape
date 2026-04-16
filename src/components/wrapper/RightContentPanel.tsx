@@ -30,7 +30,7 @@ export function RightContentPanel({ title, subtitle, actions, children }: RightC
           onClick={toggleChat}
           title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
         >
-          <LandscaperIcon style={{ width: 32, height: 32 }} />
+          <LandscaperIcon style={{ width: 26, height: 26 }} />
         </button>
         <span className="wrapper-header-title">{title}</span>
         {subtitle && <span className="wrapper-header-subtitle">{subtitle}</span>}

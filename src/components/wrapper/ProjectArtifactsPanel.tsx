@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -59,7 +58,7 @@ function docTypeLabel(docType: string): string {
 
 export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps) {
   const router = useRouter();
-  const { chatOpen, toggleChat } = useWrapperUI();
+  const { artifactsOpen, toggleArtifacts } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,19 +81,36 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
       .finally(() => setIsLoading(false));
   }, [projectId]);
 
+  /* ── Collapsed strip ── */
+  if (!artifactsOpen) {
+    return (
+      <div className="artifacts-collapsed">
+        <button
+          className="artifacts-expand-btn"
+          onClick={toggleArtifacts}
+          title="Open artifacts panel"
+        >
+          ◀
+        </button>
+      </div>
+    );
+  }
+
+  /* ── Expanded panel ── */
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', width: '320px' }}>
+    <div className="artifacts-panel">
       {/* Header */}
       <div className="wrapper-header">
-        <button
-          className="wrapper-btn-icon"
-          onClick={toggleChat}
-          title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
-        >
-          <LandscaperIcon style={{ width: 32, height: 32 }} />
-        </button>
-        <span className="wrapper-header-title">Project</span>
+        <span className="wrapper-header-title">Artifacts</span>
         <div className="wrapper-header-spacer" />
+        <button
+          className="wrapper-btn-ghost"
+          onClick={toggleArtifacts}
+          title="Collapse artifacts panel"
+          style={{ fontSize: '12px', padding: '2px 6px' }}
+        >
+          ▶
+        </button>
       </div>
 
       {/* Body */}
@@ -108,7 +124,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
               padding: '40px 24px',
             }}
           >
-            Loading documents…
+            Loading…
           </div>
         ) : documents.length === 0 ? (
           <div
@@ -138,7 +154,9 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
                   background: 'var(--w-bg-surface)',
                   border: '1px solid var(--w-border)',
                   transition: 'background 0.12s',
+                  cursor: 'pointer',
                 }}
+                onClick={() => router.push(`/w/projects/${projectId}/documents`)}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.background =
                     'var(--w-bg-surface-hover)';

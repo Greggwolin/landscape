@@ -52,7 +52,7 @@ export function PageShell({
                 onClick={toggleChat}
                 title={chatOpen ? 'Close chat' : 'Open Landscaper chat'}
               >
-                <LandscaperIcon style={{ width: 32, height: 32 }} />
+                <LandscaperIcon style={{ width: 26, height: 26 }} />
               </button>
             )}
           </div>

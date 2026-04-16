@@ -53,7 +53,7 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
           onClick={toggleChat}
           title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
         >
-          <LandscaperIcon style={{ width: 32, height: 32 }} />
+          <LandscaperIcon style={{ width: 26, height: 26 }} />
         </button>
         <span className="wrapper-header-title">{getPageTitle()}</span>
         <div className="wrapper-header-spacer" />

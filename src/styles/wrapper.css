@@ -93,9 +93,9 @@
 /* ─── Wrapper Header (universal dark bar) ─── */
 .wrapper-header {
   background: #040506;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
   border-bottom: 1px solid #323a49;
   color: rgba(255, 255, 255, 0.87);
   padding: 10px 16px;
@@ -686,8 +686,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 36px;
-  width: 36px;
+  height: 30px;
+  width: 30px;
   flex-shrink: 0;
 }
 
@@ -986,7 +986,47 @@
 /* Narrow right panel — project home artifacts sidebar */
 .wrapper-layout .wrapper-main-narrow {
   flex: 0 0 auto;
-  max-width: 380px;
+}
+
+/* ─── Artifacts Panel ─── */
+.artifacts-panel {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  height: 100%;
+  overflow: hidden;
+  border-left: 1px solid var(--w-border);
+}
+
+/* Collapsed strip — mirrors left sidebar collapsed behavior */
+.artifacts-collapsed {
+  width: 48px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  border-left: 1px solid var(--w-border);
+  background: var(--w-bg-body);
+  flex-shrink: 0;
+}
+
+.artifacts-expand-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.artifacts-expand-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 /* ─── Center Chat Panel ─── */
