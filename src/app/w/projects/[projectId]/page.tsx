@@ -1,20 +1,18 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import React from 'react';
+import { useParams } from 'next/navigation';
+import { ProjectArtifactsPanel } from '@/components/wrapper/ProjectArtifactsPanel';
 
 /**
- * Project root — redirects to Documents by default.
- * The wrapper layout's CenterChatPanel handles the Landscaper chat on the left.
+ * Project root page — renders the artifacts panel in the right content area.
+ * Landscaper chat (center panel) shows the ProjectHomepage via CenterChatPanel.
  */
 export default function WrapperProjectRootPage() {
   const params = useParams();
-  const router = useRouter();
-  const projectId = params.projectId;
+  const projectId = parseInt(params.projectId as string, 10);
 
-  useEffect(() => {
-    if (projectId) router.replace(`/w/projects/${projectId}/documents`);
-  }, [projectId, router]);
+  if (isNaN(projectId)) return null;
 
-  return null;
+  return <ProjectArtifactsPanel projectId={projectId} />;
 }

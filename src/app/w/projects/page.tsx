@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
+import { useWrapperUI } from '@/contexts/WrapperUIContext';
 
 interface ProjectRow {
   project_id: number;
@@ -41,10 +42,14 @@ function buildLocation(p: ProjectRow): string {
 
 export default function WrapperProjectsPage() {
   const router = useRouter();
+  const { closeChat } = useWrapperUI();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+
+  // Projects selector opens with chat panel closed — full width for the grid
+  useEffect(() => { closeChat(); }, [closeChat]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +126,7 @@ export default function WrapperProjectsPage() {
               <div
                 key={p.project_id}
                 className="w-project-row"
-                onClick={() => router.push(`/w/projects/${p.project_id}/documents`)}
+                onClick={() => router.push(`/w/projects/${p.project_id}`)}
               >
                 <div className="w-project-row-head">
                   <span className="w-project-row-name">{p.project_name}</span>

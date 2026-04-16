@@ -14,6 +14,8 @@ import { SalesAbsorptionModalWrapper } from './SalesAbsorptionModalWrapper';
 import { RenovationModalWrapper } from './RenovationModalWrapper';
 import { ContactsModalWrapper } from './ContactsModalWrapper';
 import { ProjectDetailsModalWrapper } from './ProjectDetailsModalWrapper';
+import { ReconciliationModalWrapper } from './ReconciliationModalWrapper';
+import { AcquisitionModalWrapper } from './AcquisitionModalWrapper';
 
 registerModal('operating_statement', {
   component: OperationsModalWrapper,
@@ -103,4 +105,16 @@ registerModal('project_details', {
   component: ProjectDetailsModalWrapper,
   defaultSize: 'wide',
   label: 'Project Details',
+});
+
+registerModal('reconciliation', {
+  component: ReconciliationModalWrapper,
+  defaultSize: 'wide',
+  label: 'Reconciliation',
+});
+
+registerModal('acquisition', {
+  component: AcquisitionModalWrapper,
+  defaultSize: 'wide',
+  label: 'Acquisition',
 });

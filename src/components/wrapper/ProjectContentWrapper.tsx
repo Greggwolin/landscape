@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { MessageSquare } from 'lucide-react';
 import { useParams, usePathname } from 'next/navigation';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { WrapperHeader } from './WrapperHeader';
 import { ChatTogglePanel } from './ChatTogglePanel';
 
@@ -53,7 +53,7 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
           onClick={toggleChat}
           title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
         >
-          <MessageSquare size={16} />
+          <LandscaperIcon style={{ width: 16, height: 16 }} />
         </button>
         <span className="wrapper-header-title">{getPageTitle()}</span>
         <div className="wrapper-header-spacer" />

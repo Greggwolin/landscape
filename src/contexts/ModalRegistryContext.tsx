@@ -102,3 +102,12 @@ export function useModalRegistry(): ModalRegistryContextValue {
   }
   return ctx;
 }
+
+/**
+ * Safe variant — returns null when no ModalRegistryProvider is mounted.
+ * Use in components that may render both inside and outside a project layout
+ * (e.g., CenterChatPanel serves project-scoped and unassigned chats).
+ */
+export function useModalRegistrySafe(): ModalRegistryContextValue | null {
+  return useContext(ModalRegistryContext);
+}

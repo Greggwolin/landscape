@@ -10,9 +10,10 @@ from ..tool_executor import register_tool
 
 VALID_MODALS = [
     'operating_statement', 'rent_roll', 'property_details', 'budget',
-    'sales_comps', 'cost_approach', 'income_approach', 'loan_inputs',
-    'equity_structure', 'land_use', 'parcels', 'sales_absorption',
-    'renovation', 'contacts', 'project_details',
+    'sales_comps', 'cost_approach', 'income_approach', 'reconciliation',
+    'loan_inputs', 'equity_structure', 'land_use', 'parcels',
+    'sales_absorption', 'renovation', 'acquisition', 'contacts',
+    'project_details',
 ]
 
 
@@ -31,12 +32,14 @@ def open_input_modal(modal_name: str = None, context: dict = None, **kwargs):
     - sales_comps: Sales comparison adjustment matrix
     - cost_approach: Cost approach inputs (Marshall & Swift)
     - income_approach: Income capitalization inputs
+    - reconciliation: Value reconciliation weights and narrative
     - loan_inputs: Debt structure and loan terms
     - equity_structure: Equity waterfall tiers
     - land_use: Land use taxonomy and product mix
     - parcels: Parcel inventory grid
     - sales_absorption: Sales schedule and absorption rates
     - renovation: Renovation scope and costs
+    - acquisition: Acquisition assumptions and pricing
     - contacts: Project contacts
     - project_details: Project profile and settings
 

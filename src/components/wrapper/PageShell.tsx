@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { MessageSquare } from 'lucide-react';
 import { WrapperHeader } from './WrapperHeader';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { ChatTogglePanel } from './ChatTogglePanel';
 
 interface PageShellProps {
@@ -52,7 +52,7 @@ export function PageShell({
                 onClick={toggleChat}
                 title={chatOpen ? 'Close chat' : 'Open Landscaper chat'}
               >
-                <MessageSquare size={16} />
+                <LandscaperIcon style={{ width: 16, height: 16 }} />
               </button>
             )}
           </div>

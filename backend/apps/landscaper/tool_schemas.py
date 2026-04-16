@@ -4086,9 +4086,10 @@ LANDSCAPER_TOOLS = [
                     "description": "The editing surface to open.",
                     "enum": [
                         "operating_statement", "rent_roll", "property_details", "budget",
-                        "sales_comps", "cost_approach", "income_approach", "loan_inputs",
-                        "equity_structure", "land_use", "parcels", "sales_absorption",
-                        "renovation", "contacts", "project_details",
+                        "sales_comps", "cost_approach", "income_approach", "reconciliation",
+                        "loan_inputs", "equity_structure", "land_use", "parcels",
+                        "sales_absorption", "renovation", "acquisition", "contacts",
+                        "project_details",
                     ],
                 },
                 "context": {

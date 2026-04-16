@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { MessageSquare } from 'lucide-react';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 
 interface RightContentPanelProps {
   title: string;
@@ -30,7 +30,7 @@ export function RightContentPanel({ title, subtitle, actions, children }: RightC
           onClick={toggleChat}
           title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
         >
-          <MessageSquare size={16} />
+          <LandscaperIcon style={{ width: 16, height: 16 }} />
         </button>
         <span className="wrapper-header-title">{title}</span>
         {subtitle && <span className="wrapper-header-subtitle">{subtitle}</span>}
