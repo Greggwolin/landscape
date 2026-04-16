@@ -93,15 +93,8 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         >
           <LandscaperIcon style={{ width: 32, height: 32 }} />
         </button>
-        <span className="wrapper-header-title">Project Documents</span>
+        <span className="wrapper-header-title">Project</span>
         <div className="wrapper-header-spacer" />
-        <button
-          className="wrapper-btn-ghost"
-          onClick={() => router.push(`/w/projects/${projectId}/documents`)}
-          title="Open full document manager"
-        >
-          All Documents
-        </button>
       </div>
 
       {/* Body */}

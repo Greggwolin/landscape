@@ -5,11 +5,17 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import {
+  getPropertyTypeLabel,
+  getPropertyTypeBadgeStyle,
+  getPropertyTypeTokenRef,
+} from '@/config/propertyTypeTokens';
 
 interface ProjectRow {
   project_id: number;
   project_name: string;
   project_type_code?: string | null;
+  property_subtype?: string | null;
   analysis_type?: string | null;
   analysis_purpose?: string | null;
   location?: string | null;
@@ -118,31 +124,42 @@ export default function WrapperProjectsPage() {
 
         <div className="w-project-list">
           {filtered.map((p) => {
-            const tags = [p.project_type_code, p.analysis_purpose || p.analysis_type]
-              .filter(Boolean) as string[];
-            const status = p.is_active === false ? 'Draft' : 'Active';
             const loc = buildLocation(p);
+            const typeLabel = getPropertyTypeLabel(p.project_type_code);
+            const typeBadgeStyle = getPropertyTypeBadgeStyle(p.project_type_code, 'soft');
+            const hasType = !!getPropertyTypeTokenRef(p.project_type_code);
+
+            // Subtype badge — uses parent type color with outline variant
+            const subtypeLabel = p.property_subtype
+              ? getPropertyTypeLabel(p.property_subtype)
+              : null;
+            const subtypeBadgeStyle = p.property_subtype
+              ? getPropertyTypeBadgeStyle(p.project_type_code, 'outline')
+              : null;
+
             return (
               <div
                 key={p.project_id}
                 className="w-project-row"
                 onClick={() => router.push(`/w/projects/${p.project_id}`)}
               >
-                <div className="w-project-row-head">
-                  <span className="w-project-row-name">{p.project_name}</span>
-                  <span className={`w-project-row-status ${status.toLowerCase()}`}>{status}</span>
-                </div>
+                <span className="w-project-row-name">{p.project_name}</span>
                 {loc && <div className="w-project-row-desc">{loc}</div>}
-                <div className="w-project-row-meta">
-                  {tags.map((t) => (
-                    <span key={t} className="w-project-row-tag">
-                      {t}
+                <div className="w-project-row-badges">
+                  {hasType && (
+                    <span className="w-project-badge" style={typeBadgeStyle}>
+                      {typeLabel}
                     </span>
-                  ))}
-                  {p.updated_at && (
-                    <span className="w-project-row-updated">· {timeAgo(p.updated_at)}</span>
+                  )}
+                  {subtypeLabel && subtypeBadgeStyle && (
+                    <span className="w-project-badge" style={subtypeBadgeStyle}>
+                      {subtypeLabel}
+                    </span>
                   )}
                 </div>
+                {p.updated_at && (
+                  <span className="w-project-row-updated">{timeAgo(p.updated_at)}</span>
+                )}
               </div>
             );
           })}
