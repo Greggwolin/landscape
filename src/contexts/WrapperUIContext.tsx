@@ -5,6 +5,30 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 /** Viewport width below which the artifacts panel auto-collapses. */
 const ARTIFACTS_COLLAPSE_BREAKPOINT = 1200;
 
+/** Map artifact config returned by generate_map_artifact tool. */
+export interface MapArtifactConfig {
+  title: string;
+  center: [number, number]; // [lng, lat]
+  zoom: number;
+  pitch: number;
+  bearing: number;
+  basemap: 'satellite' | 'terrain' | 'roadmap';
+  markers: Array<{
+    id: string;
+    coordinates: [number, number];
+    label?: string;
+    color?: string;
+    variant?: 'pin' | 'dot' | 'numbered';
+    popup?: string;
+  }>;
+  project_name?: string;
+  location?: string;
+  /** When 'input', map opens in pin-placement mode (no coords on project). */
+  mode?: 'display' | 'input';
+  /** Project ID — needed for input mode to save coordinates back. */
+  project_id?: number;
+}
+
 interface WrapperUIContextValue {
   chatOpen: boolean;
   toggleChat: () => void;
@@ -16,6 +40,9 @@ interface WrapperUIContextValue {
   /** Whether the artifacts right panel is expanded (true) or collapsed to strip (false). */
   artifactsOpen: boolean;
   toggleArtifacts: () => void;
+  /** Active map artifact — set by Landscaper tool result, rendered in artifacts panel. */
+  activeMapArtifact: MapArtifactConfig | null;
+  setActiveMapArtifact: (config: MapArtifactConfig | null) => void;
 }
 
 const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
@@ -28,6 +55,7 @@ const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
 export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(true);
   const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
+  const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
   const [artifactsOpen, setArtifactsOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= ARTIFACTS_COLLAPSE_BREAKPOINT;
@@ -52,6 +80,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       chatOpen, toggleChat, openChat, closeChat,
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
+      activeMapArtifact, setActiveMapArtifact,
     }}>
       {children}
     </WrapperUIContext.Provider>

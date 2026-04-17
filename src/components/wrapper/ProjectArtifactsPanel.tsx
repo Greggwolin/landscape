@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { MapArtifactRenderer } from './MapArtifactRenderer';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -58,7 +59,7 @@ function docTypeLabel(docType: string): string {
 
 export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps) {
   const router = useRouter();
-  const { artifactsOpen, toggleArtifacts } = useWrapperUI();
+  const { artifactsOpen, toggleArtifacts, activeMapArtifact, setActiveMapArtifact } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -113,7 +114,15 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         </button>
       </div>
 
-      {/* Body */}
+      {/* Body — map artifact takes priority when active */}
+      {activeMapArtifact ? (
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <MapArtifactRenderer
+            config={activeMapArtifact}
+            onClose={() => setActiveMapArtifact(null)}
+          />
+        </div>
+      ) : (
       <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
         {isLoading ? (
           <div
@@ -215,6 +224,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

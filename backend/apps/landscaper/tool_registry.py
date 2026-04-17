@@ -76,6 +76,8 @@ UNIVERSAL_TOOLS = [
     "run_structural_scan",
     "run_formula_integrity",
     "extract_assumptions",
+    # Map artifacts
+    "generate_map_artifact",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -462,7 +464,8 @@ PAGE_TOOLS = {
         "get_property_attributes",
         "update_property_attributes",
         "update_site_attribute",
-        # Note: GIS-specific tools would go here when implemented
+        # Map artifact generation
+        "generate_map_artifact",
     ],
 
     "reports": [

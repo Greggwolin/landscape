@@ -4174,4 +4174,35 @@ LANDSCAPER_TOOLS = [
             "required": ["doc_id"],
         },
     },
+    # ── Map Artifact tools ────────────────────────────────────────────────────
+    {
+        "name": "generate_map_artifact",
+        "description": "Generate an interactive aerial/satellite map artifact centered on the project location. The map renders in the artifacts panel with MapLibre GL. Use when the user asks to see a map, aerial view, satellite image, or location overview of the project. Supports optional comp overlays and custom markers.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Title for the map artifact"},
+                "basemap": {"type": "string", "enum": ["satellite", "terrain", "roadmap"], "description": "Base map style. Default: satellite."},
+                "zoom": {"type": "number", "description": "Initial zoom (1-20). Default: 15."},
+                "pitch": {"type": "number", "description": "Camera pitch degrees (0=top-down, 60=oblique). Default: 45."},
+                "bearing": {"type": "number", "description": "Camera bearing degrees (0=north). Default: 0."},
+                "include_comps": {"type": "boolean", "description": "Include comparable properties as markers."},
+                "custom_markers": {
+                    "type": "array",
+                    "description": "Additional markers.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "lat": {"type": "number"},
+                            "lng": {"type": "number"},
+                            "color": {"type": "string"},
+                        },
+                        "required": ["label", "lat", "lng"],
+                    },
+                },
+            },
+            "required": [],
+        },
+    },
 ]
