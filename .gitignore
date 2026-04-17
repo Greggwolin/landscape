@@ -179,3 +179,6 @@ rent-schedule-*.png
 broken_uploadthing_urls_report.txt
 uploadthing_url_check.csv
 reference/images/screenshots/Untitled.jpg
+
+# Agent framework calibration run reports (per-run output, not baselines)
+tests/agent_framework/reports/
