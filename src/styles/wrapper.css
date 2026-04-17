@@ -163,10 +163,6 @@
 .wrapper-sidebar.collapsed .sb-section-label,
 .wrapper-sidebar.collapsed .sb-thread,
 .wrapper-sidebar.collapsed .sb-agent,
-.wrapper-sidebar.collapsed .sb-project-select .sb-ps-name,
-.wrapper-sidebar.collapsed .sb-project-select .sb-ps-chevron,
-.wrapper-sidebar.collapsed .sb-project-select .sb-ps-type,
-.wrapper-sidebar.collapsed .sb-project-select .sb-ps-badges,
 .wrapper-sidebar.collapsed .sb-nav-badge { display: none; }
 .wrapper-sidebar.collapsed .sb-header { justify-content: center; padding: 14px 0 10px; background: #040506; }
 .wrapper-sidebar.collapsed .sb-logo { display: none; }
@@ -196,16 +192,6 @@
   z-index: 100;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
-.wrapper-sidebar.collapsed .sb-project-select {
-  margin: 8px 6px 6px;
-  padding: 6px 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-}
-.wrapper-sidebar.collapsed .sb-project-select .sb-ps-icon { display: flex; }
 .wrapper-sidebar.collapsed .sb-footer { justify-content: center; padding: 10px 0; }
 .wrapper-sidebar.collapsed .sb-footer .sb-avatar { margin: 0; }
 .wrapper-sidebar.collapsed .sb-footer-actions { display: none; }
@@ -247,50 +233,6 @@
   cursor: pointer;
 }
 .sb-collapse:hover { background: var(--w-bg-surface-hover); color: var(--w-text-secondary); }
-
-/* ─── Project Selector ─── */
-.sb-project-select {
-  margin: 16px 12px 8px;
-  padding: 8px 10px;
-  background: rgba(14, 165, 233, 0.12);
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.sb-project-select:hover { border-color: rgba(14, 165, 233, 0.4); }
-.sb-ps-top { display: flex; align-items: center; justify-content: space-between; }
-.sb-ps-name { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.87); }
-.sb-ps-chevron { font-size: 9px; color: rgba(255, 255, 255, 0.38); }
-.sb-ps-type { font-size: 9px; color: #38bdf8; margin-top: 1px; display: none; }
-.sb-ps-badges {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
-.sb-ps-badge {
-  flex: 1;
-  text-align: center;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 2px 0;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-}
-
-.sb-ps-icon {
-  display: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  background: var(--w-accent-dim);
-  color: var(--w-accent-text);
-  font-size: 9px;
-  font-weight: 700;
-  text-align: center;
-  line-height: 22px;
-}
 
 /* ─── New Chat & Search ─── */
 .sb-new-chat {

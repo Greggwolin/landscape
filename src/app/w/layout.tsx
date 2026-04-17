@@ -179,11 +179,27 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     { id: 's2', emoji: '🏗️', name: 'Bellflower permit monitor', status: 'active' as const },
     { id: 's3', emoji: '🏠', name: 'Redfin comp tracker', status: 'paused' as const },
   ];
-  const mockRecent = [
-    { id: 'r1', name: 'Old River School — UW' },
-    { id: 'r2', name: 'Red Valley Ranch' },
-    { id: 'r3', name: 'Peoria Meadows' },
-  ];
+
+  const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    fetch('/api/projects')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : data?.results || data?.projects || [];
+        const sorted = rows
+          .slice()
+          .sort((a: any, b: any) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+          .filter((p: any) => p.project_id !== projectId)
+          .slice(0, 5);
+        setRecentProjects(
+          sorted.map((p: any) => ({
+            id: String(p.project_id),
+            name: p.project_name || `Project ${p.project_id}`,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [projectId]);
 
   return (
     <div className="wrapper-layout">
@@ -194,13 +210,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         onToggleCollapse={handleToggleCollapse}
         sidebarWidth={sidebarWidth}
         onResizeStart={handleResizeStart}
-        projectId={projectId}
-        projectName={projectData?.project_name}
-        propertyType={projectData?.project_type_code}
-        analysisType={projectData?.analysis_type}
         threads={mockThreads}
         scheduledAgents={mockScheduled}
-        recentProjects={mockRecent}
+        recentProjects={recentProjects.map((p) => ({
+          ...p,
+          onClick: () => router.push(`/w/projects/${p.id}`),
+        }))}
         isHelpThinking={isHelpLoading}
         currentTheme={theme === 'light' ? 'light' : 'dark'}
         onThemeToggle={toggleTheme}

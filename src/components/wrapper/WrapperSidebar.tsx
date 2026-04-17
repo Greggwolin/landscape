@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { HelpIcon } from '@/components/icons/HelpIcon';
 
@@ -33,12 +33,6 @@ export interface WrapperSidebarProps {
   sidebarWidth: number;
   onResizeStart: (e: React.PointerEvent) => void;
 
-  // Project context
-  projectId?: number;
-  projectName?: string;
-  propertyType?: string;
-  analysisType?: string;
-
   // Data
   threads?: Thread[];
   scheduledAgents?: ScheduledAgent[];
@@ -46,7 +40,6 @@ export interface WrapperSidebarProps {
 
   // Actions
   onNewChat?: () => void;
-  onProjectSelect?: () => void;
   onThemeToggle?: () => void;
   onLogout?: () => void;
   currentTheme?: 'light' | 'dark';
@@ -100,15 +93,10 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   onToggleCollapse,
   sidebarWidth,
   onResizeStart,
-  projectId,
-  projectName,
-  propertyType,
-  analysisType,
   threads = [],
   scheduledAgents = [],
   recentProjects = [],
   onNewChat,
-  onProjectSelect,
   onThemeToggle,
   onLogout,
   currentTheme = 'dark',
@@ -117,56 +105,11 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   userInitials = 'GW',
   isHelpThinking = false,
 }) => {
-  const effectiveProjectName = projectName || 'Select project';
-  const effectivePropertyType = propertyType || '';
-  const effectiveAnalysisType = analysisType || 'Active';
-
   const router = useRouter();
   const handleNewChat = () => {
     if (onNewChat) onNewChat();
     else router.push('/w/chat');
   };
-
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerProjects, setPickerProjects] = useState<Array<{ project_id: number; project_name: string; project_type_code?: string | null }>>([]);
-  const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerFilter, setPickerFilter] = useState('');
-  const pickerRef = useRef<HTMLDivElement | null>(null);
-
-  const handleProjectSelect = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setPickerOpen((v) => !v);
-  };
-
-  useEffect(() => {
-    if (!pickerOpen || pickerProjects.length > 0) return;
-    setPickerLoading(true);
-    fetch('/api/projects')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        const rows = Array.isArray(data) ? data : data?.results || data?.projects || [];
-        setPickerProjects(rows);
-        setPickerLoading(false);
-      })
-      .catch(() => setPickerLoading(false));
-  }, [pickerOpen, pickerProjects.length]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [pickerOpen]);
-
-  const filteredPickerProjects = pickerFilter
-    ? pickerProjects.filter((p) =>
-        (p.project_name || '').toLowerCase().includes(pickerFilter.toLowerCase())
-      )
-    : pickerProjects;
 
   return (
     <>
@@ -182,133 +125,6 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
           <div className="sb-collapse" onClick={onToggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
             ☰
           </div>
-        </div>
-
-        {/* Project Selector - always visible */}
-        <div ref={pickerRef} style={{ position: 'relative' }}>
-        <div className="sb-project-select" onClick={handleProjectSelect} style={{ cursor: 'pointer' }}>
-          <div className="sb-ps-top">
-            <span className="sb-ps-name">{projectId ? effectiveProjectName : 'Select project'}</span>
-            <span className="sb-ps-chevron">▾</span>
-          </div>
-          {projectId && effectivePropertyType && (
-            <div className="sb-ps-type">
-              {effectivePropertyType} · {effectiveAnalysisType}
-            </div>
-          )}
-          {projectId && (
-            <div className="sb-ps-badges">
-              {effectivePropertyType && (
-                <span className="sb-ps-badge" style={{ background: '#F37021', color: '#fff' }}>
-                  {effectivePropertyType}
-                </span>
-              )}
-              <span
-                className="sb-ps-badge"
-                style={{
-                  background: 'var(--w-success-dim)',
-                  color: 'var(--w-success-text)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                }}
-              >
-                {effectiveAnalysisType}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {pickerOpen && (
-          <div
-            className="sb-project-picker"
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 4px)',
-              left: 0,
-              right: 0,
-              zIndex: 1000,
-              background: 'var(--w-bg-panel, #1a1e27)',
-              border: '1px solid var(--w-border, rgba(255,255,255,0.1))',
-              borderRadius: 6,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-              maxHeight: 360,
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search projects…"
-              value={pickerFilter}
-              onChange={(e) => setPickerFilter(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                padding: '8px 10px',
-                background: 'var(--w-bg-input, rgba(255,255,255,0.05))',
-                border: 'none',
-                borderBottom: '1px solid var(--w-border, rgba(255,255,255,0.1))',
-                color: 'var(--w-text-primary, #fff)',
-                fontSize: 13,
-                outline: 'none',
-              }}
-            />
-            <div style={{ overflowY: 'auto', flex: 1 }}>
-              {pickerLoading && (
-                <div style={{ padding: 12, fontSize: 12, color: 'var(--w-text-secondary, #94a3b8)' }}>Loading…</div>
-              )}
-              {!pickerLoading && filteredPickerProjects.length === 0 && (
-                <div style={{ padding: 12, fontSize: 12, color: 'var(--w-text-secondary, #94a3b8)' }}>No projects.</div>
-              )}
-              {filteredPickerProjects.map((p) => (
-                <div
-                  key={p.project_id}
-                  onClick={() => {
-                    setPickerOpen(false);
-                    setPickerFilter('');
-                    router.push(`/w/projects/${p.project_id}`);
-                  }}
-                  style={{
-                    padding: '8px 10px',
-                    fontSize: 13,
-                    color: 'var(--w-text-primary, #fff)',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--w-border, rgba(255,255,255,0.06))',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.project_name}
-                  </span>
-                  {p.project_type_code && (
-                    <span style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>{p.project_type_code}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div
-              onClick={() => {
-                setPickerOpen(false);
-                router.push('/w/projects');
-              }}
-              style={{
-                padding: '8px 10px',
-                fontSize: 12,
-                color: 'var(--w-accent-text, #60a5fa)',
-                cursor: 'pointer',
-                borderTop: '1px solid var(--w-border, rgba(255,255,255,0.1))',
-                textAlign: 'center',
-              }}
-            >
-              View all projects →
-            </div>
-          </div>
-        )}
         </div>
 
         {/* New Chat */}
