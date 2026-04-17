@@ -1,0 +1,62 @@
+{
+  "calibrate:project_id": 855,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "calibrate:p1_tools": [
+    "update_project_field"
+  ],
+  "calibrate:p1_mutation_proposed": true,
+  "calibrate:p1_mutation_id": "1552ceb5-91b1-48e8-83e1-79b712564617",
+  "calibrate:p1_fake_confirm_status": 404,
+  "calibrate:p1_fake_confirm_response": {
+    "error": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n  <title>Page not found at /api/landscaper/mutations/99999999/confirm/</title>\n  <meta name=\"robots\" content=\"NONE,NOARCHIVE\">\n  <style type=\"text/css\">\n    html * { padding:0; margin:0; }\n "
+  },
+  "field_equals:p1_fake_not_200": true,
+  "field_equals:p1_fake_not_500": true,
+  "calibrate:p2_tools": [
+    "get_units",
+    "get_units",
+    "get_units"
+  ],
+  "field_equals:p2_no_crash_in_response": false,
+  "calibrate:p2_explains_absence": true,
+  "calibrate:p2_response_length": 270,
+  "calibrate:p3_tools": [
+    "update_project_field"
+  ],
+  "field_equals:p3_no_crash_in_response": false,
+  "calibrate:p3_explains_limitation": true,
+  "calibrate:p3_response_length": 186,
+  "calibrate:p4_tools": [
+    "update_project_field"
+  ],
+  "calibrate:p4_skipped": false,
+  "field_equals:p4_first_confirm_success": true,
+  "calibrate:p4_first_confirm": {
+    "success": true,
+    "mutation_id": "480a8268-aa26-4916-aa8a-e4f69c8a2f5e",
+    "action": "confirmed",
+    "project_id": 855,
+    "table_name": "tbl_project",
+    "mutation_type": "field_update",
+    "result": {
+      "success": true,
+      "rows_affected": 1,
+      "field": "zip_code",
+      "new_value": "99999"
+    }
+  },
+  "calibrate:p4_double_confirm_status": 400,
+  "calibrate:p4_double_confirm_response": {
+    "success": false,
+    "error": "Mutation already confirmed"
+  },
+  "field_equals:p4_double_not_500": true,
+  "field_equals:p4_double_rejected": true,
+  "calibrate:p5_tools": [
+    "get_project_fields"
+  ],
+  "field_equals:p5_substantive_response": true,
+  "calibrate:p5_response_length": 51,
+  "field_equals:p5_no_crash": false
+}

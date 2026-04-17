@@ -398,6 +398,67 @@ class BaseAgent:
 
         return pid
 
+    def create_project_via_django(self, project_name: str,
+                                   project_type_code: str = None,
+                                   jurisdiction_city: str = None,
+                                   jurisdiction_state: str = None,
+                                   location_lat: float = None,
+                                   location_lon: float = None,
+                                   **extra_fields) -> int:
+        """
+        Create a project via the Django REST endpoint.
+
+        Unlike create_project_via_api (which uses Next.js), this endpoint
+        supports Django model field names directly — including location_lat,
+        location_lon, jurisdiction_city, jurisdiction_state.
+        """
+        self._ensure_auth()
+
+        body = {
+            'project_name': project_name,
+            'project_type_code': project_type_code or config.DEFAULT_PROJECT_TYPE,
+            'analysis_purpose': config.DEFAULT_ANALYSIS_PURPOSE,
+            'analysis_perspective': config.DEFAULT_ANALYSIS_PERSPECTIVE,
+        }
+        if jurisdiction_city:
+            body['jurisdiction_city'] = jurisdiction_city
+        if jurisdiction_state:
+            body['jurisdiction_state'] = jurisdiction_state
+        if location_lat is not None:
+            body['location_lat'] = location_lat
+        if location_lon is not None:
+            body['location_lon'] = location_lon
+        body.update(extra_fields)
+
+        self._log_step('create_project_django', f'Creating project (Django): {project_name}', body)
+
+        try:
+            resp = self.session.post(
+                config.DJANGO_PROJECT_ENDPOINT,
+                json=body,
+                timeout=config.API_TIMEOUT,
+            )
+        except requests.RequestException as e:
+            self._fail_step(f'Project creation request failed: {e}')
+            raise AgentError(f'Project creation failed: {e}')
+
+        if resp.status_code not in (200, 201):
+            self._fail_step(f'Project creation returned {resp.status_code}: {resp.text[:300]}')
+            raise AgentError(f'Project creation failed: {resp.status_code}')
+
+        data = resp.json()
+        pid = data.get('project_id')
+
+        if not pid:
+            self._fail_step('No project_id in creation response')
+            raise AgentError('Project creation response missing project_id')
+
+        self.project_id = pid
+        self._created_project_ids.append(pid)
+        self._pass_step(f'Project created (Django): id={pid}', data)
+
+        return pid
+
     def create_project_via_landscaper(self, project_name: str,
                                       project_type_code: str = None,
                                       city: str = None,

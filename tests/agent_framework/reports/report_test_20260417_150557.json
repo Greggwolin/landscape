@@ -1,0 +1,458 @@
+{
+  "suite": "landscape_agents",
+  "mode": "test",
+  "started_at": "2026-04-17T22:04:51.219061+00:00",
+  "ended_at": "2026-04-17T22:05:57.648221+00:00",
+  "elapsed_s": 66.4,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 1,
+    "scenarios_failed": 0,
+    "validations_total": 26,
+    "validations_passed": 22,
+    "validations_failed": 4
+  },
+  "scenarios": [
+    {
+      "scenario": "s4_mutation_confirmation",
+      "status": "pass",
+      "error": null,
+      "started_at": "2026-04-17T22:04:51.285598+00:00",
+      "ended_at": "2026-04-17T22:05:57.646613+00:00",
+      "elapsed_s": 66.4,
+      "steps_passed": 11,
+      "steps_failed": 0,
+      "steps_total": 11,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:04:51.285605+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S4_Mutation_Flow",
+          "details": {
+            "project_name": "AGENT_TEST_S4_Mutation_Flow",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Hawthorne",
+            "state": "CA",
+            "project_id": 850,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:04:52.005034+00:00",
+          "result": "Project created: id=850"
+        },
+        {
+          "step_num": 3,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "mf_property",
+            "project_id": 850,
+            "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:04:53.569956+00:00",
+          "result": "Thread created: 3147f3b7-7a99-406a-893a-d09275c16e26"
+        },
+        {
+          "step_num": 4,
+          "type": "send_message",
+          "description": "Sending: \"Please change the property name for this project to \"Cypress Terrace Apartments\". Update it in the database.\"",
+          "details": {
+            "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+            "page_context": "mf_property",
+            "elapsed_s": 9.8,
+            "tools_called": [
+              "update_project_field"
+            ],
+            "has_mutation": true,
+            "assistant_content_length": 168
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:04:54.197087+00:00",
+          "result": "Response received in 9.8s"
+        },
+        {
+          "step_num": 5,
+          "type": "confirm_mutation",
+          "description": "Confirming mutation",
+          "details": {
+            "mutation_id": "2fb6c7cc-2cec-46e3-8124-1610316b5084",
+            "success": true,
+            "action": "confirmed",
+            "project_id": 850,
+            "table_name": "tbl_project",
+            "mutation_type": "field_update",
+            "result": {
+              "success": true,
+              "rows_affected": 1,
+              "field": "project_name",
+              "new_value": "Cypress Terrace Apartments"
+            }
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:04.040225+00:00",
+          "result": "Mutation confirmed"
+        },
+        {
+          "step_num": 6,
+          "type": "send_message",
+          "description": "Sending: \"Please update the following project details: set the city to \"Santa Monica\" and the state to \"CA\". Update both fields in...\"",
+          "details": {
+            "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+            "page_context": "mf_property",
+            "elapsed_s": 8.2,
+            "tools_called": [
+              "bulk_update_fields"
+            ],
+            "has_mutation": true,
+            "assistant_content_length": 152
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:04.546036+00:00",
+          "result": "Response received in 8.2s"
+        },
+        {
+          "step_num": 7,
+          "type": "confirm_mutation",
+          "description": "Confirming mutation",
+          "details": {
+            "batch_id": "def08ba8-d326-44a0-9bb3-c71139ed811c",
+            "success": true,
+            "results": [
+              {
+                "success": true,
+                "mutation_id": "18917fa7-a234-434f-b970-47378e15adf9",
+                "action": "confirmed",
+                "project_id": 850,
+                "table_name": "tbl_project",
+                "mutation_type": "field_update",
+                "result": {
+                  "success": true,
+                  "rows_affected": 1,
+                  "field": "city",
+                  "new_value": "Santa Monica"
+                }
+              },
+              {
+                "success": true,
+                "mutation_id": "116aa6c4-3591-4209-a201-05bdc28179bc",
+                "action": "confirmed",
+                "project_id": 850,
+                "table_name": "tbl_project",
+                "mutation_type": "field_update",
+                "result": {
+                  "success": true,
+                  "rows_affected": 1,
+                  "field": "state",
+                  "new_value": "CA"
+                }
+              }
+            ],
+            "confirmed": 2,
+            "failed": 0
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:12.733540+00:00",
+          "result": "Mutation confirmed"
+        },
+        {
+          "step_num": 8,
+          "type": "send_message",
+          "description": "Sending: \"Please change the zip code for this project to \"90401\".\"",
+          "details": {
+            "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+            "page_context": "mf_property",
+            "elapsed_s": 8.0,
+            "tools_called": [
+              "update_project_field"
+            ],
+            "has_mutation": true,
+            "assistant_content_length": 118
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:13.606602+00:00",
+          "result": "Response received in 8.0s"
+        },
+        {
+          "step_num": 9,
+          "type": "send_message",
+          "description": "Sending: \"What is the current property name for this project?\"",
+          "details": {
+            "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+            "page_context": "mf_property",
+            "elapsed_s": 7.5,
+            "tools_called": [
+              "get_project_fields"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 58
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:21.640322+00:00",
+          "result": "Response received in 7.5s"
+        },
+        {
+          "step_num": 10,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 22,
+            "validations_failed": 4
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:29.174851+00:00",
+          "result": "S4 complete: 22/26 checks passed"
+        },
+        {
+          "step_num": 11,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": [
+              850
+            ]
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:05:29.174946+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 850,
+      "thread_id": "3147f3b7-7a99-406a-893a-d09275c16e26",
+      "calibration_mode": false
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s4_mutation_confirmation",
+      "total": 26,
+      "passed": 22,
+      "failed": 4,
+      "all_passed": false,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": false,
+          "message": "project_id: MISMATCH",
+          "expected": 844,
+          "actual": 850
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p1_tools",
+          "passed": true,
+          "message": "p1_tools: match",
+          "expected": [
+            "update_project_field"
+          ],
+          "actual": [
+            "update_project_field"
+          ]
+        },
+        {
+          "name": "field_equals:p1_has_mutation",
+          "passed": true,
+          "message": "p1_has_mutation: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p1_mutation_ids",
+          "passed": false,
+          "message": "p1_mutation_ids: MISMATCH",
+          "expected": {
+            "mutation_id": "ef0d7a51-add2-4034-8fd6-9cf58186474d"
+          },
+          "actual": {
+            "mutation_id": "2fb6c7cc-2cec-46e3-8124-1610316b5084"
+          }
+        },
+        {
+          "name": "field_equals:p1_confirm_success",
+          "passed": true,
+          "message": "p1_confirm_success: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p1_confirm_action",
+          "passed": true,
+          "message": "p1_confirm_action: match",
+          "expected": "confirmed",
+          "actual": "confirmed"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p2_tools",
+          "passed": true,
+          "message": "p2_tools: match",
+          "expected": [
+            "bulk_update_fields"
+          ],
+          "actual": [
+            "bulk_update_fields"
+          ]
+        },
+        {
+          "name": "field_equals:p2_has_mutation",
+          "passed": true,
+          "message": "p2_has_mutation: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p2_mutation_ids",
+          "passed": false,
+          "message": "p2_mutation_ids: MISMATCH",
+          "expected": {
+            "batch_id": "27af9223-b4ec-4377-9426-4c896e0c522a"
+          },
+          "actual": {
+            "batch_id": "def08ba8-d326-44a0-9bb3-c71139ed811c"
+          }
+        },
+        {
+          "name": "field_equals:p2_confirm_success",
+          "passed": true,
+          "message": "p2_confirm_success: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p2_batch_confirmed",
+          "passed": true,
+          "message": "p2_batch_confirmed: match",
+          "expected": 2,
+          "actual": 2
+        },
+        {
+          "name": "calibrate:p2_batch_failed",
+          "passed": true,
+          "message": "p2_batch_failed: match",
+          "expected": 0,
+          "actual": 0
+        },
+        {
+          "name": "field_equals:p2_batch_all_confirmed",
+          "passed": true,
+          "message": "p2_batch_all_confirmed: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p3_tools",
+          "passed": true,
+          "message": "p3_tools: match",
+          "expected": [
+            "update_project_field"
+          ],
+          "actual": [
+            "update_project_field"
+          ]
+        },
+        {
+          "name": "field_equals:p3_has_mutation",
+          "passed": true,
+          "message": "p3_has_mutation: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p3_mutation_ids",
+          "passed": false,
+          "message": "p3_mutation_ids: MISMATCH",
+          "expected": {
+            "mutation_id": "498594a8-5497-48fa-bd61-5549bf62c071"
+          },
+          "actual": {
+            "mutation_id": "5cf0ff46-c8c6-42cb-90cd-389ce8ed0b3b"
+          }
+        },
+        {
+          "name": "field_equals:p3_skipped_confirm",
+          "passed": true,
+          "message": "p3_skipped_confirm: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p4_tools",
+          "passed": true,
+          "message": "p4_tools: match",
+          "expected": [
+            "get_project_fields"
+          ],
+          "actual": [
+            "get_project_fields"
+          ]
+        },
+        {
+          "name": "field_equals:p4_name_verified",
+          "passed": true,
+          "message": "p4_name_verified: match",
+          "expected": true,
+          "actual": true
+        },
+        {
+          "name": "calibrate:p4_response_length",
+          "passed": true,
+          "message": "p4_response_length: match",
+          "expected": 58,
+          "actual": 58
+        }
+      ]
+    }
+  ]
+}

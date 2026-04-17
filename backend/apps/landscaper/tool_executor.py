@@ -17605,18 +17605,40 @@ def handle_create_project(tool_input, project_id, user_id=None, propose_only=Tru
     location_str = ', '.join(location_parts) if location_parts else 'No location specified'
 
     if propose_only:
-        return {
-            'success': True,
-            'proposal': True,
-            'action': 'create_project',
-            'summary': f"Create project: **{project_name}** ({project_type_code})",
-            'description': (
+        # Use standard MutationService so create_project returns a mutation_id
+        # confirmable via /api/landscaper/mutations/{id}/confirm/ — same as all
+        # other mutation tools.
+        from .services.mutation_service import MutationService
+
+        # Build the full params dict that _execute_mutation will need
+        create_params = dict(tool_input)
+        create_params['_resolved_perspective'] = perspective
+        create_params['_resolved_purpose'] = purpose
+
+        proposal = MutationService.create_proposal(
+            project_id=project_id,  # None for unassigned threads; project created on confirm
+            mutation_type='create_project',
+            table_name='tbl_project',
+            proposed_value=create_params,
+            reason=(
+                f"Create {project_type_code} project '{project_name}'. "
+                f"Location: {location_str}."
+            ),
+            field_name=None,
+            record_id=None,
+            source_message_id=kwargs.get('source_message_id'),
+        )
+
+        if proposal.get('success'):
+            # Augment with human-readable summary for the chat UI
+            proposal['summary'] = f"Create project: **{project_name}** ({project_type_code})"
+            proposal['description'] = (
                 f"Create a new {project_type_code} project named '{project_name}'. "
                 f"Perspective: {perspective}, Purpose: {purpose}. "
                 f"Location: {location_str}."
-            ),
-            'params': tool_input,
-        }
+            )
+
+        return proposal
 
     # Execute creation
     try:

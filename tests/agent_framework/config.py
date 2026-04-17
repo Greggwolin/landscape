@@ -25,8 +25,9 @@ THREAD_RECENT_ENDPOINT = f'{DJANGO_BASE_URL}/api/landscaper/threads/recent/'
 MUTATION_CONFIRM_ENDPOINT = f'{DJANGO_BASE_URL}/api/landscaper/mutations/{{mutation_id}}/confirm/'
 BATCH_CONFIRM_ENDPOINT = f'{DJANGO_BASE_URL}/api/landscaper/mutations/batch/{{batch_id}}/confirm/'
 
-# ── Project creation (Next.js direct — bypasses Landscaper) ──────────────────
+# ── Project creation ────────────────────────────────────────────────────────
 PROJECT_MINIMAL_ENDPOINT = f'{NEXTJS_BASE_URL}/api/projects/minimal'
+DJANGO_PROJECT_ENDPOINT = f'{DJANGO_BASE_URL}/api/projects/'
 
 # ── DMS / Documents ─────────────────────────────────────────────────────────
 DMS_UPLOAD_ENDPOINT = f'{NEXTJS_BASE_URL}/api/dms/upload'

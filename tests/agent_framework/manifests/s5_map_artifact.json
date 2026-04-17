@@ -1,0 +1,68 @@
+{
+  "calibrate:project_a_id": 847,
+  "field_equals:project_a_created": true,
+  "calibrate:project_b_id": 848,
+  "field_equals:project_b_created": true,
+  "calibrate:p1_tools": [
+    "generate_map_artifact"
+  ],
+  "field_equals:p1_tool_called": true,
+  "field_equals:p1_action": "show_map_artifact",
+  "calibrate:p1_map_config_keys": [
+    "basemap",
+    "bearing",
+    "center",
+    "location",
+    "markers",
+    "pitch",
+    "project_name",
+    "title",
+    "zoom"
+  ],
+  "calibrate:p1_center": [
+    -118.4912,
+    34.0195
+  ],
+  "field_equals:p1_center_near_santa_monica": true,
+  "calibrate:p1_marker_count": 1,
+  "field_equals:p1_has_subject_marker": true,
+  "field_equals:p1_not_input_mode": true,
+  "calibrate:p2_tools": [
+    "generate_map_artifact"
+  ],
+  "field_equals:p2_tool_called": true,
+  "field_equals:p2_action": "show_map_artifact",
+  "calibrate:p2_map_config_keys": [
+    "basemap",
+    "bearing",
+    "center",
+    "location",
+    "markers",
+    "mode",
+    "pitch",
+    "project_id",
+    "project_name",
+    "title",
+    "zoom"
+  ],
+  "field_equals:p2_mode_is_input": "input",
+  "field_equals:p2_has_project_id": true,
+  "field_equals:p2_project_id_matches": 848,
+  "calibrate:p2_center": [
+    -116.200886,
+    43.6166163
+  ],
+  "field_equals:p2_center_near_boise": true,
+  "calibrate:p2_marker_count": 0,
+  "field_equals:p2_no_markers": 0,
+  "calibrate:p2_zoom": 12,
+  "field_equals:p2_zoom_city_level": true,
+  "calibrate:p3_tools": [
+    "generate_map_artifact"
+  ],
+  "field_equals:p3_tool_called": true,
+  "field_equals:p3_has_subject_marker": true,
+  "calibrate:p3_comp_marker_count": 0,
+  "calibrate:p3_total_marker_count": 1,
+  "calibrate:p3_include_comps_param": true
+}

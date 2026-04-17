@@ -1732,6 +1732,61 @@ class MutationService:
                         },
                     }
 
+                elif mutation_type == "create_project" and isinstance(proposed_value, dict):
+                    # Project creation — proposed_value contains the full params dict
+                    # stored by handle_create_project's propose_only branch.
+                    from apps.projects.models import Project
+
+                    p_name = proposed_value.get('project_name')
+                    p_type = (proposed_value.get('project_type_code') or '').upper()
+                    perspective = proposed_value.get('_resolved_perspective', 'INVESTMENT')
+                    purpose = proposed_value.get('_resolved_purpose', 'UNDERWRITING')
+
+                    create_kwargs = {
+                        'project_name': p_name,
+                        'project_type_code': p_type,
+                        'analysis_perspective': perspective,
+                        'analysis_purpose': purpose,
+                        'is_active': True,
+                    }
+
+                    # Map optional fields from tool_input keys to model field names
+                    _OPTIONAL = {
+                        'description': 'description',
+                        'project_address': 'project_address',
+                        'street_address': 'street_address',
+                        'city': 'jurisdiction_city',
+                        'state': 'jurisdiction_state',
+                        'zip_code': 'zip_code',
+                        'jurisdiction_county': 'jurisdiction_county',
+                        'acres_gross': 'acres_gross',
+                        'total_units': 'total_units',
+                        'gross_sf': 'gross_sf',
+                        'building_count': 'building_count',
+                        'property_subtype': 'property_subtype',
+                        'property_class': 'property_class',
+                        'ownership_type': 'ownership_type',
+                        'location_lat': 'location_lat',
+                        'location_lon': 'location_lon',
+                        'value_add_enabled': 'value_add_enabled',
+                    }
+                    for input_key, model_field in _OPTIONAL.items():
+                        val = proposed_value.get(input_key)
+                        if val is not None:
+                            create_kwargs[model_field] = val
+
+                    new_project = Project.objects.create(**create_kwargs)
+                    nav_url = f"/projects/{new_project.project_id}"
+
+                    return {
+                        "success": True,
+                        "created": 1,
+                        "project_id": new_project.project_id,
+                        "project_name": new_project.project_name,
+                        "project_type_code": new_project.project_type_code,
+                        "nav_url": nav_url,
+                    }
+
                 else:
                     return {"success": False, "error": f"Unknown mutation type: {mutation_type}"}
 

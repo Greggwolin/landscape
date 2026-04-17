@@ -177,21 +177,21 @@ urlpatterns = [
 
     # Confirm a single mutation
     path(
-        'landscaper/mutations/<str:mutation_id>/confirm/',
+        'landscaper/mutations/<uuid:mutation_id>/confirm/',
         ConfirmMutationView.as_view(),
         name='confirm-mutation'
     ),
 
     # Reject a single mutation
     path(
-        'landscaper/mutations/<str:mutation_id>/reject/',
+        'landscaper/mutations/<uuid:mutation_id>/reject/',
         RejectMutationView.as_view(),
         name='reject-mutation'
     ),
 
     # Confirm all mutations in a batch
     path(
-        'landscaper/mutations/batch/<str:batch_id>/confirm/',
+        'landscaper/mutations/batch/<uuid:batch_id>/confirm/',
         ConfirmBatchView.as_view(),
         name='confirm-batch'
     ),

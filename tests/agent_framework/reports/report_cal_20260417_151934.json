@@ -1,0 +1,535 @@
+{
+  "suite": "landscape_agents",
+  "mode": "calibration",
+  "started_at": "2026-04-17T22:18:11.283748+00:00",
+  "ended_at": "2026-04-17T22:19:34.288689+00:00",
+  "elapsed_s": 83.0,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 0,
+    "scenarios_failed": 1,
+    "validations_total": 33,
+    "validations_passed": 33,
+    "validations_failed": 0
+  },
+  "scenarios": [
+    {
+      "scenario": "s10_negative_testing",
+      "status": "fail",
+      "error": null,
+      "started_at": "2026-04-17T22:18:11.346882+00:00",
+      "ended_at": "2026-04-17T22:19:34.284009+00:00",
+      "elapsed_s": 82.9,
+      "steps_passed": 11,
+      "steps_failed": 1,
+      "steps_total": 13,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:11.346888+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S10_Negative_Testing",
+          "details": {
+            "project_name": "AGENT_TEST_S10_Negative_Testing",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Portland",
+            "state": "OR",
+            "project_id": 854,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:12.032983+00:00",
+          "result": "Project created: id=854"
+        },
+        {
+          "step_num": 3,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "home",
+            "project_id": 854,
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:13.410654+00:00",
+          "result": "Thread created: 50c764ed-c5e6-4a77-8754-7c1da658283b"
+        },
+        {
+          "step_num": 4,
+          "type": "send_message",
+          "description": "Sending: \"Please change the property name to \"AGENT_TEST_S10_Expiry_Check\".\"",
+          "details": {
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "page_context": "home",
+            "elapsed_s": 12.2,
+            "tools_called": [
+              "update_project_field"
+            ],
+            "has_mutation": true,
+            "assistant_content_length": 133
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:14.047964+00:00",
+          "result": "Response received in 12.2s"
+        },
+        {
+          "step_num": 5,
+          "type": "confirm_fake",
+          "description": "Attempting confirm on fake mutation 99999999",
+          "details": {},
+          "status": "fail",
+          "timestamp": "2026-04-17T22:18:26.213987+00:00",
+          "error": "Confirm request failed: Expecting value: line 1 column 1 (char 0)"
+        },
+        {
+          "step_num": 6,
+          "type": "send_message",
+          "description": "Sending: \"What are the details for Building 99, Floor 47, Unit XYZ-9999? Show me the lease terms for that unit.\"",
+          "details": {
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "page_context": "mf_property",
+            "elapsed_s": 12.1,
+            "tools_called": [
+              "get_units",
+              "get_units",
+              "get_leases"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 230
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:26.309478+00:00",
+          "result": "Response received in 12.1s"
+        },
+        {
+          "step_num": 7,
+          "type": "send_message",
+          "description": "Sending: \"Please update the field \"unicorn_rainbow_factor\" to 42 for this project.\"",
+          "details": {
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "page_context": "home",
+            "elapsed_s": 8.1,
+            "tools_called": [
+              "update_project_field"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 246
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:38.443262+00:00",
+          "result": "Response received in 8.1s"
+        },
+        {
+          "step_num": 8,
+          "type": "send_message",
+          "description": "Sending: \"Please change the zip code to \"99999\".\"",
+          "details": {
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "page_context": "home",
+            "elapsed_s": 10.9,
+            "tools_called": [
+              "update_project_field"
+            ],
+            "has_mutation": true,
+            "assistant_content_length": 107
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:46.551673+00:00",
+          "result": "Response received in 10.9s"
+        },
+        {
+          "step_num": 9,
+          "type": "confirm_mutation",
+          "description": "Confirming mutation",
+          "details": {
+            "mutation_id": "88c914d1-a439-4808-bbce-7f4f1b3f6f29",
+            "success": true,
+            "action": "confirmed",
+            "project_id": 854,
+            "table_name": "tbl_project",
+            "mutation_type": "field_update",
+            "result": {
+              "success": true,
+              "rows_affected": 1,
+              "field": "zip_code",
+              "new_value": "99999"
+            }
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:57.472013+00:00",
+          "result": "Mutation confirmed"
+        },
+        {
+          "step_num": 10,
+          "type": "double_confirm",
+          "description": "Attempting second confirm",
+          "details": {},
+          "status": "running",
+          "timestamp": "2026-04-17T22:18:57.994046+00:00"
+        },
+        {
+          "step_num": 11,
+          "type": "send_message",
+          "description": "Sending: \"What is the property name for this project?\"",
+          "details": {
+            "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+            "page_context": "home",
+            "elapsed_s": 7.5,
+            "tools_called": [
+              "get_project_fields"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 54
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:18:58.285736+00:00",
+          "result": "Response received in 7.5s"
+        },
+        {
+          "step_num": 12,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 33,
+            "validations_failed": 0
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:19:05.801759+00:00",
+          "result": "S10 complete: 33/33 checks passed"
+        },
+        {
+          "step_num": 13,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": [
+              854
+            ]
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T22:19:05.802004+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 854,
+      "thread_id": "50c764ed-c5e6-4a77-8754-7c1da658283b",
+      "calibration_mode": true
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s10_negative_testing",
+      "total": 33,
+      "passed": 33,
+      "failed": 0,
+      "all_passed": true,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": true,
+          "message": "Calibration: project_id = 854",
+          "actual": 854,
+          "calibration_value": 854
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p1_tools",
+          "passed": true,
+          "message": "Calibration: p1_tools = ['update_project_field']",
+          "actual": [
+            "update_project_field"
+          ],
+          "calibration_value": [
+            "update_project_field"
+          ]
+        },
+        {
+          "name": "calibrate:p1_mutation_proposed",
+          "passed": true,
+          "message": "Calibration: p1_mutation_proposed = True",
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:p1_mutation_id",
+          "passed": true,
+          "message": "Calibration: p1_mutation_id = 'f9072ec9-0c00-4839-8a16-84be9f36cd4a'",
+          "actual": "f9072ec9-0c00-4839-8a16-84be9f36cd4a",
+          "calibration_value": "f9072ec9-0c00-4839-8a16-84be9f36cd4a"
+        },
+        {
+          "name": "calibrate:p1_batch_id",
+          "passed": true,
+          "message": "Calibration: p1_batch_id = None"
+        },
+        {
+          "name": "field_equals:p1_fake_no_crash",
+          "passed": true,
+          "message": "p1_fake_no_crash: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p2_tools",
+          "passed": true,
+          "message": "Calibration: p2_tools = ['get_units', 'get_units', 'get_leases']",
+          "actual": [
+            "get_units",
+            "get_units",
+            "get_leases"
+          ],
+          "calibration_value": [
+            "get_units",
+            "get_units",
+            "get_leases"
+          ]
+        },
+        {
+          "name": "field_equals:p2_no_crash_in_response",
+          "passed": true,
+          "message": "p2_no_crash_in_response: match",
+          "expected": false,
+          "actual": false,
+          "calibration_value": false
+        },
+        {
+          "name": "calibrate:p2_explains_absence",
+          "passed": true,
+          "message": "Calibration: p2_explains_absence = True",
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:p2_response_length",
+          "passed": true,
+          "message": "Calibration: p2_response_length = 230",
+          "actual": 230,
+          "calibration_value": 230
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p3_tools",
+          "passed": true,
+          "message": "Calibration: p3_tools = ['update_project_field']",
+          "actual": [
+            "update_project_field"
+          ],
+          "calibration_value": [
+            "update_project_field"
+          ]
+        },
+        {
+          "name": "field_equals:p3_no_crash_in_response",
+          "passed": true,
+          "message": "p3_no_crash_in_response: match",
+          "expected": false,
+          "actual": false,
+          "calibration_value": false
+        },
+        {
+          "name": "calibrate:p3_explains_limitation",
+          "passed": true,
+          "message": "Calibration: p3_explains_limitation = True",
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:p3_response_length",
+          "passed": true,
+          "message": "Calibration: p3_response_length = 246",
+          "actual": 246,
+          "calibration_value": 246
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p4_tools",
+          "passed": true,
+          "message": "Calibration: p4_tools = ['update_project_field']",
+          "actual": [
+            "update_project_field"
+          ],
+          "calibration_value": [
+            "update_project_field"
+          ]
+        },
+        {
+          "name": "calibrate:p4_skipped",
+          "passed": true,
+          "message": "Calibration: p4_skipped = False",
+          "actual": false,
+          "calibration_value": false
+        },
+        {
+          "name": "field_equals:p4_first_confirm_success",
+          "passed": true,
+          "message": "p4_first_confirm_success: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:p4_first_confirm",
+          "passed": true,
+          "message": "Calibration: p4_first_confirm = {'success': True, 'mutation_id': '88c914d1-a439-4808-bbce-7f4f1b3f6f29', 'action': 'confirmed', 'project_id': 854, 'table_name': 'tbl_project', 'mutation_type': 'field_update', 'result': {'success': True, 'rows_affected': 1, 'field': 'zip_code', 'new_value': '99999'}}",
+          "actual": {
+            "success": true,
+            "mutation_id": "88c914d1-a439-4808-bbce-7f4f1b3f6f29",
+            "action": "confirmed",
+            "project_id": 854,
+            "table_name": "tbl_project",
+            "mutation_type": "field_update",
+            "result": {
+              "success": true,
+              "rows_affected": 1,
+              "field": "zip_code",
+              "new_value": "99999"
+            }
+          },
+          "calibration_value": {
+            "success": true,
+            "mutation_id": "88c914d1-a439-4808-bbce-7f4f1b3f6f29",
+            "action": "confirmed",
+            "project_id": 854,
+            "table_name": "tbl_project",
+            "mutation_type": "field_update",
+            "result": {
+              "success": true,
+              "rows_affected": 1,
+              "field": "zip_code",
+              "new_value": "99999"
+            }
+          }
+        },
+        {
+          "name": "calibrate:p4_double_confirm_status",
+          "passed": true,
+          "message": "Calibration: p4_double_confirm_status = 400",
+          "actual": 400,
+          "calibration_value": 400
+        },
+        {
+          "name": "calibrate:p4_double_confirm_response",
+          "passed": true,
+          "message": "Calibration: p4_double_confirm_response = {'success': False, 'error': 'Mutation already confirmed'}",
+          "actual": {
+            "success": false,
+            "error": "Mutation already confirmed"
+          },
+          "calibration_value": {
+            "success": false,
+            "error": "Mutation already confirmed"
+          }
+        },
+        {
+          "name": "field_equals:p4_double_not_500",
+          "passed": true,
+          "message": "p4_double_not_500: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:p4_double_rejected",
+          "passed": true,
+          "message": "p4_double_rejected: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:p5_tools",
+          "passed": true,
+          "message": "Calibration: p5_tools = ['get_project_fields']",
+          "actual": [
+            "get_project_fields"
+          ],
+          "calibration_value": [
+            "get_project_fields"
+          ]
+        },
+        {
+          "name": "field_equals:p5_substantive_response",
+          "passed": true,
+          "message": "p5_substantive_response: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:p5_response_length",
+          "passed": true,
+          "message": "Calibration: p5_response_length = 54",
+          "actual": 54,
+          "calibration_value": 54
+        },
+        {
+          "name": "field_equals:p5_no_crash",
+          "passed": true,
+          "message": "p5_no_crash: match",
+          "expected": false,
+          "actual": false,
+          "calibration_value": false
+        }
+      ]
+    }
+  ]
+}
