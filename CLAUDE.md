@@ -404,7 +404,7 @@ Django uses DRF serializers with consistent envelope:
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
 | 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); legacy Next.js route retained as dead code |
-| 7 | Landscaper Chat | ✅ WORKS | 232 tools, thread-based, mutations; unassigned (pre-project) threads supported |
+| 7 | Landscaper Chat | ✅ WORKS | 233 tools, thread-based, mutations; unassigned (pre-project) threads supported |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
@@ -444,7 +444,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **232 registered tools** (`@register_tool` decorator, verified via registry inspection) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` + `open_input_modal` + 4 excel_audit tools added Apr 2026 (`classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions` — Phases 4-7 follow)
+- Claude AI with **233 registered tools** (`@register_tool` decorator, verified via registry inspection) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` + `open_input_modal` + 4 excel_audit tools added Apr 2026 + `generate_map_artifact` (interactive MapLibre maps in artifacts panel, with pin-placement input mode for projects missing coordinates)
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -855,6 +855,6 @@ DO ask clarifying questions when:
 
 *Last updated: 2026-04-17 (nightly sync — Chat Canvas / Unified UI architecture landed Apr 16: 8 commits, `/w/` route tree, unassigned Landscaper threads with nullable `project_id`, 3-panel PageShell layout, modal bridge system, DocumentsPanel refactor committed (+630 lines), ProjectHomepage with property badges; backend migration `0003_unassigned_threads.sql` + tool gap audit doc)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **232** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools: `classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions` (now exposed via UNIVERSAL_TOOLS). Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
+*Landscaper tool count: **233** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools + `generate_map_artifact` (interactive MapLibre maps in artifacts panel with pin-placement input mode). Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
