@@ -855,6 +855,6 @@ DO ask clarifying questions when:
 
 *Last updated: 2026-04-17 (nightly sync — Chat Canvas / Unified UI architecture landed Apr 16: 8 commits, `/w/` route tree, unassigned Landscaper threads with nullable `project_id`, 3-panel PageShell layout, modal bridge system, DocumentsPanel refactor committed (+630 lines), ProjectHomepage with property badges; backend migration `0003_unassigned_threads.sql` + tool gap audit doc)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **233** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools + `generate_map_artifact` (interactive MapLibre maps in artifacts panel with pin-placement input mode). Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
+*Landscaper tool count: **233** (schemas and handlers aligned — 5-tool drift closed Apr 17). Includes 4 excel_audit tools + `generate_map_artifact` (interactive MapLibre maps in artifacts panel with pin-placement input mode) + 4 appraisal knowledge tools + `log_alpha_feedback`. Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

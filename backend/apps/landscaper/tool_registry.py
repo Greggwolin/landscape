@@ -34,6 +34,9 @@ UNIVERSAL_TOOLS = [
     # Knowledge / RAG
     "get_knowledge_entities", "get_knowledge_facts", "get_knowledge_insights",
     "acknowledge_insight", "query_platform_knowledge", "search_irem_benchmarks",
+    # Appraisal knowledge (store + query from extracted appraisals)
+    "store_appraisal_valuation", "store_market_intelligence",
+    "store_construction_benchmarks", "get_appraisal_knowledge",
     # Contacts
     "search_cabinet_contacts", "get_project_contacts_v2", "get_contact_roles",
     "create_cabinet_contact", "assign_contact_to_project", "remove_contact_from_project",
