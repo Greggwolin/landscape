@@ -23,6 +23,8 @@ interface ProjectData {
   project_type_code?: string;
   property_subtype?: string;
   analysis_type?: string;
+  jurisdiction_city?: string;
+  jurisdiction_state?: string;
 }
 
 function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
@@ -38,6 +40,9 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  // On /w/chat routes, chat IS the content — hide the right <main> panel
+  const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
 
   // Derive active nav page from URL
   const activePage = (() => {
@@ -85,6 +90,8 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
             project_type_code: data.project_type_code ?? undefined,
             property_subtype: data.property_subtype ?? undefined,
             analysis_type: data.analysis_type ?? undefined,
+            jurisdiction_city: data.jurisdiction_city ?? undefined,
+            jurisdiction_state: data.jurisdiction_state ?? undefined,
           });
         }
       })
@@ -204,8 +211,13 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       <CenterChatPanel
         projectId={initialThreadId ? undefined : (projectId ?? lastProjectId)}
         initialThreadId={initialThreadId}
+        projectName={projectData?.project_name}
+        projectLocation={[projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
+        projectTypeCode={projectData?.project_type_code}
       />
-      <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
+      {!isChatRoute && (
+        <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
+      )}
       <HelpLandscaperPanel />
     </div>
   );

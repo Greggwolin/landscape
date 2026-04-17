@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LandscaperChatThreaded, LandscaperChatHandle } from '@/components/landscaper/LandscaperChatThreaded';
 import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
+import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -25,6 +26,10 @@ interface CenterChatPanelProps {
   projectId?: number;
   /** When provided, mounts the chat with this thread pre-selected (used by /w/chat/[threadId]). */
   initialThreadId?: string;
+  /** Project metadata for the header — passed from layout. */
+  projectName?: string;
+  projectLocation?: string;
+  projectTypeCode?: string;
 }
 
 /**
@@ -35,9 +40,18 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelProps) {
-  const { chatOpen, closeChat } = useWrapperUI();
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode }: CenterChatPanelProps) {
+  const { chatOpen, closeChat, openChat } = useWrapperUI();
   const pathname = usePathname();
+  const router = useRouter();
+
+  // On /w/chat routes, chat IS the content — always visible regardless of chatOpen toggle.
+  const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
+
+  // Auto-open chat panel when navigating to a chat route (ensures toggle state stays in sync)
+  useEffect(() => {
+    if (isChatRoute && !chatOpen) openChat();
+  }, [isChatRoute, chatOpen, openChat]);
 
   // Bridge: Landscaper tool results → ModalRegistry
   // When open_input_modal returns { action: 'open_modal', modal_name }, dispatch to the registry.
@@ -125,7 +139,10 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
     pendingMessageRef.current = null;
   }, []);
 
-  if (!chatOpen) return null;
+  // Hover state for back-to-projects arrow
+  const [backHover, setBackHover] = useState(false);
+
+  if (!chatOpen && !isChatRoute) return null;
 
   const getPageContext = () => {
     if (showHomepage) return 'home';
@@ -142,25 +159,69 @@ export function CenterChatPanel({ projectId, initialThreadId }: CenterChatPanelP
   return (
     <div className="wrapper-chat-center">
       <div className="wrapper-header">
-        <span className="wrapper-header-title">
-          {showHomepage ? '' : (threadTitle || 'New conversation')}
-        </span>
-        <div className="wrapper-header-spacer" />
-        {/* Back button when a thread is active from the homepage */}
-        {isProjectRoot && homepageThreadId && (
-          <button
-            className="wrapper-btn-ghost"
-            onClick={handleBackToHomepage}
-            style={{ marginRight: '4px' }}
-            title="Back to project overview"
-          >
-            ← Back
-          </button>
-        )}
-        {!showHomepage && (
-          <button className="wrapper-btn-ghost" onClick={closeChat} title="Close chat panel">
-            Close
-          </button>
+        {showHomepage && projectName ? (
+          /* ── Project homepage header: back arrow + name + location + type badge ── */
+          <>
+            <button
+              className="wrapper-btn-ghost"
+              onClick={() => router.push('/w/projects')}
+              onMouseEnter={() => setBackHover(true)}
+              onMouseLeave={() => setBackHover(false)}
+              style={{ marginRight: '6px', whiteSpace: 'nowrap', fontSize: '12px' }}
+              title="All Projects"
+            >
+              {backHover ? '← All Projects' : '←'}
+            </button>
+            <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
+              {projectName}
+            </span>
+            {projectLocation && (
+              <span style={{ fontSize: '11px', color: 'var(--w-text-secondary)', marginLeft: '6px', whiteSpace: 'nowrap' }}>
+                {projectLocation}
+              </span>
+            )}
+            <div className="wrapper-header-spacer" />
+            {projectTypeCode && (
+              <span
+                style={{
+                  ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.4px',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                }}
+              >
+                {getPropertyTypeLabel(projectTypeCode)}
+              </span>
+            )}
+          </>
+        ) : (
+          /* ── Thread / chat header ── */
+          <>
+            <span className="wrapper-header-title">
+              {showHomepage ? '' : (threadTitle || 'New conversation')}
+            </span>
+            <div className="wrapper-header-spacer" />
+            {/* Back button when a thread is active from the homepage */}
+            {isProjectRoot && homepageThreadId && (
+              <button
+                className="wrapper-btn-ghost"
+                onClick={handleBackToHomepage}
+                style={{ marginRight: '4px' }}
+                title="Back to project overview"
+              >
+                ← Back
+              </button>
+            )}
+            {!showHomepage && !isChatRoute && (
+              <button className="wrapper-btn-ghost" onClick={closeChat} title="Close chat panel">
+                Close
+              </button>
+            )}
+          </>
         )}
       </div>
 

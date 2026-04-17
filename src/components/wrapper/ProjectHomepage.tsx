@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import CIcon from '@coreui/icons-react';
 import { cilCommentSquare, cilSend } from '@coreui/icons';
 
@@ -28,14 +27,6 @@ interface ProjectThread {
   isActive: boolean;
 }
 
-interface ProjectInfo {
-  project_name: string;
-  project_type_code?: string;
-  jurisdiction_city?: string;
-  jurisdiction_state?: string;
-  analysis_type?: string;
-}
-
 interface ProjectHomepageProps {
   projectId: number;
   onSelectThread: (threadId: string, title?: string) => void;
@@ -59,46 +50,16 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const PROJECT_TYPE_LABELS: Record<string, string> = {
-  LAND: 'Land Dev',
-  MF: 'Multifamily',
-  OFF: 'Office',
-  RET: 'Retail',
-  IND: 'Industrial',
-  HTL: 'Hotel',
-  MXU: 'Mixed Use',
-};
-
 export function ProjectHomepage({
   projectId,
   onSelectThread,
   onStartChat,
   isStartingChat = false,
 }: ProjectHomepageProps) {
-  const router = useRouter();
-  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
   const [threads, setThreads] = useState<ProjectThread[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
   const [chatInput, setChatInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Fetch project info
-  useEffect(() => {
-    fetch(`/api/projects/${projectId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) {
-          setProjectInfo({
-            project_name: data.project_name ?? '',
-            project_type_code: data.project_type_code ?? undefined,
-            jurisdiction_city: data.jurisdiction_city ?? undefined,
-            jurisdiction_state: data.jurisdiction_state ?? undefined,
-            analysis_type: data.analysis_type ?? undefined,
-          });
-        }
-      })
-      .catch(() => {});
-  }, [projectId]);
 
   // Fetch threads for this project
   useEffect(() => {
@@ -133,10 +94,6 @@ export function ProjectHomepage({
     [handleSubmit]
   );
 
-  const locationStr = [projectInfo?.jurisdiction_city, projectInfo?.jurisdiction_state]
-    .filter(Boolean)
-    .join(', ');
-
   return (
     <div
       style={{
@@ -147,94 +104,14 @@ export function ProjectHomepage({
         background: 'var(--w-bg-body)',
       }}
     >
-      {/* ← All projects back link */}
-      <button
-        type="button"
-        onClick={() => router.push('/w/projects')}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '10px 16px 0',
-          fontSize: '11px',
-          color: 'var(--w-text-tertiary)',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--w-text-secondary)'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--w-text-tertiary)'; }}
-      >
-        ← All projects
-      </button>
-
-      {/* Project description block */}
+      {/* Chat starter input */}
       <div
         style={{
-          padding: '10px 16px 16px',
+          padding: '16px 16px 12px',
           borderBottom: '1px solid var(--w-border)',
           flexShrink: 0,
         }}
       >
-        {/* Project name + type badge */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: '15px',
-                fontWeight: 700,
-                color: 'var(--w-text-primary)',
-                lineHeight: 1.3,
-                marginBottom: '3px',
-              }}
-            >
-              {projectInfo?.project_name ?? '—'}
-            </div>
-            {locationStr && (
-              <div style={{ fontSize: '11px', color: 'var(--w-text-secondary)' }}>
-                {locationStr}
-              </div>
-            )}
-          </div>
-          {projectInfo?.project_type_code && (
-            <span
-              style={{
-                flexShrink: 0,
-                fontSize: '10px',
-                fontWeight: 700,
-                letterSpacing: '0.4px',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                background: 'var(--w-accent-dim)',
-                color: 'var(--w-accent-text)',
-                textTransform: 'uppercase',
-                marginTop: '2px',
-              }}
-            >
-              {PROJECT_TYPE_LABELS[projectInfo.project_type_code] ??
-                projectInfo.project_type_code}
-            </span>
-          )}
-        </div>
-
-        {/* Analysis type chip */}
-        {projectInfo?.analysis_type && (
-          <div style={{ marginBottom: '12px' }}>
-            <span
-              style={{
-                fontSize: '10px',
-                color: 'var(--w-text-tertiary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.3px',
-              }}
-            >
-              {projectInfo.analysis_type}
-            </span>
-          </div>
-        )}
-
-        {/* Chat starter input */}
         <div
           style={{
             display: 'flex',
