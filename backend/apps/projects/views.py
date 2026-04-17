@@ -78,7 +78,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         base_qs = Project.objects.select_related('created_by').annotate(
             mf_unit_count=mf_count_subquery
-        )
+        ).filter(is_active=True)
 
         # Admin users see all projects
         if getattr(user, 'role', None) == 'admin' or user.is_staff:

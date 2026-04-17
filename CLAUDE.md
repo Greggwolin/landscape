@@ -404,7 +404,7 @@ Django uses DRF serializers with consistent envelope:
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
 | 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); legacy Next.js route retained as dead code |
-| 7 | Landscaper Chat | ✅ WORKS | 231 tools, thread-based, mutations |
+| 7 | Landscaper Chat | ✅ WORKS | 232 tools, thread-based, mutations; unassigned (pre-project) threads supported |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
@@ -451,6 +451,37 @@ Django uses DRF serializers with consistent envelope:
 - Activity feed + extraction logs + scenario management
 - **Silent failure risk:** ALLOWED_UPDATES field mappings must match actual DB column names exactly — always verify tool writes against the DB directly, not just API response codes
 - **Comp tools:** Use unified comparables table with `property_type` discriminator — not separate land/MF tables
+- **Unassigned threads:** Backend supports `project_id IS NULL` threads (pre-project chat). Most tools require project context and will fail gracefully; only `UNIVERSAL_TOOLS` work without a project. See `docs/02-features/chat-canvas-tool-gaps.md` for full audit.
+
+### Chat Canvas / Unified UI (WIP — Apr 2026)
+
+New layout architecture replacing the original ARGUS-style 8-folder tabs with a chat-centric "canvas" approach. Coexists with original layout during transition.
+
+**Route structure:** `/w/` prefix — `src/app/w/layout.tsx` (shell), `/w/projects/` (project list), `/w/projects/[projectId]/` (project view), `/w/chat/` (unassigned chat), `/w/chat/[threadId]/` (specific thread).
+
+**Layout components** (`src/components/wrapper/`):
+- `PageShell.tsx` — outer 3-panel frame (sidebar + center + right)
+- `WrapperSidebar.tsx` — left nav with project list + recent threads
+- `CenterChatPanel.tsx` — Landscaper chat with thread-aware header
+- `RightContentPanel.tsx` — context-aware right panel (project content, artifacts, docs)
+- `ProjectHomepage.tsx` — project landing page with tile grid
+- `ProjectArtifactsPanel.tsx` — collapsible artifacts panel with toggle
+- `ProjectContentWrapper.tsx` — bridges wrapper layout to existing project components
+- `WrapperUIContext.tsx` — panel visibility state (sidebar, right panel, artifacts)
+
+**Key features:**
+- Hamburger (☰) toggles for panel visibility
+- Property type badges on project tiles (rectangular, 4px radius, uppercase)
+- Thread titles displayed in chat header
+- Chat background: `#1A1E28`
+- Modal bridge system (`src/components/wrapper/modals/`) for acquisition, reconciliation modals
+- DocumentsPanel refactor in `src/components/wrapper/documents/` (+630 lines)
+
+**Backend support** (migration `0003_unassigned_threads.sql`):
+- `landscaper_thread.project_id` now nullable — enables pre-project conversations
+- `tool_registry.py` routes only `UNIVERSAL_TOOLS` to unassigned threads
+- `thread_service.py` updated to handle null project context
+- `ai_handler.py` skips project lookup for unassigned threads
 
 ### Excel Model Audit Pipeline (Implemented incrementally — Apr 2026)
 
@@ -822,7 +853,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-15 (nightly sync — Excel Model Audit Phase 2f impact tracer landed (`impact_tracer.py` +397 lines; BFS forward from errors to headline outputs); Phase 2e false-positive rate reduced ~92%; Excel audit tools exposed via `UNIVERSAL_TOOLS` so Landscaper can invoke them from any page; loader accepts HTTPS UploadThing URIs + `LandscaperPanel` Excel drop fallback; ongoing uncommitted DocumentsPanel refactor in `src/components/wrapper/documents/` (+630 lines))*
+*Last updated: 2026-04-17 (nightly sync — Chat Canvas / Unified UI architecture landed Apr 16: 8 commits, `/w/` route tree, unassigned Landscaper threads with nullable `project_id`, 3-panel PageShell layout, modal bridge system, DocumentsPanel refactor committed (+630 lines), ProjectHomepage with property badges; backend migration `0003_unassigned_threads.sql` + tool gap audit doc)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: **232** (verified via TOOL_REGISTRY inspection) — includes 4 excel_audit tools: `classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions` (now exposed via UNIVERSAL_TOOLS). Phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 (waterfall classifier, replication, S&U, trust score, HTML report) remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*

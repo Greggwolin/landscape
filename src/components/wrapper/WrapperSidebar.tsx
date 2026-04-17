@@ -48,6 +48,7 @@ export interface WrapperSidebarProps {
   onNewChat?: () => void;
   onProjectSelect?: () => void;
   onThemeToggle?: () => void;
+  onLogout?: () => void;
   currentTheme?: 'light' | 'dark';
 
   // User
@@ -109,6 +110,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   onNewChat,
   onProjectSelect,
   onThemeToggle,
+  onLogout,
   currentTheme = 'dark',
   userName = 'Gregg Wolin',
   userPlan = 'Crescent Bay Holdings',
@@ -405,6 +407,15 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             >
               {currentTheme === 'light' ? '🌙' : '☀️'}
             </div>
+            {onLogout && (
+              <div
+                className="sb-footer-btn"
+                onClick={onLogout}
+                title="Sign out"
+              >
+                ⏻
+              </div>
+            )}
           </div>
         </div>
       </div>

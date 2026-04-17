@@ -1,7 +1,7 @@
 # Landscape Financial Engine - Implementation Status
-**Last Updated:** 2026-04-12
+**Last Updated:** 2026-04-17
 **Version:** 5.0
-**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening + Market Agent Fleet + DMS Filter Management)
+**Status:** Production Ready (Phases 1-8 Complete + Python Financial Engine Migration Phase 1 + Location Intelligence + Map Draw Tools + Sales Comparison UI + Cash Flow UI + DCF Enhancements + Project Navigation + Property Tab Restructure + Rent Roll Extraction Improvements + Debt UI Consolidation + Folder-Tabs UI Overhaul + Landscaper Stability & Rent Roll Visibility + PlanningWizard Archive + Market Research Extraction + Knowledge Library + DMS Doc Types/Tags/Subtypes + Rich Schema Refresh + CoreUI Theme Expansion + Reconciliation Panel + MapCanvas Overhaul + Ingestion Workbench + Alpha Prep Sprint + Schema Refresh Mar 2026 + Extraction Pipeline v2 + Geo Auto-Seeding + Appraisal Knowledge Tools + Expense Comparables + Report System Committed + Operations Full Django Migration + Inline PDF Reports + Acquisition DCF Integration + Portfolio Scaffolding + Waterfall Persist + Marketing Site + Map Market Layers + Extraction Pipeline Hardening + Market Agent Fleet + DMS Filter Management + Excel Model Audit Pipeline + Chat Canvas / Unified UI)
 
 ---
 
@@ -9,7 +9,19 @@
 
 The Landscape Financial Engine is a **production-ready** Next.js + PostgreSQL application providing comprehensive financial modeling for land development and income properties with ARGUS-level sophistication.
 
-### 🆕 **Latest Update: Extraction Pipeline Hardening + Skills Library (April 12, 2026)**
+### 🆕 **Latest Update: Chat Canvas / Unified UI + Excel Model Audit (April 15-17, 2026)**
+
+**Committed: Chat Canvas backend + frontend (8 commits Apr 16), Excel Audit Phases 2e-2f + universal tools (4 commits Apr 15)**
+
+- ✅ **Chat Canvas / Unified UI** — New `/w/` route tree with 3-panel layout (sidebar + chat + content). `PageShell`, `ProjectHomepage`, `ProjectArtifactsPanel`, `CenterChatPanel` components. Modal bridge system for acquisition/reconciliation modals.
+- ✅ **Unassigned Landscaper threads** — `project_id` nullable on `landscaper_thread` (migration `0003`). Backend routes `UNIVERSAL_TOOLS` only to pre-project conversations. Tool gap audit documented.
+- ✅ **Excel Audit Phase 2f** — Downstream impact tracer (`impact_tracer.py` +397 lines). BFS forward from formula errors to headline outputs (IRR/EM/DSCR/net CF).
+- ✅ **Excel Audit Phase 2e hardened** — False-positive rate reduced ~92% via tighter heuristics.
+- ✅ **Excel audit tools universal** — `classify_excel_file`, `run_structural_scan`, `run_formula_integrity`, `extract_assumptions` exposed via `UNIVERSAL_TOOLS`. Landscaper can invoke from any page.
+- ✅ **DocumentsPanel refactor** — `src/components/wrapper/documents/DocumentsPanel.tsx` (+630 lines).
+- 📁 **See:** `docs/session-notes/2026-04-17-daily-sync.md`
+
+### Previous Update: Extraction Pipeline Hardening + Skills Library (April 12, 2026)
 
 **Committed `b21788e`: Nightly health check, skills/reference library reorganization, excel model archive**
 **Uncommitted: Extraction writer hardening, JWT user tracking, workbench auth (7 files, +252/-84 lines)**

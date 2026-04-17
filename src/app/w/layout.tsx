@@ -9,6 +9,7 @@ import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionConte
 import { HelpLandscaperProvider, useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
+import { useAuth } from '@/contexts/AuthContext';
 import '@/styles/wrapper.css';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -30,6 +31,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { theme, toggleTheme } = useTheme();
   const { rightPanelNarrow } = useWrapperUI();
+  const { logout, user } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
@@ -195,6 +197,9 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         isHelpThinking={isHelpLoading}
         currentTheme={theme === 'light' ? 'light' : 'dark'}
         onThemeToggle={toggleTheme}
+        onLogout={logout}
+        userName={user ? `${user.first_name} ${user.last_name}`.trim() || user.username : undefined}
+        userInitials={user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || user.username[0].toUpperCase() : undefined}
       />
       <CenterChatPanel
         projectId={initialThreadId ? undefined : (projectId ?? lastProjectId)}
