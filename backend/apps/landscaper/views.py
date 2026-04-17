@@ -1561,6 +1561,125 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             'count': len(threads),
         })
 
+    @action(detail=False, methods=['get'], url_path='search')
+    def search(self, request):
+        """
+        GET /api/landscaper/threads/search/?q=<term>
+
+        Full-text search across thread titles, message content, and
+        associated project names. Results are user-scoped (threads
+        whose project the user can access, plus unassigned threads),
+        deduplicated by thread, ordered by updated_at desc, capped at 25.
+        """
+        from .models import ChatThread, ThreadMessage
+
+        term = (request.query_params.get('q') or '').strip()
+        if len(term) < 2:
+            return Response(
+                {'success': False, 'error': 'Query must be at least 2 characters'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(term) > 100:
+            term = term[:100]
+
+        MAX_RESULTS = 25
+        SNIPPET_CHARS_BEFORE = 50
+        SNIPPET_CHARS_AFTER = 70
+        SNIPPET_MAX = SNIPPET_CHARS_BEFORE + SNIPPET_CHARS_AFTER + len(term)
+
+        candidates = (
+            ChatThread.objects
+            .select_related('project')
+            .filter(
+                Q(title__icontains=term)
+                | Q(project__project_name__icontains=term)
+                | Q(messages__content__icontains=term)
+            )
+            .distinct()
+            .order_by('-updated_at')
+        )
+
+        user = request.user
+        is_admin = bool(
+            user.is_authenticated and (
+                user.is_staff or user.is_superuser
+                or getattr(user, 'role', None) == 'admin'
+            )
+        )
+        user_id = user.id if user.is_authenticated else None
+
+        threads_matched = []
+        for thread in candidates.iterator():
+            if thread.project_id is not None and not is_admin:
+                owner_id = getattr(thread.project, 'created_by_id', None)
+                if owner_id is not None and owner_id != user_id:
+                    continue
+            threads_matched.append(thread)
+            if len(threads_matched) >= MAX_RESULTS * 2:
+                break
+
+        results = []
+        term_lower = term.lower()
+        for thread in threads_matched:
+            title = thread.title or ''
+            project_name = thread.project.project_name if thread.project_id else None
+
+            if term_lower in title.lower():
+                matched_on = 'title'
+            elif project_name and term_lower in project_name.lower():
+                matched_on = 'project'
+            else:
+                matched_on = 'message'
+
+            snippet = ''
+            if matched_on == 'message':
+                msg = (
+                    ThreadMessage.objects
+                    .filter(thread_id=thread.id, content__icontains=term)
+                    .order_by('-created_at')
+                    .only('content')
+                    .first()
+                )
+                if msg and msg.content:
+                    content = msg.content
+                    idx = content.lower().find(term_lower)
+                    if idx >= 0:
+                        start = max(0, idx - SNIPPET_CHARS_BEFORE)
+                        end = min(len(content), idx + len(term) + SNIPPET_CHARS_AFTER)
+                        snippet = content[start:end].strip()
+                        if start > 0:
+                            snippet = '…' + snippet
+                        if end < len(content):
+                            snippet = snippet + '…'
+                    else:
+                        snippet = content[:SNIPPET_MAX]
+            else:
+                latest_msg = (
+                    ThreadMessage.objects
+                    .filter(thread_id=thread.id)
+                    .order_by('-created_at')
+                    .only('content')
+                    .first()
+                )
+                if latest_msg and latest_msg.content:
+                    snippet = latest_msg.content[:120]
+                    if len(latest_msg.content) > 120:
+                        snippet += '…'
+
+            results.append({
+                'thread_id': str(thread.id),
+                'thread_title': title or None,
+                'project_id': thread.project_id,
+                'project_name': project_name,
+                'snippet': snippet,
+                'matched_on': matched_on,
+                'timestamp': thread.updated_at.isoformat(),
+            })
+            if len(results) >= MAX_RESULTS:
+                break
+
+        return Response({'results': results})
+
     @action(detail=False, methods=['post'], url_path='new')
     def start_new(self, request):
         """POST start a new thread (closes existing active thread first).

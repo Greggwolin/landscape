@@ -217,6 +217,13 @@ urlpatterns = [
         name='landscaper-threads-recent'
     ),
     path(
+        'landscaper/threads/search/',
+        ChatThreadViewSet.as_view({
+            'get': 'search',
+        }),
+        name='landscaper-threads-search'
+    ),
+    path(
         'landscaper/threads/new/',
         ChatThreadViewSet.as_view({
             'post': 'start_new',
