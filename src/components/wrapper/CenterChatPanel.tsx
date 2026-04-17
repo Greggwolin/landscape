@@ -41,7 +41,7 @@ interface CenterChatPanelProps {
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
 export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode }: CenterChatPanelProps) {
-  const { chatOpen, closeChat, openChat } = useWrapperUI();
+  const { chatOpen, closeChat, openChat, setActiveMapArtifact, toggleArtifacts, artifactsOpen } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -65,8 +65,14 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           modalRegistry.openModal(result.modal_name, (result.context as Record<string, unknown>) || undefined);
         }
       }
+      // Map artifact → push to artifacts panel
+      if (toolName === 'generate_map_artifact' && result.action === 'show_map_artifact' && result.map_config) {
+        setActiveMapArtifact(result.map_config as import('@/contexts/WrapperUIContext').MapArtifactConfig);
+        // Auto-open artifacts panel if collapsed
+        if (!artifactsOpen) toggleArtifacts();
+      }
     },
-    [modalRegistry],
+    [modalRegistry, setActiveMapArtifact, artifactsOpen, toggleArtifacts],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)
