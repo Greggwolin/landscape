@@ -1,0 +1,496 @@
+{
+  "suite": "landscape_agents",
+  "mode": "calibration",
+  "started_at": "2026-04-17T18:30:50.781711+00:00",
+  "ended_at": "2026-04-17T18:32:28.234042+00:00",
+  "elapsed_s": 97.5,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 0,
+    "scenarios_failed": 1,
+    "validations_total": 27,
+    "validations_passed": 15,
+    "validations_failed": 12
+  },
+  "scenarios": [
+    {
+      "scenario": "s2_manual_entry",
+      "status": "fail",
+      "error": null,
+      "started_at": "2026-04-17T18:30:50.831294+00:00",
+      "ended_at": "2026-04-17T18:32:28.233318+00:00",
+      "elapsed_s": 97.4,
+      "steps_passed": 7,
+      "steps_failed": 4,
+      "steps_total": 15,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:30:50.831299+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S2_Manual_Entry",
+          "details": {
+            "project_name": "AGENT_TEST_S2_Manual_Entry",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Phoenix",
+            "state": "AZ",
+            "project_id": 830,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:30:51.508318+00:00",
+          "result": "Project created: id=830"
+        },
+        {
+          "step_num": 3,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "mf_property",
+            "project_id": 830,
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:30:52.852100+00:00",
+          "result": "Thread created: 87d26513-8c5f-4ed1-9c92-216657faf221"
+        },
+        {
+          "step_num": 4,
+          "type": "request_modal",
+          "description": "Requesting modal: property_details",
+          "details": {
+            "modal_name": "property_details",
+            "page_context": "mf_property"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:30:53.593659+00:00"
+        },
+        {
+          "step_num": 5,
+          "type": "send_message",
+          "description": "Sending: \"Please open the property details panel for editing\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "mf_property",
+            "elapsed_s": 17.0,
+            "tools_called": [
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 43
+          },
+          "status": "fail",
+          "timestamp": "2026-04-17T18:30:53.593780+00:00",
+          "result": "Response received in 17.0s",
+          "error": "Landscaper did not call open_input_modal"
+        },
+        {
+          "step_num": 6,
+          "type": "request_modal",
+          "description": "Requesting modal: rent_roll",
+          "details": {
+            "modal_name": "rent_roll",
+            "page_context": "mf_property"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:31:10.598243+00:00"
+        },
+        {
+          "step_num": 7,
+          "type": "send_message",
+          "description": "Sending: \"Please open the rent roll for editing\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "mf_property",
+            "elapsed_s": 7.7,
+            "tools_called": [
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 36
+          },
+          "status": "fail",
+          "timestamp": "2026-04-17T18:31:10.598325+00:00",
+          "result": "Response received in 7.7s",
+          "error": "Landscaper did not call open_input_modal"
+        },
+        {
+          "step_num": 8,
+          "type": "request_modal",
+          "description": "Requesting modal: operating_statement",
+          "details": {
+            "modal_name": "operating_statement",
+            "page_context": "mf_operations"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:31:18.327831+00:00"
+        },
+        {
+          "step_num": 9,
+          "type": "send_message",
+          "description": "Sending: \"Please open the operating statement for editing\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "mf_operations",
+            "elapsed_s": 9.1,
+            "tools_called": [
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 46
+          },
+          "status": "fail",
+          "timestamp": "2026-04-17T18:31:18.327898+00:00",
+          "result": "Response received in 9.1s",
+          "error": "Landscaper did not call open_input_modal"
+        },
+        {
+          "step_num": 10,
+          "type": "request_modal",
+          "description": "Requesting modal: income_approach",
+          "details": {
+            "modal_name": "income_approach",
+            "page_context": "mf_valuation"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:31:27.420627+00:00"
+        },
+        {
+          "step_num": 11,
+          "type": "send_message",
+          "description": "Sending: \"Please open the income approach panel\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "mf_valuation",
+            "elapsed_s": 7.9,
+            "tools_called": [
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 42
+          },
+          "status": "fail",
+          "timestamp": "2026-04-17T18:31:27.420736+00:00",
+          "result": "Response received in 7.9s",
+          "error": "Landscaper did not call open_input_modal"
+        },
+        {
+          "step_num": 12,
+          "type": "send_message",
+          "description": "Sending: \"What information do I need to enter for a multifamily valuation?\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "mf_valuation",
+            "elapsed_s": 24.2,
+            "tools_called": [
+              "",
+              "",
+              "",
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1107
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:31:35.359418+00:00",
+          "result": "Response received in 24.2s"
+        },
+        {
+          "step_num": 13,
+          "type": "send_message",
+          "description": "Sending: \"Can you summarize what data has been entered so far for this project?\"",
+          "details": {
+            "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+            "page_context": "general",
+            "elapsed_s": 28.1,
+            "tools_called": [
+              "",
+              "",
+              "",
+              "",
+              "",
+              "",
+              ""
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 786
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:31:59.577996+00:00",
+          "result": "Response received in 28.1s"
+        },
+        {
+          "step_num": 14,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 15,
+            "validations_failed": 12
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:32:27.646870+00:00",
+          "result": "S2 complete: 15/27 checks passed"
+        },
+        {
+          "step_num": 15,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": []
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:32:27.647314+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 830,
+      "thread_id": "87d26513-8c5f-4ed1-9c92-216657faf221",
+      "calibration_mode": true
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s2_manual_entry",
+      "total": 27,
+      "passed": 15,
+      "failed": 12,
+      "all_passed": false,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": true,
+          "message": "Calibration: project_id = 830",
+          "actual": 830,
+          "calibration_value": 830
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was NOT called",
+          "expected": "open_input_modal",
+          "actual": [
+            ""
+          ]
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was not called",
+          "expected": "open_input_modal with success=true",
+          "actual": "tool not called"
+        },
+        {
+          "name": "modal_opened:property_details",
+          "passed": false,
+          "message": "open_input_modal was not invoked",
+          "expected": "property_details",
+          "actual": "open_input_modal not called"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was NOT called",
+          "expected": "open_input_modal",
+          "actual": [
+            ""
+          ]
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was not called",
+          "expected": "open_input_modal with success=true",
+          "actual": "tool not called"
+        },
+        {
+          "name": "modal_opened:rent_roll",
+          "passed": false,
+          "message": "open_input_modal was not invoked",
+          "expected": "rent_roll",
+          "actual": "open_input_modal not called"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was NOT called",
+          "expected": "open_input_modal",
+          "actual": [
+            ""
+          ]
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was not called",
+          "expected": "open_input_modal with success=true",
+          "actual": "tool not called"
+        },
+        {
+          "name": "modal_opened:operating_statement",
+          "passed": false,
+          "message": "open_input_modal was not invoked",
+          "expected": "operating_statement",
+          "actual": "open_input_modal not called"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was NOT called",
+          "expected": "open_input_modal",
+          "actual": [
+            ""
+          ]
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": false,
+          "message": "Tool open_input_modal was not called",
+          "expected": "open_input_modal with success=true",
+          "actual": "tool not called"
+        },
+        {
+          "name": "modal_opened:income_approach",
+          "passed": false,
+          "message": "open_input_modal was not invoked",
+          "expected": "income_approach",
+          "actual": "open_input_modal not called"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:rent roll",
+          "passed": true,
+          "message": "Keyword \"rent roll\" found in response",
+          "expected": "Response contains \"rent roll\"",
+          "actual": "Found in 1107-char response"
+        },
+        {
+          "name": "response_mentions:operating",
+          "passed": true,
+          "message": "Keyword \"operating\" found in response",
+          "expected": "Response contains \"operating\"",
+          "actual": "Found in 1107-char response"
+        },
+        {
+          "name": "calibrate:question_1_response_length",
+          "passed": true,
+          "message": "Calibration: question_1_response_length = 1107",
+          "actual": 1107,
+          "calibration_value": 1107
+        },
+        {
+          "name": "calibrate:question_1_tools_called",
+          "passed": true,
+          "message": "Calibration: question_1_tools_called = ['', '', '', '']",
+          "actual": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "calibration_value": [
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:question_2_response_length",
+          "passed": true,
+          "message": "Calibration: question_2_response_length = 786",
+          "actual": 786,
+          "calibration_value": 786
+        },
+        {
+          "name": "calibrate:question_2_tools_called",
+          "passed": true,
+          "message": "Calibration: question_2_tools_called = ['', '', '', '', '', '', '']",
+          "actual": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          "calibration_value": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ]
+    }
+  ]
+}

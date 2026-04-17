@@ -1,0 +1,578 @@
+{
+  "suite": "landscape_agents",
+  "mode": "calibration",
+  "started_at": "2026-04-17T18:33:35.741257+00:00",
+  "ended_at": "2026-04-17T18:35:09.786078+00:00",
+  "elapsed_s": 94.0,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 1,
+    "scenarios_failed": 0,
+    "validations_total": 31,
+    "validations_passed": 31,
+    "validations_failed": 0
+  },
+  "scenarios": [
+    {
+      "scenario": "s2_manual_entry",
+      "status": "pass",
+      "error": null,
+      "started_at": "2026-04-17T18:33:35.803083+00:00",
+      "ended_at": "2026-04-17T18:35:09.785384+00:00",
+      "elapsed_s": 94.0,
+      "steps_passed": 11,
+      "steps_failed": 0,
+      "steps_total": 15,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:35.803087+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S2_Manual_Entry",
+          "details": {
+            "project_name": "AGENT_TEST_S2_Manual_Entry",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Phoenix",
+            "state": "AZ",
+            "project_id": 831,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:36.466774+00:00",
+          "result": "Project created: id=831"
+        },
+        {
+          "step_num": 3,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "mf_property",
+            "project_id": 831,
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:36.986292+00:00",
+          "result": "Thread created: 83f21498-3aca-45de-8147-02de3720ad77"
+        },
+        {
+          "step_num": 4,
+          "type": "request_modal",
+          "description": "Requesting modal: property_details",
+          "details": {
+            "modal_name": "property_details",
+            "page_context": "mf_property"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:33:37.648411+00:00"
+        },
+        {
+          "step_num": 5,
+          "type": "send_message",
+          "description": "Sending: \"Please open the property details panel for editing\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "mf_property",
+            "elapsed_s": 10.4,
+            "tools_called": [
+              "open_input_modal"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 169,
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "property_details",
+            "context": {},
+            "message": "Opening Property Details for editing."
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:37.648500+00:00",
+          "result": "Modal opened: property_details"
+        },
+        {
+          "step_num": 6,
+          "type": "request_modal",
+          "description": "Requesting modal: rent_roll",
+          "details": {
+            "modal_name": "rent_roll",
+            "page_context": "mf_property"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:33:48.079431+00:00"
+        },
+        {
+          "step_num": 7,
+          "type": "send_message",
+          "description": "Sending: \"Please open the rent roll for editing\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "mf_property",
+            "elapsed_s": 9.4,
+            "tools_called": [
+              "open_input_modal"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 136,
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "rent_roll",
+            "context": {},
+            "message": "Opening Rent Roll for editing."
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:48.079479+00:00",
+          "result": "Modal opened: rent_roll"
+        },
+        {
+          "step_num": 8,
+          "type": "request_modal",
+          "description": "Requesting modal: operating_statement",
+          "details": {
+            "modal_name": "operating_statement",
+            "page_context": "mf_operations"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:33:57.516352+00:00"
+        },
+        {
+          "step_num": 9,
+          "type": "send_message",
+          "description": "Sending: \"Please open the operating statement for editing\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "mf_operations",
+            "elapsed_s": 9.3,
+            "tools_called": [
+              "open_input_modal"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 199,
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "operating_statement",
+            "context": {},
+            "message": "Opening Operating Statement for editing."
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:33:57.516417+00:00",
+          "result": "Modal opened: operating_statement"
+        },
+        {
+          "step_num": 10,
+          "type": "request_modal",
+          "description": "Requesting modal: income_approach",
+          "details": {
+            "modal_name": "income_approach",
+            "page_context": "mf_valuation"
+          },
+          "status": "running",
+          "timestamp": "2026-04-17T18:34:06.785478+00:00"
+        },
+        {
+          "step_num": 11,
+          "type": "send_message",
+          "description": "Sending: \"Please open the income approach panel\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "mf_valuation",
+            "elapsed_s": 9.2,
+            "tools_called": [
+              "open_input_modal"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 186,
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "income_approach",
+            "context": {},
+            "message": "Opening Income Approach for editing."
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:34:06.785539+00:00",
+          "result": "Modal opened: income_approach"
+        },
+        {
+          "step_num": 12,
+          "type": "send_message",
+          "description": "Sending: \"What information do I need to enter for a multifamily valuation?\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "mf_valuation",
+            "elapsed_s": 20.8,
+            "tools_called": [
+              "get_multifamily_property",
+              "get_units",
+              "get_revenue_rent",
+              "get_income_approach"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1226
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:34:15.948589+00:00",
+          "result": "Response received in 20.8s"
+        },
+        {
+          "step_num": 13,
+          "type": "send_message",
+          "description": "Sending: \"Can you summarize what data has been entered so far for this project?\"",
+          "details": {
+            "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+            "page_context": "general",
+            "elapsed_s": 32.5,
+            "tools_called": [
+              "get_multifamily_property",
+              "get_units",
+              "get_revenue_rent",
+              "get_revenue_other",
+              "get_operating_expenses",
+              "get_sales_comparables",
+              "get_rental_comparables",
+              "get_income_approach",
+              "get_project_documents"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 900
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:34:36.724250+00:00",
+          "result": "Response received in 32.5s"
+        },
+        {
+          "step_num": 14,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 31,
+            "validations_failed": 0
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:35:09.224727+00:00",
+          "result": "S2 complete: 31/31 checks passed"
+        },
+        {
+          "step_num": 15,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": []
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T18:35:09.224881+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 831,
+      "thread_id": "83f21498-3aca-45de-8147-02de3720ad77",
+      "calibration_mode": true
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s2_manual_entry",
+      "total": 31,
+      "passed": 31,
+      "failed": 0,
+      "all_passed": true,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": true,
+          "message": "Calibration: project_id = 831",
+          "actual": 831,
+          "calibration_value": 831
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal was called",
+          "expected": "open_input_modal",
+          "actual": "open_input_modal"
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal succeeded"
+        },
+        {
+          "name": "modal_opened:property_details",
+          "passed": true,
+          "message": "Modal property_details: action=open_modal",
+          "expected": "property_details",
+          "actual": "property_details"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:modal_result:property_details",
+          "passed": true,
+          "message": "Calibration: modal_result:property_details = {'success': True, 'action': 'open_modal', 'modal_name': 'property_details', 'context': {}, 'message': 'Opening Property Details for editing.'}",
+          "actual": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "property_details",
+            "context": {},
+            "message": "Opening Property Details for editing."
+          },
+          "calibration_value": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "property_details",
+            "context": {},
+            "message": "Opening Property Details for editing."
+          }
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal was called",
+          "expected": "open_input_modal",
+          "actual": "open_input_modal"
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal succeeded"
+        },
+        {
+          "name": "modal_opened:rent_roll",
+          "passed": true,
+          "message": "Modal rent_roll: action=open_modal",
+          "expected": "rent_roll",
+          "actual": "rent_roll"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:modal_result:rent_roll",
+          "passed": true,
+          "message": "Calibration: modal_result:rent_roll = {'success': True, 'action': 'open_modal', 'modal_name': 'rent_roll', 'context': {}, 'message': 'Opening Rent Roll for editing.'}",
+          "actual": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "rent_roll",
+            "context": {},
+            "message": "Opening Rent Roll for editing."
+          },
+          "calibration_value": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "rent_roll",
+            "context": {},
+            "message": "Opening Rent Roll for editing."
+          }
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal was called",
+          "expected": "open_input_modal",
+          "actual": "open_input_modal"
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal succeeded"
+        },
+        {
+          "name": "modal_opened:operating_statement",
+          "passed": true,
+          "message": "Modal operating_statement: action=open_modal",
+          "expected": "operating_statement",
+          "actual": "operating_statement"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:modal_result:operating_statement",
+          "passed": true,
+          "message": "Calibration: modal_result:operating_statement = {'success': True, 'action': 'open_modal', 'modal_name': 'operating_statement', 'context': {}, 'message': 'Opening Operating Statement for editing.'}",
+          "actual": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "operating_statement",
+            "context": {},
+            "message": "Opening Operating Statement for editing."
+          },
+          "calibration_value": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "operating_statement",
+            "context": {},
+            "message": "Opening Operating Statement for editing."
+          }
+        },
+        {
+          "name": "tool_called:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal was called",
+          "expected": "open_input_modal",
+          "actual": "open_input_modal"
+        },
+        {
+          "name": "tool_success:open_input_modal",
+          "passed": true,
+          "message": "Tool open_input_modal succeeded"
+        },
+        {
+          "name": "modal_opened:income_approach",
+          "passed": true,
+          "message": "Modal income_approach: action=open_modal",
+          "expected": "income_approach",
+          "actual": "income_approach"
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:modal_result:income_approach",
+          "passed": true,
+          "message": "Calibration: modal_result:income_approach = {'success': True, 'action': 'open_modal', 'modal_name': 'income_approach', 'context': {}, 'message': 'Opening Income Approach for editing.'}",
+          "actual": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "income_approach",
+            "context": {},
+            "message": "Opening Income Approach for editing."
+          },
+          "calibration_value": {
+            "success": true,
+            "action": "open_modal",
+            "modal_name": "income_approach",
+            "context": {},
+            "message": "Opening Income Approach for editing."
+          }
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:rent roll",
+          "passed": true,
+          "message": "Keyword \"rent roll\" found in response",
+          "expected": "Response contains \"rent roll\"",
+          "actual": "Found in 1226-char response"
+        },
+        {
+          "name": "response_mentions:operating",
+          "passed": true,
+          "message": "Keyword \"operating\" found in response",
+          "expected": "Response contains \"operating\"",
+          "actual": "Found in 1226-char response"
+        },
+        {
+          "name": "calibrate:question_1_response_length",
+          "passed": true,
+          "message": "Calibration: question_1_response_length = 1226",
+          "actual": 1226,
+          "calibration_value": 1226
+        },
+        {
+          "name": "calibrate:question_1_tools_called",
+          "passed": true,
+          "message": "Calibration: question_1_tools_called = ['get_multifamily_property', 'get_units', 'get_revenue_rent', 'get_income_approach']",
+          "actual": [
+            "get_multifamily_property",
+            "get_units",
+            "get_revenue_rent",
+            "get_income_approach"
+          ],
+          "calibration_value": [
+            "get_multifamily_property",
+            "get_units",
+            "get_revenue_rent",
+            "get_income_approach"
+          ]
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:question_2_response_length",
+          "passed": true,
+          "message": "Calibration: question_2_response_length = 900",
+          "actual": 900,
+          "calibration_value": 900
+        },
+        {
+          "name": "calibrate:question_2_tools_called",
+          "passed": true,
+          "message": "Calibration: question_2_tools_called = ['get_multifamily_property', 'get_units', 'get_revenue_rent', 'get_revenue_other', 'get_operating_expenses', 'get_sales_comparables', 'get_rental_comparables', 'get_income_approach', 'get_project_documents']",
+          "actual": [
+            "get_multifamily_property",
+            "get_units",
+            "get_revenue_rent",
+            "get_revenue_other",
+            "get_operating_expenses",
+            "get_sales_comparables",
+            "get_rental_comparables",
+            "get_income_approach",
+            "get_project_documents"
+          ],
+          "calibration_value": [
+            "get_multifamily_property",
+            "get_units",
+            "get_revenue_rent",
+            "get_revenue_other",
+            "get_operating_expenses",
+            "get_sales_comparables",
+            "get_rental_comparables",
+            "get_income_approach",
+            "get_project_documents"
+          ]
+        }
+      ]
+    }
+  ]
+}

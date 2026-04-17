@@ -31,6 +31,184 @@ from apps.multifamily.models import MultifamilyUnitType, ValueAddAssumptions
 from apps.multifamily.serializers import ValueAddAssumptionsSerializer
 
 
+# ---------------------------------------------------------------------------
+# Pre-deletion helper — dynamic FK enumeration
+# ---------------------------------------------------------------------------
+# Nearly all models use managed=False (schema created via raw SQL).  Django
+# ORM CASCADE cannot traverse these, and many DB-level constraints lack
+# ON DELETE CASCADE.  Instead of maintaining a static list of tables (which
+# breaks every time the extraction pipeline writes to a new table), we query
+# pg_constraint at runtime to discover ALL foreign keys pointing at
+# tbl_project, topologically sort them, and delete children first.
+# ---------------------------------------------------------------------------
+
+
+def _get_fk_dependents(cur, target_schema: str, target_table: str) -> list:
+    """
+    Return [(schema.table, fk_column)] for every FK that references
+    target_schema.target_table, ordered so that leaf tables come first
+    (reverse topological sort by FK depth).
+    """
+    # Step 1: Find all FKs referencing the target table
+    cur.execute("""
+        SELECT
+            cn.nspname  AS child_schema,
+            cc.relname  AS child_table,
+            a.attname   AS child_column
+        FROM pg_constraint c
+        JOIN pg_class      cc ON cc.oid = c.conrelid
+        JOIN pg_namespace  cn ON cn.oid = cc.relnamespace
+        JOIN pg_class      pc ON pc.oid = c.confrelid
+        JOIN pg_namespace  pn ON pn.oid = pc.relnamespace
+        JOIN pg_attribute  a  ON a.attrelid = c.conrelid
+                              AND a.attnum = ANY(c.conkey)
+        WHERE c.contype   = 'f'
+          AND pn.nspname  = %s
+          AND pc.relname  = %s
+        ORDER BY cn.nspname, cc.relname
+    """, [target_schema, target_table])
+
+    direct_fks = []
+    for row in cur.fetchall():
+        schema_table = f'{row[0]}.{row[1]}'
+        fk_col = row[2]
+        direct_fks.append((schema_table, fk_col))
+
+    # Step 2: For each direct dependent, find ITS dependents (one level deep
+    # is enough — the pattern is: grandchild → child → tbl_project).
+    # We collect grandchildren so we can delete them before their parents.
+    grandchildren = []
+    for schema_table, _ in direct_fks:
+        parts = schema_table.split('.')
+        if len(parts) == 2:
+            cur.execute("""
+                SELECT
+                    cn.nspname  AS child_schema,
+                    cc.relname  AS child_table,
+                    a.attname   AS child_column,
+                    pc.relname  AS parent_table
+                FROM pg_constraint c
+                JOIN pg_class      cc ON cc.oid = c.conrelid
+                JOIN pg_namespace  cn ON cn.oid = cc.relnamespace
+                JOIN pg_class      pc ON pc.oid = c.confrelid
+                JOIN pg_namespace  pn ON pn.oid = pc.relnamespace
+                JOIN pg_attribute  a  ON a.attrelid = c.conrelid
+                                      AND a.attnum = ANY(c.conkey)
+                WHERE c.contype   = 'f'
+                  AND pn.nspname  = %s
+                  AND pc.relname  = %s
+            """, [parts[0], parts[1]])
+
+            for gc_row in cur.fetchall():
+                gc_schema_table = f'{gc_row[0]}.{gc_row[1]}'
+                gc_fk_col = gc_row[2]
+                parent_table = gc_row[3]
+                # Store the grandchild with its FK info and which parent it
+                # depends on, so we can delete via a subquery
+                grandchildren.append((
+                    gc_schema_table,
+                    gc_fk_col,
+                    f'{parts[0]}.{parent_table}',
+                ))
+
+    return grandchildren, direct_fks
+
+
+def _pre_delete_dependents(project_id: int) -> None:
+    """
+    Delete all rows that reference the given project, across all FK chains.
+
+    Queries pg_constraint to discover dependencies at runtime — no static
+    table list to maintain.
+    """
+    with connection.cursor() as cur:
+        grandchildren, direct_fks = _get_fk_dependents(
+            cur, 'landscape', 'tbl_project'
+        )
+
+        # Phase 1: Delete grandchildren (rows that FK into direct children
+        # of tbl_project, not directly into tbl_project itself).
+        # E.g., thread_message → chat_thread → tbl_project
+        #        core_doc_text → core_doc → tbl_project
+        seen_gc = set()
+        for gc_table, gc_fk_col, parent_table in grandchildren:
+            # Skip self-referencing or already-processed
+            key = (gc_table, gc_fk_col)
+            if key in seen_gc or gc_table == parent_table:
+                continue
+            seen_gc.add(key)
+
+            # Find the parent's FK column to tbl_project
+            parent_fk = None
+            for dt, dc in direct_fks:
+                if dt == parent_table:
+                    parent_fk = dc
+                    break
+
+            if not parent_fk:
+                continue
+
+            # Find the parent's PK column (what the grandchild FK references)
+            parent_parts = parent_table.split('.')
+            try:
+                cur.execute("""
+                    SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid
+                                        AND a.attnum = ANY(i.indkey)
+                    JOIN pg_class c ON c.oid = i.indrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE i.indisprimary
+                      AND n.nspname = %s
+                      AND c.relname = %s
+                    LIMIT 1
+                """, [parent_parts[0], parent_parts[1]])
+                pk_row = cur.fetchone()
+                if not pk_row:
+                    continue
+                parent_pk = pk_row[0]
+            except Exception:
+                continue
+
+            try:
+                cur.execute(
+                    f'DELETE FROM {gc_table} '
+                    f'WHERE {gc_fk_col} IN ('
+                    f'  SELECT {parent_pk} FROM {parent_table} '
+                    f'  WHERE {parent_fk} = %s'
+                    f')',
+                    [project_id],
+                )
+                if cur.rowcount > 0:
+                    logger.debug(
+                        'Pre-delete: removed %d rows from %s (via %s) for project %s',
+                        cur.rowcount, gc_table, parent_table, project_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    'Pre-delete: grandchild %s via %s failed: %s',
+                    gc_table, parent_table, exc,
+                )
+
+        # Phase 2: Delete direct children of tbl_project
+        for table, fk_col in direct_fks:
+            try:
+                cur.execute(
+                    f'DELETE FROM {table} WHERE {fk_col} = %s',
+                    [project_id],
+                )
+                if cur.rowcount > 0:
+                    logger.debug(
+                        'Pre-delete: removed %d rows from %s for project %s',
+                        cur.rowcount, table, project_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    'Pre-delete: skipped %s for project %s: %s',
+                    table, project_id, exc,
+                )
+
+
 class ProjectViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Project CRUD operations.
@@ -161,8 +339,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-        # Hard-delete — CASCADE handles all project-scoped data
-        project.delete()
+        # Pre-delete rows from managed=False tables whose DB-level CASCADE
+        # constraints may be missing.  This mirrors the FK_CHAIN logic in
+        # cleanup_test_projects management command.  Order: children first.
+        _pre_delete_dependents(project_id)
+
+        # Raw SQL delete — bypasses ORM cascade which fails on managed=False
+        # models pointing at non-existent tables (e.g. tbl_container).
+        with connection.cursor() as cur:
+            cur.execute(
+                'DELETE FROM landscape.tbl_project WHERE project_id = %s',
+                [project_id],
+            )
 
         logger.info('Project "%s" (id=%s) permanently deleted.', project_name, project_id)
 

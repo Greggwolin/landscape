@@ -2793,6 +2793,7 @@ def get_landscaper_response(
         _pid = project_context.get('project_id')
 
         if tool_executor:
+            include_extraction = False  # Default for unassigned threads; overridden below for project-scoped
             if _pid is None:
                 # Unassigned thread — only safe tools (no project context)
                 available_tool_names = get_tools_for_unassigned()

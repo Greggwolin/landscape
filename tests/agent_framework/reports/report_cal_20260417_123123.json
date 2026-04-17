@@ -1,0 +1,457 @@
+{
+  "suite": "landscape_agents",
+  "mode": "calibration",
+  "started_at": "2026-04-17T19:29:51.858147+00:00",
+  "ended_at": "2026-04-17T19:31:23.719708+00:00",
+  "elapsed_s": 91.9,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 1,
+    "scenarios_failed": 0,
+    "validations_total": 28,
+    "validations_passed": 28,
+    "validations_failed": 0
+  },
+  "scenarios": [
+    {
+      "scenario": "s1_document_extraction",
+      "status": "pass",
+      "error": null,
+      "started_at": "2026-04-17T19:29:51.930579+00:00",
+      "ended_at": "2026-04-17T19:31:23.718544+00:00",
+      "elapsed_s": 91.8,
+      "steps_passed": 12,
+      "steps_failed": 0,
+      "steps_total": 12,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:29:51.930584+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "check_file",
+          "description": "Test PDF: Torrance_rent_roll_itemized-20251219h.pdf",
+          "details": {},
+          "status": "pass",
+          "timestamp": "2026-04-17T19:29:52.618159+00:00",
+          "result": "Found: Torrance_rent_roll_itemized-20251219h.pdf (69436 bytes)"
+        },
+        {
+          "step_num": 3,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S1_Doc_Extraction",
+          "details": {
+            "project_name": "AGENT_TEST_S1_Doc_Extraction",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Torrance",
+            "state": "CA",
+            "project_id": 840,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:29:52.618222+00:00",
+          "result": "Project created: id=840"
+        },
+        {
+          "step_num": 4,
+          "type": "upload_document",
+          "description": "Uploading: Torrance_rent_roll_itemized-20251219h.pdf",
+          "details": {
+            "file_path": "/Users/5150east/landscape/test-docs/Multifamily/Torrance_rent_roll_itemized-20251219h.pdf",
+            "doc_type": "Rent Roll",
+            "run_full_extraction": true,
+            "doc_id": "739",
+            "fields_staged": 0,
+            "auto_approved": 0,
+            "duplicate": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:29:53.129720+00:00",
+          "result": "Uploaded doc_id=739"
+        },
+        {
+          "step_num": 5,
+          "type": "poll_staging",
+          "description": "Polling extraction staging",
+          "details": {
+            "project_id": 840,
+            "doc_id": "739",
+            "timeout": 120,
+            "field_count": 4,
+            "status_counts": {
+              "pending": 4
+            },
+            "scope_counts": {
+              "project": 4
+            }
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:29:59.061411+00:00",
+          "result": "Staging has 4 fields after 9.7s"
+        },
+        {
+          "step_num": 6,
+          "type": "accept_staging",
+          "description": "Accepting all pending staging rows",
+          "details": {
+            "project_id": 840,
+            "success": true,
+            "updated": 4
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:08.721243+00:00",
+          "result": "Accepted 0 staging rows"
+        },
+        {
+          "step_num": 7,
+          "type": "commit_staging",
+          "description": "Committing staging rows",
+          "details": {
+            "commit_all_accepted": true,
+            "success": true,
+            "committed": 4,
+            "failed": 0,
+            "errors": []
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:08.841287+00:00",
+          "result": "Committed 4 fields"
+        },
+        {
+          "step_num": 8,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "mf_property",
+            "project_id": 840,
+            "thread_id": "83983494-73cb-4913-bb0b-999f327b47fd",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:10.347967+00:00",
+          "result": "Thread created: 83983494-73cb-4913-bb0b-999f327b47fd"
+        },
+        {
+          "step_num": 9,
+          "type": "send_message",
+          "description": "Sending: \"How many units does this property have based on the uploaded documents?\"",
+          "details": {
+            "thread_id": "83983494-73cb-4913-bb0b-999f327b47fd",
+            "page_context": "mf_property",
+            "elapsed_s": 22.7,
+            "tools_called": [
+              "get_document_content",
+              "get_project_documents",
+              "get_document_content"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 632
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:11.069965+00:00",
+          "result": "Response received in 22.7s"
+        },
+        {
+          "step_num": 10,
+          "type": "send_message",
+          "description": "Sending: \"Summarize what you know about this property from the rent roll.\"",
+          "details": {
+            "thread_id": "83983494-73cb-4913-bb0b-999f327b47fd",
+            "page_context": "mf_property",
+            "elapsed_s": 21.2,
+            "tools_called": [
+              "get_document_content"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1138
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:33.732827+00:00",
+          "result": "Response received in 21.2s"
+        },
+        {
+          "step_num": 11,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 28,
+            "validations_failed": 0
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:54.907239+00:00",
+          "result": "S1 complete: 28/28 checks passed"
+        },
+        {
+          "step_num": 12,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": [
+              840
+            ]
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:30:54.907609+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 840,
+      "thread_id": "83983494-73cb-4913-bb0b-999f327b47fd",
+      "calibration_mode": true
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s1_document_extraction",
+      "total": 28,
+      "passed": 28,
+      "failed": 0,
+      "all_passed": true,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": true,
+          "message": "Calibration: project_id = 840",
+          "actual": 840,
+          "calibration_value": 840
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:upload_success",
+          "passed": true,
+          "message": "upload_success: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:doc_id_returned",
+          "passed": true,
+          "message": "doc_id_returned: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:doc_id",
+          "passed": true,
+          "message": "Calibration: doc_id = '739'",
+          "actual": "739",
+          "calibration_value": "739"
+        },
+        {
+          "name": "calibrate:extraction_triggered",
+          "passed": true,
+          "message": "Calibration: extraction_triggered = True",
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:fields_staged",
+          "passed": true,
+          "message": "Calibration: fields_staged = 0",
+          "actual": 0,
+          "calibration_value": 0
+        },
+        {
+          "name": "calibrate:extraction_field_count",
+          "passed": true,
+          "message": "Calibration: extraction_field_count = 4",
+          "actual": 4,
+          "calibration_value": 4
+        },
+        {
+          "name": "field_equals:has_extractions",
+          "passed": true,
+          "message": "has_extractions: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:extracted_field_keys",
+          "passed": true,
+          "message": "Calibration: extracted_field_keys = ['property_name', 'street_address', 'total_units', 'zip_code']",
+          "actual": [
+            "property_name",
+            "street_address",
+            "total_units",
+            "zip_code"
+          ],
+          "calibration_value": [
+            "property_name",
+            "street_address",
+            "total_units",
+            "zip_code"
+          ]
+        },
+        {
+          "name": "field_equals:field_present:property_name",
+          "passed": true,
+          "message": "field_present:property_name: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:field_present:street_address",
+          "passed": true,
+          "message": "field_present:street_address: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:field_present:zip_code",
+          "passed": true,
+          "message": "field_present:zip_code: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:avg_confidence",
+          "passed": true,
+          "message": "Calibration: avg_confidence = 0.9",
+          "actual": 0.9,
+          "calibration_value": 0.9
+        },
+        {
+          "name": "field_equals:avg_confidence_above_50pct",
+          "passed": true,
+          "message": "avg_confidence_above_50pct: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:status_counts",
+          "passed": true,
+          "message": "Calibration: status_counts = {'pending': 4}",
+          "actual": {
+            "pending": 4
+          },
+          "calibration_value": {
+            "pending": 4
+          }
+        },
+        {
+          "name": "calibrate:accepted_count",
+          "passed": true,
+          "message": "Calibration: accepted_count = 0",
+          "actual": 0,
+          "calibration_value": 0
+        },
+        {
+          "name": "calibrate:committed_count",
+          "passed": true,
+          "message": "Calibration: committed_count = 4",
+          "actual": 4,
+          "calibration_value": 4
+        },
+        {
+          "name": "field_equals:commit_success",
+          "passed": true,
+          "message": "commit_success: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:committed_gt_zero",
+          "passed": true,
+          "message": "committed_gt_zero: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "calibrate:question_1_response_length",
+          "passed": true,
+          "message": "Calibration: question_1_response_length = 632",
+          "actual": 632,
+          "calibration_value": 632
+        },
+        {
+          "name": "calibrate:question_1_tools_called",
+          "passed": true,
+          "message": "Calibration: question_1_tools_called = ['get_document_content', 'get_project_documents', 'get_document_content']",
+          "actual": [
+            "get_document_content",
+            "get_project_documents",
+            "get_document_content"
+          ],
+          "calibration_value": [
+            "get_document_content",
+            "get_project_documents",
+            "get_document_content"
+          ]
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:rent",
+          "passed": true,
+          "message": "Keyword \"rent\" found in response",
+          "expected": "Response contains \"rent\"",
+          "actual": "Found in 1138-char response"
+        },
+        {
+          "name": "calibrate:question_2_response_length",
+          "passed": true,
+          "message": "Calibration: question_2_response_length = 1138",
+          "actual": 1138,
+          "calibration_value": 1138
+        },
+        {
+          "name": "calibrate:question_2_tools_called",
+          "passed": true,
+          "message": "Calibration: question_2_tools_called = ['get_document_content']",
+          "actual": [
+            "get_document_content"
+          ],
+          "calibration_value": [
+            "get_document_content"
+          ]
+        }
+      ]
+    }
+  ]
+}

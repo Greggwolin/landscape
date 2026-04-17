@@ -1,0 +1,49 @@
+{
+  "calibrate:project_id": 841,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "calibrate:modal_result:property_details": {
+    "success": true,
+    "action": "open_modal",
+    "modal_name": "property_details",
+    "context": {},
+    "message": "Opening Property Details for editing."
+  },
+  "calibrate:modal_result:rent_roll": {
+    "success": true,
+    "action": "open_modal",
+    "modal_name": "rent_roll",
+    "context": {},
+    "message": "Opening Rent Roll for editing."
+  },
+  "calibrate:modal_result:operating_statement": {
+    "success": true,
+    "action": "open_modal",
+    "modal_name": "operating_statement",
+    "context": {},
+    "message": "Opening Operating Statement for editing."
+  },
+  "calibrate:modal_result:income_approach": {
+    "success": true,
+    "action": "open_modal",
+    "modal_name": "income_approach",
+    "context": {},
+    "message": "Opening Income Approach for editing."
+  },
+  "calibrate:question_1_response_length": 1020,
+  "calibrate:question_1_tools_called": [
+    "get_multifamily_property",
+    "get_units",
+    "get_revenue_rent",
+    "get_income_approach"
+  ],
+  "calibrate:question_2_response_length": 690,
+  "calibrate:question_2_tools_called": [
+    "get_multifamily_property",
+    "get_units",
+    "get_revenue_rent",
+    "get_revenue_other",
+    "get_income_approach",
+    "get_project_fields"
+  ]
+}

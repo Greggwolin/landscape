@@ -47,6 +47,11 @@ def open_input_modal(modal_name: str = None, context: dict = None, **kwargs):
         modal_name: One of the modal keys listed above
         context: Optional dict with context for the modal (e.g., {"tab": "details"})
     """
+    # tool_input comes via **kwargs from execute_tool() — extract params from it
+    tool_input = kwargs.get('tool_input', {})
+    modal_name = modal_name or tool_input.get('modal_name')
+    context = context or tool_input.get('context')
+
     if not modal_name:
         return {
             'success': False,

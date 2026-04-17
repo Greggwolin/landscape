@@ -1,0 +1,40 @@
+{
+  "calibrate:project_id": 840,
+  "field_equals:project_created": true,
+  "field_equals:upload_success": true,
+  "field_equals:doc_id_returned": true,
+  "calibrate:doc_id": "739",
+  "calibrate:extraction_triggered": true,
+  "calibrate:fields_staged": 0,
+  "calibrate:extraction_field_count": 4,
+  "field_equals:has_extractions": true,
+  "calibrate:extracted_field_keys": [
+    "property_name",
+    "street_address",
+    "total_units",
+    "zip_code"
+  ],
+  "field_equals:field_present:property_name": true,
+  "field_equals:field_present:street_address": true,
+  "field_equals:field_present:zip_code": true,
+  "calibrate:avg_confidence": 0.9,
+  "field_equals:avg_confidence_above_50pct": true,
+  "calibrate:status_counts": {
+    "pending": 4
+  },
+  "calibrate:accepted_count": 0,
+  "calibrate:committed_count": 4,
+  "field_equals:commit_success": true,
+  "field_equals:committed_gt_zero": true,
+  "field_equals:thread_created": true,
+  "calibrate:question_1_response_length": 632,
+  "calibrate:question_1_tools_called": [
+    "get_document_content",
+    "get_project_documents",
+    "get_document_content"
+  ],
+  "calibrate:question_2_response_length": 1138,
+  "calibrate:question_2_tools_called": [
+    "get_document_content"
+  ]
+}
