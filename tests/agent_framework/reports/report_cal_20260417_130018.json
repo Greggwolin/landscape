@@ -1,0 +1,595 @@
+{
+  "suite": "landscape_agents",
+  "mode": "calibration",
+  "started_at": "2026-04-17T19:56:39.285861+00:00",
+  "ended_at": "2026-04-17T20:00:18.701411+00:00",
+  "elapsed_s": 219.4,
+  "summary": {
+    "scenarios_total": 1,
+    "scenarios_passed": 1,
+    "scenarios_failed": 0,
+    "validations_total": 33,
+    "validations_passed": 33,
+    "validations_failed": 0
+  },
+  "scenarios": [
+    {
+      "scenario": "s3_financial_queries",
+      "status": "pass",
+      "error": null,
+      "started_at": "2026-04-17T19:56:39.357567+00:00",
+      "ended_at": "2026-04-17T20:00:18.698521+00:00",
+      "elapsed_s": 219.3,
+      "steps_passed": 15,
+      "steps_failed": 0,
+      "steps_total": 15,
+      "steps": [
+        {
+          "step_num": 1,
+          "type": "auth",
+          "description": "Authenticating",
+          "details": {
+            "username": "noel",
+            "endpoint": "http://localhost:8000/api/token/"
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:56:39.357572+00:00",
+          "result": "Authenticated successfully"
+        },
+        {
+          "step_num": 2,
+          "type": "check_file",
+          "description": "Test PDF: 14105 Chadron Ave_OM_2025[nopics].pdf",
+          "details": {},
+          "status": "pass",
+          "timestamp": "2026-04-17T19:56:40.047254+00:00",
+          "result": "Found: 14105 Chadron Ave_OM_2025[nopics].pdf (1413098 bytes)"
+        },
+        {
+          "step_num": 3,
+          "type": "create_project",
+          "description": "Creating project: AGENT_TEST_S3_Financial_Queries",
+          "details": {
+            "project_name": "AGENT_TEST_S3_Financial_Queries",
+            "project_type_code": "MF",
+            "analysis_purpose": "VALUATION",
+            "analysis_perspective": "INVESTMENT",
+            "city": "Hawthorne",
+            "state": "CA",
+            "project_id": 843,
+            "analysis_mode": "napkin",
+            "value_add_enabled": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:56:40.047325+00:00",
+          "result": "Project created: id=843"
+        },
+        {
+          "step_num": 4,
+          "type": "upload_document",
+          "description": "Uploading: 14105 Chadron Ave_OM_2025[nopics].pdf",
+          "details": {
+            "file_path": "/Users/5150east/landscape/test-docs/Multifamily/14105 Chadron Ave_OM_2025[nopics].pdf",
+            "doc_type": "Offering Memorandum",
+            "run_full_extraction": true,
+            "doc_id": "741",
+            "fields_staged": 0,
+            "auto_approved": 0,
+            "duplicate": false
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:56:41.453117+00:00",
+          "result": "Uploaded doc_id=741"
+        },
+        {
+          "step_num": 5,
+          "type": "poll_staging",
+          "description": "Polling extraction staging",
+          "details": {
+            "project_id": 843,
+            "doc_id": "741",
+            "timeout": 120,
+            "field_count": 16,
+            "status_counts": {
+              "pending": 16
+            },
+            "scope_counts": {
+              "mf_property": 1,
+              "project": 15
+            }
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:56:59.669802+00:00",
+          "result": "Staging has 16 fields after 31.7s"
+        },
+        {
+          "step_num": 6,
+          "type": "accept_staging",
+          "description": "Accepting all pending staging rows",
+          "details": {
+            "project_id": 843,
+            "success": true,
+            "updated": 18
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:57:31.410735+00:00",
+          "result": "Accepted 0 staging rows"
+        },
+        {
+          "step_num": 7,
+          "type": "commit_staging",
+          "description": "Committing staging rows",
+          "details": {
+            "commit_all_accepted": true,
+            "success": true,
+            "committed": 18,
+            "failed": 0,
+            "errors": []
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:57:31.524676+00:00",
+          "result": "Committed 18 fields"
+        },
+        {
+          "step_num": 8,
+          "type": "create_thread",
+          "description": "Creating thread",
+          "details": {
+            "page_context": "mf_operations",
+            "project_id": 843,
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "created": true
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:57:39.178130+00:00",
+          "result": "Thread created: 8dc8d144-2ffb-4093-b343-35cd2f98df02"
+        },
+        {
+          "step_num": 9,
+          "type": "send_message",
+          "description": "Sending: \"Based on the offering memorandum I uploaded, what is the current gross income and net operating income for this property...\"",
+          "details": {
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "page_context": "mf_operations",
+            "elapsed_s": 37.8,
+            "tools_called": [
+              "get_document_content",
+              "get_document_page",
+              "get_document_content",
+              "query_platform_knowledge",
+              "ingest_document",
+              "get_document_assertions"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1572
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:57:39.810704+00:00",
+          "result": "Response received in 37.8s"
+        },
+        {
+          "step_num": 10,
+          "type": "send_message",
+          "description": "Sending: \"What are the main operating expense categories and their amounts from the uploaded documents?\"",
+          "details": {
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "page_context": "mf_operations",
+            "elapsed_s": 31.5,
+            "tools_called": [
+              "get_document_content",
+              "get_document_page",
+              "query_platform_knowledge"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1521
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:58:17.569744+00:00",
+          "result": "Response received in 31.5s"
+        },
+        {
+          "step_num": 11,
+          "type": "send_message",
+          "description": "Sending: \"What is the average rent per unit and the total unit count for this property based on the documents?\"",
+          "details": {
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "page_context": "mf_property",
+            "elapsed_s": 22.0,
+            "tools_called": [
+              "get_document_content"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 1107
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:58:49.096871+00:00",
+          "result": "Response received in 22.0s"
+        },
+        {
+          "step_num": 12,
+          "type": "send_message",
+          "description": "Sending: \"Run a what-if scenario for this property: assume a purchase price of $5,000,000, 5-year hold period, 3% annual rent grow...\"",
+          "details": {
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "page_context": "mf_valuation",
+            "elapsed_s": 21.4,
+            "tools_called": [
+              "whatif_compute",
+              "whatif_compound",
+              "whatif_compound",
+              "whatif_compound"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 827
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:59:11.106987+00:00",
+          "result": "Response received in 21.4s"
+        },
+        {
+          "step_num": 13,
+          "type": "send_message",
+          "description": "Sending: \"Run a sensitivity analysis on cap rate for this property. Show me how the value changes across cap rates from 4.5% to 6....\"",
+          "details": {
+            "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+            "page_context": "mf_valuation",
+            "elapsed_s": 18.1,
+            "tools_called": [
+              "sensitivity_grid"
+            ],
+            "has_mutation": false,
+            "assistant_content_length": 947
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:59:32.539985+00:00",
+          "result": "Response received in 18.1s"
+        },
+        {
+          "step_num": 14,
+          "type": "summary",
+          "description": "Scenario complete",
+          "details": {
+            "validations_passed": 33,
+            "validations_failed": 0
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:59:50.627757+00:00",
+          "result": "S3 complete: 33/33 checks passed"
+        },
+        {
+          "step_num": 15,
+          "type": "cleanup",
+          "description": "Cleaning up 1 test project(s)",
+          "details": {
+            "project_ids": [
+              843
+            ]
+          },
+          "status": "pass",
+          "timestamp": "2026-04-17T19:59:50.627891+00:00",
+          "result": "Cleanup complete"
+        }
+      ],
+      "project_id": 843,
+      "thread_id": "8dc8d144-2ffb-4093-b343-35cd2f98df02",
+      "calibration_mode": true
+    }
+  ],
+  "validations": [
+    {
+      "scenario": "s3_financial_queries",
+      "total": 33,
+      "passed": 33,
+      "failed": 0,
+      "all_passed": true,
+      "results": [
+        {
+          "name": "calibrate:project_id",
+          "passed": true,
+          "message": "Calibration: project_id = 843",
+          "actual": 843,
+          "calibration_value": 843
+        },
+        {
+          "name": "field_equals:project_created",
+          "passed": true,
+          "message": "project_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:upload_success",
+          "passed": true,
+          "message": "upload_success: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:doc_id_returned",
+          "passed": true,
+          "message": "doc_id_returned: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:doc_id",
+          "passed": true,
+          "message": "Calibration: doc_id = '741'",
+          "actual": "741",
+          "calibration_value": "741"
+        },
+        {
+          "name": "calibrate:fields_staged",
+          "passed": true,
+          "message": "Calibration: fields_staged = 0",
+          "actual": 0,
+          "calibration_value": 0
+        },
+        {
+          "name": "calibrate:extraction_field_count",
+          "passed": true,
+          "message": "Calibration: extraction_field_count = 16",
+          "actual": 16,
+          "calibration_value": 16
+        },
+        {
+          "name": "field_equals:has_extractions",
+          "passed": true,
+          "message": "has_extractions: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "calibrate:extracted_field_keys",
+          "passed": true,
+          "message": "Calibration: extracted_field_keys = ['apn_primary', 'asking_price', 'bike_score', 'county', 'current_vacancy_rate', 'listing_brokerage', 'lot_size_sf', 'number_of_buildings', 'proforma_vacancy_rate', 'property_name', 'stories', 'street_address', 'total_units', 'walk_score', 'year_built', 'zip_code']",
+          "actual": [
+            "apn_primary",
+            "asking_price",
+            "bike_score",
+            "county",
+            "current_vacancy_rate",
+            "listing_brokerage",
+            "lot_size_sf",
+            "number_of_buildings",
+            "proforma_vacancy_rate",
+            "property_name",
+            "stories",
+            "street_address",
+            "total_units",
+            "walk_score",
+            "year_built",
+            "zip_code"
+          ],
+          "calibration_value": [
+            "apn_primary",
+            "asking_price",
+            "bike_score",
+            "county",
+            "current_vacancy_rate",
+            "listing_brokerage",
+            "lot_size_sf",
+            "number_of_buildings",
+            "proforma_vacancy_rate",
+            "property_name",
+            "stories",
+            "street_address",
+            "total_units",
+            "walk_score",
+            "year_built",
+            "zip_code"
+          ]
+        },
+        {
+          "name": "calibrate:accepted_count",
+          "passed": true,
+          "message": "Calibration: accepted_count = 0",
+          "actual": 0,
+          "calibration_value": 0
+        },
+        {
+          "name": "calibrate:committed_count",
+          "passed": true,
+          "message": "Calibration: committed_count = 18",
+          "actual": 18,
+          "calibration_value": 18
+        },
+        {
+          "name": "field_equals:commit_success",
+          "passed": true,
+          "message": "commit_success: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "field_equals:thread_created",
+          "passed": true,
+          "message": "thread_created: match",
+          "expected": true,
+          "actual": true,
+          "calibration_value": true
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:income",
+          "passed": true,
+          "message": "Keyword \"income\" found in response",
+          "expected": "Response contains \"income\"",
+          "actual": "Found in 1572-char response"
+        },
+        {
+          "name": "calibrate:income_summary_tools",
+          "passed": true,
+          "message": "Calibration: income_summary_tools = ['get_document_content', 'get_document_page', 'get_document_content', 'query_platform_knowledge', 'ingest_document', 'get_document_assertions']",
+          "actual": [
+            "get_document_content",
+            "get_document_page",
+            "get_document_content",
+            "query_platform_knowledge",
+            "ingest_document",
+            "get_document_assertions"
+          ],
+          "calibration_value": [
+            "get_document_content",
+            "get_document_page",
+            "get_document_content",
+            "query_platform_knowledge",
+            "ingest_document",
+            "get_document_assertions"
+          ]
+        },
+        {
+          "name": "calibrate:income_summary_response_length",
+          "passed": true,
+          "message": "Calibration: income_summary_response_length = 1572",
+          "actual": 1572,
+          "calibration_value": 1572
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:expense",
+          "passed": true,
+          "message": "Keyword \"expense\" found in response",
+          "expected": "Response contains \"expense\"",
+          "actual": "Found in 1521-char response"
+        },
+        {
+          "name": "calibrate:expense_breakdown_tools",
+          "passed": true,
+          "message": "Calibration: expense_breakdown_tools = ['get_document_content', 'get_document_page', 'query_platform_knowledge']",
+          "actual": [
+            "get_document_content",
+            "get_document_page",
+            "query_platform_knowledge"
+          ],
+          "calibration_value": [
+            "get_document_content",
+            "get_document_page",
+            "query_platform_knowledge"
+          ]
+        },
+        {
+          "name": "calibrate:expense_breakdown_response_length",
+          "passed": true,
+          "message": "Calibration: expense_breakdown_response_length = 1521",
+          "actual": 1521,
+          "calibration_value": 1521
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:unit",
+          "passed": true,
+          "message": "Keyword \"unit\" found in response",
+          "expected": "Response contains \"unit\"",
+          "actual": "Found in 1107-char response"
+        },
+        {
+          "name": "calibrate:unit_economics_tools",
+          "passed": true,
+          "message": "Calibration: unit_economics_tools = ['get_document_content']",
+          "actual": [
+            "get_document_content"
+          ],
+          "calibration_value": [
+            "get_document_content"
+          ]
+        },
+        {
+          "name": "calibrate:unit_economics_response_length",
+          "passed": true,
+          "message": "Calibration: unit_economics_response_length = 1107",
+          "actual": 1107,
+          "calibration_value": 1107
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:irr",
+          "passed": true,
+          "message": "Keyword \"irr\" found in response",
+          "expected": "Response contains \"irr\"",
+          "actual": "Found in 827-char response"
+        },
+        {
+          "name": "calibrate:whatif_irr_tools",
+          "passed": true,
+          "message": "Calibration: whatif_irr_tools = ['whatif_compute', 'whatif_compound', 'whatif_compound', 'whatif_compound']",
+          "actual": [
+            "whatif_compute",
+            "whatif_compound",
+            "whatif_compound",
+            "whatif_compound"
+          ],
+          "calibration_value": [
+            "whatif_compute",
+            "whatif_compound",
+            "whatif_compound",
+            "whatif_compound"
+          ]
+        },
+        {
+          "name": "calibrate:whatif_irr_response_length",
+          "passed": true,
+          "message": "Calibration: whatif_irr_response_length = 827",
+          "actual": 827,
+          "calibration_value": 827
+        },
+        {
+          "name": "response_no_error",
+          "passed": true,
+          "message": "No error patterns",
+          "actual": "clean"
+        },
+        {
+          "name": "response_mentions:cap",
+          "passed": true,
+          "message": "Keyword \"cap\" found in response",
+          "expected": "Response contains \"cap\"",
+          "actual": "Found in 947-char response"
+        },
+        {
+          "name": "calibrate:sensitivity_cap_rate_tools",
+          "passed": true,
+          "message": "Calibration: sensitivity_cap_rate_tools = ['sensitivity_grid']",
+          "actual": [
+            "sensitivity_grid"
+          ],
+          "calibration_value": [
+            "sensitivity_grid"
+          ]
+        },
+        {
+          "name": "calibrate:sensitivity_cap_rate_response_length",
+          "passed": true,
+          "message": "Calibration: sensitivity_cap_rate_response_length = 947",
+          "actual": 947,
+          "calibration_value": 947
+        }
+      ]
+    }
+  ]
+}

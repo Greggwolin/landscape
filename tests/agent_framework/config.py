@@ -60,6 +60,7 @@ DEFAULT_ANALYSIS_PERSPECTIVE = 'INVESTMENT'
 # Relative to the repo root (landscape/)
 TEST_DOCS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'test-docs', 'Multifamily')
 S1_RENT_ROLL_PDF = os.path.join(TEST_DOCS_DIR, 'Torrance_rent_roll_itemized-20251219h.pdf')
+S3_OM_PDF = os.path.join(TEST_DOCS_DIR, '14105 Chadron Ave_OM_2025[nopics].pdf')
 
 # ── Extraction polling ──────────────────────────────────────────────────────
 EXTRACTION_POLL_INTERVAL = 3       # seconds between staging polls

@@ -1,0 +1,38 @@
+{
+  "calibrate:project_id": 844,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "calibrate:p1_tools": [
+    "update_project_field"
+  ],
+  "field_equals:p1_has_mutation": true,
+  "calibrate:p1_mutation_ids": {
+    "mutation_id": "ef0d7a51-add2-4034-8fd6-9cf58186474d"
+  },
+  "field_equals:p1_confirm_success": true,
+  "calibrate:p1_confirm_action": "confirmed",
+  "calibrate:p2_tools": [
+    "bulk_update_fields"
+  ],
+  "field_equals:p2_has_mutation": true,
+  "calibrate:p2_mutation_ids": {
+    "batch_id": "27af9223-b4ec-4377-9426-4c896e0c522a"
+  },
+  "field_equals:p2_confirm_success": true,
+  "calibrate:p2_batch_confirmed": 2,
+  "calibrate:p2_batch_failed": 0,
+  "field_equals:p2_batch_all_confirmed": true,
+  "calibrate:p3_tools": [
+    "update_project_field"
+  ],
+  "field_equals:p3_has_mutation": true,
+  "calibrate:p3_mutation_ids": {
+    "mutation_id": "498594a8-5497-48fa-bd61-5549bf62c071"
+  },
+  "field_equals:p3_skipped_confirm": true,
+  "calibrate:p4_tools": [
+    "get_project_fields"
+  ],
+  "field_equals:p4_name_verified": true,
+  "calibrate:p4_response_length": 58
+}

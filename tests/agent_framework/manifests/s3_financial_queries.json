@@ -1,0 +1,62 @@
+{
+  "calibrate:project_id": 843,
+  "field_equals:project_created": true,
+  "field_equals:upload_success": true,
+  "field_equals:doc_id_returned": true,
+  "calibrate:doc_id": "741",
+  "calibrate:fields_staged": 0,
+  "calibrate:extraction_field_count": 16,
+  "field_equals:has_extractions": true,
+  "calibrate:extracted_field_keys": [
+    "apn_primary",
+    "asking_price",
+    "bike_score",
+    "county",
+    "current_vacancy_rate",
+    "listing_brokerage",
+    "lot_size_sf",
+    "number_of_buildings",
+    "proforma_vacancy_rate",
+    "property_name",
+    "stories",
+    "street_address",
+    "total_units",
+    "walk_score",
+    "year_built",
+    "zip_code"
+  ],
+  "calibrate:accepted_count": 0,
+  "calibrate:committed_count": 18,
+  "field_equals:commit_success": true,
+  "field_equals:thread_created": true,
+  "calibrate:income_summary_tools": [
+    "get_document_content",
+    "get_document_page",
+    "get_document_content",
+    "query_platform_knowledge",
+    "ingest_document",
+    "get_document_assertions"
+  ],
+  "calibrate:income_summary_response_length": 1572,
+  "calibrate:expense_breakdown_tools": [
+    "get_document_content",
+    "get_document_page",
+    "query_platform_knowledge"
+  ],
+  "calibrate:expense_breakdown_response_length": 1521,
+  "calibrate:unit_economics_tools": [
+    "get_document_content"
+  ],
+  "calibrate:unit_economics_response_length": 1107,
+  "calibrate:whatif_irr_tools": [
+    "whatif_compute",
+    "whatif_compound",
+    "whatif_compound",
+    "whatif_compound"
+  ],
+  "calibrate:whatif_irr_response_length": 827,
+  "calibrate:sensitivity_cap_rate_tools": [
+    "sensitivity_grid"
+  ],
+  "calibrate:sensitivity_cap_rate_response_length": 947
+}

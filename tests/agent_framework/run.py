@@ -26,9 +26,10 @@ logging.basicConfig(
 SCENARIOS = {
     's1': 'scenario_s1',
     's2': 'scenario_s2',
+    's3': 'scenario_s3',
+    's4': 'scenario_s4',
     # Future:
-    # 's3': 'scenario_s3',
-    # 's4': 'scenario_s4',
+    # 's5': 'scenario_s5',
 }
 
 
@@ -48,6 +49,16 @@ def run_scenario(name: str, report: TestReport):
     elif name == 's2':
         from .scenario_s2 import ScenarioS2
         agent = ScenarioS2()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's3':
+        from .scenario_s3 import ScenarioS3
+        agent = ScenarioS3()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's4':
+        from .scenario_s4 import ScenarioS4
+        agent = ScenarioS4()
         result, validation = agent.get_results()
         report.add_scenario(result, validation)
     # Future scenario imports go here
