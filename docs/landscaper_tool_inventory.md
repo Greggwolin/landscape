@@ -3,7 +3,7 @@
 > Generated: 2026-04-17  
 > Branch: feature/unified-ui  
 > Source: `backend/apps/landscaper/tool_schemas.py`, `tool_registry.py`  
-> Tool count: **228**
+> Tool count: **233**
 
 ---
 
@@ -239,12 +239,17 @@
 | 226 | run_formula_integrity | Phase 2 of the Excel audit. Runs four integrity checks and returns a findings list with Sheet!Cell references: (2a) error cells like #REF!/#DIV/0!, (2b) broken references inside formulas, (2c) hardcoded numeric overri… | R | Universal | Any project, any page (+ pre-project) |
 | 227 | extract_assumptions | Phase 3 of the Excel audit. Scans the workbook for labeled input values (label-left-of-value heuristic) and writes them to ai_extraction_staging as pending rows with extraction_type='excel_audit_assumption'. Requires… | R | Universal | Any project, any page (+ pre-project) |
 | 228 | generate_map_artifact | Generate an interactive aerial/satellite map artifact centered on the project location. | R | Universal | Any page — surfaced on: Map |
+| 229 | log_alpha_feedback | Log user feedback (bug, suggestion, question) from chat. | W | Universal | Any page — surfaced on: Alpha Assistant (+ pre-project) |
+| 230 | store_appraisal_valuation | Store appraisal valuation conclusions (reconciled value, approach values, appraiser info) as project knowledge facts. | R | Universal | Any project, any page |
+| 231 | store_market_intelligence | Store market intelligence from an appraisal (sales volume, pricing trends, absorption, vacancy) as platform-level knowledge reusable across projects. | R | Universal | Any project, any page |
+| 232 | store_construction_benchmarks | Store construction cost benchmarks from an appraisal (cost per SF, site improvements, profit margins) as platform-level knowledge. | R | Universal | Any project, any page |
+| 233 | get_appraisal_knowledge | Query stored appraisal knowledge — project-level valuation facts or market-level benchmarks and intelligence. | R | Universal | Any project, any page |
 
 ## Group Summary
 
 | Group | Read | Write | Total |
 |-------|------|-------|-------|
-| Universal | 50 | 33 | 83 |
+| Universal | 54 | 34 | 88 |
 | Land Dev | 22 | 34 | 56 |
 | Multifamily | 11 | 13 | 24 |
 | Income Property | 7 | 5 | 12 |
@@ -252,7 +257,7 @@
 | Ingestion | 2 | 3 | 5 |
 | What-If / Scenario | 12 | 10 | 22 |
 | Admin | 6 | 8 | 14 |
-| **Total** | **115** | **113** | **228** |
+| **Total** | **119** | **114** | **233** |
 
 ## Registry Architecture
 
@@ -260,7 +265,7 @@
 
 Tools are assembled per request via `get_tools_for_page()`, which unions:
 
-1. **UNIVERSAL_TOOLS** (83 tools) — available on every page, every property type
+1. **UNIVERSAL_TOOLS** (88 tools) — available on every page, every property type
 2. **LAND_ONLY_TOOLS** (56 tools) — land dev projects only
 3. **MF_ONLY_TOOLS** (24 tools) — multifamily projects only
 4. **INCOME_PROPERTY_TOOLS** (12 tools) — MF + Office + Retail + Industrial
@@ -269,7 +274,7 @@ Tools are assembled per request via `get_tools_for_page()`, which unions:
 7. **WHATIF_TOOLS** (22 tools) — what-if / scenario / IC analysis
 8. **ADMIN_TOOLS** (14 tools) — admin configuration
 
-**UNASSIGNED_SAFE_TOOLS** (21 tools) — safe for pre-project threads (no `project_id`). These are a subset of the above groups, whitelisted for conversations before a project has been created.
+**UNASSIGNED_SAFE_TOOLS** (22 tools) — safe for pre-project threads (no `project_id`). These are a subset of the above groups, whitelisted for conversations before a project has been created.
 
 **`PAGE_TOOLS`** maps page contexts to tool names (22 page contexts):
 `mf_home`, `mf_property`, `mf_operations`, `mf_valuation`, `mf_capitalization`, `land_home`, `land_planning`, `land_budget`, `land_schedule`, `land_valuation`, `land_capitalization`, `documents`, `map`, `reports`, `alpha_assistant`, `dashboard`, `dms`, `benchmarks`, `admin`, `settings`, `ingestion`, `investment_committee`
