@@ -1,8 +1,8 @@
 """
 Compressed Landscaper tool schemas.
 
-Tool count: 233
-Estimated tokens: ~17,700
+Tool count: 241
+Estimated tokens: ~18,500
 """
 
 
@@ -4290,6 +4290,97 @@ LANDSCAPER_TOOLS = [
                 },
             },
             "required": ["scope"],
+        },
+    },
+    # ── P1 Analysis Tools (Apr 2026) ──
+    {
+        "name": "list_projects_summary",
+        "description": "List all active projects with key metrics (name, type, location, price, units/sf/acres, doc count). Works without project context.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "property_type": {"type": "string", "description": "Filter by project type code (LAND, MF, OFF, etc.)"},
+                "limit": {"type": "integer", "description": "Max projects to return (default 50)"},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_deal_summary",
+        "description": "Comprehensive project snapshot in one call: property basics, financials, debt, valuation, data summary. Replaces 6-8 sequential reads.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_data_completeness",
+        "description": "Check what data is populated vs missing for a project. Returns per-section completeness with missing field lists. Guides onboarding.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_project_metrics",
+        "description": "Trigger financial engine to compute IRR, NPV, budget variance, and investment metrics for a project.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_cash_flow",
+        "description": "Generate period-by-period cash flow schedule. Routes to LandDev or IncomeProperty service based on project type.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "detail_level": {
+                    "type": "string",
+                    "enum": ["summary", "annual", "monthly"],
+                    "description": "Level of detail (default: annual)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "generate_report_preview",
+        "description": "Generate a report as structured JSON for conversational narration. Use list_available_reports to find valid report codes.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "report_code": {"type": "string", "description": "Report code (e.g. RPT_01, RPT_06)"},
+            },
+            "required": ["report_code"],
+        },
+    },
+    {
+        "name": "export_report",
+        "description": "Generate a report as PDF or Excel file. Returns file metadata.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "report_code": {"type": "string", "description": "Report code (e.g. RPT_01)"},
+                "format": {
+                    "type": "string",
+                    "enum": ["pdf", "excel"],
+                    "description": "Export format (default: pdf)",
+                },
+            },
+            "required": ["report_code"],
+        },
+    },
+    {
+        "name": "list_available_reports",
+        "description": "List available reports for this project's property type. Returns report codes, names, categories, and data readiness.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
         },
     },
 ]

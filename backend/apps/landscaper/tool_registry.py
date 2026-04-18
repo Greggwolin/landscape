@@ -81,6 +81,15 @@ UNIVERSAL_TOOLS = [
     "extract_assumptions",
     # Map artifacts
     "generate_map_artifact",
+    # P1 Analysis tools (Apr 2026)
+    "list_projects_summary",
+    "get_deal_summary",
+    "get_data_completeness",
+    "calculate_project_metrics",
+    "calculate_cash_flow",
+    "generate_report_preview",
+    "export_report",
+    "list_available_reports",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -212,6 +221,8 @@ UNASSIGNED_SAFE_TOOLS = [
     # Ingestion tools (operate on doc_id + session, not project)
     "get_ingestion_staging", "update_staging_field",
     "approve_staging_field", "reject_staging_field", "explain_extraction",
+    # Analysis tools that work without project context
+    "list_projects_summary", "list_available_reports",
 ]
 
 
