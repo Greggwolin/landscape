@@ -794,3 +794,333 @@ def handle_list_available_reports(
     except Exception as e:
         logger.error(f"list_available_reports error: {e}", exc_info=True)
         return {'success': False, 'error': str(e)}
+
+
+# =============================================================================
+# 9. get_demographics — ring demographics around project location
+# =============================================================================
+
+@register_tool('get_demographics')
+def handle_get_demographics(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Get Census demographics (population, income, housing) for 1/3/5-mile rings
+    around the project location. Uses cached data if available, otherwise
+    calculates live from PostGIS.
+    """
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        # Get project coordinates
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT project_name, latitude, longitude
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [project_id])
+            row = cur.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Project {project_id} not found'}
+
+            project_name, lat, lon = row[0], row[1], row[2]
+
+        if lat is None or lon is None:
+            return {
+                'success': False,
+                'error': f'Project "{project_name}" has no coordinates set. '
+                         'Set latitude/longitude on the project before requesting demographics.',
+            }
+
+        # Optional custom radii from tool input
+        radii = tool_input.get('radii', [1, 3, 5])
+
+        from apps.location_intelligence.services.demographics_service import DemographicsService
+        service = DemographicsService()
+        result = service.get_ring_demographics(
+            lat=float(lat),
+            lon=float(lon),
+            radii=radii,
+        )
+
+        # Flatten ring data for Landscaper readability
+        rings_summary = []
+        for ring in result.get('rings', []):
+            rings_summary.append({
+                'radius_miles': ring.get('radius_miles'),
+                'population': ring.get('population'),
+                'households': ring.get('households'),
+                'median_household_income': _safe_float(ring.get('median_household_income')),
+                'median_home_value': _safe_float(ring.get('median_home_value')),
+                'median_age': _safe_float(ring.get('median_age')),
+                'owner_occupied_pct': _safe_float(ring.get('owner_occupied_pct')),
+                'renter_occupied_pct': _safe_float(ring.get('renter_occupied_pct')),
+                'vacancy_rate': _safe_float(ring.get('vacancy_rate')),
+            })
+
+        return {
+            'success': True,
+            'project_id': project_id,
+            'project_name': project_name,
+            'center': {'lat': float(lat), 'lon': float(lon)},
+            'source': result.get('source', 'US Census ACS 2023 5-Year'),
+            'rings': rings_summary,
+            'note': 'ACS 5-Year estimates average 2019-2023. Values lag current market by 2-3 years. '
+                    'Census median home value caps at ~$2M; supplement with MLS/Zillow for luxury markets.',
+        }
+
+    except Exception as e:
+        logger.error(f"get_demographics error: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+# =============================================================================
+# 10. calculate_waterfall — equity waterfall distribution
+# =============================================================================
+
+@register_tool('calculate_waterfall')
+def handle_calculate_waterfall(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Calculate equity waterfall distribution for a project.
+    Fetches tiers from tbl_waterfall_tier, generates cash flows via the
+    existing cash flow services, and runs through CalculationService.calculate_waterfall().
+    """
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        # --- Step 1: Get project type ---
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT project_name, project_type
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [project_id])
+            row = cur.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Project {project_id} not found'}
+            project_name, project_type = row[0], (row[1] or '').upper()
+
+        # --- Step 2: Fetch waterfall tiers ---
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT equity_structure_id FROM landscape.tbl_equity_structure
+                WHERE project_id = %s
+            """, [project_id])
+            eq_row = cur.fetchone()
+
+            if not eq_row:
+                return {
+                    'success': False,
+                    'error': f'No equity structure found for project "{project_name}". '
+                             'Set up waterfall tiers in the Capitalization tab first.',
+                }
+            equity_structure_id = eq_row[0]
+
+            cur.execute("""
+                SELECT tier_number, tier_name, hurdle_rate, irr_threshold_pct,
+                       equity_multiple_threshold, lp_split_pct, gp_split_pct,
+                       has_catch_up, catch_up_pct, catch_up_to_pct
+                FROM landscape.tbl_waterfall_tier
+                WHERE equity_structure_id = %s OR project_id = %s
+                ORDER BY COALESCE(display_order, tier_number)
+            """, [equity_structure_id, project_id])
+
+            columns = [col[0] for col in cur.description]
+            tier_rows = cur.fetchall()
+
+        if not tier_rows:
+            return {
+                'success': False,
+                'error': f'No waterfall tiers defined for project "{project_name}".',
+            }
+
+        tiers = []
+        for r in tier_rows:
+            t = dict(zip(columns, r))
+            tiers.append({
+                'tier_number': t['tier_number'],
+                'tier_name': t.get('tier_name', f"Tier {t['tier_number']}"),
+                'irr_hurdle': float(t['irr_threshold_pct']) / 100.0 if t.get('irr_threshold_pct') else None,
+                'emx_hurdle': float(t['equity_multiple_threshold']) if t.get('equity_multiple_threshold') else None,
+                'promote_percent': 0,
+                'lp_split_pct': float(t['lp_split_pct']) if t.get('lp_split_pct') else 90,
+                'gp_split_pct': float(t['gp_split_pct']) if t.get('gp_split_pct') else 10,
+            })
+
+        # --- Step 3: Fetch waterfall settings from equity structure ---
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT hurdle_method, return_of_capital, gp_catch_up,
+                       lp_ownership_pct, preferred_return_pct
+                FROM landscape.tbl_equity_structure
+                WHERE equity_structure_id = %s
+            """, [equity_structure_id])
+            es_row = cur.fetchone()
+
+        settings = {}
+        if es_row:
+            settings = {
+                'hurdle_method': es_row[0] or 'IRR',
+                'return_of_capital': es_row[1] or 'Pari Passu',
+                'gp_catch_up': bool(es_row[2]) if es_row[2] is not None else True,
+                'lp_ownership': float(es_row[3]) / 100.0 if es_row[3] else 0.90,
+                'preferred_return_pct': float(es_row[4]) if es_row[4] else 8,
+                'num_tiers': len(tiers),
+            }
+        else:
+            settings = {
+                'hurdle_method': 'IRR',
+                'return_of_capital': 'Pari Passu',
+                'gp_catch_up': True,
+                'lp_ownership': 0.90,
+                'preferred_return_pct': 8,
+                'num_tiers': len(tiers),
+            }
+
+        # --- Step 4: Generate cash flows ---
+        if project_type == 'LAND':
+            from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+            service = LandDevCashFlowService(project_id)
+            cf_data = service.calculate(include_financing=True)
+        else:
+            from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+            service = IncomePropertyCashFlowService(project_id)
+            cf_data = service.calculate(include_financing=True)
+
+        periods = cf_data.get('periods', [])
+        if not periods:
+            return {
+                'success': False,
+                'error': 'No cash flow periods generated. Ensure budget and revenue data exist.',
+            }
+
+        # Build waterfall cash flow input (period_id, date, amount)
+        from datetime import datetime as dt
+        waterfall_cfs = []
+        for i, p in enumerate(periods):
+            p_date = p.get('startDate') or p.get('start_date')
+            if isinstance(p_date, str):
+                try:
+                    p_date = dt.strptime(p_date[:10], '%Y-%m-%d').strftime('%Y-%m-%d')
+                except Exception:
+                    p_date = f'2026-01-{(i+1):02d}'
+            waterfall_cfs.append({
+                'period_id': i + 1,
+                'date': p_date or f'2026-01-{(i+1):02d}',
+                'amount': float(p.get('net', 0) or p.get('netCashFlow', 0) or 0),
+            })
+
+        # --- Step 5: Run waterfall engine ---
+        from apps.calculations.services import CalculationService
+        result = CalculationService.calculate_waterfall(
+            tiers=tiers,
+            settings=settings,
+            cash_flows=waterfall_cfs,
+        )
+
+        if 'error' in result:
+            return {'success': False, 'error': result['error']}
+
+        return {
+            'success': True,
+            'project_id': project_id,
+            'project_name': project_name,
+            'project_type': project_type,
+            'tier_count': len(tiers),
+            'period_count': len(waterfall_cfs),
+            'settings': settings,
+            'result': result,
+        }
+
+    except Exception as e:
+        logger.error(f"calculate_waterfall error: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+# =============================================================================
+# 11. calculate_mf_cashflow — multifamily levered/unlevered IRR, NPV, DSCR
+# =============================================================================
+
+@register_tool('calculate_mf_cashflow')
+def handle_calculate_mf_cashflow(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Calculate multifamily cash flow metrics: levered/unlevered IRR, NPV,
+    equity multiple, and DSCR using the MultifamilyCashFlowAdapter.
+    MF projects only.
+    """
+    if not project_id:
+        return {'success': False, 'error': 'project_id is required'}
+
+    try:
+        # Verify project is MF type
+        with connection.cursor() as cur:
+            cur.execute("""
+                SELECT project_name, project_type
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [project_id])
+            row = cur.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Project {project_id} not found'}
+            project_name, project_type = row[0], (row[1] or '').upper()
+
+        if project_type != 'MF':
+            return {
+                'success': False,
+                'error': f'calculate_mf_cashflow is for Multifamily projects only. '
+                         f'Project "{project_name}" is type "{project_type}". '
+                         f'Use calculate_cash_flow for other project types.',
+            }
+
+        from apps.calculations.adapters.multifamily_adapter import MultifamilyCashFlowAdapter
+
+        adapter = MultifamilyCashFlowAdapter(project_id=project_id)
+        metrics = adapter.calculate_metrics()
+
+        if 'error' in metrics:
+            return {'success': False, 'error': metrics['error']}
+
+        # Build clean response (avoid sending raw monthly arrays unless requested)
+        include_monthly = tool_input.get('include_monthly', False)
+
+        result = {
+            'success': True,
+            'project_id': project_id,
+            'project_name': project_name,
+            'metrics': {
+                'unlevered_irr': _safe_float(metrics.get('unlevered_irr')),
+                'levered_irr': _safe_float(metrics.get('levered_irr')),
+                'unlevered_npv': _safe_float(metrics.get('unlevered_npv')),
+                'levered_npv': _safe_float(metrics.get('levered_npv')),
+                'equity_multiple': _safe_float(metrics.get('equity_multiple')),
+                'average_dscr': _safe_float(metrics.get('average_dscr')),
+            },
+            'assumptions': metrics.get('assumptions', {}),
+        }
+
+        if include_monthly:
+            cash_flows = metrics.get('cash_flows', {})
+            result['monthly_cash_flows'] = {
+                'unlevered': [float(x) for x in cash_flows.get('unlevered', [])],
+                'levered': [float(x) for x in cash_flows.get('levered', [])],
+                'noi': [float(x) for x in cash_flows.get('noi', [])],
+                'debt_service': [float(x) for x in cash_flows.get('debt_service', [])],
+            }
+
+        return result
+
+    except Exception as e:
+        logger.error(f"calculate_mf_cashflow error: {e}", exc_info=True)
+        return {'success': False, 'error': str(e)}

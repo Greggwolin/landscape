@@ -404,7 +404,7 @@ Django uses DRF serializers with consistent envelope:
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
 | 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
 | 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); legacy Next.js route retained as dead code |
-| 7 | Landscaper Chat | ✅ WORKS | 241 tools, thread-based, mutations; unassigned (pre-project) threads supported |
+| 7 | Landscaper Chat | ✅ WORKS | 244 tools, thread-based, mutations; unassigned (pre-project) threads supported |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
@@ -444,7 +444,7 @@ Django uses DRF serializers with consistent envelope:
 ### Landscaper Architecture
 
 - **Left panel** (320px, collapsible to 64px strip)
-- Claude AI with **241 registered tools** (`@register_tool` decorator, verified via registry inspection) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` + `open_input_modal` + 4 excel_audit tools added Apr 2026 + `generate_map_artifact` (interactive MapLibre maps in artifacts panel, with pin-placement input mode for projects missing coordinates) + 8 P1 analysis tools added Apr 2026 (`list_projects_summary`, `get_deal_summary`, `get_data_completeness`, `calculate_project_metrics`, `calculate_cash_flow`, `generate_report_preview`, `export_report`, `list_available_reports`)
+- Claude AI with **244 registered tools** (`@register_tool` decorator, verified via registry inspection) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` + `open_input_modal` + 4 excel_audit tools added Apr 2026 + `generate_map_artifact` (interactive MapLibre maps in artifacts panel, with pin-placement input mode for projects missing coordinates) + 8 P1 analysis tools added Apr 2026 (`list_projects_summary`, `get_deal_summary`, `get_data_completeness`, `calculate_project_metrics`, `calculate_cash_flow`, `generate_report_preview`, `export_report`, `list_available_reports`) + 3 P2 analysis tools added Apr 2026 (`get_demographics`, `calculate_waterfall`, `calculate_mf_cashflow`)
 - Level 2 Autonomy: propose mutations → user confirm/reject
 - Thread-based chat with per-page context awareness
 - RAG: DB-first queries → embedding retrieval → AI response
@@ -853,8 +853,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-17 (nightly sync — Chat Canvas / Unified UI architecture landed Apr 16: 8 commits, `/w/` route tree, unassigned Landscaper threads with nullable `project_id`, 3-panel PageShell layout, modal bridge system, DocumentsPanel refactor committed (+630 lines), ProjectHomepage with property badges; backend migration `0003_unassigned_threads.sql` + tool gap audit doc)*
+*Last updated: 2026-04-17 (nightly sync — Apr 17: 10 commits. P1 analysis tools added (8 new, 233→241). Test agent framework expanded (S5 map artifact, S6 unassigned threads, S8 ingestion, S10 negative testing). Thread search endpoint. `generate_map_artifact` tool. Wrapper sidebar simplified. Tool gap analysis doc. 5 missing tool schemas fixed. Calibration reports gitignored. Chat Canvas / Unified UI landed Apr 16.)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **241** (8 P1 analysis tools added Apr 17: list_projects_summary, get_deal_summary, get_data_completeness, calculate_project_metrics, calculate_cash_flow, generate_report_preview, export_report, list_available_reports). Includes 4 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 remain follow-on.*
+*Landscaper tool count: **244** (8 P1 + 3 P2 analysis tools. P1 Apr 17: list_projects_summary, get_deal_summary, get_data_completeness, calculate_project_metrics, calculate_cash_flow, generate_report_preview, export_report, list_available_reports. P2 Apr 20: get_demographics, calculate_waterfall, calculate_mf_cashflow). Includes 4 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*

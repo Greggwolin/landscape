@@ -90,6 +90,10 @@ UNIVERSAL_TOOLS = [
     "generate_report_preview",
     "export_report",
     "list_available_reports",
+    # P2 Analysis tools (Apr 2026)
+    "get_demographics",
+    "calculate_waterfall",
+    "calculate_mf_cashflow",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,

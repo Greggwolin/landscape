@@ -1,7 +1,7 @@
 """
 Compressed Landscaper tool schemas.
 
-Tool count: 241
+Tool count: 244
 Estimated tokens: ~18,500
 """
 
@@ -4380,6 +4380,44 @@ LANDSCAPER_TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_demographics",
+        "description": "Get Census demographics (population, income, housing) for 1/3/5-mile rings around the project location.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "radii": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": "Ring radii in miles (default: [1, 3, 5])",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_waterfall",
+        "description": "Calculate equity waterfall distribution. Reads tiers from Capitalization tab, generates cash flows, and runs the waterfall engine.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_mf_cashflow",
+        "description": "Calculate multifamily levered/unlevered IRR, NPV, equity multiple, and DSCR. MF projects only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "include_monthly": {
+                    "type": "boolean",
+                    "description": "Include monthly cash flow arrays in response (default: false)",
+                },
+            },
             "required": [],
         },
     },
