@@ -32,6 +32,9 @@ SCENARIOS = {
     's6': 'scenario_s6',
     's8': 'scenario_s8',
     's10': 'scenario_s10',
+    's11': 'scenario_s11',
+    's12': 'scenario_s12',
+    's13': 'scenario_s13',
 }
 
 
@@ -83,7 +86,21 @@ def run_scenario(name: str, report: TestReport):
         agent = ScenarioS10()
         result, validation = agent.get_results()
         report.add_scenario(result, validation)
-    # Future scenario imports go here
+    elif name == 's11':
+        from .scenario_s11 import ScenarioS11
+        agent = ScenarioS11()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's12':
+        from .scenario_s12 import ScenarioS12
+        agent = ScenarioS12()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's13':
+        from .scenario_s13 import ScenarioS13
+        agent = ScenarioS13()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
 
 
 def main():
