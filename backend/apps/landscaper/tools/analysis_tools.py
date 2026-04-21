@@ -917,13 +917,14 @@ def handle_calculate_waterfall(
 
         # Enrich with metadata for Landscaper response
         tier_config = result.get('tier_config', [])
+        period_results = result.get('period_results', [])
         return {
             'success': True,
             'project_id': project_id,
             'project_name': project_name,
             'project_type': project_type,
             'tier_count': len(tier_config),
-            'period_count': result.get('num_periods', 0),
+            'period_count': len(period_results),
             'settings': {
                 'num_tiers': len(tier_config),
             },

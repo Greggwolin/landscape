@@ -97,7 +97,6 @@ class ScenarioS12(BaseAgent):
                 self.validator.assert_field_equals(
                     'p1_has_settings', len(settings) > 0, True
                 )
-                self.validator.calibrate('p1_hurdle_method', settings.get('hurdle_method'))
 
                 # Check waterfall result object exists
                 wf_result = result.get('result', {})
