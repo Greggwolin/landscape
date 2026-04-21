@@ -1976,6 +1976,17 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                     user_id=_uid,
                 )
 
+            # Infer domain from thread's recent tool history when frontend sends 'home'
+            if page_context in ('home', 'general', None):
+                from apps.landscaper.ai_handler import _infer_thread_domain
+                inferred = _infer_thread_domain(messages)
+                if inferred:
+                    logger.info(
+                        f"[CONTEXT_INFER] Frontend sent '{page_context}', "
+                        f"inferred '{inferred}' from thread tool history"
+                    )
+                    page_context = inferred
+
             # Generate AI response with context-aware tool filtering
             ai_response = get_landscaper_response(
                 message_history,

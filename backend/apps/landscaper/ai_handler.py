@@ -829,6 +829,143 @@ def get_tools_for_context(
 
     return filtered_tools
 
+# Tool name → domain for thread context inference.
+# Used when frontend sends 'home' but thread history reveals a specific domain.
+TOOL_DOMAIN_MAP = {
+    # Valuation
+    'get_sales_comparables': 'valuation',
+    'add_sales_comparable': 'valuation',
+    'update_sales_comparable': 'valuation',
+    'delete_sales_comparable': 'valuation',
+    'get_cost_approach': 'valuation',
+    'update_cost_approach': 'valuation',
+    'get_income_approach': 'valuation',
+    'update_income_approach': 'valuation',
+    'get_expense_comparables': 'valuation',
+    'update_expense_comparables': 'valuation',
+    'get_reconciliation': 'valuation',
+    'update_reconciliation': 'valuation',
+    'calculate_waterfall': 'valuation',
+    'calculate_mf_cashflow': 'valuation',
+
+    # Property
+    'get_units': 'property',
+    'update_units': 'property',
+    'get_rent_roll': 'property',
+    'update_rent_roll': 'property',
+    'get_property_details': 'property',
+    'update_property_details': 'property',
+    'get_property_attributes': 'property',
+    'update_property_attributes': 'property',
+    'update_site_attribute': 'property',
+    'update_improvement_attribute': 'property',
+    'get_attribute_definitions': 'property',
+    'get_zoning_info': 'property',
+
+    # Operations
+    'get_operating_statement': 'operations',
+    'update_operating_expenses': 'operations',
+    'get_cashflow_results': 'operations',
+
+    # Capitalization
+    'get_equity_structure': 'capitalization',
+    'update_equity_structure': 'capitalization',
+    'get_loan_terms': 'capitalization',
+    'update_loan_terms': 'capitalization',
+
+    # Planning (land dev)
+    'get_land_use': 'planning',
+    'update_land_use': 'planning',
+    'update_land_use_pricing': 'planning',
+    'get_parcels': 'planning',
+    'update_parcels': 'planning',
+    'land_planning_run': 'planning',
+    'land_planning_save': 'planning',
+    'configure_hierarchy': 'planning',
+    'create_containers': 'planning',
+    'update_lot_mix': 'planning',
+    'update_absorption_schedule': 'planning',
+    'update_parcel_sale_event': 'planning',
+    'update_parcel_sale_assumptions': 'planning',
+
+    # Budget
+    'get_budget_items': 'budget',
+    'update_budget_items': 'budget',
+    'get_budget_summary': 'budget',
+
+    # Contacts
+    'get_project_contacts_v2': 'contacts',
+    'assign_contact_to_project': 'contacts',
+    'remove_contact_from_project': 'contacts',
+    'create_cabinet_contact': 'contacts',
+    'search_cabinet_contacts': 'contacts',
+    'extract_and_save_contacts': 'contacts',
+    'get_contact_roles': 'contacts',
+
+    # HBU
+    'create_hbu_scenario': 'hbu',
+    'get_hbu_scenarios': 'hbu',
+    'update_hbu_scenario': 'hbu',
+    'compare_hbu_scenarios': 'hbu',
+    'get_hbu_conclusion': 'hbu',
+    'generate_hbu_narrative': 'hbu',
+    'add_hbu_comparable_use': 'hbu',
+
+    # Demographics / Market
+    'get_demographics': 'market',
+    'generate_map_artifact': 'map',
+
+    # Documents / Ingestion
+    'get_ingestion_staging': 'ingestion',
+    'update_staging_field': 'ingestion',
+    'approve_staging_field': 'ingestion',
+    'reject_staging_field': 'ingestion',
+    'explain_extraction': 'ingestion',
+
+    # Reports
+    'generate_report_preview': 'reports',
+    'export_report': 'reports',
+    'list_available_reports': 'reports',
+}
+
+
+def _infer_thread_domain(messages: list, lookback: int = 5) -> Optional[str]:
+    """
+    Scan recent assistant messages' tool_calls to infer the conversation's
+    active domain. Returns the domain string if a clear majority of recent
+    tool calls belong to one domain, or None if ambiguous/no tools called.
+    """
+    domain_counts: Dict[str, int] = {}
+    scanned = 0
+
+    for msg in reversed(messages):
+        if scanned >= lookback:
+            break
+        if msg.role != 'assistant':
+            continue
+        if not msg.metadata or 'tool_calls' not in msg.metadata:
+            continue
+
+        scanned += 1
+        for tc in msg.metadata['tool_calls']:
+            tool_name = tc.get('tool', '')
+            domain = TOOL_DOMAIN_MAP.get(tool_name)
+            if domain:
+                domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+    if not domain_counts:
+        return None
+
+    sorted_domains = sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)
+    top_domain, top_count = sorted_domains[0]
+    total = sum(c for _, c in sorted_domains)
+
+    if len(sorted_domains) == 1 or (top_count / total) > 0.5:
+        return top_domain
+
+    return None
+
+
 _PAGE_MUTATION_HINTS = {
     "sales": (
         "MUTATION TOOLS FOR THIS PAGE:\n"
