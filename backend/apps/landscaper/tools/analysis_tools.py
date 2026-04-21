@@ -818,7 +818,7 @@ def handle_get_demographics(
         # Get project coordinates
         with connection.cursor() as cur:
             cur.execute("""
-                SELECT project_name, latitude, longitude
+                SELECT project_name, location_lat, location_lon
                 FROM landscape.tbl_project
                 WHERE project_id = %s
             """, [project_id])
