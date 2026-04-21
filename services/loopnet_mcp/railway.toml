@@ -1,0 +1,15 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/loopnet_mcp/Dockerfile"
+# Build context must be repo root so COPY has access to the correct path
+# Set this in Railway's service settings → Build → Docker Build Context = "/"
+
+[deploy]
+startCommand = "python server.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+[environments.production.variables]
+# Set PORT in Railway dashboard — defaults to 8080 in server.py
