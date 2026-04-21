@@ -43,6 +43,13 @@ interface WrapperUIContextValue {
   /** Active map artifact — set by Landscaper tool result, rendered in artifacts panel. */
   activeMapArtifact: MapArtifactConfig | null;
   setActiveMapArtifact: (config: MapArtifactConfig | null) => void;
+  /** Chat search overlay state. */
+  searchOpen: boolean;
+  openSearch: () => void;
+  closeSearch: () => void;
+  /** Content domain derived from the last modal opened — enriches page context for Landscaper. */
+  activeContentContext: string | null;
+  setActiveContentContext: (ctx: string | null) => void;
 }
 
 const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
@@ -56,6 +63,8 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(true);
   const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
   const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
   const [artifactsOpen, setArtifactsOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= ARTIFACTS_COLLAPSE_BREAKPOINT;
@@ -74,6 +83,8 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const openChat = useCallback(() => setChatOpen(true), []);
   const closeChat = useCallback(() => setChatOpen(false), []);
   const toggleArtifacts = useCallback(() => setArtifactsOpen((v) => !v), []);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
 
   return (
     <WrapperUIContext.Provider value={{
@@ -81,6 +92,8 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
       activeMapArtifact, setActiveMapArtifact,
+      searchOpen, openSearch, closeSearch,
+      activeContentContext, setActiveContentContext,
     }}>
       {children}
     </WrapperUIContext.Provider>

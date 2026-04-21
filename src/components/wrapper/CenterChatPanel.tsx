@@ -7,8 +7,29 @@ import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
+import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+/** Map open_input_modal names → Landscaper page context values. */
+const MODAL_TO_CONTEXT: Record<string, string> = {
+  operating_statement: 'operations',
+  rent_roll: 'property',
+  property_details: 'property',
+  budget: 'budget',
+  sales_comps: 'valuation',
+  cost_approach: 'valuation',
+  income_approach: 'valuation',
+  reconciliation: 'valuation',
+  loan_inputs: 'capitalization',
+  equity_structure: 'capitalization',
+  land_use: 'planning',
+  parcels: 'planning',
+  sales_absorption: 'planning',
+  renovation: 'property',
+  acquisition: 'capitalization',
+  // contacts and project_details don't change context — stay on 'home'
+};
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
@@ -41,7 +62,7 @@ interface CenterChatPanelProps {
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
 export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode }: CenterChatPanelProps) {
-  const { chatOpen, closeChat, openChat, setActiveMapArtifact, toggleArtifacts, artifactsOpen } = useWrapperUI();
+  const { chatOpen, closeChat, openChat, setActiveMapArtifact, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -64,6 +85,11 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         if (modalRegistry) {
           modalRegistry.openModal(result.modal_name, (result.context as Record<string, unknown>) || undefined);
         }
+        // Update content context for Landscaper page context enrichment
+        const derivedContext = MODAL_TO_CONTEXT[result.modal_name];
+        if (derivedContext) {
+          setActiveContentContext(derivedContext);
+        }
       }
       // Map artifact → push to artifacts panel
       if (toolName === 'generate_map_artifact' && result.action === 'show_map_artifact' && result.map_config) {
@@ -72,7 +98,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         if (!artifactsOpen) toggleArtifacts();
       }
     },
-    [modalRegistry, setActiveMapArtifact, artifactsOpen, toggleArtifacts],
+    [modalRegistry, setActiveMapArtifact, artifactsOpen, toggleArtifacts, setActiveContentContext],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)
@@ -143,7 +169,8 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     setHomepageThreadId(null);
     setThreadTitle(null);
     pendingMessageRef.current = null;
-  }, []);
+    setActiveContentContext(null);
+  }, [setActiveContentContext]);
 
   // Hover state for back-to-projects arrow
   const [backHover, setBackHover] = useState(false);
@@ -151,6 +178,8 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   if (!chatOpen && !isChatRoute) return null;
 
   const getPageContext = () => {
+    // If a modal has been opened, use its derived context (richer than pathname alone)
+    if (activeContentContext && isProjectRoot) return activeContentContext;
     if (showHomepage) return 'home';
     if (pathname.includes('/documents')) return 'documents';
     if (pathname.includes('/reports')) return 'reports';
@@ -251,6 +280,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           />
         )}
       </div>
+      <ChatSearchOverlay />
     </div>
   );
 }
