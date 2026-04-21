@@ -43,23 +43,20 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
     return 'default';
   };
 
+  const toggle = (
+    <button
+      className="wrapper-btn-icon"
+      onClick={toggleChat}
+      title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
+    >
+      <span style={{ fontSize: '18px' }}>☰</span>
+    </button>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       {/* ── Global Header Bar ── */}
-      <WrapperHeader>
-        <button
-          className="wrapper-btn-icon"
-          onClick={toggleChat}
-          title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
-        >
-          <span style={{ fontSize: '18px' }}>☰</span>
-        </button>
-        <span className="wrapper-header-title">{getPageTitle()}</span>
-        <div className="wrapper-header-spacer" />
-        <div className="wrapper-header-actions">
-          {/* Right slot for page-specific actions (e.g., export, settings) */}
-        </div>
-      </WrapperHeader>
+      <WrapperHeader leading={toggle} title={getPageTitle()} />
 
       {/* ── Content Area with Optional Chat Panel ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

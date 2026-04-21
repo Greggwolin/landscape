@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { WrapperHeader, ChatToggleButton } from './WrapperHeader';
+
 interface RightContentPanelProps {
   title: string;
   subtitle?: string;
@@ -18,23 +19,14 @@ interface RightContentPanelProps {
  * Content mounts below the header.
  */
 export function RightContentPanel({ title, subtitle, actions, children }: RightContentPanelProps) {
-  const { chatOpen, toggleChat } = useWrapperUI();
-
   return (
     <div className="wrapper-right-panel">
-      <div className="wrapper-header">
-        <button
-          className="wrapper-btn-icon"
-          onClick={toggleChat}
-          title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
-        >
-          <span style={{ fontSize: '18px' }}>☰</span>
-        </button>
-        <span className="wrapper-header-title">{title}</span>
-        {subtitle && <span className="wrapper-header-subtitle">{subtitle}</span>}
-        <div className="wrapper-header-spacer" />
-        {actions && <div className="wrapper-header-actions">{actions}</div>}
-      </div>
+      <WrapperHeader
+        leading={<ChatToggleButton />}
+        title={title}
+        subtitle={subtitle}
+        trailing={actions}
+      />
       <div className="wrapper-right-body">{children}</div>
     </div>
   );

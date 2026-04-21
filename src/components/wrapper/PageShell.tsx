@@ -36,26 +36,25 @@ export function PageShell({
   const [chatOpen, setChatOpen] = useState(false);
   const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
 
+  const trailing = (showChat || headerActions) ? (
+    <>
+      {headerActions}
+      {showChat && (
+        <button
+          className="wrapper-btn-icon"
+          onClick={toggleChat}
+          title={chatOpen ? 'Close chat' : 'Open Landscaper chat'}
+        >
+          <span style={{ fontSize: '18px' }}>☰</span>
+        </button>
+      )}
+    </>
+  ) : null;
+
   return (
     <div className="page-shell">
       {!hideHeader && (
-        <WrapperHeader>
-          <span className="wrapper-header-title">{title}</span>
-          {subtitle && <span className="wrapper-header-subtitle">{subtitle}</span>}
-          <div className="wrapper-header-spacer" />
-          <div className="wrapper-header-actions">
-            {headerActions}
-            {showChat && (
-              <button
-                className="wrapper-btn-icon"
-                onClick={toggleChat}
-                title={chatOpen ? 'Close chat' : 'Open Landscaper chat'}
-              >
-                <span style={{ fontSize: '18px' }}>☰</span>
-              </button>
-            )}
-          </div>
-        </WrapperHeader>
+        <WrapperHeader title={title} subtitle={subtitle} trailing={trailing} />
       )}
 
       <div className="page-shell-body">

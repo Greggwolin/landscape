@@ -42,44 +42,37 @@ export function ArtifactPanel({
       />
 
       <div className="wrapper-artifact-panel" style={{ width }}>
-        <WrapperHeader>
-          {content ? (
+        <WrapperHeader
+          leading={content ? <TypeIcon size={14} style={{ flexShrink: 0, opacity: 0.6 }} /> : undefined}
+          title={content?.title ?? 'Artifact'}
+          trailing={
             <>
-              <TypeIcon size={14} style={{ flexShrink: 0, opacity: 0.6 }} />
-              <span className="wrapper-header-title">{content.title}</span>
+              <div className="ap-toggle">
+                <button
+                  className={`ap-toggle-btn${mode === 'preview' ? ' active' : ''}`}
+                  onClick={() => setMode('preview')}
+                >
+                  Preview
+                </button>
+                <button
+                  className={`ap-toggle-btn${mode === 'source' ? ' active' : ''}`}
+                  onClick={() => setMode('source')}
+                >
+                  Source
+                </button>
+              </div>
+              <button className="wrapper-btn-icon" title="Open in browser">
+                <Globe size={14} />
+              </button>
+              <button className="wrapper-btn-icon" title="Download">
+                <Download size={14} />
+              </button>
+              <button className="wrapper-btn-icon" onClick={onClose} title="Close artifact panel">
+                <X size={14} />
+              </button>
             </>
-          ) : (
-            <span className="wrapper-header-title">Artifact</span>
-          )}
-
-          <div className="wrapper-header-spacer" />
-
-          {/* Preview / Source toggle */}
-          <div className="ap-toggle">
-            <button
-              className={`ap-toggle-btn${mode === 'preview' ? ' active' : ''}`}
-              onClick={() => setMode('preview')}
-            >
-              Preview
-            </button>
-            <button
-              className={`ap-toggle-btn${mode === 'source' ? ' active' : ''}`}
-              onClick={() => setMode('source')}
-            >
-              Source
-            </button>
-          </div>
-
-          <button className="wrapper-btn-icon" title="Open in browser">
-            <Globe size={14} />
-          </button>
-          <button className="wrapper-btn-icon" title="Download">
-            <Download size={14} />
-          </button>
-          <button className="wrapper-btn-icon" onClick={onClose} title="Close artifact panel">
-            <X size={14} />
-          </button>
-        </WrapperHeader>
+          }
+        />
 
         <div className="wrapper-artifact-body">
           {content ? (

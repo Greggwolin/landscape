@@ -8,6 +8,7 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
+import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -193,10 +194,10 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   return (
     <div className="wrapper-chat-center">
-      <div className="wrapper-header">
-        {showHomepage && projectName ? (
-          /* ── Project homepage header: back arrow + name + location + type badge ── */
-          <>
+      {showHomepage && projectName ? (
+        /* ── Project homepage header: back arrow + name + location + type badge ── */
+        <WrapperHeader
+          leading={
             <button
               className="wrapper-btn-ghost"
               onClick={() => router.push('/w/projects')}
@@ -207,58 +208,55 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             >
               {backHover ? '← All Projects' : '←'}
             </button>
-            <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
-              {projectName}
+          }
+          title={<span className="wrapper-header-title" style={{ fontWeight: 600 }}>{projectName}</span>}
+          titleSuffix={projectLocation ? (
+            <span style={{ fontSize: '11px', color: 'var(--w-text-secondary)', marginLeft: '6px', whiteSpace: 'nowrap' }}>
+              {projectLocation}
             </span>
-            {projectLocation && (
-              <span style={{ fontSize: '11px', color: 'var(--w-text-secondary)', marginLeft: '6px', whiteSpace: 'nowrap' }}>
-                {projectLocation}
-              </span>
-            )}
-            <div className="wrapper-header-spacer" />
-            {projectTypeCode && (
-              <span
-                style={{
-                  ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  letterSpacing: '0.4px',
-                  padding: '2px 7px',
-                  borderRadius: '4px',
-                  textTransform: 'uppercase',
-                  flexShrink: 0,
-                }}
-              >
-                {getPropertyTypeLabel(projectTypeCode)}
-              </span>
-            )}
-          </>
-        ) : (
-          /* ── Thread / chat header ── */
-          <>
-            <span className="wrapper-header-title">
-              {showHomepage ? '' : (threadTitle || 'New conversation')}
+          ) : undefined}
+          trailing={projectTypeCode ? (
+            <span
+              style={{
+                ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
+                fontSize: '10px',
+                fontWeight: 700,
+                letterSpacing: '0.4px',
+                padding: '2px 7px',
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                flexShrink: 0,
+              }}
+            >
+              {getPropertyTypeLabel(projectTypeCode)}
             </span>
-            <div className="wrapper-header-spacer" />
-            {/* Back button when a thread is active from the homepage */}
-            {isProjectRoot && homepageThreadId && (
-              <button
-                className="wrapper-btn-ghost"
-                onClick={handleBackToHomepage}
-                style={{ marginRight: '4px' }}
-                title="Back to project overview"
-              >
-                ← Back
-              </button>
-            )}
-            {!showHomepage && !isChatRoute && (
-              <button className="wrapper-btn-ghost" onClick={closeChat} title="Close chat panel">
-                Close
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          ) : undefined}
+        />
+      ) : (
+        /* ── Thread / chat header ── */
+        <WrapperHeader
+          title={showHomepage ? '' : (threadTitle || 'New conversation')}
+          trailing={
+            <>
+              {isProjectRoot && homepageThreadId && (
+                <button
+                  className="wrapper-btn-ghost"
+                  onClick={handleBackToHomepage}
+                  style={{ marginRight: '4px' }}
+                  title="Back to project overview"
+                >
+                  ← Back
+                </button>
+              )}
+              {!showHomepage && !isChatRoute && (
+                <button className="wrapper-btn-ghost" onClick={closeChat} title="Close chat panel">
+                  Close
+                </button>
+              )}
+            </>
+          }
+        />
+      )}
 
       <div className="wrapper-chat-body">
         {showHomepage ? (

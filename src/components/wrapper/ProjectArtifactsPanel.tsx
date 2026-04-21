@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
+import { WrapperHeader } from './WrapperHeader';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -101,18 +102,19 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
   return (
     <div className="artifacts-panel">
       {/* Header */}
-      <div className="wrapper-header">
-        <span className="wrapper-header-title">Artifacts</span>
-        <div className="wrapper-header-spacer" />
-        <button
-          className="wrapper-btn-ghost"
-          onClick={toggleArtifacts}
-          title="Collapse artifacts panel"
-          style={{ fontSize: '14px', padding: '2px 6px' }}
-        >
-          ☰
-        </button>
-      </div>
+      <WrapperHeader
+        title="Artifacts"
+        trailing={
+          <button
+            className="wrapper-btn-ghost"
+            onClick={toggleArtifacts}
+            title="Collapse artifacts panel"
+            style={{ fontSize: '14px', padding: '2px 6px' }}
+          >
+            ☰
+          </button>
+        }
+      />
 
       {/* Body — map artifact takes priority when active */}
       {activeMapArtifact ? (
