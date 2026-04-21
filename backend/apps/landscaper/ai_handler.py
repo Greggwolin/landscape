@@ -928,6 +928,12 @@ TOOL_DOMAIN_MAP = {
     'reject_staging_field': 'ingestion',
     'explain_extraction': 'ingestion',
 
+    # DMS Management
+    'rename_document': 'documents',
+    'update_document_profile': 'documents',
+    'move_document_to_folder': 'documents',
+    'reprocess_document': 'documents',
+
     # Reports
     'generate_report_preview': 'reports',
     'export_report': 'reports',

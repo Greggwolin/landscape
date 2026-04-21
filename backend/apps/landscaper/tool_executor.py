@@ -2298,6 +2298,284 @@ def get_document_media_summary(doc_id: int, project_id: int) -> Dict[str, Any]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DMS Management Tools — rename, profile, folder, reprocess
+# Added 2026-04-21
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('rename_document', is_mutation=True)
+def handle_rename_document(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Rename a document in the project DMS."""
+    doc_id = tool_input.get('doc_id')
+    new_name = tool_input.get('new_name', '').strip()
+
+    if not doc_id:
+        return {'success': False, 'error': 'doc_id is required'}
+    if not new_name:
+        return {'success': False, 'error': 'new_name is required'}
+
+    reason = tool_input.get('reason', f'Rename document to "{new_name}"')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='document_rename',
+            table_name='core_doc',
+            field_name='doc_name',
+            proposed_value=new_name,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE landscape.core_doc
+                SET doc_name = %s, updated_at = NOW()
+                WHERE doc_id = %s AND project_id = %s AND deleted_at IS NULL
+                RETURNING doc_id, doc_name
+            """, [new_name, doc_id, project_id])
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Document {doc_id} not found in this project'}
+            return {'success': True, 'doc_id': row[0], 'new_name': row[1]}
+    except Exception as e:
+        logger.error(f"Error renaming document: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_document_profile', is_mutation=True)
+def handle_update_document_profile(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Update document profile metadata (doc_type, doc_date, tags, custom attributes via profile_json)."""
+    doc_id = tool_input.get('doc_id')
+    if not doc_id:
+        return {'success': False, 'error': 'doc_id is required'}
+
+    # Allowed top-level fields on core_doc
+    DOC_PROFILE_FIELDS = [
+        'doc_type', 'doc_date', 'contract_value', 'priority',
+        'status', 'discipline', 'description',
+    ]
+
+    # Separate top-level fields from profile_json updates
+    top_level_updates = {k: v for k, v in tool_input.items()
+                         if k in DOC_PROFILE_FIELDS and v is not None}
+    profile_updates = tool_input.get('profile', {})  # JSONB merge
+
+    if not top_level_updates and not profile_updates:
+        return {'success': False, 'error': 'No profile fields to update. Use top-level fields (doc_type, doc_date, status, etc.) or profile: {...} for custom attributes.'}
+
+    reason = tool_input.get('reason', 'Update document profile')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='document_profile_update',
+            table_name='core_doc',
+            field_name=None,
+            proposed_value={**top_level_updates, 'profile': profile_updates} if profile_updates else top_level_updates,
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            # Build SET clause for top-level fields
+            set_clauses = []
+            params = []
+            for col, val in top_level_updates.items():
+                set_clauses.append(f"{col} = %s")
+                params.append(val)
+
+            # Merge profile_json if provided
+            if profile_updates:
+                set_clauses.append("profile_json = COALESCE(profile_json, '{}'::jsonb) || %s::jsonb")
+                params.append(json.dumps(profile_updates))
+
+            set_clauses.append("updated_at = NOW()")
+            params.extend([doc_id, project_id])
+
+            cursor.execute(f"""
+                UPDATE landscape.core_doc
+                SET {', '.join(set_clauses)}
+                WHERE doc_id = %s AND project_id = %s AND deleted_at IS NULL
+                RETURNING doc_id, doc_name, doc_type, status, profile_json
+            """, params)
+
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Document {doc_id} not found in this project'}
+
+            return {
+                'success': True,
+                'doc_id': row[0],
+                'doc_name': row[1],
+                'doc_type': row[2],
+                'status': row[3],
+                'profile_json': row[4],
+            }
+    except Exception as e:
+        logger.error(f"Error updating document profile: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('move_document_to_folder', is_mutation=True)
+def handle_move_document_to_folder(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Move a document to a DMS folder. Set folder_id to null to remove from folder."""
+    doc_id = tool_input.get('doc_id')
+    folder_id = tool_input.get('folder_id')  # None = remove from folder
+    apply_inheritance = tool_input.get('apply_inheritance', False)
+
+    if not doc_id:
+        return {'success': False, 'error': 'doc_id is required'}
+
+    reason = tool_input.get('reason', 'Move document to folder')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='document_move',
+            table_name='core_doc_folder_link',
+            field_name='folder_id',
+            proposed_value={'doc_id': doc_id, 'folder_id': folder_id, 'apply_inheritance': apply_inheritance},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            # Verify doc belongs to project
+            cursor.execute("""
+                SELECT doc_id FROM landscape.core_doc
+                WHERE doc_id = %s AND project_id = %s AND deleted_at IS NULL
+            """, [doc_id, project_id])
+            if not cursor.fetchone():
+                return {'success': False, 'error': f'Document {doc_id} not found in this project'}
+
+            if folder_id is None:
+                # Remove from folder
+                cursor.execute("""
+                    DELETE FROM landscape.core_doc_folder_link WHERE doc_id = %s
+                """, [doc_id])
+                return {'success': True, 'doc_id': doc_id, 'folder_id': None, 'action': 'removed_from_folder'}
+
+            # Verify folder exists
+            cursor.execute("""
+                SELECT folder_id, name FROM landscape.core_doc_folder
+                WHERE folder_id = %s AND is_active = true
+            """, [folder_id])
+            folder_row = cursor.fetchone()
+            if not folder_row:
+                return {'success': False, 'error': f'Folder {folder_id} not found'}
+
+            inherited = False
+            if apply_inheritance:
+                # Use DB function for inheritance
+                cursor.execute("""
+                    SELECT landscape.apply_folder_inheritance(%s::INTEGER, %s::INTEGER) as new_profile
+                """, [doc_id, folder_id])
+                inherited = True
+
+            # Upsert folder link
+            cursor.execute("""
+                INSERT INTO landscape.core_doc_folder_link (doc_id, folder_id, inherited)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (doc_id) DO UPDATE
+                SET folder_id = %s, inherited = %s, linked_at = NOW()
+            """, [doc_id, folder_id, inherited, folder_id, inherited])
+
+            return {
+                'success': True,
+                'doc_id': doc_id,
+                'folder_id': folder_id,
+                'folder_name': folder_row[1],
+                'inherited': inherited,
+                'action': 'moved',
+            }
+    except Exception as e:
+        logger.error(f"Error moving document to folder: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('reprocess_document', is_mutation=True)
+def handle_reprocess_document(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Re-queue a document for RAG/knowledge processing with high priority. Use when extraction failed or needs updating."""
+    doc_id = tool_input.get('doc_id')
+    if not doc_id:
+        return {'success': False, 'error': 'doc_id is required'}
+
+    reason = tool_input.get('reason', 'Reprocess document')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='document_reprocess',
+            table_name='core_doc',
+            field_name=None,
+            proposed_value={'doc_id': doc_id},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        # Verify doc belongs to project
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT doc_id, project_id FROM landscape.core_doc
+                WHERE doc_id = %s AND project_id = %s AND deleted_at IS NULL
+            """, [doc_id, project_id])
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Document {doc_id} not found in this project'}
+
+        # Queue for processing using the knowledge service
+        from apps.knowledge.services.document_processor import queue_document_for_processing
+        queue_document_for_processing(doc_id, project_id, priority=10)
+
+        return {
+            'success': True,
+            'doc_id': doc_id,
+            'message': f'Document {doc_id} queued for reprocessing (high priority)',
+        }
+    except ImportError:
+        return {'success': False, 'error': 'Document processing service not available'}
+    except Exception as e:
+        logger.error(f"Error reprocessing document: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Financial Assumptions Tool Handlers
 # ─────────────────────────────────────────────────────────────────────────────
 

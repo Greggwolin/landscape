@@ -193,6 +193,65 @@ LANDSCAPER_TOOLS = [
             "required": ["doc_id"],
         },
     },
+    # ── DMS Management Tools ──────────────────────────────────────────
+    {
+        "name": "rename_document",
+        "description": "Rename an uploaded document. Changes the display name in the DMS without affecting the stored file.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to rename"},
+                "new_name": {"type": "string", "description": "New display name for the document"},
+            },
+            "required": ["doc_id", "new_name"],
+        },
+    },
+    {
+        "name": "update_document_profile",
+        "description": "Update document profile attributes such as doc_type, doc_date, priority, status, discipline, description, and custom profile fields stored in profile_json.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to update"},
+                "doc_type": {"type": "string", "description": "Document type classification"},
+                "doc_date": {"type": "string", "description": "Document date (YYYY-MM-DD)"},
+                "contract_value": {"type": "number", "description": "Associated contract value"},
+                "priority": {"type": "string", "description": "Priority level"},
+                "status": {"type": "string", "description": "Document status"},
+                "discipline": {"type": "string", "description": "Document discipline/category"},
+                "description": {"type": "string", "description": "Document description"},
+                "profile_attributes": {
+                    "type": "object",
+                    "description": "Additional profile attributes merged into profile_json (key-value pairs)",
+                },
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "move_document_to_folder",
+        "description": "Move a document into a DMS folder, or remove it from its current folder. Optionally applies folder inheritance rules (default profile attributes).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to move"},
+                "folder_id": {"type": "integer", "description": "Target folder ID. Omit or null to remove from current folder."},
+                "apply_inheritance": {"type": "boolean", "description": "Whether to apply folder default profile to the document (default true)"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "reprocess_document",
+        "description": "Re-queue a document for extraction processing. Useful when extraction failed, produced poor results, or when the document has been updated. Triggers the full knowledge extraction pipeline.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "Document ID to reprocess"},
+            },
+            "required": ["doc_id"],
+        },
+    },
     {
         "name": "analyze_rent_roll_columns",
         "description": "Analyze uploaded rent roll columns for mapping.",
