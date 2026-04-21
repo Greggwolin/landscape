@@ -842,7 +842,8 @@ TOOL_DOMAIN_MAP = {
     'get_income_approach': 'valuation',
     'update_income_approach': 'valuation',
     'get_expense_comparables': 'valuation',
-    'update_expense_comparables': 'valuation',
+    'update_expense_comparable': 'valuation',
+    'delete_expense_comparable': 'valuation',
     'get_reconciliation': 'valuation',
     'update_reconciliation': 'valuation',
     'calculate_waterfall': 'valuation',
@@ -872,6 +873,11 @@ TOOL_DOMAIN_MAP = {
     'update_equity_structure': 'capitalization',
     'get_loan_terms': 'capitalization',
     'update_loan_terms': 'capitalization',
+    'get_acquisition': 'capitalization',
+    'update_acquisition': 'capitalization',
+    'get_acquisition_events': 'capitalization',
+    'create_acquisition_event': 'capitalization',
+    'delete_acquisition_event': 'capitalization',
 
     # Planning (land dev)
     'get_land_use': 'planning',

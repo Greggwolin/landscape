@@ -415,6 +415,57 @@ LANDSCAPER_TOOLS = [
             },
         },
     },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Acquisition Event Tools (tbl_acquisition — the event ledger)
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "get_acquisition_events",
+        "description": "Get acquisition event ledger entries — deposits, fees, credits, milestones, and closing costs. These are individual line items below the top-level acquisition assumptions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_type": {"type": "string", "description": "Filter by type: MILESTONE, OPEN_ESCROW, CLOSING, CRITICAL_DATE, DEPOSIT, FEE, CREDIT, REFUND, ADJUSTMENT, CLOSING_COSTS"},
+                "limit": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "create_acquisition_event",
+        "description": "Create or update an acquisition event (deposit, fee, credit, milestone, closing cost). Include acquisition_id to update an existing event.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "acquisition_id": {"type": "integer", "description": "Omit to create new; include to update existing."},
+                "event_type": {"type": "string", "description": "MILESTONE, OPEN_ESCROW, CLOSING, CRITICAL_DATE, DEPOSIT, FEE, CREDIT, REFUND, ADJUSTMENT, CLOSING_COSTS"},
+                "event_date": {"type": "string", "description": "Date of event (YYYY-MM-DD)."},
+                "description": {"type": "string"},
+                "amount": {"type": "number"},
+                "is_applied_to_purchase": {"type": "boolean", "description": "Whether this affects net purchase price (default true)."},
+                "goes_hard_date": {"type": "string", "description": "Date when deposit becomes non-refundable (YYYY-MM-DD)."},
+                "is_conditional": {"type": "boolean"},
+                "is_deposit_refundable": {"type": "boolean"},
+                "deposit_goes_hard_date": {"type": "string"},
+                "units_conveyed": {"type": "number", "description": "Acres, SF, or other units conveyed."},
+                "notes": {"type": "string"},
+                "category_id": {"type": "integer", "description": "Parent cost category (1100, 1200, 1300 series)."},
+                "subcategory_id": {"type": "integer", "description": "Child subcategory (1110, 1120, 1210)."},
+                "reason": {"type": "string"},
+            },
+            "required": ["event_type"],
+        },
+    },
+    {
+        "name": "delete_acquisition_event",
+        "description": "Delete an acquisition event from the ledger. This is a hard delete — the record is removed permanently.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "acquisition_id": {"type": "integer", "description": "The event to delete."},
+                "reason": {"type": "string"},
+            },
+            "required": ["acquisition_id"],
+        },
+    },
     {
         "name": "get_revenue_rent",
         "description": "Get rent revenue assumptions.",
@@ -3541,6 +3592,57 @@ LANDSCAPER_TOOLS = [
                 "section_8_contract_date": {"type": "string"},
                 "reason": {"type": "string"},
             },
+        },
+    },
+    # ─────────────────────────────────────────────────────────────────────────
+    # Expense Comparables (tbl_expense_comparable)
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "name": "get_expense_comparables",
+        "description": "Get expense comparable properties for income approach analysis. Returns property-level operating expense data including line-item breakdowns stored as JSONB.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "active_only": {"type": "boolean", "description": "If true (default), only return active comps."},
+                "limit": {"type": "integer"},
+            },
+        },
+    },
+    {
+        "name": "update_expense_comparable",
+        "description": "Create or update an expense comparable. The 'expenses' field is a JSON object mapping expense categories to amounts (e.g. {\"Real Estate Taxes\": 285000, \"Insurance\": 78000}).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "comparable_id": {"type": "integer", "description": "Omit to create new; include to update existing."},
+                "property_name": {"type": "string"},
+                "address": {"type": "string"},
+                "distance_miles": {"type": "number"},
+                "year_built": {"type": "integer"},
+                "total_units": {"type": "integer"},
+                "total_sqft": {"type": "integer"},
+                "expenses": {"type": "object", "description": "Operating expense line items: {\"Real Estate Taxes\": 285000, \"Insurance\": 78000, ...}"},
+                "total_opex": {"type": "number", "description": "Total operating expenses (cached sum)."},
+                "data_source": {"type": "string", "description": "CoStar, Manual Entry, Broker, etc."},
+                "as_of_date": {"type": "string", "description": "Date of expense data (YYYY-MM-DD)."},
+                "notes": {"type": "string"},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "reason": {"type": "string"},
+            },
+            "required": ["property_name"],
+        },
+    },
+    {
+        "name": "delete_expense_comparable",
+        "description": "Soft-delete an expense comparable (sets is_active = FALSE). The record is retained for audit trail.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "comparable_id": {"type": "integer", "description": "The expense comparable to deactivate."},
+                "reason": {"type": "string"},
+            },
+            "required": ["comparable_id"],
         },
     },
     # ─────────────────────────────────────────────────────────────────────────

@@ -3163,6 +3163,206 @@ def handle_update_acquisition(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Acquisition Event Tools (tbl_acquisition — the event ledger)
+# Added 2026-04-21 — multi-row CRUD for deposits, fees, credits, milestones
+# Note: tbl_property_acquisition = top-level assumptions (above)
+#       tbl_acquisition = individual events/line items (this section)
+# ─────────────────────────────────────────────────────────────────────────────
+
+ACQUISITION_EVENT_COLUMNS = [
+    'event_type', 'event_date', 'description', 'amount',
+    'is_applied_to_purchase', 'goes_hard_date', 'is_conditional',
+    'is_deposit_refundable', 'deposit_goes_hard_date',
+    'units_conveyed', 'notes',
+    'category_id', 'subcategory_id', 'contact_id', 'measure_id',
+]
+
+
+@register_tool('get_acquisition_events')
+def handle_get_acquisition_events(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get acquisition event ledger entries (deposits, fees, credits, milestones)."""
+    event_type = tool_input.get('event_type')  # Optional filter
+    limit = tool_input.get('limit', 100)
+
+    try:
+        with connection.cursor() as cursor:
+            where_clause = "WHERE a.project_id = %s"
+            params = [project_id]
+            if event_type:
+                where_clause += " AND a.event_type = %s"
+                params.append(event_type)
+            params.append(limit)
+
+            cursor.execute(f"""
+                SELECT a.acquisition_id, a.project_id, a.event_type, a.event_date,
+                       a.description, a.amount, a.is_applied_to_purchase,
+                       a.goes_hard_date, a.is_conditional, a.is_deposit_refundable,
+                       a.deposit_goes_hard_date, a.units_conveyed,
+                       a.notes, a.category_id, a.subcategory_id,
+                       a.contact_id, a.measure_id,
+                       a.created_at, a.updated_at
+                FROM landscape.tbl_acquisition a
+                {where_clause}
+                ORDER BY a.event_date ASC NULLS LAST, a.acquisition_id
+                LIMIT %s
+            """, params)
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+            records = []
+            for row in rows:
+                record = dict(zip(columns, row))
+                # Convert Decimal to float
+                for key in ['amount', 'units_conveyed']:
+                    if record.get(key) is not None:
+                        record[key] = float(record[key])
+                # Handle dates
+                for key in ['event_date', 'goes_hard_date', 'deposit_goes_hard_date']:
+                    if record.get(key) is not None:
+                        record[key] = str(record[key])
+                # Handle timestamps
+                for key in ['created_at', 'updated_at']:
+                    if record.get(key) is not None:
+                        record[key] = record[key].isoformat()
+                records.append(record)
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting acquisition events: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('create_acquisition_event', is_mutation=True)
+def handle_create_acquisition_event(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Create or update an acquisition event (deposit, fee, credit, milestone)."""
+    reason = tool_input.get('reason', 'Create acquisition event')
+    acquisition_id = tool_input.get('acquisition_id')
+
+    # Filter to allowed columns
+    updates = {k: v for k, v in tool_input.items()
+               if k in ACQUISITION_EVENT_COLUMNS and v is not None}
+
+    if not updates.get('event_type') and not acquisition_id:
+        return {'success': False, 'error': 'event_type required for new events'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='acquisition_event_upsert',
+            table_name='tbl_acquisition',
+            field_name=None,
+            proposed_value={'acquisition_id': acquisition_id, **updates},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            if acquisition_id:
+                # Update existing event
+                set_clauses = []
+                params = []
+                for col, val in updates.items():
+                    set_clauses.append(f"{col} = %s")
+                    params.append(val)
+                set_clauses.append("updated_at = NOW()")
+                params.extend([acquisition_id, project_id])
+
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_acquisition
+                    SET {', '.join(set_clauses)}
+                    WHERE acquisition_id = %s AND project_id = %s
+                    RETURNING acquisition_id
+                """, params)
+
+                row = cursor.fetchone()
+                if not row:
+                    return {'success': False, 'error': f'Acquisition event {acquisition_id} not found'}
+                return {'success': True, 'action': 'updated', 'acquisition_id': row[0]}
+            else:
+                # Insert new event
+                updates['project_id'] = project_id
+                col_names = list(updates.keys())
+                values = [updates[c] for c in col_names]
+                placeholders = ', '.join(['%s'] * len(col_names))
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_acquisition ({', '.join(col_names)})
+                    VALUES ({placeholders})
+                    RETURNING acquisition_id
+                """, values)
+
+                row = cursor.fetchone()
+                return {'success': True, 'action': 'created', 'acquisition_id': row[0]}
+
+    except Exception as e:
+        logger.error(f"Error creating acquisition event: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('delete_acquisition_event', is_mutation=True)
+def handle_delete_acquisition_event(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Delete an acquisition event from the ledger."""
+    acquisition_id = tool_input.get('acquisition_id')
+    if not acquisition_id:
+        return {'success': False, 'error': 'acquisition_id required'}
+
+    reason = tool_input.get('reason', 'Delete acquisition event')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='acquisition_event_delete',
+            table_name='tbl_acquisition',
+            field_name=None,
+            proposed_value={'acquisition_id': acquisition_id},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                DELETE FROM landscape.tbl_acquisition
+                WHERE acquisition_id = %s AND project_id = %s
+                RETURNING acquisition_id
+            """, [acquisition_id, project_id])
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Acquisition event {acquisition_id} not found'}
+            return {'success': True, 'action': 'deleted', 'acquisition_id': row[0]}
+    except Exception as e:
+        logger.error(f"Error deleting acquisition event: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Revenue Rent Tools
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -3958,6 +4158,202 @@ def handle_update_income_property_mf_ext(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Expense Comparable Tools (tbl_expense_comparable)
+# Added 2026-04-21 — multi-row CRUD, same pattern as sales comps
+# ─────────────────────────────────────────────────────────────────────────────
+
+EXPENSE_COMP_COLUMNS = [
+    'property_name', 'address', 'distance_miles', 'year_built',
+    'total_units', 'total_sqft', 'expenses', 'total_opex',
+    'data_source', 'as_of_date', 'notes', 'is_active',
+    'latitude', 'longitude',
+]
+
+
+@register_tool('get_expense_comparables')
+def handle_get_expense_comparables(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get expense comparables for a project's income approach analysis."""
+    limit = tool_input.get('limit', 50)
+    active_only = tool_input.get('active_only', True)
+
+    try:
+        with connection.cursor() as cursor:
+            where_clause = "WHERE project_id = %s"
+            params = [project_id]
+            if active_only:
+                where_clause += " AND is_active = TRUE"
+            params.append(limit)
+
+            cursor.execute(f"""
+                SELECT comparable_id, project_id, property_name, address,
+                       distance_miles, year_built, total_units, total_sqft,
+                       expenses, total_opex, data_source, as_of_date,
+                       notes, is_active, latitude, longitude
+                FROM landscape.tbl_expense_comparable
+                {where_clause}
+                ORDER BY property_name
+                LIMIT %s
+            """, params)
+
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+            records = []
+            for row in rows:
+                record = dict(zip(columns, row))
+                # Convert Decimal to float for JSON
+                for key in ['distance_miles', 'total_opex', 'latitude', 'longitude']:
+                    if record.get(key) is not None:
+                        record[key] = float(record[key])
+                # Handle date
+                if record.get('as_of_date'):
+                    record['as_of_date'] = str(record['as_of_date'])
+                records.append(record)
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting expense comparables: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_expense_comparable', is_mutation=True)
+def handle_update_expense_comparable(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Add or update an expense comparable."""
+    reason = tool_input.get('reason', 'Update expense comparable')
+    comparable_id = tool_input.get('comparable_id')
+    property_name = tool_input.get('property_name')
+
+    if not property_name and not comparable_id:
+        return {'success': False, 'error': 'property_name or comparable_id required'}
+
+    # Filter to allowed columns
+    updates = {k: v for k, v in tool_input.items()
+               if k in EXPENSE_COMP_COLUMNS and v is not None}
+
+    if not updates:
+        return {'success': False, 'error': 'No valid fields to update'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='expense_comp_upsert',
+            table_name='tbl_expense_comparable',
+            field_name=None,
+            proposed_value={'comparable_id': comparable_id, **updates},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            if comparable_id:
+                # Update existing
+                set_clauses = []
+                params = []
+                for col, val in updates.items():
+                    set_clauses.append(f"{col} = %s")
+                    params.append(json.dumps(val) if col == 'expenses' else val)
+                set_clauses.append("updated_at = NOW()")
+                params.extend([comparable_id, project_id])
+
+                cursor.execute(f"""
+                    UPDATE landscape.tbl_expense_comparable
+                    SET {', '.join(set_clauses)}
+                    WHERE comparable_id = %s AND project_id = %s
+                    RETURNING comparable_id
+                """, params)
+
+                row = cursor.fetchone()
+                if not row:
+                    return {'success': False, 'error': f'Expense comp {comparable_id} not found for this project'}
+                return {'success': True, 'action': 'updated', 'comparable_id': row[0]}
+            else:
+                # Insert new
+                updates['project_id'] = project_id
+                col_names = list(updates.keys())
+                values = []
+                for col in col_names:
+                    val = updates[col]
+                    values.append(json.dumps(val) if col == 'expenses' else val)
+                placeholders = ', '.join(['%s'] * len(col_names))
+
+                cursor.execute(f"""
+                    INSERT INTO landscape.tbl_expense_comparable ({', '.join(col_names)})
+                    VALUES ({placeholders})
+                    RETURNING comparable_id
+                """, values)
+
+                row = cursor.fetchone()
+                return {'success': True, 'action': 'created', 'comparable_id': row[0]}
+
+    except Exception as e:
+        logger.error(f"Error updating expense comparable: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('delete_expense_comparable', is_mutation=True)
+def handle_delete_expense_comparable(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Soft-delete an expense comparable (sets is_active = FALSE)."""
+    comparable_id = tool_input.get('comparable_id')
+    if not comparable_id:
+        return {'success': False, 'error': 'comparable_id required'}
+
+    reason = tool_input.get('reason', 'Delete expense comparable')
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='expense_comp_delete',
+            table_name='tbl_expense_comparable',
+            field_name=None,
+            proposed_value={'comparable_id': comparable_id, 'is_active': False},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE landscape.tbl_expense_comparable
+                SET is_active = FALSE, updated_at = NOW()
+                WHERE comparable_id = %s AND project_id = %s
+                RETURNING comparable_id
+            """, [comparable_id, project_id])
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Expense comp {comparable_id} not found'}
+            return {'success': True, 'action': 'deleted', 'comparable_id': row[0]}
+    except Exception as e:
+        logger.error(f"Error deleting expense comparable: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # P1-5: Valuation Reconciliation Tools (tbl_valuation_reconciliation)
 # Added 2026-02-27
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4042,7 +4438,9 @@ LEASE_COLUMNS = [
     'renewal_probability_pct', 'early_termination_allowed',
     'termination_notice_months', 'termination_penalty_amount',
     'security_deposit_amount', 'security_deposit_months', 'affects_occupancy',
-    'expansion_rights', 'right_of_first_refusal', 'notes'
+    'expansion_rights', 'right_of_first_refusal', 'notes',
+    # CRE lease provisions (verified against tbl_lease schema)
+    'exclusive_use_clause', 'co_tenancy_clause', 'radius_restriction',
 ]
 
 
@@ -4914,9 +5312,11 @@ SALES_COMP_COLUMNS = [
     'sale_date', 'sale_price', 'price_per_unit', 'price_per_sf',
     'year_built', 'units', 'building_sf', 'cap_rate', 'grm',
     'distance_from_subject', 'unit_mix', 'notes', 'latitude', 'longitude', 'unit_count',
-    # Added Session 3: property classification fields
+    # Property classification fields
     'property_type', 'property_subtype', 'building_class', 'property_rights',
     'land_area_sf', 'land_area_acres',
+    # Sale verification fields (verified against 2026-02-11 CoStar parity migration)
+    'sale_conditions', 'verification_source', 'verification_date',
 ]
 
 SALES_ADJ_COLUMNS = [
@@ -6266,13 +6666,42 @@ def handle_delete_rental_comparable(
 # ─────────────────────────────────────────────────────────────────────────────
 
 LOAN_COLUMNS = [
-    'loan_name', 'loan_type', 'structure_type', 'lender_name', 'commitment_amount',
-    'loan_amount', 'interest_rate_pct', 'interest_type', 'interest_index',
-    'interest_spread_bps', 'loan_term_months', 'loan_term_years',
+    # Core identifiers & classification
+    'loan_name', 'loan_type', 'structure_type', 'lender_name', 'seniority', 'status',
+    # Amounts & sizing
+    'commitment_amount', 'loan_amount', 'loan_to_cost_pct', 'loan_to_value_pct',
+    # Interest rate
+    'interest_rate_pct', 'interest_rate_decimal', 'interest_type', 'interest_index',
+    'interest_spread_bps', 'rate_floor_pct', 'rate_cap_pct', 'rate_reset_frequency',
+    'interest_calculation', 'interest_payment_method',
+    # Term & amortization
+    'loan_start_date', 'loan_maturity_date', 'loan_term_months', 'loan_term_years',
     'amortization_months', 'amortization_years', 'interest_only_months',
-    'payment_frequency', 'origination_fee_pct', 'exit_fee_pct',
-    'loan_to_cost_pct', 'loan_to_value_pct', 'seniority', 'status',
-    'loan_start_date', 'loan_maturity_date', 'notes'
+    'payment_frequency', 'commitment_date',
+    # Fees
+    'origination_fee_pct', 'exit_fee_pct', 'unused_fee_pct',
+    'commitment_fee_pct', 'extension_fee_bps', 'extension_fee_amount',
+    'prepayment_penalty_years',
+    # Reserves
+    'interest_reserve_amount', 'interest_reserve_funded_upfront',
+    'reserve_requirements', 'replacement_reserve_per_unit',
+    'tax_insurance_escrow_months', 'initial_reserve_months',
+    # Covenants
+    'covenants', 'loan_covenant_dscr_min', 'loan_covenant_ltv_max',
+    'loan_covenant_occupancy_min', 'covenant_test_frequency',
+    # Recourse & guarantees
+    'guarantee_type', 'guarantor_name', 'recourse_carveout_provisions',
+    # Extension & construction
+    'extension_options', 'extension_option_years',
+    'draw_trigger_type', 'commitment_balance', 'drawn_to_date',
+    'is_construction_loan', 'release_price_pct', 'minimum_release_amount',
+    'takes_out_loan_id',
+    # Profit participation
+    'can_participate_in_profits', 'profit_participation_tier', 'profit_participation_pct',
+    # Calculated / display
+    'monthly_payment', 'annual_debt_service',
+    # Notes
+    'notes',
 ]
 
 EQUITY_STRUCTURE_COLUMNS = [
