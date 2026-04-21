@@ -853,12 +853,14 @@ def handle_get_demographics(
                 'radius_miles': ring.get('radius_miles'),
                 'population': ring.get('population'),
                 'households': ring.get('households'),
-                'median_household_income': _safe_float(ring.get('median_household_income')),
+                'median_household_income': _safe_float(
+                    ring.get('median_income') or ring.get('median_household_income')
+                ),
                 'median_home_value': _safe_float(ring.get('median_home_value')),
+                'median_gross_rent': _safe_float(ring.get('median_gross_rent')),
                 'median_age': _safe_float(ring.get('median_age')),
                 'owner_occupied_pct': _safe_float(ring.get('owner_occupied_pct')),
-                'renter_occupied_pct': _safe_float(ring.get('renter_occupied_pct')),
-                'vacancy_rate': _safe_float(ring.get('vacancy_rate')),
+                'block_groups_included': ring.get('block_groups_included'),
             })
 
         return {

@@ -186,8 +186,10 @@ class Validator:
         """Check that the response doesn't contain common error indicators."""
         content = chat_response.assistant_content.lower()
         error_patterns = [
-            'error:', 'traceback', 'exception', 'failed to',
+            'error:', 'traceback', 'exception occurred', 'exception:',
+            'failed to execute', 'failed to process',
             'cannot access', 'unboundlocalerror', 'typeerror',
+            'keyerror', 'attributeerror', 'valueerror',
             'i apologize, but i\'m currently unable',
         ]
 
