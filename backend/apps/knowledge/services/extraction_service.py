@@ -1430,6 +1430,21 @@ class RegistryBasedExtractor:
                 'doc_id': doc_id
             }
 
+        # Step 3c: CoStar detection — route to deterministic Excel path or
+        # inject layout-aware PDF prompt before the generic LLM extraction.
+        from .costar_extractor import is_costar_document
+        if is_costar_document(doc_content.get('text', '')):
+            logger.info(f"CoStar document detected for doc {doc_id}")
+            costar_result = self._handle_costar_document(
+                doc_id=doc_id,
+                doc_name=doc_content['doc_name'],
+                classification=classification,
+            )
+            if costar_result is not None:
+                return costar_result
+            # None means not Excel (PDF path) — fall through to LLM with
+            # enhanced system prompt (set below at Step 5).
+
         # Step 3b: Subtype classification — auto-assign tag if confident
         subtype_result = self.subtype_classifier.classify(
             content=doc_content['text'][:50000],
@@ -1451,10 +1466,9 @@ class RegistryBasedExtractor:
         # Step 5: Call Claude for extraction
         try:
             client = _get_anthropic_client()
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system="""You are a precise data extraction assistant for real estate documents.
+
+            # Build system prompt — prepend CoStar-specific instructions when applicable
+            base_system = """You are a precise data extraction assistant for real estate documents.
 Extract values ONLY for the fields specified in the schema.
 Return a JSON object with field_key as keys and extracted values.
 For each value, include:
@@ -1463,7 +1477,19 @@ For each value, include:
 - "source_quote": Brief quote from document supporting the extraction
 
 If a field cannot be found in the document, omit it from the response.
-Never guess or make up values - only extract what is explicitly stated.""",
+Never guess or make up values - only extract what is explicitly stated."""
+
+            from .costar_extractor import is_costar_document, get_costar_pdf_system_prompt
+            if is_costar_document(doc_content.get('text', '')):
+                system_prompt = get_costar_pdf_system_prompt() + "\n\n" + base_system
+                logger.info(f"Using CoStar PDF system prompt for doc {doc_id}")
+            else:
+                system_prompt = base_system
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=system_prompt,
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -1675,6 +1701,166 @@ Never guess or make up values - only extract what is explicitly stated.""",
                 ORDER BY doc_id
             """, [self.project_id])
             return [row[0] for row in cursor.fetchall()]
+
+    def _handle_costar_document(
+        self,
+        doc_id: int,
+        doc_name: str,
+        classification,
+    ):
+        """
+        CoStar-specific routing called from extract_from_document.
+
+        Excel path: parse comps deterministically, stage directly, return result dict.
+        PDF path:   return None so the caller falls through to the LLM path
+                    (which will use the CoStar-enhanced system prompt).
+        """
+        import tempfile, os
+        from django.db import connection as _conn
+
+        # Fetch mime_type and storage_uri
+        with _conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT storage_uri, mime_type
+                FROM landscape.core_doc
+                WHERE doc_id = %s
+            """, [doc_id])
+            row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        storage_uri, mime_type = row
+
+        excel_mimes = {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+        }
+
+        if mime_type not in excel_mimes:
+            # PDF or other — return None to use LLM with enhanced prompt
+            return None
+
+        # ── Excel path: deterministic column mapping ──────────────────────────
+        from .costar_extractor import extract_costar_excel_comps
+
+        tmp_path = None
+        try:
+            from django.core.files.storage import default_storage
+            suffix = '.xlsx'
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                with default_storage.open(storage_uri, 'rb') as f:
+                    tmp.write(f.read())
+                tmp_path = tmp.name
+
+            comps = extract_costar_excel_comps(tmp_path)
+
+        except Exception as exc:
+            logger.error(f"CoStar Excel download/parse failed for doc {doc_id}: {exc}")
+            return None
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+        if not comps:
+            logger.warning(f"CoStar Excel: no comps found in doc {doc_id}")
+            return {
+                'success': False,
+                'error': 'CoStar Excel detected but no comp rows found',
+                'doc_id': doc_id,
+                'classification': {
+                    'type': classification.evidence_type,
+                    'confidence': classification.confidence,
+                },
+            }
+
+        staged = self._stage_costar_excel_comps(doc_id, doc_name, comps)
+
+        return {
+            'success': True,
+            'doc_id': doc_id,
+            'doc_name': doc_name,
+            'classification': {
+                'type': 'costar_excel',
+                'confidence': 0.95,
+                'matched_patterns': ['CoStar Excel column mapping'],
+            },
+            'extracted_count': staged,
+            'costar_excel': True,
+            'comp_count': len(comps),
+        }
+
+    def _stage_costar_excel_comps(
+        self,
+        doc_id: int,
+        doc_name: str,
+        comps: list,
+    ) -> int:
+        """
+        Insert CoStar Excel comp dicts directly into ai_extraction_staging.
+
+        Each comp is staged as a single row with scope='sales_comp' and
+        the full comp dict as extracted_value (JSON).  The commit path in
+        workbench_views.py → ExtractionWriter._insert_full_comp handles
+        the actual INSERT into tbl_sales_comparables.
+        """
+        import json as _json
+        import uuid
+
+        staged_count = 0
+        with connection.cursor() as cursor:
+            for array_index, comp in enumerate(comps):
+                scope_label = comp.get('property_name') or f'Comp {array_index + 1}'
+                scope_id = str(uuid.uuid4())
+
+                try:
+                    cursor.execute("""
+                        INSERT INTO landscape.ai_extraction_staging (
+                            project_id,
+                            doc_id,
+                            field_key,
+                            target_table,
+                            target_field,
+                            extracted_value,
+                            extraction_type,
+                            source_text,
+                            confidence_score,
+                            scope,
+                            scope_id,
+                            scope_label,
+                            array_index,
+                            status,
+                            created_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', NOW()
+                        )
+                    """, [
+                        self.project_id,
+                        doc_id,
+                        'sales_comp_name',          # field_key expected by ExtractionWriter
+                        'tbl_sales_comparables',    # target table
+                        None,                       # target_field — whole-row insert
+                        _json.dumps(comp),
+                        'costar_excel',
+                        f'CoStar Excel export — {doc_name}',
+                        0.95,
+                        'sales_comp',
+                        scope_id,
+                        scope_label[:100],
+                        array_index,
+                    ])
+                    staged_count += 1
+                except Exception as exc:
+                    logger.error(
+                        f"CoStar staging failed for comp {array_index} "
+                        f"(doc {doc_id}): {exc}"
+                    )
+
+        logger.info(f"CoStar Excel: staged {staged_count} comp(s) for doc {doc_id}")
+        return staged_count
 
     def _build_registry_extraction_prompt(
         self,

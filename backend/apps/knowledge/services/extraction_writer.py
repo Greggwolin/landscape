@@ -1407,26 +1407,96 @@ class ExtractionWriter:
             params = [self.project_id]
 
             field_map = {
-                'property_name': 'property_name',
-                'address': 'address',
-                'city': 'city',
-                'state': 'state',
-                'zip': 'zip',
-                'sale_date': 'sale_date',
-                'sale_price': 'sale_price',
-                'price_per_unit': 'price_per_unit',
-                'price_per_sf': 'price_per_sf',
-                'cap_rate': 'cap_rate',
-                'units': 'unit_count',
-                'unit_count': 'unit_count',
-                'year_built': 'year_built',
-                'building_sf': 'building_sf',
-                'distance_miles': 'distance_from_subject',
-                'buyer': 'true_buyer',
-                'seller': 'true_seller',
-                'buyer_type': 'buyer_type',
-                'seller_type': 'seller_type',
-                'notes': 'notes',
+                # ── Identity ──────────────────────────────────────────────────
+                'property_name':            'property_name',
+                'address':                  'address',
+                'city':                     'city',
+                'state':                    'state',
+                'zip':                      'zip',
+                'county':                   'county',
+                'submarket':                'submarket',
+                'metro_market':             'metro_market',
+                'cbsa':                     'cbsa',
+                'latitude':                 'latitude',
+                'longitude':                'longitude',
+                'distance_from_subject':    'distance_from_subject',
+                'distance_miles':           'distance_from_subject',  # legacy alias
+                'costar_comp_id':           'costar_comp_id',
+
+                # ── Property characteristics ───────────────────────────────────
+                'property_type':            'property_type',
+                'property_subtype':         'property_subtype',
+                'building_class':           'building_class',
+                'costar_star_rating':       'costar_star_rating',
+                'year_built':               'year_built',
+                'units':                    'units',
+                'unit_count':               'unit_count',
+                'building_sf':              'building_sf',
+                'num_floors':               'num_floors',
+                'num_buildings':            'num_buildings',
+                'land_area_sf':             'land_area_sf',
+                'land_area_acres':          'land_area_acres',
+                'parking_spaces':           'parking_spaces',
+                'parking_ratio':            'parking_ratio',
+                'parking_type':             'parking_type',
+                'zoning':                   'zoning',
+                'construction_type':        'construction_type',
+                'tenancy_type':             'tenancy_type',
+                'avg_unit_size_sf':         'avg_unit_size_sf',
+                'entitlements':             'entitlements',
+
+                # ── Transaction ────────────────────────────────────────────────
+                'sale_date':                'sale_date',
+                'sale_price':               'sale_price',
+                'sale_conditions':          'sale_conditions',
+                'sale_type':                'sale_type',
+                'property_rights':          'property_rights',
+                'asking_price':             'asking_price',
+                'document_number':          'document_number',
+                'days_on_market':           'days_on_market',
+                'is_portfolio_sale':        'is_portfolio_sale',
+                'portfolio_name':           'portfolio_name',
+
+                # ── Pricing metrics ───────────────────────────────────────────
+                'price_per_unit':           'price_per_unit',
+                'price_per_sf':             'price_per_sf',
+                'price_per_acre':           'price_per_acre',
+
+                # ── Financial metrics ─────────────────────────────────────────
+                'cap_rate':                 'cap_rate',
+                'actual_cap_rate':          'actual_cap_rate',
+                'pro_forma_cap_rate':        'pro_forma_cap_rate',
+                'grm':                      'grm',
+                'gim':                      'gim',
+                'noi_at_sale':              'noi_at_sale',
+                'percent_leased_at_sale':   'percent_leased_at_sale',
+
+                # ── Financing ─────────────────────────────────────────────────
+                'financing_type':           'financing_type',
+                'financing_lender':         'financing_lender',
+                'financing_amount':         'financing_amount',
+                'financing_rate':           'financing_rate',
+
+                # ── Buyer / Seller ────────────────────────────────────────────
+                'buyer':                    'true_buyer',   # legacy alias
+                'seller':                   'true_seller',  # legacy alias
+                'true_buyer':               'true_buyer',
+                'true_seller':              'true_seller',
+                'recorded_buyer':           'recorded_buyer',
+                'recorded_seller':          'recorded_seller',
+                'buyer_type':               'buyer_type',
+                'seller_type':              'seller_type',
+                'buyer_broker_company':     'buyer_broker_company',
+                'listing_broker_company':   'listing_broker_company',
+
+                # ── Verification ──────────────────────────────────────────────
+                'verification_source':      'verification_source',
+                'verification_date':        'verification_date',
+                'data_source':              'data_source',
+
+                # ── Notes ─────────────────────────────────────────────────────
+                'notes':                    'notes',
+                'transaction_notes':        'transaction_notes',
             }
 
             for ext_key, col in field_map.items():
