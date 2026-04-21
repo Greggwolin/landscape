@@ -934,6 +934,11 @@ TOOL_DOMAIN_MAP = {
     'move_document_to_folder': 'documents',
     'reprocess_document': 'documents',
 
+    # LoopNet Deal Sourcing
+    'loopnet_search_listings': 'market',
+    'loopnet_get_listing_detail': 'market',
+    'loopnet_search_similar': 'market',
+
     # Reports
     'generate_report_preview': 'reports',
     'export_report': 'reports',
