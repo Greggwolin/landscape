@@ -345,6 +345,9 @@ PAGE_TOOLS = {
         # Market assumptions
         "get_market_assumptions",
         "update_market_assumptions",
+        # P2 analysis — waterfall + MF cash flow metrics
+        "calculate_waterfall",
+        "calculate_mf_cashflow",
         # Knowledge / RAG search — needed for finding comps in uploaded docs
         "query_platform_knowledge",
     ],
@@ -360,6 +363,7 @@ PAGE_TOOLS = {
         # Waterfall
         "get_waterfall_tiers",
         "update_waterfall_tiers",
+        "calculate_waterfall",
     ],
 
     # -------------------------------------------------------------------------

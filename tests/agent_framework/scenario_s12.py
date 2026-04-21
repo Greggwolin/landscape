@@ -58,7 +58,7 @@ class ScenarioS12(BaseAgent):
         # ── Step 1: Create thread ──────────────────────────────────────
         self.create_thread(
             project_id=self.project_id,
-            page_context='mf_valuation',
+            page_context='mf_capitalization',
         )
         self.validator.assert_field_equals(
             'thread_created', self.thread_id is not None, True
@@ -66,7 +66,7 @@ class ScenarioS12(BaseAgent):
 
         # ── Phase 1: Run waterfall ─────────────────────────────────────
         logger.info('--- Phase 1: Calculate waterfall ---')
-        resp1 = self.send_message(P1_PROMPT, page_context='mf_valuation')
+        resp1 = self.send_message(P1_PROMPT, page_context='mf_capitalization')
 
         self.validator.assert_response_not_error(resp1)
 
@@ -122,7 +122,7 @@ class ScenarioS12(BaseAgent):
 
         # ── Phase 2: Interpret results ─────────────────────────────────
         logger.info('--- Phase 2: Interpret waterfall ---')
-        resp2 = self.send_message(P2_PROMPT, page_context='mf_valuation')
+        resp2 = self.send_message(P2_PROMPT, page_context='mf_capitalization')
 
         self.validator.assert_response_not_error(resp2)
         self.validator.calibrate('p2_tools', [tc.tool_name for tc in resp2.tool_calls])
