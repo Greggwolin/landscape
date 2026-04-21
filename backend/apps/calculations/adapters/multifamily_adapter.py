@@ -186,15 +186,28 @@ class MultifamilyCashFlowAdapter:
             """, [self.project_id])
             growth_sets = {row[1]: row[0] for row in cursor.fetchall()}
 
-            # Load closing_costs_pct from tbl_property_acquisition
+            # Load acquisition details from tbl_property_acquisition
+            # This is the primary source for purchase_price, hold_period,
+            # exit_cap_rate, and closing_costs_pct — matching the
+            # IncomePropertyCashFlowService and the Acquisition UI.
             cursor.execute("""
-                SELECT closing_costs_pct
+                SELECT purchase_price, closing_costs_pct,
+                       hold_period_years, exit_cap_rate
                 FROM landscape.tbl_property_acquisition
                 WHERE project_id = %s
                 ORDER BY acquisition_id
                 LIMIT 1
             """, [self.project_id])
             acq_row = cursor.fetchone()
+
+            # Fallback purchase price from tbl_project (matches
+            # IncomePropertyCashFlowService behavior).
+            cursor.execute("""
+                SELECT COALESCE(acquisition_price, asking_price)
+                FROM landscape.tbl_project
+                WHERE project_id = %s
+            """, [self.project_id])
+            proj_price_row = cursor.fetchone()
 
         # Calculate derived values
         unit_count = int(units[0] or 0) if units else 0
@@ -207,14 +220,32 @@ class MultifamilyCashFlowAdapter:
 
         annual_gpr = Decimal(str(units[1] or 0)) if units else Decimal('0')
 
-        # Default assumptions where not available
-        hold_months = 60  # 5 years default
+        # Purchase price: prefer tbl_property_acquisition.purchase_price,
+        # then tbl_multifamily_property.acquisition_price, then
+        # tbl_project.acquisition_price/asking_price (matches the
+        # IncomePropertyCashFlowService fallback).
+        purchase_price = Decimal('0')
+        if acq_row and acq_row[0]:
+            purchase_price = Decimal(str(acq_row[0]))
+        elif mf_prop and mf_prop[2]:
+            purchase_price = Decimal(str(mf_prop[2]))
+        elif proj_price_row and proj_price_row[0]:
+            purchase_price = Decimal(str(proj_price_row[0]))
+
+        # Closing costs: from tbl_property_acquisition
+        closing_pct = Decimal(str(acq_row[1])) if acq_row and acq_row[1] is not None else Decimal('0')
+
+        # Hold period: from tbl_property_acquisition, default 5 years
+        hold_years = float(acq_row[2]) if acq_row and acq_row[2] else 5.0
+        hold_months = int(hold_years * 12)
+
+        # Exit cap rate: from tbl_property_acquisition, default 5.5%
+        exit_cap = Decimal(str(acq_row[3])) if acq_row and acq_row[3] else Decimal('0.055')
+
+        # Vacancy
         vacancy_pct = Decimal('0.05')  # 5% default
         if mf_prop and mf_prop[3]:
             vacancy_pct = (Decimal('100') - Decimal(str(mf_prop[3]))) / 100
-
-        purchase_price = Decimal(str(mf_prop[2] or 0)) if mf_prop else Decimal('0')
-        closing_pct = Decimal(str(acq_row[0])) if acq_row and acq_row[0] is not None else Decimal('0')
 
         loan_amount = Decimal(str(debt[0] or 0)) if debt else Decimal('0')
         interest_rate = Decimal(str(debt[1] or 6.5)) / 100 if debt else Decimal('0.065')
@@ -240,7 +271,7 @@ class MultifamilyCashFlowAdapter:
             reserves_per_unit=Decimal('300'),  # $300/unit default
             purchase_price=purchase_price,
             closing_costs_pct=closing_pct,
-            exit_cap_rate=Decimal('0.055'),  # 5.5% default
+            exit_cap_rate=exit_cap,
             disposition_costs_pct=Decimal('0.02'),  # 2% default
             loan_amount=loan_amount,
             interest_rate=interest_rate,
