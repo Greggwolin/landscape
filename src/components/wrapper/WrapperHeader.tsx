@@ -55,7 +55,7 @@ export function ChatToggleButton() {
   const { chatOpen, toggleChat } = useWrapperUI();
   return (
     <button
-      className="wrapper-btn-icon"
+      className="w-btn w-btn-icon"
       onClick={toggleChat}
       title={chatOpen ? 'Close Landscaper chat' : 'Open Landscaper chat'}
     >

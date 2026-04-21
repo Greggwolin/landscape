@@ -464,20 +464,20 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
           {viewingTrash ? (
             <>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 onClick={() => setViewingTrash(false)}
               >
                 ← Back
               </button>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 disabled={!hasSelection}
                 onClick={() => setShowRestoreModal(true)}
               >
                 ↩ Restore
               </button>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 disabled={!hasSelection}
                 onClick={() => setShowPermanentDeleteModal(true)}
               >
@@ -487,32 +487,32 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
           ) : (
             <>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 onClick={toggleTrash}
               >
                 🗑 View Trash{trashCount > 0 ? ` (${trashCount})` : ''}
               </button>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 disabled={selCount !== 1}
                 onClick={() => setShowRenameModal(true)}
               >
                 ✏️ Rename
               </button>
               <button
-                className="w-doc-toolbar-btn"
+                className="w-btn w-btn-ghost w-btn-sm"
                 disabled={!hasSelection}
                 onClick={() => setShowDeleteModal(true)}
               >
                 🗑 Delete
               </button>
-              <button className="w-doc-toolbar-btn" disabled title="Coming in M3">
+              <button className="w-btn w-btn-ghost w-btn-sm" disabled title="Coming in M3">
                 ↗ Move/Copy
               </button>
-              <button className="w-doc-toolbar-btn" disabled title="Coming in M3">
+              <button className="w-btn w-btn-ghost w-btn-sm" disabled title="Coming in M3">
                 🔗 Share
               </button>
-              <button className="w-doc-toolbar-btn" disabled title="Coming in M4">
+              <button className="w-btn w-btn-ghost w-btn-sm" disabled title="Coming in M4">
                 ✏️ Edit profile
               </button>
             </>

@@ -41,7 +41,7 @@ export function PageShell({
       {headerActions}
       {showChat && (
         <button
-          className="wrapper-btn-icon"
+          className="w-btn w-btn-icon"
           onClick={toggleChat}
           title={chatOpen ? 'Close chat' : 'Open Landscaper chat'}
         >

@@ -111,7 +111,7 @@ export default function DmsAdminPanelNew() {
             Manage document type categories for your projects (workspace #{workspaceId})
           </div>
         </div>
-        <button className="wrapper-btn wrapper-btn-primary" onClick={openCreate}>+ Create Template</button>
+        <button className="w-btn w-btn-primary" onClick={openCreate}>+ Create Template</button>
       </div>
 
       {loading && templates.length === 0 ? (
@@ -198,8 +198,8 @@ export default function DmsAdminPanelNew() {
                 <span>Set as default template for this workspace</span>
               </label>
               <div className="w-modal-foot">
-                <button type="button" className="wrapper-btn wrapper-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="wrapper-btn wrapper-btn-primary" disabled={loading}>
+                <button type="button" className="w-btn w-btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="w-btn w-btn-primary" disabled={loading}>
                   {loading ? 'Saving…' : editing ? 'Save Changes' : 'Create Template'}
                 </button>
               </div>

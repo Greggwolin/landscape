@@ -40,6 +40,7 @@ export interface WrapperSidebarProps {
 
   // Actions
   onNewChat?: () => void;
+  onSearchClick?: () => void;
   onThemeToggle?: () => void;
   onLogout?: () => void;
   currentTheme?: 'light' | 'dark';
@@ -97,6 +98,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   scheduledAgents = [],
   recentProjects = [],
   onNewChat,
+  onSearchClick,
   onThemeToggle,
   onLogout,
   currentTheme = 'dark',
@@ -128,15 +130,15 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
         </div>
 
         {/* New Chat */}
-        <div className="sb-new-chat" onClick={handleNewChat}>
+        <button type="button" className="w-btn w-btn-ghost sb-new-chat-stub" onClick={handleNewChat}>
           <span className="sb-new-icon">＋</span>
           <span className="sb-nav-label">New chat</span>
-        </div>
+        </button>
 
         {/* Search */}
-        <div className="sb-search">
+        <div className="sb-search" onClick={onSearchClick} style={{ cursor: 'pointer' }}>
           <span>🔍</span>
-          <span className="sb-nav-label"> Search chats &amp; documents…</span>
+          <span className="sb-nav-label"> Search chats…</span>
         </div>
 
         <div className="sb-divider" />
@@ -216,21 +218,23 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             <div className="sb-user-plan">{userPlan}</div>
           </div>
           <div className="sb-footer-actions">
-            <div
-              className="sb-footer-btn"
+            <button
+              type="button"
+              className="w-btn w-btn-icon w-btn-sm"
               onClick={onThemeToggle}
               title={`Switch to ${currentTheme === 'light' ? 'dark' : 'light'} mode`}
             >
               {currentTheme === 'light' ? '🌙' : '☀️'}
-            </div>
+            </button>
             {onLogout && (
-              <div
-                className="sb-footer-btn"
+              <button
+                type="button"
+                className="w-btn w-btn-icon w-btn-sm"
                 onClick={onLogout}
                 title="Sign out"
               >
                 ⏻
-              </div>
+              </button>
             )}
           </div>
         </div>

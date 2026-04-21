@@ -199,7 +199,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         <WrapperHeader
           leading={
             <button
-              className="wrapper-btn-ghost"
+              className="w-btn w-btn-ghost w-btn-sm"
               onClick={() => router.push('/w/projects')}
               onMouseEnter={() => setBackHover(true)}
               onMouseLeave={() => setBackHover(false)}
@@ -240,7 +240,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             <>
               {isProjectRoot && homepageThreadId && (
                 <button
-                  className="wrapper-btn-ghost"
+                  className="w-btn w-btn-ghost w-btn-sm"
                   onClick={handleBackToHomepage}
                   style={{ marginRight: '4px' }}
                   title="Back to project overview"
@@ -249,7 +249,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
                 </button>
               )}
               {!showHomepage && !isChatRoute && (
-                <button className="wrapper-btn-ghost" onClick={closeChat} title="Close chat panel">
+                <button className="w-btn w-btn-ghost w-btn-sm" onClick={closeChat} title="Close chat panel">
                   Close
                 </button>
               )}

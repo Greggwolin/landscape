@@ -108,7 +108,7 @@ export default function BenchmarksPanelNew() {
       </div>
 
       {error && (
-        <div className="w-dms-admin-empty" style={{ color: '#fca5a5', borderColor: '#fca5a5' }}>
+        <div className="w-dms-admin-empty" style={{ color: 'var(--w-danger-text)', borderColor: 'var(--w-danger-text)' }}>
           {error}
         </div>
       )}

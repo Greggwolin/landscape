@@ -61,13 +61,13 @@ export function ArtifactPanel({
                   Source
                 </button>
               </div>
-              <button className="wrapper-btn-icon" title="Open in browser">
+              <button className="w-btn w-btn-icon" title="Open in browser">
                 <Globe size={14} />
               </button>
-              <button className="wrapper-btn-icon" title="Download">
+              <button className="w-btn w-btn-icon" title="Download">
                 <Download size={14} />
               </button>
-              <button className="wrapper-btn-icon" onClick={onClose} title="Close artifact panel">
+              <button className="w-btn w-btn-icon" onClick={onClose} title="Close artifact panel">
                 <X size={14} />
               </button>
             </>

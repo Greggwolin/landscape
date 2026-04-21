@@ -106,7 +106,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         title="Artifacts"
         trailing={
           <button
-            className="wrapper-btn-ghost"
+            className="w-btn w-btn-ghost w-btn-sm"
             onClick={toggleArtifacts}
             title="Collapse artifacts panel"
             style={{ fontSize: '14px', padding: '2px 6px' }}

@@ -23,7 +23,7 @@ export function MediaPanel() {
         <span className="w-panel-title">Project Media</span>
         <span className="w-panel-count">59 items</span>
         <div className="w-panel-spacer" />
-        <button className="wrapper-btn wrapper-btn-ghost" onClick={(e) => e.stopPropagation()}>
+        <button className="w-btn w-btn-ghost" onClick={(e) => e.stopPropagation()}>
           Scan PDFs ▾
         </button>
       </div>

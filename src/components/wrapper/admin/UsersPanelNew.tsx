@@ -209,11 +209,11 @@ export default function UsersPanelNew() {
             Manage platform users, roles, and access
           </div>
         </div>
-        <button className="wrapper-btn wrapper-btn-primary" onClick={openCreate}>+ Invite User</button>
+        <button className="w-btn w-btn-primary" onClick={openCreate}>+ Invite User</button>
       </div>
 
       {error && (
-        <div className="w-dms-admin-empty" style={{ color: '#fca5a5', borderColor: '#fca5a5' }}>
+        <div className="w-dms-admin-empty" style={{ color: 'var(--w-danger-text)', borderColor: 'var(--w-danger-text)' }}>
           {error}
         </div>
       )}
@@ -375,14 +375,14 @@ export default function UsersPanelNew() {
               <div className="w-modal-foot">
                 <button
                   type="button"
-                  className="wrapper-btn wrapper-btn-ghost"
+                  className="w-btn w-btn-ghost"
                   onClick={closeModal}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="wrapper-btn wrapper-btn-primary"
+                  className="w-btn w-btn-primary"
                   disabled={loading}
                 >
                   {loading

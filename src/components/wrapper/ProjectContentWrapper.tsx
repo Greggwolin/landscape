@@ -45,7 +45,7 @@ export function ProjectContentWrapper({ children }: ProjectContentWrapperProps) 
 
   const toggle = (
     <button
-      className="wrapper-btn-icon"
+      className="w-btn w-btn-icon"
       onClick={toggleChat}
       title={chatOpen ? 'Close chat panel' : 'Open chat panel'}
     >
