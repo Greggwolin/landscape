@@ -7814,6 +7814,222 @@ def handle_update_budget_category(
         return {'success': False, 'error': str(e)}
 
 
+@register_tool('delete_budget_category', is_mutation=True)
+def handle_delete_budget_category(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Soft-delete a budget category (sets is_active = false). Does NOT delete child categories or items."""
+    category_id = tool_input.get('category_id')
+    reason = tool_input.get('reason', 'Deactivate budget category')
+
+    if not category_id:
+        return {'success': False, 'error': 'category_id is required'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='budget_delete',
+            table_name='core_unit_cost_category',
+            field_name=None,
+            proposed_value={'category_id': category_id, 'is_active': False},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            # Check for child categories first
+            cursor.execute("""
+                SELECT COUNT(*) FROM landscape.core_unit_cost_category
+                WHERE parent_id = %s AND is_active = true
+            """, [category_id])
+            child_count = cursor.fetchone()[0]
+
+            if child_count > 0:
+                return {
+                    'success': False,
+                    'error': f'Category has {child_count} active child categories. Deactivate children first or use force.'
+                }
+
+            cursor.execute("""
+                UPDATE landscape.core_unit_cost_category
+                SET is_active = false, updated_at = NOW()
+                WHERE category_id = %s
+                RETURNING category_id, category_name
+            """, [category_id])
+
+            row = cursor.fetchone()
+            if not row:
+                return {'success': False, 'error': f'Category {category_id} not found'}
+
+            _log_budget_activity(project_id, 'core_unit_cost_category', 'deactivate', 1, reason)
+
+            return {
+                'success': True,
+                'action': 'deactivated',
+                'category_id': row[0],
+                'category_name': row[1]
+            }
+
+    except Exception as e:
+        logger.error(f"Error deleting budget category: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lifecycle Stage Assignment Tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+VALID_ACTIVITIES = [
+    'Acquisition', 'Planning & Engineering', 'Improvements',
+    'Operations', 'Disposition', 'Financing'
+]
+
+
+@register_tool('get_category_lifecycle_stages')
+def handle_get_category_lifecycle_stages(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get lifecycle activity assignments for cost categories.
+    Can filter by category_id or activity name.
+    Returns which activities each category belongs to."""
+    category_id = tool_input.get('category_id')
+    activity = tool_input.get('activity')
+
+    try:
+        with connection.cursor() as cursor:
+            conditions = []
+            params = []
+
+            if category_id is not None:
+                conditions.append("cls.category_id = %s")
+                params.append(category_id)
+
+            if activity:
+                conditions.append("cls.activity = %s")
+                params.append(activity)
+
+            where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+            cursor.execute(f"""
+                SELECT cls.id, cls.category_id, c.category_name,
+                       cls.activity, cls.sort_order
+                FROM landscape.core_category_lifecycle_stages cls
+                JOIN landscape.core_unit_cost_category c ON cls.category_id = c.category_id
+                {where_clause}
+                ORDER BY cls.activity, cls.sort_order, c.category_name
+            """, params)
+
+            columns = [col[0] for col in cursor.description]
+            records = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            return {
+                'success': True,
+                'count': len(records),
+                'records': records,
+                'valid_activities': VALID_ACTIVITIES
+            }
+
+    except Exception as e:
+        logger.error(f"Error fetching lifecycle stages: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@register_tool('update_category_lifecycle_stages', is_mutation=True)
+def handle_update_category_lifecycle_stages(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    propose_only: bool = True,
+    source_message_id: Optional[str] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Assign or remove a cost category from a lifecycle activity.
+    action='assign' adds the category to the activity.
+    action='remove' removes the category from the activity."""
+    category_id = tool_input.get('category_id')
+    activity = tool_input.get('activity')
+    action = tool_input.get('action', 'assign')
+    sort_order = tool_input.get('sort_order', 0)
+    reason = tool_input.get('reason', f'{action.title()} category lifecycle stage')
+
+    if not category_id or not activity:
+        return {'success': False, 'error': 'category_id and activity are required'}
+
+    if activity not in VALID_ACTIVITIES:
+        return {
+            'success': False,
+            'error': f'Invalid activity "{activity}". Must be one of: {", ".join(VALID_ACTIVITIES)}'
+        }
+
+    if action not in ('assign', 'remove'):
+        return {'success': False, 'error': 'action must be "assign" or "remove"'}
+
+    if propose_only:
+        from .services.mutation_service import MutationService
+        return MutationService.create_proposal(
+            project_id=project_id,
+            mutation_type='system_upsert' if action == 'assign' else 'system_delete',
+            table_name='core_category_lifecycle_stages',
+            field_name=None,
+            proposed_value={'category_id': category_id, 'activity': activity, 'action': action},
+            current_value=None,
+            reason=reason,
+            source_message_id=source_message_id,
+        )
+
+    try:
+        with connection.cursor() as cursor:
+            if action == 'assign':
+                # Upsert — insert if not exists
+                cursor.execute("""
+                    INSERT INTO landscape.core_category_lifecycle_stages
+                        (category_id, activity, sort_order, created_at, updated_at)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (category_id, activity) DO UPDATE
+                        SET sort_order = EXCLUDED.sort_order, updated_at = NOW()
+                    RETURNING id, category_id, activity
+                """, [category_id, activity, sort_order])
+
+                row = cursor.fetchone()
+                return {
+                    'success': True,
+                    'action': 'assigned',
+                    'id': row[0],
+                    'category_id': row[1],
+                    'activity': row[2]
+                }
+
+            else:  # remove
+                cursor.execute("""
+                    DELETE FROM landscape.core_category_lifecycle_stages
+                    WHERE category_id = %s AND activity = %s
+                    RETURNING id
+                """, [category_id, activity])
+
+                row = cursor.fetchone()
+                if not row:
+                    return {'success': False, 'error': f'No assignment found for category {category_id} + activity "{activity}"'}
+
+                return {
+                    'success': True,
+                    'action': 'removed',
+                    'category_id': category_id,
+                    'activity': activity
+                }
+
+    except Exception as e:
+        logger.error(f"Error updating lifecycle stage: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 @register_tool('get_budget_items')
 def handle_get_budget_items(
     tool_input: Dict[str, Any],
@@ -10837,6 +11053,109 @@ def query_platform_knowledge(
                     })
     except Exception as e:
         logger.warning(f"User knowledge search failed (continuing): {e}")
+
+    # Source 3: Cost library items + global benchmarks (text-match search)
+    # Bridges the cost database into RAG retrieval so "what does grading cost
+    # in Phoenix?" finds stored cost data alongside document-extracted knowledge.
+    try:
+        with connection.cursor() as cursor:
+            # Search cost library items by name/category match
+            search_terms = query.split()
+            # Build ILIKE conditions for meaningful words (skip short/common words)
+            meaningful_terms = [t for t in search_terms if len(t) > 2]
+            if meaningful_terms:
+                ilike_conditions = " OR ".join(
+                    ["i.item_name ILIKE %s OR c.category_name ILIKE %s"] * len(meaningful_terms)
+                )
+                ilike_params = []
+                for term in meaningful_terms:
+                    ilike_params.extend([f'%{term}%', f'%{term}%'])
+
+                cursor.execute(f"""
+                    SELECT i.item_name, c.category_name, i.typical_low_value,
+                           i.typical_mid_value, i.typical_high_value,
+                           i.default_uom_code, i.market_geography,
+                           i.project_type_code, i.source, i.as_of_date
+                    FROM landscape.core_unit_cost_item i
+                    LEFT JOIN landscape.core_unit_cost_category c ON i.category_id = c.category_id
+                    WHERE i.is_active = true AND ({ilike_conditions})
+                    ORDER BY i.item_name
+                    LIMIT 10
+                """, ilike_params)
+
+                for row in cursor.fetchall():
+                    cost_range = ""
+                    if row[2] and row[4]:
+                        cost_range = f"${float(row[2]):,.2f} - ${float(row[4]):,.2f}"
+                    mid_val = f"${float(row[3]):,.2f}" if row[3] else "N/A"
+
+                    content = (
+                        f"Cost Item: {row[0]} | Category: {row[1] or 'Uncategorized'} | "
+                        f"Unit Cost: {mid_val} ({cost_range}) per {row[5] or 'unit'} | "
+                        f"Market: {row[6] or 'N/A'} | Type: {row[7] or 'N/A'} | "
+                        f"Source: {row[8] or 'N/A'} | As-of: {row[9] or 'N/A'}"
+                    )
+                    formatted_chunks.append({
+                        'content': content,
+                        'similarity': 0.80,  # Fixed relevance score for direct text matches
+                        'source': {
+                            'document': 'Cost Library',
+                            'publisher': 'Platform Cost Database',
+                            'chapter': row[1],  # category name
+                            'page': None,
+                            'origin': 'cost_library',
+                        }
+                    })
+
+            # Also search global benchmark registry
+            if meaningful_terms:
+                bm_ilike = " OR ".join(
+                    ["b.benchmark_name ILIKE %s OR b.category ILIKE %s OR b.subcategory ILIKE %s"]
+                    * len(meaningful_terms)
+                )
+                bm_params = []
+                for term in meaningful_terms:
+                    bm_params.extend([f'%{term}%', f'%{term}%', f'%{term}%'])
+
+                cursor.execute(f"""
+                    SELECT b.benchmark_name, b.category, b.subcategory,
+                           b.market_geography, b.property_type, b.source_type,
+                           b.confidence_level, b.as_of_date, b.context_metadata
+                    FROM landscape.tbl_global_benchmark_registry b
+                    WHERE b.is_active = true AND ({bm_ilike})
+                    ORDER BY b.benchmark_name
+                    LIMIT 10
+                """, bm_params)
+
+                for row in cursor.fetchall():
+                    metadata_str = ""
+                    if row[8]:
+                        meta = row[8] if isinstance(row[8], dict) else {}
+                        metadata_str = " | ".join(f"{k}: {v}" for k, v in meta.items() if v)
+
+                    content = (
+                        f"Benchmark: {row[0]} | Category: {row[1] or 'N/A'} / {row[2] or 'N/A'} | "
+                        f"Market: {row[3] or 'N/A'} | Property Type: {row[4] or 'N/A'} | "
+                        f"Source: {row[5] or 'N/A'} | Confidence: {row[6] or 'N/A'} | "
+                        f"As-of: {row[7] or 'N/A'}"
+                    )
+                    if metadata_str:
+                        content += f" | {metadata_str}"
+
+                    formatted_chunks.append({
+                        'content': content,
+                        'similarity': 0.78,  # Slightly lower than cost library direct match
+                        'source': {
+                            'document': 'Global Benchmark Registry',
+                            'publisher': 'Platform Benchmark Database',
+                            'chapter': row[1],  # category
+                            'page': None,
+                            'origin': 'benchmark_registry',
+                        }
+                    })
+
+    except Exception as e:
+        logger.warning(f"Cost library/benchmark search failed (continuing): {e}")
 
     # Sort all results by similarity, take top max_chunks
     formatted_chunks.sort(key=lambda c: c['similarity'], reverse=True)

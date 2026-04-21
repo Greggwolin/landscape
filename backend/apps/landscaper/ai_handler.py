@@ -898,6 +898,11 @@ TOOL_DOMAIN_MAP = {
     'get_budget_items': 'budget',
     'update_budget_items': 'budget',
     'get_budget_summary': 'budget',
+    'get_budget_categories': 'budget',
+    'update_budget_category': 'budget',
+    'delete_budget_category': 'budget',
+    'get_category_lifecycle_stages': 'budget',
+    'update_category_lifecycle_stages': 'budget',
 
     # Contacts
     'get_project_contacts_v2': 'contacts',

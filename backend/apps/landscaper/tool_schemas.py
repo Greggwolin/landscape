@@ -1295,6 +1295,45 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "delete_budget_category",
+        "description": "Deactivate a budget category (soft-delete). Will refuse if the category has active children — deactivate children first.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category_id": {"type": "integer", "description": "Category ID to deactivate"},
+                "reason": {"type": "string", "description": "Reason for deactivation"},
+            },
+            "required": ["category_id"],
+        },
+    },
+    # ── Lifecycle Stage Assignment Tools ──────────────────────────────
+    {
+        "name": "get_category_lifecycle_stages",
+        "description": "Get lifecycle activity assignments for cost categories. Shows which activities (Acquisition, Planning & Engineering, Improvements, Operations, Disposition, Financing) each category belongs to.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category_id": {"type": "integer", "description": "Filter by category ID"},
+                "activity": {"type": "string", "description": "Filter by activity name", "enum": ["Acquisition", "Planning & Engineering", "Improvements", "Operations", "Disposition", "Financing"]},
+            },
+        },
+    },
+    {
+        "name": "update_category_lifecycle_stages",
+        "description": "Assign or remove a cost category from a lifecycle activity. Use action='assign' to add, action='remove' to delete the assignment.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category_id": {"type": "integer", "description": "Category ID"},
+                "activity": {"type": "string", "description": "Activity name", "enum": ["Acquisition", "Planning & Engineering", "Improvements", "Operations", "Disposition", "Financing"]},
+                "action": {"type": "string", "description": "assign or remove", "enum": ["assign", "remove"]},
+                "sort_order": {"type": "integer", "description": "Sort position within the activity (default 0)"},
+                "reason": {"type": "string"},
+            },
+            "required": ["category_id", "activity"],
+        },
+    },
+    {
         "name": "get_budget_items",
         "description": "Get budget line items with optional filters.",
         "input_schema": {
