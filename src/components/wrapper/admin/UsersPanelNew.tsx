@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilX } from '@coreui/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   AdminUser,
@@ -272,7 +274,7 @@ export default function UsersPanelNew() {
                   ? `Edit ${editingUser?.username}`
                   : `Set Password — ${editingUser?.username}`}
               </span>
-              <button className="w-modal-close" onClick={closeModal}>✕</button>
+              <button className="w-modal-close" onClick={closeModal}><CIcon icon={cilX} size="sm" /></button>
             </div>
             <form onSubmit={submit} className="w-modal-body">
               {mode !== 'password' && (

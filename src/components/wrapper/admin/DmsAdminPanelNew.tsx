@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilX } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
 interface Template {
@@ -151,7 +153,7 @@ export default function DmsAdminPanelNew() {
           <div className="w-modal" onClick={(e) => e.stopPropagation()}>
             <div className="w-modal-head">
               <span>{editing ? 'Edit Template' : 'Create Template'}</span>
-              <button className="w-modal-close" onClick={() => setShowModal(false)}>✕</button>
+              <button className="w-modal-close" onClick={() => setShowModal(false)}><CIcon icon={cilX} size="sm" /></button>
             </div>
             <form onSubmit={save} className="w-modal-body">
               <label className="w-modal-field">

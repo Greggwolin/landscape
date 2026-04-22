@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import CIcon from '@coreui/icons-react';
+import { cilPlus, cilSearch, cilMenu, cilMoon, cilSun, cilAccountLogout } from '@coreui/icons';
 import { HelpIcon } from '@/components/icons/HelpIcon';
 
 interface Thread {
@@ -125,19 +127,19 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
             <img src={LOGO_SVG} alt="Landscape" className="sb-logo-img" />
           </div>
           <div className="sb-collapse" onClick={onToggleCollapse} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            ☰
+            <CIcon icon={cilMenu} size="sm" />
           </div>
         </div>
 
         {/* New Chat */}
         <button type="button" className="w-btn w-btn-ghost sb-new-chat-stub" onClick={handleNewChat}>
-          <span className="sb-new-icon">＋</span>
+          <span className="sb-new-icon"><CIcon icon={cilPlus} size="sm" /></span>
           <span className="sb-nav-label">New chat</span>
         </button>
 
         {/* Search */}
         <div className="sb-search" onClick={onSearchClick} style={{ cursor: 'pointer' }}>
-          <span>🔍</span>
+          <span className="sb-search-icon"><CIcon icon={cilSearch} size="sm" /></span>
           <span className="sb-nav-label"> Search chats…</span>
         </div>
 
@@ -224,7 +226,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
               onClick={onThemeToggle}
               title={`Switch to ${currentTheme === 'light' ? 'dark' : 'light'} mode`}
             >
-              {currentTheme === 'light' ? '🌙' : '☀️'}
+              <CIcon icon={currentTheme === 'light' ? cilMoon : cilSun} size="sm" />
             </button>
             {onLogout && (
               <button
@@ -233,7 +235,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 onClick={onLogout}
                 title="Sign out"
               >
-                ⏻
+                <CIcon icon={cilAccountLogout} size="sm" />
               </button>
             )}
           </div>

@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import CIcon from '@coreui/icons-react';
+import { cilX } from '@coreui/icons';
 
 export interface DocumentDetailDoc {
   doc_id: string;
@@ -62,7 +64,7 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
         <span className="w-doc-detail-title">Document Details</span>
         <div className="w-doc-detail-actions">
           <button className="w-doc-detail-close" onClick={onClose} aria-label="Close">
-            ✕
+            <CIcon icon={cilX} size="sm" />
           </button>
         </div>
       </div>

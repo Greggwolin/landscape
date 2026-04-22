@@ -32,7 +32,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { theme, toggleTheme } = useTheme();
-  const { rightPanelNarrow } = useWrapperUI();
+  const { rightPanelNarrow, openSearch } = useWrapperUI();
   const { logout, user } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -217,6 +217,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           onClick: () => router.push(`/w/projects/${p.id}`),
         }))}
         isHelpThinking={isHelpLoading}
+        onSearchClick={openSearch}
         currentTheme={theme === 'light' ? 'light' : 'dark'}
         onThemeToggle={toggleTheme}
         onLogout={logout}

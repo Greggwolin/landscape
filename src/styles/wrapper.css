@@ -12,13 +12,13 @@
 /* ─── Light mode defaults ─── */
 :root {
   --w-bg-body: #fff;
-  --w-bg-sidebar: #1a1e28;
+  --w-bg-sidebar: #1a1e28; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
   --w-bg-surface: rgba(0, 0, 0, 0.05);
   --w-bg-surface-hover: rgba(0, 0, 0, 0.08);
   --w-bg-input: #fff;
   --w-border: #dbdfe6;
   --w-border-hover: #aab3c5;
-  --w-header-bg: #040506;          /* Universal dark header bar — always dark, regardless of theme */
+  --w-header-bg: #040506; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
   --w-panel-bg: #1a1e28;           /* Chat panel background — always dark */
   --w-border-subtle: rgba(0, 0, 0, 0.06);   /* Faint divider inside light surfaces */
   --w-border-subtle-dark: rgba(255, 255, 255, 0.06); /* Faint divider inside dark surfaces */
@@ -44,6 +44,13 @@
   --w-info-text: #3634a3;
   --w-card-bg: #fff;
   --w-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  /* ─── Spacing scale (unified) ─── */
+  --w-sp-1: 4px;
+  --w-sp-2: 8px;
+  --w-sp-3: 12px;
+  --w-sp-4: 16px;
+  --w-sp-5: 24px;
+  --w-sp-6: 32px;
 }
 
 /* ─── Dark mode overrides ─── */
@@ -54,7 +61,8 @@
   --w-bg-input: rgba(255, 255, 255, 0.05);
   --w-border: #323a49;
   --w-border-hover: #4a566d;
-  --w-header-bg: #040506;          /* Same — header stays always-dark */
+  --w-bg-sidebar: #1a1e28; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
+  --w-header-bg: #040506; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
   --w-panel-bg: #1a1e28;
   --w-border-subtle: rgba(255, 255, 255, 0.06);
   --w-border-subtle-dark: rgba(255, 255, 255, 0.06);
@@ -106,11 +114,21 @@
   max-height: 42px;
   border-bottom: 1px solid #323a49;
   color: rgba(255, 255, 255, 0.87);
-  padding: 10px 16px;
+  padding: 10px var(--w-sp-4);  /* vertical kept as raw to preserve 42px height pin */
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+}
+/* Three-tone shell: force dark text tokens on the header regardless of active theme. */
+.wrapper-header {
+  --w-text-primary:    rgba(255, 255, 255, 0.87);
+  --w-text-secondary:  rgba(255, 255, 255, 0.60);
+  --w-text-tertiary:   rgba(255, 255, 255, 0.45);
+  --w-border:          #323a49;
+  --w-border-hover:    #3f4858;
+  --w-bg-surface:      rgba(255, 255, 255, 0.04);
+  --w-bg-surface-hover: rgba(255, 255, 255, 0.07);
 }
 
 .wrapper-header-title {
@@ -252,6 +270,10 @@
   justify-content: flex-start;
 }
 .sb-new-icon { font-size: 14px; color: var(--w-text-tertiary); }
+.sb-new-icon svg { width: 14px; height: 14px; display: block; }
+.sb-search-icon svg { width: 14px; height: 14px; display: block; }
+.sb-collapse svg { width: 16px; height: 16px; display: block; }
+.sb-footer-actions .w-btn-icon svg { width: 14px; height: 14px; display: block; }
 
 .sb-search {
   margin: 0 12px 10px;
@@ -409,6 +431,22 @@
 .sb-footer-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .sb-help-btn { color: var(--w-accent-text, #38bdf8); }
 
+/* ─────────────────────────────────────────────
+   Three-tone shell: force dark text tokens on
+   the sidebar regardless of active theme.
+   ───────────────────────────────────────────── */
+.wrapper-sidebar {
+  --w-text-primary:    rgba(255, 255, 255, 0.87);
+  --w-text-secondary:  rgba(255, 255, 255, 0.60);
+  --w-text-tertiary:   rgba(255, 255, 255, 0.45);
+  --w-text-muted:      rgba(255, 255, 255, 0.38);
+  --w-border:          #323a49;
+  --w-border-hover:    #3f4858;
+  --w-bg-surface:      rgba(255, 255, 255, 0.04);
+  --w-bg-surface-hover: rgba(255, 255, 255, 0.07);
+  color: var(--w-text-primary);
+}
+
 /* ─── Drag Handle (sidebar resize) ─── */
 .wrapper-drag-handle {
   width: 4px;
@@ -474,7 +512,7 @@
 .page-shell-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--w-sp-4);
 }
 
 /* ─── Scrollbar styles ─── */
@@ -894,7 +932,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
+  padding: var(--w-sp-3) var(--w-sp-4);
   border-bottom: 1px solid var(--w-border);
   background: var(--w-bg-surface);
   flex-shrink: 0;
@@ -1052,10 +1090,10 @@
 
 /* ─── Page body spacing ─── */
 .w-page-body {
-  padding: 16px;
+  padding: var(--w-sp-4);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--w-sp-4);
   flex: 1;
   min-height: 0;
 }
@@ -1142,13 +1180,13 @@
 }
 
 .w-doc-detail-body {
-  padding: 14px;
+  padding: var(--w-sp-3);
 }
 
 .w-doc-detail-row {
   display: flex;
   padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--w-border-subtle);
 }
 
 .w-doc-detail-label {
@@ -1786,7 +1824,7 @@
   padding: 6px 0;
 }
 .w-admin-row + .w-admin-row {
-  border-top: 1px solid rgba(255,255,255,0.04);
+  border-top: 1px solid var(--w-border-subtle);
 }
 .w-admin-row-label {
   font-size: 12px;
@@ -1910,7 +1948,7 @@
   box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 .w-modal-head {
-  padding: 10px 14px; border-bottom: 1px solid var(--w-border);
+  padding: var(--w-sp-2) var(--w-sp-3); border-bottom: 1px solid var(--w-border);
   display: flex; align-items: center; justify-content: space-between;
   font-size: 13px; font-weight: 600; color: var(--w-text-primary);
 }
@@ -1920,7 +1958,7 @@
 }
 .w-modal-close:hover { color: var(--w-text-primary); }
 .w-modal-body {
-  padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto;
+  padding: var(--w-sp-3); display: flex; flex-direction: column; gap: var(--w-sp-3); overflow-y: auto;
 }
 .w-modal-field { display: flex; flex-direction: column; gap: 4px; }
 .w-modal-field > span { font-size: 11px; font-weight: 500; color: var(--w-text-secondary, var(--w-text-primary)); }
@@ -2061,7 +2099,7 @@
 .chat-search-result {
   padding: 10px 16px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--w-border-subtle);
   transition: background 0.1s;
 }
 .chat-search-result:hover {

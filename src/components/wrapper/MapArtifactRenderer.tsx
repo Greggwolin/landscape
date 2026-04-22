@@ -264,6 +264,7 @@ export function MapArtifactRenderer({ config, onClose, onLocationSaved }: MapArt
           }}
           title="Close map"
         >
+          {/* intentionally unicode — inline-styled button, CIcon not applicable here */}
           ✕
         </button>
       </div>
