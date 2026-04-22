@@ -58,6 +58,7 @@ export function ProjectHomepage({
 }: ProjectHomepageProps) {
   const [threads, setThreads] = useState<ProjectThread[]>([]);
   const [isLoadingThreads, setIsLoadingThreads] = useState(true);
+  const [threadsExpanded, setThreadsExpanded] = useState(true);
   const [chatInput, setChatInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -199,13 +200,17 @@ export function ProjectHomepage({
 
       {/* Thread list */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {/* Collapsible header */}
         <div
+          onClick={() => setThreadsExpanded((v) => !v)}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '8px 16px 6px',
             flexShrink: 0,
+            cursor: 'pointer',
+            userSelect: 'none',
           }}
         >
           <span
@@ -215,23 +220,22 @@ export function ProjectHomepage({
               color: 'var(--w-text-tertiary)',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
             }}
           >
+            <span style={{ fontSize: '8px', opacity: 0.7 }}>{threadsExpanded ? '▾' : '▸'}</span>
             Threads
           </span>
           {threads.length > 0 && (
-            <span
-              style={{
-                fontSize: '10px',
-                color: 'var(--w-text-muted)',
-              }}
-            >
+            <span style={{ fontSize: '10px', color: 'var(--w-text-muted)' }}>
               {threads.length}
             </span>
           )}
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '0 8px 12px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 0, display: threadsExpanded ? undefined : 'none' }}>
           {isLoadingThreads ? (
             <div
               style={{
@@ -268,14 +272,14 @@ export function ProjectHomepage({
                   alignItems: 'center',
                   gap: '8px',
                   width: '100%',
-                  padding: '7px 8px',
-                  borderRadius: '6px',
+                  padding: '8px 8px',
+                  borderRadius: 0,
                   border: 'none',
+                  borderBottom: '1px solid var(--w-border-subtle)',
                   background: 'transparent',
                   cursor: 'pointer',
                   textAlign: 'left',
                   transition: 'background 0.12s',
-                  marginBottom: '1px',
                 }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.background =
@@ -306,34 +310,22 @@ export function ProjectHomepage({
                   >
                     {thread.title ?? 'New conversation'}
                   </div>
+                  <div style={{ fontSize: '11px', color: 'var(--w-text-muted)', marginTop: '1px' }}>
+                    Last message {formatRelativeTime(thread.updatedAt)}
+                  </div>
                 </div>
-                <div
+                <span
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
+                    fontSize: '11px',
+                    color: 'var(--w-text-muted)',
                     flexShrink: 0,
+                    marginLeft: '8px',
+                    fontVariantNumeric: 'tabular-nums',
                   }}
+                  title={`${thread.messageCount} message${thread.messageCount === 1 ? '' : 's'}`}
                 >
-                  {thread.messageCount > 0 && (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        color: 'var(--w-text-muted)',
-                        background: 'var(--w-bg-surface)',
-                        padding: '1px 5px',
-                        borderRadius: '8px',
-                      }}
-                    >
-                      {thread.messageCount}
-                    </span>
-                  )}
-                  <span
-                    style={{ fontSize: '10px', color: 'var(--w-text-muted)', whiteSpace: 'nowrap' }}
-                  >
-                    {formatRelativeTime(thread.updatedAt)}
-                  </span>
-                </div>
+                  {thread.messageCount}
+                </span>
               </button>
             ))
           )}
