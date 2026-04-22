@@ -65,18 +65,18 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
-  const [artifactsOpen, setArtifactsOpen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.innerWidth >= ARTIFACTS_COLLAPSE_BREAKPOINT;
-  });
+  // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
+  // Actual viewport-based value is applied in the useEffect below after mount.
+  const [artifactsOpen, setArtifactsOpen] = useState(true);
 
-  // Auto-collapse/expand artifacts panel on viewport resize
+  // Sync to viewport after mount + auto-collapse/expand on resize
   useEffect(() => {
-    const onResize = () => {
+    const syncToViewport = () => {
       setArtifactsOpen(window.innerWidth >= ARTIFACTS_COLLAPSE_BREAKPOINT);
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    syncToViewport();
+    window.addEventListener('resize', syncToViewport);
+    return () => window.removeEventListener('resize', syncToViewport);
   }, []);
 
   const toggleChat = useCallback(() => setChatOpen((v) => !v), []);
