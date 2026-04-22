@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilSearch, cilMenu, cilMoon, cilSun, cilAccountLogout } from '@coreui/icons';
@@ -110,6 +110,10 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   isHelpThinking = false,
 }) => {
   const router = useRouter();
+  const [threadsCollapsed, setThreadsCollapsed] = useState(false);
+  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
+  const [projectsCollapsed, setProjectsCollapsed] = useState(false);
+
   const handleNewChat = () => {
     if (onNewChat) onNewChat();
     else router.push('/w/chat');
@@ -171,8 +175,14 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
         <div className="sb-scroll">
           {threads.length > 0 && (
             <div className="sb-section">
-              <div className="sb-section-label">Threads</div>
-              {threads.map((t) => (
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                onClick={() => setThreadsCollapsed((v) => !v)}
+              >
+                <span>Threads</span>
+                <span className="sb-section-chev">{threadsCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!threadsCollapsed && threads.map((t) => (
                 <div
                   key={t.id}
                   className={`sb-thread${t.isActive ? ' active' : ''}`}
@@ -187,8 +197,14 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
 
           {scheduledAgents.length > 0 && (
             <div className="sb-section">
-              <div className="sb-section-label">Scheduled</div>
-              {scheduledAgents.map((a) => (
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                onClick={() => setScheduledCollapsed((v) => !v)}
+              >
+                <span>Scheduled</span>
+                <span className="sb-section-chev">{scheduledCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!scheduledCollapsed && scheduledAgents.map((a) => (
                 <div key={a.id} className="sb-agent">
                   <span>{a.emoji}</span> {a.name}
                   <span className={`sb-agent-status ${a.status}`}>
@@ -201,8 +217,14 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
 
           {recentProjects.length > 0 && (
             <div className="sb-section">
-              <div className="sb-section-label">Recent Projects</div>
-              {recentProjects.map((p) => (
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                onClick={() => setProjectsCollapsed((v) => !v)}
+              >
+                <span>Recent Projects</span>
+                <span className="sb-section-chev">{projectsCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!projectsCollapsed && recentProjects.map((p) => (
                 <div key={p.id} className="sb-thread" onClick={p.onClick}>
                   <span className="sb-thread-dot idle" />
                   {p.name}

@@ -344,6 +344,17 @@
   padding: 12px 10px 6px;
   white-space: nowrap;
 }
+.sb-section-label--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sb-section-label--toggle:hover { color: var(--w-text-tertiary); }
+.sb-section-chev { font-size: 8px; opacity: 0.7; }
 
 /* ─── Scrollable Section (Threads, Agents, Recent) ─── */
 .sb-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
