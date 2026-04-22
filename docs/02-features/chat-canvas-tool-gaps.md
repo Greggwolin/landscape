@@ -1,12 +1,18 @@
 # Chat Canvas — Landscaper Tool Gaps in Unassigned Threads
 
-**Status:** Read-only audit. No tool code has been modified. The backend allows
-unassigned threads (`project_id IS NULL`) to send messages to Landscaper, but
-most tools assume a project context. This document lists which tools are safe
-from an unassigned thread, which will fail, and what each category should do
-when called without a project.
+**Status:** Audit + shim shipped. This document's original recommendation
+(§ Recommendation per category, below) was implemented in the same commit
+(`7f7eee8`, Apr 16 2026). Two-layer guard is now live:
+
+1. **AI filter** — `ai_handler.py` calls `get_tools_for_unassigned()` when
+   `project_id IS NULL`, so Claude only sees the whitelist
+   (`UNASSIGNED_SAFE_TOOLS` in `tool_registry.py`).
+2. **Executor safety net** — `tool_executor.execute_tool()` (lines ~15358-15376)
+   blocks any project-scoped tool that slips through with a structured
+   `project_required` error.
 
 **Audit date:** 2026-04-16
+**Shim implemented:** 2026-04-16 (commit `7f7eee8`)
 **Scope:** tool_registry.py groups (UNIVERSAL_TOOLS + property-type groups
 + INGESTION_TOOLS + WHATIF_TOOLS + ADMIN_TOOLS)
 
@@ -157,28 +163,33 @@ project-scoped)
 
 ## Recommendation per category
 
-Not implemented in this change — this audit is read-only. For the follow-up
-task, a thin guard at the top of `execute_tool` or in each `handler` should:
+**Shipped as of commit `7f7eee8` (Apr 16 2026).** Original recommendation
+text preserved below for reference.
 
-1. If `project_id is None` and the tool is in the "require project" list
-   above, return early with:
+1. ✅ **Implemented.** `execute_tool()` in `tool_executor.py` now returns:
 
    ```python
    return {
        'success': False,
        'error': 'project_required',
-       'message': 'This action needs a project. Create one from this chat, or switch to a project-scoped conversation.',
-       'suggested_next': ['create_project', 'convert_draft_to_project'],
+       'message': f"The tool '{tool_name}' requires a project context. "
+                  "You can create a project from this chat using create_project "
+                  "or convert_draft_to_project, then try again.",
+       'tool': tool_name,
+       'suggested_tools': ['create_project', 'convert_draft_to_project'],
    }
    ```
 
-2. The tool executor already exposes `source_message_id`; include it so the
-   frontend can surface a "Create project from this chat" CTA in the failing
-   assistant turn.
+   when `project_id is None` and `tool_name not in UNASSIGNED_SAFE_TOOLS`.
 
-3. For `ingest_document` specifically, consider teaching it to accept
-   `thread_id` as an alternative scope (writes staging rows against the
-   thread rather than the project). Out of scope for Phase 1.
+2. ⚠️ **Partial.** `source_message_id` is already threaded through
+   `execute_tool` kwargs; frontend "Create project from this chat" CTA
+   on the failing assistant turn is not yet wired. Track separately if
+   needed.
+
+3. 🔲 **Not implemented.** `ingest_document` still requires `project_id`.
+   Teaching it to accept `thread_id` as an alternative scope (staging rows
+   against thread rather than project) remains out of scope for Phase 1.
 
 ## References
 
