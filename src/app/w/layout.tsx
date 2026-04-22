@@ -225,11 +225,16 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         userInitials={user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || user.username[0].toUpperCase() : undefined}
       />
       <CenterChatPanel
-        projectId={initialThreadId ? undefined : (projectId ?? lastProjectId)}
+        projectId={
+          // On /w/chat routes, chat is always unassigned — never leak lastProjectId.
+          // On /w/chat/[threadId], initialThreadId carries its own scope.
+          // Everywhere else, prefer current URL projectId, then last-visited.
+          isChatRoute ? undefined : (projectId ?? lastProjectId)
+        }
         initialThreadId={initialThreadId}
-        projectName={projectData?.project_name}
-        projectLocation={[projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
-        projectTypeCode={projectData?.project_type_code}
+        projectName={isChatRoute ? undefined : projectData?.project_name}
+        projectLocation={isChatRoute ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
+        projectTypeCode={isChatRoute ? undefined : projectData?.project_type_code}
       />
       {!isChatRoute && (
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>

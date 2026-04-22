@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import CIcon from '@coreui/icons-react';
+import { cilPlus, cilCommentSquare } from '@coreui/icons';
 import { LandscaperChatThreaded, LandscaperChatHandle } from '@/components/landscaper/LandscaperChatThreaded';
 import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
+import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
-import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
+import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -107,6 +110,23 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   const [threadTitle, setThreadTitle] = useState<string | null>(null);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
+  // Thread count for the badge on the thread-history toggle button
+  const [threadCount, setThreadCount] = useState<number>(0);
+  useEffect(() => {
+    if (!projectId) { setThreadCount(0); return; }
+    fetch(`${DJANGO_API_URL}/api/landscaper/threads/?project_id=${projectId}&include_closed=true`, {
+      headers: getAuthHeaders(),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.threads)) setThreadCount(data.threads.length);
+      })
+      .catch(() => {});
+  }, [projectId, homepageThreadId]); // refetch after a new thread starts
+
+  // Whether the in-panel thread history drawer is visible
+  const [threadListVisible, setThreadListVisible] = useState(false);
+
   // Ref to the chat component so we can auto-send the initial message
   const chatRef = useRef<LandscaperChatHandle>(null);
   const pendingMessageRef = useRef<string | null>(null);
@@ -173,13 +193,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     setActiveContentContext(null);
   }, [setActiveContentContext]);
 
-  // Hover state for back-to-projects arrow
-  const [backHover, setBackHover] = useState(false);
-
   if (!chatOpen && !isChatRoute) return null;
 
   const getPageContext = () => {
-    // If a modal has been opened, use its derived context (richer than pathname alone)
     if (activeContentContext && isProjectRoot) return activeContentContext;
     if (showHomepage) return 'home';
     if (pathname.includes('/documents')) return 'documents';
@@ -194,69 +210,114 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   return (
     <div className="wrapper-chat-center">
-      {showHomepage && projectName ? (
-        /* ── Project homepage header: back arrow + name + location + type badge ── */
-        <WrapperHeader
-          leading={
-            <button
-              className="w-btn w-btn-ghost w-btn-sm"
-              onClick={() => router.push('/w/projects')}
-              onMouseEnter={() => setBackHover(true)}
-              onMouseLeave={() => setBackHover(false)}
-              style={{ marginRight: '6px', whiteSpace: 'nowrap', fontSize: '12px' }}
-              title="All Projects"
-            >
-              {backHover ? '← All Projects' : '←'}
-            </button>
-          }
-          title={<span className="wrapper-header-title" style={{ fontWeight: 600 }}>{projectName}</span>}
-          titleSuffix={projectLocation ? (
-            <span style={{ fontSize: '11px', color: 'var(--w-text-secondary)', marginLeft: '6px', whiteSpace: 'nowrap' }}>
-              {projectLocation}
+      {/* ── Unified center-panel header: icon + breadcrumb title ── */}
+      <WrapperHeader
+        leading={
+          <LandscaperIcon style={{ width: 24, height: 24, flexShrink: 0 }} />
+        }
+        title={
+          showHomepage ? (
+            <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
+              {projectName || 'Landscaper'}
             </span>
-          ) : undefined}
-          trailing={projectTypeCode ? (
-            <span
-              style={{
-                ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
-                fontSize: '10px',
-                fontWeight: 700,
-                letterSpacing: '0.4px',
-                padding: '2px 7px',
-                borderRadius: '4px',
-                textTransform: 'uppercase',
-                flexShrink: 0,
-              }}
-            >
-              {getPropertyTypeLabel(projectTypeCode)}
+          ) : (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, fontSize: '12px' }}>
+              {projectName && (
+                <>
+                  <span style={{ opacity: 0.55, whiteSpace: 'nowrap', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {projectName}
+                  </span>
+                  <span style={{ opacity: 0.35, flexShrink: 0 }}>/</span>
+                </>
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 2 }}>
+                {threadTitle || 'New conversation'}
+              </span>
             </span>
-          ) : undefined}
-        />
-      ) : (
-        /* ── Thread / chat header ── */
-        <WrapperHeader
-          title={showHomepage ? '' : (threadTitle || 'New conversation')}
-          trailing={
-            <>
-              {isProjectRoot && homepageThreadId && (
-                <button
-                  className="w-btn w-btn-ghost w-btn-sm"
-                  onClick={handleBackToHomepage}
-                  style={{ marginRight: '4px' }}
-                  title="Back to project overview"
-                >
-                  ← Back
-                </button>
-              )}
-              {!showHomepage && !isChatRoute && (
-                <button className="w-btn w-btn-ghost w-btn-sm" onClick={closeChat} title="Close chat panel">
-                  Close
-                </button>
-              )}
-            </>
-          }
-        />
-      )}
+          )
+        }
+        trailing={
+          <>
+            {projectTypeCode && (
+              <span
+                style={{
+                  ...getPropertyTypeBadgeStyle(projectTypeCode, 'soft'),
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  letterSpacing: '0.4px',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                }}
+              >
+                {getPropertyTypeLabel(projectTypeCode)}
+              </span>
+            )}
+            {isProjectRoot && homepageThreadId && (
+              <button
+                className="w-btn w-btn-ghost w-btn-sm"
+                onClick={handleBackToHomepage}
+                style={{ marginRight: '4px' }}
+                title="Back to project overview"
+              >
+                ← Back
+              </button>
+            )}
+            {projectId && !showHomepage && (
+              <button
+                className="w-btn w-btn-icon w-btn-sm"
+                onClick={() => handleStartChat('')}
+                title="New chat in this project"
+              >
+                <CIcon icon={cilPlus} size="sm" />
+              </button>
+            )}
+            {projectId && !showHomepage && (
+              <button
+                className="w-btn w-btn-icon w-btn-sm"
+                onClick={() => setThreadListVisible((v) => !v)}
+                title={threadListVisible ? 'Hide thread history' : 'Show thread history'}
+                style={{ position: 'relative' }}
+              >
+                <CIcon
+                  icon={cilCommentSquare}
+                  size="sm"
+                  style={{ color: threadListVisible ? 'var(--w-accent, #0ea5e9)' : 'inherit' }}
+                />
+                {threadCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      minWidth: 16,
+                      height: 16,
+                      padding: '0 4px',
+                      borderRadius: 8,
+                      background: 'var(--w-accent, #0ea5e9)',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {threadCount}
+                  </span>
+                )}
+              </button>
+            )}
+            {!showHomepage && !isChatRoute && !isProjectRoot && (
+              <button className="w-btn w-btn-ghost w-btn-sm" onClick={closeChat} title="Close chat panel">
+                Close
+              </button>
+            )}
+          </>
+        }
+      />
 
       <div className="wrapper-chat-body">
         {showHomepage ? (
@@ -275,6 +336,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             hideInternalHeader={true}
             initialThreadId={initialThreadId ?? homepageThreadId ?? undefined}
             onToolResult={handleToolResult}
+            showThreadList={threadListVisible}
           />
         )}
       </div>

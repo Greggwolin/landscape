@@ -71,6 +71,8 @@ interface LandscaperChatThreadedProps {
   initialThreadId?: string;
   /** When true, suppresses the internal header (used when parent provides its own header, e.g. `/w/` CenterChatPanel) */
   hideInternalHeader?: boolean;
+  /** External control for the thread-history drawer. When provided, overrides internal toggle state. */
+  showThreadList?: boolean;
 }
 
 /**
@@ -254,9 +256,15 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onToolResult,
     initialThreadId,
     hideInternalHeader = false,
+    showThreadList: showThreadListProp,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
+
+  // Sync external control (from CenterChatPanel) into internal state
+  useEffect(() => {
+    if (showThreadListProp !== undefined) setShowThreadList(showThreadListProp);
+  }, [showThreadListProp]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userHasSentMessage = useRef(false);
