@@ -35,7 +35,7 @@
     "auto-commit:stop": "./scripts/start-auto-commit.sh stop",
     "auto-commit:status": "./scripts/start-auto-commit.sh status",
     "auto-commit:setup": "./scripts/setup-auto-start.sh",
-    "prepare": "husky install",
+    "prepare": "husky",
     "postinstall": "patch-package"
   },
   "dependencies": {
