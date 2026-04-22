@@ -586,6 +586,7 @@ Two distinct failure modes — treat separately:
 - 40+ service files in `backend/apps/knowledge/services/`
 - Cross-project search backend exists, no REST endpoint yet
 - Sync processing: `POST /api/knowledge/documents/{doc_id}/process/`
+- CoStar sale comp extractor: `backend/apps/knowledge/services/costar_extractor.py` — specialized extraction pipeline for CoStar export PDFs, routes through `extraction_service.py` with dedicated field mappings and `extraction_writer.py` for DB persistence
 
 ### Valuation Engine Status
 
@@ -741,6 +742,8 @@ When the user says **"Document"** (standalone or as part of a message), **prepen
 5. **Prepend only** — Never overwrite or edit prior entries. New entries go at the top (newest first).
 6. **Keep it tight** — Each entry should be scannable in 10 seconds.
 
+**Note — nightly automated syncs:** Separately from the user-invoked `Document` command, an automated nightly sync writes one dated file per day to `docs/09_session_notes/YYYY-MM-DD-daily-sync.md`. Those files are machine-generated; do not prepend to them or confuse them with the `session-log.md` stream described above.
+
 ### Adding a New Django Endpoint
 
 1. Create/update model in `backend/apps/{app}/models.py`
@@ -853,8 +856,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-17 (nightly sync — Apr 17: 10 commits. P1 analysis tools added (8 new, 233→241). Test agent framework expanded (S5 map artifact, S6 unassigned threads, S8 ingestion, S10 negative testing). Thread search endpoint. `generate_map_artifact` tool. Wrapper sidebar simplified. Tool gap analysis doc. 5 missing tool schemas fixed. Calibration reports gitignored. Chat Canvas / Unified UI landed Apr 16.)*
+*Last updated: 2026-04-21 (nightly sync — Apr 21: 17 commits. Massive Landscaper expansion day: +16 tools (244→260). LoopNet MCP service + 3 deal-sourcing tools. CoStar sale comp extractor. 3 cost-taxonomy tools + RAG bridge into cost DB. 4 DMS management tools. 6 CRUD gap fixes (expense comps, acq events). Unified-UI refactor: slot-based WrapperHeader, CSS token hygiene. Page context inference from thread tool history. Multiple P2 analysis bug fixes (waterfall, demographics, MF adapter).)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **254** (8 P1 + 3 P2 analysis tools + 6 CRUD gap fixes Apr 21 + 4 DMS management tools Apr 21). CRUD gap fixes: 3 expense comparable tools (get/update/delete), 3 acquisition event tools (get/create/delete). DMS tools: rename_document, update_document_profile, move_document_to_folder, reprocess_document. Also expanded: LOAN_COLUMNS 25→65, SALES_COMP_COLUMNS +3, LEASE_COLUMNS +3. Includes 4 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 remain follow-on.*
+*Landscaper tool count: **260** (8 P1 + 3 P2 analysis tools + 6 CRUD gap fixes Apr 21 + 4 DMS management tools Apr 21 + 3 LoopNet deal-sourcing tools Apr 21 + 3 cost-taxonomy tools Apr 21). CRUD gap fixes: 3 expense comparable tools (get/update/delete), 3 acquisition event tools (get/create/delete). DMS tools: rename_document, update_document_profile, move_document_to_folder, reprocess_document. LoopNet tools: loopnet_search_listings, loopnet_get_listing_detail, loopnet_search_similar. Cost-taxonomy tools: delete_budget_category, get_category_lifecycle_stages, update_category_lifecycle_stages. Also expanded: LOAN_COLUMNS 25→65, SALES_COMP_COLUMNS +3, LEASE_COLUMNS +3. Includes 4 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
