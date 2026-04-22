@@ -55,6 +55,11 @@ interface CenterChatPanelProps {
   projectName?: string;
   projectLocation?: string;
   projectTypeCode?: string;
+  /**
+   * Force-remount key for the chat subtree. Bump this (from the layout's
+   * "New chat" handler) to reset thread state without a page nav.
+   */
+  sessionKey?: string | number;
 }
 
 /**
@@ -65,7 +70,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -156,6 +161,22 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   }, [homepageThreadId]);
 
   const showHomepage = isProjectRoot && !homepageThreadId && !initialThreadId;
+
+  // On /w/chat root (no initialThreadId), when the hook creates a thread on
+  // first message send, replace the URL to /w/chat/[newId] so refresh resumes
+  // and the URL becomes the source of truth.
+  const isUnassignedChatRoot = isChatRoute && !initialThreadId;
+  const handleActiveThreadChange = useCallback(
+    (threadId: string | null) => {
+      if (!isUnassignedChatRoot) return;
+      if (!threadId) return;
+      // Only swap the URL when we're still sitting on /w/chat (not a sub-thread).
+      if (pathname === '/w/chat' || pathname === '/w/chat/') {
+        router.replace(`/w/chat/${threadId}`);
+      }
+    },
+    [isUnassignedChatRoot, pathname, router]
+  );
 
   const handleSelectThread = useCallback((threadId: string, title?: string) => {
     setHomepageThreadId(threadId);
@@ -329,6 +350,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           />
         ) : (
           <LandscaperChatThreaded
+            key={sessionKey ?? 'default'}
             ref={chatRef}
             projectId={projectId}
             pageContext={projectId ? getPageContext() : 'general'}
@@ -336,6 +358,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             hideInternalHeader={true}
             initialThreadId={initialThreadId ?? homepageThreadId ?? undefined}
             onToolResult={handleToolResult}
+            onActiveThreadChange={handleActiveThreadChange}
             showThreadList={threadListVisible}
           />
         )}

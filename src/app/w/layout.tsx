@@ -41,6 +41,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const startX = useRef(0);
   const startWidth = useRef(0);
 
+  // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
+  // thread state (hook refs, message list) is fully discarded.
+  const [chatSessionKey, setChatSessionKey] = useState(0);
+  const handleNewChat = useCallback(() => {
+    setChatSessionKey((k) => k + 1);
+    router.push('/w/chat');
+  }, [router]);
+
   // On /w/chat routes, chat IS the content — hide the right <main> panel
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
 
@@ -210,6 +218,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         onToggleCollapse={handleToggleCollapse}
         sidebarWidth={sidebarWidth}
         onResizeStart={handleResizeStart}
+        onNewChat={handleNewChat}
         threads={mockThreads}
         scheduledAgents={mockScheduled}
         recentProjects={recentProjects.map((p) => ({
@@ -232,6 +241,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           isChatRoute ? undefined : (projectId ?? lastProjectId)
         }
         initialThreadId={initialThreadId}
+        sessionKey={chatSessionKey}
         projectName={isChatRoute ? undefined : projectData?.project_name}
         projectLocation={isChatRoute ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
         projectTypeCode={isChatRoute ? undefined : projectData?.project_type_code}
