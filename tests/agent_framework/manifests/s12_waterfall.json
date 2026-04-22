@@ -1,0 +1,27 @@
+{
+  "field_equals:thread_created": true,
+  "field_equals:p1_tool_called": true,
+  "calibrate:p1_tools": [
+    "calculate_waterfall"
+  ],
+  "calibrate:p1_response_length": 1224,
+  "calibrate:p1_success": true,
+  "calibrate:p1_tier_count": 3,
+  "calibrate:p1_period_count": 85,
+  "field_equals:p1_has_tiers": true,
+  "field_equals:p1_has_periods": true,
+  "field_equals:p1_has_settings": true,
+  "field_equals:p1_has_result": true,
+  "calibrate:p1_result_keys": [
+    "engine",
+    "gp_summary",
+    "lp_summary",
+    "period_results",
+    "project_summary",
+    "success",
+    "tier_config"
+  ],
+  "calibrate:p2_tools": [],
+  "calibrate:p2_response_length": 1402,
+  "field_equals:p2_substantive_response": true
+}

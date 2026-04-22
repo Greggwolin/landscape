@@ -1,0 +1,34 @@
+{
+  "field_equals:thread_created": true,
+  "field_equals:p1_tool_called": true,
+  "calibrate:p1_tools": [
+    "calculate_mf_cashflow"
+  ],
+  "calibrate:p1_response_length": 1127,
+  "calibrate:p1_success": true,
+  "field_equals:p1_has_metrics": true,
+  "calibrate:p1_levered_irr": 0.07845946057185471,
+  "calibrate:p1_unlevered_irr": 0.06265916592188092,
+  "calibrate:p1_levered_npv": -1919599.870812703,
+  "calibrate:p1_unlevered_npv": -7312323.268377323,
+  "calibrate:p1_equity_multiple": 1.3891597147152317,
+  "calibrate:p1_average_dscr": 1.7091086059436407,
+  "field_equals:p1_has_irr": true,
+  "field_equals:p1_has_assumptions": true,
+  "calibrate:p1_hold_period": 60,
+  "calibrate:p1_unit_count": 113,
+  "calibrate:p1_purchase_price": 47500000.0,
+  "field_equals:p2_tool_called": true,
+  "calibrate:p2_tools": [
+    "calculate_mf_cashflow"
+  ],
+  "calibrate:p2_response_length": 1281,
+  "calibrate:p2_success": true,
+  "field_equals:p2_include_monthly_passed": true,
+  "calibrate:p2_has_monthly": true,
+  "calibrate:p2_noi_periods": 60,
+  "calibrate:p2_levered_periods": 61,
+  "calibrate:p3_tools": [],
+  "calibrate:p3_response_length": 1696,
+  "field_equals:p3_substantive_response": true
+}

@@ -1,18 +1,18 @@
 {
-  "calibrate:project_id": 851,
+  "calibrate:project_id": 859,
   "field_equals:project_created": true,
   "field_equals:upload_success": true,
   "field_equals:doc_id_returned": true,
-  "calibrate:doc_id": "742",
+  "calibrate:doc_id": "743",
   "field_equals:has_staging_rows": true,
-  "calibrate:initial_staging_count": 7,
+  "calibrate:initial_staging_count": 6,
   "field_equals:thread_created": true,
   "calibrate:p1_tools": [
     "get_ingestion_staging"
   ],
   "field_equals:p1_get_staging_called": true,
   "field_equals:p1_substantive_response": true,
-  "calibrate:p1_response_length": 660,
+  "calibrate:p1_response_length": 1031,
   "field_equals:p1_mentions_fields": true,
   "calibrate:p2_tools": [
     "explain_extraction",
@@ -21,25 +21,24 @@
   ],
   "field_equals:p2_explain_called": true,
   "field_equals:p2_mentions_source": true,
-  "calibrate:p2_response_length": 558,
+  "calibrate:p2_response_length": 725,
   "calibrate:p3_tools": [
     "update_staging_field"
   ],
   "field_equals:p3_update_called": true,
   "calibrate:p3_mutation_confirmed": false,
   "field_equals:p3_mentions_update": true,
-  "calibrate:p3_response_length": 157,
+  "calibrate:p3_response_length": 187,
   "calibrate:p4_tools": [
-    "get_ingestion_staging",
     "reject_staging_field"
   ],
   "field_equals:p4_reject_called": true,
   "field_equals:p4_mentions_rejection": true,
-  "calibrate:p4_response_length": 125,
+  "calibrate:p4_response_length": 247,
   "calibrate:p5_tools": [
     "approve_staging_field"
   ],
   "field_equals:p5_approve_called": true,
   "field_equals:p5_mentions_approval": true,
-  "calibrate:p5_response_length": 176
+  "calibrate:p5_response_length": 210
 }
