@@ -103,6 +103,13 @@ interface UseLandscaperThreadsOptions {
   projectId?: string;
   pageContext: string;
   subtabContext?: string;
+  /**
+   * URL-derived thread UUID. When set on an unassigned chat, the hook fetches
+   * this exact thread instead of calling the server-side get_or_create flow.
+   * This is how `/w/chat/[threadId]` resumes a conversation without
+   * accidentally resurrecting a different "active" thread.
+   */
+  initialThreadId?: string;
   onFieldUpdate?: (updates: Record<string, unknown>) => void;
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
 }
@@ -184,6 +191,7 @@ export function useLandscaperThreads({
   projectId,
   pageContext,
   subtabContext,
+  initialThreadId,
   onFieldUpdate,
   onToolResult,
 }: UseLandscaperThreadsOptions) {
@@ -352,7 +360,51 @@ export function useLandscaperThreads({
   }, [fetchWithTimeout, getAuthHeaders]);
 
   /**
-   * Get or create an active thread for the current page context.
+   * Load a single thread by UUID. Used by URL-based thread resumption
+   * (`/w/chat/[threadId]`) so we fetch exactly the thread named in the URL
+   * without falling through to get_or_create (which could return a
+   * different active thread).
+   *
+   * Returns the ChatThread on success, or null on 404 / error / abort.
+   */
+  const loadThreadById = useCallback(
+    async (threadId: string): Promise<ChatThread | null> => {
+      try {
+        const response = await fetchWithTimeout(
+          `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`,
+          {
+            headers: getAuthHeaders(false),
+          }
+        );
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.success && data.thread) {
+          return data.thread as ChatThread;
+        }
+        return null;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return null;
+        console.error('[LandscaperThreads] Failed to load thread by id:', err);
+        return null;
+      }
+    },
+    [fetchWithTimeout, getAuthHeaders]
+  );
+
+  /**
+   * Initialize the thread for the current context.
+   *
+   * Branches:
+   * 1. **URL-pinned thread** — if `initialThreadId` is set, fetch that exact
+   *    thread by UUID. No get_or_create fallback. If the fetch fails we leave
+   *    activeThread=null and let the caller / UI surface the miss. This is
+   *    the Chat Canvas resume path (`/w/chat/[threadId]`).
+   * 2. **Project-scoped chat** — existing get_or_create flow. The server
+   *    reactivates or creates a thread keyed on (project, page_context,
+   *    subtab_context). This is the project-page Landscaper behavior.
+   * 3. **Unassigned chat with no URL thread** — DO NOT create anything.
+   *    activeThread stays null, messages stays []. A thread is created
+   *    lazily on the first sendMessage call. This is `/w/chat` root.
    */
   const initializeThread = useCallback(async () => {
     if (initializingRef.current) return;
@@ -367,65 +419,58 @@ export function useLandscaperThreads({
     const mySignal = abortControllerRef.current.signal;
 
     try {
-      // First, try to get existing active thread
-      const loadedThreads = await loadThreads();
+      // --- Branch 1: URL-pinned thread (Chat Canvas resume) ---
+      if (initialThreadId) {
+        const thread = await loadThreadById(initialThreadId);
+        if (mySignal.aborted) return;
 
-      // Bail out if context changed while loading
+        if (thread) {
+          setActiveThread(thread);
+          await loadThreadMessages(thread.threadId);
+          if (mySignal.aborted) return;
+          // Refresh sidebar list so the resumed thread is reflected
+          await loadThreads();
+        } else {
+          // URL pointed at a thread we can't fetch (deleted / bad id / auth).
+          // Don't fall through to get_or_create — that would silently
+          // resurrect a different thread. Leave state empty and let the
+          // user decide what to do.
+          setActiveThread(null);
+          setMessages([]);
+        }
+        return;
+      }
+
+      // --- Branch 3: Unassigned chat, no URL thread → wait for first send ---
+      if (!hasProjectId(projectId)) {
+        // Don't POST anything. activeThread stays null; sendMessage will
+        // create the thread on first user message (Option B semantics).
+        // Still load the sidebar list so past threads are browsable.
+        await loadThreads();
+        if (mySignal.aborted) return;
+        setActiveThread(null);
+        setMessages([]);
+        return;
+      }
+
+      // --- Branch 2: Project-scoped chat — existing get_or_create flow ---
+      const loadedThreads = await loadThreads();
       if (mySignal.aborted) return;
 
       const existingActive = loadedThreads.find((t: ChatThread) => t.isActive);
 
       if (existingActive) {
         setActiveThread(existingActive);
-        // Load messages for this thread
         await loadThreadMessages(existingActive.threadId);
-      } else if (loadedThreads.length > 0) {
-        // No active thread but threads exist for this context —
-        // pick the most recently updated one instead of creating a blank.
-        // The server-side POST (get_or_create) would reactivate anyway,
-        // but doing it here avoids an unnecessary network round-trip.
-        const mostRecent = [...loadedThreads].sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        )[0];
-
-        if (mySignal.aborted) return;
-
-        // Use the server-side get_or_create which will return this thread
-        // (it reactivates or creates as needed, protected by SELECT FOR UPDATE)
-        const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            ...(hasProjectId(projectId) ? { project_id: parseInt(projectId) } : {}),
-            page_context: pageContext,
-            subtab_context: subtabContext || null,
-          }),
-        });
-
-        if (mySignal.aborted) return;
-
-        if (isAuthError(response)) {
-          recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
-          setError('Authentication failed — please refresh the page or log in again');
-          return;
-        }
-
-        const data = await response.json();
-        if (data.success && data.thread) {
-          setActiveThread(data.thread);
-          // Load messages — the reactivated thread may have history
-          await loadThreadMessages(data.thread.threadId);
-          await loadThreads();
-        }
       } else {
-        // No threads at all for this context — create new
-        if (mySignal.aborted) return;
-
+        // No active thread for this (project, page_context) — use
+        // server-side get_or_create (SELECT FOR UPDATE protected). Handles
+        // both "reactivate most recent" and "create new" via one call.
         const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/`, {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
-            ...(hasProjectId(projectId) ? { project_id: parseInt(projectId) } : {}),
+            project_id: parseInt(projectId),
             page_context: pageContext,
             subtab_context: subtabContext || null,
           }),
@@ -434,7 +479,6 @@ export function useLandscaperThreads({
         if (mySignal.aborted) return;
 
         if (isAuthError(response)) {
-          // Auth failure — stop recovery loop, surface immediately
           recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
           setError('Authentication failed — please refresh the page or log in again');
           return;
@@ -443,8 +487,7 @@ export function useLandscaperThreads({
         const data = await response.json();
         if (data.success && data.thread) {
           setActiveThread(data.thread);
-          setMessages([]);
-          // Refresh threads list
+          await loadThreadMessages(data.thread.threadId);
           await loadThreads();
         }
       }
@@ -460,7 +503,7 @@ export function useLandscaperThreads({
       initializingRef.current = false;
       hasInitializedOnceRef.current = true;
     }
-  }, [projectId, pageContext, subtabContext, loadThreads, loadThreadMessages, fetchWithTimeout, getAuthHeaders, isAuthError]);
+  }, [projectId, pageContext, subtabContext, initialThreadId, loadThreads, loadThreadById, loadThreadMessages, fetchWithTimeout, getAuthHeaders, isAuthError]);
 
   /**
    * Select a different thread.
@@ -476,10 +519,27 @@ export function useLandscaperThreads({
 
   /**
    * Start a new thread (closes current one first).
+   *
+   * For project-scoped chats this POSTs `/threads/new/` to bypass
+   * get_or_create. For unassigned chats the UI-preferred path is instead
+   * to clear state and let sendMessage create the thread on first message
+   * (Option B). We keep this callable for project chats and defensive
+   * fallback; unassigned callers should prefer navigating to `/w/chat`
+   * and letting the hook handle the empty state.
    */
   const startNewThread = useCallback(async () => {
     setIsThreadLoading(true);
     try {
+      if (!hasProjectId(projectId)) {
+        // Unassigned — clear state, don't create. sendMessage will create
+        // on first send. Refresh the sidebar list so any existing
+        // unassigned threads remain visible.
+        setActiveThread(null);
+        setMessages([]);
+        await loadThreads();
+        return;
+      }
+
       const response = await fetchWithTimeout(`${DJANGO_API_URL}/api/landscaper/threads/new/`, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -578,21 +638,63 @@ export function useLandscaperThreads({
       }
 
       if (!activeThread) {
-        // Attempt recovery — initializeThread updates activeThreadRef synchronously
-        console.log('[LandscaperThreads] No active thread — attempting recovery before send...');
         setError(null);
-        try {
-          await initializeThread();
-        } catch {
-          // initializeThread sets its own error
+
+        if (!hasProjectId(projectId) && !initialThreadId) {
+          // Unassigned chat, first message — create thread lazily here
+          // (Option B semantics). Bypasses get_or_create so we always
+          // get a fresh thread rather than resurrecting a stale one.
+          try {
+            const response = await fetchWithTimeout(
+              `${DJANGO_API_URL}/api/landscaper/threads/new/`,
+              {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                  page_context: pageContext,
+                  subtab_context: subtabContext || null,
+                }),
+              }
+            );
+
+            if (isAuthError(response)) {
+              setError('Authentication failed — please refresh the page or log in again');
+              return;
+            }
+
+            const data = await response.json();
+            if (data.success && data.thread) {
+              setActiveThread(data.thread);
+              activeThreadRef.current = data.thread;
+              setMessages([]);
+              // Don't await loadThreads here — it's non-blocking sidebar refresh
+              loadThreads();
+            } else {
+              setError(data.error || 'Failed to start new thread');
+              return;
+            }
+          } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            console.error('[LandscaperThreads] Failed to create thread on first send:', err);
+            setError('Failed to start new thread');
+            return;
+          }
+        } else {
+          // Project-scoped or URL-pinned with missing thread — run full
+          // initializeThread recovery. initializeThread keeps
+          // activeThreadRef in sync via the state→ref effect.
+          console.log('[LandscaperThreads] No active thread — attempting recovery before send...');
+          try {
+            await initializeThread();
+          } catch {
+            // initializeThread sets its own error
+          }
+          if (!activeThreadRef.current) {
+            setError('No active thread — please try again');
+            return;
+          }
+          console.log('[LandscaperThreads] Recovery succeeded, proceeding with send');
         }
-        // Check ref (not stale closure) to see if recovery succeeded
-        if (!activeThreadRef.current) {
-          setError('No active thread — please try again');
-          return;
-        }
-        // Recovery succeeded — fall through to send using the ref value
-        console.log('[LandscaperThreads] Recovery succeeded, proceeding with send');
       }
 
       // Use ref for the thread ID in case we just recovered
@@ -708,7 +810,7 @@ export function useLandscaperThreads({
         sendingRef.current = false;
       }
     },
-    [activeThread, projectId, pageContext, onFieldUpdate, onToolResult, loadThreads, initializeThread, fetchWithTimeout, getAuthHeaders, isAuthError]
+    [activeThread, projectId, pageContext, subtabContext, initialThreadId, onFieldUpdate, onToolResult, loadThreads, initializeThread, fetchWithTimeout, getAuthHeaders, isAuthError]
   );
 
   // Keep ref in sync with state so sendMessage recovery can check current value
@@ -716,12 +818,12 @@ export function useLandscaperThreads({
     activeThreadRef.current = activeThread;
   }, [activeThread]);
 
-  // Initialize thread when page context or subtab changes
+  // Initialize thread when page context, subtab, or URL-pinned thread changes.
   // NOTE: initializeThread intentionally excluded from deps to prevent
   // cascading re-renders when its callback deps (loadThreads) change.
   // The context key string captures the meaningful changes.
   useEffect(() => {
-    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext, subtabContext });
+    console.log('[LandscaperThreads] Context changed:', { projectId, pageContext, subtabContext, initialThreadId });
     // Abort any in-flight requests from previous context
     abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
@@ -730,19 +832,27 @@ export function useLandscaperThreads({
     hasInitializedOnceRef.current = false;
     initializeThread();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, pageContext, subtabContext]);
+  }, [projectId, pageContext, subtabContext, initialThreadId]);
 
   // Auto-recover from missing/failed thread — retry with increasing delay.
   // This prevents "No active thread" from being a permanent terminal state
   // (e.g. after ingestion closes and the main Landscaper re-mounts).
+  //
+  // IMPORTANT: only run for project-scoped or URL-pinned threads. On the
+  // unassigned `/w/chat` root we WANT activeThread=null (waiting for the
+  // user's first message); looping recovery here would recreate the old
+  // bug where new-chat mounts silently resurrect a thread.
   const recoveryAttemptsRef = useRef(0);
   const MAX_RECOVERY_ATTEMPTS = 5;
   useEffect(() => {
     // Reset recovery counter when context changes (new mount / new page)
     recoveryAttemptsRef.current = 0;
-  }, [projectId, pageContext, subtabContext]);
+  }, [projectId, pageContext, subtabContext, initialThreadId]);
 
   useEffect(() => {
+    const shouldRecover = hasProjectId(projectId) || !!initialThreadId;
+    if (!shouldRecover) return;
+
     if (
       !activeThread &&
       !isThreadLoading &&
@@ -765,7 +875,7 @@ export function useLandscaperThreads({
     // re-fires when its callback reference changes. The effect triggers
     // on activeThread/isThreadLoading state changes which are the meaningful signals.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeThread, isThreadLoading, error]);
+  }, [activeThread, isThreadLoading, error, projectId, initialThreadId]);
 
   // Reset recovery counter on successful thread acquisition
   useEffect(() => {

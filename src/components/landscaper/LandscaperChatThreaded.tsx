@@ -73,6 +73,12 @@ interface LandscaperChatThreadedProps {
   hideInternalHeader?: boolean;
   /** External control for the thread-history drawer. When provided, overrides internal toggle state. */
   showThreadList?: boolean;
+  /**
+   * Fires whenever the hook's activeThread transitions to a new UUID (or to null).
+   * Parent uses this to sync the URL — on `/w/chat`, the parent does
+   * `router.replace('/w/chat/[newId]')` once the first message creates a thread.
+   */
+  onActiveThreadChange?: (threadId: string | null) => void;
 }
 
 /**
@@ -257,6 +263,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     initialThreadId,
     hideInternalHeader = false,
     showThreadList: showThreadListProp,
+    onActiveThreadChange,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -298,8 +305,21 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     projectId: projectId !== undefined ? projectId.toString() : undefined,
     pageContext,
     subtabContext,
+    initialThreadId,
     onToolResult,
   });
+
+  // Bubble activeThread id changes up to the parent so /w/chat can sync the URL.
+  // Fires on transitions to a new UUID AND on transitions to null, so the
+  // parent can react to new-chat (null → id) and thread-switch (id → id') both.
+  const lastEmittedThreadIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!onActiveThreadChange) return;
+    const current = activeThread?.threadId ?? null;
+    if (lastEmittedThreadIdRef.current === current) return;
+    lastEmittedThreadIdRef.current = current;
+    onActiveThreadChange(current);
+  }, [activeThread?.threadId, onActiveThreadChange]);
 
   // Home/project pages show all threads; other pages filter by page+subtab
   const isHomePage = ['home', 'mf_home', 'land_home'].includes(pageContext);
@@ -318,23 +338,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   // Load all project threads on mount so the badge count is available immediately
   useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
 
-  // URL-based thread activation — when initialThreadId is provided, select that thread
-  const initialThreadAppliedRef = useRef(false);
-  useEffect(() => {
-    if (initialThreadId && !initialThreadAppliedRef.current && !isThreadLoading && threads.length > 0) {
-      if (activeThread?.threadId !== initialThreadId) {
-        // Thread might be in allThreads or threads — try both
-        const found = threads.find(t => t.threadId === initialThreadId)
-          || allThreads.find(t => t.threadId === initialThreadId);
-        if (found) {
-          selectThread(initialThreadId);
-          initialThreadAppliedRef.current = true;
-        }
-      } else {
-        initialThreadAppliedRef.current = true;
-      }
-    }
-  }, [initialThreadId, isThreadLoading, threads, allThreads, activeThread?.threadId, selectThread]);
+  // URL-based thread activation is now handled inside the hook
+  // (useLandscaperThreads accepts `initialThreadId` and fetches the thread
+  // directly by UUID, avoiding the list-filter race this effect used to
+  // work around). Kept as a comment marker in case of regression.
 
   // Sync project landscaper loading state to global context (drives HelpIcon propeller)
   const { setIsThinking } = useLandscaperThinking();
