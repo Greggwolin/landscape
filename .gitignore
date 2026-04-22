@@ -182,3 +182,12 @@ reference/images/screenshots/Untitled.jpg
 
 # Agent framework calibration run reports (per-run output, not baselines)
 tests/agent_framework/reports/
+
+# Claude Code worktree orphans (registered via `git worktree` — files live under .git/worktrees/)
+.claude/worktrees/
+
+# Local test fixtures (not shared)
+test-docs/
+
+# Spent deploy-prompt scratch docs (historical, kept local)
+CC_*.md
