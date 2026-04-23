@@ -81,6 +81,8 @@ UNIVERSAL_TOOLS = [
     "extract_assumptions",
     # Map artifacts
     "generate_map_artifact",
+    # Location Brief artifact (universal, works pre-project)
+    "generate_location_brief",
     # P1 Analysis tools (Apr 2026)
     "list_projects_summary",
     "get_deal_summary",
@@ -227,6 +229,8 @@ UNASSIGNED_SAFE_TOOLS = [
     "approve_staging_field", "reject_staging_field", "explain_extraction",
     # Analysis tools that work without project context
     "list_projects_summary", "list_available_reports",
+    # Universal location intelligence (FRED + Census, no project required)
+    "generate_location_brief",
 ]
 
 

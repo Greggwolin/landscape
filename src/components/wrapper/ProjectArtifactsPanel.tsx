@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
+import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { WrapperHeader } from './WrapperHeader';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -60,7 +61,14 @@ function docTypeLabel(docType: string): string {
 
 export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps) {
   const router = useRouter();
-  const { artifactsOpen, toggleArtifacts, activeMapArtifact, setActiveMapArtifact } = useWrapperUI();
+  const {
+    artifactsOpen,
+    toggleArtifacts,
+    activeMapArtifact,
+    setActiveMapArtifact,
+    activeLocationBrief,
+    setActiveLocationBrief,
+  } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -116,8 +124,15 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — map artifact takes priority when active */}
-      {activeMapArtifact ? (
+      {/* Body — artifact priority: location brief > map > documents list */}
+      {activeLocationBrief ? (
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <LocationBriefArtifact
+            config={activeLocationBrief}
+            onClose={() => setActiveLocationBrief(null)}
+          />
+        </div>
+      ) : activeMapArtifact ? (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <MapArtifactRenderer
             config={activeMapArtifact}

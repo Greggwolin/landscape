@@ -4405,6 +4405,34 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "generate_location_brief",
+        "description": "Generate a property-type-aware economic location brief for any US city. Pulls FRED national + state indicators and Census ACS 5-Year demographics, then narrates with Anthropic. Universal tool — works pre-project from unassigned threads. Result renders as an artifact in the right-side panel. Use when the user asks about a market, metro, city, location, or wants a pre-underwriting snapshot of an area. Depth scales with user intent: 'condensed' for a quick read, 'standard' (default) for most cases, 'comprehensive' only on explicit request for a full T1/T2/T3 × 6 section analysis.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "City, ST (e.g., 'Phoenix, AZ'). Required.",
+                },
+                "property_type": {
+                    "type": "string",
+                    "enum": ["LAND", "MF", "OFF", "RET", "IND", "HTL", "MXU"],
+                    "description": "Target property type code. Shapes the narrative's focus and implications. Default: LAND.",
+                },
+                "depth": {
+                    "type": "string",
+                    "enum": ["condensed", "standard", "comprehensive"],
+                    "description": "Brief depth. condensed = ~4 sections, standard = ~8 sections (default), comprehensive = ~18 sections (full T1/T2/T3).",
+                },
+                "force_refresh": {
+                    "type": "boolean",
+                    "description": "Skip cache and regenerate. Default false. Use only when user explicitly asks for fresh data.",
+                },
+            },
+            "required": ["location"],
+        },
+    },
+    {
         "name": "log_alpha_feedback",
         "description": "Log user feedback (bug, suggestion, question) from chat.",
         "input_schema": {

@@ -29,6 +29,46 @@ export interface MapArtifactConfig {
   project_id?: number;
 }
 
+/** Location Brief artifact config returned by generate_location_brief tool. */
+export interface LocationBriefArtifactConfig {
+  title: string;
+  location_display: string;
+  property_type: string;
+  property_type_label: string;
+  depth: 'condensed' | 'standard' | 'comprehensive';
+  center?: [number, number] | null; // [lng, lat]
+  geo_hierarchy: {
+    city?: string;
+    state?: string;
+    state_abbrev?: string;
+    county?: string;
+  };
+  summary: string;
+  sections: Array<{ title: string; content: string }>;
+  indicators: {
+    fred?: Record<string, {
+      series_id: string;
+      value: number | null;
+      date?: string;
+      yoy_pct?: number | null;
+      next_release?: string | null;
+    }>;
+    census?: {
+      population?: number | null;
+      median_hh_income?: number | null;
+      median_home_value?: number | null;
+      owner_occ_pct?: number | null;
+      vintage?: string;
+      data_as_of?: string;
+    };
+  };
+  data_as_of: string;
+  cached: boolean;
+  cached_at?: string;
+  /** True when we have enough info (city+state+property_type) to offer a "Create Project" CTA. */
+  project_ready: boolean;
+}
+
 interface WrapperUIContextValue {
   chatOpen: boolean;
   toggleChat: () => void;
@@ -43,6 +83,9 @@ interface WrapperUIContextValue {
   /** Active map artifact — set by Landscaper tool result, rendered in artifacts panel. */
   activeMapArtifact: MapArtifactConfig | null;
   setActiveMapArtifact: (config: MapArtifactConfig | null) => void;
+  /** Active location brief artifact — set by generate_location_brief tool. */
+  activeLocationBrief: LocationBriefArtifactConfig | null;
+  setActiveLocationBrief: (config: LocationBriefArtifactConfig | null) => void;
   /** Chat search overlay state. */
   searchOpen: boolean;
   openSearch: () => void;
@@ -63,6 +106,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [chatOpen, setChatOpen] = useState(true);
   const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
   const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
+  const [activeLocationBrief, setActiveLocationBrief] = useState<LocationBriefArtifactConfig | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
   // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
@@ -92,6 +136,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
       activeMapArtifact, setActiveMapArtifact,
+      activeLocationBrief, setActiveLocationBrief,
       searchOpen, openSearch, closeSearch,
       activeContentContext, setActiveContentContext,
     }}>

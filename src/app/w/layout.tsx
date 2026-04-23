@@ -4,6 +4,8 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
+import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifact';
+import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
 import { WrapperUIProvider, useWrapperUI } from '@/contexts/WrapperUIContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { HelpLandscaperProvider, useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
@@ -32,7 +34,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { theme, toggleTheme } = useTheme();
-  const { rightPanelNarrow, openSearch } = useWrapperUI();
+  const {
+    rightPanelNarrow,
+    openSearch,
+    activeLocationBrief,
+    setActiveLocationBrief,
+    activeMapArtifact,
+    setActiveMapArtifact,
+  } = useWrapperUI();
   const { logout, user } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -248,6 +257,24 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       />
       {!isChatRoute && (
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
+      )}
+      {/* On unassigned chat routes, surface artifacts in a right-side slot when
+          the Landscaper dispatches one (location brief, map). Otherwise the
+          main column is hidden on chat routes — see isChatRoute check above. */}
+      {isChatRoute && (activeLocationBrief || activeMapArtifact) && (
+        <aside className="artifacts-panel">
+          {activeLocationBrief ? (
+            <LocationBriefArtifact
+              config={activeLocationBrief}
+              onClose={() => setActiveLocationBrief(null)}
+            />
+          ) : activeMapArtifact ? (
+            <MapArtifactRenderer
+              config={activeMapArtifact}
+              onClose={() => setActiveMapArtifact(null)}
+            />
+          ) : null}
+        </aside>
       )}
       <HelpLandscaperPanel />
     </div>
