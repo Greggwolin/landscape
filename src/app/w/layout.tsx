@@ -20,6 +20,10 @@ const MAX_SIDEBAR_WIDTH = 450;
 const COLLAPSE_THRESHOLD = 120;
 const COLLAPSED_WIDTH = 48;
 
+const DEFAULT_RIGHT_PANEL_WIDTH = 420;
+const MIN_RIGHT_PANEL_WIDTH = 320;
+const MAX_RIGHT_PANEL_WIDTH = 900;
+
 interface ProjectData {
   project_name: string;
   project_type_code?: string;
@@ -49,6 +53,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  // Right-side artifacts panel (appears on /w/chat when a brief/map is active)
+  const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
+  const isRightResizing = useRef(false);
+  const rightStartX = useRef(0);
+  const rightStartWidth = useRef(0);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.
@@ -184,6 +194,35 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     [sidebarWidth]
   );
 
+  const handleRightResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      isRightResizing.current = true;
+      rightStartX.current = e.clientX;
+      rightStartWidth.current = rightPanelWidth;
+
+      const handleMove = (ev: PointerEvent) => {
+        if (!isRightResizing.current) return;
+        // Dragging left increases the width of a right-docked panel
+        const delta = rightStartX.current - ev.clientX;
+        const newWidth = rightStartWidth.current + delta;
+        setRightPanelWidth(
+          Math.min(Math.max(newWidth, MIN_RIGHT_PANEL_WIDTH), MAX_RIGHT_PANEL_WIDTH)
+        );
+      };
+
+      const handleUp = () => {
+        isRightResizing.current = false;
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
+      };
+
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
+    },
+    [rightPanelWidth]
+  );
+
   // Mock data for sidebar sections until real sources wired
   const mockThreads = [
     { id: 't1', name: 'OM ingestion — Brownstone', isActive: true },
@@ -262,19 +301,35 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           the Landscaper dispatches one (location brief, map). Otherwise the
           main column is hidden on chat routes — see isChatRoute check above. */}
       {isChatRoute && (activeLocationBrief || activeMapArtifact) && (
-        <aside className="artifacts-panel">
-          {activeLocationBrief ? (
-            <LocationBriefArtifact
-              config={activeLocationBrief}
-              onClose={() => setActiveLocationBrief(null)}
-            />
-          ) : activeMapArtifact ? (
-            <MapArtifactRenderer
-              config={activeMapArtifact}
-              onClose={() => setActiveMapArtifact(null)}
-            />
-          ) : null}
-        </aside>
+        <>
+          {/* Drag handle — lives on the LEFT edge of the right panel */}
+          <div
+            className="wrapper-drag-handle"
+            onPointerDown={handleRightResizeStart}
+            style={{
+              cursor: 'col-resize',
+              width: 4,
+              flexShrink: 0,
+              background: 'transparent',
+            }}
+          />
+          <aside
+            className="artifacts-panel"
+            style={{ width: rightPanelWidth, flexShrink: 0 }}
+          >
+            {activeLocationBrief ? (
+              <LocationBriefArtifact
+                config={activeLocationBrief}
+                onClose={() => setActiveLocationBrief(null)}
+              />
+            ) : activeMapArtifact ? (
+              <MapArtifactRenderer
+                config={activeMapArtifact}
+                onClose={() => setActiveMapArtifact(null)}
+              />
+            ) : null}
+          </aside>
+        </>
       )}
       <HelpLandscaperPanel />
     </div>

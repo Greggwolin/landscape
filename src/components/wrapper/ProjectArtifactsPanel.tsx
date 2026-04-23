@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { WrapperHeader } from './WrapperHeader';
+
+const DEFAULT_ARTIFACTS_WIDTH = 420;
+const MIN_ARTIFACTS_WIDTH = 320;
+const MAX_ARTIFACTS_WIDTH = 900;
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -72,6 +76,40 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Draggable width (LEFT-edge handle, dragging left widens the panel)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_ARTIFACTS_WIDTH);
+  const isResizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      startX.current = e.clientX;
+      startWidth.current = panelWidth;
+
+      const handleMove = (ev: PointerEvent) => {
+        if (!isResizing.current) return;
+        const delta = startX.current - ev.clientX;
+        const newWidth = startWidth.current + delta;
+        setPanelWidth(
+          Math.min(Math.max(newWidth, MIN_ARTIFACTS_WIDTH), MAX_ARTIFACTS_WIDTH)
+        );
+      };
+
+      const handleUp = () => {
+        isResizing.current = false;
+        document.removeEventListener('pointermove', handleMove);
+        document.removeEventListener('pointerup', handleUp);
+      };
+
+      document.addEventListener('pointermove', handleMove);
+      document.addEventListener('pointerup', handleUp);
+    },
+    [panelWidth]
+  );
+
   useEffect(() => {
     setIsLoading(true);
     fetch(`${DJANGO_API_URL}/api/dms/documents/?project_id=${projectId}`, {
@@ -108,7 +146,19 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
 
   /* ── Expanded panel ── */
   return (
-    <div className="artifacts-panel">
+    <>
+      {/* Drag handle on LEFT edge */}
+      <div
+        className="wrapper-drag-handle"
+        onPointerDown={handleResizeStart}
+        style={{
+          cursor: 'col-resize',
+          width: 4,
+          flexShrink: 0,
+          background: 'transparent',
+        }}
+      />
+      <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
       {/* Header */}
       <WrapperHeader
         title="Artifacts"
@@ -242,6 +292,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         )}
       </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
