@@ -356,9 +356,17 @@ Target property type: {property_label}.
 
 Writing rules:
 - Professional, analytical, dense. Each section = 1-2 short paragraphs, 3-4 sentences.
-- Cite specific numbers inline. No filler. No bullets. No markdown.
+- The numeric indicators below are already rendered as tiles in the UI above
+  the narrative. DO NOT restate the raw numbers (unemployment rate %, Fed Funds %,
+  CPI index, population count, median HH income $, median home value $, etc.).
+  Refer to them directionally instead — "elevated", "softening", "above the
+  national average", "well below peer metros". Cite a specific figure only when
+  you are comparing it to something not already in the tiles (e.g., historical
+  baseline, peer market, asset-class threshold).
+- No filler. No bullets. No markdown.
 - Where data is unavailable, omit quietly. Do not invent numbers.
-- Summary = 2-3 sentences max. Tight executive snapshot.
+- Summary = 2-3 sentences. A genuine executive takeaway — what the tiles MEAN
+  for the target property type, not a recitation of what they say.
 - Tailor implications to the {property_label} asset class.
 
 Respond with ONLY valid JSON matching this schema:
