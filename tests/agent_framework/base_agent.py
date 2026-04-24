@@ -202,19 +202,28 @@ class BaseAgent:
     # ── Thread Management ────────────────────────────────────────────────
 
     def create_thread(self, project_id: Optional[int] = None,
-                      page_context: str = 'general') -> str:
-        """Create a new Landscaper thread. Returns thread UUID."""
+                      page_context: str = 'general',
+                      force_new: bool = False) -> str:
+        """Create a new Landscaper thread. Returns thread UUID.
+
+        The default POST /threads/ is idempotent — it returns the existing
+        active thread for (project_id, page_context) if one exists. Pass
+        force_new=True to route through POST /threads/new/ which closes any
+        existing active thread first and creates a fresh one (needed for
+        intent-resolution tests that require no prior-message context bleed).
+        """
         self._ensure_auth()
 
         body: dict = {'page_context': page_context}
         if project_id is not None:
             body['project_id'] = project_id
 
-        self._log_step('create_thread', 'Creating thread', body)
+        endpoint = f'{config.THREADS_ENDPOINT}new/' if force_new else config.THREADS_ENDPOINT
+        self._log_step('create_thread', 'Creating thread', {**body, 'force_new': force_new})
 
         try:
             resp = self.session.post(
-                config.THREADS_ENDPOINT,
+                endpoint,
                 json=body,
                 timeout=config.API_TIMEOUT,
             )

@@ -1,0 +1,728 @@
+{
+  "calibrate:tier1_synonyms_counts": {
+    "pass": 9,
+    "partial": 1,
+    "miss": 0,
+    "fail": 0
+  },
+  "calibrate:tier1_synonyms_details": [
+    {
+      "idx": 1,
+      "prompt": "Give me an area report on Queen Creek, AZ for land development",
+      "note": "synonym: area report",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Queen Creek, AZ",
+      "actual_city": "Queen Creek",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Queen Creek",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 2,
+      "prompt": "Market overview for Bellflower, CA \u2014 small apartments",
+      "note": "synonym: market overview",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Bellflower, CA",
+      "actual_city": "Bellflower",
+      "actual_state": "CA",
+      "actual_pt": "MF",
+      "expected_city": "Bellflower",
+      "expected_state": "CA",
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 3,
+      "prompt": "Economic brief on Tempe, AZ for office",
+      "note": "synonym: economic brief",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Tempe, AZ",
+      "actual_city": "Tempe",
+      "actual_state": "AZ",
+      "actual_pt": "OFF",
+      "expected_city": "Tempe",
+      "expected_state": "AZ",
+      "expected_pt": "OFF"
+    },
+    {
+      "idx": 4,
+      "prompt": "Neighborhood profile for Mesa, AZ \u2014 retail",
+      "note": "synonym: neighborhood profile",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Mesa, AZ",
+      "actual_city": "Mesa",
+      "actual_state": "AZ",
+      "actual_pt": "RET",
+      "expected_city": "Mesa",
+      "expected_state": "AZ",
+      "expected_pt": "RET"
+    },
+    {
+      "idx": 5,
+      "prompt": "Research Goodyear, AZ",
+      "note": "synonym: research (no PT \u2192 generic)",
+      "outcome": "partial",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Goodyear, AZ",
+      "actual_city": "Goodyear",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Goodyear",
+      "expected_state": "AZ",
+      "expected_pt": null
+    },
+    {
+      "idx": 6,
+      "prompt": "What's the market intel on Scottsdale, AZ for hotel",
+      "note": "synonym: market intel",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Scottsdale, AZ",
+      "actual_city": "Scottsdale",
+      "actual_state": "AZ",
+      "actual_pt": "HTL",
+      "expected_city": "Scottsdale",
+      "expected_state": "AZ",
+      "expected_pt": "HTL"
+    },
+    {
+      "idx": 7,
+      "prompt": "Pull a regional summary for Austin, TX mixed-use",
+      "note": "synonym: regional summary",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Austin, TX",
+      "actual_city": "Austin",
+      "actual_state": "TX",
+      "actual_pt": "MXU",
+      "expected_city": "Austin",
+      "expected_state": "TX",
+      "expected_pt": "MXU"
+    },
+    {
+      "idx": 8,
+      "prompt": "Area overview \u2014 Chandler, AZ, multifamily",
+      "note": "synonym: area overview",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Chandler, AZ",
+      "actual_city": "Chandler",
+      "actual_state": "AZ",
+      "actual_pt": "MF",
+      "expected_city": "Chandler",
+      "expected_state": "AZ",
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 9,
+      "prompt": "Give me the market snapshot for Gilbert, AZ land",
+      "note": "synonym: market snapshot",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Gilbert, AZ",
+      "actual_city": "Gilbert",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Gilbert",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 10,
+      "prompt": "Demographic and economic profile of Phoenix, AZ for industrial",
+      "note": "synonym: demographic and economic profile",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Phoenix, AZ",
+      "actual_city": "Phoenix",
+      "actual_state": "AZ",
+      "actual_pt": "IND",
+      "expected_city": "Phoenix",
+      "expected_state": "AZ",
+      "expected_pt": "IND"
+    }
+  ],
+  "field_equals:tier1_synonyms_passes_threshold": true,
+  "calibrate:tier2_indirect_counts": {
+    "pass": 6,
+    "partial": 2,
+    "miss": 1,
+    "fail": 1
+  },
+  "calibrate:tier2_indirect_details": [
+    {
+      "idx": 1,
+      "prompt": "I'm underwriting a 40-acre parcel in Queen Creek, AZ \u2014 what should I know",
+      "note": "indirect: underwriting parcel",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Queen Creek, AZ",
+      "actual_city": "Queen Creek",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Queen Creek",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 2,
+      "prompt": "Looking at Class A office in Tempe, AZ \u2014 tell me about the area",
+      "note": "indirect: Class A office",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Tempe, AZ",
+      "actual_city": "Tempe",
+      "actual_state": "AZ",
+      "actual_pt": "OFF",
+      "expected_city": "Tempe",
+      "expected_state": "AZ",
+      "expected_pt": "OFF"
+    },
+    {
+      "idx": 3,
+      "prompt": "Considering a retail strip center acquisition in Mesa, AZ",
+      "note": "indirect: strip center acquisition",
+      "outcome": "miss",
+      "tools_fired": [
+        "create_analysis_draft"
+      ]
+    },
+    {
+      "idx": 4,
+      "prompt": "What's going on economically in Gilbert, AZ",
+      "note": "indirect: economic (no PT \u2192 generic)",
+      "outcome": "partial",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Gilbert, AZ",
+      "actual_city": "Gilbert",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Gilbert",
+      "expected_state": "AZ",
+      "expected_pt": null
+    },
+    {
+      "idx": 5,
+      "prompt": "Background on Scottsdale, AZ for a boutique hotel investment",
+      "note": "indirect: boutique hotel",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Scottsdale, AZ",
+      "actual_city": "Scottsdale",
+      "actual_state": "AZ",
+      "actual_pt": "HTL",
+      "expected_city": "Scottsdale",
+      "expected_state": "AZ",
+      "expected_pt": "HTL"
+    },
+    {
+      "idx": 6,
+      "prompt": "Tell me everything about Chandler, AZ for multifamily",
+      "note": "indirect: tell me everything",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Chandler, AZ",
+      "actual_city": "Chandler",
+      "actual_state": "AZ",
+      "actual_pt": "MF",
+      "expected_city": "Chandler",
+      "expected_state": "AZ",
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 7,
+      "prompt": "I'm evaluating an industrial deal in Goodyear, AZ",
+      "note": "indirect: industrial deal",
+      "outcome": "fail",
+      "reason": "no tool fired",
+      "content_snippet": "I'll help you analyze that industrial deal in Goodyear. Let me start by gathering some basic information about the property and what type of analysis you're looking for.\n\nWhat can you tell me about th"
+    },
+    {
+      "idx": 8,
+      "prompt": "Help me understand the Phoenix, AZ market",
+      "note": "indirect: understand market (no PT \u2192 generic)",
+      "outcome": "partial",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Phoenix, AZ",
+      "actual_city": "Phoenix",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Phoenix",
+      "expected_state": "AZ",
+      "expected_pt": null
+    },
+    {
+      "idx": 9,
+      "prompt": "Walk me through Austin, TX for a mixed-use project",
+      "note": "indirect: walk me through",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Austin, TX",
+      "actual_city": "Austin",
+      "actual_state": "TX",
+      "actual_pt": "MXU",
+      "expected_city": "Austin",
+      "expected_state": "TX",
+      "expected_pt": "MXU"
+    },
+    {
+      "idx": 10,
+      "prompt": "Before I dig into this Bellflower CA apartment deal, what should I know",
+      "note": "indirect: apartment deal",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Bellflower, CA",
+      "actual_city": "Bellflower",
+      "actual_state": "CA",
+      "actual_pt": "MF",
+      "expected_city": "Bellflower",
+      "expected_state": "CA",
+      "expected_pt": "MF"
+    }
+  ],
+  "field_equals:tier2_indirect_passes_threshold": false,
+  "calibrate:tier3_pt_fuzzing_counts": {
+    "pass": 10,
+    "partial": 0,
+    "miss": 0,
+    "fail": 0
+  },
+  "calibrate:tier3_pt_fuzzing_details": [
+    {
+      "idx": 1,
+      "prompt": "Location brief for Queen Creek, AZ \u2014 40-acre entitled parcel",
+      "note": "PT: entitled parcel \u2192 LAND",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Queen Creek, AZ",
+      "actual_city": "Queen Creek",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Queen Creek",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 2,
+      "prompt": "Location brief for Gilbert, AZ \u2014 raw land for a subdivision",
+      "note": "PT: raw land / subdivision \u2192 LAND",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Gilbert, AZ",
+      "actual_city": "Gilbert",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Gilbert",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 3,
+      "prompt": "Location brief for Bellflower, CA \u2014 small apartment complex",
+      "note": "PT: apartment complex \u2192 MF",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Bellflower, CA",
+      "actual_city": "Bellflower",
+      "actual_state": "CA",
+      "actual_pt": "MF",
+      "expected_city": "Bellflower",
+      "expected_state": "CA",
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 4,
+      "prompt": "Location brief for Tempe, AZ \u2014 Class A office tower",
+      "note": "PT: Class A office tower \u2192 OFF",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Tempe, AZ",
+      "actual_city": "Tempe",
+      "actual_state": "AZ",
+      "actual_pt": "OFF",
+      "expected_city": "Tempe",
+      "expected_state": "AZ",
+      "expected_pt": "OFF"
+    },
+    {
+      "idx": 5,
+      "prompt": "Location brief for Chandler, AZ \u2014 medical office building",
+      "note": "PT: medical office \u2192 OFF",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Chandler, AZ",
+      "actual_city": "Chandler",
+      "actual_state": "AZ",
+      "actual_pt": "OFF",
+      "expected_city": "Chandler",
+      "expected_state": "AZ",
+      "expected_pt": "OFF"
+    },
+    {
+      "idx": 6,
+      "prompt": "Location brief for Mesa, AZ \u2014 power center",
+      "note": "PT: power center \u2192 RET",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Mesa, AZ",
+      "actual_city": "Mesa",
+      "actual_state": "AZ",
+      "actual_pt": "RET",
+      "expected_city": "Mesa",
+      "expected_state": "AZ",
+      "expected_pt": "RET"
+    },
+    {
+      "idx": 7,
+      "prompt": "Location brief for Phoenix, AZ \u2014 distribution warehouse",
+      "note": "PT: distribution warehouse \u2192 IND",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Phoenix, AZ",
+      "actual_city": "Phoenix",
+      "actual_state": "AZ",
+      "actual_pt": "IND",
+      "expected_city": "Phoenix",
+      "expected_state": "AZ",
+      "expected_pt": "IND"
+    },
+    {
+      "idx": 8,
+      "prompt": "Location brief for Goodyear, AZ \u2014 cold storage facility",
+      "note": "PT: cold storage \u2192 IND",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Goodyear, AZ",
+      "actual_city": "Goodyear",
+      "actual_state": "AZ",
+      "actual_pt": "IND",
+      "expected_city": "Goodyear",
+      "expected_state": "AZ",
+      "expected_pt": "IND"
+    },
+    {
+      "idx": 9,
+      "prompt": "Location brief for Scottsdale, AZ \u2014 boutique hotel",
+      "note": "PT: boutique hotel \u2192 HTL",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Scottsdale, AZ",
+      "actual_city": "Scottsdale",
+      "actual_state": "AZ",
+      "actual_pt": "HTL",
+      "expected_city": "Scottsdale",
+      "expected_state": "AZ",
+      "expected_pt": "HTL"
+    },
+    {
+      "idx": 10,
+      "prompt": "Location brief for Austin, TX \u2014 live-work mixed-use development",
+      "note": "PT: live-work mixed-use \u2192 MXU",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Austin, TX",
+      "actual_city": "Austin",
+      "actual_state": "TX",
+      "actual_pt": "MXU",
+      "expected_city": "Austin",
+      "expected_state": "TX",
+      "expected_pt": "MXU"
+    }
+  ],
+  "field_equals:tier3_pt_fuzzing_passes_threshold": true,
+  "calibrate:tier4_location_fuzzing_counts": {
+    "pass": 10,
+    "partial": 0,
+    "miss": 0,
+    "fail": 0
+  },
+  "calibrate:tier4_location_fuzzing_details": [
+    {
+      "idx": 1,
+      "prompt": "Location brief for Bellflower, California, multifamily",
+      "note": "loc: full state name",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Bellflower, CA",
+      "actual_city": "Bellflower",
+      "actual_state": "CA",
+      "actual_pt": "MF",
+      "expected_city": "Bellflower",
+      "expected_state": "CA",
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 2,
+      "prompt": "Location brief for Gilbert AZ land dev",
+      "note": "loc: no comma",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Gilbert, AZ",
+      "actual_city": "Gilbert",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Gilbert",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 3,
+      "prompt": "Location brief for Tempe, Maricopa County, office",
+      "note": "loc: county \u2192 AZ",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Tempe, AZ",
+      "actual_city": "Tempe",
+      "actual_state": "AZ",
+      "actual_pt": "OFF",
+      "expected_city": "Tempe",
+      "expected_state": "AZ",
+      "expected_pt": "OFF"
+    },
+    {
+      "idx": 4,
+      "prompt": "Location brief for Queen Creek (Phoenix area) land",
+      "note": "loc: parenthetical region",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Queen Creek, AZ",
+      "actual_city": "Queen Creek",
+      "actual_state": "AZ",
+      "actual_pt": "LAND",
+      "expected_city": "Queen Creek",
+      "expected_state": "AZ",
+      "expected_pt": "LAND"
+    },
+    {
+      "idx": 5,
+      "prompt": "Location brief for the city of Scottsdale, Arizona, hotel",
+      "note": "loc: city of + full state",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Scottsdale, AZ",
+      "actual_city": "Scottsdale",
+      "actual_state": "AZ",
+      "actual_pt": "HTL",
+      "expected_city": "Scottsdale",
+      "expected_state": "AZ",
+      "expected_pt": "HTL"
+    },
+    {
+      "idx": 6,
+      "prompt": "Location brief for Bellflower \u2014 multifamily",
+      "note": "loc: no state \u2192 default (calibration: most common)",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Bellflower, CA",
+      "actual_city": "Bellflower",
+      "actual_state": "CA",
+      "actual_pt": "MF",
+      "expected_city": "Bellflower",
+      "expected_state": null,
+      "expected_pt": "MF"
+    },
+    {
+      "idx": 7,
+      "prompt": "Location brief for 85225 retail",
+      "note": "loc: ZIP \u2192 Chandler, AZ",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Chandler, AZ",
+      "actual_city": "Chandler",
+      "actual_state": "AZ",
+      "actual_pt": "RET",
+      "expected_city": "Chandler",
+      "expected_state": "AZ",
+      "expected_pt": "RET"
+    },
+    {
+      "idx": 8,
+      "prompt": "Location brief for Mesa in Phoenix MSA, industrial",
+      "note": "loc: MSA reference",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Mesa, AZ",
+      "actual_city": "Mesa",
+      "actual_state": "AZ",
+      "actual_pt": "IND",
+      "expected_city": "Mesa",
+      "expected_state": "AZ",
+      "expected_pt": "IND"
+    },
+    {
+      "idx": 9,
+      "prompt": "Location brief for Austin, Central Texas, mixed-use",
+      "note": "loc: regional name",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Austin, TX",
+      "actual_city": "Austin",
+      "actual_state": "TX",
+      "actual_pt": "MXU",
+      "expected_city": "Austin",
+      "expected_state": "TX",
+      "expected_pt": "MXU"
+    },
+    {
+      "idx": 10,
+      "prompt": "Location brief for Springfield warehouse",
+      "note": "loc: ambiguous city \u2192 default (calibration: most common)",
+      "outcome": "pass",
+      "tools_fired": [
+        "generate_location_brief"
+      ],
+      "actual_location_raw": "Springfield, IL",
+      "actual_city": "Springfield",
+      "actual_state": "IL",
+      "actual_pt": "IND",
+      "expected_city": "Springfield",
+      "expected_state": null,
+      "expected_pt": "IND"
+    }
+  ],
+  "field_equals:tier4_location_fuzzing_passes_threshold": true,
+  "calibrate:tier_negative_counts": {
+    "pass": 5,
+    "fail": 0
+  },
+  "calibrate:tier_negative_details": [
+    {
+      "idx": 1,
+      "prompt": "What's the cap rate in Bellflower, CA multifamily",
+      "note": "neg: cap rate (market data)",
+      "outcome": "pass",
+      "tools_fired": [
+        "query_platform_knowledge",
+        "query_platform_knowledge",
+        "query_platform_knowledge"
+      ]
+    },
+    {
+      "idx": 2,
+      "prompt": "Show me land sale comps in Queen Creek, AZ",
+      "note": "neg: sale comps",
+      "outcome": "pass",
+      "tools_fired": [
+        "query_platform_knowledge",
+        "query_platform_knowledge"
+      ]
+    },
+    {
+      "idx": 3,
+      "prompt": "What's office vacancy in Tempe, AZ",
+      "note": "neg: vacancy stat",
+      "outcome": "pass",
+      "tools_fired": [
+        "query_platform_knowledge",
+        "query_platform_knowledge"
+      ]
+    },
+    {
+      "idx": 4,
+      "prompt": "Who are the top industrial brokers in Phoenix, AZ",
+      "note": "neg: brokers list",
+      "outcome": "pass",
+      "tools_fired": [
+        "query_platform_knowledge",
+        "query_platform_knowledge"
+      ]
+    },
+    {
+      "idx": 5,
+      "prompt": "What's the zoning for retail in Gilbert, AZ",
+      "note": "neg: zoning lookup",
+      "outcome": "pass",
+      "tools_fired": [
+        "query_platform_knowledge",
+        "query_platform_knowledge"
+      ]
+    }
+  ],
+  "field_equals:tier_negative_passes_threshold": true,
+  "calibrate:total_positive_pass": 35,
+  "calibrate:total_positive_attempts": 40,
+  "calibrate:positive_pass_rate": 0.875,
+  "calibrate:total_negative_pass": 5,
+  "calibrate:negative_pass_rate": 1.0,
+  "calibrate:overall_pass_rate": 0.8888888888888888,
+  "field_equals:overall_passes_80pct": true
+}
