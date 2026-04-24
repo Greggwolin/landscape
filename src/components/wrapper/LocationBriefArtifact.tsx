@@ -12,20 +12,8 @@ interface LocationBriefArtifactProps {
 /**
  * Renders a generate_location_brief tool result in the right artifacts panel.
  *
- * Round 3 refinements (Apr 2026):
- *   1. No green "Multifamily" pill, no "Standard" badge — property type is a
- *      small neutral inline badge; depth tier is dropped from the header.
- *   2. Data cards remain tabular (5 groups), but rows now reflect tiered
- *      Census geography (United States / State / County / City) so the city
- *      label can't mask state-level numbers.
- *   3. Source labels on each row are gone — the footer says it once.
- *   4. Executive Summary is plain prose (no green shading callout).
- *   5. "Show detail" is compressed (smaller type, tighter spacing, no
- *      oversize section headers).
- *   6. No "Create Project" CTA. A location brief alone is not project
- *      scaffolding; Landscaper decides when to offer that path.
- *
- * Artifact still uses a hardcoded LIGHT palette — does NOT inherit app theme.
+ * Preserves R3: flat header, plain Exec Summary, compressed Show-Detail,
+ * consolidated footer, no CreateProjectCTA, hardcoded light palette.
  */
 
 /* ─── Light palette (artifact-scoped, does NOT inherit app theme) ────── */
@@ -39,8 +27,7 @@ const P = {
   accent: '#2e6f40',
   border: '#d9d9d4',
   borderSoft: '#ececea',
-  badgeBg: '#f0efec',
-  badgeInk: '#3a3a3a',
+  headerBg: '#f4f3f0',
   up: '#2e6f40',
   down: '#b64040',
 } as const;
@@ -52,15 +39,23 @@ type FredEntry = {
   yoy_pct?: number | null;
 };
 
-type Row = {
-  geoName: string;
+/** One value cell in a matrix: a display value + optional YoY delta. */
+type Cell = {
   value: string;
   yoy: number | null;
 };
 
-type CardSpec = {
+/** A matrix row: indicator label + one cell per geo column. */
+type MatrixRow = {
+  indicator: string;
+  cells: (Cell | null)[];
+};
+
+/** A full matrix table spec. */
+type Matrix = {
   title: string;
-  rows: Row[];
+  columns: string[];
+  rows: MatrixRow[];
 };
 
 export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifactProps) {
@@ -91,26 +86,34 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
 
   const stateLabel = geo_hierarchy?.state || geo_hierarchy?.state_abbrev || 'State';
   const countyLabel =
-    geo_hierarchy?.county ||
-    (countyTier?.tier_label ? countyTier.tier_label.replace(/ County$/, '') : null);
-  const cityLabel = geo_hierarchy?.city || cityTier?.tier_label;
-  const msaLabel = geo_hierarchy?.cbsa_name?.replace(/\s+Metro(politan)? Area$/, '') || null;
+    (geo_hierarchy?.county ||
+      (countyTier?.tier_label
+        ? countyTier.tier_label.replace(/ County$/, '')
+        : null)) ?? null;
+  const cityLabel = geo_hierarchy?.city || cityTier?.tier_label || null;
+  const msaLabel =
+    geo_hierarchy?.cbsa_name?.replace(/\s+Metro(politan)? Area$/, '') || null;
 
-  const cards = useMemo<CardSpec[]>(
+  const economicMatrix = useMemo(
+    () => buildEconomicMatrix(fred, { stateLabel, msaLabel }),
+    [fred, stateLabel, msaLabel],
+  );
+
+  const demographicsMatrix = useMemo(
     () =>
-      buildCards(fred, {
+      buildDemographicsMatrix({
         stateLabel,
         countyLabel,
         cityLabel,
-        msaLabel,
         stateTier,
         countyTier,
         cityTier,
       }),
-    [fred, stateLabel, countyLabel, cityLabel, msaLabel, stateTier, countyTier, cityTier],
+    [stateLabel, countyLabel, cityLabel, stateTier, countyTier, cityTier],
   );
 
-  const hasAnyTiles = cards.some((c) => c.rows.length > 0);
+  const hasAnyTiles =
+    economicMatrix.rows.length > 0 || demographicsMatrix.rows.length > 0;
 
   return (
     <div
@@ -193,12 +196,8 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
       {/* Body — scrollable, 820px inner wrap */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px 16px 32px' }}>
         <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          {/* Indicator tiles */}
-          {hasAnyTiles &&
-            cards.map(
-              (card) =>
-                card.rows.length > 0 && <IndicatorCard key={card.title} card={card} />,
-            )}
+          {economicMatrix.rows.length > 0 && <MatrixTable matrix={economicMatrix} />}
+          {demographicsMatrix.rows.length > 0 && <MatrixTable matrix={demographicsMatrix} />}
 
           {/* Executive Summary — plain prose, no green shading */}
           {summary && (
@@ -344,9 +343,9 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
   );
 }
 
-/* ─── Tile card (LocationSubTab-style table) ─────────────────────────── */
+/* ─── Matrix table — indicator rows × geo columns ────────────────────── */
 
-function IndicatorCard({ card }: { card: CardSpec }) {
+function MatrixTable({ matrix }: { matrix: Matrix }) {
   return (
     <section
       style={{
@@ -363,368 +362,307 @@ function IndicatorCard({ card }: { card: CardSpec }) {
           borderBottom: `1px solid ${P.borderSoft}`,
           fontSize: 12,
           fontWeight: 600,
-          color: P.badgeInk,
+          color: P.ink,
           background: P.card,
           letterSpacing: 0.2,
         }}
       >
-        {card.title}
+        {matrix.title}
       </div>
       <table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
+          tableLayout: 'auto',
           fontSize: 13,
           color: P.ink,
         }}
       >
-        <tbody>
-          {card.rows.map((row, i) => {
-            const direction: 'up' | 'down' | 'flat' =
-              row.yoy == null
-                ? 'flat'
-                : row.yoy > 0.05
-                  ? 'up'
-                  : row.yoy < -0.05
-                    ? 'down'
-                    : 'flat';
-            const yoyColor =
-              direction === 'up' ? P.up : direction === 'down' ? P.down : P.mutedSoft;
-            return (
-              <tr
-                key={`${row.geoName}-${i}`}
+        <thead>
+          <tr style={{ background: P.headerBg }}>
+            <th
+              style={{
+                padding: '7px 14px',
+                textAlign: 'left',
+                fontSize: 11,
+                fontWeight: 600,
+                color: P.muted,
+                textTransform: 'uppercase',
+                letterSpacing: 0.3,
+                borderBottom: `1px solid ${P.borderSoft}`,
+                whiteSpace: 'normal',
+                verticalAlign: 'bottom',
+              }}
+            >
+              Indicator
+            </th>
+            {matrix.columns.map((col) => (
+              <th
+                key={col}
                 style={{
-                  borderBottom:
-                    i < card.rows.length - 1 ? `1px solid ${P.borderSoft}` : undefined,
+                  padding: '7px 12px',
+                  textAlign: 'right',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: P.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.3,
+                  borderBottom: `1px solid ${P.borderSoft}`,
+                  whiteSpace: 'normal',
+                  verticalAlign: 'bottom',
+                  lineHeight: 1.25,
                 }}
               >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.rows.map((row, i) => (
+            <tr
+              key={`${row.indicator}-${i}`}
+              style={{
+                borderBottom:
+                  i < matrix.rows.length - 1 ? `1px solid ${P.borderSoft}` : undefined,
+              }}
+            >
+              <td
+                style={{
+                  padding: '8px 14px',
+                  color: P.inkSoft,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {row.indicator}
+              </td>
+              {row.cells.map((cell, ci) => (
                 <td
+                  key={ci}
                   style={{
-                    padding: '7px 14px',
-                    color: P.muted,
-                    width: '50%',
+                    padding: '8px 12px',
+                    textAlign: 'right',
+                    fontVariantNumeric: 'tabular-nums',
                     whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                  title={row.geoName}
-                >
-                  {row.geoName}
-                </td>
-                <td
-                  style={{
-                    padding: '7px 10px',
-                    textAlign: 'right',
-                    fontVariantNumeric: 'tabular-nums',
-                    fontWeight: 500,
-                    color: P.ink,
-                    width: '27%',
                   }}
                 >
-                  {row.value}
+                  <CellContent cell={cell} />
                 </td>
-                <td
-                  style={{
-                    padding: '7px 14px 7px 10px',
-                    textAlign: 'right',
-                    fontVariantNumeric: 'tabular-nums',
-                    fontWeight: 500,
-                    width: '23%',
-                    color: yoyColor,
-                  }}
-                >
-                  {row.yoy == null ? (
-                    <span style={{ color: P.mutedSoft }}>—</span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                      {direction === 'up' && <ArrowUp size={11} />}
-                      {direction === 'down' && <ArrowDown size={11} />}
-                      {row.yoy > 0 ? '+' : ''}
-                      {row.yoy.toFixed(1)}%
-                    </span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </section>
   );
 }
 
-/* ─── Card builders — organize fred/census into tabular groups ───────── */
+function CellContent({ cell }: { cell: Cell | null }) {
+  if (!cell || cell.value === '—') {
+    return <span style={{ color: P.mutedSoft }}>—</span>;
+  }
+  const direction: 'up' | 'down' | 'flat' =
+    cell.yoy == null
+      ? 'flat'
+      : cell.yoy > 0.05
+        ? 'up'
+        : cell.yoy < -0.05
+          ? 'down'
+          : 'flat';
+  const yoyColor =
+    direction === 'up' ? P.up : direction === 'down' ? P.down : P.mutedSoft;
 
-interface BuildContext {
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+      <span style={{ fontWeight: 500, color: P.ink, lineHeight: 1.2 }}>{cell.value}</span>
+      {cell.yoy != null && (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 2,
+            fontSize: 10,
+            fontWeight: 500,
+            color: yoyColor,
+            marginTop: 1,
+            lineHeight: 1.1,
+          }}
+        >
+          {direction === 'up' && <ArrowUp size={9} />}
+          {direction === 'down' && <ArrowDown size={9} />}
+          {cell.yoy > 0 ? '+' : ''}
+          {cell.yoy.toFixed(1)}%
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ─── Matrix builders ────────────────────────────────────────────────── */
+
+function buildEconomicMatrix(
+  fred: Record<string, FredEntry>,
+  ctx: { stateLabel: string; msaLabel: string | null },
+): Matrix {
+  const { stateLabel, msaLabel } = ctx;
+
+  // Column 0: United States. Column 1: State. Column 2: Metro (if resolvable).
+  const includeMetro = !!msaLabel;
+  const columns = includeMetro
+    ? ['United States', stateLabel, msaLabel as string]
+    : ['United States', stateLabel];
+
+  const rowSpecs: Array<{
+    indicator: string;
+    us: FredEntry | null;
+    state: FredEntry | null;
+    metro: FredEntry | null;
+    fmt: (n: number | null | undefined) => string;
+  }> = [
+    {
+      indicator: 'Unemployment Rate',
+      us: pickFred(fred, ['us unemployment', 'unemployment rate']),
+      state: pickFred(fred, [
+        `${stateLabel.toLowerCase()} unemployment`,
+        'state unemployment',
+      ]),
+      metro: null,
+      fmt: formatPercent,
+    },
+    {
+      indicator: 'Fed Funds Rate',
+      us: pickFred(fred, ['fed funds']),
+      state: null,
+      metro: null,
+      fmt: formatPercent,
+    },
+    {
+      indicator: '30-Yr Fixed Mortgage',
+      us: pickFred(fred, ['30-yr', '30-year', 'mortgage']),
+      state: null,
+      metro: null,
+      fmt: formatPercent,
+    },
+    {
+      indicator: 'CPI (All Items)',
+      us: pickFred(fred, ['cpi']),
+      state: null,
+      metro: null,
+      fmt: formatIndex,
+    },
+    {
+      indicator: 'FHFA Home Price Index',
+      us: pickFred(fred, ['us house price', 'fhfa us', 'ussthpi']),
+      state: pickFred(fred, [
+        `${stateLabel.toLowerCase()} house price`,
+        'state house price',
+        'sthpi',
+      ]),
+      metro: msaLabel
+        ? pickFred(fred, [msaLabel.toLowerCase(), 'atnhpi'])
+        : pickFred(fred, ['atnhpi']),
+      fmt: formatIndex,
+    },
+    {
+      indicator: 'Case-Shiller HPI',
+      us: pickFred(fred, ['case-shiller', 'case shiller']),
+      state: null,
+      metro: null,
+      fmt: formatIndex,
+    },
+    {
+      indicator: 'Housing Starts (annualized)',
+      us: pickFred(fred, ['housing starts']),
+      state: null,
+      metro: null,
+      fmt: formatThousands,
+    },
+  ];
+
+  const rows: MatrixRow[] = rowSpecs
+    .map((spec) => {
+      const cells: (Cell | null)[] = [
+        entryToCell(spec.us, spec.fmt),
+        entryToCell(spec.state, spec.fmt),
+      ];
+      if (includeMetro) cells.push(entryToCell(spec.metro, spec.fmt));
+      // Drop row if every cell is null/blank
+      const hasAny = cells.some((c) => c && c.value !== '—');
+      return hasAny ? { indicator: spec.indicator, cells } : null;
+    })
+    .filter((r): r is MatrixRow => r !== null);
+
+  return {
+    title: 'Economic Indicators',
+    columns,
+    rows,
+  };
+}
+
+function buildDemographicsMatrix(ctx: {
   stateLabel: string;
   countyLabel: string | null;
-  cityLabel?: string | null;
-  msaLabel: string | null;
+  cityLabel: string | null;
   stateTier?: CensusTier;
   countyTier?: CensusTier;
   cityTier?: CensusTier;
+}): Matrix {
+  const { stateLabel, countyLabel, cityLabel, stateTier, countyTier, cityTier } = ctx;
+
+  // Only include columns that have a resolvable tier.
+  const cols: Array<{ label: string; tier: CensusTier | undefined }> = [];
+  if (stateTier) cols.push({ label: stateLabel, tier: stateTier });
+  if (countyTier)
+    cols.push({
+      label: countyLabel ? `${countyLabel} County` : 'County',
+      tier: countyTier,
+    });
+  if (cityTier) cols.push({ label: cityLabel || 'City', tier: cityTier });
+
+  const columns = cols.map((c) => c.label);
+
+  const rowSpecs: Array<{
+    indicator: string;
+    field: keyof CensusTier;
+    fmt: (n: number | null | undefined) => string;
+  }> = [
+    { indicator: 'Population', field: 'population', fmt: formatNumber },
+    { indicator: 'Median Household Income', field: 'median_hh_income', fmt: formatCurrency },
+    { indicator: 'Median Home Value', field: 'median_home_value', fmt: formatCurrency },
+    { indicator: 'Median Gross Rent', field: 'median_gross_rent', fmt: formatCurrency },
+    { indicator: 'Median Age', field: 'median_age', fmt: (n) => (n == null ? '—' : n.toFixed(1)) },
+    {
+      indicator: 'Owner-Occupied',
+      field: 'owner_occ_pct',
+      fmt: (n) => (n == null ? '—' : `${n.toFixed(1)}%`),
+    },
+  ];
+
+  const rows: MatrixRow[] = rowSpecs
+    .map((spec) => {
+      const cells: (Cell | null)[] = cols.map((c) => {
+        const raw = c.tier?.[spec.field] as number | null | undefined;
+        if (raw == null) return { value: '—', yoy: null };
+        return { value: spec.fmt(raw), yoy: null };
+      });
+      const hasAny = cells.some((c) => c && c.value !== '—');
+      return hasAny ? { indicator: spec.indicator, cells } : null;
+    })
+    .filter((r): r is MatrixRow => r !== null);
+
+  return {
+    title: 'Demographics',
+    columns,
+    rows,
+  };
 }
 
-function buildCards(fred: Record<string, FredEntry>, ctx: BuildContext): CardSpec[] {
-  const { stateLabel, countyLabel, cityLabel, msaLabel, stateTier, countyTier, cityTier } = ctx;
-
-  /* ─── Unemployment Rate ─── US + State (metro-level FRED deferred) */
-  const unemploymentRows: Row[] = [];
-  const usUnemp = pickFred(fred, ['us unemployment', 'unemployment rate']);
-  if (usUnemp) {
-    unemploymentRows.push({
-      geoName: 'United States',
-      value: formatPercent(usUnemp.value),
-      yoy: usUnemp.yoy_pct ?? null,
-    });
-  }
-  const stateUnemp = pickFred(fred, [
-    `${stateLabel.toLowerCase()} unemployment`,
-    'state unemployment',
-  ]);
-  if (stateUnemp) {
-    unemploymentRows.push({
-      geoName: stateLabel,
-      value: formatPercent(stateUnemp.value),
-      yoy: stateUnemp.yoy_pct ?? null,
-    });
-  }
-
-  /* ─── Interest Rates — national */
-  const rateRows: Row[] = [];
-  const fedFunds = pickFred(fred, ['fed funds']);
-  if (fedFunds) {
-    rateRows.push({
-      geoName: 'Fed Funds Rate',
-      value: formatPercent(fedFunds.value),
-      yoy: fedFunds.yoy_pct ?? null,
-    });
-  }
-  const mortgage = pickFred(fred, ['30-yr', '30-year', 'mortgage']);
-  if (mortgage) {
-    rateRows.push({
-      geoName: '30-Yr Fixed Mortgage',
-      value: formatPercent(mortgage.value),
-      yoy: mortgage.yoy_pct ?? null,
-    });
-  }
-
-  /* ─── Inflation — national */
-  const inflationRows: Row[] = [];
-  const cpi = pickFred(fred, ['cpi']);
-  if (cpi) {
-    inflationRows.push({
-      geoName: 'CPI (All Items, SA)',
-      value: formatIndex(cpi.value),
-      yoy: cpi.yoy_pct ?? null,
-    });
-  }
-
-  /* ─── Housing Market — US Case-Shiller + FHFA HPI tiered (US / State / MSA) */
-  const housingRows: Row[] = [];
-  const housingStarts = pickFred(fred, ['housing starts']);
-  if (housingStarts) {
-    housingRows.push({
-      geoName: 'Housing Starts (US, annualized)',
-      value: formatThousands(housingStarts.value),
-      yoy: housingStarts.yoy_pct ?? null,
-    });
-  }
-  const caseShiller = pickFred(fred, ['case-shiller', 'case shiller']);
-  if (caseShiller) {
-    housingRows.push({
-      geoName: 'Case-Shiller Home Price Index (US)',
-      value: formatIndex(caseShiller.value),
-      yoy: caseShiller.yoy_pct ?? null,
-    });
-  }
-  const usHpi = pickFred(fred, ['us house price', 'fhfa us', 'ussthpi']);
-  if (usHpi) {
-    housingRows.push({
-      geoName: 'FHFA Home Price Index — United States',
-      value: formatIndex(usHpi.value),
-      yoy: usHpi.yoy_pct ?? null,
-    });
-  }
-  const stateHpi = pickFred(fred, [
-    `${stateLabel.toLowerCase()} house price`,
-    'state house price',
-    'sthpi',
-  ]);
-  if (stateHpi) {
-    housingRows.push({
-      geoName: `FHFA Home Price Index — ${stateLabel}`,
-      value: formatIndex(stateHpi.value),
-      yoy: stateHpi.yoy_pct ?? null,
-    });
-  }
-  const msaHpi = msaLabel
-    ? pickFred(fred, [msaLabel.toLowerCase(), 'atnhpi'])
-    : pickFred(fred, ['atnhpi']);
-  if (msaHpi) {
-    housingRows.push({
-      geoName: `FHFA Home Price Index — ${msaLabel || 'Metro Area'}`,
-      value: formatIndex(msaHpi.value),
-      yoy: msaHpi.yoy_pct ?? null,
-    });
-  }
-
-  /* ─── Median Home Value — tiered Census */
-  const homeValueRows: Row[] = [];
-  if (stateTier?.median_home_value != null) {
-    homeValueRows.push({
-      geoName: stateLabel,
-      value: formatCurrency(stateTier.median_home_value),
-      yoy: null,
-    });
-  }
-  if (countyTier?.median_home_value != null) {
-    homeValueRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: formatCurrency(countyTier.median_home_value),
-      yoy: null,
-    });
-  }
-  if (cityTier?.median_home_value != null) {
-    homeValueRows.push({
-      geoName: cityLabel || 'City',
-      value: formatCurrency(cityTier.median_home_value),
-      yoy: null,
-    });
-  }
-
-  /* ─── Median Gross Rent — tiered Census */
-  const rentRows: Row[] = [];
-  if (stateTier?.median_gross_rent != null) {
-    rentRows.push({
-      geoName: stateLabel,
-      value: formatCurrency(stateTier.median_gross_rent),
-      yoy: null,
-    });
-  }
-  if (countyTier?.median_gross_rent != null) {
-    rentRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: formatCurrency(countyTier.median_gross_rent),
-      yoy: null,
-    });
-  }
-  if (cityTier?.median_gross_rent != null) {
-    rentRows.push({
-      geoName: cityLabel || 'City',
-      value: formatCurrency(cityTier.median_gross_rent),
-      yoy: null,
-    });
-  }
-
-  /* ─── Population — tiered Census */
-  const popRows: Row[] = [];
-  if (stateTier?.population != null) {
-    popRows.push({
-      geoName: stateLabel,
-      value: formatNumber(stateTier.population),
-      yoy: null,
-    });
-  }
-  if (countyTier?.population != null) {
-    popRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: formatNumber(countyTier.population),
-      yoy: null,
-    });
-  }
-  if (cityTier?.population != null) {
-    popRows.push({
-      geoName: cityLabel || 'City',
-      value: formatNumber(cityTier.population),
-      yoy: null,
-    });
-  }
-
-  /* ─── Median HH Income — tiered Census */
-  const incomeRows: Row[] = [];
-  if (stateTier?.median_hh_income != null) {
-    incomeRows.push({
-      geoName: stateLabel,
-      value: formatCurrency(stateTier.median_hh_income),
-      yoy: null,
-    });
-  }
-  if (countyTier?.median_hh_income != null) {
-    incomeRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: formatCurrency(countyTier.median_hh_income),
-      yoy: null,
-    });
-  }
-  if (cityTier?.median_hh_income != null) {
-    incomeRows.push({
-      geoName: cityLabel || 'City',
-      value: formatCurrency(cityTier.median_hh_income),
-      yoy: null,
-    });
-  }
-
-  /* ─── Median Age — tiered Census */
-  const ageRows: Row[] = [];
-  if (stateTier?.median_age != null) {
-    ageRows.push({
-      geoName: stateLabel,
-      value: `${stateTier.median_age.toFixed(1)}`,
-      yoy: null,
-    });
-  }
-  if (countyTier?.median_age != null) {
-    ageRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: `${countyTier.median_age.toFixed(1)}`,
-      yoy: null,
-    });
-  }
-  if (cityTier?.median_age != null) {
-    ageRows.push({
-      geoName: cityLabel || 'City',
-      value: `${cityTier.median_age.toFixed(1)}`,
-      yoy: null,
-    });
-  }
-
-  /* ─── Owner-Occupied — tiered Census */
-  const ownerOccRows: Row[] = [];
-  if (stateTier?.owner_occ_pct != null) {
-    ownerOccRows.push({
-      geoName: stateLabel,
-      value: `${stateTier.owner_occ_pct.toFixed(1)}%`,
-      yoy: null,
-    });
-  }
-  if (countyTier?.owner_occ_pct != null) {
-    ownerOccRows.push({
-      geoName: countyLabel ? `${countyLabel} County` : 'County',
-      value: `${countyTier.owner_occ_pct.toFixed(1)}%`,
-      yoy: null,
-    });
-  }
-  if (cityTier?.owner_occ_pct != null) {
-    ownerOccRows.push({
-      geoName: cityLabel || 'City',
-      value: `${cityTier.owner_occ_pct.toFixed(1)}%`,
-      yoy: null,
-    });
-  }
-
-  return [
-    { title: 'Unemployment Rate', rows: unemploymentRows },
-    { title: 'Interest Rates', rows: rateRows },
-    { title: 'Inflation', rows: inflationRows },
-    { title: 'Housing Market', rows: housingRows },
-    { title: 'Median Home Value', rows: homeValueRows },
-    { title: 'Median Gross Rent', rows: rentRows },
-    { title: 'Population', rows: popRows },
-    { title: 'Median Household Income', rows: incomeRows },
-    { title: 'Median Age', rows: ageRows },
-    { title: 'Owner-Occupied Housing', rows: ownerOccRows },
-  ];
+function entryToCell(
+  entry: FredEntry | null,
+  fmt: (n: number | null | undefined) => string,
+): Cell | null {
+  if (!entry || entry.value == null) return { value: '—', yoy: null };
+  return { value: fmt(entry.value), yoy: entry.yoy_pct ?? null };
 }
 
 /** Fuzzy-find a FRED entry whose key contains any of the given needles (case-insensitive). */
