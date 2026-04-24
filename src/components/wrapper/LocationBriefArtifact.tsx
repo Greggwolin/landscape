@@ -2,8 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { X, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react';
-import type { LocationBriefArtifactConfig } from '@/contexts/WrapperUIContext';
-import { CreateProjectCTA } from './CreateProjectCTA';
+import type { LocationBriefArtifactConfig, CensusTier } from '@/contexts/WrapperUIContext';
 
 interface LocationBriefArtifactProps {
   config: LocationBriefArtifactConfig;
@@ -13,14 +12,20 @@ interface LocationBriefArtifactProps {
 /**
  * Renders a generate_location_brief tool result in the right artifacts panel.
  *
- * Visual pattern ported from LocationSubTab (alpha19/main econ-indicators widget):
- * - Metric-grouped cards with Geography | Value | YoY tables
- * - Green up-arrow / red down-arrow for YoY direction
- * - Executive summary renders BELOW the tiles, condensed by default
- * - "Show detail" toggle reveals the longer narrative sections
+ * Round 3 refinements (Apr 2026):
+ *   1. No green "Multifamily" pill, no "Standard" badge — property type is a
+ *      small neutral inline badge; depth tier is dropped from the header.
+ *   2. Data cards remain tabular (5 groups), but rows now reflect tiered
+ *      Census geography (United States / State / County / City) so the city
+ *      label can't mask state-level numbers.
+ *   3. Source labels on each row are gone — the footer says it once.
+ *   4. Executive Summary is plain prose (no green shading callout).
+ *   5. "Show detail" is compressed (smaller type, tighter spacing, no
+ *      oversize section headers).
+ *   6. No "Create Project" CTA. A location brief alone is not project
+ *      scaffolding; Landscaper decides when to offer that path.
  *
- * Artifact uses a hardcoded LIGHT palette — it does NOT inherit the app theme.
- * Review-style companion doc aesthetic.
+ * Artifact still uses a hardcoded LIGHT palette — does NOT inherit app theme.
  */
 
 /* ─── Light palette (artifact-scoped, does NOT inherit app theme) ────── */
@@ -32,9 +37,10 @@ const P = {
   muted: '#5a5a5a',
   mutedSoft: '#8a8a8a',
   accent: '#2e6f40',
-  accentSoft: '#e8f1ec',
   border: '#d9d9d4',
   borderSoft: '#ececea',
+  badgeBg: '#f0efec',
+  badgeInk: '#3a3a3a',
   up: '#2e6f40',
   down: '#b64040',
 } as const;
@@ -50,7 +56,6 @@ type Row = {
   geoName: string;
   value: string;
   yoy: number | null;
-  asOf?: string;
 };
 
 type CardSpec = {
@@ -62,29 +67,48 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
   const {
     location_display,
     property_type_label,
-    depth,
     geo_hierarchy,
     summary,
     sections,
     indicators,
     data_as_of,
     cached,
-    project_ready,
   } = config;
 
   const [showDetail, setShowDetail] = useState(false);
 
   const fred = (indicators?.fred || {}) as Record<string, FredEntry>;
-  const census = indicators?.census || {};
-  const stateName = geo_hierarchy?.state || geo_hierarchy?.state_abbrev || 'State';
-  const cityLabel =
-    geo_hierarchy?.city && geo_hierarchy?.state_abbrev
-      ? `${geo_hierarchy.city}, ${geo_hierarchy.state_abbrev}`
-      : geo_hierarchy?.city || location_display;
 
-  const cards = useMemo<CardSpec[]>(() => {
-    return buildCards(fred, census, stateName, cityLabel);
-  }, [fred, census, stateName, cityLabel]);
+  // Tiered census, with single-tier fallback for pre-R3 cached briefs.
+  const tiers = indicators?.census_tiers || {};
+  const legacyCensus = indicators?.census;
+  const stateTier: CensusTier | undefined =
+    tiers.state || (legacyCensus?.tier === 'state' ? legacyCensus : undefined);
+  const countyTier: CensusTier | undefined =
+    tiers.county || (legacyCensus?.tier === 'county' ? legacyCensus : undefined);
+  const cityTier: CensusTier | undefined =
+    tiers.city || (legacyCensus?.tier === 'place' ? legacyCensus : undefined);
+
+  const stateLabel = geo_hierarchy?.state || geo_hierarchy?.state_abbrev || 'State';
+  const countyLabel =
+    geo_hierarchy?.county ||
+    (countyTier?.tier_label ? countyTier.tier_label.replace(/ County$/, '') : null);
+  const cityLabel = geo_hierarchy?.city || cityTier?.tier_label;
+  const msaLabel = geo_hierarchy?.cbsa_name?.replace(/\s+Metro(politan)? Area$/, '') || null;
+
+  const cards = useMemo<CardSpec[]>(
+    () =>
+      buildCards(fred, {
+        stateLabel,
+        countyLabel,
+        cityLabel,
+        msaLabel,
+        stateTier,
+        countyTier,
+        cityTier,
+      }),
+    [fred, stateLabel, countyLabel, cityLabel, msaLabel, stateTier, countyTier, cityTier],
+  );
 
   const hasAnyTiles = cards.some((c) => c.rows.length > 0);
 
@@ -99,7 +123,7 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
         background: P.bg,
       }}
     >
-      {/* Header — sticky, minimal */}
+      {/* Header — flat, no green pill, no depth badge */}
       <div
         style={{
           display: 'flex',
@@ -112,7 +136,7 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
           gap: 10,
         }}
       >
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <div
             style={{
               fontSize: 14,
@@ -127,10 +151,18 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
           >
             {location_display}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Pill>{property_type_label}</Pill>
-            <Pill muted>{capitalize(depth)}</Pill>
-            <span style={{ fontSize: 11, color: P.muted }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 11,
+              color: P.muted,
+            }}
+          >
+            <span>{property_type_label}</span>
+            <span style={{ color: P.borderSoft }}>·</span>
+            <span>
               as of {data_as_of}
               {cached ? ' · cached' : ''}
             </span>
@@ -161,31 +193,38 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
       {/* Body — scrollable, 820px inner wrap */}
       <div style={{ flex: 1, overflow: 'auto', padding: '20px 16px 32px' }}>
         <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          {/* Indicator tiles (always expanded, at top) */}
+          {/* Indicator tiles */}
           {hasAnyTiles &&
             cards.map(
               (card) =>
                 card.rows.length > 0 && <IndicatorCard key={card.title} card={card} />,
             )}
 
-          {/* Executive Summary — BELOW tiles, condensed, with detail toggle */}
+          {/* Executive Summary — plain prose, no green shading */}
           {summary && (
             <section
               style={{
                 background: P.card,
                 border: `1px solid ${P.border}`,
                 borderRadius: 8,
-                padding: '18px 22px',
-                marginBottom: 14,
+                padding: '14px 18px',
+                marginBottom: 12,
               }}
             >
-              <SectionHeader>Executive Summary</SectionHeader>
               <div
                 style={{
-                  background: P.accentSoft,
-                  borderLeft: `3px solid ${P.accent}`,
-                  padding: '10px 14px',
-                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: 0.4,
+                  textTransform: 'uppercase',
+                  color: P.muted,
+                  marginBottom: 6,
+                }}
+              >
+                Executive Summary
+              </div>
+              <div
+                style={{
                   fontSize: 13,
                   lineHeight: 1.55,
                   color: P.inkSoft,
@@ -198,45 +237,53 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
                 <button
                   onClick={() => setShowDetail((v) => !v)}
                   style={{
-                    marginTop: 12,
+                    marginTop: 10,
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
-                    padding: '6px 12px',
-                    border: `1px solid ${P.border}`,
-                    borderRadius: 6,
-                    background: P.card,
+                    padding: '3px 8px',
+                    border: 'none',
+                    background: 'transparent',
                     color: P.accent,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: 600,
                     cursor: 'pointer',
                   }}
                 >
-                  {showDetail ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  {showDetail ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   {showDetail ? 'Hide detail' : 'Show detail'}
                 </button>
               )}
 
               {showDetail && sections.length > 0 && (
-                <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    marginTop: 10,
+                    paddingTop: 10,
+                    borderTop: `1px solid ${P.borderSoft}`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                  }}
+                >
                   {sections.map((section, idx) => (
                     <div key={idx}>
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: 600,
-                          color: P.accent,
-                          marginBottom: 6,
-                          paddingBottom: 4,
-                          borderBottom: `1px solid ${P.borderSoft}`,
+                          color: P.muted,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.3,
+                          marginBottom: 3,
                         }}
                       >
                         {section.title}
                       </div>
                       <div
                         style={{
-                          fontSize: 13,
-                          lineHeight: 1.6,
+                          fontSize: 12,
+                          lineHeight: 1.5,
                           color: P.inkSoft,
                           whiteSpace: 'pre-wrap',
                         }}
@@ -247,21 +294,6 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
                   ))}
                 </div>
               )}
-            </section>
-          )}
-
-          {/* Project creation CTA — only when we have enough info */}
-          {project_ready && (
-            <section
-              style={{
-                background: P.card,
-                border: `1px solid ${P.border}`,
-                borderRadius: 8,
-                padding: '18px 22px',
-                marginBottom: 14,
-              }}
-            >
-              <CreateProjectCTA config={config} />
             </section>
           )}
 
@@ -289,11 +321,11 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
             </section>
           )}
 
-          {/* Footer */}
+          {/* Footer — sources listed once, not per row */}
           <div
             style={{
               marginTop: 12,
-              paddingTop: 12,
+              paddingTop: 10,
               borderTop: `1px solid ${P.border}`,
               fontSize: 11,
               color: P.muted,
@@ -301,7 +333,7 @@ export function LocationBriefArtifact({ config, onClose }: LocationBriefArtifact
               lineHeight: 1.5,
             }}
           >
-            Data sources: FRED · US Census Bureau ACS 5-Year
+            Sources: FRED · Federal Reserve · BLS · US Census Bureau ACS 5-Year 2023
             <br />
             Refreshed {data_as_of}
             {cached ? ' (cached)' : ''}
@@ -321,18 +353,19 @@ function IndicatorCard({ card }: { card: CardSpec }) {
         background: P.card,
         border: `1px solid ${P.border}`,
         borderRadius: 8,
-        marginBottom: 14,
+        marginBottom: 12,
         overflow: 'hidden',
       }}
     >
       <div
         style={{
-          padding: '10px 16px',
+          padding: '8px 14px',
           borderBottom: `1px solid ${P.borderSoft}`,
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 600,
-          color: P.accent,
+          color: P.badgeInk,
           background: P.card,
+          letterSpacing: 0.2,
         }}
       >
         {card.title}
@@ -367,41 +400,36 @@ function IndicatorCard({ card }: { card: CardSpec }) {
               >
                 <td
                   style={{
-                    padding: '8px 16px',
+                    padding: '7px 14px',
                     color: P.muted,
-                    width: '45%',
+                    width: '50%',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                   }}
-                  title={`${row.geoName}${row.asOf ? ` · ${row.asOf}` : ''}`}
+                  title={row.geoName}
                 >
                   {row.geoName}
-                  {row.asOf && (
-                    <span style={{ marginLeft: 6, fontSize: 11, color: P.mutedSoft }}>
-                      {row.asOf}
-                    </span>
-                  )}
                 </td>
                 <td
                   style={{
-                    padding: '8px 10px',
+                    padding: '7px 10px',
                     textAlign: 'right',
                     fontVariantNumeric: 'tabular-nums',
                     fontWeight: 500,
                     color: P.ink,
-                    width: '30%',
+                    width: '27%',
                   }}
                 >
                   {row.value}
                 </td>
                 <td
                   style={{
-                    padding: '8px 16px 8px 10px',
+                    padding: '7px 14px 7px 10px',
                     textAlign: 'right',
                     fontVariantNumeric: 'tabular-nums',
                     fontWeight: 500,
-                    width: '25%',
+                    width: '23%',
                     color: yoyColor,
                   }}
                 >
@@ -425,58 +453,22 @@ function IndicatorCard({ card }: { card: CardSpec }) {
   );
 }
 
-/* ─── Shared subcomponents ───────────────────────────────────────────── */
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <h2
-      style={{
-        fontSize: 15,
-        margin: '0 0 10px',
-        paddingBottom: 6,
-        color: P.accent,
-        borderBottom: `2px solid ${P.borderSoft}`,
-        fontWeight: 600,
-        lineHeight: 1.3,
-      }}
-    >
-      {children}
-    </h2>
-  );
-}
-
-function Pill({ children, muted }: { children: React.ReactNode; muted?: boolean }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        background: muted ? P.borderSoft : P.accent,
-        color: muted ? P.muted : '#ffffff',
-        padding: '2px 9px',
-        borderRadius: 12,
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: 0.2,
-        lineHeight: 1.4,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
 /* ─── Card builders — organize fred/census into tabular groups ───────── */
 
-function buildCards(
-  fred: Record<string, FredEntry>,
-  census: LocationBriefArtifactConfig['indicators']['census'] | undefined,
-  stateName: string,
-  cityLabel: string,
-): CardSpec[] {
-  const c = census || {};
+interface BuildContext {
+  stateLabel: string;
+  countyLabel: string | null;
+  cityLabel?: string | null;
+  msaLabel: string | null;
+  stateTier?: CensusTier;
+  countyTier?: CensusTier;
+  cityTier?: CensusTier;
+}
 
-  // Unemployment Rate — US + State rows
+function buildCards(fred: Record<string, FredEntry>, ctx: BuildContext): CardSpec[] {
+  const { stateLabel, countyLabel, cityLabel, msaLabel, stateTier, countyTier, cityTier } = ctx;
+
+  /* ─── Unemployment Rate ─── US + State (metro-level FRED deferred) */
   const unemploymentRows: Row[] = [];
   const usUnemp = pickFred(fred, ['us unemployment', 'unemployment rate']);
   if (usUnemp) {
@@ -484,23 +476,21 @@ function buildCards(
       geoName: 'United States',
       value: formatPercent(usUnemp.value),
       yoy: usUnemp.yoy_pct ?? null,
-      asOf: usUnemp.date,
     });
   }
   const stateUnemp = pickFred(fred, [
-    `${stateName.toLowerCase()} unemployment`,
+    `${stateLabel.toLowerCase()} unemployment`,
     'state unemployment',
   ]);
   if (stateUnemp) {
     unemploymentRows.push({
-      geoName: stateName,
+      geoName: stateLabel,
       value: formatPercent(stateUnemp.value),
       yoy: stateUnemp.yoy_pct ?? null,
-      asOf: stateUnemp.date,
     });
   }
 
-  // Interest Rates — national
+  /* ─── Interest Rates — national */
   const rateRows: Row[] = [];
   const fedFunds = pickFred(fred, ['fed funds']);
   if (fedFunds) {
@@ -508,7 +498,6 @@ function buildCards(
       geoName: 'Fed Funds Rate',
       value: formatPercent(fedFunds.value),
       yoy: fedFunds.yoy_pct ?? null,
-      asOf: fedFunds.date,
     });
   }
   const mortgage = pickFred(fred, ['30-yr', '30-year', 'mortgage']);
@@ -517,11 +506,10 @@ function buildCards(
       geoName: '30-Yr Fixed Mortgage',
       value: formatPercent(mortgage.value),
       yoy: mortgage.yoy_pct ?? null,
-      asOf: mortgage.date,
     });
   }
 
-  // Inflation — national
+  /* ─── Inflation — national */
   const inflationRows: Row[] = [];
   const cpi = pickFred(fred, ['cpi']);
   if (cpi) {
@@ -529,11 +517,10 @@ function buildCards(
       geoName: 'CPI (All Items, SA)',
       value: formatIndex(cpi.value),
       yoy: cpi.yoy_pct ?? null,
-      asOf: cpi.date,
     });
   }
 
-  // Housing Market — mix of national + city
+  /* ─── Housing Market — US Case-Shiller + FHFA HPI tiered (US / State / MSA) */
   const housingRows: Row[] = [];
   const housingStarts = pickFred(fred, ['housing starts']);
   if (housingStarts) {
@@ -541,51 +528,188 @@ function buildCards(
       geoName: 'Housing Starts (US, annualized)',
       value: formatThousands(housingStarts.value),
       yoy: housingStarts.yoy_pct ?? null,
-      asOf: housingStarts.date,
     });
   }
   const caseShiller = pickFred(fred, ['case-shiller', 'case shiller']);
   if (caseShiller) {
     housingRows.push({
-      geoName: 'Case-Shiller US Home Price Index',
+      geoName: 'Case-Shiller Home Price Index (US)',
       value: formatIndex(caseShiller.value),
       yoy: caseShiller.yoy_pct ?? null,
-      asOf: caseShiller.date,
     });
   }
-  if (c.median_home_value != null) {
+  const usHpi = pickFred(fred, ['us house price', 'fhfa us', 'ussthpi']);
+  if (usHpi) {
     housingRows.push({
-      geoName: `${cityLabel} Median Home Value`,
-      value: formatCurrency(c.median_home_value),
-      yoy: null,
-      asOf: c.vintage || 'ACS 5-Yr',
+      geoName: 'FHFA Home Price Index — United States',
+      value: formatIndex(usHpi.value),
+      yoy: usHpi.yoy_pct ?? null,
+    });
+  }
+  const stateHpi = pickFred(fred, [
+    `${stateLabel.toLowerCase()} house price`,
+    'state house price',
+    'sthpi',
+  ]);
+  if (stateHpi) {
+    housingRows.push({
+      geoName: `FHFA Home Price Index — ${stateLabel}`,
+      value: formatIndex(stateHpi.value),
+      yoy: stateHpi.yoy_pct ?? null,
+    });
+  }
+  const msaHpi = msaLabel
+    ? pickFred(fred, [msaLabel.toLowerCase(), 'atnhpi'])
+    : pickFred(fred, ['atnhpi']);
+  if (msaHpi) {
+    housingRows.push({
+      geoName: `FHFA Home Price Index — ${msaLabel || 'Metro Area'}`,
+      value: formatIndex(msaHpi.value),
+      yoy: msaHpi.yoy_pct ?? null,
     });
   }
 
-  // Demographics — census city-level
-  const demoRows: Row[] = [];
-  if (c.population != null) {
-    demoRows.push({
-      geoName: `${cityLabel} Population`,
-      value: formatNumber(c.population),
+  /* ─── Median Home Value — tiered Census */
+  const homeValueRows: Row[] = [];
+  if (stateTier?.median_home_value != null) {
+    homeValueRows.push({
+      geoName: stateLabel,
+      value: formatCurrency(stateTier.median_home_value),
       yoy: null,
-      asOf: c.vintage || 'ACS 5-Yr',
     });
   }
-  if (c.median_hh_income != null) {
-    demoRows.push({
-      geoName: `${cityLabel} Median HH Income`,
-      value: formatCurrency(c.median_hh_income),
+  if (countyTier?.median_home_value != null) {
+    homeValueRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: formatCurrency(countyTier.median_home_value),
       yoy: null,
-      asOf: c.vintage || 'ACS 5-Yr',
     });
   }
-  if (c.owner_occ_pct != null) {
-    demoRows.push({
-      geoName: `${cityLabel} Owner-Occupied`,
-      value: `${c.owner_occ_pct.toFixed(1)}%`,
+  if (cityTier?.median_home_value != null) {
+    homeValueRows.push({
+      geoName: cityLabel || 'City',
+      value: formatCurrency(cityTier.median_home_value),
       yoy: null,
-      asOf: c.vintage || 'ACS 5-Yr',
+    });
+  }
+
+  /* ─── Median Gross Rent — tiered Census */
+  const rentRows: Row[] = [];
+  if (stateTier?.median_gross_rent != null) {
+    rentRows.push({
+      geoName: stateLabel,
+      value: formatCurrency(stateTier.median_gross_rent),
+      yoy: null,
+    });
+  }
+  if (countyTier?.median_gross_rent != null) {
+    rentRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: formatCurrency(countyTier.median_gross_rent),
+      yoy: null,
+    });
+  }
+  if (cityTier?.median_gross_rent != null) {
+    rentRows.push({
+      geoName: cityLabel || 'City',
+      value: formatCurrency(cityTier.median_gross_rent),
+      yoy: null,
+    });
+  }
+
+  /* ─── Population — tiered Census */
+  const popRows: Row[] = [];
+  if (stateTier?.population != null) {
+    popRows.push({
+      geoName: stateLabel,
+      value: formatNumber(stateTier.population),
+      yoy: null,
+    });
+  }
+  if (countyTier?.population != null) {
+    popRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: formatNumber(countyTier.population),
+      yoy: null,
+    });
+  }
+  if (cityTier?.population != null) {
+    popRows.push({
+      geoName: cityLabel || 'City',
+      value: formatNumber(cityTier.population),
+      yoy: null,
+    });
+  }
+
+  /* ─── Median HH Income — tiered Census */
+  const incomeRows: Row[] = [];
+  if (stateTier?.median_hh_income != null) {
+    incomeRows.push({
+      geoName: stateLabel,
+      value: formatCurrency(stateTier.median_hh_income),
+      yoy: null,
+    });
+  }
+  if (countyTier?.median_hh_income != null) {
+    incomeRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: formatCurrency(countyTier.median_hh_income),
+      yoy: null,
+    });
+  }
+  if (cityTier?.median_hh_income != null) {
+    incomeRows.push({
+      geoName: cityLabel || 'City',
+      value: formatCurrency(cityTier.median_hh_income),
+      yoy: null,
+    });
+  }
+
+  /* ─── Median Age — tiered Census */
+  const ageRows: Row[] = [];
+  if (stateTier?.median_age != null) {
+    ageRows.push({
+      geoName: stateLabel,
+      value: `${stateTier.median_age.toFixed(1)}`,
+      yoy: null,
+    });
+  }
+  if (countyTier?.median_age != null) {
+    ageRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: `${countyTier.median_age.toFixed(1)}`,
+      yoy: null,
+    });
+  }
+  if (cityTier?.median_age != null) {
+    ageRows.push({
+      geoName: cityLabel || 'City',
+      value: `${cityTier.median_age.toFixed(1)}`,
+      yoy: null,
+    });
+  }
+
+  /* ─── Owner-Occupied — tiered Census */
+  const ownerOccRows: Row[] = [];
+  if (stateTier?.owner_occ_pct != null) {
+    ownerOccRows.push({
+      geoName: stateLabel,
+      value: `${stateTier.owner_occ_pct.toFixed(1)}%`,
+      yoy: null,
+    });
+  }
+  if (countyTier?.owner_occ_pct != null) {
+    ownerOccRows.push({
+      geoName: countyLabel ? `${countyLabel} County` : 'County',
+      value: `${countyTier.owner_occ_pct.toFixed(1)}%`,
+      yoy: null,
+    });
+  }
+  if (cityTier?.owner_occ_pct != null) {
+    ownerOccRows.push({
+      geoName: cityLabel || 'City',
+      value: `${cityTier.owner_occ_pct.toFixed(1)}%`,
+      yoy: null,
     });
   }
 
@@ -594,7 +718,12 @@ function buildCards(
     { title: 'Interest Rates', rows: rateRows },
     { title: 'Inflation', rows: inflationRows },
     { title: 'Housing Market', rows: housingRows },
-    { title: 'Demographics', rows: demoRows },
+    { title: 'Median Home Value', rows: homeValueRows },
+    { title: 'Median Gross Rent', rows: rentRows },
+    { title: 'Population', rows: popRows },
+    { title: 'Median Household Income', rows: incomeRows },
+    { title: 'Median Age', rows: ageRows },
+    { title: 'Owner-Occupied Housing', rows: ownerOccRows },
   ];
 }
 
@@ -627,7 +756,7 @@ function formatNumber(n: number | null | undefined): string {
 function formatCurrency(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`;
+  if (n >= 10_000) return `$${(n / 1_000).toFixed(1)}k`;
   return `$${n.toLocaleString('en-US')}`;
 }
 
@@ -644,9 +773,4 @@ function formatIndex(n: number | null | undefined): string {
 function formatThousands(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
   return `${n.toFixed(0)}K`;
-}
-
-function capitalize(s: string): string {
-  if (!s) return s;
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

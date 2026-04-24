@@ -72,10 +72,15 @@ FRED_SERIES_NATIONAL = [
     ("MORTGAGE30US", "30-Yr Fixed Mortgage", "%"),
     ("HOUST", "Housing Starts (Annualized)", "thou"),
     ("CSUSHPINSA", "Case-Shiller US Home Price Index", "idx"),
+    ("USSTHPI", "US House Price Index (FHFA)", "idx"),
 ]
 
-# State-level unemployment: pattern {STATE}UR (e.g., AZUR, CAUR)
-FRED_STATE_UNEMP_TPL = "{state}UR"
+# State-level FRED patterns
+FRED_STATE_UNEMP_TPL = "{state}UR"       # e.g., CAUR
+FRED_STATE_HPI_TPL = "{state}STHPI"      # e.g., CASTHPI (FHFA HPI, quarterly)
+
+# MSA-level FRED pattern (FHFA HPI, quarterly, NSA)
+FRED_MSA_HPI_TPL = "ATNHPIUS{cbsa}Q"     # e.g., ATNHPIUS31080Q for LA-LB-Anaheim
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Location resolution
@@ -161,6 +166,87 @@ def _state_name_to_abbrev(name: Optional[str]) -> Optional[str]:
     return _STATE_MAP.get(name.strip())
 
 
+def resolve_census_fips(lat: float, lon: float) -> Optional[Dict[str, Any]]:
+    """
+    Call Census Geocoder to resolve a coordinate to the full FIPS hierarchy.
+
+    Returns a dict shaped like:
+      {
+        "state_fips": "06",
+        "state_name": "California",
+        "county_fips": "037",           # 3-digit, no state prefix
+        "county_name": "Los Angeles County",
+        "place_fips": "06308",          # 5-digit (state+3 is NOT the pattern;
+                                        # Census uses a 5-digit place code per state)
+        "place_name": "Bellflower",
+        "cbsa_code": "31080",           # 5-digit CBSA
+        "cbsa_name": "Los Angeles-Long Beach-Anaheim, CA Metro Area",
+      }
+
+    Keys will be None (omitted) when the coordinate has no match for that tier
+    (e.g., rural coordinates outside any incorporated place will have no
+    place_fips).
+    """
+    if lat is None or lon is None:
+        return None
+    try:
+        resp = requests.get(
+            "https://geocoding.geo.census.gov/geocoder/geographies/coordinates",
+            params={
+                "x": lon,
+                "y": lat,
+                "benchmark": "Public_AR_Current",
+                "vintage": "Current_Current",
+                "format": "json",
+            },
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        geos = (data.get("result") or {}).get("geographies") or {}
+
+        out: Dict[str, Any] = {}
+
+        states = geos.get("States") or []
+        if states:
+            s = states[0]
+            out["state_fips"] = s.get("STATE") or s.get("GEOID")
+            out["state_name"] = s.get("NAME") or s.get("BASENAME")
+
+        counties = geos.get("Counties") or []
+        if counties:
+            c = counties[0]
+            out["county_fips"] = c.get("COUNTY")  # 3-digit
+            out["county_name"] = c.get("NAME") or c.get("BASENAME")
+
+        places = geos.get("Incorporated Places") or []
+        if not places:
+            # Fall back to Census Designated Places if no incorporated place
+            places = geos.get("Census Designated Places") or []
+        if places:
+            p = places[0]
+            # PLACE is 5-digit; GEOID = state+place (7 digits)
+            out["place_fips"] = p.get("PLACE")
+            out["place_name"] = p.get("NAME") or p.get("BASENAME")
+
+        cbsas = (
+            geos.get("Metropolitan Statistical Areas")
+            or geos.get("Metropolitan/Micropolitan Statistical Areas")
+            or geos.get("Combined Statistical Areas")
+            or []
+        )
+        if cbsas:
+            m = cbsas[0]
+            out["cbsa_code"] = m.get("CBSA") or m.get("GEOID")
+            out["cbsa_name"] = m.get("NAME") or m.get("BASENAME")
+
+        return out or None
+    except Exception as e:
+        logger.warning(f"Census Geocoder failed for ({lat},{lon}): {e}")
+        return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Indicator fetching
 # ─────────────────────────────────────────────────────────────────────────────
@@ -230,20 +316,78 @@ def fetch_fred_series(series_id: str, api_key: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def fetch_census_acs(state_fips: str, county_fips: Optional[str], api_key: str) -> Optional[Dict[str, Any]]:
+# Expanded ACS variable set
+_ACS_VARS = [
+    "B01003_001E",   # Population
+    "B19013_001E",   # Median HH Income
+    "B25077_001E",   # Median Home Value
+    "B25064_001E",   # Median Gross Rent
+    "B01002_001E",   # Median Age
+    "B25003_001E",   # Total occupied housing units (denominator)
+    "B25003_002E",   # Owner-occupied housing units
+]
+
+
+def _parse_acs_row(header, row) -> Dict[str, Any]:
+    idx = {h: i for i, h in enumerate(header)}
+
+    def g(v):
+        return _safe_int(row[idx[v]]) if v in idx else None
+
+    pop = g("B01003_001E")
+    med_inc = g("B19013_001E")
+    med_val = g("B25077_001E")
+    med_rent = g("B25064_001E")
+    med_age_raw = row[idx["B01002_001E"]] if "B01002_001E" in idx else None
+    med_age = _safe_float(med_age_raw) if med_age_raw not in (None, "") else None
+    total_occ = g("B25003_001E")
+    owner_occ = g("B25003_002E")
+    owner_pct = (owner_occ / total_occ * 100.0) if (owner_occ and total_occ) else None
+
+    return {
+        "population": pop,
+        "median_hh_income": med_inc,
+        "median_home_value": med_val,
+        "median_gross_rent": med_rent,
+        "median_age": med_age,
+        "owner_occ_pct": owner_pct,
+        "vintage": "ACS 5-Year 2023",
+        "data_as_of": "2023-12-31",
+    }
+
+
+def fetch_census_acs_tier(
+    tier: str,
+    fips_info: Dict[str, Any],
+    api_key: str,
+) -> Optional[Dict[str, Any]]:
     """
-    Fetch key ACS 5-Year indicators for a state (or county).
-    Returns: population, median_hh_income, median_home_value, owner_occ_pct.
-    ACS vintage = 2023 (latest available).
+    Fetch ACS 5-Year (vintage 2023) at a specific geo tier.
+
+    tier in {"state", "county", "place"}
+    fips_info expects state_fips + (county_fips | place_fips) as needed.
     """
+    state_fips = fips_info.get("state_fips")
     if not state_fips:
         return None
+
+    if tier == "state":
+        geo_clause = f"state:{state_fips}"
+    elif tier == "county":
+        cf = fips_info.get("county_fips")
+        if not cf:
+            return None
+        geo_clause = f"county:{cf}&in=state:{state_fips}"
+    elif tier == "place":
+        pf = fips_info.get("place_fips")
+        if not pf:
+            return None
+        geo_clause = f"place:{pf}&in=state:{state_fips}"
+    else:
+        return None
+
     try:
-        variables = "B01003_001E,B19013_001E,B25077_001E,B25003_002E,B25003_001E"
-        if county_fips:
-            geo_clause = f"county:{county_fips}&in=state:{state_fips}"
-        else:
-            geo_clause = f"state:{state_fips}"
+        variables = ",".join(_ACS_VARS)
         url = (
             f"https://api.census.gov/data/2023/acs/acs5"
             f"?get={variables}&for={geo_clause}"
@@ -256,26 +400,34 @@ def fetch_census_acs(state_fips: str, county_fips: Optional[str], api_key: str) 
         data = resp.json()
         if len(data) < 2:
             return None
-        header, row = data[0], data[1]
-        idx = {h: i for i, h in enumerate(header)}
-        pop = _safe_int(row[idx["B01003_001E"]])
-        med_inc = _safe_int(row[idx["B19013_001E"]])
-        med_val = _safe_int(row[idx["B25077_001E"]])
-        owner_occ = _safe_int(row[idx["B25003_002E"]])
-        total_occ = _safe_int(row[idx["B25003_001E"]])
-        owner_pct = (owner_occ / total_occ * 100.0) if (owner_occ and total_occ) else None
+        parsed = _parse_acs_row(data[0], data[1])
 
-        return {
-            "population": pop,
-            "median_hh_income": med_inc,
-            "median_home_value": med_val,
-            "owner_occ_pct": owner_pct,
-            "vintage": "ACS 5-Year 2023",
-            "data_as_of": "2023-12-31",
-        }
+        # Attach tier label for frontend row rendering
+        parsed["tier"] = tier
+        if tier == "state":
+            parsed["tier_label"] = fips_info.get("state_name") or state_fips
+            parsed["fips"] = state_fips
+        elif tier == "county":
+            parsed["tier_label"] = fips_info.get("county_name") or f"County {fips_info.get('county_fips')}"
+            parsed["fips"] = f"{state_fips}{fips_info.get('county_fips')}"
+        elif tier == "place":
+            parsed["tier_label"] = fips_info.get("place_name") or f"Place {fips_info.get('place_fips')}"
+            parsed["fips"] = f"{state_fips}{fips_info.get('place_fips')}"
+
+        return parsed
     except Exception as e:
-        logger.warning(f"Census ACS fetch failed: {e}")
+        logger.warning(f"Census ACS tier={tier} fetch failed: {e}")
         return None
+
+
+# Legacy shim — preserved for any caller still relying on the flat signature.
+def fetch_census_acs(state_fips: str, county_fips: Optional[str], api_key: str) -> Optional[Dict[str, Any]]:
+    tier = "county" if county_fips else "state"
+    return fetch_census_acs_tier(
+        tier,
+        {"state_fips": state_fips, "county_fips": county_fips},
+        api_key,
+    )
 
 
 _STATE_FIPS = {
@@ -332,18 +484,43 @@ def narrate_brief(
         yoy_str = f" (YoY {yoy:+.1f}%)" if yoy is not None else ""
         fred_lines.append(f"  {k}: {val}{yoy_str} as of {v.get('date', 'n/a')}")
 
-    census = indicators.get("census", {}) or {}
-    census_lines = []
-    if census:
-        if census.get("population") is not None:
-            census_lines.append(f"  Population: {census['population']:,}")
-        if census.get("median_hh_income") is not None:
-            census_lines.append(f"  Median HH Income: ${census['median_hh_income']:,}")
-        if census.get("median_home_value") is not None:
-            census_lines.append(f"  Median Home Value: ${census['median_home_value']:,}")
-        if census.get("owner_occ_pct") is not None:
-            census_lines.append(f"  Owner-Occupied: {census['owner_occ_pct']:.1f}%")
-        census_lines.append(f"  Source: {census.get('vintage', 'ACS 5-Year')}")
+    # Tiered census data — feed Claude state / county / city values
+    # explicitly so narrative can contrast local vs regional variance.
+    census_tiers = indicators.get("census_tiers", {}) or {}
+    census_lines: List[str] = []
+    for tier_key in ("state", "county", "city"):
+        t = census_tiers.get(tier_key)
+        if not t:
+            continue
+        label = t.get("tier_label") or tier_key.title()
+        parts = []
+        if t.get("population") is not None:
+            parts.append(f"pop {t['population']:,}")
+        if t.get("median_hh_income") is not None:
+            parts.append(f"median HH income ${t['median_hh_income']:,}")
+        if t.get("median_home_value") is not None:
+            parts.append(f"median home value ${t['median_home_value']:,}")
+        if t.get("median_gross_rent") is not None:
+            parts.append(f"median gross rent ${t['median_gross_rent']:,}")
+        if t.get("median_age") is not None:
+            parts.append(f"median age {t['median_age']:.1f}")
+        if t.get("owner_occ_pct") is not None:
+            parts.append(f"owner-occ {t['owner_occ_pct']:.1f}%")
+        if parts:
+            census_lines.append(f"  {label}: {', '.join(parts)}")
+
+    # Fallback to legacy census dict if no tiers present
+    if not census_lines:
+        census = indicators.get("census", {}) or {}
+        if census:
+            if census.get("population") is not None:
+                census_lines.append(f"  Population: {census['population']:,}")
+            if census.get("median_hh_income") is not None:
+                census_lines.append(f"  Median HH Income: ${census['median_hh_income']:,}")
+            if census.get("median_home_value") is not None:
+                census_lines.append(f"  Median Home Value: ${census['median_home_value']:,}")
+            if census.get("owner_occ_pct") is not None:
+                census_lines.append(f"  Owner-Occupied: {census['owner_occ_pct']:.1f}%")
 
     section_list = _section_list_for_depth(depth)
     sections_spec = "\n".join(f"  - {s}" for s in section_list)
@@ -690,11 +867,35 @@ def generate_location_brief(
         geo_hit = geocode_location(location_display)
     center = [geo_hit["lon"], geo_hit["lat"]] if geo_hit else None
 
+    # Resolve full FIPS hierarchy via Census Geocoder (state / county / place / CBSA)
+    fips_info: Dict[str, Any] = {}
+    if geo_hit and geo_hit.get("lat") is not None and geo_hit.get("lon") is not None:
+        fips_info = resolve_census_fips(geo_hit["lat"], geo_hit["lon"]) or {}
+
+    # Backfill state FIPS from abbrev if geocoder didn't return it
+    if not fips_info.get("state_fips"):
+        fips_info["state_fips"] = state_abbrev_to_fips(state)
+    if not fips_info.get("state_name") and state:
+        # reverse lookup from _STATE_MAP
+        for full_name, abbr in _STATE_MAP.items():
+            if abbr == state.upper():
+                fips_info["state_name"] = full_name
+                break
+
     geo = {
         "city": city,
         "state_abbrev": state,
-        "state": (geo_hit or {}).get("state"),
-        "county": (geo_hit or {}).get("county"),
+        "state": (geo_hit or {}).get("state") or fips_info.get("state_name"),
+        "county": (geo_hit or {}).get("county") or (
+            (fips_info.get("county_name") or "").replace(" County", "") or None
+        ),
+        "cbsa_code": fips_info.get("cbsa_code"),
+        "cbsa_name": fips_info.get("cbsa_name"),
+        "fips": {
+            "state": fips_info.get("state_fips"),
+            "county": fips_info.get("county_fips"),
+            "place": fips_info.get("place_fips"),
+        },
     }
 
     # Fetch indicators
@@ -708,15 +909,56 @@ def generate_location_brief(
             fred[label] = obs
 
     # State unemployment
-    state_unemp_series = FRED_STATE_UNEMP_TPL.format(state=state.upper())
+    state_abbr_upper = state.upper()
+    state_unemp_series = FRED_STATE_UNEMP_TPL.format(state=state_abbr_upper)
     state_obs = fetch_fred_series(state_unemp_series, fred_key)
     if state_obs:
-        fred[f"{state} Unemployment Rate"] = state_obs
+        fred[f"{state_abbr_upper} Unemployment Rate"] = state_obs
 
-    state_fips = state_abbrev_to_fips(state)
-    census = fetch_census_acs(state_fips, None, census_key) or {}
+    # State HPI (FHFA, quarterly)
+    state_hpi_series = FRED_STATE_HPI_TPL.format(state=state_abbr_upper)
+    state_hpi_obs = fetch_fred_series(state_hpi_series, fred_key)
+    if state_hpi_obs:
+        fred[f"{state_abbr_upper} House Price Index (FHFA)"] = state_hpi_obs
 
-    indicators = {"fred": fred, "census": census}
+    # MSA HPI (FHFA, quarterly, NSA) — only if CBSA resolved
+    if fips_info.get("cbsa_code"):
+        msa_hpi_series = FRED_MSA_HPI_TPL.format(cbsa=fips_info["cbsa_code"])
+        msa_hpi_obs = fetch_fred_series(msa_hpi_series, fred_key)
+        if msa_hpi_obs:
+            msa_label_base = fips_info.get("cbsa_name") or f"MSA {fips_info['cbsa_code']}"
+            # Strip " Metro Area" suffix for tidier labels
+            msa_label = re.sub(r"\s+Metro(politan)? Area$", "", msa_label_base)
+            fred[f"{msa_label} Home Price Index (FHFA)"] = msa_hpi_obs
+
+    # Tiered Census ACS — state / county / place
+    census_tiers: Dict[str, Any] = {}
+    state_census = fetch_census_acs_tier("state", fips_info, census_key)
+    if state_census:
+        census_tiers["state"] = state_census
+    if fips_info.get("county_fips"):
+        county_census = fetch_census_acs_tier("county", fips_info, census_key)
+        if county_census:
+            census_tiers["county"] = county_census
+    if fips_info.get("place_fips"):
+        place_census = fetch_census_acs_tier("place", fips_info, census_key)
+        if place_census:
+            census_tiers["city"] = place_census
+
+    # Legacy `census` key — populate with most-specific tier (city > county > state)
+    # so downstream consumers + cache shape keep working.
+    legacy_census = (
+        census_tiers.get("city")
+        or census_tiers.get("county")
+        or census_tiers.get("state")
+        or {}
+    )
+
+    indicators = {
+        "fred": fred,
+        "census": legacy_census,
+        "census_tiers": census_tiers,
+    }
 
     # Narrate
     narrative = narrate_brief(indicators, geo, property_type, depth)

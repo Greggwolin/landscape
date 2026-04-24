@@ -29,6 +29,21 @@ export interface MapArtifactConfig {
   project_id?: number;
 }
 
+/** Census ACS tier — state / county / city. */
+export interface CensusTier {
+  population?: number | null;
+  median_hh_income?: number | null;
+  median_home_value?: number | null;
+  median_gross_rent?: number | null;
+  median_age?: number | null;
+  owner_occ_pct?: number | null;
+  vintage?: string;
+  data_as_of?: string;
+  tier?: 'state' | 'county' | 'place';
+  tier_label?: string;
+  fips?: string;
+}
+
 /** Location Brief artifact config returned by generate_location_brief tool. */
 export interface LocationBriefArtifactConfig {
   title: string;
@@ -42,6 +57,13 @@ export interface LocationBriefArtifactConfig {
     state?: string;
     state_abbrev?: string;
     county?: string;
+    cbsa_code?: string;
+    cbsa_name?: string;
+    fips?: {
+      state?: string;
+      county?: string;
+      place?: string;
+    };
   };
   summary: string;
   sections: Array<{ title: string; content: string }>;
@@ -53,13 +75,11 @@ export interface LocationBriefArtifactConfig {
       yoy_pct?: number | null;
       next_release?: string | null;
     }>;
-    census?: {
-      population?: number | null;
-      median_hh_income?: number | null;
-      median_home_value?: number | null;
-      owner_occ_pct?: number | null;
-      vintage?: string;
-      data_as_of?: string;
+    census?: CensusTier;
+    census_tiers?: {
+      state?: CensusTier;
+      county?: CensusTier;
+      city?: CensusTier;
     };
   };
   data_as_of: string;
