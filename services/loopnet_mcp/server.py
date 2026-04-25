@@ -160,31 +160,40 @@ async def api_similar(req: SimilarRequest):
 class DebugRequest(BaseModel):
     location: str = Field(..., min_length=2)
     property_type: str = Field(default="Multifamily")
+    force_nodriver: bool = False
 
 
 @app.post("/api/debug")
 async def api_debug(req: DebugRequest):
-    """Diagnostic — fetches the search URL through the same curl_cffi path as
-    /api/search and returns HTML stats + sample. For parser tuning only."""
+    """Diagnostic — fetches the search URL and returns HTML stats + sample.
+    Default path = curl_cffi (same as /api/search). force_nodriver=true skips
+    curl_cffi and exercises the nodriver fallback directly. For parser tuning only."""
     import re
     from bs4 import BeautifulSoup
     from curl_cffi.requests import AsyncSession
     from scraper import (
         AKAMAI_SIGNALS, HEADERS, IMPERSONATE, LOOPNET_BASE,
-        _is_akamai_challenge, build_search_url,
+        _is_akamai_challenge, _nodriver_fetch, build_search_url,
     )
 
     url = build_search_url(req.location, req.property_type, {})
+    final_url = url
+    status_code: Optional[int] = None
 
-    async with AsyncSession(impersonate=IMPERSONATE) as session:
-        try:
-            await session.get(LOOPNET_BASE, headers=HEADERS, timeout=15)
-        except Exception:
-            pass
-        resp = await session.get(url, headers=HEADERS, timeout=30, allow_redirects=True)
-        html = resp.text
-        status = resp.status_code
-        final_url = str(resp.url)
+    if req.force_nodriver:
+        html = await _nodriver_fetch(url)
+        fetch_path = "nodriver"
+    else:
+        async with AsyncSession(impersonate=IMPERSONATE) as session:
+            try:
+                await session.get(LOOPNET_BASE, headers=HEADERS, timeout=15)
+            except Exception:
+                pass
+            resp = await session.get(url, headers=HEADERS, timeout=30, allow_redirects=True)
+            html = resp.text
+            status_code = resp.status_code
+            final_url = str(resp.url)
+        fetch_path = "curl_cffi"
 
     soup = BeautifulSoup(html, "lxml")
 
@@ -200,7 +209,8 @@ async def api_debug(req: DebugRequest):
     return {
         "url_built": url,
         "url_final": final_url,
-        "status_code": status,
+        "status_code": status_code,
+        "fetch_path": fetch_path,
         "html_length": len(html),
         "is_akamai_detected": _is_akamai_challenge(html),
         "akamai_signals_seen": signals_seen,

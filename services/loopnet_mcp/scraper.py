@@ -68,6 +68,11 @@ AKAMAI_SIGNALS = [
     "You don't have permission to access",
     "Access Denied",
     "checking your browser",
+    # SCF (Sensor Data Collection) JS-challenge interstitial — observed on LoopNet Apr 2026
+    "sec-if-cpt-container",
+    "scf-akamai-logo",
+    "Powered and protected by",
+    "/akam/13/pixel",
 ]
 
 
@@ -113,10 +118,11 @@ def build_search_url(location: str, property_type: str, filters: Dict[str, Any])
 
 # ─── HTTP fetch with Akamai fallback ──────────────────────────────────────────
 
-async def _fetch_html(url: str, session: AsyncSession) -> str:
+async def _fetch_html(url: str, session: AsyncSession) -> Tuple[str, str]:
     """
     Primary: curl_cffi with Chrome 136 TLS fingerprint.
     Fallback: nodriver (undetectable headless Chrome) for JS challenge pages.
+    Returns (html, fetch_path) where fetch_path is "curl_cffi" or "nodriver".
     """
     try:
         resp = await session.get(url, headers=HEADERS, timeout=30, allow_redirects=True)
@@ -124,13 +130,13 @@ async def _fetch_html(url: str, session: AsyncSession) -> str:
 
         if _is_akamai_challenge(html):
             logger.warning(f"Akamai challenge on {url} — falling back to nodriver")
-            return await _nodriver_fetch(url)
+            return await _nodriver_fetch(url), "nodriver"
 
-        return html
+        return html, "curl_cffi"
 
     except Exception as e:
         logger.warning(f"curl_cffi fetch failed for {url}: {e} — trying nodriver")
-        return await _nodriver_fetch(url)
+        return await _nodriver_fetch(url), "nodriver"
 
 
 async def _nodriver_fetch(url: str) -> str:
@@ -501,7 +507,7 @@ async def search_listings(
         except Exception:
             pass
 
-        html = await _fetch_html(url, session)
+        html, fetch_path = await _fetch_html(url, session)
 
     listings = parse_search_results(html, property_type)[:max_results]
     return {
@@ -510,14 +516,17 @@ async def search_listings(
         "search_url": url,
         "count": len(listings),
         "listings": listings,
+        "_fetch_path": fetch_path,
         "note": "asking_price is the listed price, not a closed sale price",
     }
 
 
 async def get_detail(url: str) -> Dict[str, Any]:
     async with AsyncSession(impersonate=IMPERSONATE) as session:
-        html = await _fetch_html(url, session)
-    return parse_detail(html, url)
+        html, fetch_path = await _fetch_html(url, session)
+    detail = parse_detail(html, url)
+    detail["_fetch_path"] = fetch_path
+    return detail
 
 
 async def search_similar(
