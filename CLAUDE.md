@@ -4,6 +4,23 @@
 
 ---
 
+## Project Rules (Canonical)
+
+> **Read at session start, alongside this file.** Behavioral rules — communication style, CC prompt structure, anti-patterns, dual-output spec delivery, downstream-impact analysis, token economy, tool verification, PDF/OCR protocol — live in a single canonical file shared across all Claude systems (Claude Code, Cowork, Claude.ai, Claude Design):
+>
+> **`/landscape/docs/PROJECT_INSTRUCTIONS.md`**
+>
+> **Division of responsibility:**
+>
+> - **This file (`CLAUDE.md`)** — codebase facts: architecture, schema, alpha status, current Landscaper tool count, recent decisions. Updated session-by-session.
+> - **`PROJECT_INSTRUCTIONS.md`** — behavioral rules and cross-system policy. Updated when policy changes.
+>
+> When the two files disagree on a behavioral rule, `PROJECT_INSTRUCTIONS.md` wins. When they disagree on a codebase fact (file path, table name, tool count, alpha status), `CLAUDE.md` wins.
+>
+> **Editing discipline.** When `PROJECT_INSTRUCTIONS.md` is edited, the editor must also mirror the change into Cowork project settings and Claude.ai project knowledge. The repo file is the source of truth; the other two are mirrors.
+
+---
+
 ## Project Overview
 
 Landscape is an AI-powered real estate analytics platform targeting land developers and commercial real estate professionals. It's positioned as a modern alternative to ARGUS, with emphasis on:
@@ -480,6 +497,9 @@ New layout architecture replacing the original ARGUS-style 8-folder tabs with a 
 - Chat search overlay (`ChatSearchOverlay.tsx`) — search across thread history from center panel
 - Collapsible sidebar sections (Projects / Recent Threads) with persistent toggle state
 - 10 workflow recipes injected into Landscaper system prompt (`ai_handler.py`) for guided multi-step workflows
+- Draggable right panel width (320–900px, 420px default, left-edge handle) on `/w/chat` aside and `ProjectArtifactsPanel` (Apr 23)
+- `LocationBriefArtifact.tsx` — renders `generate_location_brief` output with tabular indicator tiles + condensed exec summary toggle; hardcoded light palette avoids dark-mode bleed (Apr 23)
+- `CreateProjectCTA.tsx` — contextual "Create Project" prompt shown when location brief resolves city/state/property type
 
 **Backend support** (migration `0003_unassigned_threads.sql`):
 - `landscaper_thread.project_id` now nullable — enables pre-project conversations
@@ -860,7 +880,7 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-22 (nightly sync — Apr 22: 14 commits. Unified-UI chat wiring day: URL-based thread identity (/w/chat/[threadId] routing + useLandscaperThreads refactor), chat search overlay, collapsible sidebar sections, SSR hydration fix, unassigned chat routing fix, 10 workflow recipes in Landscaper system prompt, husky v9 migration, test manifest expansion S11-S13.)*
+*Last updated: 2026-04-24 (nightly sync — Apr 24: 3 commits. Location brief R3 (tiered census + MSA HPI + de-chromed UI) + R4 (matrix-table refactor, -62 lines net). Agent test S7: location brief intent resolution (45 variants, 89% accuracy). Tool count holds at 261.)*
 *Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
 *Landscaper tool count: **261** (8 P1 + 3 P2 analysis tools + 6 CRUD gap fixes Apr 21 + 4 DMS management tools Apr 21 + 3 LoopNet deal-sourcing tools Apr 21 + 3 cost-taxonomy tools Apr 21 + `generate_location_brief` Apr 23). CRUD gap fixes: 3 expense comparable tools (get/update/delete), 3 acquisition event tools (get/create/delete). DMS tools: rename_document, update_document_profile, move_document_to_folder, reprocess_document. LoopNet tools: loopnet_search_listings, loopnet_get_listing_detail, loopnet_search_similar. Cost-taxonomy tools: delete_budget_category, get_category_lifecycle_stages, update_category_lifecycle_stages. Also expanded: LOAN_COLUMNS 25→65, SALES_COMP_COLUMNS +3, LEASE_COLUMNS +3. Includes 4 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3. Phases 4-7 remain follow-on.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
