@@ -154,6 +154,67 @@ async def api_similar(req: SimilarRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ─── Debug endpoint (TEMPORARY — remove once parser is tuned) ─────────────────
+
+
+class DebugRequest(BaseModel):
+    location: str = Field(..., min_length=2)
+    property_type: str = Field(default="Multifamily")
+
+
+@app.post("/api/debug")
+async def api_debug(req: DebugRequest):
+    """Diagnostic — fetches the search URL through the same curl_cffi path as
+    /api/search and returns HTML stats + sample. For parser tuning only."""
+    import re
+    from bs4 import BeautifulSoup
+    from curl_cffi.requests import AsyncSession
+    from scraper import (
+        AKAMAI_SIGNALS, HEADERS, IMPERSONATE, LOOPNET_BASE,
+        _is_akamai_challenge, build_search_url,
+    )
+
+    url = build_search_url(req.location, req.property_type, {})
+
+    async with AsyncSession(impersonate=IMPERSONATE) as session:
+        try:
+            await session.get(LOOPNET_BASE, headers=HEADERS, timeout=15)
+        except Exception:
+            pass
+        resp = await session.get(url, headers=HEADERS, timeout=30, allow_redirects=True)
+        html = resp.text
+        status = resp.status_code
+        final_url = str(resp.url)
+
+    soup = BeautifulSoup(html, "lxml")
+
+    placard_articles = len(soup.find_all("article", class_=re.compile(r"placard|listing-card", re.I)))
+    listing_lis = len(soup.find_all("li", class_=re.compile(r"placard|listing", re.I)))
+    listing_card_divs = len(soup.find_all("div", class_=re.compile(r"ListingCard|property-record", re.I)))
+
+    article_classes = list({" ".join(a.get("class", [])) for a in soup.find_all("article")[:20]})
+    li_classes = list({" ".join(li.get("class", [])) for li in soup.find_all("li", class_=True)[:30]})
+
+    signals_seen = [s for s in AKAMAI_SIGNALS if s.lower() in html.lower()]
+
+    return {
+        "url_built": url,
+        "url_final": final_url,
+        "status_code": status,
+        "html_length": len(html),
+        "is_akamai_detected": _is_akamai_challenge(html),
+        "akamai_signals_seen": signals_seen,
+        "card_counts": {
+            "article_placard": placard_articles,
+            "li_listing": listing_lis,
+            "div_listing_card": listing_card_divs,
+        },
+        "article_classes_sample": article_classes,
+        "li_classes_sample": li_classes,
+        "html_sample": html[:5000],
+    }
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
