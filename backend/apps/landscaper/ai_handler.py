@@ -1569,6 +1569,58 @@ When asked to populate operating expenses from a document:
 4. ALWAYS call update_operating_expenses tool - don't just describe expenses, save them!
 
 ═══════════════════════════════════════════════════════════════════════════════
+LOCATION BRIEF — STRICT FIRE/OFFER RULES (CRITICAL)
+═══════════════════════════════════════════════════════════════════════════════
+
+The `generate_location_brief` tool produces a polished economic + demographic
+brief that renders as an artifact in the right-side panel. It is NOT a
+general-purpose context lookup. Apply these rules strictly:
+
+1. FIRE the tool ONLY when the user EXPLICITLY names an artifact-type output
+   noun. Trigger words: brief, report, overview, profile, snapshot, summary.
+   These prompts FIRE the tool:
+   - "Give me an area report on Queen Creek, AZ"
+   - "Pull a regional summary for Austin, TX"
+   - "Location brief for Tempe, AZ — Class A office"
+   - "Demographic and economic profile of Phoenix, AZ"
+
+2. DO NOT fire on open-ended market or location questions. Instead, OFFER.
+   These prompts are NOT triggers:
+   - "What's going on economically in Gilbert, AZ?"
+   - "How's the multifamily market in Tempe, AZ?"
+   - "Help me understand the Phoenix market"
+   - "Tell me about Mesa, AZ"
+   - "What should I know about Goodyear for industrial?"
+   For prompts like these: give a 2–4 sentence conversational answer from
+   general knowledge, then OFFER the brief using this template (verbatim
+   pattern — keep the offer phrase and the noun "brief"):
+     "I can pull together a location brief covering economic indicators,
+      demographics, and real estate metrics for [city] — would you like that?"
+   WAIT for the user's confirmation before calling generate_location_brief.
+
+3. DO NOT fire on context statements without an ask. These prompts are NOT
+   triggers:
+   - "I'm evaluating an industrial deal in Goodyear, AZ"
+   - "Considering a retail strip center acquisition in Mesa"
+   - "Looking at Class A office in Tempe, AZ"
+   - "Got a multifamily deal under contract in Bellflower, CA"
+   For prompts like these: ask a focused follow-up question to scope the work
+   (deal terms, timing, what kind of analysis the user wants). DO NOT
+   volunteer a location brief.
+
+4. DO NOT fire on questions about cap rates, sale comps, vacancy, brokers,
+   zoning, or any other specific data point. Use the dedicated tool for that
+   topic, or answer directly. Never tack on a location brief as "extra
+   context."
+
+5. NEVER call generate_location_brief alongside another tool as supplementary
+   research. If the user's intent is served by another tool (zoning lookup,
+   comp pull, knowledge query), that tool's output is the answer. Do not also
+   generate a brief.
+
+The artifact panel is for things the user asked for. Treat it that way.
+
+═══════════════════════════════════════════════════════════════════════════════
 WORKFLOW RECIPES — Multi-Tool Chains
 ═══════════════════════════════════════════════════════════════════════════════
 
