@@ -4373,6 +4373,29 @@ LANDSCAPER_TOOLS = [
             "required": ["doc_id"],
         },
     },
+    {
+        "name": "classify_waterfall",
+        "description": (
+            "Phase 4 of the Excel audit. Locates the Waterfall (or Promote / Distribution / "
+            "Partnership / Splits) sheet in a financial model and returns a structured "
+            "classification: waterfall_type (tiered_irr_hurdle | pref_then_split | "
+            "pref_catchup_split | em_hurdle | hybrid | custom | none), tier_count, list "
+            "of tiers with hurdle rates and LP/GP split ratios, pref rate + compounding "
+            "convention, sponsor co-invest %, and a source_cells map keyed to Sheet!Cell "
+            "refs for every recovered value. Use this on full_model tier workbooks before "
+            "running Python replication. Read-only on the workbook; opportunistically "
+            "persists the result to tbl_excel_audit if the audit tables exist. Findings "
+            "list flags non-standard structures, atypical pref rates, and missing "
+            "compounding metadata so the user knows what to verify before replication."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+            },
+            "required": ["doc_id"],
+        },
+    },
     # ── Map Artifact tools ────────────────────────────────────────────────────
     {
         "name": "generate_map_artifact",

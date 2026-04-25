@@ -11,9 +11,11 @@ Tools implemented in this module:
   3. run_formula_integrity(doc_id)    - Phase 2, error cells + broken refs +
                                          range consistency (Check 2e)
   4. extract_assumptions(doc_id)      - Phase 3, labeled inputs -> staging
+  5. classify_waterfall(doc_id)       - Phase 4, waterfall structure JSON +
+                                         tiers + hurdles + splits + source cells
 
-Future turns add: classify_waterfall, replicate_waterfall, replicate_debt,
-verify_sources_uses, compute_trust_score, generate_audit_report.
+Future turns add: replicate_waterfall, replicate_debt, verify_sources_uses,
+compute_trust_score, generate_audit_report.
 """
 
 import logging
@@ -200,4 +202,76 @@ def extract_assumptions(doc_id: int = None, **kwargs):
         return result
     except Exception as e:
         logger.exception("extract_assumptions failed doc_id=%s", doc_id_int)
+        return _error_envelope(doc_id_int, e)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tool 5: classify_waterfall (Phase 4)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@register_tool("classify_waterfall")
+def classify_waterfall(doc_id: int = None, **kwargs):
+    """
+    Phase 4 — classify the waterfall structure of a financial model.
+
+    Locates the Waterfall (or Promote/Distribution/Partnership) sheet,
+    detects tier labels (return-of-capital / pref / catch-up / hurdle /
+    residual), reads adjacent cells for hurdle rates and split ratios,
+    and returns a structured classification:
+
+      waterfall_type        : tiered_irr_hurdle | pref_then_split |
+                              pref_catchup_split | em_hurdle | hybrid |
+                              custom | none
+      tier_count            : int
+      sheet_name            : detected waterfall sheet
+      tiers                 : list of tier objects with label, hurdle,
+                              splits, source_cells
+      pref_rate             : annual pref rate (if pref tier present)
+      pref_compounding      : monthly | quarterly | annual | None
+      hurdle_type           : IRR | EM | IRR_EM | None
+      sponsor_coinvest_pct  : detected GP co-invest %
+      source_cells          : Sheet!Cell refs for every recovered value
+      findings              : data quality / classification gaps
+
+    Output feeds Phase 5 (Python replication). Read-only on the workbook;
+    upserts the result into tbl_excel_audit if the audit tables exist
+    (silently skips otherwise — won't crash if migration is unapplied).
+    """
+    doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
+    if err:
+        return err
+    project_id = _resolve_project_id(kwargs)
+    try:
+        with _open_workbook(doc_id_int) as (values_wb, formulas_wb):
+            # Re-classify tier so we can persist it alongside the waterfall.
+            # Cheap (~ms) and ensures tbl_excel_audit.tier stays current.
+            classification = xa.classify(values_wb, formulas_wb)
+            tier = classification.get("tier")
+
+            result = xa.classify_waterfall(values_wb, formulas_wb)
+
+        # Opportunistic persistence — failures are logged, not raised.
+        audit_id = xa.upsert_audit_phase(
+            doc_id=doc_id_int,
+            phase="phase_4",
+            payload=result,
+            project_id=project_id,
+            tier=tier,
+            findings=[
+                {**f, "sheet_cell": result.get("sheet_name")}
+                for f in result.get("findings", [])
+            ],
+        )
+
+        result.update({
+            "ok": True,
+            "doc_id": doc_id_int,
+            "project_id": project_id,
+            "tier": tier,
+            "audit_id": audit_id,
+        })
+        return result
+    except Exception as e:
+        logger.exception("classify_waterfall failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)
