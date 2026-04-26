@@ -939,10 +939,8 @@ TOOL_DOMAIN_MAP = {
     'move_document_to_folder': 'documents',
     'reprocess_document': 'documents',
 
-    # LoopNet Deal Sourcing
-    'loopnet_search_listings': 'market',
-    'loopnet_get_listing_detail': 'market',
-    'loopnet_search_similar': 'market',
+    # LoopNet Deal Sourcing — DEFERRED 2026-04-25 (gx14)
+    # See tool_schemas.py for context. Schemas removed; routing deleted.
 
     # Reports
     'generate_report_preview': 'reports',
@@ -1676,18 +1674,7 @@ Chain:
   7. update_reconciliation → set approach weights if multiple approaches complete
   8. Report current indicated value and any data gaps remaining
 
-RECIPE 5 — DEAL SOURCING / MARKET RESEARCH
-Trigger: "find me deals", "what's on the market", "search for [property type] in [market]"
-Chain:
-  1. loopnet_search_listings({location, property_type, price_range}) → get active listings
-  2. For interesting results: loopnet_get_listing_detail(listing_url) → full details
-  3. get_demographics({project_id}) → market context for the area
-  4. query_platform_knowledge(query about market/submarket) → any prior knowledge
-  5. Present findings with market context. Offer: "Want me to save any of these as
-     sales comparables for your project?"
-  6. If yes: add_sales_comparable for each selected listing
-
-RECIPE 6 — BUDGET SETUP / TAXONOMY CONFIGURATION
+RECIPE 5 — BUDGET SETUP / TAXONOMY CONFIGURATION
 Trigger: "set up the budget", "configure cost categories", "add a new cost category"
 Chain:
   1. get_budget_categories → see current taxonomy tree
@@ -1698,7 +1685,7 @@ Chain:
   6. update_budget_items → create budget line items from templates or user input
   7. Verify: get_budget_summary → confirm totals
 
-RECIPE 7 — KNOWLEDGE-FIRST RESEARCH (cost, market, or methodology questions)
+RECIPE 6 — KNOWLEDGE-FIRST RESEARCH (cost, market, or methodology questions)
 Trigger: "what does X cost", "what's the typical cap rate", "how should I handle..."
 Chain:
   1. query_platform_knowledge(query) → searches ALL three sources:
@@ -1711,7 +1698,7 @@ Chain:
      from [source]), platform benchmarks ($Y/SF), and [document name] ($Z/SF)..."
   5. NEVER say "I don't have that data" without completing step 1 first.
 
-RECIPE 8 — PROJECT SETUP FROM SCRATCH
+RECIPE 7 — PROJECT SETUP FROM SCRATCH
 Trigger: "create a new project", "start a new analysis"
 Chain:
   1. create_project → gather inputs conversationally (type, purpose, perspective)
@@ -1721,7 +1708,7 @@ Chain:
   5. Suggest next steps based on gaps: "Your project needs: [list]. Want to start
      with [highest-priority gap]?"
 
-RECIPE 9 — DMS ORGANIZATION
+RECIPE 8 — DMS ORGANIZATION
 Trigger: "organize my documents", "rename this file", "move to folder", "reprocess"
 Chain:
   1. get_project_documents → list all documents with status
@@ -1729,7 +1716,7 @@ Chain:
   3. If extraction failed or produced poor results: reprocess_document(doc_id)
   4. Report: "Renamed [N] docs, moved [M] to [folder], reprocessed [K]."
 
-RECIPE 10 — FULL PROJECT HEALTH CHECK
+RECIPE 9 — FULL PROJECT HEALTH CHECK
 Trigger: "how complete is this project", "what's missing", "am I ready for [milestone]"
 Chain:
   1. get_data_completeness → field-level coverage

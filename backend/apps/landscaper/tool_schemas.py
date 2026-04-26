@@ -4672,112 +4672,17 @@ LANDSCAPER_TOOLS = [
             "required": [],
         },
     },
-    # ─── LoopNet Deal Sourcing ────────────────────────────────────────────────
-    {
-        "name": "loopnet_search_listings",
-        "description": (
-            "Search LoopNet for active commercial real estate listings for sale. "
-            "Returns asking prices, unit count, year built, cap rate, and listing URLs. "
-            "Use for: 'find MF for sale near Downey', 'what's for sale in Pasadena under $5M', "
-            "'find pre-1980 apartments in Long Beach'. "
-            "Results are active listings — asking_price, not closed sale price."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "City/state or ZIP — 'Pasadena, CA' or '90241'",
-                },
-                "property_type": {
-                    "type": "string",
-                    "description": "Multifamily | Office | Retail | Industrial | Land (default: Multifamily)",
-                    "default": "Multifamily",
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Max listings to return (1-25, default 10)",
-                    "default": 10,
-                },
-                "filters": {
-                    "type": "object",
-                    "description": "Optional filters",
-                    "properties": {
-                        "min_price": {"type": "number", "description": "Min asking price ($)"},
-                        "max_price": {"type": "number", "description": "Max asking price ($)"},
-                        "min_units": {"type": "integer", "description": "Min unit count"},
-                        "max_units": {"type": "integer", "description": "Max unit count"},
-                        "min_year_built": {"type": "integer", "description": "Min year built"},
-                        "max_year_built": {"type": "integer", "description": "Max year built"},
-                    },
-                },
-            },
-            "required": ["location"],
-        },
-    },
-    {
-        "name": "loopnet_get_listing_detail",
-        "description": (
-            "Retrieve full detail for a specific LoopNet listing by URL. "
-            "Use after loopnet_search_listings to get complete property data. "
-            "Returns all fields mapped to tbl_sales_comparables: units, year built, SF, "
-            "cap rate, price/unit, broker, occupancy, NOI, zoning, coordinates."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "listing_url": {
-                    "type": "string",
-                    "description": "Full LoopNet listing URL from search results",
-                },
-            },
-            "required": ["listing_url"],
-        },
-    },
-    {
-        "name": "loopnet_search_similar",
-        "description": (
-            "Find LoopNet listings similar to a subject property. "
-            "Builds a targeted search using subject attributes (units, year built, price range) "
-            "and annotates results with similarity notes. "
-            "Use for comp discovery: 'find MF comps similar to ours', "
-            "'find pre-1980 MF near Pasadena', 'what are 50-unit buildings selling for?'"
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "Search center — city/state or ZIP",
-                },
-                "units": {
-                    "type": "integer",
-                    "description": "Subject unit count — searches ±30% range",
-                },
-                "year_built_before": {
-                    "type": "integer",
-                    "description": "Only include buildings built before this year",
-                },
-                "year_built_after": {
-                    "type": "integer",
-                    "description": "Only include buildings built after this year",
-                },
-                "max_price": {
-                    "type": "number",
-                    "description": "Max asking price ($)",
-                },
-                "radius_miles": {
-                    "type": "number",
-                    "description": "Search radius in miles (0.5–50, default 5)",
-                    "default": 5.0,
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Max results (1-25, default 10)",
-                    "default": 10,
-                },
-            },
-            "required": ["location"],
-        },
-    },
+    # ─── LoopNet Deal Sourcing — DEFERRED 2026-04-25 (gx14) ───────────────────
+    # loopnet_search_listings, loopnet_get_listing_detail, loopnet_search_similar
+    # were committed Apr 21 against an HTML scraper in services/loopnet_mcp.
+    # LoopNet's Akamai SCF challenge proved unscrapable from datacenter IPs
+    # (Railway egress hard-blocked at the edge). Crexi recon Apr 25 found the
+    # public JSON API gates filters behind auth + Google Place IDs we did not
+    # fully reverse-engineer; the unauth endpoint returns a static 50-record
+    # explore feed regardless of body params.
+    #
+    # Schemas removed here so Landscaper does not advertise the tools. The
+    # @register_tool decorators in loopnet_tools.py remain — registry stays
+    # at 261 — so revival is "paste schemas back + repoint the URL" once a
+    # working backend exists (paid feed, ATTOM/Reonomy, post-alpha).
 ]
