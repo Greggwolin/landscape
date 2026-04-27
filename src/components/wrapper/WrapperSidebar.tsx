@@ -11,7 +11,12 @@ interface Thread {
   name: string;
   isActive?: boolean;
   onClick?: () => void;
+  /** Optional project name shown beneath the title as a faint hint. */
+  projectName?: string;
 }
+
+// Default visible-thread cap — Claude pattern: show recent N, expand to all.
+const DEFAULT_THREAD_CAP = 7;
 
 interface ScheduledAgent {
   id: string;
@@ -113,6 +118,19 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   const [threadsCollapsed, setThreadsCollapsed] = useState(false);
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
+  // Thread "See more" state — capped at DEFAULT_THREAD_CAP by default.
+  // If the active thread sits past the cap, expand automatically so the
+  // user always sees the row that matches the URL they're on.
+  const activeThreadIndex = threads.findIndex((t) => t.isActive);
+  const [threadsExpanded, setThreadsExpanded] = useState(
+    activeThreadIndex >= DEFAULT_THREAD_CAP,
+  );
+  // Re-evaluate auto-expand when the active thread changes.
+  React.useEffect(() => {
+    if (activeThreadIndex >= DEFAULT_THREAD_CAP) setThreadsExpanded(true);
+  }, [activeThreadIndex]);
+  const visibleThreads = threadsExpanded ? threads : threads.slice(0, DEFAULT_THREAD_CAP);
+  const hiddenThreadCount = Math.max(0, threads.length - DEFAULT_THREAD_CAP);
 
   const handleNewChat = () => {
     if (onNewChat) onNewChat();
@@ -182,16 +200,58 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 <span>Threads</span>
                 <span className="sb-section-chev">{threadsCollapsed ? '▸' : '▾'}</span>
               </div>
-              {!threadsCollapsed && threads.map((t) => (
+              {!threadsCollapsed && visibleThreads.map((t) => (
                 <div
                   key={t.id}
                   className={`sb-thread${t.isActive ? ' active' : ''}`}
                   onClick={t.onClick}
+                  title={t.projectName ? `${t.name} — ${t.projectName}` : t.name}
                 >
                   <span className={`sb-thread-dot ${t.isActive ? 'active' : 'idle'}`} />
-                  {t.name}
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                    {t.projectName && (
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: 10,
+                          opacity: 0.55,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {t.projectName}
+                      </span>
+                    )}
+                  </span>
                 </div>
               ))}
+              {!threadsCollapsed && hiddenThreadCount > 0 && (
+                <div
+                  className="sb-thread sb-thread-more"
+                  onClick={() => setThreadsExpanded((v) => !v)}
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.7,
+                    cursor: 'pointer',
+                    paddingLeft: 22,
+                  }}
+                >
+                  {threadsExpanded
+                    ? 'See less'
+                    : `See more (${hiddenThreadCount})`}
+                </div>
+              )}
             </div>
           )}
 

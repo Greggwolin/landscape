@@ -201,12 +201,25 @@ export function useLandscaperThreads({
   const [isLoading, setIsLoading] = useState(false);
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Set true when a URL-pinned thread (`initialThreadId`) returns 404 / null
+   * from the server. Permanent failure — recovery loop has been short-circuited.
+   * Consumers (CenterChatPanel) should watch this and redirect to /w/chat.
+   */
+  const [threadNotFound, setThreadNotFound] = useState(false);
   const initializingRef = useRef(false);
   const activeThreadRef = useRef<ChatThread | null>(null);
   /** Guards concurrent sendMessage calls */
   const sendingRef = useRef(false);
   /** Tracks whether at least one full initializeThread cycle has completed */
   const hasInitializedOnceRef = useRef(false);
+  /**
+   * Recovery attempt counter for missing/failed threads. Hoisted up here
+   * (was declared near the recovery effect) so initializeThread can short-
+   * circuit it on permanent 404 in the URL-pinned branch.
+   */
+  const recoveryAttemptsRef = useRef(0);
+  const MAX_RECOVERY_ATTEMPTS = 5;
 
   // AbortController for cancelling in-flight requests on unmount / context change
   const abortControllerRef = useRef<AbortController>(new AbortController());
@@ -426,6 +439,7 @@ export function useLandscaperThreads({
 
         if (thread) {
           setActiveThread(thread);
+          setThreadNotFound(false);
           await loadThreadMessages(thread.threadId);
           if (mySignal.aborted) return;
           // Refresh sidebar list so the resumed thread is reflected
@@ -433,13 +447,20 @@ export function useLandscaperThreads({
         } else {
           // URL pointed at a thread we can't fetch (deleted / bad id / auth).
           // Don't fall through to get_or_create — that would silently
-          // resurrect a different thread. Leave state empty and let the
-          // user decide what to do.
+          // resurrect a different thread. SHORT-CIRCUIT recovery: a 404
+          // here is permanent (thread is genuinely gone), retrying 5x
+          // floods the console with errors and leaves the user stranded.
+          // Set threadNotFound so CenterChatPanel can redirect to /w/chat.
           setActiveThread(null);
           setMessages([]);
+          setThreadNotFound(true);
+          recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
+          setError('Thread not found — redirecting to a new chat');
         }
         return;
       }
+      // Reset the flag any time we successfully take a non-URL branch
+      setThreadNotFound(false);
 
       // --- Branch 3: Unassigned chat, no URL thread → wait for first send ---
       if (!hasProjectId(projectId)) {
@@ -842,8 +863,8 @@ export function useLandscaperThreads({
   // unassigned `/w/chat` root we WANT activeThread=null (waiting for the
   // user's first message); looping recovery here would recreate the old
   // bug where new-chat mounts silently resurrect a thread.
-  const recoveryAttemptsRef = useRef(0);
-  const MAX_RECOVERY_ATTEMPTS = 5;
+  // (recoveryAttemptsRef + MAX_RECOVERY_ATTEMPTS now declared at top of
+  // hook so initializeThread can short-circuit them on permanent 404.)
   useEffect(() => {
     // Reset recovery counter when context changes (new mount / new page)
     recoveryAttemptsRef.current = 0;
@@ -893,6 +914,8 @@ export function useLandscaperThreads({
     isLoading,
     isThreadLoading,
     error,
+    /** True when URL-pinned thread fetch returned 404. Watch from layout/CenterChatPanel and redirect to /w/chat. */
+    threadNotFound,
     // Thread actions
     selectThread,
     startNewThread,

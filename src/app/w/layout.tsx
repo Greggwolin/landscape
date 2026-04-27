@@ -6,9 +6,11 @@ import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
 import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifact';
 import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
+import { ExcelAuditArtifact } from '@/components/wrapper/ExcelAuditArtifact';
 import { WrapperUIProvider, useWrapperUI } from '@/contexts/WrapperUIContext';
 import { LandscaperCollisionProvider } from '@/contexts/LandscaperCollisionContext';
 import { HelpLandscaperProvider, useHelpLandscaper } from '@/contexts/HelpLandscaperContext';
+import { FileDropProvider } from '@/contexts/FileDropContext';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,9 +44,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     rightPanelNarrow,
     openSearch,
     activeLocationBrief,
-    setActiveLocationBrief,
     activeMapArtifact,
-    setActiveMapArtifact,
+    activeExcelAudit,
+    artifactsOpen,
+    toggleArtifacts,
   } = useWrapperUI();
   const { logout, user } = useAuth();
 
@@ -223,13 +226,97 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     [rightPanelWidth]
   );
 
-  // Mock data for sidebar sections until real sources wired
-  const mockThreads = [
-    { id: 't1', name: 'OM ingestion — Brownstone', isActive: true },
-    { id: 't2', name: 'Bridge rate sensitivity analysis' },
-    { id: 't3', name: 'Model integrity audit' },
-    { id: 't4', name: 'Comp survey — Bellflower' },
-  ];
+  // ─── Sidebar threads (Claude/ChatGPT-style cross-project list) ───
+  // Fetches every thread visible to this user — project-scoped + unassigned —
+  // sorted by recency. The sidebar component caps display to 7 with a
+  // "See more" toggle. Refetches when the active thread changes (covers
+  // create/delete/rename triggered from the center panel).
+  interface SidebarThreadRaw {
+    threadId: string;
+    title: string | null;
+    firstUserMessage: string | null;
+    projectId: number | null;
+    projectName: string | null;
+    pageContext: string | null;
+    updatedAt: string;
+    isActive: boolean;
+  }
+  const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+  const getAuthHeaders = (): Record<string, string> => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('auth_tokens');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.access) return { Authorization: `Bearer ${parsed.access}` };
+      }
+    } catch { /* ignore */ }
+    return {};
+  };
+
+  // Active thread id derived from /w/chat/[threadId] — used to highlight
+  // the matching row in the sidebar.
+  const activeSidebarThreadId = initialThreadId ?? null;
+
+  const [sidebarThreads, setSidebarThreads] = useState<SidebarThreadRaw[]>([]);
+  // Bumping this re-runs the fetch (e.g., after a new thread is created).
+  // Wired up below via a window event so child components don't need a
+  // direct callback path through the WrapperUIContext yet.
+  const [sidebarThreadsRefreshKey, setSidebarThreadsRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${DJANGO_API_URL}/api/landscaper/threads/?all_user_threads=true`, {
+      headers: getAuthHeaders(),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.threads || !Array.isArray(data.threads)) return;
+        setSidebarThreads(data.threads as SidebarThreadRaw[]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [sidebarThreadsRefreshKey, DJANGO_API_URL]);
+
+  // Refresh trigger — listens for a window event the chat panel can dispatch
+  // after thread create/delete. Keeps the sidebar list in sync without
+  // threading a callback through every layer.
+  useEffect(() => {
+    const handler = () => setSidebarThreadsRefreshKey((k) => k + 1);
+    window.addEventListener('landscaper:threads-changed', handler);
+    return () => window.removeEventListener('landscaper:threads-changed', handler);
+  }, []);
+
+  // Also refresh when the URL-pinned thread changes (covers /w/chat → /w/chat/[id]
+  // after first message creates a thread, and thread-switch via the URL).
+  useEffect(() => {
+    setSidebarThreadsRefreshKey((k) => k + 1);
+  }, [activeSidebarThreadId]);
+
+  // Build the props the sidebar consumes. Label fallback chain:
+  //   1. title (auto-generated after first AI response, or user-edited)
+  //   2. firstUserMessage truncated to 40 chars
+  //   3. "New conversation"
+  // Project name is appended as a hint when the thread is project-scoped.
+  const sidebarThreadItems = sidebarThreads.map((t) => {
+    let label: string;
+    if (t.title && t.title.trim()) {
+      label = t.title.trim();
+    } else if (t.firstUserMessage && t.firstUserMessage.trim()) {
+      const msg = t.firstUserMessage.trim();
+      label = msg.length > 40 ? msg.slice(0, 40).trimEnd() + '…' : msg;
+    } else {
+      label = 'New conversation';
+    }
+    return {
+      id: t.threadId,
+      name: label,
+      projectName: t.projectName ?? undefined,
+      isActive: t.threadId === activeSidebarThreadId,
+      onClick: () => router.push(`/w/chat/${t.threadId}`),
+    };
+  });
+
   const mockScheduled = [
     { id: 's1', emoji: '📊', name: 'FRED market data pull', status: 'active' as const },
     { id: 's2', emoji: '🏗️', name: 'Bellflower permit monitor', status: 'active' as const },
@@ -267,7 +354,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         sidebarWidth={sidebarWidth}
         onResizeStart={handleResizeStart}
         onNewChat={handleNewChat}
-        threads={mockThreads}
+        threads={sidebarThreadItems}
         scheduledAgents={mockScheduled}
         recentProjects={recentProjects.map((p) => ({
           ...p,
@@ -297,39 +384,56 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       {!isChatRoute && (
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
       )}
-      {/* On unassigned chat routes, surface artifacts in a right-side slot when
-          the Landscaper dispatches one (location brief, map). Otherwise the
-          main column is hidden on chat routes — see isChatRoute check above. */}
-      {isChatRoute && (activeLocationBrief || activeMapArtifact) && (
-        <>
-          {/* Drag handle — lives on the LEFT edge of the right panel */}
-          <div
-            className="wrapper-drag-handle"
-            onPointerDown={handleRightResizeStart}
-            style={{
-              cursor: 'col-resize',
-              width: 4,
-              flexShrink: 0,
-              background: 'transparent',
-            }}
-          />
-          <aside
-            className="artifacts-panel"
-            style={{ width: rightPanelWidth, flexShrink: 0 }}
-          >
-            {activeLocationBrief ? (
-              <LocationBriefArtifact
-                config={activeLocationBrief}
-                onClose={() => setActiveLocationBrief(null)}
-              />
-            ) : activeMapArtifact ? (
-              <MapArtifactRenderer
-                config={activeMapArtifact}
-                onClose={() => setActiveMapArtifact(null)}
-              />
-            ) : null}
-          </aside>
-        </>
+      {/* Artifacts on chat routes: full panel when open, ☰ strip when collapsed.
+          Close from inside an artifact toggles the panel rather than nuking
+          state, so the same artifact can be reopened via the strip. */}
+      {isChatRoute && (activeLocationBrief || activeMapArtifact || activeExcelAudit) && (
+        artifactsOpen ? (
+          <>
+            <div
+              className="wrapper-drag-handle"
+              onPointerDown={handleRightResizeStart}
+              style={{
+                cursor: 'col-resize',
+                width: 4,
+                flexShrink: 0,
+                background: 'transparent',
+              }}
+            />
+            <aside
+              className="artifacts-panel"
+              style={{ width: rightPanelWidth, flexShrink: 0 }}
+            >
+              {/* Priority: location brief > map > excel audit */}
+              {activeLocationBrief ? (
+                <LocationBriefArtifact
+                  config={activeLocationBrief}
+                  onClose={toggleArtifacts}
+                />
+              ) : activeMapArtifact ? (
+                <MapArtifactRenderer
+                  config={activeMapArtifact}
+                  onClose={toggleArtifacts}
+                />
+              ) : activeExcelAudit ? (
+                <ExcelAuditArtifact
+                  config={activeExcelAudit}
+                  onClose={toggleArtifacts}
+                />
+              ) : null}
+            </aside>
+          </>
+        ) : (
+          <div className="artifacts-collapsed">
+            <button
+              className="artifacts-expand-btn"
+              onClick={toggleArtifacts}
+              title="Open artifacts panel"
+            >
+              ☰
+            </button>
+          </div>
+        )
       )}
       <HelpLandscaperPanel />
     </div>
@@ -341,7 +445,18 @@ export default function WrapperLayout({ children }: { children: React.ReactNode 
     <WrapperUIProvider>
       <LandscaperCollisionProvider>
         <HelpLandscaperProvider>
-          <WrapperLayoutInner>{children}</WrapperLayoutInner>
+          {/*
+            FileDropProvider must wrap WrapperLayoutInner because CenterChatPanel
+            (mounted inside Inner) calls useFileDrop. ProjectContextShell at the
+            project-route layer also wraps with FileDropProvider — that creates
+            a nested provider on /w/projects/[id]/* routes. Duplication is
+            harmless (inner wins for project-page consumers) but worth cleaning
+            up by removing the wrap from ProjectContextShell once we're sure
+            nothing in legacy /projects/* depends on it being there.
+          */}
+          <FileDropProvider>
+            <WrapperLayoutInner>{children}</WrapperLayoutInner>
+          </FileDropProvider>
         </HelpLandscaperProvider>
       </LandscaperCollisionProvider>
     </WrapperUIProvider>

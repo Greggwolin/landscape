@@ -79,34 +79,36 @@ interface LandscaperChatThreadedProps {
    * `router.replace('/w/chat/[newId]')` once the first message creates a thread.
    */
   onActiveThreadChange?: (threadId: string | null) => void;
+  /**
+   * Pre-send hook. Fires inside `handleSend` BEFORE `sendMessage` is called.
+   * Parent uses this to upload pending attachments and return context that
+   * gets appended to the user's message (e.g. doc_id reference). If it
+   * throws, the send is aborted and the input is restored.
+   *
+   * Returning a `contextSuffix` causes the actual sent message to be
+   *   `${userText}\n\n${contextSuffix}`
+   * so the model sees both the user's prompt and the attached doc context.
+   */
+  onBeforeSend?: () => Promise<{ contextSuffix?: string } | void>;
+  /**
+   * Fires when the URL-pinned `initialThreadId` is permanently missing
+   * (404 from the backend). Parent should redirect to /w/chat or similar
+   * fallback so the user isn't stranded on a dead URL.
+   */
+  onThreadNotFound?: () => void;
+  /**
+   * Fires whenever the count of in-scope threads changes (mount, after a
+   * thread is created/deleted, after refetch). Parent uses this to drive the
+   * thread-history badge count without making a duplicate fetch — this
+   * component already loads `allThreads` for the in-panel browser, so the
+   * badge reads from the same source. Keeps badge ↔ list in sync.
+   */
+  onThreadCountChange?: (count: number) => void;
 }
 
 /**
  * Get context-aware hint for the current page.
  */
-/**
- * Normalize page context for thread grouping (must match ThreadList).
- */
-const CONTEXT_NORMALIZATION: Record<string, string> = {
-  home: 'home', mf_home: 'home', land_home: 'home',
-  property: 'property', mf_property: 'property', land_planning: 'property',
-  operations: 'operations', mf_operations: 'operations',
-  valuation: 'valuation', mf_valuation: 'valuation', land_valuation: 'valuation', feasibility: 'valuation',
-  capitalization: 'capital', capital: 'capital', mf_capitalization: 'capital', land_capitalization: 'capital',
-  budget: 'budget', land_budget: 'budget',
-  schedule: 'schedule', land_schedule: 'schedule',
-  reports: 'reports', documents: 'documents', map: 'map', alpha_assistant: 'alpha_assistant',
-};
-
-function normalizeContext(ctx: string): string {
-  return CONTEXT_NORMALIZATION[ctx.toLowerCase()] || ctx.toLowerCase();
-}
-
-function normalizeSubtab(subtab: string | null | undefined): string | null {
-  if (!subtab) return null;
-  return subtab.toLowerCase().replace(/_/g, '-');
-}
-
 function getPageContextHint(context: string): string {
   const hints: Record<string, string> = {
     home: 'Overview',
@@ -264,6 +266,9 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     hideInternalHeader = false,
     showThreadList: showThreadListProp,
     onActiveThreadChange,
+    onBeforeSend,
+    onThreadNotFound,
+    onThreadCountChange,
   }, ref) {
   const [input, setInput] = useState('');
   const [showThreadList, setShowThreadList] = useState(false);
@@ -294,6 +299,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     isLoading,
     isThreadLoading,
     error,
+    threadNotFound,
     selectThread,
     startNewThread,
     updateThreadTitle,
@@ -321,22 +327,21 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onActiveThreadChange(current);
   }, [activeThread?.threadId, onActiveThreadChange]);
 
-  // Home/project pages show all threads; other pages filter by page+subtab
-  const isHomePage = ['home', 'mf_home', 'land_home'].includes(pageContext);
-  const normalizedPage = normalizeContext(pageContext);
-  const normalizedSubtab = normalizeSubtab(subtabContext);
-  const visibleThreadCount = isHomePage
-    ? allThreads.length
-    : allThreads.filter((t) => {
-        if (normalizeContext(t.pageContext) !== normalizedPage) return false;
-        if (normalizedSubtab) {
-          return normalizeSubtab(t.subtabContext) === normalizedSubtab;
-        }
-        return true;
-      }).length;
+  // Thread browser shows all threads in scope (project-scoped when a project
+  // is active, unassigned-scoped on /w/chat) — page context is shown as a
+  // per-thread badge in the list, not used as a filter.
+  const visibleThreadCount = allThreads.length;
 
   // Load all project threads on mount so the badge count is available immediately
   useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
+
+  // Emit thread count to parent — single source of truth for the badge.
+  // Parent (CenterChatPanel) reads from this callback instead of running
+  // its own duplicate fetch, so the badge can never disagree with the
+  // in-panel thread list count.
+  useEffect(() => {
+    if (onThreadCountChange) onThreadCountChange(allThreads.length);
+  }, [allThreads.length, onThreadCountChange]);
 
   // URL-based thread activation is now handled inside the hook
   // (useLandscaperThreads accepts `initialThreadId` and fetches the thread
@@ -349,6 +354,14 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   // Expose sendMessage and setInputText to parent via imperative handle
   useImperativeHandle(ref, () => ({ sendMessage, setInputText: setInput }), [sendMessage, setInput]);
+
+  // Notify parent when URL-pinned thread is permanently missing (404).
+  // Parent typically redirects to /w/chat — keeps us off a dead URL.
+  useEffect(() => {
+    if (threadNotFound && onThreadNotFound) {
+      onThreadNotFound();
+    }
+  }, [threadNotFound, onThreadNotFound]);
 
   // Collision handling via context
   const { pendingCollision, setOnCollisionResolved } = useLandscaperCollision();
@@ -540,8 +553,33 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     const currentMessage = input.trim();
     setInput('');
 
-    sendMessage(currentMessage).catch(() => {
-      setInput(currentMessage);
+    // Pre-send hook: parent may upload pending attachments and return a
+    // contextSuffix to append to the user's message (e.g. doc_id reference).
+    // If the hook throws, restore the input and bail.
+    const sendWithContext = async () => {
+      let contextSuffix = '';
+      if (onBeforeSend) {
+        try {
+          const result = await onBeforeSend();
+          if (result && typeof result === 'object' && result.contextSuffix) {
+            contextSuffix = result.contextSuffix;
+          }
+        } catch (err) {
+          console.error('onBeforeSend failed', err);
+          setInput(currentMessage);
+          throw err;
+        }
+      }
+      const finalMessage = contextSuffix
+        ? `${currentMessage}\n\n${contextSuffix}`
+        : currentMessage;
+      await sendMessage(finalMessage);
+    };
+
+    sendWithContext().catch(() => {
+      // sendMessage failure restores input; onBeforeSend failure already did.
+      // Avoid double-restore by checking input state.
+      if (!input) setInput(currentMessage);
     });
   };
 
@@ -740,7 +778,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
           activeThreadId={activeThread?.threadId}
           currentPageContext={pageContext}
           currentSubtabContext={subtabContext}
-          showAllPages={isHomePage}
+          showAllPages={true}
           onSelectThread={handleSelectThread}
           onNewThread={handleNewThread}
           onUpdateTitle={updateThreadTitle}

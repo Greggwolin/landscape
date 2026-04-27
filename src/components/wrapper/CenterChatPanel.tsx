@@ -126,19 +126,33 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   const [threadTitle, setThreadTitle] = useState<string | null>(null);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
-  // Thread count for the badge on the thread-history toggle button
+  // Thread count for the badge on the thread-history toggle button.
+  // Single source of truth: LandscaperChatThreaded already loads `allThreads`
+  // for the in-panel browser; it now emits the count up via onThreadCountChange.
+  // Removing the duplicate fetch eliminates the badge ↔ list drift bug where
+  // the badge could go stale after a thread create/delete.
   const [threadCount, setThreadCount] = useState<number>(0);
+  // Tracks whether we've already seen at least one count value, so the initial
+  // mount (0 → 0, or first real value) doesn't emit a redundant refresh event.
+  const prevThreadCountRef = useRef<number | null>(null);
+  // When the in-panel count changes (mount, create, delete), notify the
+  // sidebar so its cross-project list refreshes too. The dispatch lives in
+  // the effect below — NOT inside the setState updater — to avoid triggering
+  // a parent setState during a child render (React 19 surfaces this as the
+  // "Cannot update a component while rendering a different component" error).
+  const handleThreadCountChange = useCallback((count: number) => {
+    setThreadCount(count);
+  }, []);
   useEffect(() => {
-    if (!projectId) { setThreadCount(0); return; }
-    fetch(`${DJANGO_API_URL}/api/landscaper/threads/?project_id=${projectId}&include_closed=true`, {
-      headers: getAuthHeaders(),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (Array.isArray(data?.threads)) setThreadCount(data.threads.length);
-      })
-      .catch(() => {});
-  }, [projectId, homepageThreadId]); // refetch after a new thread starts
+    if (typeof window === 'undefined') return;
+    const prev = prevThreadCountRef.current;
+    prevThreadCountRef.current = threadCount;
+    // Skip the first observed value (mount). Only emit when the count
+    // actually changes after we've established a baseline.
+    if (prev === null) return;
+    if (prev === threadCount) return;
+    window.dispatchEvent(new CustomEvent('landscaper:threads-changed'));
+  }, [threadCount]);
 
   // Whether the in-panel thread history drawer is visible
   const [threadListVisible, setThreadListVisible] = useState(false);
@@ -370,6 +384,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             initialThreadId={initialThreadId ?? homepageThreadId ?? undefined}
             onToolResult={handleToolResult}
             onActiveThreadChange={handleActiveThreadChange}
+            onThreadCountChange={handleThreadCountChange}
             showThreadList={threadListVisible}
           />
         )}
