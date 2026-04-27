@@ -101,7 +101,24 @@ class HelpChatView(APIView):
             else:
                 conversation_id, conv_id = self._create_conversation(user_id)
 
-            # Load conversation history
+            # For #FB messages, skip the LLM call entirely — feedback was already
+            # forwarded to Discord above. Return a simple acknowledgment.
+            if has_feedback:
+                ack_content = "Feedback received, thanks!"
+
+                # Store user message (with #FB stripped) and the acknowledgment
+                self._store_message(conv_id, 'user', message, current_page)
+                self._store_message(conv_id, 'assistant', ack_content, current_page)
+                self._touch_conversation(conv_id)
+
+                return Response({
+                    'success': True,
+                    'content': ack_content,
+                    'conversation_id': str(conversation_id),
+                    'metadata': {'feedback_captured': True},
+                }, status=status.HTTP_201_CREATED)
+
+            # Non-feedback path: load history and generate AI response
             conversation_history = self._get_conversation_history(conv_id)
 
             # Generate AI response
