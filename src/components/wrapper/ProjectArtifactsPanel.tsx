@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
+import { ExcelAuditArtifact } from './ExcelAuditArtifact';
 import { WrapperHeader } from './WrapperHeader';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
@@ -69,9 +70,8 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
     artifactsOpen,
     toggleArtifacts,
     activeMapArtifact,
-    setActiveMapArtifact,
     activeLocationBrief,
-    setActiveLocationBrief,
+    activeExcelAudit,
   } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -174,19 +174,26 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — artifact priority: location brief > map > documents list */}
+      {/* Body — artifact priority: location brief > map > excel audit > documents list */}
       {activeLocationBrief ? (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <LocationBriefArtifact
             config={activeLocationBrief}
-            onClose={() => setActiveLocationBrief(null)}
+            onClose={toggleArtifacts}
           />
         </div>
       ) : activeMapArtifact ? (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <MapArtifactRenderer
             config={activeMapArtifact}
-            onClose={() => setActiveMapArtifact(null)}
+            onClose={toggleArtifacts}
+          />
+        </div>
+      ) : activeExcelAudit ? (
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <ExcelAuditArtifact
+            config={activeExcelAudit}
+            onClose={toggleArtifacts}
           />
         </div>
       ) : (

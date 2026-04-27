@@ -89,6 +89,102 @@ export interface LocationBriefArtifactConfig {
   project_ready: boolean;
 }
 
+/**
+ * Excel Audit artifact config — accumulates results across the 5 audit tools.
+ * Each tool fills in its own optional section; the renderer shows whichever
+ * sections are populated. Setter merges (vs. replaces) so a sequence of tool
+ * calls (classify → structural → integrity → assumptions → waterfall) builds
+ * up a single artifact rather than replacing it 5 times.
+ */
+export interface ExcelAuditArtifactConfig {
+  doc_id: number;
+  doc_name?: string;
+  /** Phase 0 — classify_excel_file */
+  classification?: {
+    tier: 'flat' | 'assumption_heavy' | 'full_model' | string;
+    sheet_count: number;
+    formula_count: number;
+    full_model_hits: string[];
+    assumption_hits: string[];
+    rationale: string;
+  };
+  /** Phase 1 — run_structural_scan */
+  structural?: {
+    sheets: Array<{ name: string; dimensions: string; max_row: number; max_col: number; merged_ranges: number; hidden: boolean }>;
+    sheet_count: number;
+    hidden_sheet_count: number;
+    named_ranges: Array<{ name: string; value: string | null }>;
+    named_range_count: number;
+    external_links: string[];
+    external_link_count: number;
+  };
+  /** Phase 2 — run_formula_integrity (incl. 2f impact tracer annotations) */
+  integrity?: {
+    findings: Array<Record<string, unknown>>;
+    impact_summary?: {
+      errors_reaching_headline: number;
+      errors_quarantined: number;
+      total_traced: number;
+      note?: string;
+      verdict?: 'ALL_QUARANTINED' | 'ALL_REACH_OUTPUTS' | 'MIXED' | 'NONE' | 'UNTRACED';
+      verdict_text?: string;
+    };
+    tier?: string;
+  };
+  /** Phase 3 — extract_assumptions */
+  assumptions?: {
+    extractions?: Array<Record<string, unknown>>;
+    staged_count?: number;
+    project_id?: number | null;
+  };
+  /** Phase 4 — classify_waterfall */
+  waterfall?: {
+    waterfall_type: string;
+    tier_count: number;
+    sheet_name: string | null;
+    tiers: Array<Record<string, unknown>>;
+    pref_rate: number | null;
+    pref_compounding: string | null;
+    hurdle_type: string | null;
+    sponsor_coinvest_pct: number | null;
+    source_cells: Record<string, string>;
+    findings: Array<Record<string, unknown>>;
+    rationale: string;
+  };
+  /** Phase 6 — run_sources_uses */
+  sources_uses?: {
+    sources: Array<{ label: string; value: number; sheet_cell: string }>;
+    uses: Array<{ label: string; value: number; sheet_cell: string }>;
+    sources_total: number | null;
+    sources_total_cell: string | null;
+    uses_total: number | null;
+    uses_total_cell: string | null;
+    delta: number | null;
+    balanced: boolean;
+    sheet_name: string | null;
+    findings: Array<Record<string, unknown>>;
+    rationale: string;
+  };
+  /** Phase 7 — compute_trust_score */
+  trust_score?: {
+    trust_score: number;
+    components: Record<string, { weight: number; raw_score: number; contribution: number }>;
+    profile: 'standard' | 'land_dev' | 'valuation' | string;
+    phase_5_status: 'not_run' | 'completed' | 'failed';
+    rationale: string;
+    headline_status: 'verified' | 'partial' | 'cannot_verify';
+  };
+  /** Most recently updated phase (for highlighting in the renderer). */
+  last_updated_phase?:
+    | 'classification'
+    | 'structural'
+    | 'integrity'
+    | 'assumptions'
+    | 'waterfall'
+    | 'sources_uses'
+    | 'trust_score';
+}
+
 interface WrapperUIContextValue {
   chatOpen: boolean;
   toggleChat: () => void;
@@ -106,6 +202,10 @@ interface WrapperUIContextValue {
   /** Active location brief artifact — set by generate_location_brief tool. */
   activeLocationBrief: LocationBriefArtifactConfig | null;
   setActiveLocationBrief: (config: LocationBriefArtifactConfig | null) => void;
+  /** Active Excel audit artifact — set by audit tool returns; merge-update. */
+  activeExcelAudit: ExcelAuditArtifactConfig | null;
+  setActiveExcelAudit: (config: ExcelAuditArtifactConfig | null) => void;
+  mergeActiveExcelAudit: (partial: Partial<ExcelAuditArtifactConfig>) => void;
   /** Chat search overlay state. */
   searchOpen: boolean;
   openSearch: () => void;
@@ -127,6 +227,20 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [rightPanelNarrow, setRightPanelNarrow] = useState(false);
   const [activeMapArtifact, setActiveMapArtifact] = useState<MapArtifactConfig | null>(null);
   const [activeLocationBrief, setActiveLocationBrief] = useState<LocationBriefArtifactConfig | null>(null);
+  const [activeExcelAudit, setActiveExcelAudit] = useState<ExcelAuditArtifactConfig | null>(null);
+  // Merge setter: combines partial updates into current config keyed by doc_id.
+  // If the partial references a different doc_id, replaces (audit context switched).
+  const mergeActiveExcelAudit = useCallback((partial: Partial<ExcelAuditArtifactConfig>) => {
+    setActiveExcelAudit((prev) => {
+      const incomingDocId = partial.doc_id;
+      if (prev && incomingDocId && prev.doc_id !== incomingDocId) {
+        // Different doc — replace rather than merge cross-doc state
+        return { ...partial, doc_id: incomingDocId } as ExcelAuditArtifactConfig;
+      }
+      const base = prev ?? ({ doc_id: incomingDocId ?? 0 } as ExcelAuditArtifactConfig);
+      return { ...base, ...partial } as ExcelAuditArtifactConfig;
+    });
+  }, []);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
   // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
@@ -157,6 +271,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       artifactsOpen, toggleArtifacts,
       activeMapArtifact, setActiveMapArtifact,
       activeLocationBrief, setActiveLocationBrief,
+      activeExcelAudit, setActiveExcelAudit, mergeActiveExcelAudit,
       searchOpen, openSearch, closeSearch,
       activeContentContext, setActiveContentContext,
     }}>
