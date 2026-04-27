@@ -4396,6 +4396,54 @@ LANDSCAPER_TOOLS = [
             "required": ["doc_id"],
         },
     },
+    {
+        "name": "run_sources_uses",
+        "description": (
+            "Phase 6 of the Excel audit. Locates the Sources & Uses schedule in the "
+            "workbook (anchors on cells labeled 'Sources' / 'Uses' / 'Sources of Funds' / "
+            "etc., walks downward collecting label-value pairs until a 'Total' row), then "
+            "compares the two block totals. Sources must equal Uses within $1; gaps > $100 "
+            "are flagged as findings. Returns the line items with Sheet!Cell refs, the two "
+            "totals, the absolute delta, a balanced flag, and findings list. Use AFTER "
+            "classify_excel_file on assumption_heavy or full_model tier workbooks. Skips "
+            "any workbook where no S&U schedule is locatable rather than fabricating one."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "compute_trust_score",
+        "description": (
+            "Phase 7 of the Excel audit. Aggregates persisted phase outputs (sheet "
+            "classification, assumption extraction count, waterfall classification, formula "
+            "integrity findings, S&U balance, Python replication when available) into a "
+            "single 0-100 trust score using property-type-aware weights. Reads "
+            "tbl_excel_audit only — does NOT re-run any phases. Returns the score, "
+            "per-component breakdown, headline_status (verified | partial | cannot_verify), "
+            "and phase_5_status so the artifact verdict block knows whether Python "
+            "replication has been run yet. Phase 5 (replication) is currently NOT "
+            "IMPLEMENTED — score is appropriately capped and the rationale notes this. "
+            "Use AFTER all upstream phases have been run for the doc_id. Profile defaults "
+            "to 'standard'; pass 'land_dev' or 'valuation' for those property types."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "integer", "description": "core_doc.doc_id of the uploaded Excel file"},
+                "profile": {
+                    "type": "string",
+                    "enum": ["standard", "land_dev", "valuation"],
+                    "description": "Weight profile. Default: standard.",
+                },
+            },
+            "required": ["doc_id"],
+        },
+    },
     # ── Map Artifact tools ────────────────────────────────────────────────────
     {
         "name": "generate_map_artifact",

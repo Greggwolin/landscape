@@ -172,7 +172,37 @@ def detect_sinks(values_wb: Workbook, formulas_wb: Workbook) -> List[Dict]:
                             "value": val,
                             "is_formula": is_formula,
                         })
-    return sinks
+    return _filter_dead_sinks(sinks)
+
+
+def _filter_dead_sinks(sinks: List[Dict]) -> List[Dict]:
+    """
+    Drop sinks whose cached value is #N/A, #REF!, #VALUE!, etc. These are
+    "dead outputs" — the workbook itself shows the metric is broken, which
+    almost always means the user has abandoned that calculation path (e.g.,
+    refinancing IRR cells in a deal that doesn't contemplate a refi). Such
+    sinks should NOT count as "headline outputs errors propagate to" — that
+    creates false-positive ALL_REACH_OUTPUTS verdicts for errors that only
+    feed the dormant branch.
+
+    Also drops sinks whose value is None (cell never computed) for the same
+    reason — if the user hasn't activated the calculation, errors reaching
+    it are not affecting reported numbers.
+
+    Numeric-zero sinks are KEPT — zero is a legitimate value (e.g., year-1
+    cash flow can legitimately be zero). Only error-string and None values
+    indicate dead state.
+    """
+    error_strings = {"#N/A", "#REF!", "#VALUE!", "#DIV/0!", "#NAME?", "#NUM!", "#NULL!"}
+    kept = []
+    for s in sinks:
+        v = s.get("value")
+        if v is None:
+            continue
+        if isinstance(v, str) and v.strip().upper() in error_strings:
+            continue
+        kept.append(s)
+    return kept
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -319,17 +349,40 @@ def annotate(findings: List[Dict], impact_map: Dict[str, Dict]) -> List[Dict]:
     """
     Enrich formula_integrity findings with downstream impact info.
     Mutates findings in-place and returns them.
+
+    Severity downgrade rule:
+      - When trace is conclusive AND nothing downstream is hit, the finding
+        is cosmetic (range/value error doesn't reach any headline output).
+        Severity is downgraded to 'low' and `is_cosmetic` is set True.
+        Original severity preserved as `severity_raw` for audit trail.
+      - When trace is conclusive AND a sink IS hit, severity is preserved
+        and `is_cosmetic` is False — the error feeds a headline output.
+      - When trace is inconclusive (reaches_headline=None), severity is
+        preserved and `is_cosmetic` is None — no claim either way.
+
+    The `effective_severity` post-trace lets the report differentiate
+    "this 2e truncation feeds IRR" (high, real) from "this 2e truncation
+    is in a quarantined cosmetic block" (low, no action needed).
     """
     for f in findings:
         ref = f.get("ref", "")
         impact = impact_map.get(ref)
+        original_severity = f.get("severity")
         if impact:
             f["reaches_headline"] = impact["reaches"]
             f["sinks_hit"] = impact["sinks_hit"]
+            if not impact["reaches"]:
+                f["is_cosmetic"] = True
+                if original_severity and original_severity != "low":
+                    f["severity_raw"] = original_severity
+                    f["severity"] = "low"
+            else:
+                f["is_cosmetic"] = False
         else:
-            # Finding wasn't in the trace set (e.g., hardcoded overrides)
+            # Finding wasn't traced (e.g., no ref, or check not in TRACEABLE_CHECKS)
             f["reaches_headline"] = None
             f["sinks_hit"] = []
+            f["is_cosmetic"] = None
     return findings
 
 
@@ -358,10 +411,21 @@ def run_impact_analysis(
     sinks = detect_sinks(values_wb, formulas_wb)
     sink_ref_set = {s["ref"] for s in sinks}
 
-    # Only trace error cells and broken refs (high-severity, actionable)
+    # Trace ALL formula-integrity findings that have a cell ref. Previously
+    # this filter only included 2a (error cells) and 2b (broken refs), which
+    # left 2c (hardcoded overrides) and 2e (range-consistency / truncated
+    # SUMs) untagged — every finding looked equally critical even when it
+    # didn't feed any headline output. Wider trace lets the report mark
+    # cosmetic findings explicitly.
+    TRACEABLE_CHECKS = (
+        "2a_error_cell",
+        "2b_broken_ref",
+        "2c_hardcoded_override",
+        "2e_range_consistency",
+    )
     error_refs = [
         f["ref"] for f in findings
-        if f.get("check") in ("2a_error_cell", "2b_broken_ref")
+        if f.get("check") in TRACEABLE_CHECKS and f.get("ref")
     ]
 
     if not error_refs or not sink_ref_set:
@@ -377,6 +441,11 @@ def run_impact_analysis(
                 "errors_quarantined": 0 if not error_refs else len(error_refs),
                 "total_traced": 0,
                 "note": "no sinks detected" if not sink_ref_set else "no error cells to trace",
+                "verdict": "UNTRACED",
+                "verdict_text": (
+                    "Could not trace impact — no headline-output cells detected in workbook. "
+                    "Findings cannot be classified as cosmetic vs. impactful without sinks to trace to."
+                ),
             },
         }
 
@@ -386,6 +455,38 @@ def run_impact_analysis(
     reaching = sum(1 for v in impact_map.values() if v["reaches"])
     quarantined = sum(1 for v in impact_map.values() if not v["reaches"])
 
+    # Verdict — prominent + impossible-to-misread summary so the LLM (and any
+    # downstream summarizer) leads with impact status rather than raw error
+    # counts. Brownstone calibration: a 41-cell quarantined error block was
+    # being reported as "critical, cascades to 41 cells" because the model
+    # was reading raw `cells_traversed` instead of the impact-summary fields.
+    if reaching == 0 and quarantined > 0:
+        verdict = "ALL_QUARANTINED"
+        verdict_text = (
+            f"All {quarantined} errors are in quarantined cells that do NOT feed any "
+            f"headline output (IRR, equity multiple, DSCR, net cash flow, NOI, "
+            f"distributions). The errors are cosmetic from a results-integrity standpoint. "
+            f"They should still be fixed for cleanliness, but the model's reported "
+            f"returns and cash flows are not affected by them."
+        )
+    elif reaching > 0 and quarantined == 0:
+        verdict = "ALL_REACH_OUTPUTS"
+        verdict_text = (
+            f"All {reaching} errors propagate to headline outputs (IRR, EM, DSCR, "
+            f"net CF, etc.). The model's reported numbers cannot be trusted until "
+            f"these are fixed."
+        )
+    elif reaching > 0 and quarantined > 0:
+        verdict = "MIXED"
+        verdict_text = (
+            f"{reaching} of {reaching + quarantined} errors propagate to headline "
+            f"outputs and require fixes before trusting reported numbers. The other "
+            f"{quarantined} are quarantined / cosmetic and don't affect results."
+        )
+    else:
+        verdict = "NONE"
+        verdict_text = "No errors found."
+
     return {
         "sinks_detected": sinks,
         "impact_map": impact_map,
@@ -393,5 +494,7 @@ def run_impact_analysis(
             "errors_reaching_headline": reaching,
             "errors_quarantined": quarantined,
             "total_traced": len(error_refs),
+            "verdict": verdict,
+            "verdict_text": verdict_text,
         },
     }

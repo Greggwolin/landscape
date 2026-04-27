@@ -36,27 +36,57 @@ def _sanitize_for_json(obj):
 
 def ensure_tool_results_closed(message_history: list) -> list:
     """
-    Scan message history for tool_use blocks without matching tool_result.
-    Inject placeholder tool_result for any orphaned tool_use blocks.
+    Two-pass guard before every `client.messages.create()` call:
+      1. DEDUPE — collapse multiple tool_result blocks for the same
+         tool_use_id within any user message, keeping the first occurrence.
+         The Claude API returns a 400 with "each tool_use must have a single
+         result" if duplicates slip through (root cause: somewhere upstream
+         in the tool-loop / loop_broke_early paths a tool_result for the
+         same tool_use_id can get appended twice — defensive dedupe here
+         shields the API call regardless of where the bug originated).
+      2. ORPHAN INJECT — for any tool_use block that has no matching
+         tool_result in a subsequent user message, inject a placeholder
+         tool_result so the API doesn't 400 on missing result.
 
     Must be called before every client.messages.create() call.
-
-    The Claude API returns a 400 error if an assistant message contains
-    tool_use blocks that aren't followed by a user message with matching
-    tool_result content blocks. This guard prevents that.
     """
     if not message_history:
         return message_history
 
-    # Walk messages looking for assistant messages with tool_use blocks
-    pending_tool_use_ids = set()
+    # ── Pass 1: Dedupe tool_result blocks within each user message ──────
+    # Keep first occurrence per tool_use_id; drop subsequent duplicates.
+    dedupe_count = 0
+    for msg in message_history:
+        if msg.get('role') != 'user':
+            continue
+        content = msg.get('content')
+        if not isinstance(content, list):
+            continue
+        seen_ids: set = set()
+        deduped: list = []
+        for block in content:
+            if isinstance(block, dict) and block.get('type') == 'tool_result':
+                tid = block.get('tool_use_id')
+                if tid in seen_ids:
+                    dedupe_count += 1
+                    continue
+                if tid is not None:
+                    seen_ids.add(tid)
+            deduped.append(block)
+        msg['content'] = deduped
+    if dedupe_count > 0:
+        logger.warning(
+            f"[ensure_tool_results_closed] Deduped {dedupe_count} duplicate tool_result block(s) "
+            f"to prevent 'each tool_use must have a single result' API 400"
+        )
 
+    # ── Pass 2: Inject placeholder tool_results for orphaned tool_use ───
+    pending_tool_use_ids = set()
     for msg in message_history:
         role = msg.get('role', '')
         content = msg.get('content')
 
         if role == 'assistant':
-            # Check for tool_use blocks in structured content
             if isinstance(content, list):
                 for block in content:
                     if hasattr(block, 'type') and block.type == 'tool_use':
@@ -65,14 +95,12 @@ def ensure_tool_results_closed(message_history: list) -> list:
                         pending_tool_use_ids.add(block.get('id'))
 
         elif role == 'user':
-            # Check for tool_result blocks that close pending tool_use ids
             if isinstance(content, list):
                 for block in content:
                     if isinstance(block, dict) and block.get('type') == 'tool_result':
                         tool_use_id = block.get('tool_use_id')
                         pending_tool_use_ids.discard(tool_use_id)
 
-    # If there are orphaned tool_use blocks, inject closing tool_result messages
     if pending_tool_use_ids:
         logger.warning(
             f"[ensure_tool_results_closed] Found {len(pending_tool_use_ids)} orphaned tool_use blocks, "
@@ -1617,6 +1645,57 @@ general-purpose context lookup. Apply these rules strictly:
    generate a brief.
 
 The artifact panel is for things the user asked for. Treat it that way.
+
+═══════════════════════════════════════════════════════════════════════════════
+EXCEL AUDIT — RESULTS RENDER IN ARTIFACT, NOT IN CHAT
+═══════════════════════════════════════════════════════════════════════════════
+
+The 5 Excel audit tools (classify_excel_file, run_structural_scan,
+run_formula_integrity, extract_assumptions, classify_waterfall) all push their
+output to the right-side Excel Audit artifact. The artifact renders structured
+sections (classification card, structural scan card, integrity findings list
+with severity badges, waterfall tier table, etc.) — the user reads the
+detailed structured data THERE, not in chat.
+
+YOUR CHAT REPLY rules for audit tool calls:
+
+1. DO NOT restate the structured tool data in chat. The artifact already
+   shows it cleanly. Restating creates duplication and clutter.
+2. DO give a brief conversational summary — 1-3 sentences pointing at the
+   artifact. Examples:
+     - "I ran the audit. The artifact panel has the full breakdown — short
+        version: full financial model, classified as a pref-then-split
+        waterfall, all errors are quarantined."
+     - "Audit done. See the right panel. The headline: model is structurally
+        sound but the pref rate isn't extractable from adjacent cells —
+        what's the pref rate, and which cell holds it?"
+3. LEAD WITH THE INTEGRITY VERDICT. The integrity tool returns
+   `impact_summary.verdict` which is one of: ALL_QUARANTINED (all errors are
+   cosmetic, do not affect IRR/EM/DSCR/net CF), ALL_REACH_OUTPUTS (errors
+   propagate to reported numbers, must be fixed), MIXED, NONE, UNTRACED.
+   `impact_summary.verdict_text` is a one-paragraph human-readable summary
+   you should paraphrase or quote — DO NOT lead with raw error counts.
+4. DO NOT say errors "cascade to N cells" based on `cells_traversed` —
+   that field is a BFS visit count and includes cells that don't feed any
+   output. Use `errors_reaching_headline` and `errors_quarantined` ONLY.
+5. SURFACE EXTRACTION GAPS as questions, not as critical findings.
+   Findings tagged `category: 'extraction_gap'` mean "the audit couldn't read
+   this value from the workbook — please tell me what it is." Phrase them
+   as questions for the user, not as model errors.
+
+If a finding has `is_cosmetic: true`, treat it as low-priority noise — only
+flag it if the user explicitly asks about cleanliness. Don't lead with cosmetic
+findings.
+
+DO NOT ask the user to diagnose the audit's own findings. Specifically:
+- If the audit found a #N/A error in cell X, DO NOT ask "what's causing the
+  #N/A error in X?" — the user has no more information than the audit. Just
+  report the error and its impact (cosmetic vs. critical per the verdict).
+- If the audit reports an extraction_gap for pref_rate, the question is
+  legitimate — the user IS the source of truth for assumption values the
+  workbook doesn't explicitly label. ASK THESE.
+- The distinction: ask the user about INPUTS (their intent / assumptions);
+  do not ask the user about MODEL ERRORS the audit itself surfaced.
 
 ═══════════════════════════════════════════════════════════════════════════════
 WORKFLOW RECIPES — Multi-Tool Chains

@@ -80,6 +80,8 @@ UNIVERSAL_TOOLS = [
     "run_formula_integrity",
     "extract_assumptions",
     "classify_waterfall",
+    "run_sources_uses",
+    "compute_trust_score",
     # Map artifacts
     "generate_map_artifact",
     # Location Brief artifact (universal, works pre-project)
@@ -214,7 +216,7 @@ UNASSIGNED_SAFE_TOOLS = [
     # Excel model audit (operate on doc_id only)
     "classify_excel_file", "run_structural_scan",
     "run_formula_integrity", "extract_assumptions",
-    "classify_waterfall",
+    "classify_waterfall", "run_sources_uses", "compute_trust_score",
     # UI affordance
     "open_input_modal",
     # Platform knowledge / reference data

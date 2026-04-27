@@ -13,9 +13,14 @@ Tools implemented in this module:
   4. extract_assumptions(doc_id)      - Phase 3, labeled inputs -> staging
   5. classify_waterfall(doc_id)       - Phase 4, waterfall structure JSON +
                                          tiers + hurdles + splits + source cells
+  6. run_sources_uses(doc_id)         - Phase 6, S&U schedule location +
+                                         balance check
+  7. compute_trust_score(doc_id)      - Phase 7, weighted aggregation of all
+                                         persisted phases into a 0-100 trust
+                                         score for the v3 verdict block
 
-Future turns add: replicate_waterfall, replicate_debt, verify_sources_uses,
-compute_trust_score, generate_audit_report.
+Future turns add: replicate_waterfall (Phase 5), replicate_debt (Phase 5b),
+generate_audit_report (Phase 7 HTML output).
 """
 
 import logging
@@ -37,11 +42,11 @@ def _coerce_doc_id(doc_id, kwargs):
         tool_input = kwargs.get("tool_input", {}) or {}
         doc_id = tool_input.get("doc_id")
     if not doc_id:
-        return None, {"ok": False, "error": "doc_id is required"}
+        return None, {"success": False, "error": "doc_id is required"}
     try:
         return int(doc_id), None
     except (TypeError, ValueError):
-        return None, {"ok": False, "error": f"doc_id must be an integer, got {doc_id!r}"}
+        return None, {"success": False, "error": f"doc_id must be an integer, got {doc_id!r}"}
 
 
 def _resolve_project_id(kwargs) -> Optional[int]:
@@ -85,8 +90,8 @@ def _open_workbook(doc_id_int: int):
 
 def _error_envelope(doc_id_int: int, exc: Exception) -> dict:
     if isinstance(exc, UnsupportedFileError):
-        return {"ok": False, "doc_id": doc_id_int, "error": str(exc)}
-    return {"ok": False, "doc_id": doc_id_int, "error": f"{type(exc).__name__}: {exc}"}
+        return {"success": False, "doc_id": doc_id_int, "error": str(exc)}
+    return {"success": False, "doc_id": doc_id_int, "error": f"{type(exc).__name__}: {exc}"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,16 +103,30 @@ def _error_envelope(doc_id_int: int, exc: Exception) -> dict:
 def classify_excel_file(doc_id: int = None, **kwargs):
     """
     Three-tier classification: flat / assumption_heavy / full_model.
-    Always the first audit call after an Excel upload.
+    Always the first audit call after an Excel upload. Result also pushed
+    to the right-side artifacts panel as the 'classification' section of
+    the unified Excel Audit artifact.
     """
     doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
     if err:
         return err
     try:
         with _open_workbook(doc_id_int) as (values_wb, formulas_wb):
-            result = xa.classify(values_wb, formulas_wb)
-        result.update({"ok": True, "doc_id": doc_id_int, "error": None})
-        return result
+            phase_result = xa.classify(values_wb, formulas_wb)
+        # Build the return dict via spread (NOT mutate-in-place) to avoid
+        # the self-reference that caused JSON serialization to recurse.
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "error": None,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "classification": phase_result,
+                "last_updated_phase": "classification",
+            },
+        }
     except Exception as e:
         logger.exception("classify_excel_file failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)
@@ -123,15 +142,25 @@ def run_structural_scan(doc_id: int = None, **kwargs):
     """
     Sheet inventory, named ranges, external links, hidden sheets.
     Read-only. Run after classification to decide whether to proceed.
+    Result pushed to the artifacts panel as the 'structural' section.
     """
     doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
     if err:
         return err
     try:
         with _open_workbook(doc_id_int) as (values_wb, formulas_wb):
-            result = xa.structural_scan(values_wb, formulas_wb)
-        result.update({"ok": True, "doc_id": doc_id_int})
-        return result
+            phase_result = xa.structural_scan(values_wb, formulas_wb)
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "structural": phase_result,
+                "last_updated_phase": "structural",
+            },
+        }
     except Exception as e:
         logger.exception("run_structural_scan failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)
@@ -162,10 +191,19 @@ def run_formula_integrity(doc_id: int = None, **kwargs):
             # Classify inline (cheap) to determine tier for impact trace
             classification = xa.classify(values_wb, formulas_wb)
             tier = classification.get("tier")
-            result = xa.formula_integrity_check(values_wb, formulas_wb, tier=tier)
-            result["tier"] = tier
-        result.update({"ok": True, "doc_id": doc_id_int})
-        return result
+            phase_result = xa.formula_integrity_check(values_wb, formulas_wb, tier=tier)
+            phase_result["tier"] = tier
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "integrity": phase_result,
+                "last_updated_phase": "integrity",
+            },
+        }
     except Exception as e:
         logger.exception("run_formula_integrity failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)
@@ -192,14 +230,24 @@ def extract_assumptions(doc_id: int = None, **kwargs):
     project_id = _resolve_project_id(kwargs)
     try:
         with _open_workbook(doc_id_int) as (values_wb, _formulas_wb):
-            result = xa.extract_assumptions(
+            phase_result = xa.extract_assumptions(
                 values_wb,
                 doc_id=doc_id_int,
                 project_id=project_id,
                 write_to_staging=bool(project_id),
             )
-        result.update({"ok": True, "doc_id": doc_id_int, "project_id": project_id})
-        return result
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "project_id": project_id,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "assumptions": {**phase_result, "project_id": project_id},
+                "last_updated_phase": "assumptions",
+            },
+        }
     except Exception as e:
         logger.exception("extract_assumptions failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)
@@ -249,29 +297,138 @@ def classify_waterfall(doc_id: int = None, **kwargs):
             classification = xa.classify(values_wb, formulas_wb)
             tier = classification.get("tier")
 
-            result = xa.classify_waterfall(values_wb, formulas_wb)
+            phase_result = xa.classify_waterfall(values_wb, formulas_wb)
 
         # Opportunistic persistence — failures are logged, not raised.
         audit_id = xa.upsert_audit_phase(
             doc_id=doc_id_int,
             phase="phase_4",
-            payload=result,
+            payload=phase_result,
             project_id=project_id,
             tier=tier,
             findings=[
-                {**f, "sheet_cell": result.get("sheet_name")}
-                for f in result.get("findings", [])
+                {**f, "sheet_cell": phase_result.get("sheet_name")}
+                for f in phase_result.get("findings", [])
             ],
         )
 
-        result.update({
-            "ok": True,
+        return {
+            **phase_result,
+            "success": True,
             "doc_id": doc_id_int,
             "project_id": project_id,
             "tier": tier,
             "audit_id": audit_id,
-        })
-        return result
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "waterfall": phase_result,
+                "last_updated_phase": "waterfall",
+            },
+        }
     except Exception as e:
         logger.exception("classify_waterfall failed doc_id=%s", doc_id_int)
+        return _error_envelope(doc_id_int, e)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tool 6: run_sources_uses (Phase 6)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@register_tool("run_sources_uses")
+def run_sources_uses(doc_id: int = None, **kwargs):
+    """
+    Phase 6 — locate the Sources & Uses schedule in the workbook and compare
+    totals. Sources must equal Uses within $1; gaps > $100 are flagged as
+    findings. Read-only on the workbook; opportunistically persists to
+    tbl_excel_audit if the audit tables exist.
+    """
+    doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
+    if err:
+        return err
+    project_id = _resolve_project_id(kwargs)
+    try:
+        with _open_workbook(doc_id_int) as (values_wb, formulas_wb):
+            classification = xa.classify(values_wb, formulas_wb)
+            tier = classification.get("tier")
+            phase_result = xa.verify_sources_uses(values_wb, formulas_wb)
+
+        audit_id = xa.upsert_audit_phase(
+            doc_id=doc_id_int,
+            phase="phase_6",
+            payload=phase_result,
+            project_id=project_id,
+            tier=tier,
+            findings=phase_result.get("findings", []),
+        )
+
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "project_id": project_id,
+            "tier": tier,
+            "audit_id": audit_id,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "sources_uses": phase_result,
+                "last_updated_phase": "sources_uses",
+            },
+        }
+    except Exception as e:
+        logger.exception("run_sources_uses failed doc_id=%s", doc_id_int)
+        return _error_envelope(doc_id_int, e)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tool 7: compute_trust_score (Phase 7 — partial)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@register_tool("compute_trust_score")
+def compute_trust_score(doc_id: int = None, profile: str = "standard", **kwargs):
+    """
+    Phase 7 — aggregate persisted phase outputs into a single 0-100 trust
+    score using property-type-aware weights. Reads tbl_excel_audit for the
+    given doc_id; does NOT re-run any phases. The caller (or Landscaper) is
+    responsible for ensuring relevant phases have run first.
+
+    Phase 5 (Python replication) is currently NOT implemented — when the
+    replication column is empty the score is capped accordingly and
+    `phase_5_status: 'not_run'` is returned so the verdict block can render
+    the partial state honestly.
+    """
+    doc_id_int, err = _coerce_doc_id(doc_id, kwargs)
+    if err:
+        return err
+    if profile not in ("standard", "land_dev", "valuation"):
+        profile = "standard"
+    try:
+        phase_result = xa.compute_trust_score(doc_id=doc_id_int, profile=profile)
+
+        # Persist trust_score column on tbl_excel_audit
+        xa.upsert_audit_phase(
+            doc_id=doc_id_int,
+            phase="phase_7",
+            payload={
+                "trust_score": phase_result.get("trust_score"),
+                "report_html_path": None,  # HTML report generation deferred
+            },
+        )
+
+        return {
+            **phase_result,
+            "success": True,
+            "doc_id": doc_id_int,
+            "action": "show_excel_audit",
+            "excel_audit_config": {
+                "doc_id": doc_id_int,
+                "trust_score": phase_result,
+                "last_updated_phase": "trust_score",
+            },
+        }
+    except Exception as e:
+        logger.exception("compute_trust_score failed doc_id=%s", doc_id_int)
         return _error_envelope(doc_id_int, e)

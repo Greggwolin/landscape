@@ -26,6 +26,8 @@ from .formula_integrity import check as formula_integrity_check
 from .assumption_extractor import extract as extract_assumptions
 from .impact_tracer import run_impact_analysis, detect_sinks, trace as trace_impact
 from .waterfall_classifier import classify as classify_waterfall
+from .sources_uses import verify as verify_sources_uses
+from .trust_score import compute as compute_trust_score
 from .persistence import upsert_audit_phase
 
 __all__ = [
@@ -41,5 +43,7 @@ __all__ = [
     "detect_sinks",
     "trace_impact",
     "classify_waterfall",
+    "verify_sources_uses",
+    "compute_trust_score",
     "upsert_audit_phase",
 ]
