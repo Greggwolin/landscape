@@ -58,6 +58,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     closedAt = serializers.DateTimeField(source='closed_at', read_only=True, allow_null=True)
     messageCount = serializers.SerializerMethodField()
+    firstUserMessage = serializers.SerializerMethodField()
 
     class Meta:
         model = ChatThread
@@ -74,10 +75,12 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'updatedAt',
             'closedAt',
             'messageCount',
+            'firstUserMessage',
         ]
         read_only_fields = [
             'threadId', 'projectId', 'projectName', 'isActive',
             'createdAt', 'updatedAt', 'closedAt', 'messageCount',
+            'firstUserMessage',
         ]
 
     def get_messageCount(self, obj):
@@ -87,6 +90,19 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     def get_projectName(self, obj):
         """Return the parent project's name, or None for unassigned threads."""
         return obj.project.project_name if obj.project_id else None
+
+    def get_firstUserMessage(self, obj):
+        """Return the first user-role message text (truncated to 120 chars).
+
+        Used by the sidebar/recent-threads UI as a label fallback when the
+        thread has no auto-generated title yet. Truncated server-side to keep
+        list payloads small. Frontend further truncates for display.
+        """
+        first = obj.messages.filter(role='user').order_by('created_at').first()
+        if not first or not first.content:
+            return None
+        text = first.content.strip()
+        return text[:120] + ('…' if len(text) > 120 else '')
 
 
 class ChatThreadDetailSerializer(ChatThreadSerializer):

@@ -54,6 +54,7 @@ next-env.d.ts
 
 # Claude session data
 .claude/plans/
+.claude/scheduled_tasks.lock
 /.vscode/
 *.psd
 *.DS_Store

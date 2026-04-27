@@ -25,96 +25,154 @@ export async function POST(req: NextRequest) {
     // Validate request body
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
 
-    // Auth: identify uploader and verify project ownership
+    // Auth: identify uploader and verify access (project OR thread)
     const requestUser = getUserFromRequest(req);
     if (!requestUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const ownsProject = await userOwnsProject(requestUser.userId, system.project_id);
-    if (!ownsProject) {
-      return NextResponse.json({ error: 'You do not have access to this project' }, { status: 403 });
+    // Branch by ownership target:
+    //   - system.project_id present                → project-scoped upload (legacy path)
+    //   - system.thread_id present, thread has    → auto-route to that project (promoted thread)
+    //     project_id
+    //   - system.thread_id present, thread is      → unassigned upload (chat canvas)
+    //     unassigned (project_id IS NULL)
+    // Schema superRefine guarantees at least one of project_id / thread_id is supplied.
+    let resolvedProjectId: number | null = system.project_id ?? null;
+    const resolvedThreadId: string | null = system.thread_id ?? null;
+
+    if (!resolvedProjectId && resolvedThreadId) {
+      // Look up the thread; if it's been promoted to a project, transparently
+      // route the upload to that project instead of rejecting.
+      const [threadRow] = await sql`
+        SELECT id, project_id
+          FROM landscape.landscaper_chat_thread
+         WHERE id = ${resolvedThreadId}::uuid
+         LIMIT 1
+      `;
+      if (!threadRow) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+      }
+      if (threadRow.project_id !== null) {
+        // Promoted thread — switch to project-scoped upload path. Keep
+        // thread_id on the row too so the linkage is preserved.
+        resolvedProjectId = Number(threadRow.project_id);
+      }
     }
 
-    // Validate doc_type against project-owned doc types (dms_project_doc_types).
-    // If missing, auto-insert as a custom project doc type to prevent drift.
-    const docType = system.doc_type ?? 'general';
-    const projectDocTypes = await sql`
-      SELECT doc_type_name
-      FROM landscape.dms_project_doc_types
-      WHERE project_id = ${system.project_id}
-    `;
+    const isThreadScoped = !resolvedProjectId && !!resolvedThreadId;
 
-    if (projectDocTypes.length > 0) {
-      const validSet = new Set(projectDocTypes.map(row => row.doc_type_name.toLowerCase()));
-      if (!validSet.has(docType.toLowerCase())) {
-        await sql`
-          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
-          VALUES (
-            ${system.project_id},
-            ${docType},
-            (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${system.project_id}),
-            FALSE
-          )
-          ON CONFLICT (project_id, doc_type_name) DO NOTHING
-        `;
+    if (resolvedProjectId) {
+      const ownsProject = await userOwnsProject(requestUser.userId, resolvedProjectId);
+      if (!ownsProject) {
+        return NextResponse.json({ error: 'You do not have access to this project' }, { status: 403 });
       }
-    } else {
-      // Fallback: if project doc types aren't seeded yet, use template options
-      const template = await sql`
-        SELECT doc_type_options
-        FROM landscape.dms_templates
-        WHERE (project_id = ${system.project_id} OR workspace_id = ${system.workspace_id ?? null})
-          AND is_default = true
-        LIMIT 1
+    }
+    // Pure thread path needs no further auth gate at alpha — thread existence
+    // was confirmed above. Strict per-user thread ownership check is a follow-up.
+
+    const docType = system.doc_type ?? 'general';
+
+    // doc_type validation against dms_project_doc_types runs ONLY for
+    // project-scoped uploads. Thread-scoped uploads skip it — there's no
+    // project to scope the doc-type catalog to until promotion.
+    if (resolvedProjectId) {
+      const projectDocTypes = await sql`
+        SELECT doc_type_name
+        FROM landscape.dms_project_doc_types
+        WHERE project_id = ${resolvedProjectId}
       `;
 
-      if (template.length > 0 && template[0].doc_type_options) {
-        const validDocTypes = template[0].doc_type_options;
-        if (!validDocTypes.includes(docType)) {
-          return NextResponse.json(
-            {
-              error: 'Invalid doc_type',
-              details: `doc_type "${docType}" is not allowed. Valid options: ${validDocTypes.join(', ')}`,
-              valid_doc_types: validDocTypes
-            },
-            { status: 400 }
-          );
+      if (projectDocTypes.length > 0) {
+        const validSet = new Set(projectDocTypes.map(row => row.doc_type_name.toLowerCase()));
+        if (!validSet.has(docType.toLowerCase())) {
+          await sql`
+            INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+            VALUES (
+              ${resolvedProjectId},
+              ${docType},
+              (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${resolvedProjectId}),
+              FALSE
+            )
+            ON CONFLICT (project_id, doc_type_name) DO NOTHING
+          `;
         }
       } else {
-        await sql`
-          INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
-          VALUES (
-            ${system.project_id},
-            ${docType},
-            (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${system.project_id}),
-            FALSE
-          )
-          ON CONFLICT (project_id, doc_type_name) DO NOTHING
+        // Fallback: if project doc types aren't seeded yet, use template options
+        const template = await sql`
+          SELECT doc_type_options
+          FROM landscape.dms_templates
+          WHERE (project_id = ${resolvedProjectId} OR workspace_id = ${system.workspace_id ?? null})
+            AND is_default = true
+          LIMIT 1
         `;
+
+        if (template.length > 0 && template[0].doc_type_options) {
+          const validDocTypes = template[0].doc_type_options;
+          if (!validDocTypes.includes(docType)) {
+            return NextResponse.json(
+              {
+                error: 'Invalid doc_type',
+                details: `doc_type "${docType}" is not allowed. Valid options: ${validDocTypes.join(', ')}`,
+                valid_doc_types: validDocTypes
+              },
+              { status: 400 }
+            );
+          }
+        } else {
+          await sql`
+            INSERT INTO landscape.dms_project_doc_types (project_id, doc_type_name, display_order, is_from_template)
+            VALUES (
+              ${resolvedProjectId},
+              ${docType},
+              (SELECT COALESCE(MAX(display_order), 0) + 1 FROM landscape.dms_project_doc_types WHERE project_id = ${resolvedProjectId}),
+              FALSE
+            )
+            ON CONFLICT (project_id, doc_type_name) DO NOTHING
+          `;
+        }
       }
     }
 
-    // Check for existing document with same sha256 or filename (collision detection)
+    // Collision detection scoped to whichever ownership applies.
+    // Project: dedupe within the project. Thread: dedupe within the thread.
     const [hashMatch] = system.sha256
+      ? (isThreadScoped
+        ? await sql`
+          SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
+          FROM landscape.core_doc
+          WHERE sha256_hash = ${system.sha256}
+            AND thread_id = ${resolvedThreadId!}::uuid
+            AND deleted_at IS NULL
+          LIMIT 1
+        `
+        : await sql`
+          SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
+          FROM landscape.core_doc
+          WHERE sha256_hash = ${system.sha256}
+            AND project_id = ${resolvedProjectId}
+            AND deleted_at IS NULL
+          LIMIT 1
+        `)
+      : [];
+
+    const [filenameMatch] = isThreadScoped
       ? await sql`
         SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
         FROM landscape.core_doc
-        WHERE sha256_hash = ${system.sha256}
-          AND project_id = ${system.project_id}
+        WHERE LOWER(doc_name) = LOWER(${system.doc_name})
+          AND thread_id = ${resolvedThreadId!}::uuid
           AND deleted_at IS NULL
         LIMIT 1
       `
-      : [];
-
-    const [filenameMatch] = await sql`
-      SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
-      FROM landscape.core_doc
-      WHERE LOWER(doc_name) = LOWER(${system.doc_name})
-        AND project_id = ${system.project_id}
-        AND deleted_at IS NULL
-      LIMIT 1
-    `;
+      : await sql`
+        SELECT doc_id, version_no, doc_name, status, created_at, doc_type, file_size_bytes, mime_type
+        FROM landscape.core_doc
+        WHERE LOWER(doc_name) = LOWER(${system.doc_name})
+          AND project_id = ${resolvedProjectId}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
 
     if (hashMatch || filenameMatch) {
       let matchType: 'filename' | 'content' | 'both' = 'filename';
@@ -155,7 +213,7 @@ export async function POST(req: NextRequest) {
       }
 
       console.log(
-        `📦 Collision detected (${matchType}): doc_id=${matchedDoc.doc_id}, project=${system.project_id}`
+        `📦 Collision detected (${matchType}): doc_id=${matchedDoc.doc_id}, project=${resolvedProjectId}`
       );
 
       return NextResponse.json(
@@ -190,6 +248,7 @@ export async function POST(req: NextRequest) {
     const inserted = await sql`
       INSERT INTO landscape.core_doc (
         project_id,
+        thread_id,
         workspace_id,
         phase_id,
         parcel_id,
@@ -207,7 +266,8 @@ export async function POST(req: NextRequest) {
         updated_by,
         deleted_at
       ) VALUES (
-        ${system.project_id},
+        ${resolvedProjectId},
+        ${resolvedThreadId}::uuid,
         ${system.workspace_id ?? null},
         ${system.phase_id ?? null},
         ${system.parcel_id ?? null},
@@ -232,14 +292,16 @@ export async function POST(req: NextRequest) {
 
     console.log(`✅ Created document: doc_id=${doc.doc_id}, name=${doc.doc_name}`);
 
-    // Increment tag usage for all tags in profile_json.tags[]
-    if (profile.tags && Array.isArray(profile.tags) && profile.tags.length > 0) {
+    // Increment tag usage for all tags in profile_json.tags[].
+    // Tag usage is scoped to project_id; skip for thread-scoped uploads
+    // (tags will be re-evaluated when the thread is promoted to a project).
+    if (resolvedProjectId && profile.tags && Array.isArray(profile.tags) && profile.tags.length > 0) {
       for (const tag of profile.tags) {
         try {
           await sql`
             SELECT landscape.increment_tag_usage(
               ${tag},
-              ${system.project_id},
+              ${resolvedProjectId},
               ${system.workspace_id ?? null}
             )
           `;
@@ -260,7 +322,7 @@ export async function POST(req: NextRequest) {
         ai_analysis,
         created_by
       ) VALUES (
-        ${system.project_id},
+        ${resolvedProjectId},
         ${ai?.source ?? 'upload'},
         ${JSON.stringify({ doc_ids: [doc.doc_id], doc_names: [doc.doc_name] })}::jsonb,
         ${ai?.raw ? JSON.stringify(ai.raw) : null}::jsonb,

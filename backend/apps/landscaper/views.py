@@ -1354,13 +1354,28 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         return instance
 
     def get_queryset(self):
-        """Filter threads based on query params."""
+        """Filter threads based on query params.
+
+        Modes (mutually exclusive):
+          - all_user_threads=true: every thread visible to this user (project-scoped + unassigned).
+            Backs the cross-project sidebar list.
+          - unassigned=true: project_id IS NULL only.
+          - project_id=<id>: scoped to a single project.
+        """
         from .models import ChatThread
 
         queryset = ChatThread.objects.all()
 
+        all_user_threads = self.request.query_params.get('all_user_threads', '').lower() == 'true'
         unassigned = self.request.query_params.get('unassigned', '').lower() == 'true'
-        if unassigned:
+
+        if all_user_threads:
+            # No project/unassigned filter — sidebar shows everything the user can see.
+            # NOTE: ChatThread has no created_by FK, so we can't strictly user-scope today;
+            # current behavior matches the rest of the codebase (single-tenant alpha).
+            # Tighten when per-user scoping lands at the model level.
+            pass
+        elif unassigned:
             queryset = queryset.filter(project_id__isnull=True)
         else:
             project_id = self.request.query_params.get('project_id')
@@ -1386,15 +1401,16 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-updated_at')
 
     def list(self, request, *args, **kwargs):
-        """GET list of threads. Requires project_id or unassigned=true."""
+        """GET list of threads. Requires project_id, unassigned=true, or all_user_threads=true."""
         from .serializers import ChatThreadSerializer
 
         project_id = request.query_params.get('project_id')
         unassigned = request.query_params.get('unassigned', '').lower() == 'true'
-        if not project_id and not unassigned:
+        all_user_threads = request.query_params.get('all_user_threads', '').lower() == 'true'
+        if not project_id and not unassigned and not all_user_threads:
             return Response({
                 'success': False,
-                'error': 'project_id or unassigned=true query parameter is required',
+                'error': 'project_id, unassigned=true, or all_user_threads=true query parameter is required',
             }, status=status.HTTP_400_BAD_REQUEST)
 
         queryset = self.get_queryset()
