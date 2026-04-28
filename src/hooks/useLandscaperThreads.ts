@@ -818,9 +818,14 @@ export function useLandscaperThreads({
           setMessages((prev) => prev.filter((m) => m.messageId !== tempUserMessage.messageId));
         }
         if (err instanceof DOMException && err.name === 'AbortError') {
-          // Could be unmount or genuine timeout — only show error if component is still mounted
-          // (setError is a no-op after unmount in React 18+, but avoid noisy re-throws)
-          setError('Request timed out — the operation may still be processing. Please refresh and try again.');
+          // AbortError lands here for three reasons: (1) the context-change
+          // effect aborts when initialThreadId / pageContext changes — most
+          // commonly a benign URL echo after THIS request created a thread,
+          // (2) component unmount, (3) the genuine 150s REQUEST_TIMEOUT_MS
+          // firing. None of these benefit from a user-facing banner: the
+          // first two are by-design cancellations and the third is rare
+          // enough that the user has navigated away. Match the silent-return
+          // pattern used by the other catch blocks in this hook.
           return undefined;
         }
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -844,6 +849,15 @@ export function useLandscaperThreads({
   // cascading re-renders when its callback deps (loadThreads) change.
   // The context key string captures the meaningful changes.
   useEffect(() => {
+    // Skip the reset/abort when the URL transition is just THIS request
+    // creating a thread — the new initialThreadId echoes back to match the
+    // activeThread we just set, so there's no real context change. Without
+    // this guard, the abort cancels the in-flight POST that just succeeded
+    // and the catch block produces a spurious "Request timed out" (finding #11).
+    if (initialThreadId && initialThreadId === activeThreadRef.current?.threadId) {
+      return;
+    }
+
     console.log('[LandscaperThreads] Context changed:', { projectId, pageContext, subtabContext, initialThreadId });
     // Abort any in-flight requests from previous context
     abortControllerRef.current.abort();
