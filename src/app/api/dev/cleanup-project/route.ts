@@ -52,7 +52,7 @@ export async function DELETE(request: NextRequest) {
   const projectOwner: string | null = existing[0].created_by ?? null
 
   // Ownership check: prevent deleting another user's project
-  const requestUser = getUserFromRequest(request)
+  const requestUser = await getUserFromRequest(request)
   if (projectOwner !== null && requestUser) {
     // Project has an owner AND request is authenticated — enforce ownership
     if (projectOwner !== requestUser.username) {
