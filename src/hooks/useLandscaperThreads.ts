@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
+import { redirectToLoginExpired } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const REQUEST_TIMEOUT_MS = 150000;
@@ -500,8 +501,12 @@ export function useLandscaperThreads({
         if (mySignal.aborted) return;
 
         if (isAuthError(response)) {
+          // Token expired or revoked. Stop retrying and redirect to /login
+          // with the ?expired=1 marker so the login page can explain why
+          // (finding #13 — silent rendering of empty data was costing
+          // 30+ minutes of false-debug per session).
           recoveryAttemptsRef.current = MAX_RECOVERY_ATTEMPTS;
-          setError('Authentication failed — please refresh the page or log in again');
+          redirectToLoginExpired();
           return;
         }
 
@@ -679,7 +684,7 @@ export function useLandscaperThreads({
             );
 
             if (isAuthError(response)) {
-              setError('Authentication failed — please refresh the page or log in again');
+              redirectToLoginExpired();
               return;
             }
 
@@ -758,7 +763,10 @@ export function useLandscaperThreads({
         );
 
         if (isAuthError(response)) {
-          throw new Error('Authentication failed — please refresh the page or log in again');
+          // Token expired mid-send. Redirect to /login?expired=1 rather
+          // than surfacing a banner the user can't act on (finding #13).
+          redirectToLoginExpired();
+          return undefined;
         }
 
         const data = await response.json();

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   createLandscaperProfile,
@@ -13,6 +13,11 @@ import {
 export default function LoginForm() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set by redirectToLoginExpired() in src/lib/authHeaders.ts when an
+  // authenticated request 401s anywhere in the app — explains to the user
+  // why they landed back on /login (finding #13).
+  const sessionExpired = searchParams?.get('expired') === '1';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -155,6 +160,15 @@ export default function LoginForm() {
           <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
             Sign in to Alpha
           </h2>
+          {sessionExpired && !error && (
+            <div
+              className="mb-4 rounded-lg px-4 py-3 text-sm"
+              style={{ backgroundColor: 'var(--chip-soft-costs-bg)', color: 'var(--text-primary)' }}
+              role="status"
+            >
+              Your session expired — please sign in again.
+            </div>
+          )}
           {error && (
             <div
               className="mb-4 rounded-lg px-4 py-3 text-sm"

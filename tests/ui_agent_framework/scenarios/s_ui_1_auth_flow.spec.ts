@@ -4,9 +4,8 @@
 // one exists. Verify login succeeds, sidebar exists, no auth errors.
 //
 // Findings this catches: #13 (no auto-redirect on 401), broken logout link.
-// Both expected-fail tests are marked test.fail() so the suite stays green
-// while the underlying bugs are open. Remove the .fail() annotation when
-// each fix lands.
+// test.fail() markers were removed when the fix landed — these tests now
+// stand as regression detectors for finding #13.
 
 import { test, expect } from '../helpers/fixtures';
 import { config } from '../config';
@@ -50,48 +49,41 @@ test.describe('S-UI-1: Auth flow', () => {
     await expect(page.locator(selectors.sidebar.newChatButton)).toBeVisible();
   });
 
-  // ── Expected-fail block: finding #13 (no auto-redirect on 401) ──
-  test.fail(
-    'expired token should auto-redirect to /login (currently fails — finding #13)',
-    async ({ capturedPage }) => {
-      const { page } = capturedPage;
-      await login(page);
-      await gotoChat(page);
+  // ── Finding #13 regression detector (auto-redirect on 401) ──
+  // The fix wires src/lib/authHeaders.ts:redirectToLoginExpired() into
+  // useLandscaperThreads.ts and AuthContext init. If the redirect ever
+  // breaks, this test fails and we know finding #13 is back.
+  test('expired token should auto-redirect to /login', async ({ capturedPage }) => {
+    const { page } = capturedPage;
+    await login(page);
+    await gotoChat(page);
 
-      // Clobber the JWT, then trigger an authenticated fetch (any sidebar
-      // refresh will do). Per finding #13, the app does NOT detect the 401
-      // and redirect — instead it silently returns empty data.
-      await expireToken(page);
+    // Clobber the JWT, then trigger an authenticated fetch.
+    await expireToken(page);
 
-      // Force a navigation that triggers an authed fetch
-      await page.goto(config.routes.chat);
+    // Force a navigation that triggers an authed fetch (useLandscaperThreads
+    // calls /api/landscaper/threads on mount).
+    await page.goto(config.routes.chat);
 
-      // Expectation (currently failing): URL becomes /login within 5s.
-      await page.waitForURL(/\/login/, { timeout: 5_000 });
-    },
-  );
+    // Should land on /login (with ?expired=1 marker) within 5s.
+    await page.waitForURL(/\/login/, { timeout: 5_000 });
+    expect(page.url()).toMatch(/expired=1/);
+  });
 
-  // ── Expected-fail block: finding #13b (broken logout link) ──
-  test.fail(
-    'logout button reaches login screen (currently fails — broken link)',
-    async ({ capturedPage }) => {
-      const { page } = capturedPage;
-      await login(page);
+  // ── Finding #13b regression detector (logout button) ──
+  // The sign-out button is rendered directly in the WrapperSidebar footer
+  // (no profile dropdown — that mental model from the original test was
+  // incorrect). The button is icon-only with aria-label="Sign out".
+  test('logout button reaches login screen', async ({ capturedPage }) => {
+    const { page } = capturedPage;
+    await login(page);
+    await gotoChat(page);
 
-      // Open the profile dropdown, click logout. Selectors here are best-guess
-      // since the dropdown is reportedly broken — this test exists to alert
-      // when the logout flow is restored.
-      const profileTrigger = page.locator('[aria-label*="profile" i], [aria-label*="user" i]').first();
-      if (await profileTrigger.count()) {
-        await profileTrigger.click();
-        const logoutBtn = page.locator('text=/log\\s*out|sign\\s*out/i').first();
-        await logoutBtn.click({ timeout: 5_000 });
-      } else {
-        throw new Error('Profile trigger not found — logout dropdown not exposed yet');
-      }
-      await page.waitForURL(/\/login/, { timeout: 5_000 });
-    },
-  );
+    const logoutBtn = page.getByRole('button', { name: /sign\s*out/i }).first();
+    await logoutBtn.click({ timeout: 5_000 });
+
+    await page.waitForURL(/\/login/, { timeout: 5_000 });
+  });
 
   test.afterEach(async ({ capturedPage }) => {
     // Best-effort cleanup so subsequent tests start fresh.

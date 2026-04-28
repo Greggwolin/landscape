@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { redirectToLoginExpired } from '@/lib/authHeaders';
 
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -173,11 +174,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Try refresh token
             const refreshed = await refreshToken();
             if (!refreshed) {
-              // Clear invalid tokens and cookie
-              localStorage.removeItem('auth_tokens');
-              document.cookie = 'auth_token_exists=; path=/; max-age=0; SameSite=Lax';
+              // Stored tokens are stale and refresh didn't recover them. Bounce
+              // to /login?expired=1 instead of silently rendering empty pages —
+              // see UNIFIED_UI_TEST_FINDINGS finding #13. The helper clears
+              // local state before the redirect, so the React state-clear
+              // below is belt-and-suspenders for the brief moment before
+              // window.location actually navigates.
               setTokens(null);
               setUser(null);
+              redirectToLoginExpired();
+              return;
             } else {
               // Refresh succeeded, ensure cookie is set
               document.cookie = 'auth_token_exists=true; path=/; max-age=604800; SameSite=Lax';

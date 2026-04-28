@@ -316,6 +316,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 className="w-btn w-btn-icon w-btn-sm"
                 onClick={onLogout}
                 title="Sign out"
+                aria-label="Sign out"
               >
                 <CIcon icon={cilAccountLogout} size="sm" />
               </button>
