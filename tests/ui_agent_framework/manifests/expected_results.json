@@ -1,0 +1,66 @@
+{
+  "_comment": "Expected pass/fail counts per scenario as of 2026-04-28. test.fail() entries are tracked here so a future fix removing the annotation also updates this manifest. Run the suite, compare against this — anything inconsistent is a regression or a fix worth celebrating.",
+  "_legend": {
+    "passes": "Should pass on a green run.",
+    "expected_failures": "Currently marked test.fail() — known open findings. Remove .fail() when the underlying fix lands and update this entry.",
+    "fixture_gaps": "Test documents intent but cannot actually run yet — needs a dedicated fixture project / data state. Will throw early with an explicit error message so the gap is visible in the report."
+  },
+  "scenarios": {
+    "S-UI-1": {
+      "file": "scenarios/s_ui_1_auth_flow.spec.ts",
+      "passes": [
+        "fresh login completes and lands on a logged-in route",
+        "navigation to /w/chat after login renders unified-UI shell"
+      ],
+      "expected_failures": [
+        "expired token should auto-redirect to /login (currently fails — finding #13)",
+        "logout button reaches login screen (currently fails — broken link)"
+      ],
+      "fixture_gaps": []
+    },
+    "S-UI-2": {
+      "file": "scenarios/s_ui_2_wchat_baseline.spec.ts",
+      "passes": [
+        "sidebar root + new-chat button render",
+        "center panel mounts without long-running loading state",
+        "sidebar populates (or renders clean empty state) within 30s"
+      ],
+      "expected_failures": [
+        "right artifact panel exists with a toggle on /w/chat (currently fails — finding #14)"
+      ],
+      "fixture_gaps": []
+    },
+    "S-UI-3": {
+      "file": "scenarios/s_ui_3_first_message_and_naming.spec.ts",
+      "passes": [
+        "typing and sending a message creates a thread + URL transitions",
+        "assistant reply renders within 30s",
+        "thread title auto-names within 60s of first reply"
+      ],
+      "expected_failures": [
+        "no \"Request timed out\" error appears after first send (currently fails — finding #11)"
+      ],
+      "fixture_gaps": []
+    },
+    "S-UI-5": {
+      "file": "scenarios/s_ui_5_report_request_artifact_first.spec.ts",
+      "passes": [],
+      "expected_failures": [
+        "Tier 1: project with full DB renders artifact from DB (currently fails — finding #4)",
+        "Tier 4: user explicitly requests modal → modal opens (currently fails — finding #4)",
+        "anti-fabrication: mismatched-name doc does NOT get scaled into the answer (currently fails — finding #10)"
+      ],
+      "fixture_gaps": [
+        "Tier 2: empty DB but populated DMS renders artifact extracted from docs (not yet implemented)",
+        "Tier 3: empty project renders explicit \"not enough info\" + no fabrication (currently fails — finding #4)"
+      ]
+    },
+    "S-UI-8": {
+      "file": "(implemented as fixture wrapper in helpers/fixtures.ts)",
+      "passes": [],
+      "expected_failures": [],
+      "fixture_gaps": [],
+      "_note": "The console-hygiene gate fails any other test that produces critical console errors. Counted as part of the wrapping test, not a separate scenario."
+    }
+  }
+}
