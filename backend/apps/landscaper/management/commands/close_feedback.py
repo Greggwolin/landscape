@@ -75,6 +75,8 @@ class Command(BaseCommand):
             if row is None:
                 raise CommandError(f"FB-{feedback_id} does not exist")
             current_status = row[1]
+            # Only terminal states block the transition; both 'open' and
+            # 'in_progress' close cleanly via this command.
             if current_status in ('closed', 'wontfix', 'duplicate'):
                 raise CommandError(
                     f"FB-{feedback_id} is already in terminal state "

@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """
-Daily Brief generator.
+Daily Brief generator — redesign version.
 
 Produces a single self-contained HTML brief to the OneDrive workspace folder
-summarizing:
-  - Open + recently-resolved feedback (landscape.tbl_feedback)
-  - Yesterday's commits, with auto-resolution of items referenced via
-    "fixes|closes|resolves FB-N" in commit subjects
-  - Latest health-check failures (or a SKIPPED banner if stale > 24h)
-  - Current branch state (uncommitted, ahead/behind)
+matching daily-brief/MOCKUP-redesign.html. Sections in order:
+  1. Header + summary callout
+  2. Work In Progress (labeled branches only — see .claude/branch-labels.json)
+  3. Open Feedback (from tbl_feedback where source='help_panel' and
+     status in (open, in_progress); in_progress rows get the orange border
+     treatment plus a "Being worked on" tag)
+  4. Resolved Recently (closed_at or addressed_at within last 7 days)
+  5. Today's Sessions (rolling 3-day; read from .claude/sessions.json)
+  6. Parallel Sessions (one-line summary of .claude/worktrees/)
+  7. Uncommitted Right Now (plain-English translation of git status)
+  8. System Status (plain-English health summary)
+  9. Footer
 
-Designed to run nightly via launchd (~/Library/LaunchAgents/com.landscape.daily-brief.plist).
+Labels are read on every render — no caching.
 
-Refs: LANDSCAPE_DAILY_BRIEF_SPEC.md sections 5, 7
+Refs: daily-brief/MOCKUP-redesign.html (design source of truth)
 """
 
 import json
@@ -21,7 +27,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -39,12 +45,12 @@ ONEDRIVE_BRIEF_DIR = (
 )
 HEALTH_STALE_THRESHOLD_HOURS = 24
 RECENTLY_CLOSED_DAYS = 7
-
+SESSIONS_LOOKBACK_DAYS = 3
 COMMIT_RESOLVE_RE = re.compile(r'(?i)\b(?:fixes|closes|resolves)\s+FB-(\d+)\b')
+COMMIT_PREFIX_RE = re.compile(r'^(?:feat|fix|chore|docs|refactor|test|build|ci|perf|style)(?:\([^)]*\))?:\s*')
 
 
 def _find_repo_root(start: Path) -> Path:
-    """Walk up until we hit a .git directory."""
     p = start.resolve()
     for candidate in (p, *p.parents):
         if (candidate / '.git').exists():
@@ -54,6 +60,51 @@ def _find_repo_root(start: Path) -> Path:
 
 REPO_ROOT = _find_repo_root(Path(__file__))
 HEALTH_REPORT_DIR = REPO_ROOT / 'docs' / 'UX' / 'health-reports'
+BRANCH_LABELS_PATH = REPO_ROOT / '.claude' / 'branch-labels.json'
+SESSIONS_PATH = REPO_ROOT / '.claude' / 'sessions.json'
+WORKTREES_DIR = REPO_ROOT / '.claude' / 'worktrees'
+
+
+# ---------------------------------------------------------------------------
+# Page tag mapping (Help > {slug} → "Human Label")
+# TODO: move to a lookup table in the DB once the page taxonomy stabilizes.
+# ---------------------------------------------------------------------------
+
+PAGE_TAG_MAP = {
+    'general': 'Help & Feedback',
+    'home': 'Home',
+    'home_overview': 'Home',
+    'documents': 'Documents',
+    'documents_all': 'Documents',
+    'property_property-details': 'Property Details',
+    'property_details': 'Property Details',
+    'property_location': 'Property Location',
+    'property_market': 'Market',
+    'property_rent-roll': 'Rent Roll',
+    'property_acquisition': 'Acquisition',
+    'operations': 'Operations',
+    'operations_overview': 'Operations',
+    'budget_budget': 'Budget',
+    'capital_equity': 'Capitalization',
+    'valuation': 'Valuation',
+    'valuation_income': 'Income Approach',
+    'valuation_cost': 'Cost Approach',
+    'valuation_sales-comparison': 'Sales Comparison',
+    'reports_summary': 'Reports',
+    'map_overview': 'Map',
+    'verification': 'Verification (test)',
+}
+
+
+def page_tag(page_context: Optional[str]) -> str:
+    if not page_context:
+        return 'Unknown'
+    raw = page_context
+    if raw.startswith('Help > '):
+        raw = raw[len('Help > '):]
+    if raw in PAGE_TAG_MAP:
+        return PAGE_TAG_MAP[raw]
+    return raw.replace('_', ' ').replace('-', ' ').title()
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +112,6 @@ HEALTH_REPORT_DIR = REPO_ROOT / 'docs' / 'UX' / 'health-reports'
 # ---------------------------------------------------------------------------
 
 def _load_database_url() -> str:
-    """Load DATABASE_URL from env or .env.local at repo root."""
     if os.environ.get('DATABASE_URL'):
         return os.environ['DATABASE_URL']
     env_path = REPO_ROOT / '.env.local'
@@ -71,8 +121,7 @@ def _load_database_url() -> str:
             if not line or line.startswith('#'):
                 continue
             if line.startswith('DATABASE_URL='):
-                val = line.split('=', 1)[1]
-                return val.strip().strip('"').strip("'")
+                return line.split('=', 1)[1].strip().strip('"').strip("'")
     raise RuntimeError("DATABASE_URL not found in env or .env.local")
 
 
@@ -81,57 +130,53 @@ def _connect():
 
 
 # ---------------------------------------------------------------------------
-# Gathering
+# Date helpers
 # ---------------------------------------------------------------------------
 
-def gather_open_and_recent_feedback(conn) -> list[dict]:
+def relative_day(d, today: date) -> str:
+    """today / yesterday / N days ago / 'Mar 10' style.
+    Accepts date or datetime (datetime is converted to local date).
     """
-    Spec §5.2 + C5: rows where status='open' OR (terminal status AND closed
-    within last 7 days), AND source != 'backfill'. Backfilled rows are
-    excluded from Section 1 by default — they're triaged via the admin tools
-    and counted separately in the header. Spec is silent on the
-    addressed-only case (auto-resolved rows have addressed_at set but no
-    closed_at), so we use COALESCE(closed_at, addressed_at) for the 7-day
-    window. Rows older than that drop out per §5.5.1.
-    """
-    sql = """
-        SELECT
-            id, created_at, page_context, project_id, project_name,
-            message_text, status, source,
-            addressed_at, closed_at,
-            resolved_by_commit_sha, resolved_by_commit_url,
-            resolution_notes, duplicate_of_id
-          FROM landscape.tbl_feedback
-         WHERE source <> 'backfill'
-           AND (
-                status = 'open'
-                OR COALESCE(closed_at, addressed_at) >= NOW() - INTERVAL %s
-           )
-         ORDER BY status = 'open' DESC, COALESCE(closed_at, addressed_at, created_at) DESC, id DESC
-    """
-    interval = f'{RECENTLY_CLOSED_DAYS} days'
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(sql, [interval])
-        return [dict(r) for r in cur.fetchall()]
+    if d is None:
+        return ''
+    if isinstance(d, datetime):
+        d = d.astimezone().date() if d.tzinfo else d.date()
+    if not isinstance(d, date):
+        return str(d)
+    delta = (today - d).days
+    if delta == 0:
+        return 'today'
+    if delta == 1:
+        return 'yesterday'
+    if 0 < delta < 7:
+        return f'{delta} days ago'
+    return d.strftime('%b ').replace(' 0', ' ') + f"{d.day}"
 
 
-def gather_backfill_queue_count(conn) -> int:
-    """How many rows are still source='backfill' AND status='open'."""
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT COUNT(*) FROM landscape.tbl_feedback "
-            "WHERE source = 'backfill' AND status = 'open'"
-        )
-        return int(cur.fetchone()[0])
+def reported_phrase(created_at, today: date) -> str:
+    return f'Reported {relative_day(created_at, today)}'
+
+
+# ---------------------------------------------------------------------------
+# Git
+# ---------------------------------------------------------------------------
+
+def _git(*args) -> str:
+    out = subprocess.run(
+        ['git', *args], cwd=REPO_ROOT,
+        capture_output=True, text=True, check=False,
+    )
+    return out.stdout
+
+
+def gather_branch_name() -> str:
+    return _git('symbolic-ref', '--short', 'HEAD').strip() or '(detached)'
 
 
 def gather_commits_24h() -> list[dict]:
-    """git log --since='24 hours ago' --pretty=format:'%H|%an|%ad|%s' --date=iso"""
-    out = subprocess.run(
-        ['git', 'log', '--since=24 hours ago',
-         '--pretty=format:%H|%an|%ad|%s', '--date=iso'],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout
+    """Used internally by auto_resolve. Not surfaced in the brief output."""
+    out = _git('log', '--since=24 hours ago',
+               '--pretty=format:%H|%an|%ad|%s', '--date=iso')
     commits = []
     for line in out.splitlines():
         if not line:
@@ -141,34 +186,142 @@ def gather_commits_24h() -> list[dict]:
             continue
         sha, author, date_iso, subject = parts
         commits.append({
-            'sha': sha,
-            'short': sha[:8],
-            'author': author,
-            'date_iso': date_iso,
-            'subject': subject,
+            'sha': sha, 'short': sha[:8], 'author': author,
+            'date_iso': date_iso, 'subject': subject,
             'url': f"{REPO_URL_PREFIX}{sha}",
         })
     return commits
 
 
+def gather_uncommitted_summary() -> dict:
+    porcelain = _git('status', '--porcelain')
+    modified, deleted, untracked_count = [], [], 0
+    for line in porcelain.splitlines():
+        if not line:
+            continue
+        xy = line[:2]
+        path = line[3:]
+        if 'M' in xy:
+            modified.append(path)
+        elif 'D' in xy:
+            deleted.append(path)
+        elif xy == '??':
+            untracked_count += 1
+        else:
+            modified.append(path)
+    return {
+        'modified': modified,
+        'deleted': deleted,
+        'untracked_count': untracked_count,
+    }
+
+
+def _commits_ahead_of_main(branch: str) -> int:
+    out = _git('rev-list', '--count', f'main..{branch}').strip()
+    try:
+        return int(out)
+    except Exception:
+        return 0
+
+
+def _branch_last_activity(branch: str) -> Optional[date]:
+    out = _git('log', '-1', '--format=%cI', branch).strip()
+    if not out:
+        return None
+    try:
+        return datetime.fromisoformat(out).astimezone().date()
+    except Exception:
+        return None
+
+
+def strip_commit_prefix(subject: str) -> str:
+    return COMMIT_PREFIX_RE.sub('', subject or '').strip()
+
+
+# ---------------------------------------------------------------------------
+# WIP — read branch-labels.json, render only labeled branches.
+# ---------------------------------------------------------------------------
+
+def gather_wip_branches() -> list[dict]:
+    if not BRANCH_LABELS_PATH.exists():
+        return []
+    try:
+        labels = json.loads(BRANCH_LABELS_PATH.read_text())
+    except Exception:
+        return []
+
+    out = []
+    for branch, meta in labels.items():
+        ahead = _commits_ahead_of_main(branch)
+        last_activity = _branch_last_activity(branch)
+        out.append({
+            'branch': branch,
+            'title': meta.get('title') or branch,
+            'description': meta.get('description') or '',
+            'cowork_chat': meta.get('cowork_chat'),
+            'status_note': meta.get('status_note') or '',
+            'commits_ahead': ahead,
+            'last_activity': last_activity,
+        })
+    out.sort(key=lambda w: (w['last_activity'] or date.min, w['branch']), reverse=True)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Sessions — rolling 3-day window from .claude/sessions.json
+# ---------------------------------------------------------------------------
+
+def gather_sessions_3day(today: date) -> list[dict]:
+    if not SESSIONS_PATH.exists():
+        return []
+    try:
+        payload = json.loads(SESSIONS_PATH.read_text())
+    except Exception:
+        return []
+    cutoff = today - timedelta(days=SESSIONS_LOOKBACK_DAYS - 1)
+    rows = []
+    for entry in payload.get('sessions') or []:
+        try:
+            d = date.fromisoformat(entry['date'])
+        except Exception:
+            continue
+        if d < cutoff:
+            continue
+        rows.append({
+            'date': d,
+            'topic': entry.get('topic') or '',
+            'cowork_chat': entry.get('cowork_chat'),
+            'cc_session': entry.get('cc_session') or '',
+        })
+    rows.sort(key=lambda r: r['date'], reverse=True)
+    return rows
+
+
+def session_pair(cowork_chat: Optional[str], cc_session: str) -> str:
+    cw = f'cw-{cowork_chat}' if cowork_chat else 'cw-(unlabeled)'
+    cc_name = cc_session.split('/', 1)[-1] if cc_session else '(none)'
+    cc = f'cc-{cc_name}'
+    return f'{cw} · {cc}'
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
 def gather_health_status() -> dict:
-    """
-    Find the most recent health-*.json. If stale (> 24h), return a SKIPPED
-    payload per §11.2; otherwise return failure list.
-    """
     if not HEALTH_REPORT_DIR.exists():
         return {'status': 'skipped', 'last_ran_at': None,
-                'hours_ago': None, 'reason': f'{HEALTH_REPORT_DIR} not present'}
+                'reason': 'no health-reports directory yet'}
     files = sorted(HEALTH_REPORT_DIR.glob('health-*.json'))
     if not files:
         return {'status': 'skipped', 'last_ran_at': None,
-                'hours_ago': None, 'reason': 'no health-*.json files'}
+                'reason': 'no health reports recorded yet'}
     latest = files[-1]
     try:
         report = json.loads(latest.read_text())
     except Exception as e:
         return {'status': 'skipped', 'last_ran_at': None,
-                'hours_ago': None, 'reason': f'parse error: {e}'}
+                'reason': f'latest report unreadable ({e})'}
 
     ts_raw = report.get('timestamp')
     last_ran_at = None
@@ -185,8 +338,6 @@ def gather_health_status() -> dict:
             'status': 'skipped',
             'last_ran_at': last_ran_at,
             'hours_ago': hours_ago,
-            'reason': f'last report {hours_ago:.1f}h old' if hours_ago is not None else 'no usable timestamp',
-            'source_file': latest.name,
         }
 
     failures = []
@@ -201,12 +352,10 @@ def gather_health_status() -> dict:
         'last_ran_at': last_ran_at,
         'hours_ago': hours_ago,
         'failures': failures,
-        'source_file': latest.name,
     }
 
 
 def _summarize_failure(result: dict) -> str:
-    """Pull the most informative one-liner from a FAIL agent result."""
     if 'total_violations' in result:
         return f"{result['total_violations']} violations"
     if 'dead_table_refs' in result or 'dead_column_refs' in result:
@@ -217,50 +366,47 @@ def _summarize_failure(result: dict) -> str:
     return 'see source report'
 
 
-def gather_branch_state() -> dict:
-    branch = subprocess.run(
-        ['git', 'branch', '--show-current'],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout.strip()
-    porcelain = subprocess.run(
-        ['git', 'status', '--porcelain'],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    ).stdout
-    uncommitted = [l for l in porcelain.splitlines() if l.strip()]
-
-    ahead = behind = None
-    if branch:
-        try:
-            counts = subprocess.run(
-                ['git', 'rev-list', '--left-right', '--count',
-                 f'origin/{branch}...HEAD'],
-                cwd=REPO_ROOT, capture_output=True, text=True, check=False,
-            )
-            if counts.returncode == 0 and counts.stdout.strip():
-                left, right = counts.stdout.strip().split()
-                behind, ahead = int(left), int(right)
-        except Exception:
-            pass
-
-    return {
-        'branch': branch,
-        'uncommitted': uncommitted,
-        'ahead': ahead,
-        'behind': behind,
-    }
-
-
 # ---------------------------------------------------------------------------
-# Auto-resolution
+# Feedback
 # ---------------------------------------------------------------------------
+
+def gather_open_feedback(conn) -> list[dict]:
+    """Open + in-progress, real captures only (source='help_panel')."""
+    sql = """
+        SELECT
+            id, created_at, page_context, message_text, status, source,
+            in_progress_branch, in_progress_session_slug, started_at
+          FROM landscape.tbl_feedback
+         WHERE source = 'help_panel'
+           AND status IN ('open', 'in_progress')
+         ORDER BY status = 'in_progress' DESC, created_at DESC, id DESC
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql)
+        return [dict(r) for r in cur.fetchall()]
+
+
+def gather_resolved_recently(conn) -> list[dict]:
+    """Closed/addressed within last 7 days, real captures only."""
+    sql = """
+        SELECT
+            id, created_at, page_context, message_text, status, source,
+            addressed_at, closed_at,
+            resolved_by_commit_sha, resolved_by_commit_url, resolution_notes
+          FROM landscape.tbl_feedback
+         WHERE source = 'help_panel'
+           AND status IN ('addressed', 'closed', 'wontfix', 'duplicate')
+           AND COALESCE(closed_at, addressed_at) >= NOW() - INTERVAL %s
+         ORDER BY COALESCE(closed_at, addressed_at) DESC, id DESC
+    """
+    interval = f'{RECENTLY_CLOSED_DAYS} days'
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql, [interval])
+        return [dict(r) for r in cur.fetchall()]
+
 
 def auto_resolve(conn, commits: list[dict]) -> list[dict]:
-    """
-    Walk today's commits, find FB-N references in subjects, and flip
-    matching open rows to 'addressed'. Returns the (fb_id, sha, subject)
-    triples that actually flipped (i.e. excluding refs to already-resolved
-    rows).
-    """
+    """Walk today's commits, flip referenced rows to addressed."""
     resolved = []
     with conn.cursor() as cur:
         for c in commits:
@@ -273,21 +419,33 @@ def auto_resolve(conn, commits: list[dict]) -> list[dict]:
                            addressed_at = NOW(),
                            resolved_by_commit_sha = %s,
                            resolved_by_commit_url = %s
-                     WHERE id = %s AND status = 'open'
+                     WHERE id = %s AND status IN ('open', 'in_progress')
                      RETURNING id
                     """,
                     [c['sha'], c['url'], fb_id],
                 )
                 if cur.fetchone() is not None:
                     resolved.append({
-                        'fb_id': fb_id,
-                        'sha': c['sha'],
-                        'short': c['short'],
-                        'url': c['url'],
-                        'subject': c['subject'],
+                        'fb_id': fb_id, 'sha': c['sha'], 'short': c['short'],
+                        'url': c['url'], 'subject': c['subject'],
                     })
     conn.commit()
     return resolved
+
+
+def _commit_subject_for_sha(sha: str) -> Optional[str]:
+    out = _git('show', '-s', '--format=%s', sha).strip()
+    return out or None
+
+
+# ---------------------------------------------------------------------------
+# Worktrees
+# ---------------------------------------------------------------------------
+
+def count_worktrees() -> int:
+    if not WORKTREES_DIR.exists():
+        return 0
+    return sum(1 for p in WORKTREES_DIR.iterdir() if p.is_dir())
 
 
 # ---------------------------------------------------------------------------
@@ -297,222 +455,77 @@ def auto_resolve(conn, commits: list[dict]) -> list[dict]:
 CSS = """
 * { box-sizing: border-box; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 13px;
-  line-height: 1.45;
-  color: #2c3e50;
-  background: #f5f7fa;
-  margin: 0;
-  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  max-width: 920px; margin: 32px auto; padding: 0 32px;
+  color: #1f2937; background: #fafafa; line-height: 1.55;
 }
-.container { max-width: 1100px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0 0 4px 0; color: #1a253c; }
+h1 { font-size: 28px; margin: 0 0 4px 0; color: #0f172a; font-weight: 700; }
+.date-line { color: #64748b; font-size: 14px; margin-bottom: 28px; }
+.summary {
+  background: white; border-radius: 8px; padding: 20px 24px;
+  margin-bottom: 32px; border: 1px solid #e5e7eb;
+  font-size: 16px; color: #334155;
+}
+.summary strong { color: #0f172a; }
 h2 {
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #5a6b7d;
-  margin: 28px 0 8px 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #d8dfe6;
+  font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: #475569; margin: 36px 0 12px 0; font-weight: 600;
 }
-.subhead { color: #6b7c8c; font-size: 12px; margin-bottom: 18px; }
-.kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; }
-.kpi {
-  background: #fff;
-  border: 1px solid #d8dfe6;
-  border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 12px;
+.item {
+  background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+  padding: 14px 18px; margin-bottom: 8px; display: flex; align-items: flex-start;
+  gap: 16px;
 }
-.kpi b { color: #1a253c; font-size: 14px; }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  border: 1px solid #d8dfe6;
-  border-radius: 4px;
-  overflow: hidden;
-  font-size: 12px;
+.item.resolved { background: #f9fafb; border-color: #e5e7eb; }
+.item.resolved .what { color: #6b7280; text-decoration: line-through; }
+.id {
+  font-family: ui-monospace, monospace; font-size: 12px;
+  color: #64748b; background: #f1f5f9; padding: 3px 8px;
+  border-radius: 4px; flex-shrink: 0; min-width: 64px; text-align: center;
 }
-th, td {
-  padding: 7px 10px;
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid #eef1f5;
+.id.resolved { background: #d1fae5; color: #065f46; }
+.body { flex-grow: 1; }
+.what { font-size: 15px; color: #1f2937; line-height: 1.5; }
+.meta { font-size: 13px; color: #64748b; margin-top: 4px; }
+.meta .tag {
+  display: inline-block; background: #eef2ff; color: #4338ca;
+  padding: 1px 8px; border-radius: 10px; font-size: 11px;
+  margin-left: 8px;
 }
-th { background: #f0f3f7; font-weight: 600; color: #4a5b6c; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
-tr:last-child td { border-bottom: none; }
-.fb-row.resolved { color: #95a5a6; }
-.fb-row.resolved .msg { text-decoration: line-through; }
-.cmd { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; color: #2c3e50; background: #f0f3f7; padding: 4px 8px; border-radius: 3px; display: inline-block; margin-top: 4px; user-select: all; }
-.banner { padding: 10px 14px; border-radius: 4px; margin: 8px 0; font-size: 12px; }
-.banner.skipped { background: #fff8e1; border: 1px solid #f0d97a; color: #7a5d10; }
-.banner.empty { background: #eef9ee; border: 1px solid #b9e2bb; color: #2d6a30; }
-a { color: #2962a8; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.muted { color: #95a5a6; font-size: 11px; }
-.sha { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11px; }
-.footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #d8dfe6; color: #95a5a6; font-size: 11px; }
+.meta .resolution { font-size: 12px; color: #047857; margin-top: 4px; }
+.empty {
+  background: white; border: 1px dashed #d1d5db; border-radius: 6px;
+  padding: 16px 18px; color: #9ca3af; font-style: italic; font-size: 14px;
+}
+.item.in-progress { border-left: 3px solid #f59e0b; }
+.id.in-progress { background: #fef3c7; color: #92400e; }
+.progress-tag {
+  display: inline-block; background: #fef3c7; color: #92400e;
+  padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+  margin-left: 8px;
+}
+.in-progress-detail { color: #92400e; font-size: 12px; margin-top: 4px; }
+.session-row {
+  background: white; border: 1px solid #e5e7eb; border-radius: 6px;
+  padding: 12px 16px; margin-bottom: 6px; font-size: 13px;
+  display: grid; grid-template-columns: 90px 1fr auto; gap: 12px;
+  align-items: center;
+}
+.session-day { color: #6b7280; font-weight: 500; }
+.session-topic { color: #1f2937; }
+.session-pair { color: #4338ca; font-family: ui-monospace, monospace; font-size: 12px; }
+.system-status {
+  background: white; border: 1px solid #e5e7eb; border-radius: 8px;
+  padding: 18px 22px; margin-bottom: 12px;
+}
+.system-status .stale { color: #b45309; font-size: 14px; }
+.system-status .ok { color: #047857; font-size: 14px; }
+.footer {
+  margin-top: 48px; padding-top: 16px;
+  border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;
+}
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 """
-
-
-def render_html(*, today: datetime, branch_state: dict, commits: list[dict],
-                feedback: list[dict], auto_resolved: list[dict],
-                health: dict, backfill_queue: int) -> str:
-    open_count = sum(1 for r in feedback if r['status'] == 'open')
-    recent_resolved = sum(1 for r in feedback if r['status'] != 'open')
-    failures = health.get('failures') or []
-
-    # ----- header -----
-    if health['status'] == 'fresh':
-        health_kpi = f"Health: {len(failures)} failures" if failures else "Health: clean"
-    else:
-        health_kpi = "Health: SKIPPED"
-
-    parts = []
-    parts.append(f"""<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<title>Daily Brief — {today:%Y-%m-%d}</title>
-<style>{CSS}</style>
-</head><body><div class="container">""")
-
-    parts.append(f"""<h1>Landscape Daily Brief</h1>
-<div class="subhead">{today:%A, %B %-d, %Y}  ·  branch <code>{_esc(branch_state['branch'])}</code></div>
-<div class="kpi-row">
-  <div class="kpi"><b>{open_count}</b> open FB</div>
-  <div class="kpi"><b>{recent_resolved}</b> recently resolved</div>
-  <div class="kpi"><b>{len(commits)}</b> commits today</div>
-  <div class="kpi"><b>{len(auto_resolved)}</b> auto-resolved today</div>
-  <div class="kpi">{_esc(health_kpi)}</div>
-</div>
-<div class="muted" style="margin-top:-12px;margin-bottom:18px;">
-  Backfill queue: <b>{backfill_queue}</b> items pending triage (run admin tools to clean).
-</div>""")
-
-    # ----- Section 1: Feedback Tracker -----
-    parts.append('<h2>Feedback Tracker</h2>')
-    if not feedback:
-        parts.append('<div class="banner empty">No open or recently-resolved feedback.</div>')
-    else:
-        parts.append("""<table><thead><tr>
-<th></th><th>FB</th><th>Created</th><th>Page</th><th>Message</th><th>Action / Resolution</th>
-</tr></thead><tbody>""")
-        for r in feedback:
-            is_open = r['status'] == 'open'
-            checkbox = '☐' if is_open else '☑'
-            row_class = 'fb-row' if is_open else 'fb-row resolved'
-            created = r['created_at'].strftime('%Y-%m-%d')
-            msg = _esc((r['message_text'] or '')[:200])
-            page = _esc(r['page_context'] or '—')
-            if is_open:
-                cmd = (f'cd ~/landscape/backend && ./venv/bin/python manage.py '
-                       f'close_feedback {r["id"]} --note "..."')
-                action = f'<span class="cmd">$ {_esc(cmd)}</span>'
-            else:
-                bits = [f'<span class="muted">status: {r["status"]}</span>']
-                if r.get('resolved_by_commit_url'):
-                    bits.append(
-                        f'<a href="{_esc(r["resolved_by_commit_url"])}" class="sha">'
-                        f'{_esc((r["resolved_by_commit_sha"] or "")[:8])}</a>'
-                    )
-                if r.get('resolution_notes'):
-                    bits.append(_esc(r['resolution_notes']))
-                if r.get('duplicate_of_id'):
-                    bits.append(f'<span class="muted">duplicate of FB-{r["duplicate_of_id"]}</span>')
-                action = ' · '.join(bits)
-            parts.append(
-                f'<tr class="{row_class}"><td>{checkbox}</td>'
-                f'<td>FB-{r["id"]}</td>'
-                f'<td>{created}</td>'
-                f'<td>{page}</td>'
-                f'<td class="msg">{msg}</td>'
-                f'<td>{action}</td></tr>'
-            )
-        parts.append('</tbody></table>')
-
-    # ----- Section 2: Auto-Resolved Today -----
-    parts.append('<h2>Auto-Resolved Today</h2>')
-    if not auto_resolved:
-        parts.append('<div class="banner empty">No commits referenced FB-N in the last 24h.</div>')
-    else:
-        parts.append('<table><thead><tr><th>FB</th><th>Commit</th><th>Subject</th></tr></thead><tbody>')
-        for r in auto_resolved:
-            parts.append(
-                f'<tr><td>FB-{r["fb_id"]}</td>'
-                f'<td><a href="{_esc(r["url"])}" class="sha">{_esc(r["short"])}</a></td>'
-                f'<td>{_esc(r["subject"])}</td></tr>'
-            )
-        parts.append('</tbody></table>')
-
-    # ----- Section 3: Yesterday's Commits -----
-    parts.append("<h2>Yesterday's Commits</h2>")
-    if not commits:
-        parts.append('<div class="banner empty">No commits in the last 24h.</div>')
-    else:
-        parts.append('<table><thead><tr><th>SHA</th><th>Author</th><th>Subject</th></tr></thead><tbody>')
-        for c in commits:
-            parts.append(
-                f'<tr><td><a href="{_esc(c["url"])}" class="sha">{_esc(c["short"])}</a></td>'
-                f'<td>{_esc(c["author"])}</td>'
-                f'<td>{_esc(c["subject"])}</td></tr>'
-            )
-        parts.append('</tbody></table>')
-
-    # ----- Section 4: Health Check -----
-    parts.append('<h2>Health Check</h2>')
-    if health['status'] == 'skipped':
-        if health.get('last_ran_at'):
-            parts.append(
-                f'<div class="banner skipped">SKIPPED — last ran '
-                f'{health["last_ran_at"]:%Y-%m-%d %H:%M} UTC, '
-                f'{health.get("hours_ago", 0):.1f}h ago. '
-                f'<span class="muted">({_esc(health.get("reason", ""))})</span></div>'
-            )
-        else:
-            parts.append(
-                f'<div class="banner skipped">SKIPPED — '
-                f'{_esc(health.get("reason", "no recent report"))}</div>'
-            )
-    elif not failures:
-        parts.append(
-            f'<div class="banner empty">All agents PASS '
-            f'(report: {_esc(health.get("source_file", "?"))}).</div>'
-        )
-    else:
-        parts.append('<table><thead><tr><th>Agent</th><th>Summary</th></tr></thead><tbody>')
-        for f in failures:
-            parts.append(f'<tr><td>{_esc(f["agent"])}</td><td>{_esc(f["summary"])}</td></tr>')
-        parts.append('</tbody></table>')
-
-    # ----- Section 5: Branch State -----
-    parts.append('<h2>Branch State</h2>')
-    bits = [f'On <code>{_esc(branch_state["branch"])}</code>']
-    if branch_state.get('ahead') is not None and branch_state.get('behind') is not None:
-        bits.append(
-            f'{branch_state["ahead"]} ahead / {branch_state["behind"]} behind '
-            f'<code>origin/{_esc(branch_state["branch"])}</code>'
-        )
-    parts.append(f'<div>{" · ".join(bits)}</div>')
-    if branch_state['uncommitted']:
-        parts.append(f'<p class="muted">{len(branch_state["uncommitted"])} uncommitted file(s):</p>')
-        parts.append('<table><thead><tr><th>Status</th><th>Path</th></tr></thead><tbody>')
-        for line in branch_state['uncommitted']:
-            xy = line[:2]
-            path = line[3:]
-            parts.append(f'<tr><td class="sha">{_esc(xy)}</td><td>{_esc(path)}</td></tr>')
-        parts.append('</tbody></table>')
-    else:
-        parts.append('<div class="muted">Working tree clean.</div>')
-
-    # ----- footer -----
-    parts.append(f"""<div class="footer">
-Generated {datetime.now():%Y-%m-%d %H:%M:%S %Z} ·
-Regenerate: <code>./backend/venv/bin/python scripts/brief/generate_daily_brief.py</code>
-</div></div></body></html>""")
-
-    return ''.join(parts)
 
 
 def _esc(s) -> str:
@@ -525,11 +538,319 @@ def _esc(s) -> str:
             .replace('"', '&quot;'))
 
 
+def _strip_cw_prefix(slug: Optional[str]) -> str:
+    if not slug:
+        return ''
+    return slug[3:] if slug.startswith('cw-') else slug
+
+
+def render_summary(*, today: date, open_count: int, in_progress_count: int,
+                   wip_count: int, sessions_count: int, health: dict) -> str:
+    bits = []
+    if open_count == 0:
+        bits.append('You have <strong>no open feedback items</strong>')
+    elif in_progress_count > 0:
+        plural = 'item' if open_count == 1 else 'items'
+        bits.append(
+            f'You have <strong>{open_count} open feedback {plural}</strong> '
+            f'({in_progress_count} currently being worked on)'
+        )
+    else:
+        plural = 'item' if open_count == 1 else 'items'
+        bits.append(f'You have <strong>{open_count} open feedback {plural}</strong>')
+
+    if wip_count:
+        plural = 'branch' if wip_count == 1 else 'branches'
+        bits.append(f'<strong>{wip_count} active {plural}</strong>')
+    if sessions_count:
+        plural = 'chat' if sessions_count == 1 else 'chats'
+        bits.append(f'<strong>{sessions_count} Cowork {plural}</strong> from the last 3 days')
+
+    if health['status'] == 'fresh' and not (health.get('failures') or []):
+        bits.append('the system health check is fresh')
+    elif health['status'] == 'fresh':
+        n = len(health.get('failures') or [])
+        bits.append(f'the system health check has {n} failure{"s" if n != 1 else ""} to look at')
+    else:
+        bits.append("the system health check hasn't run in a while")
+
+    return ', '.join(bits) + '.'
+
+
+def render_wip(wip_rows: list[dict], today: date) -> str:
+    if not wip_rows:
+        return '<div class="empty">No labeled branches in <code>.claude/branch-labels.json</code> yet.</div>'
+    parts = []
+    for w in wip_rows:
+        last_activity = (
+            f'Last activity {relative_day(w["last_activity"], today)}'
+            if w['last_activity'] else 'No commits'
+        )
+        commits_phrase = (
+            f'{w["commits_ahead"]} commit{"s" if w["commits_ahead"] != 1 else ""}'
+            if w['commits_ahead'] else 'no commits ahead of main'
+        )
+        cowork_phrase = (
+            f'Cowork chat: <code>{_esc(w["cowork_chat"])}</code>'
+            if w['cowork_chat'] else 'Cowork chat: <code>(needs label)</code>'
+        )
+        meta_bits = [
+            f'Branch <code>{_esc(w["branch"])}</code>',
+            commits_phrase,
+            last_activity,
+            _esc(w['status_note']) if w['status_note'] else None,
+            cowork_phrase,
+        ]
+        meta = ' · '.join(b for b in meta_bits if b)
+        parts.append(
+            f'<div class="item">'
+            f'<div class="body">'
+            f'<div class="what"><strong>{_esc(w["title"])}</strong> — {_esc(w["description"])}</div>'
+            f'<div class="meta">{meta}</div>'
+            f'</div></div>'
+        )
+    return '\n'.join(parts)
+
+
+def render_open_feedback(rows: list[dict], today: date) -> str:
+    if not rows:
+        return '<div class="empty">No open feedback. Nice.</div>'
+    parts = []
+    for r in rows:
+        is_in_progress = r['status'] == 'in_progress'
+        item_class = 'item in-progress' if is_in_progress else 'item'
+        id_class = 'id in-progress' if is_in_progress else 'id'
+        meta_bits = [
+            reported_phrase(r['created_at'], today),
+            f'<span class="tag">{_esc(page_tag(r["page_context"]))}</span>',
+        ]
+        if is_in_progress:
+            meta_bits.append('<span class="progress-tag">Being worked on</span>')
+
+        progress_detail = ''
+        if is_in_progress:
+            ip_bits = []
+            if r.get('in_progress_branch'):
+                ip_bits.append(f'Branch <code>{_esc(r["in_progress_branch"])}</code>')
+            if r.get('started_at'):
+                ip_bits.append(f'CC session opened {relative_day(r["started_at"], today)}')
+            if r.get('in_progress_session_slug'):
+                ip_bits.append(
+                    f'Cowork chat <code>{_esc(_strip_cw_prefix(r["in_progress_session_slug"]))}</code>'
+                )
+            if ip_bits:
+                progress_detail = f'<div class="in-progress-detail">→ {" · ".join(ip_bits)}</div>'
+
+        parts.append(
+            f'<div class="{item_class}">'
+            f'<div class="{id_class}">FB-{r["id"]}</div>'
+            f'<div class="body">'
+            f'<div class="what">{_esc((r["message_text"] or "")[:400])}</div>'
+            f'<div class="meta">{" ".join(meta_bits)}{progress_detail}</div>'
+            f'</div></div>'
+        )
+    return '\n'.join(parts)
+
+
+def render_resolved(rows: list[dict], today: date) -> str:
+    if not rows:
+        return '<div class="empty">Nothing resolved in the last 7 days.</div>'
+    parts = []
+    for r in rows:
+        resolved_at = r.get('closed_at') or r.get('addressed_at')
+        resolved_phrase = relative_day(resolved_at, today) if resolved_at else 'recently'
+        note = r.get('resolution_notes')
+        if not note and r.get('resolved_by_commit_sha'):
+            subject = _commit_subject_for_sha(r['resolved_by_commit_sha'])
+            if subject:
+                note = strip_commit_prefix(subject)
+        resolution_line = (
+            f'<div class="resolution">✓ Resolved {resolved_phrase}'
+            + (f' — {_esc(note)}' if note else '')
+            + '</div>'
+        )
+        parts.append(
+            f'<div class="item resolved">'
+            f'<div class="id resolved">FB-{r["id"]}</div>'
+            f'<div class="body">'
+            f'<div class="what">{_esc((r["message_text"] or "")[:400])}</div>'
+            f'<div class="meta">'
+            f'{reported_phrase(r["created_at"], today)} '
+            f'<span class="tag">{_esc(page_tag(r["page_context"]))}</span>'
+            f'{resolution_line}'
+            f'</div>'
+            f'</div></div>'
+        )
+    return '\n'.join(parts)
+
+
+def render_sessions(rows: list[dict], today: date) -> str:
+    if not rows:
+        return '<div class="empty">No sessions logged in the last 3 days.</div>'
+    parts = []
+    for s in rows:
+        delta = (today - s['date']).days
+        if delta == 0:
+            day_label = 'Today'
+        elif delta == 1:
+            day_label = 'Yesterday'
+        else:
+            day_label = s['date'].strftime('%b ').replace(' 0', ' ') + f"{s['date'].day}"
+        topic = s['topic']
+        if ' — ' in topic:
+            head, _, tail = topic.partition(' — ')
+            topic_html = f'<strong>{_esc(head)}</strong> — {_esc(tail)}'
+        else:
+            topic_html = _esc(topic)
+        pair = session_pair(s.get('cowork_chat'), s.get('cc_session', ''))
+        parts.append(
+            f'<div class="session-row">'
+            f'<div class="session-day">{_esc(day_label)}</div>'
+            f'<div class="session-topic">{topic_html}</div>'
+            f'<div class="session-pair">{_esc(pair)}</div>'
+            f'</div>'
+        )
+    return '\n'.join(parts)
+
+
+def render_parallel(worktree_count: int) -> str:
+    if worktree_count == 0:
+        return '<div class="empty">No parallel CC worktrees.</div>'
+    return (
+        f'<div class="item"><div class="body">'
+        f'<div class="what">{worktree_count} dormant CC worktree{"s" if worktree_count != 1 else ""} '
+        f'from past sessions. Nothing active in any of them.</div>'
+        f'<div class="meta">Stored under <code>.claude/worktrees/</code> · '
+        f'Cleanup not blocking anything; can sweep when you want.</div>'
+        f'</div></div>'
+    )
+
+
+def render_uncommitted(summary: dict) -> str:
+    modified = summary['modified']
+    deleted = summary['deleted']
+    untracked_count = summary['untracked_count']
+    if not modified and not deleted and untracked_count == 0:
+        return '<div class="empty">Working tree is clean.</div>'
+
+    n_real = len(modified) + len(deleted)
+    if n_real == 0 and untracked_count > 0:
+        return (
+            f'<div class="item"><div class="body">'
+            f'<div class="what">{untracked_count} untracked files (worktree artifacts, test scratch, '
+            f'prompt drafts) — not blocking.</div>'
+            f'</div></div>'
+        )
+
+    summary_phrase = (
+        f'{n_real} file{"s" if n_real != 1 else ""} '
+        f'{"have" if n_real != 1 else "has"} changes that haven\'t been saved to git yet on the current branch:'
+    )
+    meta_bits = []
+    for path in modified:
+        meta_bits.append(f'<strong>Modified:</strong> <code>{_esc(path)}</code>')
+    for path in deleted:
+        meta_bits.append(f'<strong>Deleted:</strong> <code>{_esc(path)}</code>')
+    if untracked_count:
+        meta_bits.append(
+            f'<strong>{untracked_count} untracked</strong> '
+            f'(worktree artifacts, test scratch, prompt drafts) — not blocking.'
+        )
+    return (
+        f'<div class="item"><div class="body">'
+        f'<div class="what">{summary_phrase}</div>'
+        f'<div class="meta">{"<br>".join(meta_bits)}</div>'
+        f'</div></div>'
+    )
+
+
+def render_system_status(health: dict, today: date) -> str:
+    if health['status'] == 'fresh':
+        failures = health.get('failures') or []
+        if not failures:
+            return (
+                '<div class="system-status">'
+                '<div class="ok">✓ All system health checks passing.</div>'
+                '</div>'
+            )
+        items = ''.join(
+            f'<li><strong>{_esc(f["agent"])}</strong>: {_esc(f["summary"])}</li>'
+            for f in failures
+        )
+        return (
+            '<div class="system-status">'
+            f'<div class="stale">⚠ {len(failures)} health-check failure{"s" if len(failures) != 1 else ""}:</div>'
+            f'<ul>{items}</ul>'
+            '</div>'
+        )
+    last = health.get('last_ran_at')
+    if last:
+        date_phrase = last.strftime('%B ').replace(' 0', ' ') + f"{last.day}"
+        days_ago = max(0, int((datetime.now(timezone.utc) - last).days))
+        days_phrase = f'about {days_ago} day{"s" if days_ago != 1 else ""} ago'
+        msg = (
+            f'⚠ The nightly system health check hasn\'t run since {date_phrase} '
+            f'({days_phrase}). Once it runs again, this section will surface anything '
+            f'broken — missing pages, dead tools, broken connections.'
+        )
+    else:
+        msg = (
+            '⚠ The nightly system health check has never run yet. Once it does, '
+            'this section will surface anything broken — missing pages, dead tools, '
+            'broken connections.'
+        )
+    return f'<div class="system-status"><div class="stale">{msg}</div></div>'
+
+
+def render_html(*, today: date, branch: str, open_feedback: list[dict],
+                resolved_recent: list[dict], wip_rows: list[dict],
+                sessions: list[dict], worktree_count: int,
+                uncommitted: dict, health: dict) -> str:
+    in_progress_count = sum(1 for r in open_feedback if r['status'] == 'in_progress')
+    summary = render_summary(
+        today=today,
+        open_count=len(open_feedback),
+        in_progress_count=in_progress_count,
+        wip_count=len(wip_rows),
+        sessions_count=len(sessions),
+        health=health,
+    )
+
+    return f"""<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<title>Landscape Daily Brief — {today:%Y-%m-%d}</title>
+<style>{CSS}</style>
+</head><body>
+<h1>Landscape Daily Brief</h1>
+<div class="date-line">{today:%A, %B %-d, %Y}  ·  branch <code>{_esc(branch)}</code></div>
+<div class="summary">{summary}</div>
+<h2>Work In Progress</h2>
+{render_wip(wip_rows, today)}
+<h2>Open Feedback ({len(open_feedback)})</h2>
+{render_open_feedback(open_feedback, today)}
+<h2>Resolved Recently ({len(resolved_recent)})</h2>
+{render_resolved(resolved_recent, today)}
+<h2>Today's Sessions (rolling 3-day)</h2>
+{render_sessions(sessions, today)}
+<h2>Parallel Sessions</h2>
+{render_parallel(worktree_count)}
+<h2>Uncommitted Right Now</h2>
+{render_uncommitted(uncommitted)}
+<h2>System Status</h2>
+{render_system_status(health, today)}
+<div class="footer">
+  Generated {datetime.now():%Y-%m-%d %H:%M:%S} ·
+  Regenerate: <code>./backend/venv/bin/python scripts/brief/generate_daily_brief.py</code>
+</div>
+</body></html>"""
+
+
 # ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
 
-def write_outputs(html: str, today: datetime) -> tuple[Path, Path]:
+def write_outputs(html: str, today: date) -> tuple[Path, Path]:
     out_dir = Path(ONEDRIVE_BRIEF_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     dated = out_dir / f'{today:%Y-%m-%d}-brief.html'
@@ -544,34 +865,38 @@ def write_outputs(html: str, today: datetime) -> tuple[Path, Path]:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    today = datetime.now()
+    today = date.today()
     print(f"[brief] generating for {today:%Y-%m-%d}", file=sys.stderr)
 
-    branch_state = gather_branch_state()
+    branch = gather_branch_name()
     commits = gather_commits_24h()
     health = gather_health_status()
+    uncommitted = gather_uncommitted_summary()
+    wip_rows = gather_wip_branches()
+    sessions = gather_sessions_3day(today)
+    worktree_count = count_worktrees()
 
     with _connect() as conn:
-        auto_resolved = auto_resolve(conn, commits)
-        feedback = gather_open_and_recent_feedback(conn)
-        backfill_queue = gather_backfill_queue_count(conn)
+        auto_resolve(conn, commits)
+        open_feedback = gather_open_feedback(conn)
+        resolved_recent = gather_resolved_recently(conn)
 
     html = render_html(
-        today=today,
-        branch_state=branch_state,
-        commits=commits,
-        feedback=feedback,
-        auto_resolved=auto_resolved,
+        today=today, branch=branch,
+        open_feedback=open_feedback,
+        resolved_recent=resolved_recent,
+        wip_rows=wip_rows,
+        sessions=sessions,
+        worktree_count=worktree_count,
+        uncommitted=uncommitted,
         health=health,
-        backfill_queue=backfill_queue,
     )
     dated, current = write_outputs(html, today)
     print(f"[brief] wrote {dated}", file=sys.stderr)
-    print(f"[brief] wrote {current}", file=sys.stderr)
-    print(f"[brief] open={sum(1 for r in feedback if r['status']=='open')} "
-          f"resolved={len(auto_resolved)} commits={len(commits)} "
-          f"backfill_queue={backfill_queue} "
-          f"health={health['status']}", file=sys.stderr)
+    print(f"[brief] open={len(open_feedback)} in_progress="
+          f"{sum(1 for r in open_feedback if r['status']=='in_progress')} "
+          f"resolved_recent={len(resolved_recent)} wip={len(wip_rows)} "
+          f"sessions={len(sessions)} health={health['status']}", file=sys.stderr)
     return 0
 
 
