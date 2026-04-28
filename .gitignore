@@ -180,3 +180,9 @@ rent-schedule-*.png
 broken_uploadthing_urls_report.txt
 uploadthing_url_check.csv
 reference/images/screenshots/Untitled.jpg
+
+# Daily Brief cleanup — keep CC artifacts and test reports out of git
+.claude/worktrees/
+playwright-report/
+test-docs/
+/CC_*.md

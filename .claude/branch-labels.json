@@ -1,0 +1,20 @@
+{
+  "feature/daily-brief": {
+    "title": "Daily Brief + Feedback Tracker",
+    "description": "Building this very page plus the system that captures and tracks #FB submissions.",
+    "cowork_chat": "gx",
+    "status_note": "Ready to merge after redesign sign-off"
+  },
+  "feature/unified-ui": {
+    "title": "Unified UI Refresh",
+    "description": "The new chat-driven layout (sidebar + center + artifact panel) replacing the old folder-tabs view.",
+    "cowork_chat": null,
+    "status_note": "5 of 6 live-test findings still failing — fix prompt drafted, awaiting go-ahead"
+  },
+  "feature/excel-audit-phase4": {
+    "title": "Excel Audit Phase 4",
+    "description": "Deeper formula auditing for uploaded Excel models.",
+    "cowork_chat": null,
+    "status_note": "Paused/archived per Gregg's call"
+  }
+}
