@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.local.template
+!/.env.example
 
 # vercel
 .vercel
@@ -192,3 +193,6 @@ test-docs/
 
 # Spent deploy-prompt scratch docs (historical, kept local)
 CC_*.md
+
+# Playwright reports
+playwright-report/

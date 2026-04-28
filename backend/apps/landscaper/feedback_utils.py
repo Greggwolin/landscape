@@ -9,6 +9,7 @@ import logging
 import requests
 from typing import Optional, List, Dict
 from django.conf import settings
+from django.db import connection
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -63,73 +64,90 @@ def capture_feedback(
     project_name: Optional[str] = None,
     page_context: Optional[str] = None,
     message_history: Optional[List[Dict]] = None,
-) -> bool:
+) -> Optional[int]:
     """
-    Send feedback to Discord webhook.
-    
-    Args:
-        user_message: The message containing #FB
-        user_email: User's email address (if available)
-        user_id: User's ID
-        project_id: Current project ID
-        project_name: Current project name
-        page_context: Current page/workflow context
-        message_history: Recent message history for context (last 3-5 messages)
-        
+    Send feedback to Discord webhook AND persist to landscape.tbl_feedback.
+
+    Discord posting is best-effort; persistence is the source of truth.
+    DB row is written even if Discord fails (with discord_posted_at NULL).
+
     Returns:
-        True if sent successfully, False otherwise
+        New tbl_feedback row id on successful persistence, or None if the
+        DB INSERT itself failed. Discord post failure alone does not
+        produce None — it just leaves discord_posted_at NULL.
+
+        Note: only views_help.py currently surfaces this id back to users.
+        Other callers (project chat, thread message, knowledge chat) discard
+        the return value; threading FB-N through their response shapes is a
+        v2 task.
     """
+    feedback_text = strip_feedback_tag(user_message)
+    discord_ok = False
+
+    # 1. Discord post (best-effort)
     webhook_url = getattr(settings, 'LANDSCAPER_FEEDBACK_WEBHOOK_URL', None)
-    
     if not webhook_url:
-        logger.warning("LANDSCAPER_FEEDBACK_WEBHOOK_URL not configured - feedback not sent")
-        return False
-    
+        logger.warning("LANDSCAPER_FEEDBACK_WEBHOOK_URL not configured - skipping Discord post")
+    else:
+        try:
+            logger.info(
+                f"[FEEDBACK_CAPTURE] user_name={user_name}, user_email={user_email}, "
+                f"user_id={user_id}, project_id={project_id}, project_name={project_name}"
+            )
+            username = (
+                user_name
+                or (user_email.split('@')[0] if user_email else None)
+                or (f"user_{user_id}" if user_id else "unknown")
+            )
+            title = f"{username}: {page_context or 'unknown'}"
+            embed = {
+                "title": title,
+                "description": feedback_text[:2000],
+                "color": 0x5865F2,
+                "timestamp": datetime.utcnow().isoformat(),
+                "footer": {"text": f"Project: {project_name or project_id or '—'}"},
+            }
+            response = requests.post(
+                webhook_url,
+                json={"embeds": [embed]},
+                headers={"Content-Type": "application/json"},
+                timeout=10,
+            )
+            if response.status_code in (200, 204):
+                discord_ok = True
+                logger.info(f"Feedback Discord-posted for user {user_id} on project {project_id}")
+            else:
+                logger.error(f"Discord post failed: {response.status_code} - {response.text}")
+        except Exception as e:
+            logger.error(f"Error posting feedback to Discord: {e}", exc_info=True)
+
+    # 2. Persist to tbl_feedback (source of truth — runs regardless of Discord outcome)
     try:
-        # Debug logging
-        logger.info(f"[FEEDBACK_CAPTURE] user_name={user_name}, user_email={user_email}, user_id={user_id}, project_id={project_id}, project_name={project_name}")
-        
-        # Build compact Discord embed
-        # Title: "username: Page > Tab"
-        username = (
-            user_name or 
-            (user_email.split('@')[0] if user_email else None) or
-            f"user_{user_id}" if user_id else "unknown"
-        )
-        page_label = page_context or "unknown"
-        title = f"{username}: {page_label}"
-
-        feedback_text = strip_feedback_tag(user_message)
-
-        embed = {
-            "title": title,
-            "description": feedback_text[:2000],
-            "color": 0x5865F2,
-            "timestamp": datetime.utcnow().isoformat(),
-            "footer": {"text": f"Project: {project_name or project_id or '—'}"},
-        }
-
-        payload = {
-            "embeds": [embed]
-        }
-        
-        response = requests.post(
-            webhook_url,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if response.status_code in (200, 204):
-            logger.info(f"Feedback captured successfully for user {user_id} on project {project_id}")
-            return True
-        else:
-            logger.error(f"Failed to send feedback to Discord: {response.status_code} - {response.text}")
-            return False
-            
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO landscape.tbl_feedback
+                  (user_id, user_name, user_email, page_context,
+                   project_id, project_name, message_text,
+                   source, discord_posted_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                [
+                    user_id, user_name, user_email, page_context,
+                    project_id, project_name, feedback_text,
+                    'help_panel',
+                    datetime.utcnow() if discord_ok else None,
+                ],
+            )
+            feedback_id = cursor.fetchone()[0]
+            logger.info(
+                f"Feedback persisted as FB-{feedback_id} (discord_ok={discord_ok})"
+            )
+            return feedback_id
     except Exception as e:
-        logger.error(f"Error sending feedback to Discord: {str(e)}", exc_info=True)
-        return False
+        logger.error(f"Failed to persist feedback to tbl_feedback: {e}", exc_info=True)
+        return None
 
 
 def send_login_notification(

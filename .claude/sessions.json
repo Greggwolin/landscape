@@ -1,0 +1,28 @@
+{
+  "sessions": [
+    {
+      "date": "2026-04-28",
+      "topic": "Daily Brief redesign — feedback tracker spec, mockup iterations, C5/C6/C7 implementation",
+      "cowork_chat": "gx",
+      "cc_session": "feature/daily-brief"
+    },
+    {
+      "date": "2026-04-28",
+      "topic": "Doc profile bug fix — addressing FB-281",
+      "cowork_chat": "gx-doc-profile",
+      "cc_session": "feature/doc-profile-fix"
+    },
+    {
+      "date": "2026-04-27",
+      "topic": "Unified UI live-test triage — 6 findings logged, fix prompt drafted for #1",
+      "cowork_chat": null,
+      "cc_session": "feature/unified-ui"
+    },
+    {
+      "date": "2026-04-26",
+      "topic": "Excel Audit Phase 4 wrap-up — archived per your call",
+      "cowork_chat": null,
+      "cc_session": "feature/excel-audit-phase4"
+    }
+  ]
+}

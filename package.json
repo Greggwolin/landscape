@@ -108,6 +108,7 @@
     "exceljs": "^4.4.0",
     "form-data": "^4.0.4",
     "handsontable": "^16.0.0",
+    "jose": "^6.2.2",
     "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "lucide-react": "^0.542.0",

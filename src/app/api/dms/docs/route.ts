@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const { system, profile = {}, ai } = CreateDocZ.parse(body);
 
     // Auth: identify uploader and verify access (project OR thread)
-    const requestUser = getUserFromRequest(req);
+    const requestUser = await getUserFromRequest(req);
     if (!requestUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
