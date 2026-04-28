@@ -64,8 +64,9 @@ class HelpChatView(APIView):
                     'error': 'Message is required',
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # #FB detection — capture to Discord and strip before AI sees it
+            # #FB detection — capture to Discord + tbl_feedback, strip before AI sees it
             has_feedback = detect_feedback_tag(message)
+            feedback_id = None
             if has_feedback:
                 # Extract user info from request.data (sent by frontend)
                 user_id = request.data.get('user_id')
@@ -78,7 +79,7 @@ class HelpChatView(APIView):
                     user_name = getattr(request.user, 'username', None)
                     user_email = getattr(request.user, 'email', None)
 
-                capture_feedback(
+                feedback_id = capture_feedback(
                     user_message=message,
                     user_email=user_email,
                     user_name=user_name,
@@ -87,6 +88,11 @@ class HelpChatView(APIView):
                     project_name=None,
                     page_context=f"Help > {current_page or 'general'}",
                 )
+                if feedback_id is None:
+                    logger.error(
+                        "[FEEDBACK] capture_feedback returned None — "
+                        "tbl_feedback INSERT failed; ack will omit FB-N reference"
+                    )
                 message = strip_feedback_tag(message)
 
             # Get or create conversation
@@ -101,10 +107,32 @@ class HelpChatView(APIView):
             else:
                 conversation_id, conv_id = self._create_conversation(user_id)
 
-            # Load conversation history
+            # For #FB messages, skip the LLM call entirely — feedback was already
+            # forwarded to Discord + persisted to tbl_feedback above. Return ack
+            # with the FB-N reference if persistence succeeded.
+            if has_feedback:
+                if feedback_id is not None:
+                    ack_content = f"Feedback received, thanks! (FB-{feedback_id})"
+                else:
+                    ack_content = "Feedback received, thanks!"
+
+                self._store_message(conv_id, 'user', message, current_page)
+                self._store_message(conv_id, 'assistant', ack_content, current_page)
+                self._touch_conversation(conv_id)
+
+                return Response({
+                    'success': True,
+                    'content': ack_content,
+                    'conversation_id': str(conversation_id),
+                    'metadata': {
+                        'feedback_captured': True,
+                        'feedback_id': feedback_id,
+                    },
+                }, status=status.HTTP_201_CREATED)
+
+            # Non-feedback path: load history and generate AI response
             conversation_history = self._get_conversation_history(conv_id)
 
-            # Generate AI response
             ai_response = get_help_response(
                 message=message,
                 current_page=current_page,
@@ -112,13 +140,8 @@ class HelpChatView(APIView):
                 conversation_history=conversation_history,
             )
 
-            # Store user message
             self._store_message(conv_id, 'user', message, current_page)
-
-            # Store assistant response
             self._store_message(conv_id, 'assistant', ai_response['content'], current_page)
-
-            # Update conversation timestamp
             self._touch_conversation(conv_id)
 
             return Response({
