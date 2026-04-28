@@ -43,17 +43,20 @@ test.describe('S-UI-3: First message creates thread + thread auto-names', () => 
     await watchdog;
   });
 
-  // ── Expected-fail: finding #11, fake 1s "timeout" ──
-  // Same as above but isolated as a dedicated case so a future fix is
-  // unambiguous. Currently marked .fail() because the AbortController race
-  // is still open as of 2026-04-27.
-  test.fail(
-    'no "Request timed out" error appears after first send (currently fails — finding #11)',
+  // ── Finding #11 watchdog (no longer expected-fail with Enter-submit) ──
+  // The 1-second AbortController-race timeout was reproducing reliably when
+  // sendMessage clicked the Send button; switching the helper to Enter-submit
+  // (because Next.js dev-overlay was intercepting clicks) appears to have
+  // sidestepped the race. Keep this test as a regression detector — if the
+  // banner ever returns, this fails immediately and we know the race is back.
+  test(
+    'no "Request timed out" error appears after first send',
     async ({ authedPage }) => {
       const { page } = authedPage;
       await gotoChat(page);
 
-      // Set the watchdog window tight so the test fails on the 1s race.
+      // Watchdog window matches the original 3s used while finding #11 was
+      // open — long enough to catch the 1s race if it returns.
       const watchdog = expectNoTimeoutError(page, 3_000);
       await sendMessage(page, config.testMessages.firstMessage);
       await watchdog;

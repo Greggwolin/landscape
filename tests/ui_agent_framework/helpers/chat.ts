@@ -7,18 +7,46 @@ import { config } from '../config';
 import { selectors } from './selectors';
 
 /**
- * Type a message into the chat textarea and click Send. Does NOT wait for
- * any post-send state — the caller chooses whether to wait for thread URL,
+ * Type a message into the chat textarea and submit via Enter. Does NOT wait
+ * for any post-send state — the caller chooses whether to wait for thread URL,
  * reply rendering, or both.
+ *
+ * IMPORTANT: We submit via Enter (not by clicking the Send button) because
+ * Next.js dev mode injects a <nextjs-portal> overlay that intercepts pointer
+ * events on top of the page. Clicks on the Send button get caught by that
+ * portal and never reach the React handler — surfaces in Playwright traces
+ * as: "<nextjs-portal>... subtree intercepts pointer events / retrying click
+ * action" until the test timeout.
+ *
+ * The chat textarea has an onKeyDown handler (LandscaperChatThreaded.tsx)
+ * that calls handleSend() on Enter (without Shift). Keyboard events dispatch
+ * directly to the focused element, bypassing the portal. As a side benefit,
+ * Enter-to-send is also the actual user behavior we want to test.
+ *
+ * If the textarea's keyboard path is ever decoupled from the click path,
+ * a force-clicking fallback is below.
  */
 export async function sendMessage(page: Page, text: string): Promise<void> {
   const ta = page.locator(selectors.centerChat.textarea).first();
   await ta.waitFor({ state: 'visible', timeout: config.timeouts.pageLoad });
+
+  // fill() focuses the element, sets the value via the native setter, and
+  // dispatches input/change events. After this, React's onChange has fired
+  // and the textarea is the focused element.
   await ta.fill(text);
+
+  // Sanity-check the Send button is enabled — same gating signal the user
+  // would observe (input non-empty AND not loading). If it's disabled, the
+  // textarea is also locked (isThreadLoading or isLoading), and Enter would
+  // be a no-op too. Keep this so we get a clear error message instead of a
+  // mysterious "Enter was pressed but nothing happened".
   const sendBtn = page.locator(selectors.centerChat.sendButton).first();
-  await sendBtn.waitFor({ state: 'visible' });
   await expect(sendBtn).toBeEnabled({ timeout: 5_000 });
-  await sendBtn.click();
+
+  // Submit via Enter. The onKeyDown handler in LandscaperChatThreaded calls
+  // handleSend() on Enter (without Shift). Keyboard events dispatch to the
+  // focused element directly — no portal interception.
+  await ta.press('Enter');
 }
 
 /**
@@ -42,32 +70,33 @@ export async function expectNoTimeoutError(page: Page, windowMs = 5_000): Promis
 }
 
 /**
- * Wait for the assistant's reply to render. Detection: a message bubble
- * appears that is NOT the user message we just sent. Best-effort selector
- * since LandscaperChatThreaded uses Bootstrap-ish classes for messages.
+ * Wait for the assistant's reply to render.
+ *
+ * ChatMessageBubble (src/components/landscaper/ChatMessageBubble.tsx) renders
+ * each message as a Bootstrap-utility div: `align-items-end` for user, and
+ * `align-items-start` for assistant. We detect the assistant reply by looking
+ * for the first `.align-items-start` bubble inside the chat panel. Polling
+ * because we want the FIRST one to appear (it may take 30s for a real
+ * Anthropic round-trip).
  */
 export async function expectReplyRendered(
   page: Page,
   userMessageText: string,
   timeoutMs = config.timeouts.aiReply,
 ): Promise<void> {
-  // The reply lives inside the chat body; we look for a message element
-  // whose text doesn't include the user's input. Use a count poll to avoid
-  // brittle structural assumptions about which element is the assistant.
+  void userMessageText; // kept in signature for caller-side context; not used in selector
   const start = Date.now();
-  let lastCount = 0;
   while (Date.now() - start < timeoutMs) {
-    const messages = page.locator('.wrapper-chat-body :is(.message, [data-role], .markdown-body)');
-    const count = await messages.count().catch(() => 0);
-    if (count > 1) {
-      // At least 2 messages → user + assistant. Confirm at least one isn't ours.
-      const allText = await messages.allInnerTexts().catch(() => [] as string[]);
-      const otherThanUser = allText.some(
-        (t) => !!t && !t.includes(userMessageText),
-      );
-      if (otherThanUser) return;
+    const assistantBubbles = page.locator(
+      '.wrapper-chat-center .d-flex.flex-column.align-items-start',
+    );
+    const count = await assistantBubbles.count().catch(() => 0);
+    if (count > 0) {
+      // First assistant bubble must have non-empty text (LandscaperProgress
+      // can render an empty placeholder during streaming). Confirm content.
+      const firstText = await assistantBubbles.first().innerText().catch(() => '');
+      if (firstText.trim().length > 0) return;
     }
-    if (count !== lastCount) lastCount = count;
     await page.waitForTimeout(500);
   }
   throw new Error(

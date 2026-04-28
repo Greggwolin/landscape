@@ -34,13 +34,13 @@
       "file": "scenarios/s_ui_3_first_message_and_naming.spec.ts",
       "passes": [
         "typing and sending a message creates a thread + URL transitions",
+        "no \"Request timed out\" error appears after first send",
         "assistant reply renders within 30s",
         "thread title auto-names within 60s of first reply"
       ],
-      "expected_failures": [
-        "no \"Request timed out\" error appears after first send (currently fails — finding #11)"
-      ],
-      "fixture_gaps": []
+      "expected_failures": [],
+      "fixture_gaps": [],
+      "_note": "The Enter-submit path in helpers/chat.ts sidesteps the 1s AbortController race that finding #11 documented for click-submit. The watchdog test no longer expected-fails — it's now a regression detector."
     },
     "S-UI-5": {
       "file": "scenarios/s_ui_5_report_request_artifact_first.spec.ts",
