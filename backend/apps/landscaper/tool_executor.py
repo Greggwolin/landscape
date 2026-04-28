@@ -2957,17 +2957,62 @@ ASSUMPTION_FIELD_TYPES = {
 }
 
 
+INCOME_PROPERTY_TYPE_CODES = ('MF', 'OFF', 'RET', 'IND', 'HTL', 'MXU')
+
+
 def _fetch_cashflow_schedule(project_id: int) -> Dict[str, Any]:
     """
-    Fetch cash flow schedule for a Land Dev project.
+    Fetch cash flow schedule for a project, routing by project_type_code.
 
-    Now calls the Django LandDevCashFlowService directly instead of
-    making an HTTP call to the Next.js API.
+    LAND projects use LandDevCashFlowService.
+    Income-property projects (MF, OFF, RET, IND, HTL, MXU) use
+    IncomePropertyCashFlowService. Both services produce the same envelope
+    shape (projectId, periods, sections, summary, periodType, startDate,
+    endDate, totalPeriods), so downstream consumers do not need to branch.
+
+    Mirrors the canonical routing at apps/calculations/services.py
+    (_fetch_cashflows_from_django_service).
+
+    Unknown / missing project_type_code logs a warning and returns an empty
+    schedule envelope rather than raising, so Landscaper can degrade
+    gracefully on misconfigured projects.
     """
-    from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT project_type_code FROM landscape.tbl_project WHERE project_id = %s",
+            [project_id]
+        )
+        row = cursor.fetchone()
+
+    project_type_code = ((row[0] if row else '') or '').upper()
+
+    if project_type_code == 'LAND':
+        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+        service_cls = LandDevCashFlowService
+    elif project_type_code in INCOME_PROPERTY_TYPE_CODES:
+        from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+        service_cls = IncomePropertyCashFlowService
+    else:
+        from datetime import date
+        logger.warning(
+            "[_fetch_cashflow_schedule] Unrecognized project_type_code=%r for project_id=%s; "
+            "returning empty schedule",
+            project_type_code, project_id,
+        )
+        return {
+            'projectId': project_id,
+            'periodType': 'month',
+            'startDate': None,
+            'endDate': None,
+            'totalPeriods': 0,
+            'periods': [],
+            'sections': [],
+            'summary': {},
+            'generatedAt': date.today().isoformat(),
+        }
 
     try:
-        service = LandDevCashFlowService(project_id)
+        service = service_cls(project_id)
         data = service.calculate()
     except ValueError as err:
         raise RuntimeError(f"Cash flow calculation error: {err}")
