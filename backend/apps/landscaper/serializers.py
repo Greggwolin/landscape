@@ -84,12 +84,29 @@ class ChatThreadSerializer(serializers.ModelSerializer):
         ]
 
     def get_messageCount(self, obj):
-        """Return the number of messages in this thread."""
+        """Return the number of messages in this thread.
+
+        Reads from the `msg_count` annotation set by ChatThreadViewSet.
+        get_queryset(). Falls back to a per-row count for callers that
+        bypass the viewset (unit tests, one-off scripts).
+
+        Uses hasattr (not getattr is not None) so that an annotated value
+        of 0 doesn't trigger the fallback query.
+        """
+        if hasattr(obj, 'msg_count'):
+            return obj.msg_count
         return obj.messages.count()
 
     def get_projectName(self, obj):
-        """Return the parent project's name, or None for unassigned threads."""
-        return obj.project.project_name if obj.project_id else None
+        """Return the parent project's name, or None for unassigned threads.
+
+        select_related('project') in the viewset's queryset means obj.project
+        is a single JOIN, not a per-row query. Defensive on orphaned-FK
+        edge cases (project_id set but project row missing).
+        """
+        if not obj.project_id:
+            return None
+        return obj.project.project_name if obj.project else None
 
     def get_firstUserMessage(self, obj):
         """Return the first user-role message text (truncated to 120 chars).
@@ -97,11 +114,23 @@ class ChatThreadSerializer(serializers.ModelSerializer):
         Used by the sidebar/recent-threads UI as a label fallback when the
         thread has no auto-generated title yet. Truncated server-side to keep
         list payloads small. Frontend further truncates for display.
+
+        Reads from the `first_user_text` Subquery annotation set by
+        ChatThreadViewSet.get_queryset(). Falls back to a per-row query for
+        callers that bypass the viewset.
+
+        Uses hasattr so that the annotation being present-but-null (no user
+        messages yet — Subquery returned no row) doesn't trigger a redundant
+        fallback query.
         """
-        first = obj.messages.filter(role='user').order_by('created_at').first()
-        if not first or not first.content:
+        if hasattr(obj, 'first_user_text'):
+            text = obj.first_user_text
+        else:
+            first = obj.messages.filter(role='user').order_by('created_at').first()
+            text = first.content if first else None
+        if not text:
             return None
-        text = first.content.strip()
+        text = text.strip()
         return text[:120] + ('…' if len(text) > 120 else '')
 
 

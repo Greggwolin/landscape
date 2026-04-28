@@ -1361,10 +1361,34 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             Backs the cross-project sidebar list.
           - unassigned=true: project_id IS NULL only.
           - project_id=<id>: scoped to a single project.
-        """
-        from .models import ChatThread
 
-        queryset = ChatThread.objects.all()
+        Performance: select_related('project') + Count/Subquery annotations
+        replace the 3N+1 query pattern that ChatThreadSerializer's
+        SerializerMethodFields (messageCount, projectName, firstUserMessage)
+        previously triggered. See finding #8 — the unassigned thread list
+        was firing ~520 queries per call (173 rows × 3 method fields).
+        """
+        from django.db.models import Count, Subquery, OuterRef
+        from .models import ChatThread, ThreadMessage
+
+        # Annotation: first user message content for the sidebar fallback label
+        # (when a thread has no auto-generated title yet).
+        first_user_text_subq = Subquery(
+            ThreadMessage.objects
+            .filter(thread=OuterRef('pk'), role='user')
+            .order_by('created_at')
+            .values('content')[:1]
+        )
+
+        queryset = (
+            ChatThread.objects
+            .all()
+            .select_related('project')
+            .annotate(
+                msg_count=Count('messages'),
+                first_user_text=first_user_text_subq,
+            )
+        )
 
         all_user_threads = self.request.query_params.get('all_user_threads', '').lower() == 'true'
         unassigned = self.request.query_params.get('unassigned', '').lower() == 'true'
