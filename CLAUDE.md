@@ -339,6 +339,86 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 
 ---
 
+## Feedback Tracker + Daily Brief
+
+### Purpose
+
+Captures `#FB`-tagged messages from the Help panel for tracking, surfaces open items in a nightly HTML brief, and supports lifecycle management (open → in_progress → closed) via Django management commands.
+
+### Table: `landscape.tbl_feedback`
+
+| Column | Purpose |
+|--------|---------|
+| `id` | Sequential PK; rendered publicly as `FB-{id}` (e.g., FB-247) |
+| `created_at` | When the feedback was reported |
+| `user_id`, `user_name`, `user_email` | Reporter (when known) |
+| `page_context` | Where in the app it was reported (e.g., `Help > Documents`) |
+| `project_id`, `project_name` | Project context (when known) |
+| `message_text` | The feedback content (with `#FB` tag stripped) |
+| `status` | Lifecycle: `open` \| `in_progress` \| `addressed` \| `closed` \| `wontfix` \| `duplicate` |
+| `source` | Capture origin: `help_panel` (live) \| `backfill` (historical) \| `manual` |
+| `addressed_at`, `closed_at`, `started_at` | Lifecycle timestamps |
+| `resolved_by_commit_sha`, `resolved_by_commit_url` | Set by auto-resolution from commit messages |
+| `resolution_notes`, `duplicate_of_id` | Set by `close_feedback` CLI |
+| `in_progress_branch`, `in_progress_session_slug` | Set by `start_feedback` CLI |
+| `discord_message_id`, `discord_posted_at` | Discord webhook bookkeeping |
+| `source_help_message_id` | For `backfill` rows: FK to `tbl_help_message.id` so the original LLM reply can be surfaced in the brief |
+
+### Capture path
+
+`POST /api/landscaper/help/chat/` — when `#FB` is detected:
+1. Forwards the feedback to a Discord webhook (`LANDSCAPER_FEEDBACK_WEBHOOK_URL`)
+2. Inserts a row into `tbl_feedback` with `source='help_panel'`
+3. Bypasses `get_help_response()` (LLM) entirely
+4. Returns `"Feedback received, thanks! (FB-N)"` so the user has a public reference
+
+### Management commands
+
+| Command | Purpose |
+|---------|---------|
+| `python manage.py list_feedback [--status open] [--limit 50]` | Print open (or filtered) FB items to stdout |
+| `python manage.py close_feedback FB-N --note "..." [--status closed\|wontfix\|duplicate] [--duplicate-of N]` | Close an item; allows transitioning from `open` or `in_progress` |
+| `python manage.py start_feedback FB-N --branch <branch> --session <slug>` | Flip an item to `in_progress` and stamp the branch + session working on it |
+
+Both bare ID (`123`) and `FB-N` form (`FB-123`) are accepted.
+
+### Auto-resolution
+
+Commit messages matching the regex `(?i)\b(?:fixes|closes|resolves)\s+FB-(\d+)\b` are parsed by the brief generator. Matched rows flip from `open` to `addressed` with `resolved_by_commit_sha` populated. Examples that fire auto-resolution:
+
+- `fix(docs): closes FB-282 — thumbnail loader uses correct CDN`
+- `feat: resolves FB-188 by gating county selector behind Phoenix MSA check`
+
+### Daily Brief
+
+| Property | Value |
+|----------|-------|
+| Generator | `scripts/brief/generate_daily_brief.py` |
+| Schedule | Nightly 23:30 local via launchd (`~/Library/LaunchAgents/com.landscape.daily-brief.plist`) |
+| Output | `~/.../OneDrive/.../Landscape app/daily-brief/YYYY-MM-DD-brief.html` + `current.html` |
+| Sections (in order) | Summary · Work In Progress · Today's Sessions (rolling 3-day) · Open Feedback · Resolved Recently · Parallel Sessions · Uncommitted · System Status |
+
+### Manual labels (read by the brief)
+
+- `.claude/branch-labels.json` — per-branch `{title, description, cowork_chat, status_note}`. WIP section enumerates branches ahead of `main` and looks each up.
+- `.claude/sessions.json` — rolling list of `{date, topic, cowork_chat, cc_session}` entries. Today's Sessions filters to last 3 days.
+
+Both files are hand-maintained for now. Append entries when starting new branches or sessions.
+
+### Page tag mapping
+
+Brief renders `page_context` values via `PAGE_TAG_MAP` in the generator. Strip the `Help > ` prefix, look up the remainder. Fallback: title-case the slug. Hardcoded for v1; should move to a lookup table later.
+
+### Known data state
+
+282 `backfill` rows seeded from historical `tbl_help_message` user messages (Feb-19-onward demo + real-feedback mix). Brief filters them out of Section 1 by default; surface only via `list_feedback --status open --source backfill` (CLI flag not yet implemented but query is straightforward).
+
+### Spec
+
+Full design lives in `Landscape app/LANDSCAPE_DAILY_BRIEF_SPEC.md` (OneDrive workspace folder). Plain-English version: `Landscape app/LANDSCAPE_DAILY_BRIEF_OVERVIEW.html`.
+
+---
+
 ## API Patterns
 
 ### Django Endpoints (Current)
