@@ -129,13 +129,14 @@ def capture_feedback(
                 INSERT INTO landscape.tbl_feedback
                   (user_id, user_name, user_email, page_context,
                    project_id, project_name, message_text,
-                   discord_posted_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   source, discord_posted_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 [
                     user_id, user_name, user_email, page_context,
                     project_id, project_name, feedback_text,
+                    'help_panel',
                     datetime.utcnow() if discord_ok else None,
                 ],
             )

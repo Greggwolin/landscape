@@ -86,28 +86,43 @@ def _connect():
 
 def gather_open_and_recent_feedback(conn) -> list[dict]:
     """
-    Spec §5.2: rows where status='open' OR (terminal status AND closed within
-    last 7 days). Spec is silent on the addressed-only case (auto-resolved
-    rows have addressed_at set but no closed_at), so we use
-    COALESCE(closed_at, addressed_at) for the 7-day window. Rows older than
-    that drop out per §5.5.1.
+    Spec §5.2 + C5: rows where status='open' OR (terminal status AND closed
+    within last 7 days), AND source != 'backfill'. Backfilled rows are
+    excluded from Section 1 by default — they're triaged via the admin tools
+    and counted separately in the header. Spec is silent on the
+    addressed-only case (auto-resolved rows have addressed_at set but no
+    closed_at), so we use COALESCE(closed_at, addressed_at) for the 7-day
+    window. Rows older than that drop out per §5.5.1.
     """
     sql = """
         SELECT
             id, created_at, page_context, project_id, project_name,
-            message_text, status,
+            message_text, status, source,
             addressed_at, closed_at,
             resolved_by_commit_sha, resolved_by_commit_url,
             resolution_notes, duplicate_of_id
           FROM landscape.tbl_feedback
-         WHERE status = 'open'
-            OR COALESCE(closed_at, addressed_at) >= NOW() - INTERVAL %s
+         WHERE source <> 'backfill'
+           AND (
+                status = 'open'
+                OR COALESCE(closed_at, addressed_at) >= NOW() - INTERVAL %s
+           )
          ORDER BY status = 'open' DESC, COALESCE(closed_at, addressed_at, created_at) DESC, id DESC
     """
     interval = f'{RECENTLY_CLOSED_DAYS} days'
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(sql, [interval])
         return [dict(r) for r in cur.fetchall()]
+
+
+def gather_backfill_queue_count(conn) -> int:
+    """How many rows are still source='backfill' AND status='open'."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) FROM landscape.tbl_feedback "
+            "WHERE source = 'backfill' AND status = 'open'"
+        )
+        return int(cur.fetchone()[0])
 
 
 def gather_commits_24h() -> list[dict]:
@@ -344,7 +359,7 @@ a:hover { text-decoration: underline; }
 
 def render_html(*, today: datetime, branch_state: dict, commits: list[dict],
                 feedback: list[dict], auto_resolved: list[dict],
-                health: dict) -> str:
+                health: dict, backfill_queue: int) -> str:
     open_count = sum(1 for r in feedback if r['status'] == 'open')
     recent_resolved = sum(1 for r in feedback if r['status'] != 'open')
     failures = health.get('failures') or []
@@ -371,6 +386,9 @@ def render_html(*, today: datetime, branch_state: dict, commits: list[dict],
   <div class="kpi"><b>{len(commits)}</b> commits today</div>
   <div class="kpi"><b>{len(auto_resolved)}</b> auto-resolved today</div>
   <div class="kpi">{_esc(health_kpi)}</div>
+</div>
+<div class="muted" style="margin-top:-12px;margin-bottom:18px;">
+  Backfill queue: <b>{backfill_queue}</b> items pending triage (run admin tools to clean).
 </div>""")
 
     # ----- Section 1: Feedback Tracker -----
@@ -536,6 +554,7 @@ def main() -> int:
     with _connect() as conn:
         auto_resolved = auto_resolve(conn, commits)
         feedback = gather_open_and_recent_feedback(conn)
+        backfill_queue = gather_backfill_queue_count(conn)
 
     html = render_html(
         today=today,
@@ -544,12 +563,14 @@ def main() -> int:
         feedback=feedback,
         auto_resolved=auto_resolved,
         health=health,
+        backfill_queue=backfill_queue,
     )
     dated, current = write_outputs(html, today)
     print(f"[brief] wrote {dated}", file=sys.stderr)
     print(f"[brief] wrote {current}", file=sys.stderr)
     print(f"[brief] open={sum(1 for r in feedback if r['status']=='open')} "
           f"resolved={len(auto_resolved)} commits={len(commits)} "
+          f"backfill_queue={backfill_queue} "
           f"health={health['status']}", file=sys.stderr)
     return 0
 
