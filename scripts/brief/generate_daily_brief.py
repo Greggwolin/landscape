@@ -371,15 +371,33 @@ def _summarize_failure(result: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def gather_open_feedback(conn) -> list[dict]:
-    """Open + in-progress, real captures only (source='help_panel')."""
+    """Open + in-progress, real captures only (source='help_panel').
+    LEFT JOIN LATERAL pulls the LLM's prior answer for backfilled rows
+    (source_help_message_id IS NOT NULL) so the brief can render it inline.
+    Rows without a help_message link return previous_answer = NULL.
+    """
     sql = """
         SELECT
-            id, created_at, page_context, message_text, status, source,
-            in_progress_branch, in_progress_session_slug, started_at
-          FROM landscape.tbl_feedback
-         WHERE source = 'help_panel'
-           AND status IN ('open', 'in_progress')
-         ORDER BY status = 'in_progress' DESC, created_at DESC, id DESC
+            f.id, f.created_at, f.page_context, f.message_text,
+            f.status, f.source,
+            f.in_progress_branch, f.in_progress_session_slug, f.started_at,
+            f.source_help_message_id,
+            prev.content AS previous_answer
+          FROM landscape.tbl_feedback f
+          LEFT JOIN landscape.tbl_help_message m_user
+            ON m_user.id = f.source_help_message_id
+          LEFT JOIN LATERAL (
+            SELECT m_assistant.content
+              FROM landscape.tbl_help_message m_assistant
+             WHERE m_assistant.conversation_id = m_user.conversation_id
+               AND m_assistant.role = 'assistant'
+               AND m_assistant.created_at > m_user.created_at
+             ORDER BY m_assistant.created_at ASC
+             LIMIT 1
+          ) prev ON true
+         WHERE f.source = 'help_panel'
+           AND f.status IN ('open', 'in_progress')
+         ORDER BY f.status = 'in_progress' DESC, f.created_at DESC, f.id DESC
     """
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(sql)
@@ -505,6 +523,26 @@ h2 {
   margin-left: 8px;
 }
 .in-progress-detail { color: #92400e; font-size: 12px; margin-top: 4px; }
+.prev-answer {
+  background: #f3f4f6;
+  border-left: 2px solid #cbd5e1;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-style: italic;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.prev-answer-label {
+  font-style: normal;
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  display: block;
+}
 .session-row {
   background: white; border: 1px solid #e5e7eb; border-radius: 6px;
   padding: 12px 16px; margin-bottom: 6px; font-size: 13px;
@@ -641,12 +679,26 @@ def render_open_feedback(rows: list[dict], today: date) -> str:
             if ip_bits:
                 progress_detail = f'<div class="in-progress-detail">→ {" · ".join(ip_bits)}</div>'
 
+        prev_answer_block = ''
+        prev_answer = r.get('previous_answer')
+        if prev_answer:
+            truncated = prev_answer.strip()
+            if len(truncated) > 300:
+                truncated = truncated[:299].rstrip() + '…'
+            prev_answer_block = (
+                f'<div class="prev-answer">'
+                f'<span class="prev-answer-label">Previous answer</span>'
+                f'{_esc(truncated)}'
+                f'</div>'
+            )
+
         parts.append(
             f'<div class="{item_class}">'
             f'<div class="{id_class}">FB-{r["id"]}</div>'
             f'<div class="body">'
             f'<div class="what">{_esc((r["message_text"] or "")[:400])}</div>'
             f'<div class="meta">{" ".join(meta_bits)}{progress_detail}</div>'
+            f'{prev_answer_block}'
             f'</div></div>'
         )
     return '\n'.join(parts)
