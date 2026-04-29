@@ -1,0 +1,421 @@
+/*
+ * ArtifactRenderer — wrapper dark theme via CoreUI tokens.
+ *
+ * No hardcoded hex colors, no Tailwind dark: variants, no bg-slate-* /
+ * bg-gray-* classes per project instructions §7.
+ *
+ * Drift indicator color tokens:
+ *   stale   → var(--cui-warning)
+ *   removed → var(--cui-danger)
+ *   new     → var(--cui-info-bg-subtle)
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  font-size: 13px;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-tertiary-bg);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.headerTitleText {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cui-body-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerSubtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+}
+
+.headerSubtitleSep {
+  color: var(--cui-border-color);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ─── Header buttons (CoreUI button-style without the package import) ──── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  height: 24px;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.btnIcon {
+  width: 24px;
+  padding: 0;
+}
+
+.btnDanger {
+  color: var(--cui-danger);
+}
+
+.btnPrimary {
+  background: var(--cui-primary);
+  color: var(--cui-white, #fff);
+  border-color: var(--cui-primary);
+}
+
+.btnPrimary:hover {
+  background: var(--cui-primary-bg-subtle);
+  color: var(--cui-primary);
+}
+
+.dropdown {
+  position: relative;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 2px;
+  min-width: 180px;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdownItem {
+  padding: 6px 10px;
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  color: var(--cui-body-color);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdownItem:hover {
+  background: var(--cui-secondary-bg);
+}
+
+/* ─── Body ───────────────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.warningBanner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--cui-warning-bg-subtle);
+  border: 1px solid var(--cui-warning-border-subtle, var(--cui-warning));
+  border-radius: 4px;
+  color: var(--cui-warning-text-emphasis, var(--cui-body-color));
+  font-size: 11px;
+}
+
+.newRowsBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: var(--cui-info-bg-subtle);
+  border: 1px solid var(--cui-info-border-subtle, var(--cui-info));
+  border-radius: 4px;
+  color: var(--cui-info-text-emphasis, var(--cui-body-color));
+  font-size: 11px;
+}
+
+/* ─── Section block ──────────────────────────────────────────────────── */
+
+.section {
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--cui-secondary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  cursor: pointer;
+  user-select: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+.sectionHeaderCollapsed {
+  border-bottom: none;
+}
+
+.sectionBody {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ─── Table block ────────────────────────────────────────────────────── */
+
+.tableWrap {
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--cui-tertiary-bg);
+}
+
+.tableTitle {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--cui-secondary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 12px;
+  color: var(--cui-body-color);
+}
+
+.table th {
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cui-secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--cui-secondary-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.25;
+}
+
+.table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--cui-border-color);
+  white-space: nowrap;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.alignLeft {
+  text-align: left;
+}
+
+.driftCell {
+  width: 18px;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.editableCell {
+  cursor: text;
+}
+
+.editableCell:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.editInput {
+  width: 100%;
+  padding: 2px 4px;
+  font-size: 12px;
+  border: 1px solid var(--cui-primary);
+  border-radius: 3px;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+/* ─── Drift indicator dots ───────────────────────────────────────────── */
+
+.driftDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.driftDotStale {
+  background: var(--cui-warning);
+}
+
+.driftDotRemoved {
+  background: transparent;
+  border: 1.5px solid var(--cui-danger);
+  width: 8px;
+  height: 8px;
+}
+
+.driftPopover {
+  position: absolute;
+  z-index: 20;
+  padding: 8px 10px;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  font-size: 11px;
+  color: var(--cui-body-color);
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.driftPopoverLabel {
+  color: var(--cui-secondary-color);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Key-value grid ─────────────────────────────────────────────────── */
+
+.kvGrid {
+  display: grid;
+  gap: 4px 16px;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+.kvPair {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px dotted var(--cui-border-color);
+}
+
+.kvLabel {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  white-space: nowrap;
+}
+
+.kvValue {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cui-body-color);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.kvValueEditable {
+  cursor: text;
+  border-bottom: 1px dotted var(--cui-secondary-color);
+}
+
+.kvValueEditable:hover {
+  background: var(--cui-secondary-bg);
+}
+
+/* ─── Text block variants ────────────────────────────────────────────── */
+
+.textBody {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cui-body-color);
+}
+
+.textCaption {
+  font-size: 11px;
+  color: var(--cui-secondary-color);
+  font-style: italic;
+}
+
+.textCallout {
+  padding: 8px 12px;
+  background: var(--cui-info-bg-subtle);
+  border-left: 3px solid var(--cui-info);
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--cui-body-color);
+}

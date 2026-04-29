@@ -12,6 +12,12 @@
       "runtimeExecutable": "./backend/venv/bin/python",
       "runtimeArgs": ["backend/manage.py", "runserver", "8000"],
       "port": 8000
+    },
+    {
+      "name": "nextjs-verify",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "autoPort": true
     }
   ]
 }
