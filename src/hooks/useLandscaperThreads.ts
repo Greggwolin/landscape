@@ -538,13 +538,20 @@ export function useLandscaperThreads({
    * Select a different thread.
    */
   const selectThread = useCallback(async (threadId: string) => {
-    const thread = threads.find((t) => t.threadId === threadId);
+    const thread =
+      threads.find((t) => t.threadId === threadId) ??
+      allThreads.find((t) => t.threadId === threadId) ??
+      await loadThreadById(threadId);
+
     if (thread) {
       setActiveThread(thread);
+      activeThreadRef.current = thread;
       setMessages([]);
+      setThreadNotFound(false);
+      setError(null);
       await loadThreadMessages(threadId);
     }
-  }, [threads, loadThreadMessages]);
+  }, [threads, allThreads, loadThreadById, loadThreadMessages]);
 
   /**
    * Start a new thread (closes current one first).
