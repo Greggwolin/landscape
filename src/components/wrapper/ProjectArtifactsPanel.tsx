@@ -6,6 +6,7 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ExcelAuditArtifact } from './ExcelAuditArtifact';
+import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
@@ -72,6 +73,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
     activeMapArtifact,
     activeLocationBrief,
     activeExcelAudit,
+    activeArtifactId,
   } = useWrapperUI();
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -174,8 +176,14 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — artifact priority: location brief > map > excel audit > documents list */}
-      {activeLocationBrief ? (
+      {/* Body — artifact priority:
+          generative artifact (Phase 3) > location brief > map > excel audit > documents list.
+          Generative artifact wins because it's the active selection from
+          create_artifact / Pinned-or-Recent click; user explicitly closes
+          to fall through to the legacy artifact slots. */}
+      {activeArtifactId != null ? (
+        <ArtifactWorkspacePanel projectId={projectId} />
+      ) : activeLocationBrief ? (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <LocationBriefArtifact
             config={activeLocationBrief}

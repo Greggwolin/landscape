@@ -83,7 +83,7 @@ interface CenterChatPanelProps {
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
 export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey }: CenterChatPanelProps) {
-  const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
+  const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -141,8 +141,19 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         );
         if (!artifactsOpen) toggleArtifacts();
       }
+      // Generative artifact (Finding #4 Phase 3) — create_artifact /
+      // update_artifact tools both return action='show_artifact' with an
+      // artifact_id. Set as active and auto-open the panel; the panel's
+      // ArtifactWorkspacePanel handles fetch + render via useArtifact.
+      if (
+        result.action === 'show_artifact' &&
+        typeof result.artifact_id === 'number'
+      ) {
+        setActiveArtifactId(result.artifact_id);
+        if (!artifactsOpen) toggleArtifacts();
+      }
     },
-    [modalRegistry, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, artifactsOpen, toggleArtifacts, setActiveContentContext],
+    [modalRegistry, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)

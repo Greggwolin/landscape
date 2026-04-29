@@ -206,6 +206,15 @@ interface WrapperUIContextValue {
   activeExcelAudit: ExcelAuditArtifactConfig | null;
   setActiveExcelAudit: (config: ExcelAuditArtifactConfig | null) => void;
   mergeActiveExcelAudit: (partial: Partial<ExcelAuditArtifactConfig>) => void;
+  /**
+   * Generative artifact (Finding #4 Phase 3) — id of the artifact currently
+   * shown in ArtifactWorkspacePanel's "Active" section. Set by
+   * create_artifact / update_artifact tool returns and by clicks in the
+   * Pinned / Recent panel sections. The panel uses the Phase 1 REST hooks
+   * (`useArtifact`, `useArtifactList`) to fetch the underlying schema.
+   */
+  activeArtifactId: number | null;
+  setActiveArtifactId: (id: number | null) => void;
   /** Chat search overlay state. */
   searchOpen: boolean;
   openSearch: () => void;
@@ -241,6 +250,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       return { ...base, ...partial } as ExcelAuditArtifactConfig;
     });
   }, []);
+  const [activeArtifactId, setActiveArtifactId] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
   // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
@@ -272,6 +282,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       activeMapArtifact, setActiveMapArtifact,
       activeLocationBrief, setActiveLocationBrief,
       activeExcelAudit, setActiveExcelAudit, mergeActiveExcelAudit,
+      activeArtifactId, setActiveArtifactId,
       searchOpen, openSearch, closeSearch,
       activeContentContext, setActiveContentContext,
     }}>
