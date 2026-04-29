@@ -1128,6 +1128,37 @@ def commit_staging(request, project_id: int):
     if floor_plan_prompt:
         result['floor_plan_prompt'] = floor_plan_prompt
 
+    # Phase 4 — artifact dependency cascade hook (fail-safe). Each committed
+    # extraction row becomes a `(table='ai_extraction_staging', row_id=<extraction_id>)`
+    # changed row. Artifacts whose source_pointers reference staging-tier values
+    # match here. If artifacts pin to the production tables instead (e.g.
+    # `core_fin_fact_actual.id`), the cascade misses them — that is acceptable
+    # in v1; the field-level downstream targets vary per writer and a generic
+    # production-row mapping is a Phase 5+ refinement.
+    if committed > 0:
+        try:
+            from apps.artifacts.cascade import process_dependency_cascade
+            cascade_changed_rows = [
+                {
+                    'table': 'ai_extraction_staging',
+                    'row_id': row['extraction_id'],
+                }
+                for row in rows
+                if row.get('extraction_id') is not None
+            ]
+            dependency_notification = process_dependency_cascade(
+                project_id=int(project_id),
+                changed_rows=cascade_changed_rows,
+                user_id=_user_id,
+            )
+            if dependency_notification:
+                result['dependency_notification'] = dependency_notification
+        except Exception:
+            logger.warning(
+                'commit_staging: cascade hook failed (non-blocking)',
+                exc_info=True,
+            )
+
     return JsonResponse(result)
 
 

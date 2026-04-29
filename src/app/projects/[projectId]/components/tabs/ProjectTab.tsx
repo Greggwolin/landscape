@@ -11,6 +11,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import NewProjectModal from '@/app/components/NewProjectModal';
 import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
+import { ArtifactBehaviorSettings } from '@/components/wrapper/ArtifactBehaviorSettings';
 
 interface Project {
   project_id: number;
@@ -1368,6 +1369,15 @@ export default function ProjectTab({
           </CCardBody>
         )}
       </CCard>
+
+      {/* Phase 4 / Finding #4 — cascade-mode toggle for the project. */}
+      <ArtifactBehaviorSettings
+        projectId={project.project_id}
+        initialMode={
+          (project as unknown as { artifact_cascade_mode?: 'auto' | 'manual' })
+            .artifact_cascade_mode ?? 'auto'
+        }
+      />
 
       </div>
       <NewProjectModal

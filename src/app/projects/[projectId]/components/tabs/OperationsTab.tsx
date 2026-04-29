@@ -21,6 +21,10 @@ import { useOperationsData } from '@/hooks/useOperationsData';
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { useValueAddAssumptions } from '@/hooks/useValueAddAssumptions';
+import {
+  useWrapperUISafe,
+  type CascadeNotificationPayload,
+} from '@/contexts/WrapperUIContext';
 
 interface Project {
   project_id: number;
@@ -46,6 +50,21 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
   const isLand = !isIncome;
   const isMultifamily = projectCategory === 'multifamily';
 
+  // Phase 4 — surface cascade notifications when running inside the
+  // unified UI shell. Legacy /projects/[id] route has no provider; the
+  // safe variant returns null and the callback becomes a no-op.
+  const wrapperUI = useWrapperUISafe();
+  const handleCascadeNotification = useCallback(
+    (notification: unknown) => {
+      if (wrapperUI) {
+        wrapperUI.setCascadeNotification(
+          notification as CascadeNotificationPayload,
+        );
+      }
+    },
+    [wrapperUI],
+  );
+
   // Use the operations data hook
   const {
     data,
@@ -68,7 +87,9 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     toggleExpand,
     saveAll,
     reload
-  } = useOperationsData(project.project_id);
+  } = useOperationsData(project.project_id, {
+    onCascadeNotification: handleCascadeNotification,
+  });
 
   // Extract row data early (before any useCallback that references them)
   const vacancyRows: LineItemRow[] = vacancyDeductions?.rows || [];

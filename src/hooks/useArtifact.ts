@@ -17,7 +17,12 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BlockDocument, EditTarget, SourcePointersMap } from '@/types/artifact';
+import type {
+  BlockDocument,
+  EditTarget,
+  JsonPatchOp,
+  SourcePointersMap,
+} from '@/types/artifact';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -173,6 +178,70 @@ export function useArtifactRestore() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['artifacts', 'detail', vars.artifactId] });
       qc.invalidateQueries({ queryKey: ['artifacts', 'versions', vars.artifactId] });
+    },
+  });
+}
+
+/* ─── Phase 4 — inline-edit write path ─────────────────────────────────
+ * POSTs to the Phase 4 `update_state` action. The backend route lands in
+ * `update_artifact_record`, the same code the Landscaper tool dispatcher
+ * uses, and fires the dependency cascade hook on success.
+ */
+
+export interface ArtifactUpdateStateInput {
+  schema_diff?: JsonPatchOp[];
+  full_schema?: BlockDocument;
+  source_pointers_diff?: unknown;
+  edit_source?: 'user_edit' | 'drift_pull' | 'extraction_commit' | 'modal_save' | 'cascade';
+  /** Optional cascade hint — when the edited cells carry source_refs, pass
+   *  them here so the backend can fan out to dependent artifacts. */
+  changed_rows?: Array<{ table: string; row_id: number | string }>;
+}
+
+export interface ArtifactUpdateStateResponse {
+  success: boolean;
+  action?: string;
+  artifact_id?: number;
+  new_state?: BlockDocument;
+  version_id?: number;
+  error?: string;
+  dependency_notification?: {
+    cascade_mode: 'auto' | 'manual';
+    cascaded_artifacts?: Array<{ artifact_id: number; title?: string; affected_rows?: string[] }>;
+    skipped?: Array<{ artifact_id: number | null; reason: string }>;
+    dependent_artifacts?: Array<{ artifact_id: number; title?: string; affected_rows?: string[]; last_edited_at?: string | null }>;
+    wide_graph_fallback?: boolean;
+  };
+}
+
+export function useArtifactUpdateState() {
+  const qc = useQueryClient();
+  return useMutation<
+    ArtifactUpdateStateResponse,
+    Error,
+    { artifactId: number; input: ArtifactUpdateStateInput }
+  >({
+    mutationFn: async ({ artifactId, input }) => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/artifacts/${artifactId}/update_state/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      );
+      const data = await res.json().catch(() => ({} as ArtifactUpdateStateResponse));
+      if (!res.ok || !data?.success) {
+        throw new Error(
+          data?.error || `Failed to update artifact ${artifactId}: ${res.status}`,
+        );
+      }
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['artifacts', 'detail', vars.artifactId] });
+      qc.invalidateQueries({ queryKey: ['artifacts', 'versions', vars.artifactId] });
+      qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
     },
   });
 }

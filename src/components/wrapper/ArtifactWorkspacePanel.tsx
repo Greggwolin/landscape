@@ -10,6 +10,7 @@ import {
   useArtifactList,
   useArtifactPatch,
   useArtifactRestore,
+  useArtifactUpdateState,
 } from '@/hooks/useArtifact';
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
@@ -74,6 +75,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
   // Mutations.
   const patchMutation = useArtifactPatch();
   const restoreMutation = useArtifactRestore();
+  const updateStateMutation = useArtifactUpdateState();
 
   // Section collapsed state — Pinned and Recent default collapsed; Source Pointers default collapsed.
   const [pinnedCollapsed, setPinnedCollapsed] = useState(true);
@@ -172,16 +174,28 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
             newRowsAvailable={false}
             editTarget={asEditTarget(active.edit_target_json)}
             pinnedLabel={active.pinned_label}
-            loading={patchMutation.isPending || restoreMutation.isPending}
+            loading={
+              patchMutation.isPending
+              || restoreMutation.isPending
+              || updateStateMutation.isPending
+            }
             onClose={() => {
               setActiveArtifactId(null);
             }}
             onUpdate={(patch: JsonPatchOp[]) => {
-              // Phase 3: REST-side update_artifact endpoint does not exist
-              // (tool-only path per Phase 1 design). Inline edits log here
-              // until Phase 4 wires the Landscaper tool dispatcher.
-               
-              console.log('[ArtifactWorkspacePanel] inline edit (Phase 3 stub):', patch);
+              // Phase 4 — real write path. Lands in update_artifact_record on
+              // the backend (same code as the Landscaper tool dispatcher),
+              // appends a version log entry, fires the dependency cascade
+              // hook for the project. Detail + versions cache are invalidated
+              // on success.
+              if (!patch || patch.length === 0) return;
+              updateStateMutation.mutate({
+                artifactId: active.artifact_id,
+                input: {
+                  schema_diff: patch,
+                  edit_source: 'user_edit',
+                },
+              });
             }}
             onPin={(label: string) => {
               patchMutation.mutate({

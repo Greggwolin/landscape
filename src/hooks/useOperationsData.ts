@@ -71,7 +71,20 @@ const API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:800
 // HOOK IMPLEMENTATION
 // =============================================================================
 
-export function useOperationsData(projectId: number): UseOperationsDataReturn {
+/**
+ * Optional hooks for cross-cutting concerns. Phase 4 / Finding #4 adds
+ * `onCascadeNotification` so the wrapper UI can surface a toast when an
+ * operations save affects dependent artifacts. Legacy callers can ignore.
+ */
+export interface UseOperationsDataOptions {
+  onCascadeNotification?: (notification: unknown) => void;
+}
+
+export function useOperationsData(
+  projectId: number,
+  options: UseOperationsDataOptions = {},
+): UseOperationsDataReturn {
+  const { onCascadeNotification } = options;
   const [data, setData] = useState<OperationsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -353,6 +366,16 @@ export function useOperationsData(projectId: number): UseOperationsDataReturn {
 
       if (!response.ok) {
         throw new Error('Failed to save updates');
+      }
+
+      // Phase 4 — surface cascade notification if backend hook fired.
+      try {
+        const body = await response.clone().json();
+        if (body?.dependency_notification && onCascadeNotification) {
+          onCascadeNotification(body.dependency_notification);
+        }
+      } catch {
+        // Response has no JSON body or callback not provided — no-op.
       }
 
       // Clear pending updates on success

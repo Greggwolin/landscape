@@ -67,6 +67,12 @@ interface LandscaperChatThreadedProps {
   onCollapsePanel?: () => void;
   onReviewMedia?: (docId: number, docName: string) => void;
   onToolResult?: (toolName: string, result: Record<string, unknown>) => void;
+  /**
+   * Phase 4 — invoked when the user clicks "Open" on an inline artifact card
+   * below an assistant bubble. Parent should set the active artifact id and
+   * make the right artifacts panel visible.
+   */
+  onOpenArtifact?: (artifactId: number) => void;
   /** When provided, activates this thread on mount (used by URL-based thread switching) */
   initialThreadId?: string;
   /** When true, suppresses the internal header (used when parent provides its own header, e.g. `/w/` CenterChatPanel) */
@@ -262,6 +268,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     onCollapsePanel,
     onReviewMedia,
     onToolResult,
+    onOpenArtifact,
     initialThreadId,
     hideInternalHeader = false,
     showThreadList: showThreadListProp,
@@ -838,6 +845,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
               onRejectMutation={handleRejectMutation}
               onConfirmBatch={handleConfirmBatch}
               onReviewMedia={onReviewMedia}
+              onOpenArtifact={onOpenArtifact}
             />
           ))
         )}

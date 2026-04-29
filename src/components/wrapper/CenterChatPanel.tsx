@@ -727,6 +727,12 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             onThreadCountChange={handleThreadCountChange}
             showThreadList={threadListVisible}
             onBeforeSend={handleBeforeSend}
+            // Phase 4 — chat-card "Open" → re-activate the artifact in the
+            // workspace panel (and re-open the panel if collapsed).
+            onOpenArtifact={(artifactId) => {
+              setActiveArtifactId(artifactId);
+              if (!artifactsOpen) toggleArtifacts();
+            }}
             onThreadNotFound={() => {
               // URL-pinned thread is permanently gone (404). Redirect to
               // /w/chat root so the user gets a fresh session instead of

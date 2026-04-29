@@ -5,6 +5,39 @@ import { ThreadMessage } from '@/hooks/useLandscaperThreads';
 import { MutationProposalCard, MutationProposal } from './MutationProposalCard';
 import MediaSummaryCard from './MediaSummaryCard';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
+import { ArtifactCardInline } from '@/components/wrapper/ArtifactCardInline';
+
+/**
+ * Slim shape pulled out of a tool_execution result whose tool name is
+ * `create_artifact`. Matches the envelope `create_artifact_record`
+ * returns (services.py §6.1).
+ */
+interface CreateArtifactCardData {
+  artifactId: number;
+  title: string;
+}
+
+function extractArtifactCards(
+  message: ThreadMessage,
+): CreateArtifactCardData[] {
+  const executions = message.metadata?.tool_executions;
+  if (!Array.isArray(executions) || executions.length === 0) return [];
+  const cards: CreateArtifactCardData[] = [];
+  for (const exec of executions) {
+    if (!exec || exec.tool !== 'create_artifact') continue;
+    if (!exec.success) continue;
+    const result = exec.result as Record<string, unknown> | undefined;
+    if (!result) continue;
+    const artifactId = result.artifact_id;
+    const title = result.title;
+    if (typeof artifactId !== 'number') continue;
+    cards.push({
+      artifactId,
+      title: typeof title === 'string' ? title : `Artifact #${artifactId}`,
+    });
+  }
+  return cards;
+}
 
 interface ChatMessageBubbleProps {
   message: ThreadMessage;
@@ -12,6 +45,8 @@ interface ChatMessageBubbleProps {
   onRejectMutation?: (mutationId: string) => Promise<void>;
   onConfirmBatch?: (batchId: string) => Promise<void>;
   onReviewMedia?: (docId: number, docName: string) => void;
+  /** Phase 4 — opens an artifact in the right-side workspace panel. */
+  onOpenArtifact?: (artifactId: number) => void;
 }
 
 export function ChatMessageBubble({
@@ -20,6 +55,7 @@ export function ChatMessageBubble({
   onRejectMutation,
   onConfirmBatch,
   onReviewMedia,
+  onOpenArtifact,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user';
 
@@ -28,6 +64,13 @@ export function ChatMessageBubble({
     message.metadata?.mutationProposals ||
     [];
   const hasProposals = proposals.length > 0;
+
+  // Phase 4 — surface a card per `create_artifact` tool_execution so the
+  // user has a stable handle back to the artifact even after scrolling.
+  const artifactCards = useMemo(
+    () => (isUser ? [] : extractArtifactCards(message)),
+    [isUser, message],
+  );
 
   // Process assistant responses to remove markdown and thinking narration
   const displayContent = useMemo(() => {
@@ -103,6 +146,21 @@ export function ChatMessageBubble({
             summary={message.metadata.media_summary}
             onReview={onReviewMedia}
           />
+        </div>
+      )}
+
+      {/* Phase 4 — artifact cards from create_artifact tool_executions. */}
+      {!isUser && artifactCards.length > 0 && onOpenArtifact && (
+        <div className="mt-2 d-flex flex-column gap-2 w-100">
+          {artifactCards.map((card) => (
+            <ArtifactCardInline
+              key={card.artifactId}
+              artifactId={card.artifactId}
+              title={card.title}
+              subtitle="Artifact"
+              onOpen={onOpenArtifact}
+            />
+          ))}
         </div>
       )}
     </div>

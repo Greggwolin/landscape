@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { WrapperHeader } from './WrapperHeader';
 import { ChatTogglePanel } from './ChatTogglePanel';
+import { CascadeNotification } from './CascadeNotification';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 
 interface PageShellProps {
@@ -99,6 +100,8 @@ export function PageShell({
         )}
         <div className="page-shell-content">{children}</div>
       </div>
+      {/* Phase 4 — global cascade-notification toast (renders only when set). */}
+      <CascadeNotification />
     </div>
   );
 }

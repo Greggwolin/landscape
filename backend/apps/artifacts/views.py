@@ -5,12 +5,16 @@ Endpoints:
     GET    /api/artifacts/?project_id=X    — list (used by panel)
     GET    /api/artifacts/<id>/            — full retrieval
     PATCH  /api/artifacts/<id>/            — pin/unpin/archive/title
+    POST   /api/artifacts/<id>/update_state/  — inline edit write path (Phase 4)
     GET    /api/artifacts/<id>/versions/   — version log
     POST   /api/artifacts/<id>/restore/    — restore to a prior state
 
-Tool-side `create_artifact` and `update_artifact` go through the Landscaper
-tool dispatcher; they are not exposed as REST endpoints in Phase 1 (the
-frontend reads via these endpoints + creates via Landscaper tools).
+`create_artifact` still flows through the Landscaper tool dispatcher
+(no public REST endpoint by design — creation is a Landscaper-orchestrated
+act). `update_artifact` is reachable BOTH via the Landscaper tool dispatcher
+AND via the `update_state` action below; the action is the path the
+ArtifactRenderer uses for inline cell edits, so the frontend can write
+without a chat round-trip. Both paths land in `update_artifact_record`.
 """
 
 from django.shortcuts import get_object_or_404
@@ -30,6 +34,7 @@ from .serializers import (
 from .services import (
     get_artifact_history_records,
     restore_artifact_state_record,
+    update_artifact_record,
 )
 
 
@@ -120,4 +125,92 @@ class ArtifactViewSet(viewsets.ViewSet):
         )
         if not result.get('success'):
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+    @action(detail=True, methods=['post'], url_path='update_state')
+    def update_state(self, request, pk=None):
+        """Phase 4 — inline-edit write path for the ArtifactRenderer.
+
+        Body: ``{schema_diff?: JsonPatch[], full_schema?: object,
+        source_pointers_diff?: any, edit_source?: str}``. Either
+        ``schema_diff`` or ``full_schema`` must be present. ``edit_source``
+        defaults to ``'user_edit'`` and is constrained to the same enum
+        validated by ``update_artifact_record``.
+
+        Returns the same envelope the Landscaper-tool path returns. The
+        frontend invalidates its detail + versions caches on success.
+
+        After the artifact mutates, fire the dependency cascade hook for
+        the project (if any) so other artifacts referencing the same
+        source rows are notified or auto-cascaded per the project's
+        ``artifact_cascade_mode`` setting.
+        """
+        try:
+            artifact_id = int(pk)
+        except (TypeError, ValueError):
+            return Response(
+                {'success': False, 'error': 'invalid artifact id'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        body = request.data or {}
+        schema_diff = body.get('schema_diff')
+        full_schema = body.get('full_schema')
+        if schema_diff is None and full_schema is None:
+            return Response(
+                {'success': False,
+                 'error': 'one of schema_diff or full_schema is required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        edit_source = body.get('edit_source') or 'user_edit'
+        # update_artifact_record validates the enum; we let invalid values
+        # bubble up as a 400 with the specific error string.
+        user_id = (
+            getattr(request.user, 'id', None)
+            or body.get('user_id')
+            or None
+        )
+
+        result = update_artifact_record(
+            artifact_id=artifact_id,
+            schema_diff=schema_diff,
+            full_schema=full_schema,
+            source_pointers_diff=body.get('source_pointers_diff'),
+            edit_source=edit_source,
+            user_id=user_id,
+        )
+        if not result.get('success'):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        # Phase 4 — fan-out cascade for dependents in the same project.
+        # Edits inside an artifact's own cells emit `(table, row_id)` only
+        # when the edited cell carries an explicit `source_ref`; the body
+        # may include a `changed_rows` hint to seed the cascade. If not
+        # provided, we skip the cascade — there is no reliable way to
+        # derive changed source rows from an opaque schema_diff.
+        changed_rows = body.get('changed_rows')
+        if isinstance(changed_rows, list) and changed_rows:
+            try:
+                artifact = Artifact.objects.only('project_id').get(pk=artifact_id)
+                if artifact.project_id is not None:
+                    from .cascade import process_dependency_cascade
+                    notification = process_dependency_cascade(
+                        project_id=artifact.project_id,
+                        changed_rows=changed_rows,
+                        exclude_artifact_id=artifact_id,
+                        user_id=user_id,
+                    )
+                    if notification:
+                        result['dependency_notification'] = notification
+            except Artifact.DoesNotExist:
+                pass
+            except Exception:
+                # Cascade is fail-safe — log and continue.
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    'update_state cascade hook failed (non-blocking)',
+                    exc_info=True,
+                )
+
         return Response(result)

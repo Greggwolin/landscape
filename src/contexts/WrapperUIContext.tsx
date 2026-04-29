@@ -222,6 +222,38 @@ interface WrapperUIContextValue {
   /** Content domain derived from the last modal opened — enriches page context for Landscaper. */
   activeContentContext: string | null;
   setActiveContentContext: (ctx: string | null) => void;
+  /**
+   * Generative artifact cascade notification (Finding #4 Phase 4).
+   * Set by post-save / post-commit endpoints when dependent artifacts are
+   * affected by an upstream edit. Rendered as a top-right toast by the
+   * page shell. Pass `null` to dismiss.
+   */
+  cascadeNotification: CascadeNotificationPayload | null;
+  setCascadeNotification: (n: CascadeNotificationPayload | null) => void;
+}
+
+/** Cascade notification payload returned by the backend dependency hook. */
+export interface CascadeNotificationPayload {
+  cascade_mode: 'auto' | 'manual';
+  /** Auto mode — artifacts that were cascaded successfully. */
+  cascaded_artifacts?: Array<{
+    artifact_id: number;
+    title?: string;
+    affected_rows?: string[];
+  }>;
+  /** Auto mode — dependents that failed to cascade. */
+  skipped?: Array<{ artifact_id: number | null; reason: string }>;
+  /** Manual mode — dependents the user must refresh by hand. */
+  dependent_artifacts?: Array<{
+    artifact_id: number;
+    title?: string;
+    affected_rows?: string[];
+    last_edited_at?: string | null;
+  }>;
+  /** True when the project is technically in auto mode but the dependent set
+   *  exceeded the wide-graph threshold and the backend fell back to manual
+   *  notification per spec §10.4. */
+  wide_graph_fallback?: boolean;
 }
 
 const WrapperUIContext = createContext<WrapperUIContextValue | null>(null);
@@ -253,6 +285,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   const [activeArtifactId, setActiveArtifactId] = useState<number | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeContentContext, setActiveContentContext] = useState<string | null>(null);
+  const [cascadeNotification, setCascadeNotification] = useState<CascadeNotificationPayload | null>(null);
   // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
   // Actual viewport-based value is applied in the useEffect below after mount.
   const [artifactsOpen, setArtifactsOpen] = useState(true);
@@ -285,6 +318,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       activeArtifactId, setActiveArtifactId,
       searchOpen, openSearch, closeSearch,
       activeContentContext, setActiveContentContext,
+      cascadeNotification, setCascadeNotification,
     }}>
       {children}
     </WrapperUIContext.Provider>
@@ -295,4 +329,14 @@ export function useWrapperUI(): WrapperUIContextValue {
   const ctx = useContext(WrapperUIContext);
   if (!ctx) throw new Error('useWrapperUI must be used within WrapperUIProvider');
   return ctx;
+}
+
+/**
+ * Safe variant — returns null when called outside WrapperUIProvider.
+ * Useful for components that render in both legacy and unified UI shells
+ * (e.g. OperationsTab) and want to opt into wrapper-only side effects
+ * (cascade toasts, panel toggles) without breaking the legacy mount.
+ */
+export function useWrapperUISafe(): WrapperUIContextValue | null {
+  return useContext(WrapperUIContext);
 }

@@ -254,13 +254,24 @@ function buildSections(
 // Hook
 // ---------------------------------------------------------------------------
 
+/**
+ * Phase 4 — optional callback so the workbench commit response can surface
+ * a cascade notification when artifacts in the project depend on the just-
+ * committed extractions. Keeps the hook context-free.
+ */
+export interface UseExtractionStagingOptions {
+  onCascadeNotification?: (notification: unknown) => void;
+}
+
 export function useExtractionStaging(
   projectId: number,
   folders: FolderTab[],
   isLandDev: boolean = false,
   /** When provided, scopes results to extractions from this document only */
   docId?: number | null,
+  options: UseExtractionStagingOptions = {},
 ) {
+  const { onCascadeNotification } = options;
   const queryClient = useQueryClient();
   const queryKey = ['extraction-staging', projectId, docId ?? 'all'];
 
@@ -424,6 +435,11 @@ export function useExtractionStaging(
     onError: (err) => {
       console.error('[Workbench] commitSection error:', err);
     },
+    onSuccess: (data) => {
+      if (data?.dependency_notification && onCascadeNotification) {
+        onCascadeNotification(data.dependency_notification);
+      }
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });
     },
@@ -483,6 +499,11 @@ export function useExtractionStaging(
     },
     onError: (err) => {
       console.error('[Workbench] commitAllAccepted error:', err);
+    },
+    onSuccess: (data) => {
+      if (data?.dependency_notification && onCascadeNotification) {
+        onCascadeNotification(data.dependency_notification);
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });

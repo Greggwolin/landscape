@@ -10,6 +10,10 @@ Tables touched:
   - tbl_multifamily_unit, tbl_multifamily_unit_type
   - tbl_operating_expenses, core_unit_cost_category
   - tbl_operations_user_inputs
+
+Phase 4 / Finding #4 — after a successful operations input save we run the
+artifact dependency cascade hook (see apps.artifacts.cascade). The hook is
+fail-safe; it never blocks the primary save response.
 """
 
 import logging
@@ -21,6 +25,31 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
+
+
+def _build_changed_rows_from_operations_updates(updates):
+    """Translate `operations_inputs` PUT body into cascade `changed_rows`.
+
+    Each row is keyed on `tbl_operations_user_inputs` with a composite
+    row_id of the form ``"<section>:<line_item_key>"``. Operating-statement
+    artifacts whose source_pointers reference that table+row_id will match
+    the dependency check.
+    """
+    rows = []
+    if not isinstance(updates, list):
+        return rows
+    for update in updates:
+        if not isinstance(update, dict):
+            continue
+        section = update.get('section')
+        line_item_key = update.get('line_item_key')
+        if not section or not line_item_key:
+            continue
+        rows.append({
+            'table': 'tbl_operations_user_inputs',
+            'row_id': f'{section}:{line_item_key}',
+        })
+    return rows
 
 
 # =============================================================================
@@ -1066,10 +1095,28 @@ def operations_inputs(request, project_id):
                     update.get('post_reno_growth_rate'),
                 ])
 
-        return Response({
+        # Phase 4 — artifact dependency cascade hook (fail-safe).
+        dependency_notification = None
+        try:
+            from apps.artifacts.cascade import process_dependency_cascade
+            dependency_notification = process_dependency_cascade(
+                project_id=int(project_id),
+                changed_rows=_build_changed_rows_from_operations_updates(updates),
+                user_id=getattr(getattr(request, 'user', None), 'id', None),
+            )
+        except Exception:
+            logger.warning(
+                'operations_inputs: cascade hook failed (non-blocking)',
+                exc_info=True,
+            )
+
+        response_body = {
             'success': True,
             'updated_count': len(updates),
-        })
+        }
+        if dependency_notification:
+            response_body['dependency_notification'] = dependency_notification
+        return Response(response_body)
 
     except Exception as e:
         logger.exception('Error saving operations inputs')
