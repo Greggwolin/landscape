@@ -299,7 +299,10 @@ export function useLandscaperThreads({
         // Unassigned mode — list Chat Canvas threads (no project attached)
         url.searchParams.set('unassigned', 'true');
       }
-      url.searchParams.set('include_closed', 'true');
+      // Default to active-only. Closed threads are loaded on-demand when
+      // the user opens the history drawer (TODO when that toggle UX lands).
+      // Including closed by default was pulling 173 unassigned rows when
+      // only ~1 is active — finding #8 in the unified-UI test report.
 
       const response = await fetchWithTimeout(url.toString(), {
         headers: getAuthHeaders(false),
@@ -332,7 +335,7 @@ export function useLandscaperThreads({
       } else {
         url.searchParams.set('unassigned', 'true');
       }
-      url.searchParams.set('include_closed', 'true');
+      // Default to active-only. Same rationale as loadThreads — see finding #8.
 
       const response = await fetchWithTimeout(url.toString(), {
         headers: getAuthHeaders(false),

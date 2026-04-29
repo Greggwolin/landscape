@@ -330,18 +330,34 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   // Thread browser shows all threads in scope (project-scoped when a project
   // is active, unassigned-scoped on /w/chat) — page context is shown as a
   // per-thread badge in the list, not used as a filter.
-  const visibleThreadCount = allThreads.length;
+  //
+  // On project-scoped chats, allThreads (from loadAllThreads) is the canonical
+  // source — loadThreads filters by page_context, allThreads does not. On
+  // unassigned mode the two URLs are identical, so we mirror `threads` into
+  // the effective collection rather than firing a redundant request.
+  const effectiveAllThreads = projectId ? allThreads : threads;
+  const visibleThreadCount = effectiveAllThreads.length;
 
-  // Load all project threads on mount so the badge count is available immediately
-  useEffect(() => { loadAllThreads(); }, [loadAllThreads]);
+  // Load all project threads on mount so the badge count is available immediately.
+  //
+  // Skipped on unassigned mode (no projectId): useLandscaperThreads.initializeThread()
+  // Branch 3 already calls loadThreads() with the same `unassigned=true` URL
+  // on mount, so loadAllThreads() here would fire a duplicate request. The
+  // effectiveAllThreads above falls through to `threads` in that case so the
+  // in-panel browser + badge count stay populated.
+  // Finding #8 fix — was the second of the two duplicate /w/chat fetches.
+  useEffect(() => {
+    if (!projectId) return;
+    loadAllThreads();
+  }, [loadAllThreads, projectId]);
 
   // Emit thread count to parent — single source of truth for the badge.
   // Parent (CenterChatPanel) reads from this callback instead of running
   // its own duplicate fetch, so the badge can never disagree with the
   // in-panel thread list count.
   useEffect(() => {
-    if (onThreadCountChange) onThreadCountChange(allThreads.length);
-  }, [allThreads.length, onThreadCountChange]);
+    if (onThreadCountChange) onThreadCountChange(effectiveAllThreads.length);
+  }, [effectiveAllThreads.length, onThreadCountChange]);
 
   // URL-based thread activation is now handled inside the hook
   // (useLandscaperThreads accepts `initialThreadId` and fetches the thread
@@ -774,7 +790,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       {/* Thread List (collapsible) — shows ALL project threads across pages */}
       {showThreadList && (
         <ThreadList
-          threads={allThreads.length > 0 ? allThreads : threads}
+          threads={effectiveAllThreads.length > 0 ? effectiveAllThreads : threads}
           activeThreadId={activeThread?.threadId}
           currentPageContext={pageContext}
           currentSubtabContext={subtabContext}
