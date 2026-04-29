@@ -147,6 +147,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             'location_lon',
             'is_active',
             'analysis_mode',
+            'artifact_cascade_mode',
             'total_residential_units',
             'gross_sf',
             'created_at',

@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "apps.valuation",  # Valuation approaches (Sales Comparison, Cost Approach)
     "apps.dynamic",  # Dynamic columns (EAV pattern for extensible fields)
     "apps.landdev",  # Land development planning engine
+    "apps.artifacts",  # Generative artifacts (Finding #4)
 ]
 
 MIDDLEWARE = [

@@ -61,5 +61,6 @@ urlpatterns = [
     path("api/", include('apps.valuation.urls')),  # Valuation approaches
     path("api/", include('apps.dynamic.urls')),  # Dynamic columns (EAV pattern)
     path("api/landdev/", include('apps.landdev.urls')),  # Land development planning
+    path("api/", include('apps.artifacts.urls')),  # Generative artifacts (Finding #4)
     path("api/lookups/<str:list_code>/items/", lookup_items, name='lookup_items'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

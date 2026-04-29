@@ -265,6 +265,16 @@ class Project(models.Model):
         db_column='created_by_id'
     )
 
+    # Generative artifacts cascade mode (Finding #4, Phase 1)
+    # 'auto' = silent cascade (default); 'manual' = notify and wait for refresh.
+    # Phase 4 wires the cascade behavior; Phase 1 only persists the flag.
+    artifact_cascade_mode = models.CharField(
+        max_length=10,
+        choices=[('manual', 'Manual'), ('auto', 'Auto')],
+        default='auto',
+        help_text='How dependent-artifact updates cascade after edits.',
+    )
+
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

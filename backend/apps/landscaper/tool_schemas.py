@@ -4720,6 +4720,121 @@ LANDSCAPER_TOOLS = [
             "required": [],
         },
     },
+    # ─── Generative Artifacts (Finding #4, Phase 1) ──────────────────────────
+    {
+        "name": "create_artifact",
+        "description": "Create a structured artifact in the right-side panel for the user to view and edit. Use when the answer is meaningful as a viewable/editable structured object — tabular financial data, multi-section summaries, comparisons, syntheses. Do NOT use for simple factual answers, single-value lookups, or conversational replies. The artifact persists with the project and is editable inline. STRICT TRIGGER guidance lives in BASE_INSTRUCTIONS § ARTIFACTS — FIRING DISCIPLINE (added in Phase 4).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "User-facing artifact label (e.g., 'Operating Statement — T-12 Apr').",
+                },
+                "schema": {
+                    "type": "object",
+                    "description": "Block document. Vocabulary: section, table, key_value_grid, text. Each block requires a unique 'id'. Tables require a non-empty 'columns' array.",
+                },
+                "edit_target": {
+                    "description": "Optional. Single {modal_name} or list of {modal_name, label} for synthesis artifacts.",
+                },
+                "source_pointers": {
+                    "description": "Optional per-row/cell DB row refs + capture timestamps. Required for drift detection and dependency tracking on rows derived from DB data.",
+                },
+            },
+            "required": ["title", "schema"],
+        },
+    },
+    {
+        "name": "update_artifact",
+        "description": "Modify an existing artifact in place. Use for adding a section, replacing a block, or refreshing data. Pass schema_diff (JSON Patch RFC-6902 array) to surgically modify the artifact, or full_schema to replace it entirely. The version log captures the change for restore.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "integer"},
+                "schema_diff": {
+                    "type": "array",
+                    "description": "RFC-6902 JSON Patch operations. Mutually exclusive with full_schema.",
+                },
+                "full_schema": {
+                    "type": "object",
+                    "description": "Full replacement schema. Mutually exclusive with schema_diff.",
+                },
+                "source_pointers_diff": {
+                    "description": "Optional updates to source pointers. Object merges with existing dict pointers; list replaces.",
+                },
+                "edit_source": {
+                    "type": "string",
+                    "enum": ["user_edit", "drift_pull", "extraction_commit", "modal_save", "cascade"],
+                    "description": "Provenance tag stored in the version log. Default user_edit.",
+                },
+            },
+            "required": ["artifact_id"],
+        },
+    },
+    {
+        "name": "get_artifact_history",
+        "description": "Retrieve version history for an artifact. Returns versions newest first with edit metadata and a one-line summary per version.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "integer"},
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of versions to return. Default 20.",
+                },
+                "since": {
+                    "type": "string",
+                    "description": "ISO-8601 timestamp; only versions edited at or after this time.",
+                },
+                "row_filter": {
+                    "type": "string",
+                    "description": "Optional row identifier to filter to edits affecting that row only.",
+                },
+            },
+            "required": ["artifact_id"],
+        },
+    },
+    {
+        "name": "restore_artifact_state",
+        "description": "Restore an artifact to a prior version, timestamp, or original capture. The restore action itself appends to the version log so it is reversible.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "artifact_id": {"type": "integer"},
+                "target": {
+                    "description": "One of: 'original' (version 1), 'previous' (version_seq - 1), an integer (specific version_seq), an ISO-8601 timestamp (latest version at or before), or {version_seq: N} for explicit selection.",
+                },
+            },
+            "required": ["artifact_id", "target"],
+        },
+    },
+    {
+        "name": "find_dependent_artifacts",
+        "description": "Find artifacts in the same project whose source pointers overlap a set of changed DB rows. Used after edits/modal saves/extraction commits to surface cascading impact. Lookback is bounded to the last 90 days.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "integer"},
+                "changed_rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "table": {"type": "string"},
+                            "row_id": {},
+                        },
+                        "required": ["table", "row_id"],
+                    },
+                },
+                "exclude_artifact_id": {
+                    "type": "integer",
+                    "description": "Optional. Exclude the artifact that triggered the change.",
+                },
+            },
+            "required": ["project_id", "changed_rows"],
+        },
+    },
     # ─── LoopNet Deal Sourcing — DEFERRED 2026-04-25 (gx14) ───────────────────
     # loopnet_search_listings, loopnet_get_listing_detail, loopnet_search_similar
     # were committed Apr 21 against an HTML scraper in services/loopnet_mcp.
