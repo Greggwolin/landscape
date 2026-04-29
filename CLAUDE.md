@@ -529,6 +529,7 @@ Django uses DRF serializers with consistent envelope:
 - Reports system complete: 20 generators with real SQL + PDF/Excel export; data_readiness flags updated
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
+- Code-side cross-property entity guard (post-alpha) — `e27123e` added the BASE_INSTRUCTIONS rule blocking Landscaper from fabricating data across mismatched property names (finding #10), but the entity creation path still permits a `canonical_name` that conflates two property names (e.g. "BROWNSTONE APARTMENTS (CHADRON TERRACE)"). Add a server-side guard in the entity write path so the prompt rule is backed by code enforcement
 
 ### Navigation Architecture
 
