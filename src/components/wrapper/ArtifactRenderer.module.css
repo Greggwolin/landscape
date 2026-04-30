@@ -288,7 +288,28 @@
   border-bottom: none;
 }
 
-/* ─── Subtotal / total row styling ───────────────────────────────────── */
+/* ─── Operating-statement layout — section dividers, subsections,
+   subtotals, totals, indent depths ────────────────────────────────────
+
+   Stateful row classification in the renderer (classifyRow + inSubsection
+   tracking) tags every row with a kind (section_divider | subsection |
+   subtotal | grand_total | line_item) and a depth (0 | 1 | 2). The classes
+   below render the spec hierarchy:
+
+     section_divider  — Income / Operating Expenses / Revenue / Expenses
+                        section header inside the table; bottom border
+     subsection       — Taxes & Insurance / Utilities / etc. (depth 1)
+     subtotal         — Gross Potential Rent / Effective Gross Income /
+                        Total Operating Expenses (depth 0, bold, top rule)
+     grand_total      — Net Operating Income (depth 0, bold, top + bottom
+                        rule)
+     line_item        — depth 1 if directly under a section, depth 2 if
+                        under a subsection
+
+   Subsection labels share the depth-1 indent visual with line items in
+   Income (where there are no subsections) — that's intentional per the
+   spec example.
+*/
 
 /* Subtotal row: bold, single thin black rule above. */
 .subtotalRow td {
@@ -305,6 +326,44 @@
   border-bottom: 1px solid var(--cui-body-color);
   padding-top: 5px;
   padding-bottom: 5px;
+}
+
+/* Section divider row (Income / Operating Expenses inside the same big
+   table). Regular weight, larger top padding, thin bottom rule under the
+   label. The label sits in column 1; other cells are blank by design. */
+.sectionDividerRow td {
+  border-bottom: 1px solid var(--cui-body-color);
+  padding-top: 12px;
+  padding-bottom: 4px;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+/* Subsection row (Taxes & Insurance, Utilities, etc.). Regular weight, no
+   border, small top padding. Indent applied via .depth1. */
+.subsectionRow td {
+  font-weight: 400;
+  padding-top: 6px;
+  padding-bottom: 2px;
+}
+
+/* Indent depths — applied to the label column. When the table has a drift
+   indicator column, that's the first child and shouldn't be padded; the
+   label column is then the cell right after it. */
+.depth1 td:first-child:not(.driftCell) {
+  padding-left: 16px;
+}
+
+.depth2 td:first-child:not(.driftCell) {
+  padding-left: 32px;
+}
+
+.depth1 td.driftCell + td {
+  padding-left: 16px;
+}
+
+.depth2 td.driftCell + td {
+  padding-left: 32px;
 }
 
 .alignRight {

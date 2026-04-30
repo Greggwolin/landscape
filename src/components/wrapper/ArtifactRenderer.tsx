@@ -520,27 +520,52 @@ function TableBlockRenderer({
           </tr>
         </thead>
         <tbody>
-          {block.rows.map((row, rIdx) => {
-            const rowPath = [...blockPath, 'rows', String(rIdx)];
-            const rowPathStr = rowPath.join('/');
-            const isRemoved = removedRowPaths?.has(rowPathStr) ?? false;
-            const driftState = isRemoved
-              ? 'removed'
-              : computeRowDriftState(row, sourcePointers, currentValues, rowPath);
+          {(() => {
+            // Stateful pass over rows so line-item depth depends on whether
+            // we're currently inside a subsection. Section dividers and
+            // subtotals/totals reset the subsection context.
+            let inSubsection = false;
+            return block.rows.map((row, rIdx) => {
+              const rowPath = [...blockPath, 'rows', String(rIdx)];
+              const rowPathStr = rowPath.join('/');
+              const isRemoved = removedRowPaths?.has(rowPathStr) ?? false;
+              const driftState = isRemoved
+                ? 'removed'
+                : computeRowDriftState(row, sourcePointers, currentValues, rowPath);
 
-            // Heuristic role detection — see detectRowRole. Bold + rules
-            // are applied to subtotal and grand-total rows per the tabular
-            // formatting standard.
-            const role = detectRowRole(row, block.columns);
-            const rowClass =
-              role === 'grand_total' ? styles.grandTotalRow
-              : role === 'subtotal' ? styles.subtotalRow
-              : '';
-            // First column is the label column — never apply numeric
-            // formatting to it. Other columns are numeric by default.
-            const labelKey = block.columns[0]?.key;
+              const kind = classifyRow(row, block.columns);
+              let depth = 0;
+              switch (kind) {
+                case 'section_divider':
+                case 'subtotal':
+                case 'grand_total':
+                  inSubsection = false;
+                  depth = 0;
+                  break;
+                case 'subsection':
+                  inSubsection = true;
+                  depth = 1;
+                  break;
+                case 'line_item':
+                  depth = inSubsection ? 2 : 1;
+                  break;
+              }
 
-            return (
+              const rowClass = [
+                kind === 'section_divider' ? styles.sectionDividerRow : '',
+                kind === 'subsection' ? styles.subsectionRow : '',
+                kind === 'subtotal' ? styles.subtotalRow : '',
+                kind === 'grand_total' ? styles.grandTotalRow : '',
+                depth === 1 ? styles.depth1
+                  : depth === 2 ? styles.depth2
+                  : '',
+              ].filter(Boolean).join(' ');
+
+              // First column is the label column — never apply numeric
+              // formatting to it. Other columns are numeric by default.
+              const labelKey = block.columns[0]?.key;
+
+              return (
               <tr key={row.id} className={rowClass}>
                 {hasAnySourceRefs && (
                   <td className={styles.driftCell}>
@@ -568,8 +593,9 @@ function TableBlockRenderer({
                   );
                 })}
               </tr>
-            );
-          })}
+              );
+            });
+          })()}
           {block.rows.length === 0 && (
             <tr>
               <td
@@ -719,6 +745,59 @@ export function detectPairRole(label: string): 'subtotal' | 'grand_total' | null
     if (probe.includes(kw)) return 'subtotal';
   }
   return null;
+}
+
+/** Section-divider keywords. Rows whose label exactly matches one of these
+ * (case-insensitive, after normalization) AND have only the label cell
+ * populated are treated as full-width section dividers in the table. */
+const _SECTION_DIVIDER_KEYWORDS = new Set([
+  'income',
+  'revenue',
+  'operating expenses',
+  'expenses',
+  'other income',
+]);
+
+/** A row is "label-only" when the only populated cell key is the label
+ * column. Used to distinguish section dividers / subsections (which carry
+ * just the label) from line items (which carry values across all columns). */
+function _isLabelOnlyRow(row: TableRow, columns: { key: string }[]): boolean {
+  const labelKey = columns[0]?.key;
+  if (!labelKey) return false;
+  for (let i = 1; i < columns.length; i++) {
+    const col = columns[i];
+    const v = row.cells?.[col.key];
+    if (v != null && v !== '' && v !== 0 && v !== '0') return false;
+  }
+  return true;
+}
+
+/** Row kinds for the operating-statement layout. */
+export type RowKind =
+  | 'section_divider'
+  | 'subsection'
+  | 'subtotal'
+  | 'grand_total'
+  | 'line_item';
+
+/** Classify a row for layout purposes (section/subsection/line/subtotal/total). */
+export function classifyRow(
+  row: TableRow,
+  columns: { key: string }[],
+): RowKind {
+  const role = detectRowRole(row, columns);
+  if (role === 'grand_total') return 'grand_total';
+  if (role === 'subtotal') return 'subtotal';
+
+  const firstColKey = columns[0]?.key;
+  const labelRaw = firstColKey ? String(row.cells?.[firstColKey] ?? '') : '';
+  const labelProbe = _normalizeRowProbe(labelRaw);
+
+  if (_isLabelOnlyRow(row, columns)) {
+    if (_SECTION_DIVIDER_KEYWORDS.has(labelProbe)) return 'section_divider';
+    return 'subsection';
+  }
+  return 'line_item';
 }
 
 interface EditableCellProps {
