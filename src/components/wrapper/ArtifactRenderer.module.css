@@ -192,20 +192,27 @@
 }
 
 .sectionHeader {
+  /* Per tabular formatting standard (feedback_tabular_artifact_formatting):
+     section headings are regular weight, left-aligned, with thin black bottom
+     border (using the body-color border so it's visible on dark theme too). */
   display: block;
-  margin: 0 0 4px 0;
-  padding: 0;
+  margin: 8px 0 4px 0;
+  padding: 0 0 4px 0;
   background: transparent;
-  border: 0;
   cursor: default;
   user-select: text;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--cui-secondary-color);
-  border-bottom: 1px solid var(--cui-border-color);
-  padding-bottom: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cui-body-color);
+  border: 0;
+  border-bottom: 1px solid var(--cui-body-color);
+}
+
+/* First section in the artifact — no top margin to keep it tight to the header. */
+.section:first-child .sectionHeader {
+  margin-top: 0;
 }
 
 /* Kept for backward compat — flat sections never collapse. */
@@ -231,14 +238,16 @@
 }
 
 .tableTitle {
-  padding: 4px 0 2px 0;
-  font-size: 11px;
-  font-weight: 600;
+  /* Per tabular formatting standard: subsection headings (Taxes & Insurance,
+     Utilities, etc.) are regular weight, left-aligned, no underline. */
+  padding: 6px 0 2px 0;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--cui-body-color);
   text-transform: none;
   letter-spacing: 0;
   background: transparent;
-  border-bottom: 0;
+  border: 0;
 }
 
 .table {
@@ -250,15 +259,17 @@
 }
 
 .table th {
-  padding: 4px 8px 2px 8px;
+  /* Header row per tabular formatting standard: bold, with a thin black
+     bottom border separating headers from data. */
+  padding: 4px 8px 4px 8px;
   text-align: left;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--cui-secondary-color);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cui-body-color);
+  text-transform: none;
+  letter-spacing: 0;
   background: transparent;
-  border-bottom: 1px solid var(--cui-border-color);
+  border-bottom: 1px solid var(--cui-body-color);
   white-space: normal;
   vertical-align: bottom;
   line-height: 1.25;
@@ -266,14 +277,34 @@
 
 .table td {
   padding: 3px 8px;
-  border-bottom: 1px dotted var(--cui-border-color);
+  border-bottom: 0;
   white-space: nowrap;
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
+  font-size: 12px;
 }
 
 .table tr:last-child td {
   border-bottom: none;
+}
+
+/* ─── Subtotal / total row styling ───────────────────────────────────── */
+
+/* Subtotal row: bold, single thin black rule above. */
+.subtotalRow td {
+  font-weight: 700;
+  border-top: 1px solid var(--cui-body-color);
+  padding-top: 5px;
+}
+
+/* Grand total row (e.g., Net Operating Income): bold, with both top and
+   bottom rules to box the value off as a final result. */
+.grandTotalRow td {
+  font-weight: 700;
+  border-top: 1px solid var(--cui-body-color);
+  border-bottom: 1px solid var(--cui-body-color);
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
 .alignRight {
@@ -375,7 +406,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 2px 0;
-  border-bottom: 1px dotted var(--cui-border-color);
+  border-bottom: 0;
   min-width: 0;
   overflow: hidden;
 }

@@ -528,8 +528,20 @@ function TableBlockRenderer({
               ? 'removed'
               : computeRowDriftState(row, sourcePointers, currentValues, rowPath);
 
+            // Heuristic role detection — see detectRowRole. Bold + rules
+            // are applied to subtotal and grand-total rows per the tabular
+            // formatting standard.
+            const role = detectRowRole(row, block.columns);
+            const rowClass =
+              role === 'grand_total' ? styles.grandTotalRow
+              : role === 'subtotal' ? styles.subtotalRow
+              : '';
+            // First column is the label column — never apply numeric
+            // formatting to it. Other columns are numeric by default.
+            const labelKey = block.columns[0]?.key;
+
             return (
-              <tr key={row.id}>
+              <tr key={row.id} className={rowClass}>
                 {hasAnySourceRefs && (
                   <td className={styles.driftCell}>
                     <DriftIndicator state={driftState} row={row} sourcePointers={sourcePointers} currentValues={currentValues} rowPath={rowPath} />
@@ -539,6 +551,7 @@ function TableBlockRenderer({
                   const cellValue = row.cells[col.key];
                   const cellEditable = Boolean(row.editable);
                   const cellPath = [...rowPath, 'cells', col.key];
+                  const isLabelCol = col.key === labelKey;
                   return (
                     <td
                       key={col.key}
@@ -549,6 +562,7 @@ function TableBlockRenderer({
                         editable={cellEditable}
                         path={cellPath}
                         onUpdate={onUpdate}
+                        formatNumeric={!isLabelCol}
                       />
                     </td>
                   );
@@ -572,18 +586,137 @@ function TableBlockRenderer({
   );
 }
 
+/* ─── Tabular formatting standard (per Memory: feedback_tabular_artifact_formatting) ──
+ *
+ * Accounting style for every tabular artifact:
+ *   - Positives: 1,234        (with thousand separators)
+ *   - Negatives: (1,234)      (parens, no minus sign)
+ *   - Zero / null: —          (em dash)
+ *   - No decimals
+ *   - No $ symbol
+ *
+ * Subtotal/total row detection is heuristic — we check the row id and the
+ * first-cell label for canonical keywords (Gross Potential Rent, Effective
+ * Gross Income, Total Operating Expenses, Net Operating Income, etc.). When
+ * the schema gains explicit row.role markers we'll switch to those.
+ */
+
+const _NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+  minimumFractionDigits: 0,
+  useGrouping: true,
+});
+
+/** Coerce a cell value to its display string per the tabular formatting standard. */
+export function formatCellValue(value: string | number | null | undefined): string {
+  if (value == null) return '—';
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value === 0) return '—';
+    if (value < 0) return `(${_NUMBER_FORMATTER.format(Math.abs(value))})`;
+    return _NUMBER_FORMATTER.format(value);
+  }
+  // String — try to detect numeric content
+  const s = String(value).trim();
+  if (s === '' || s === '0' || s === '0.00') return '—';
+  // Strip $, commas, surrounding parens for negative detection
+  const isParenNeg = /^\(.+\)$/.test(s);
+  const cleaned = s.replace(/[$,\s]/g, '').replace(/^\(/, '-').replace(/\)$/, '');
+  const n = Number(cleaned);
+  if (Number.isFinite(n) && /^-?\d/.test(cleaned)) {
+    if (n === 0) return '—';
+    if (n < 0 || isParenNeg) return `(${_NUMBER_FORMATTER.format(Math.abs(n))})`;
+    return _NUMBER_FORMATTER.format(n);
+  }
+  return s;
+}
+
+/** Heuristic detection of subtotal/total/grand-total rows for bold styling.
+ *
+ * Subtotal rows get bold + single rule above. Grand total (NOI specifically)
+ * gets bold + rules above AND below. Per the operating statement rendering
+ * spec — see THREAD_STATE.md "Operating statement rendering spec".
+ *
+ * The full-phrase keywords are used deliberately — bare 'noi' would match
+ * 'NOI per Unit' / 'NOI per SF' (summary metrics, not totals). Anti-keywords
+ * disqualify rows that look like per-unit / ratio metrics regardless.
+ */
+const _SUBTOTAL_KEYWORDS = [
+  'gross potential rent',
+  'effective gross income',
+  'total operating expenses',
+  'total income',
+  'gross income',
+  'subtotal',
+];
+
+const _GRAND_TOTAL_KEYWORDS = [
+  'net operating income',
+  'grand total',
+];
+
+/** Disqualify rows whose label contains any of these — they're summary
+ * metrics (NOI per Unit, Operating Expense Ratio, etc.), not actual totals. */
+const _ANTI_KEYWORDS = [
+  'per unit',
+  'per sf',
+  'per square',
+  'per square foot',
+  'expense ratio',
+  'ratio',
+];
+
+function _normalizeRowProbe(s: string | undefined | null): string {
+  return (s ?? '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Returns 'subtotal' | 'grand_total' | null based on the row's id and first-cell label. */
+export function detectRowRole(
+  row: TableRow,
+  columns: { key: string }[],
+): 'subtotal' | 'grand_total' | null {
+  const idProbe = _normalizeRowProbe(row.id);
+  const firstColKey = columns[0]?.key;
+  const labelProbe = _normalizeRowProbe(
+    firstColKey ? String(row.cells?.[firstColKey] ?? '') : '',
+  );
+
+  // Disqualifier — per-unit / ratio summary metrics never get bolded as totals.
+  for (const anti of _ANTI_KEYWORDS) {
+    if (labelProbe.includes(anti) || idProbe.includes(anti.replace(/ /g, '_'))) {
+      return null;
+    }
+  }
+
+  for (const kw of _GRAND_TOTAL_KEYWORDS) {
+    if (idProbe.includes(kw.replace(/ /g, '_')) || labelProbe.includes(kw)) {
+      return 'grand_total';
+    }
+  }
+  for (const kw of _SUBTOTAL_KEYWORDS) {
+    if (idProbe.includes(kw.replace(/ /g, '_')) || labelProbe.includes(kw)) {
+      return 'subtotal';
+    }
+  }
+  return null;
+}
+
 interface EditableCellProps {
   value: string | number | null;
   editable: boolean;
   path: string[];
   onUpdate: (patch: JsonPatchOp[]) => void;
+  /** When true, value is rendered via formatCellValue (accounting style). */
+  formatNumeric?: boolean;
 }
 
-function EditableCell({ value, editable, path, onUpdate }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, formatNumeric = true }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
 
-  const display = value == null ? '—' : value;
+  // Display path: format via tabular standard for non-editing state.
+  const display = formatNumeric
+    ? formatCellValue(value)
+    : (value == null ? '—' : value);
 
   if (!editable) {
     return <>{display}</>;
