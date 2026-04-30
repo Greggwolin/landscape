@@ -440,6 +440,38 @@
   background: var(--cui-secondary-bg);
 }
 
+/* Per the tabular formatting standard — kv-pair subtotal / grand-total
+   styling matches the table-row styling. Used when the model composes
+   summary metrics (Net Operating Income, Total Operating Expenses) as
+   kv_grid pairs instead of as rows in the main operating-statement table. */
+.kvPairSubtotal {
+  font-weight: 700;
+  border-top: 1px solid var(--cui-body-color);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.kvPairSubtotal .kvLabel,
+.kvPairSubtotal .kvValue {
+  font-weight: 700;
+  color: var(--cui-body-color);
+}
+
+.kvPairGrandTotal {
+  font-weight: 700;
+  border-top: 1px solid var(--cui-body-color);
+  border-bottom: 1px solid var(--cui-body-color);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-top: 4px;
+}
+
+.kvPairGrandTotal .kvLabel,
+.kvPairGrandTotal .kvValue {
+  font-weight: 700;
+  color: var(--cui-body-color);
+}
+
 /* ─── Text block variants ────────────────────────────────────────────── */
 
 .textBody {

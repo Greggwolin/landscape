@@ -700,6 +700,27 @@ export function detectRowRole(
   return null;
 }
 
+/** Same role detection as detectRowRole, but for kv_grid pairs.
+ *
+ * Sometimes the model composes summary metrics (Net Operating Income, Total
+ * Operating Expenses) as kv_grid pairs instead of as rows in the main
+ * operating-statement table. The kv_grid pair labels still match the
+ * subtotal/grand_total keyword sets, so we apply the same bold styling.
+ */
+export function detectPairRole(label: string): 'subtotal' | 'grand_total' | null {
+  const probe = _normalizeRowProbe(label);
+  for (const anti of _ANTI_KEYWORDS) {
+    if (probe.includes(anti)) return null;
+  }
+  for (const kw of _GRAND_TOTAL_KEYWORDS) {
+    if (probe.includes(kw)) return 'grand_total';
+  }
+  for (const kw of _SUBTOTAL_KEYWORDS) {
+    if (probe.includes(kw)) return 'subtotal';
+  }
+  return null;
+}
+
 interface EditableCellProps {
   value: string | number | null;
   editable: boolean;
@@ -829,14 +850,26 @@ function KeyValuePairRenderer({ pair, driftState, path, onUpdate }: KeyValuePair
   const [draft, setDraft] = useState<string>(String(pair.value ?? ''));
   const editable = Boolean(pair.editable);
 
+  // Apply role-based bold styling for pairs that match subtotal/total keywords.
+  // This catches cases where the model composes summary metrics (Net Operating
+  // Income, Total Operating Expenses) as kv_grid pairs instead of as rows in
+  // the main operating-statement table.
+  const role = detectPairRole(pair.label);
+  const roleClass =
+    role === 'grand_total' ? styles.kvPairGrandTotal
+    : role === 'subtotal' ? styles.kvPairSubtotal
+    : '';
+
   const valueClass = editable
     ? `${styles.kvValue} ${styles.kvValueEditable}`
     : styles.kvValue;
 
-  const display = pair.value == null ? '—' : String(pair.value);
+  // Apply tabular formatting standard to the value (thousand separators,
+  // parens for negatives, em-dash for zero/null, no $ symbol).
+  const display = formatCellValue(pair.value as string | number | null);
 
   return (
-    <div className={styles.kvPair}>
+    <div className={`${styles.kvPair} ${roleClass}`}>
       <span className={styles.kvLabel}>
         {driftState !== 'unchanged' && (
           <span style={{ marginRight: 4 }}>
