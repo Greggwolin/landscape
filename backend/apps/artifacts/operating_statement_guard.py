@@ -47,7 +47,8 @@ rationale, including the rejected alternatives and why phasing was chosen.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable
+import re
+from typing import Any, Dict, Iterable, List, Tuple
 
 from .schema_validation import SchemaValidationError
 
@@ -110,6 +111,29 @@ _FORBIDDEN_COLUMN_SUBSTRINGS_T12_ONLY = (
 # label / display name can vary, but the column key must be one of these
 # (case-insensitive).
 _OPEX_REQUIRED_COLUMN_KEYS = ('line', 'rate', 'annual', 'per_unit', 'per_sf')
+
+# Section-title substrings (case-insensitive) that mark an "Operating Expenses"
+# section. Any table nested inside such a section gets the canonical 5-column
+# shape rule, regardless of the inner table's own title.
+_OPEX_SECTION_TITLE_HINTS = (
+    'operating expense',
+    'operating exp',
+    'opex',
+    'expenses',
+)
+
+# Unit-type row pattern. A T-12 (pure historical) artifact should NOT contain
+# a table whose line items break down by unit type — that's rent-roll territory.
+# Detection: any row whose first-cell value matches this regex (1BR, 2BR/2BA,
+# Studio, Efficiency, "1 Bedroom", etc.).
+_UNIT_TYPE_ROW_REGEX = re.compile(
+    r'^\s*('
+    r'studio'
+    r'|efficiency|eff\b'
+    r'|\d+\s*(br|bd|ba|bed|bath|bedroom|bathroom)'
+    r')',
+    re.IGNORECASE,
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -244,23 +268,78 @@ def validate_operating_statement_artifact(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _walk_blocks(schema: Any) -> Iterable[Dict[str, Any]]:
-    """Yield every block in the document, descending into section.children."""
+def _walk_blocks(
+    schema: Any,
+) -> Iterable[Tuple[Dict[str, Any], List[str]]]:
+    """Yield (block, ancestor_section_titles_lower) for every block.
+
+    Ancestor titles are accumulated as we descend into section.children, so
+    callers can apply rules based on the surrounding section context (e.g.,
+    "any table inside an Operating Expenses section must follow the canonical
+    5-column shape, regardless of its own title").
+
+    Returns ancestors as a list of lowercase, stripped section titles, oldest
+    first (outermost ancestor at index 0).
+    """
     if not isinstance(schema, dict):
         return
     blocks = schema.get('blocks')
     if not isinstance(blocks, list):
         return
-    stack: list = list(blocks)
+    stack: List[Tuple[Dict[str, Any], List[str]]] = [
+        (b, []) for b in blocks if isinstance(b, dict)
+    ]
     while stack:
-        b = stack.pop()
-        if not isinstance(b, dict):
-            continue
-        yield b
-        if b.get('type') == 'section':
-            children = b.get('children')
+        block, ancestors = stack.pop()
+        yield block, ancestors
+        if block.get('type') == 'section':
+            children = block.get('children')
             if isinstance(children, list):
-                stack.extend(children)
+                section_title_lower = (block.get('title') or '').strip().lower()
+                new_ancestors = ancestors + [section_title_lower]
+                for child in children:
+                    if isinstance(child, dict):
+                        stack.append((child, new_ancestors))
+
+
+def _row_first_cell_value(row: Any, columns: list) -> str | None:
+    """Return the line-item / first-column cell value for a row, as a string.
+
+    Handles both row shapes — list-of-dicts (keyed by column key/field) and
+    list-of-lists (positional). Returns None when the value can't be
+    extracted as a non-empty string.
+    """
+    if isinstance(row, dict):
+        for key in ('line', 'line_item', 'category', 'name', 'label', 'item'):
+            v = row.get(key)
+            if isinstance(v, str) and v.strip():
+                return v
+        if columns and isinstance(columns[0], dict):
+            first_key = columns[0].get('key') or columns[0].get('field')
+            if isinstance(first_key, str):
+                v = row.get(first_key)
+                if isinstance(v, str) and v.strip():
+                    return v
+        return None
+    if isinstance(row, list) and row:
+        first = row[0]
+        if isinstance(first, str) and first.strip():
+            return first
+        if isinstance(first, dict):
+            for key in ('value', 'text', 'label', 'display'):
+                v = first.get(key)
+                if isinstance(v, str) and v.strip():
+                    return v
+    return None
+
+
+def _is_inside_opex_section(ancestors: List[str]) -> bool:
+    """True if any ancestor section title looks like Operating Expenses."""
+    for title in ancestors:
+        for hint in _OPEX_SECTION_TITLE_HINTS:
+            if hint in title:
+                return True
+    return False
 
 
 def _block_title_normalized(block: Dict[str, Any]) -> str:
@@ -309,7 +388,7 @@ def _is_opex_table(block: Dict[str, Any]) -> bool:
 
 def _check_content_shape(*, subtype: str, schema: Any) -> None:
     """Reject blocks that don't belong on the declared subtype."""
-    for block in _walk_blocks(schema):
+    for block, ancestors in _walk_blocks(schema):
         btype = block.get('type')
         title_norm = _block_title_normalized(block)
 
@@ -369,8 +448,41 @@ def _check_content_shape(*, subtype: str, schema: Any) -> None:
                             ),
                         )
 
-            # OpEx column shape (any subtype)
-            if _is_opex_table(block):
+            # T-12 only: no unit-type breakdowns. If any row's first-cell value
+            # matches a unit-type pattern (1BR, 2BR/2BA, Studio, Efficiency,
+            # etc.), this is rent-roll content and doesn't belong on a pure
+            # historical T-12. Section heading doesn't matter — we catch this
+            # by row content so the model can't bypass the rule by labeling
+            # the section "Income" instead of "Rental Income by Unit Type".
+            if subtype == SUBTYPE_T12:
+                rows = block.get('rows') or []
+                for row in rows:
+                    first_val = _row_first_cell_value(row, cols)
+                    if first_val and _UNIT_TYPE_ROW_REGEX.match(first_val):
+                        raise OperatingStatementGuardError(
+                            code='unit_type_breakdown_in_t12',
+                            subtype=subtype,
+                            message=(
+                                f'table {block.get("id")!r} contains a unit-type '
+                                f'row ({first_val!r}); unit-mix breakdowns are '
+                                f'rent-roll content and not allowed in t12'
+                            ),
+                            guidance=(
+                                'A pure T-12 should report income as totals only '
+                                '(Gross Potential Rent, Vacancy, etc.) — not broken '
+                                'down by unit type. Unit-type income tables belong '
+                                'on a Rent Roll artifact, or in an f12_proforma / '
+                                'current_proforma where market rents per unit type '
+                                'are part of the analysis.'
+                            ),
+                        )
+
+            # OpEx column shape (any subtype). Detection covers BOTH the table's
+            # own id/title (legacy) AND any ancestor section titled like
+            # Operating Expenses (new). The latter catches the common pattern
+            # where a parent "Operating Expenses" section holds named sub-tables
+            # (Taxes & Insurance, Utilities, Repairs & Maintenance, etc.).
+            if _is_opex_table(block) or _is_inside_opex_section(ancestors):
                 col_keys = [_column_key(c) for c in cols if c]
                 missing = [k for k in _OPEX_REQUIRED_COLUMN_KEYS if k not in col_keys]
                 if missing:

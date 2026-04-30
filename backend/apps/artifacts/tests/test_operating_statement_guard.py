@@ -239,6 +239,98 @@ class ForbiddenColumnTests(SimpleTestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Content-shape: unit-type-row detection (T-12 only)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class UnitTypeRowTests(SimpleTestCase):
+    def _income_table_with_rows(self, row_first_values):
+        return {
+            'type': 'table',
+            'id': 'income_breakdown',
+            'title': 'Income',
+            'columns': [
+                {'key': 'line', 'label': 'Line Item'},
+                {'key': 'units', 'label': 'Units'},
+                {'key': 'avg_rent', 'label': 'Avg Rent'},
+                {'key': 'annual', 'label': 'Annual'},
+            ],
+            'rows': [{'line': v} for v in row_first_values],
+        }
+
+    def test_t12_rejects_1br_2br_breakdown(self):
+        schema = _doc([self._income_table_with_rows(['1BR/1BA', '2BR/2BA', '3BR/2BA', 'Gross Potential Rent'])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12 Operating Statement',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'unit_type_breakdown_in_t12')
+
+    def test_t12_rejects_studio_unit_type(self):
+        schema = _doc([self._income_table_with_rows(['Studio', '1BR', '2BR'])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'unit_type_breakdown_in_t12')
+
+    def test_t12_rejects_unit_type_inside_income_section(self):
+        # Same content but nested in a section — section heading is "Income",
+        # which the older title-only rule wouldn't have caught.
+        schema = _doc([{
+            'type': 'section',
+            'id': 'sec_income',
+            'title': 'Income',
+            'children': [self._income_table_with_rows(['1BR/1BA', '2BR/2BA'])],
+        }])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'unit_type_breakdown_in_t12')
+
+    def test_t12_allows_total_only_income(self):
+        # No unit-type rows — all aggregate line items.
+        schema = _doc([self._income_table_with_rows([
+            'Gross Potential Rent', 'Vacancy', 'Effective Gross Income',
+        ])])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_T12,
+            title='T-12',
+            schema=schema,
+            project_id=None,
+        )
+
+    def test_f12_proforma_allows_unit_type_breakdown(self):
+        # f12_proforma legitimately may show unit-type breakdowns.
+        schema = _doc([self._income_table_with_rows(['1BR/1BA', '2BR/2BA'])])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_F12_PROFORMA,
+            title='F-12 Proforma',
+            schema=schema,
+            project_id=None,
+        )
+
+    def test_current_proforma_allows_unit_type_breakdown(self):
+        schema = _doc([self._income_table_with_rows(['Studio', '1BR', '2BR'])])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_CURRENT_PROFORMA,
+            title='Current Proforma',
+            schema=schema,
+            project_id=None,
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Content-shape: OpEx column structure
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -283,6 +375,56 @@ class OpexColumnShapeTests(SimpleTestCase):
             )
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
         self.assertEqual(set(ctx.exception.missing), {'per_unit', 'per_sf'})
+
+    def test_subtable_inside_opex_section_with_4_cols_rejected(self):
+        # Sub-table titled "Taxes & Insurance" nested inside an "Operating
+        # Expenses" section, with only 4 columns (no Rate). The legacy rule
+        # missed this because the sub-table's own title doesn't match the
+        # OpEx detector. The new ancestor-aware check catches it.
+        sub_table = {
+            'type': 'table',
+            'id': 'taxes_insurance',
+            'title': 'Taxes & Insurance',
+            'columns': [
+                {'key': 'line', 'label': 'Line Item'},
+                {'key': 'annual', 'label': 'Annual'},
+                {'key': 'per_unit', 'label': '$/Unit'},
+                {'key': 'per_sf', 'label': '$/SF'},
+            ],
+            'rows': [],
+        }
+        schema = _doc([{
+            'type': 'section',
+            'id': 'sec_opex',
+            'title': 'Operating Expenses',
+            'children': [sub_table],
+        }])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
+        self.assertIn('rate', ctx.exception.missing)
+
+    def test_subtable_inside_opex_section_with_5_cols_passes(self):
+        sub_table = _opex_table(_canonical_opex_columns())
+        sub_table['title'] = 'Utilities'
+        sub_table['id'] = 'utilities'
+        schema = _doc([{
+            'type': 'section',
+            'id': 'sec_opex',
+            'title': 'Operating Expenses',
+            'children': [sub_table],
+        }])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_T12,
+            title='T-12',
+            schema=schema,
+            project_id=None,
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
