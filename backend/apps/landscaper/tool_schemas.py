@@ -4756,6 +4756,12 @@ LANDSCAPER_TOOLS = [
             "artifact (e.g. 'Operating statement is in the right panel'). "
             "Do NOT use for: single-value lookups ('what's the cap rate'), yes/no "
             "questions, or conversational replies. "
+            "OPERATING STATEMENT ARTIFACTS (T-12 / P&L / proforma / income statement / "
+            "operating expenses): you MUST pass artifact_subtype. The Phase 1 guard "
+            "rejects with structured guidance if subtype is missing, content doesn't "
+            "match subtype, or the project lacks the source data the subtype requires. "
+            "On rejection, READ the suggested_user_question field and ask the user "
+            "exactly that question — do not fabricate values to bypass the guard. "
             "Strict firing rules and the required tool-call sequence (DB read first, "
             "then create_artifact) live in BASE_INSTRUCTIONS § ARTIFACTS — FIRING "
             "DISCIPLINE."
@@ -4765,11 +4771,35 @@ LANDSCAPER_TOOLS = [
             "properties": {
                 "title": {
                     "type": "string",
-                    "description": "User-facing artifact label (e.g., 'Operating Statement — T-12 Apr').",
+                    "description": "User-facing artifact label (e.g., 'Operating Statement — F-12 Proforma').",
                 },
                 "schema": {
                     "type": "object",
                     "description": "Block document. Vocabulary: section, table, key_value_grid, text. Each block requires a unique 'id'. Tables require a non-empty 'columns' array.",
+                },
+                "artifact_subtype": {
+                    "type": "string",
+                    "enum": ["t12", "f12_proforma", "current_proforma"],
+                    "description": (
+                        "REQUIRED for operating statement / T-12 / P&L / proforma / "
+                        "income statement artifacts. Declares the kind of operating statement: "
+                        "'t12' = pure historical trailing 12 months (actuals only — NO market rent "
+                        "columns, NO Value-Add or Loss-to-Lease sections, NO unit-mix tables). "
+                        "'f12_proforma' = T-12 trended forward via the project's income/expense "
+                        "growth assumptions (this is what users mean ~90% of the time when they "
+                        "ask for a 'proforma'). "
+                        "'current_proforma' = operating statement at current asking/market rents "
+                        "(use ONLY when the user explicitly asks for current/market rents, e.g., "
+                        "'show me the current proforma'). "
+                        "If the user's intent is ambiguous, ASK before composing — example: "
+                        "'Just to confirm — do you want a trailing 12 (historical only), an "
+                        "F-12 proforma (historical trended forward with project growth "
+                        "assumptions), or a current proforma using current asking/market rents?' "
+                        "If the project lacks the source data required for a subtype (e.g., no "
+                        "market rents on file for current_proforma), the guard will reject; "
+                        "ASK the user how to proceed using the suggested_user_question from the "
+                        "rejection envelope. NEVER pick silently when sources conflict."
+                    ),
                 },
                 "edit_target": {
                     "description": "Optional. Single {modal_name} or list of {modal_name, label} for synthesis artifacts.",

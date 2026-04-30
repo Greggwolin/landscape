@@ -73,6 +73,11 @@ def create_artifact_tool(
     if schema is None:
         return {'success': False, 'error': 'schema is required'}
 
+    # Operating statement / T-12 / P&L / proforma artifacts require artifact_subtype.
+    # The guard in apps.artifacts.operating_statement_guard enforces this — pass
+    # the value through and let the guard reject if missing for an OS artifact.
+    artifact_subtype = params.get('artifact_subtype')
+
     try:
         return create_artifact_record(
             title=title,
@@ -84,8 +89,9 @@ def create_artifact_tool(
             user_id=_resolve_user_id(kwargs),
             tool_name='create_artifact',
             params_json={k: params.get(k) for k in (
-                'title', 'edit_target', 'source_pointers'
+                'title', 'edit_target', 'source_pointers', 'artifact_subtype',
             ) if k in params},
+            artifact_subtype=artifact_subtype,
         )
     except Exception as exc:
         logger.exception('create_artifact_tool failed')

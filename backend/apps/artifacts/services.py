@@ -15,6 +15,11 @@ from typing import Any, Iterable
 from django.db import transaction
 
 from .models import Artifact, ArtifactVersion
+from .operating_statement_guard import (
+    OperatingStatementGuardError,
+    is_operating_statement_artifact,
+    validate_operating_statement_artifact,
+)
 from .schema_validation import (
     SchemaValidationError,
     apply_json_patch,
@@ -119,14 +124,39 @@ def create_artifact_record(
     user_id: Any = None,
     tool_name: str = 'create_artifact',
     params_json: Any | None = None,
+    artifact_subtype: str | None = None,
 ) -> dict:
-    """Create a new artifact + version 1 entry. Returns spec §6.1 envelope."""
+    """Create a new artifact + version 1 entry. Returns spec §6.1 envelope.
+
+    `artifact_subtype` is required for operating statement / T-12 / P&L /
+    proforma artifacts. The Phase 1 guard in `operating_statement_guard.py`
+    rejects on missing/invalid subtype, forbidden content shape per subtype,
+    or absent source data. See guard module docstring for details.
+    """
     if not isinstance(title, str) or not title.strip():
         return {'success': False, 'error': 'title is required (non-empty string)'}
     try:
         validate_block_document(schema)
     except SchemaValidationError as exc:
         return {'success': False, 'error': f'schema invalid: {exc}'}
+
+    # Phase 1 operating-statement guard. Runs after generic schema validation,
+    # before persistence. On rejection, return a structured envelope so the
+    # model's retry-on-error path in BASE_INSTRUCTIONS knows what to ask the user.
+    if is_operating_statement_artifact(title, schema):
+        try:
+            validate_operating_statement_artifact(
+                subtype=artifact_subtype,
+                title=title,
+                schema=schema,
+                project_id=project_id,
+            )
+        except OperatingStatementGuardError as exc:
+            return {
+                'success': False,
+                'error': f'operating statement guard rejected: {exc}',
+                **exc.to_envelope_extras(),
+            }
 
     pointers = source_pointers if source_pointers is not None else {}
     if not isinstance(pointers, (dict, list)):
