@@ -285,8 +285,18 @@ def validate_operating_statement_artifact(
             guidance='Use t12, f12_proforma, or current_proforma.',
         )
 
-    # 2. Content shape
+    # 2a. Content shape — fires first because more-specific rules (forbidden
+    # section titles, forbidden columns, unit-type rows, OpEx column shape,
+    # property-metadata kv_grid pairs) deserve their own error codes for
+    # clearer model retry guidance.
     _check_content_shape(subtype=subtype, schema=schema)
+
+    # 2b. Top-level structure — operating statements must be ONE table at
+    # the top level, not a section block (which would render a duplicate
+    # heading) and not multiple sibling table blocks (duplicate column
+    # headers). Runs after content-shape so specific issues are surfaced
+    # before the structural fallback fires.
+    _check_top_level_structure(subtype=subtype, schema=schema)
 
     # 3. Source data presence (skip for pre-project threads)
     if project_id:
@@ -414,6 +424,74 @@ def _is_opex_table(block: Dict[str, Any]) -> bool:
             return True
     title = _block_title_normalized(block)
     return 'operating expense' in title or title == 'opex' or title == 'expenses'
+
+
+def _check_top_level_structure(*, subtype: str, schema: Any) -> None:
+    """Enforce single-table layout at the top level of OS artifacts.
+
+    Live testing showed the model composing both a `section` block titled
+    "Income" AND inside it a table with a section_divider row also labeled
+    "Income" — duplicate headings. Reject top-level section blocks for OS
+    artifacts so the model is forced into the single-table compose pattern.
+
+    Allows: a single top-level `table` block, plus optional `text` blocks
+    (used sparingly for callouts) and a single header `key_value_grid`
+    block (only for property name + period; the property-metadata rule in
+    `_check_content_shape` rejects pairs like Units/SqFt). Rejects: any
+    top-level `section` block, multiple `table` blocks at the top level.
+    """
+    if not isinstance(schema, dict):
+        return
+    blocks = schema.get('blocks')
+    if not isinstance(blocks, list):
+        return
+
+    section_blocks = []
+    table_count = 0
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get('type')
+        if btype == 'section':
+            section_blocks.append(block)
+        elif btype == 'table':
+            table_count += 1
+
+    if section_blocks:
+        offending_titles = [
+            (b.get('title') or '<untitled>') for b in section_blocks
+        ]
+        raise OperatingStatementGuardError(
+            code='section_block_in_os',
+            subtype=subtype,
+            message=(
+                f'operating statement artifact contains top-level section '
+                f'block(s) {offending_titles!r}; not allowed'
+            ),
+            guidance=(
+                'Operating statement artifacts must be a SINGLE table at the '
+                'top level. Section headings (Income, Operating Expenses) go '
+                'INSIDE that table as section_divider rows where only the '
+                '`line` cell is populated. Do NOT wrap content in section '
+                'blocks — that produces duplicate headings.'
+            ),
+        )
+
+    if table_count > 1:
+        raise OperatingStatementGuardError(
+            code='multiple_tables_in_os',
+            subtype=subtype,
+            message=(
+                f'operating statement artifact has {table_count} top-level '
+                f'table blocks; only one is allowed'
+            ),
+            guidance=(
+                'Compose the entire operating statement as a SINGLE table '
+                'block. Section dividers (Income, Operating Expenses) and '
+                'subsections (Taxes & Insurance, Utilities, etc.) are rows '
+                'inside that one table, not separate tables.'
+            ),
+        )
 
 
 def _check_content_shape(*, subtype: str, schema: Any) -> None:

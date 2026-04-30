@@ -181,16 +181,21 @@ class ForbiddenSectionTests(SimpleTestCase):
             )
         self.assertEqual(ctx.exception.code, 'forbidden_section_for_t12')
 
-    def test_value_add_allowed_in_f12_proforma(self):
-        # f12_proforma legitimately discusses upside; no rejection on this title alone.
+    def test_value_add_section_block_rejected_in_f12_proforma(self):
+        # The single-table mandate added later (Pass 5) rejects ALL section
+        # blocks at the top level for OS artifacts regardless of subtype.
+        # The previous T12-only forbidden-section-titles rule was superseded
+        # by the broader structural rule. Value-Add content, if needed, goes
+        # as a row inside the single table — not as a separate section block.
         schema = _doc([_section('Value-Add Opportunity')])
-        # Source-data check would fire; bypass for this content-only test.
-        validate_operating_statement_artifact(
-            subtype=SUBTYPE_F12_PROFORMA,
-            title='F-12 Proforma',
-            schema=schema,
-            project_id=None,  # skips source-data check
-        )
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_F12_PROFORMA,
+                title='F-12 Proforma',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'section_block_in_os')
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -236,6 +241,53 @@ class ForbiddenColumnTests(SimpleTestCase):
         validate_operating_statement_artifact(
             subtype=SUBTYPE_CURRENT_PROFORMA,
             title='Current Proforma',
+            schema=schema,
+            project_id=None,
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Top-level structure — single-table enforcement
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TopLevelStructureTests(SimpleTestCase):
+    def test_top_level_section_block_rejected(self):
+        # Section block at the top level produces duplicate Income heading.
+        schema = _doc([{
+            'type': 'section',
+            'id': 'sec_income',
+            'title': 'Income',
+            'children': [_opex_table(_canonical_opex_columns())],
+        }])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'section_block_in_os')
+
+    def test_multiple_top_level_tables_rejected(self):
+        schema = _doc([
+            _opex_table(_canonical_opex_columns()),
+            _opex_table(_canonical_opex_columns()),
+        ])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'multiple_tables_in_os')
+
+    def test_single_top_level_table_passes(self):
+        schema = _doc([_opex_table(_canonical_opex_columns())])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_T12,
+            title='T-12',
             schema=schema,
             project_id=None,
         )
@@ -516,16 +568,16 @@ class OpexColumnShapeTests(SimpleTestCase):
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
         self.assertIn('units', ctx.exception.missing)
 
-    def test_subtable_inside_opex_section_with_canonical_cols_passes(self):
-        sub_table = _opex_table(_canonical_opex_columns())
-        sub_table['title'] = 'Utilities'
-        sub_table['id'] = 'utilities'
-        schema = _doc([{
-            'type': 'section',
-            'id': 'sec_opex',
-            'title': 'Operating Expenses',
-            'children': [sub_table],
-        }])
+    def test_top_level_opex_table_with_canonical_cols_passes(self):
+        # Single top-level table titled "Operating Expenses" with the
+        # canonical 4-col shape. Replaces an earlier section-wrapped test —
+        # Pass 5's single-table mandate forbids top-level section blocks
+        # regardless, so the section-wrapped variant is no longer composable.
+        # The OpEx column rule still fires here via _is_opex_table's
+        # title detection.
+        opex_table = _opex_table(_canonical_opex_columns())
+        opex_table['id'] = 'opex_main'
+        schema = _doc([opex_table])
         validate_operating_statement_artifact(
             subtype=SUBTYPE_T12,
             title='T-12',

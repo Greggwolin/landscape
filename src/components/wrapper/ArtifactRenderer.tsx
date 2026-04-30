@@ -178,29 +178,29 @@ function ArtifactHeader({
       </div>
 
       <div className={styles.headerActions}>
-        {/* Edit (single modal or list dropdown) */}
+        {/* Edit (single modal or list dropdown) — icon-only to keep the
+            title from getting truncated when the panel is narrow. */}
         {editTarget && !editIsList && (
           <button
             type="button"
-            className={styles.btn}
+            className={`${styles.btn} ${styles.btnIcon}`}
             onClick={() => onOpenModal((editTarget as { modal_name: string }).modal_name)}
-            title="Open editing form"
+            title="Edit"
+            aria-label="Edit"
           >
-            <Edit2 size={11} />
-            Edit
+            <Edit2 size={12} />
           </button>
         )}
         {editTarget && editIsList && (
           <div className={styles.dropdown}>
             <button
               type="button"
-              className={styles.btn}
+              className={`${styles.btn} ${styles.btnIcon}`}
               onClick={() => setEditMenuOpen((v) => !v)}
-              title="Open editing form"
+              title="Edit"
+              aria-label="Edit"
             >
-              <Edit2 size={11} />
-              Edit
-              <ChevronDown size={11} />
+              <Edit2 size={12} />
             </button>
             {editMenuOpen && (
               <div className={styles.dropdownMenu}>
@@ -222,26 +222,26 @@ function ArtifactHeader({
           </div>
         )}
 
-        {/* Pin / Unpin */}
+        {/* Pin / Unpin — icon-only with tooltip */}
         {isPinned ? (
           <button
             type="button"
-            className={styles.btn}
+            className={`${styles.btn} ${styles.btnIcon}`}
             onClick={onUnpin}
             title="Unpin this artifact"
+            aria-label="Unpin"
           >
-            <Pin size={11} />
-            Unpin
+            <Pin size={12} />
           </button>
         ) : (
           <button
             type="button"
-            className={styles.btn}
+            className={`${styles.btn} ${styles.btnIcon}`}
             onClick={() => setPinPromptOpen(true)}
             title="Pin this artifact with a label"
+            aria-label="Pin"
           >
-            <Pin size={11} />
-            Pin
+            <Pin size={12} />
           </button>
         )}
         {pinPromptOpen && (
@@ -254,18 +254,18 @@ function ArtifactHeader({
           />
         )}
 
-        {/* Save as new version */}
+        {/* Save as new version — icon-only with tooltip */}
         <button
           type="button"
-          className={styles.btn}
+          className={`${styles.btn} ${styles.btnIcon}`}
           onClick={() => {
             const label = window.prompt('Optional label for this saved version:') ?? undefined;
             onSaveAsNewVersion(label || undefined);
           }}
           title="Save current state as a new version"
+          aria-label="Save version"
         >
-          <Save size={11} />
-          Save version
+          <Save size={12} />
         </button>
 
         {/* Refresh all stale */}

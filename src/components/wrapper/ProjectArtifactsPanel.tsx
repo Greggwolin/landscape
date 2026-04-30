@@ -149,15 +149,27 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
   /* ── Expanded panel ── */
   return (
     <>
-      {/* Drag handle on LEFT edge */}
+      {/* Drag handle on LEFT edge — wider than before (was 4px, hard to
+          target) and visible on hover so users can find it. */}
       <div
         className="wrapper-drag-handle"
         onPointerDown={handleResizeStart}
+        title="Drag to resize artifact panel"
         style={{
           cursor: 'col-resize',
-          width: 4,
+          width: 6,
           flexShrink: 0,
-          background: 'transparent',
+          background: 'var(--cui-border-color)',
+          opacity: 0.5,
+          transition: 'opacity 0.15s ease, background 0.15s ease',
+        }}
+        onPointerEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '1';
+          (e.currentTarget as HTMLDivElement).style.background = 'var(--cui-primary)';
+        }}
+        onPointerLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.opacity = '0.5';
+          (e.currentTarget as HTMLDivElement).style.background = 'var(--cui-border-color)';
         }}
       />
       <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
