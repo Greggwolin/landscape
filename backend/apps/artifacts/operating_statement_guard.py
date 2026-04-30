@@ -107,10 +107,13 @@ _FORBIDDEN_COLUMN_SUBSTRINGS_T12_ONLY = (
     'pro-forma rent',
 )
 
-# Canonical 5-column shape for any Operating Expenses table. Required keys —
+# Canonical 4-column shape for any Operating Expenses table. Required keys —
 # label / display name can vary, but the column key must be one of these
-# (case-insensitive).
-_OPEX_REQUIRED_COLUMN_KEYS = ('line', 'rate', 'annual', 'per_unit', 'per_sf')
+# (case-insensitive). Rates (e.g., "9.7%" vacancy, "3.0%" management fee) go
+# INLINE in the line-item label per the rendering spec, not as a separate
+# column. $/SF is dropped from the spec — operating statements are unit-
+# denominated, not SF-denominated.
+_OPEX_REQUIRED_COLUMN_KEYS = ('line', 'units', 'annual', 'per_unit')
 
 # Section-title substrings (case-insensitive) that mark an "Operating Expenses"
 # section. Any table nested inside such a section gets the canonical 5-column
@@ -132,6 +135,33 @@ _UNIT_TYPE_ROW_REGEX = re.compile(
     r'|efficiency|eff\b'
     r'|\d+\s*(br|bd|ba|bed|bath|bedroom|bathroom)'
     r')',
+    re.IGNORECASE,
+)
+
+# Property-metadata labels. An operating statement artifact should NOT contain
+# kv_grid pairs whose label is property metadata (units, square feet, year
+# built, address, zoning, etc.). Property NAME and Reporting PERIOD are allowed
+# as legitimate header info — they're not in this set. This is structural
+# protection: property metadata belongs on a Property Profile artifact, not an
+# operating statement, regardless of what the surrounding section is named.
+_PROPERTY_METADATA_LABEL_REGEX = re.compile(
+    r'\b('
+    r'units?'                         # Units, Unit Count
+    r'|unit count'
+    r'|square feet?'                  # Square Feet
+    r'|sq\.?\s*ft\.?'                 # Sq Ft, Sq.Ft.
+    r'|sqft'
+    r'|square footage'
+    r'|gross sq'                      # Gross Sq Ft
+    r'|net rentable'                  # Net Rentable SF
+    r'|rentable sq'
+    r'|year built'
+    r'|stories'
+    r'|address'
+    r'|apn'
+    r'|parcel(?: number)?'
+    r'|zoning'
+    r')\b',
     re.IGNORECASE,
 )
 
@@ -391,6 +421,35 @@ def _check_content_shape(*, subtype: str, schema: Any) -> None:
     for block, ancestors in _walk_blocks(schema):
         btype = block.get('type')
         title_norm = _block_title_normalized(block)
+
+        # Property-metadata pairs in kv_grid (all subtypes). Property NAME and
+        # PERIOD are allowed; physical-asset metrics (units, square feet, year
+        # built, address, zoning) are not. Catches the "Property & Period"
+        # section pattern where the model embeds property metadata in a kv_grid
+        # whose section heading bypasses the literal forbidden-section list.
+        if btype == 'key_value_grid':
+            pairs = block.get('pairs') or []
+            for pair in pairs:
+                if not isinstance(pair, dict):
+                    continue
+                label = pair.get('label')
+                if isinstance(label, str) and _PROPERTY_METADATA_LABEL_REGEX.search(label):
+                    raise OperatingStatementGuardError(
+                        code='property_metadata_in_os',
+                        subtype=subtype,
+                        message=(
+                            f'kv_grid {block.get("id")!r} has a property-metadata '
+                            f'pair (label={label!r}); this content belongs on a '
+                            f'Property Profile artifact, not an operating statement'
+                        ),
+                        guidance=(
+                            'Property metadata (units, square feet, year built, '
+                            'address, zoning, etc.) belongs on a separate Property '
+                            'Profile artifact. Remove these pairs and recompose. '
+                            'Property name and reporting period are allowed as '
+                            'header info.'
+                        ),
+                    )
 
         # Forbidden sections (all subtypes)
         if btype == 'section' and title_norm in _FORBIDDEN_SECTION_TITLES_ALL_SUBTYPES:

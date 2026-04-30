@@ -46,12 +46,15 @@ def _doc(blocks):
 
 
 def _canonical_opex_columns():
+    """4-column canonical shape per operating-statement rendering spec.
+    Rates go inline in labels (e.g., 'Management Fee (3.0%)'), not as a
+    separate column. $/SF is dropped from the spec.
+    """
     return [
-        {'key': 'line', 'label': 'Line'},
-        {'key': 'rate', 'label': 'Rate'},
+        {'key': 'line', 'label': ''},               # label column has no header per spec
+        {'key': 'units', 'label': 'Units'},
         {'key': 'annual', 'label': 'Annual'},
-        {'key': 'per_unit', 'label': 'Per Unit'},
-        {'key': 'per_sf', 'label': 'Per SF'},
+        {'key': 'per_unit', 'label': '$/Unit'},
     ]
 
 
@@ -239,6 +242,88 @@ class ForbiddenColumnTests(SimpleTestCase):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Content-shape: property-metadata pairs in kv_grid (all subtypes)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class PropertyMetadataKvGridTests(SimpleTestCase):
+    def _kv_grid(self, pairs):
+        return {
+            'type': 'key_value_grid',
+            'id': 'header_grid',
+            'pairs': pairs,
+        }
+
+    def test_units_pair_rejected_for_t12(self):
+        schema = _doc([self._kv_grid([
+            {'label': 'Property', 'value': 'Chadron Terrace'},
+            {'label': 'Units', 'value': 113},
+        ])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'property_metadata_in_os')
+
+    def test_square_feet_pair_rejected_for_f12_proforma(self):
+        schema = _doc([self._kv_grid([
+            {'label': 'Property', 'value': 'Chadron Terrace'},
+            {'label': 'Square Feet', 'value': 138504},
+            {'label': 'Period', 'value': 'F-12 forecast'},
+        ])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_F12_PROFORMA,
+                title='F-12 Proforma',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'property_metadata_in_os')
+
+    def test_year_built_pair_rejected(self):
+        schema = _doc([self._kv_grid([
+            {'label': 'Year Built', 'value': 2016},
+        ])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'property_metadata_in_os')
+
+    def test_property_and_period_only_passes(self):
+        # Property NAME and PERIOD are legitimate header info; no metadata.
+        schema = _doc([self._kv_grid([
+            {'label': 'Property', 'value': 'Chadron Terrace'},
+            {'label': 'Period', 'value': 'T-12 ending Apr 2026'},
+        ])])
+        validate_operating_statement_artifact(
+            subtype=SUBTYPE_T12,
+            title='T-12',
+            schema=schema,
+            project_id=None,
+        )
+
+    def test_address_pair_rejected_case_insensitive(self):
+        schema = _doc([self._kv_grid([
+            {'label': 'ADDRESS', 'value': '123 Main St'},
+        ])])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_CURRENT_PROFORMA,
+                title='Current Proforma',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'property_metadata_in_os')
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Content-shape: unit-type-row detection (T-12 only)
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -359,10 +444,33 @@ class OpexColumnShapeTests(SimpleTestCase):
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
         self.assertIn('per_unit', ctx.exception.missing)
 
-    def test_3_column_opex_rejected(self):
+    def test_old_5_col_with_rate_and_per_sf_rejected(self):
+        """The legacy 5-col shape (line/rate/annual/per_unit/per_sf) is no
+        longer canonical. Old shape that includes 'rate' or 'per_sf' is fine
+        if it ALSO includes 'units', but if 'units' is missing it should be
+        rejected — the new spec drops the rate column and adds units."""
         cols = [
             {'key': 'line', 'label': 'Line'},
             {'key': 'rate', 'label': 'Rate'},
+            {'key': 'annual', 'label': 'Annual'},
+            {'key': 'per_unit', 'label': 'Per Unit'},
+            {'key': 'per_sf', 'label': 'Per SF'},
+        ]
+        schema = _doc([_opex_table(cols)])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
+        self.assertIn('units', ctx.exception.missing)
+
+    def test_3_column_opex_rejected(self):
+        cols = [
+            {'key': 'line', 'label': 'Line'},
+            {'key': 'units', 'label': 'Units'},
             {'key': 'annual', 'label': 'Annual'},
         ]
         schema = _doc([_opex_table(cols)])
@@ -374,22 +482,21 @@ class OpexColumnShapeTests(SimpleTestCase):
                 project_id=None,
             )
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
-        self.assertEqual(set(ctx.exception.missing), {'per_unit', 'per_sf'})
+        self.assertIn('per_unit', ctx.exception.missing)
 
-    def test_subtable_inside_opex_section_with_4_cols_rejected(self):
+    def test_subtable_inside_opex_section_missing_units_rejected(self):
         # Sub-table titled "Taxes & Insurance" nested inside an "Operating
-        # Expenses" section, with only 4 columns (no Rate). The legacy rule
+        # Expenses" section, missing the new 'units' column. The legacy rule
         # missed this because the sub-table's own title doesn't match the
-        # OpEx detector. The new ancestor-aware check catches it.
+        # OpEx detector. The ancestor-aware check catches it.
         sub_table = {
             'type': 'table',
             'id': 'taxes_insurance',
             'title': 'Taxes & Insurance',
             'columns': [
-                {'key': 'line', 'label': 'Line Item'},
+                {'key': 'line', 'label': ''},
                 {'key': 'annual', 'label': 'Annual'},
                 {'key': 'per_unit', 'label': '$/Unit'},
-                {'key': 'per_sf', 'label': '$/SF'},
             ],
             'rows': [],
         }
@@ -407,9 +514,9 @@ class OpexColumnShapeTests(SimpleTestCase):
                 project_id=None,
             )
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
-        self.assertIn('rate', ctx.exception.missing)
+        self.assertIn('units', ctx.exception.missing)
 
-    def test_subtable_inside_opex_section_with_5_cols_passes(self):
+    def test_subtable_inside_opex_section_with_canonical_cols_passes(self):
         sub_table = _opex_table(_canonical_opex_columns())
         sub_table['title'] = 'Utilities'
         sub_table['id'] = 'utilities'

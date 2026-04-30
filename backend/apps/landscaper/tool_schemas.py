@@ -4798,7 +4798,22 @@ LANDSCAPER_TOOLS = [
                         "If the project lacks the source data required for a subtype (e.g., no "
                         "market rents on file for current_proforma), the guard will reject; "
                         "ASK the user how to proceed using the suggested_user_question from the "
-                        "rejection envelope. NEVER pick silently when sources conflict."
+                        "rejection envelope. NEVER pick silently when sources conflict. "
+                        "STRUCTURE — operating statement artifacts use the 4-column canonical "
+                        "shape: `line` (label, no header text in the column itself), `units` "
+                        "(integer, populated only on income unit-type rows like 1BR/1BA, blank "
+                        "elsewhere), `annual` (dollar amount), `per_unit` ($/Unit dollar amount). "
+                        "Do NOT include a `rate` column or a `per_sf` column. Rates (vacancy %, "
+                        "management fee %, etc.) go INLINE in the line label like 'Less: Physical "
+                        "Vacancy (9.7%)' or 'Management Fee (3.0%)'. Render the column-header row "
+                        "ONCE at the top — do not repeat headers per sub-section. Operating "
+                        "Expenses sub-categories (Taxes & Insurance, Utilities, Repairs & "
+                        "Maintenance, Administrative, Management & Reserves) belong as text-style "
+                        "section labels, not as separate tables each with their own column "
+                        "headers. Do NOT include property metadata (units count, square feet, "
+                        "year built, address, zoning) in any kv_grid — that content belongs on a "
+                        "Property Profile artifact. Property NAME and reporting PERIOD are "
+                        "allowed as kv_grid header pairs."
                     ),
                 },
                 "edit_target": {
