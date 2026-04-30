@@ -318,8 +318,12 @@ class SourcePresenceTests(SimpleTestCase):
             )
 
     def test_t12_subtype_rejected_when_no_actuals_and_no_doc(self):
-        # Both fetchone calls return None — no actuals, no operating-statement doc
-        connection = self._mock_cursor([None, None])
+        # Three fetchone calls all return None:
+        #   1. core_fin_fact_actual → None
+        #   2. core_doc taxonomy match → None
+        #   3. core_doc + core_doc_text fallback → None
+        # → guard raises missing_t12_source.
+        connection = self._mock_cursor([None, None, None])
         with mock.patch('django.db.connection', connection):
             with self.assertRaises(OperatingStatementGuardError) as ctx:
                 validate_operating_statement_artifact(
@@ -336,9 +340,10 @@ class SourcePresenceTests(SimpleTestCase):
         #   1. _has_t12_source → core_fin_fact_actual returns (1,) → t12 passes
         #   2-4. _has_market_rent_source unit-level probes (multifamily_unit,
         #        rent_roll_unit, multifamily_unit_type) all return None
-        #   5. _has_market_rent_source core_doc fallback returns None
+        #   5. _has_market_rent_source core_doc taxonomy probe → None
+        #   6. _has_market_rent_source core_doc_text fallback → None
         # → guard raises missing_market_rent_source.
-        connection = self._mock_cursor([(1,), None, None, None, None])
+        connection = self._mock_cursor([(1,), None, None, None, None, None])
         with mock.patch('django.db.connection', connection):
             with self.assertRaises(OperatingStatementGuardError) as ctx:
                 validate_operating_statement_artifact(

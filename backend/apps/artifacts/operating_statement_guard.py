@@ -461,11 +461,27 @@ def _check_source_data_presence(*, subtype: str, project_id: int) -> None:
 
 
 def _has_t12_source(project_id: int) -> bool:
-    """Permissive: any historical operating data on file = pass."""
+    """Permissive: any historical operating data on file = pass.
+
+    Three-layer probe (each in its own try/except so a missing/renamed
+    table or column falls through to the next):
+
+      1. `core_fin_fact_actual` — operations entered via Operations tab.
+      2. `core_doc` filtered by `doc_type` against the canonical taxonomy
+         (Offering Memorandum, Operating Statement, Financial Model,
+         Appraisal, Proforma, Diligence — see
+         docs/02-features/financial-engine/data_validation_lists_reference.md).
+         The pattern set intentionally errs broad: any doc that COULD
+         contain operating data passes the check.
+      3. Final fallback — any doc with extracted text content (joined to
+         `core_doc_text`). Catches the case where `doc_type` is NULL or
+         a custom value the user set; if the doc has text we can work with,
+         the model has something to compose against.
+    """
     from django.db import connection
 
     with connection.cursor() as cur:
-        # Primary: actuals fact table
+        # 1. Actuals fact table
         try:
             cur.execute(
                 """
@@ -481,10 +497,12 @@ def _has_t12_source(project_id: int) -> bool:
         except Exception as exc:  # pragma: no cover — defensive
             logger.debug('_has_t12_source: core_fin_fact_actual probe failed: %s', exc)
 
-        # Fallback: any operating-statement-shaped doc in DMS.
-        # NOTE: core_doc uses `deleted_at IS NULL` for soft-delete (timestamp
-        # column), unlike most other landscape tables which use `is_active`.
-        # Confirmed via dbshell against live schema 2026-04-30.
+        # 2. Doc taxonomy match. Patterns broadened beyond Operating Statement /
+        # Offering Memorandum to include other taxonomy entries that routinely
+        # contain operating data (Financial Model, Appraisal, Proforma) plus
+        # Diligence as a folder/bucket fallback. Match is case-insensitive
+        # substring, against the canonical TitleCase values per
+        # docs/02-features/financial-engine/data_validation_lists_reference.md.
         try:
             cur.execute(
                 """
@@ -499,8 +517,14 @@ def _has_t12_source(project_id: int) -> bool:
                     OR LOWER(COALESCE(doc_type, '')) LIKE '%%trailing%%'
                     OR LOWER(COALESCE(doc_type, '')) LIKE '%%p&l%%'
                     OR LOWER(COALESCE(doc_type, '')) LIKE '%%profit%%loss%%'
-                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering memo%%'
-                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering memorandum%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%memorandum%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%proforma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%pro forma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%pro-forma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%financial model%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%appraisal%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%diligence%%'
                   )
                 LIMIT 1
                 """,
@@ -509,7 +533,32 @@ def _has_t12_source(project_id: int) -> bool:
             if cur.fetchone():
                 return True
         except Exception as exc:  # pragma: no cover — defensive
-            logger.debug('_has_t12_source: core_doc probe failed: %s', exc)
+            logger.debug('_has_t12_source: core_doc taxonomy probe failed: %s', exc)
+
+        # 3. Final fallback — any non-deleted doc with extracted text content.
+        # If the user has uploaded ANY classified or extracted doc, the model
+        # has something to compose against. Catches NULL-or-custom doc_type
+        # values that slip past the taxonomy patterns. The content-shape rules
+        # and prompt-side discipline still prevent fabrication of forbidden
+        # blocks/columns; the source-presence check at this point is just
+        # confirming the project isn't empty.
+        try:
+            cur.execute(
+                """
+                SELECT 1
+                FROM landscape.core_doc d
+                JOIN landscape.core_doc_text t ON t.doc_id = d.doc_id
+                WHERE d.project_id = %s
+                  AND d.deleted_at IS NULL
+                  AND COALESCE(LENGTH(t.extracted_text), 0) > 0
+                LIMIT 1
+                """,
+                [project_id],
+            )
+            if cur.fetchone():
+                return True
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.debug('_has_t12_source: core_doc_text fallback probe failed: %s', exc)
 
     return False
 
@@ -581,7 +630,10 @@ def _has_market_rent_source(project_id: int) -> bool:
         except Exception as exc:  # pragma: no cover — defensive
             logger.debug('_has_market_rent_source: tbl_multifamily_unit_type probe failed: %s', exc)
 
-        # 4. Document-shaped fallback
+        # 4. Doc taxonomy match — broadened to include all canonical doc_types
+        # that routinely contain rent data. Same rationale as _has_t12_source:
+        # be inclusive about what counts as a possible source; the content-shape
+        # rules + prompt-side discipline catch fabrication.
         try:
             cur.execute(
                 """
@@ -592,9 +644,17 @@ def _has_market_rent_source(project_id: int) -> bool:
                   AND (
                        LOWER(COALESCE(doc_type, '')) LIKE '%%rent roll%%'
                     OR LOWER(COALESCE(doc_type, '')) LIKE '%%rent comp%%'
-                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering memo%%'
-                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering memorandum%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%rent_roll%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%offering%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%memorandum%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%proforma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%pro forma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%pro-forma%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%appraisal%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%financial model%%'
                     OR LOWER(COALESCE(doc_type, '')) LIKE '%%market study%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%market data%%'
+                    OR LOWER(COALESCE(doc_type, '')) LIKE '%%diligence%%'
                   )
                 LIMIT 1
                 """,
@@ -603,6 +663,26 @@ def _has_market_rent_source(project_id: int) -> bool:
             if cur.fetchone():
                 return True
         except Exception as exc:  # pragma: no cover — defensive
-            logger.debug('_has_market_rent_source: core_doc probe failed: %s', exc)
+            logger.debug('_has_market_rent_source: core_doc taxonomy probe failed: %s', exc)
+
+        # 5. Final fallback — any non-deleted doc with extracted text content.
+        # Mirrors the t12 check; catches NULL-or-custom doc_type values.
+        try:
+            cur.execute(
+                """
+                SELECT 1
+                FROM landscape.core_doc d
+                JOIN landscape.core_doc_text t ON t.doc_id = d.doc_id
+                WHERE d.project_id = %s
+                  AND d.deleted_at IS NULL
+                  AND COALESCE(LENGTH(t.extracted_text), 0) > 0
+                LIMIT 1
+                """,
+                [project_id],
+            )
+            if cur.fetchone():
+                return True
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.debug('_has_market_rent_source: core_doc_text fallback probe failed: %s', exc)
 
     return False
