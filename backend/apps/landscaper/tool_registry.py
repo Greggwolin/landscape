@@ -171,6 +171,7 @@ MF_ONLY_TOOLS = [
 # Shared by MF + Office + Retail + Industrial (not land dev).
 INCOME_PROPERTY_TOOLS = [
     "update_operating_expenses",
+    "get_operating_statement",
     "get_acquisition", "update_acquisition",
     "get_revenue_rent", "update_revenue_rent",
     "get_revenue_other", "update_revenue_other",

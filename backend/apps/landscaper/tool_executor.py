@@ -3704,6 +3704,68 @@ def handle_get_revenue_rent(
     )
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Operating Statement (full structured P&L)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@register_tool('get_operating_statement')
+def handle_get_operating_statement(
+    tool_input: Dict[str, Any],
+    project_id: int,
+    **kwargs,
+) -> Dict[str, Any]:
+    """Return the full structured operating statement / T-12 / P&L for a project.
+
+    Wraps the same view that powers the Operations tab — `GET
+    /api/projects/<id>/operations/`. Use this BEFORE composing a `create_artifact`
+    call for any operating-statement / T-12 / P&L request. Returns a dict with:
+
+        - project metadata (project_id, project_name, project_type_code,
+          analysis_type, value_add_enabled, active_opex_discriminator)
+        - assumptions (physical_vacancy_pct, bad_debt_pct, concessions_pct,
+          management_fee_pct, replacement_reserve_pct, ...)
+        - rental_income (rows + total)
+        - vacancy_deductions (rows + total)
+        - other_income (rows + total)
+        - operating_expenses (rows grouped by category + total)
+        - totals (potential_rental_income, effective_gross_income,
+          total_operating_expenses, net_operating_income)
+        - unit_count, square_feet
+
+    Composition tip: use the categorized operating_expenses to build a `table`
+    block per category (Taxes & Insurance, Utilities, Repairs & Maintenance,
+    Administrative, Other Expenses, Management & Reserves), then a totals
+    `key_value_grid`.
+    """
+    try:
+        from django.test import RequestFactory
+        from apps.financial.views_operations import operations_data
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('get_operating_statement: import failed')
+        return {'success': False, 'error': f'failed to import operations view: {exc}'}
+
+    try:
+        factory = RequestFactory()
+        req = factory.get(f'/api/projects/{int(project_id)}/operations/')
+        resp = operations_data(req, int(project_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('get_operating_statement: view call failed')
+        return {'success': False, 'error': f'operations view raised: {exc}'}
+
+    status_code = getattr(resp, 'status_code', 500)
+    payload = getattr(resp, 'data', None)
+    if status_code != 200:
+        return {
+            'success': False,
+            'error': f'operations endpoint returned HTTP {status_code}',
+            'detail': payload,
+        }
+    return {
+        'success': True,
+        'data': payload,
+    }
+
+
 @register_tool('update_revenue_rent', is_mutation=True)
 def handle_update_revenue_rent(
     tool_input: Dict[str, Any],

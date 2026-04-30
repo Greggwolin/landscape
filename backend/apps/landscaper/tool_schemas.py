@@ -534,6 +534,25 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_operating_statement",
+        "description": (
+            "Return the full structured operating statement / T-12 / P&L for the "
+            "active project. Wraps the same view that powers the Operations tab. "
+            "Returns a dict with project metadata, assumptions, rental_income rows + "
+            "total, vacancy_deductions rows + total, other_income rows + total, "
+            "operating_expenses rows grouped by category + total, totals "
+            "(potential_rental_income, effective_gross_income, "
+            "total_operating_expenses, net_operating_income), unit_count, square_feet. "
+            "MUST be called as the FIRST step before composing a create_artifact call "
+            "for any operating-statement / T-12 / P&L / income-statement request. "
+            "Multifamily / Office / Retail / Hotel only — refuse on Land Dev projects."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "update_revenue_rent",
         "description": "Update rent revenue assumptions.",
         "input_schema": {
@@ -4723,7 +4742,24 @@ LANDSCAPER_TOOLS = [
     # ─── Generative Artifacts (Finding #4, Phase 1) ──────────────────────────
     {
         "name": "create_artifact",
-        "description": "Create a structured artifact in the right-side panel for the user to view and edit. Use when the answer is meaningful as a viewable/editable structured object — tabular financial data, multi-section summaries, comparisons, syntheses. Do NOT use for simple factual answers, single-value lookups, or conversational replies. The artifact persists with the project and is editable inline. STRICT TRIGGER guidance lives in BASE_INSTRUCTIONS § ARTIFACTS — FIRING DISCIPLINE (added in Phase 4).",
+        "description": (
+            "Create a structured artifact in the right-side panel for the user to view "
+            "and edit. THIS IS THE REQUIRED OUTPUT FORMAT for any request that asks for "
+            "tabular financial data (operating statement / T-12 / P&L / income statement, "
+            "rent roll, comp grid, cap stack, sources & uses, debt schedule, cash flow, "
+            "waterfall, IRR table, DCF schedule, budget, draw schedule, variance report) "
+            "OR multi-section summaries / comparisons / synthesis views. "
+            "WHEN A USER REQUEST MATCHES ANY OF THE ABOVE, YOU MUST CALL create_artifact. "
+            "Do not reply in prose. Do not summarize the data in chat. Do not list bullet "
+            "points of the values. The user has a panel for structured content — use it. "
+            "After this tool returns, your chat reply is 1-3 sentences pointing AT the "
+            "artifact (e.g. 'Operating statement is in the right panel'). "
+            "Do NOT use for: single-value lookups ('what's the cap rate'), yes/no "
+            "questions, or conversational replies. "
+            "Strict firing rules and the required tool-call sequence (DB read first, "
+            "then create_artifact) live in BASE_INSTRUCTIONS § ARTIFACTS — FIRING "
+            "DISCIPLINE."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {

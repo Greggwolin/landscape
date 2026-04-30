@@ -458,39 +458,25 @@ function SectionBlockRenderer({
   removedRowPaths,
   onUpdate,
 }: SectionBlockRendererProps) {
-  const [collapsed, setCollapsed] = useState<boolean>(Boolean(block.collapsed));
   const childrenPath = [...blockPath, 'children'];
 
+  // Flat-section rendering — operating-statement style. No card frame,
+  // no collapsing, just a label header above continuous content. The
+  // spec called for collapsible cards but the chrome buried the data.
   return (
-    <div className={styles.section}>
-      <div
-        className={`${styles.sectionHeader} ${collapsed ? styles.sectionHeaderCollapsed : ''}`}
-        onClick={() => setCollapsed((v) => !v)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setCollapsed((v) => !v);
-          }
-        }}
-      >
-        <span>{block.title}</span>
-        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+    <section className={styles.section}>
+      <h3 className={styles.sectionHeader}>{block.title}</h3>
+      <div className={styles.sectionBody}>
+        <BlockListRenderer
+          blocks={block.children}
+          sourcePointers={sourcePointers}
+          currentValues={currentValues}
+          removedRowPaths={removedRowPaths}
+          basePath={childrenPath}
+          onUpdate={onUpdate}
+        />
       </div>
-      {!collapsed && (
-        <div className={styles.sectionBody}>
-          <BlockListRenderer
-            blocks={block.children}
-            sourcePointers={sourcePointers}
-            currentValues={currentValues}
-            removedRowPaths={removedRowPaths}
-            basePath={childrenPath}
-            onUpdate={onUpdate}
-          />
-        </div>
-      )}
-    </div>
+    </section>
   );
 }
 

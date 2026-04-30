@@ -181,59 +181,64 @@
   font-size: 11px;
 }
 
-/* ─── Section block ──────────────────────────────────────────────────── */
+/* ─── Section block — flat statement style, no card frame ────────────── */
 
 .section {
-  background: var(--cui-tertiary-bg);
-  border: 1px solid var(--cui-border-color);
-  border-radius: 6px;
-  margin-bottom: 8px;
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0 0 8px 0;
+  overflow: visible;
 }
 
 .sectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: var(--cui-secondary-bg);
-  border-bottom: 1px solid var(--cui-border-color);
-  cursor: pointer;
-  user-select: none;
-  font-size: 12px;
+  display: block;
+  margin: 0 0 4px 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: default;
+  user-select: text;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--cui-body-color);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--cui-secondary-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding-bottom: 4px;
 }
 
+/* Kept for backward compat — flat sections never collapse. */
 .sectionHeaderCollapsed {
-  border-bottom: none;
+  display: none;
 }
 
 .sectionBody {
-  padding: 8px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* ─── Table block ────────────────────────────────────────────────────── */
+/* ─── Table block — flat statement style ────────────────────────────── */
 
 .tableWrap {
-  border: 1px solid var(--cui-border-color);
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--cui-tertiary-bg);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  margin-bottom: 4px;
 }
 
 .tableTitle {
-  padding: 6px 10px;
+  padding: 4px 0 2px 0;
   font-size: 11px;
   font-weight: 600;
-  color: var(--cui-secondary-color);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  background: var(--cui-secondary-bg);
-  border-bottom: 1px solid var(--cui-border-color);
+  color: var(--cui-body-color);
+  text-transform: none;
+  letter-spacing: 0;
+  background: transparent;
+  border-bottom: 0;
 }
 
 .table {
@@ -245,14 +250,14 @@
 }
 
 .table th {
-  padding: 6px 8px;
+  padding: 4px 8px 2px 8px;
   text-align: left;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--cui-secondary-color);
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  background: var(--cui-secondary-bg);
+  background: transparent;
   border-bottom: 1px solid var(--cui-border-color);
   white-space: normal;
   vertical-align: bottom;
@@ -260,8 +265,8 @@
 }
 
 .table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--cui-border-color);
+  padding: 3px 8px;
+  border-bottom: 1px dotted var(--cui-border-color);
   white-space: nowrap;
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
@@ -357,26 +362,32 @@
 
 .kvGrid {
   display: grid;
-  gap: 4px 16px;
-  background: var(--cui-tertiary-bg);
-  border: 1px solid var(--cui-border-color);
-  border-radius: 4px;
-  padding: 8px 12px;
+  gap: 4px 24px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
 }
 
 .kvPair {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   padding: 2px 0;
   border-bottom: 1px dotted var(--cui-border-color);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kvLabel {
   font-size: 11px;
   color: var(--cui-secondary-color);
-  white-space: nowrap;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .kvValue {
@@ -386,6 +397,7 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .kvValueEditable {
