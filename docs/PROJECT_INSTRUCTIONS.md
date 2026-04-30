@@ -1,7 +1,8 @@
-# Landscape Project Instructions — v3.0 (Unified)
+# Landscape Project Instructions — v3.1 (Unified)
 
-**Last Updated:** April 25, 2026
-**Supersedes:** Cowork Edition v1.2 + Claude.ai v2.4
+**Last Updated:** April 30, 2026
+**Supersedes:** v3.0 (April 25, 2026)
+**Changes from v3.0:** §5.7 rewritten as the explicit Plain-English Chat Replies rule with a single carve-out for technical questions. Added matching anti-pattern entry in §6.0. The rule now lives in personal preferences too (cross-project), not just this file.
 **Canonical Location:** `/landscape/docs/PROJECT_INSTRUCTIONS.md` (this file)
 **Mirror Targets:** Cowork project settings, Claude.ai project knowledge, any future Claude system with repo access
 
@@ -203,9 +204,24 @@ All must pass:
 
 **5.6** Always include numbers and letters (no bullet points) in questions for easy reference. Multi-part questions use 1a, 1b, 1c style.
 
-**5.7** Do NOT include code or SQL unless given explicit instructions to do so.
+**5.7 Plain-English chat replies.** All chat dialogue with Gregg must be written in plain English. The following are not permitted in normal conversation:
 
-**5.8** Do NOT include "time to complete" estimates for tasks or processes.
+- File names, folder names, or paths (e.g., `CLAUDE.md`, `tool_schemas.py`, `/w/`)
+- Database table, column, schema, or migration names
+- Code-construct names (functions, classes, methods, hooks, components, decorators)
+- Branch names, commit hashes, session IDs, ticket numbers
+- Server, deployment, or infrastructure terms (commit, push, deploy, build, endpoint, API, merge, stage, diff, stash)
+- Programming language or framework names (React, Python, TypeScript, SQL, Django)
+
+**Single carve-out.** When Gregg's own message asks a specifically technical question (e.g., "what's the file path?", "what branch are we on?", "what does the function return?"), Cowork may answer in technical terms appropriate to that question. The carve-out is narrow: it fires only when Gregg's message asks for a technical answer, not when Cowork is summarizing technical work it just did.
+
+**Files are exempt.** Documents and prompts produced for technical audiences (CC prompts, code, audits, spec files, this document itself) may contain full technical detail — that's their purpose. The rule applies to chat dialogue only.
+
+**Translation pattern.** Describe the thing, don't name it: "the file that tells the coding assistant how the project works" instead of `CLAUDE.md`; "the chat-first version of the app" instead of `the /w/ route layer`; "saved the changes" instead of "committed".
+
+**5.8** Do NOT include code or SQL blocks in chat unless explicitly asked. (Reinforces 5.7 for the specific case of code/query content.)
+
+**5.9** Do NOT include "time to complete" estimates for tasks or processes.
 
 ---
 
@@ -229,6 +245,7 @@ Things that cause frustration. Do not do these.
 - Drafting implementation prompts without reading existing specs in the working directory first (§1.4.4)
 - Trusting the compaction summary over `THREAD_STATE.md` for file paths, line numbers, or decisions (§1.4.3)
 - Delivering a technical spec as a single tech-heavy `.md` without the plain-English HTML companion (§10.5)
+- Slipping technical jargon (file names, branch names, table names, infrastructure terms) into plain conversation when no technical question was asked (§5.7)
 
 ---
 
