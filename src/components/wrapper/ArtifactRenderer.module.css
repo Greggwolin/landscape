@@ -311,21 +311,38 @@
    spec example.
 */
 
-/* Subtotal row: bold, single thin black rule above. */
+/* Subtotal row: bold, single thin black rule above the numeric cells only.
+   The label cell (and the drift cell, when present) get no border so the
+   rule sits visually under the data, not under the line label. */
 .subtotalRow td {
   font-weight: 700;
-  border-top: 1px solid var(--cui-body-color);
   padding-top: 5px;
 }
 
-/* Grand total row (e.g., Net Operating Income): bold, with both top and
-   bottom rules to box the value off as a final result. */
+.subtotalRow td:not(:first-child) {
+  border-top: 1px solid var(--cui-body-color);
+}
+
+.subtotalRow td.driftCell + td {
+  border-top: 0;
+}
+
+/* Grand total row (e.g., Net Operating Income): bold, with top + bottom
+   rules on numeric cells only. Same drift-cell-aware fallback. */
 .grandTotalRow td {
   font-weight: 700;
-  border-top: 1px solid var(--cui-body-color);
-  border-bottom: 1px solid var(--cui-body-color);
   padding-top: 5px;
   padding-bottom: 5px;
+}
+
+.grandTotalRow td:not(:first-child) {
+  border-top: 1px solid var(--cui-body-color);
+  border-bottom: 1px solid var(--cui-body-color);
+}
+
+.grandTotalRow td.driftCell + td {
+  border-top: 0;
+  border-bottom: 0;
 }
 
 /* Section divider row (Income / Operating Expenses inside the same big
@@ -358,6 +375,19 @@
    bottom border (it's the section name). Override the not-first-child
    rule above. */
 .sectionDividerRow td.driftCell + td {
+  border-bottom: 0;
+}
+
+/* Subsequent section_divider rows (everything after the first one) do
+   NOT get the bottom-border underline — their numeric cells are blank
+   so the underline would float under nothing and look like a stray rule.
+   The first section_divider keeps its underline (column-label rule). */
+.sectionDividerNoHeader td:not(:first-child) {
+  border-bottom: 0;
+  font-weight: 400;
+}
+
+.sectionDividerNoHeader td.driftCell + td {
   border-bottom: 0;
 }
 

@@ -535,7 +535,15 @@ function TableBlockRenderer({
             // Stateful pass over rows so line-item depth depends on whether
             // we're currently inside a subsection. Section dividers and
             // subtotals/totals reset the subsection context.
+            //
+            // `firstSectionDividerSeen` controls column-label rendering on
+            // section_divider rows. Only the first one shows column labels
+            // (Annual / $/Unit) in its numeric cells — subsequent section
+            // dividers (e.g., Operating Expenses after Income) show only
+            // the section name with blank numeric cells, so the column
+            // labels don't repeat down the artifact.
             let inSubsection = false;
+            let firstSectionDividerSeen = false;
             return block.rows.map((row, rIdx) => {
               const rowPath = [...blockPath, 'rows', String(rIdx)];
               const rowPathStr = rowPath.join('/');
@@ -546,6 +554,7 @@ function TableBlockRenderer({
 
               const kind = classifyRow(row, block.columns);
               let depth = 0;
+              const isFirstSectionDivider = kind === 'section_divider' && !firstSectionDividerSeen;
               switch (kind) {
                 case 'section_divider':
                 case 'subtotal':
@@ -561,9 +570,15 @@ function TableBlockRenderer({
                   depth = inSubsection ? 2 : 1;
                   break;
               }
+              if (kind === 'section_divider') {
+                firstSectionDividerSeen = true;
+              }
 
               const rowClass = [
                 kind === 'section_divider' ? styles.sectionDividerRow : '',
+                kind === 'section_divider' && !isFirstSectionDivider
+                  ? styles.sectionDividerNoHeader
+                  : '',
                 kind === 'subsection' ? styles.subsectionRow : '',
                 kind === 'subtotal' ? styles.subtotalRow : '',
                 kind === 'grand_total' ? styles.grandTotalRow : '',
@@ -589,17 +604,21 @@ function TableBlockRenderer({
                   const cellPath = [...rowPath, 'cells', col.key];
                   const isLabelCol = col.key === labelKey;
 
-                  // Section divider rows: label cell shows section name,
-                  // numeric cells show the column label (acting as the
-                  // section's header). Bottom border styling is handled in
-                  // CSS via .sectionDividerRow + :not(:first-child).
+                  // Section divider rows: label cell shows section name.
+                  // Numeric cells show column labels (Annual / $/Unit) ONLY
+                  // on the FIRST section_divider — subsequent ones leave
+                  // numeric cells blank so the column header doesn't repeat
+                  // down the artifact. `isFirstSectionDivider` was captured
+                  // BEFORE flipping the flag earlier in this row's pass.
                   if (kind === 'section_divider') {
                     return (
                       <td
                         key={col.key}
                         className={alignClass(col.align)}
                       >
-                        {isLabelCol ? cellValue ?? '' : col.label}
+                        {isLabelCol
+                          ? cellValue ?? ''
+                          : isFirstSectionDivider ? col.label : ''}
                       </td>
                     );
                   }
