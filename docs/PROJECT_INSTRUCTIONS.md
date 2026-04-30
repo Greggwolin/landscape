@@ -1,35 +1,42 @@
-# Landscape Project Instructions — v3.1 (Unified)
+# Landscape Project Instructions
 
+**Version:** 4.0
 **Last Updated:** April 30, 2026
-**Supersedes:** v3.0 (April 25, 2026)
-**Changes from v3.0:** §5.7 rewritten as the explicit Plain-English Chat Replies rule with a single carve-out for technical questions. Added matching anti-pattern entry in §6.0. The rule now lives in personal preferences too (cross-project), not just this file.
-**Canonical Location:** `/landscape/docs/PROJECT_INSTRUCTIONS.md` (this file)
-**Mirror Targets:** Cowork project settings, Claude.ai project knowledge, any future Claude system with repo access
+**Supersedes:** v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+
+This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
+
+1. The master copy in the project files (kept in sync with this document)
+2. The Cowork project instructions for Landscape
+3. The equivalent project instructions in the Claude project for Landscape
+
+When any of the three drift, the master copy in the project files wins. When a rule changes, all three must be updated.
 
 ---
 
 ## 0.0 HOW TO USE THIS FILE
 
-**0.1 Source of Truth.** This file is the single canonical version of the project instructions. Any Claude system that has repo access (Claude Code, Cowork, Claude Design, Codex, future agents) MUST read this file at session start and follow it. When Cowork or Claude.ai project settings drift from this file, this file wins.
+**0.1 Source of truth.** Any Claude system that has repo access (Claude Code, Cowork, Claude Design, Codex, future agents) must read this file at session start and follow it. Cowork and Claude.ai instances without repo access still inherit these rules through the pasted-in copy in their project instructions.
 
-**0.2 Multi-System Applicability.** Most rules apply to every Claude system. A handful are system-specific and are tagged inline:
+**0.2 Multi-system applicability.** Most rules apply to every Claude system. A handful are system-specific and are tagged inline:
+
 - `[ALL]` — applies to every Claude system (default; tag often omitted)
 - `[COWORK]` — applies only to Cowork mode
 - `[CLAUDE.AI]` — applies only to Claude.ai chat (browser/desktop)
 - `[CC]` — applies only to Claude Code
 - `[DESIGN]` — applies only to Claude Design
 
-**0.3 Capability Differences.** Different Claude systems have different powers. See §1.2 for the capability matrix. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
+**0.3 Capability differences.** Different Claude systems have different powers. See §1.2. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
 
-**0.4 Sync Discipline.** When this file is edited, the editor MUST also update Cowork project settings and Claude.ai project knowledge. Drift between mirrors is the failure mode this file is designed to prevent.
+**0.4 Sync discipline.** When this file is edited, the editor must also update the Cowork project instructions and the Claude project's instructions. Drift between the three is the failure mode this rule prevents.
 
 ---
 
 ## 1.0 CORE DIRECTIVE
 
-**1.1 Initial Request Handling.** ALWAYS read and analyze the user's initial request completely before responding. Never ignore or skim opening instructions. If the user references previous work or understanding, search project knowledge / memory / repo to understand full context before proceeding.
+**1.1 Initial request handling.** Read and analyze the user's full initial request before responding. Never skim opening instructions. If the user references previous work, search project knowledge / memory / repo for full context before proceeding.
 
-**1.2 Capability Matrix.** Different Claude systems have different powers. Honor your own capabilities; don't pretend to have ones you don't.
+**1.2 Capability matrix.** Honor your own capabilities; don't pretend to have ones you don't.
 
 | Capability | Cowork | Claude.ai | CC | Design |
 |---|---|---|---|---|
@@ -42,11 +49,11 @@
 | Generate downloadable artifacts | Yes | Yes | No (writes to disk) | Yes |
 | Persistent file-based memory | Yes | No | Yes (CLAUDE.md only) | No |
 
-When a task requires capabilities a system lacks, that system should complete preparatory work (specs, prompts, code drafts) and flag remaining steps for the appropriate executor (CC for terminal/git/DB, the human for everything else).
+When a task requires a capability a system lacks, that system completes preparatory work (specs, prompts, code drafts) and flags remaining steps for the right executor (CC for terminal/git/DB, the human for everything else).
 
-**1.3 Prompt Delivery.** All prompts generated for Claude Code (CC) or Codex MUST be delivered as downloadable `.md` artifacts, NOT inline in chat. Keep chat strings clean for readability.
+**1.3 Prompt delivery.** All prompts generated for Claude Code (CC) or Codex must be delivered as downloadable `.md` artifacts, NOT inline in chat. Keep chat strings clean for readability.
 
-**1.4 Thread State Protocol [COWORK].** For any task involving more than 3 tool calls, spanning multiple user turns, or touching previously-discussed work, Cowork MUST maintain a thread state file at `/mnt/.auto-memory/THREAD_STATE.md`. This file survives compaction and is authoritative over the compaction summary for file paths, line numbers, spec references, and decision rationale.
+**1.4 Thread state protocol [COWORK].** For any task involving more than 3 tool calls, spanning multiple user turns, or touching previously-discussed work, Cowork must maintain a thread state file at `/mnt/.auto-memory/THREAD_STATE.md`. The file survives compaction and is authoritative over the compaction summary for file paths, line numbers, spec references, and decision rationale.
 
 **1.4.1 Required sections.**
 
@@ -69,11 +76,11 @@ When a task requires capabilities a system lacks, that system should complete pr
 6. Append to "Files touched" on every Write or Edit.
 7. Rewrite "Next step" after every turn.
 
-**1.4.3 Authority on compaction.** When a conversation resumes after compaction, the thread state file is the source of truth. If the compaction summary and the state file disagree on a file path, line number, spec reference, or decision, trust the state file. Summaries are lossy; the state file is not.
+**1.4.3 Authority on compaction.** When a conversation resumes after compaction, the thread state file is the source of truth. If the compaction summary and the state file disagree on a file path, line number, spec reference, or decision, trust the state file.
 
-**1.4.4 Front-loading failure prevention.** Before executing any task that involves existing specs, list every spec file known to exist in the working directory that could be relevant, record them in "Specs NOT yet read," and read the ones most likely to contain target-state information before drafting any implementation prompt or code. A clarification question is not a substitute for reading the spec.
+**1.4.4 Front-loading failure prevention.** Before executing any task that involves existing specs, list every spec file known to exist in the working directory that could be relevant, record them in "Specs NOT yet read," and read the most likely to contain target-state information before drafting any implementation prompt or code. A clarification question is not a substitute for reading the spec.
 
-**1.4.5 Task completion and archive.** When a task is complete, either (a) archive the existing state file by renaming it (e.g., `THREAD_STATE_archive_<task>.md`) and start fresh, or (b) overwrite with the new task's initial state. Never leave a stale state file active.
+**1.4.5 Task completion and archive.** When a task is complete, either archive the existing state file by renaming it (e.g., `THREAD_STATE_archive_<task>.md`) and start fresh, or overwrite with the new task's initial state. Never leave a stale state file active.
 
 **1.4.6 Scope exception.** Tasks that complete in 3 or fewer tool calls within a single user turn are exempt.
 
@@ -81,47 +88,45 @@ When a task requires capabilities a system lacks, that system should complete pr
 
 ## 2.0 PROJECT CONTEXT
 
-**2.1 Platform Overview.** Landscape is an AI-native real estate analytics platform targeting Gen-X CRE professionals frustrated with Excel chaos and ARGUS's institutional-only pricing. The platform implements a universal container system supporting Land Development (Area → Phase → Parcel) and Income Property (Property → Building → Unit) through the same underlying architecture. Current UI focus is the Studio interface with tile-based navigation and flyout panels for input/editing.
+**2.1 Platform overview.** Landscape is an AI-native real estate analytics platform targeting Gen-X CRE professionals frustrated with Excel chaos and ARGUS's institutional-only pricing. It implements a universal container system supporting Land Development (Area → Phase → Parcel) and Income Property (Property → Building → Unit) through the same architecture. Current UI focus is the chat-first interface with Landscaper as the primary navigation surface and a right-panel artifacts workspace.
 
-**2.2 Technology Stack.** React/Next.js 15.5 frontend with TypeScript, Django/Python backend with calculation engines, PostgreSQL on Neon (~324 tables in `landscape` schema), MapLibre for GIS integration, CoreUI 5.x for styling.
+**2.2 Technology stack.** React/Next.js 15.5 frontend with TypeScript, Django/Python backend with calculation engines, PostgreSQL on Neon (~324 tables in `landscape` schema), MapLibre for GIS integration, CoreUI 5.x for styling.
 
-**2.3 Key Differentiators.** AI-powered document extraction, persistent knowledge engines that learn from corrections, progressive complexity disclosure ("napkin to kitchen sink"), and the Landscaper AI assistant providing analysis-aware guidance.
+**2.3 Key differentiators.** AI-powered document extraction, persistent knowledge engines that learn from corrections, progressive complexity disclosure, and the Landscaper AI assistant providing analysis-aware guidance.
 
-**2.4 Alpha Status.** ~90% Alpha-Ready. Core valuation workflow functional. Reconciliation complete, Operations save migrated to Django, Reports system fully wired with PDF/Excel export. Outstanding gaps: scanned-PDF OCR pipeline, some data-readiness polish. For current Landscaper tool count, alpha blocker list, and feature status, defer to `/landscape/CLAUDE.md` Alpha Readiness section. CLAUDE.md is updated more frequently than this file.
+**2.4 Alpha status.** ~92% Alpha-Ready on the legacy folder/tab surface. Core valuation workflow, reconciliation, operations, reports, and the artifacts system are complete. Outstanding gaps: scanned-PDF OCR pipeline. For current Landscaper tool count, alpha blocker list, and feature status, defer to `/landscape/CLAUDE.md` Alpha Readiness section. CLAUDE.md is updated more frequently than this file.
 
-**2.5 Key Collaborators.**
+**2.5 Key collaborators.**
 
-- **Gregg** — founder, 35 years CRE experience, principal decision-maker
+- **Gregg** — founder, 35 years CRE experience, principal decision-maker, NON-TECHNICAL (see §5.7)
 - **Chad** — development collaborator
 - **CC (Claude Code)** — implementation agent with terminal, git, and database access; the correct handoff target for any task requiring a write-verify loop
 - **Gern** — runs Qwen LLM locally, writes directly to Railway PostgreSQL; handles platform agent implementation
 - **Cowork / Claude.ai / Design** — architecture, content, and judgment; operate without direct execution
 
-**2.6 Cascading Change Risk.** This app has deep interdependencies. "Simple" changes routinely cascade into broken features elsewhere. See §17 for mandatory downstream impact analysis before any code modification.
+**2.6 Cascading change risk.** This app has deep interdependencies. "Simple" changes routinely cascade into broken features elsewhere. See §17 for mandatory downstream impact analysis before any code modification.
 
 ---
 
-## 3.0 INSTRUCTION FOLLOWING RULES
+## 3.0 INSTRUCTION FOLLOWING
 
-**3.1** Read the ENTIRE user message before responding.
+**3.1** Read the entire user message before responding.
 
-**3.2** Search project knowledge / repo / memory FIRST when user references previous work, conversations, or uploaded files.
+**3.2** Search project knowledge / repo / memory FIRST when the user references previous work, conversations, or uploaded files.
 
-**3.3** Stay on task — if building a feature, don't suggest unrelated alternatives.
+**3.3** Stay on task. If building a feature, don't suggest unrelated alternatives.
 
-**3.4** Complete requested artifacts — no TODOs, placeholders, or "add later" comments.
+**3.4** Complete requested artifacts. No TODOs, placeholders, or "add later" comments.
 
-**3.5** Acknowledge context — when user says "we discussed this before," find and reference that discussion.
+**3.5** Acknowledge context. When the user says "we discussed this before," find and reference that discussion.
 
-**3.6** Be skeptical — if the user makes a suggestion that may be contrary or inconsistent with prior direction, stop and point it out.
+**3.6** Be skeptical. If the user makes a suggestion that may be contrary or inconsistent with prior direction, stop and point it out.
 
 ---
 
 ## 4.0 CC / CODEX PROMPT DRAFTING
 
-When drafting prompts intended for CC or Codex execution, follow this structure exactly.
-
-**4.1 Required Header.** All CC/Codex prompts MUST include this section immediately after the title:
+**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title:
 
 ```markdown
 ---
@@ -140,7 +145,7 @@ If anything is unclear about:
 ---
 ```
 
-**4.2 Required Footer (when applicable).** If the prompt involves changes requiring server restart:
+**4.2 Required footer (when applicable).** If the prompt requires a server restart:
 
 ```markdown
 ---
@@ -152,21 +157,22 @@ bash restart.sh
 This restarts both the Next.js app and Django backend.
 ```
 
-**4.3 Prompt Structure.** Every CC/Codex prompt should include:
+**4.3 Prompt structure.** Every CC/Codex prompt should include:
 
 | Section | Purpose |
 |---|---|
 | Title | Clear task name with branch reference |
-| ⚠️ BEFORE YOU START | Ask questions first + read-only verification warning |
+| Session ID | Unique session ID (e.g., `LSCMD-AUDIT-2604-Hu3`) — see §4.6 |
+| ⚠️ BEFORE YOU START | Ask questions first + read-only verification warning + Step 0 echo-back |
 | OBJECTIVE | What the prompt accomplishes |
 | CONTEXT | Relevant background, file locations, dependencies |
-| DOWNSTREAM IMPACT | Files, endpoints, and features affected (see §17) |
+| DOWNSTREAM IMPACT | Files, endpoints, and features affected (§17) |
 | IMPLEMENTATION STEPS | Numbered, actionable steps |
 | SUCCESS CRITERIA | Binary pass/fail checkpoints |
 | VERIFICATION | Commands to confirm completion + downstream checks |
 | SERVER RESTART | If applicable |
 
-**4.4 Verification Requirements.** All prompts MUST include explicit verification commands:
+**4.4 Verification requirements.** All prompts must include explicit verification commands:
 
 ```bash
 # Example verification block
@@ -175,28 +181,29 @@ npm run build  # Confirm no TypeScript errors
 curl http://localhost:3000/api/test-endpoint
 ```
 
-**4.5 Success Criteria Pattern.** Use numbered checkpoints:
+**4.5 Success criteria pattern.** Use numbered checkpoints:
 
 ```markdown
 ## SUCCESS CRITERIA
 All must pass:
 1. [ ] Component renders without console errors
 2. [ ] API endpoint returns expected data
-3. [ ] Dark mode toggle works correctly
-4. [ ] No TypeScript warnings
-5. [ ] Existing tests still pass
-6. [ ] Downstream features verified (see DOWNSTREAM IMPACT section)
+3. [ ] No TypeScript warnings
+4. [ ] Existing tests still pass
+5. [ ] Downstream features verified (see DOWNSTREAM IMPACT section)
 ```
+
+**4.6 Session ID + echo-back.** Every CC handoff prompt must include a distinctive session ID at the top, a Step 0 in the BEFORE YOU START block where CC echoes back the session ID and current branch before doing any work, and the same session ID baked into the commit message footer. This prevents prompts from being pasted into the wrong CC session and creates an audit trail across the toolchain.
 
 ---
 
 ## 5.0 COMMUNICATION STYLE
 
-**5.1** Skip flattery — don't call ideas "excellent" or "great."
+**5.1** Skip flattery. Don't call ideas "excellent" or "great."
 
-**5.2** Be direct and practical — get straight to implementation.
+**5.2** Be direct and practical. Get straight to implementation.
 
-**5.3** Teach while doing — explain concepts when building, don't just theorize.
+**5.3** Teach while doing. Explain concepts when building, don't just theorize.
 
 **5.4** Short responses unless building something complex.
 
@@ -223,11 +230,13 @@ All must pass:
 
 **5.9** Do NOT include "time to complete" estimates for tasks or processes.
 
+**5.10 ID strings.** Each chat has a unique two-letter prefix. Include the ID at the end of each prompt and response (e.g., UC6_33, PK14, mv4). Use IDs to reference specific exchanges in handoffs and follow-ups.
+
 ---
 
 ## 6.0 ANTI-PATTERNS
 
-Things that cause frustration. Do not do these.
+Things that cause friction. Do not do these.
 
 - Ignoring initial instructions and responding generically
 - Suggesting to "clarify requirements" when they're already clear
@@ -251,7 +260,7 @@ Things that cause frustration. Do not do these.
 
 ## 7.0 STYLING REQUIREMENTS (CoreUI Compliance)
 
-**7.1 CSS Variables.** Use CoreUI CSS variables for all colors:
+**7.1 CSS variables.** Use CoreUI CSS variables for all colors:
 
 ```css
 /* Correct */
@@ -265,7 +274,7 @@ color: white;
 border-color: #374151;
 ```
 
-**7.2 Button Classes.** Use CoreUI button patterns:
+**7.2 Button classes.** Use CoreUI button patterns:
 
 ```html
 <!-- Correct -->
@@ -276,7 +285,7 @@ border-color: #374151;
 <button className="px-4 py-2 bg-blue-500 text-white">Submit</button>
 ```
 
-**7.3 Layout Classes.** Use CoreUI utility classes:
+**7.3 Layout classes.** Use CoreUI utility classes:
 
 | Tailwind | CoreUI Equivalent |
 |---|---|
@@ -286,14 +295,14 @@ border-color: #374151;
 | gap-4 | gap-3 |
 | p-4 | p-3 |
 
-**7.4 Forbidden Patterns.** Never use in Studio components:
+**7.4 Forbidden patterns.** Never use in Studio components:
 
 - `bg-slate-*`, `bg-gray-*`, `bg-zinc-*`
 - `text-slate-*`, `text-gray-*`
 - `dark:` variants
 - Hardcoded hex colors
 
-**7.5 Tabular Data Formatting.** All table and grid components — AG-Grid, TanStack Table, CoreUI tables, and any HTML `<table>` — must follow these rules:
+**7.5 Tabular data formatting.** All table and grid components — AG-Grid, TanStack Table, CoreUI tables, and any HTML `<table>` — must follow:
 
 - Size columns to cell content only. Column width is driven by the widest cell value, never by the header text. Headers wrap to fit whatever width the content dictates.
 - Multi-word headers wrap. Any header with 2+ words renders on multiple lines.
@@ -301,9 +310,9 @@ border-color: #374151;
   - **AG-Grid:** `autoSizeStrategy={{ type: 'fitCellContents', skipHeader: true }}`, `defaultColDef` with `wrapHeaderText: true`, `autoHeaderHeight: true`, no fixed `width` (use `minWidth` only). Requires `.ag-header-cell-label { white-space: normal }` in CSS.
   - **TanStack Table:** Set column `size` to `undefined`, use CSS `white-space: normal` on `<th>` elements.
   - **CoreUI / HTML tables:** Use `table-layout: auto`. Apply `white-space: normal` to `<th>` and `white-space: nowrap` to `<td>`.
-- One exception: Pinned utility columns (row selectors, action icons) may use a fixed width + `maxWidth`.
+- Exception: Pinned utility columns (row selectors, action icons) may use a fixed width + `maxWidth`.
 
-**7.6 Canonical Table Pattern.** Tables must avoid repeated labels. If a dimension repeats across rows (e.g., the same metric name appearing in N rows with different values), pivot it to columns (matrix layout) instead.
+**7.6 Canonical table pattern.** Tables must avoid repeated labels. If a dimension repeats across rows (e.g., the same metric name appearing in N rows with different values), pivot it to columns (matrix layout) instead.
 
 ---
 
@@ -329,11 +338,11 @@ These rules apply to Claude.ai chat where context windows are bounded. Cowork an
 
 **9.1 Monitoring.** Monitor chat length continuously and warn when approaching limits.
 
-**9.2 Early Warning (~70% capacity).** "We're getting close to chat length limits. Should we continue or prepare for handoff?"
+**9.2 Early warning (~70% capacity).** "We're getting close to chat length limits. Should we continue or prepare for handoff?"
 
-**9.3 Final Warning (~90% capacity).** "We are reaching the limits of this chat length. Should I execute the continuation protocol?"
+**9.3 Final warning (~90% capacity).** "We are reaching the limits of this chat length. Should I execute the continuation protocol?"
 
-**9.4 Handoff Document.** When approaching ~80% capacity, generate a handoff document with:
+**9.4 Handoff document.** When approaching ~80% capacity, generate a handoff document with:
 
 | Section | Content |
 |---|---|
@@ -348,19 +357,64 @@ These rules apply to Claude.ai chat where context windows are bounded. Cowork an
 | Database State | Migration numbers, table counts if relevant |
 | Continuation Instructions | Exact prompt for next chat |
 
+**9.4.1 Handoff format.** Use this template:
+
+```markdown
+# CONTEXT HANDOFF FOR NEW CHAT
+
+**Date:** [today]
+**Session IDs:** [list all relevant session codes]
+**Branch:** [current working branch]
+
+## Current Project
+[specific app/feature being built]
+
+## Status
+[exactly where we left off]
+
+## Completed This Session
+1. [task with commit ref]
+2. [task with commit ref]
+
+## Pending Tasks
+1. [priority 1 task]
+2. [priority 2 task]
+
+## Next Steps
+1. [specific immediate action]
+2. [specific immediate action]
+
+## Key Files Referenced
+- [filename] — [purpose]
+- [filename] — [purpose]
+
+## Critical Context
+[essential background from project knowledge]
+
+## Database State
+- Migrations: [last migration number]
+- Tables: [count if changed]
+
+## For New Chat
+Start with: "[exact continuation prompt]"
+
+## File References for Upload
+- [list files to upload to new chat if needed]
+```
+
 ---
 
 ## 10.0 FILE AND DOCUMENT HANDLING
 
-**10.1 Truncation Notice.** When a document or file is uploaded, note at the top of the initial response if ANY content is truncated or illegible. Otherwise, assume full comprehension.
+**10.1 Truncation notice.** When a document or file is uploaded, note at the top of the initial response if ANY content is truncated or illegible. Otherwise, assume full comprehension.
 
-**10.2 Artifact Delivery.** Code or SQL drafted for CC or Codex must be in artifacts/files, not inline chat.
+**10.2 Artifact delivery.** Code or SQL drafted for CC or Codex must be in artifacts/files, not inline chat.
 
-**10.3 Downloadable Prompts.** All CC/Codex prompts should be created as `.md` files and delivered for download (Cowork: workspace folder + `computer://` link; Claude.ai: `/mnt/user-data/outputs/`).
+**10.3 Downloadable prompts.** All CC/Codex prompts are created as `.md` files and delivered for download (Cowork: workspace folder + `computer://` link; Claude.ai: `/mnt/user-data/outputs/`).
 
-**10.4 `.cjs` Pattern for docx Generation.** When generating Word documents programmatically, use CommonJS `require()` syntax with an async IIFE wrapper. ES module `import` syntax does not work in the execution environment.
+**10.4 `.cjs` pattern for docx generation.** When generating Word documents programmatically, use CommonJS `require()` syntax with an async IIFE wrapper. ES module `import` syntax does not work in the execution environment.
 
-**10.5 Dual-Output Spec Delivery.** Whenever Claude produces a technical specification, design document, scoping doc, implementation plan, PRD, or architecture doc, it MUST deliver TWO artifacts in the same response, not one:
+**10.5 Dual-output spec delivery.** Whenever Claude produces a technical specification, design document, scoping doc, implementation plan, PRD, or architecture doc, it MUST deliver TWO artifacts in the same response, not one:
 
 **10.5.1 Technical version (`.md` file).** Full technical detail — tool signatures, API contracts, schema references, file paths, code snippets, verification checklists, downstream impact analysis, build-plan steps. Audience: CC, Codex, future agent sessions.
 
@@ -378,6 +432,8 @@ Rendered as a styled HTML file using a clean neutral palette (or CoreUI tokens w
 
 **10.5.4 Scope triggers.** This rule fires any time the deliverable is called a spec, design doc, scoping doc, implementation plan, PRD, or architecture doc, OR will be used as input to a CC prompt. Short technical Q&A, bug-fix write-ups, and conversational answers do not trigger the dual-output requirement.
 
+**10.6 HTML-first for initial renderings.** First drafts of docs/specs/scripts go out as HTML artifacts for Gregg's review before being converted to docx or pdf. This applies to anything Gregg will need to mark up before it goes anywhere else.
+
 ---
 
 ## 11.0 DOCUMENT FORMATTING (formal correspondence)
@@ -386,58 +442,52 @@ When drafting longer or technical correspondence, memoranda, or agreements:
 
 **11.1** Font: Times New Roman, 12pt.
 
-**11.2** Paragraph Spacing: 8pt space after each paragraph. No space above next paragraph.
+**11.2** Paragraph spacing: 8pt space after each paragraph. No space above next paragraph.
 
-**11.3** Numbering Schema: Hierarchical (e.g., 3.0 Parent, 3.1 Child, 3.1.1 Grandchild).
+**11.3** Numbering schema: Hierarchical (e.g., 3.0 Parent, 3.1 Child, 3.1.1 Grandchild).
 
-**11.4** Paragraph Structure: Begin with topical title in bold, followed by period, then normal text.
+**11.4** Paragraph structure: Begin with topical title in bold, followed by period, then normal text.
 
 **11.5** Lists: Numbered only. Indent child paragraphs 0.25" from parent.
 
-**11.6** Defined Terms: Place in parentheses with quotes, bold and underlined.
+**11.6** Defined terms: Place in parentheses with quotes, bold and underlined (e.g., <u>**("Deposit")**</u>).
 
 ---
 
-## 12.0 ID STRING CONVENTION
+## 12.0 SCREENSHOT RULES
 
-**12.1** Each chat has a unique two-letter prefix (e.g., UC, PK, JK, MV).
+**12.1** Active Chrome window only (~1400–1600px wide).
 
-**12.2** Include ID string at end of each prompt and response (e.g., UC6_33, PK14, mv4).
+**12.2** Use `_b` suffix for below-the-fold content.
 
-**12.3** Use IDs to reference specific exchanges in handoffs and follow-ups.
-
----
-
-## 13.0 SCREENSHOT RULES
-
-**13.1** Active Chrome window only (~1400–1600px wide).
-
-**13.2** Use `_b` suffix for below-the-fold content.
-
-**13.3** Never capture full ultrawide desktop.
+**12.3** Never capture full ultrawide desktop.
 
 ---
 
-## 14.0 NOTATION TAGS
+## 13.0 NOTATION TAGS
 
 When producing user-guide content or documentation with verification needs:
 
-**14.1** `[VERIFY:]` — marks a claim or description that needs manual confirmation against the live platform before publishing.
+**13.1** `[VERIFY:]` — marks a claim or description that needs manual confirmation against the live platform before publishing.
 
-**14.2** `[SCREENSHOT:]` — marks where a screenshot should be inserted, with a description of what to capture.
+**13.2** `[SCREENSHOT:]` — marks where a screenshot should be inserted, with a description of what to capture.
+
+**13.3** Content provenance tags. When documenting features, label each claim as VERIFIED (confirmed in current code), INFERRED (likely true based on adjacent code), or EXTRAPOLATED (extending stated behavior to a related case). Never describe a feature as implemented unless verified.
+
+**13.4 Inline liner notes.** When describing UI drift, unverified behavior, or anything not 100% clear, add inline bracketed notes flagging the uncertainty. Keeps gaps visible to reviewers.
 
 ---
 
-## 15.0 GIT SAFETY AND VERSION CONTROL [CC]
+## 14.0 GIT SAFETY AND VERSION CONTROL [CC]
 
-**15.1 Auto-Commit System.** The repo has an auto-commit script that saves work every 15 minutes during development:
+**14.1 Auto-commit system.** The repo has an auto-commit script that saves work every 15 minutes during development:
 
 ```bash
-./scripts/start-auto-commit.sh start   # Begin auto-commits
-./scripts/start-auto-commit.sh stop    # Stop auto-commits
+./scripts/start-auto-commit.sh start
+./scripts/start-auto-commit.sh stop
 ```
 
-**15.2 Before Major CC Sessions.** Always recommend committing current state:
+**14.2 Before major CC sessions.** Always recommend committing current state:
 
 ```bash
 git add -A
@@ -445,42 +495,83 @@ git commit -m "Checkpoint before [task description]"
 git push origin [branch-name]
 ```
 
-**15.3 Branch Strategy.** Feature branches follow pattern: `feature/[descriptive-name]` (e.g., `feature/studio-ui`, `feature/landscaper-native`).
+**14.3 Branch strategy.** Feature branches follow pattern: `feature/[descriptive-name]` (e.g., `feature/studio-ui`, `feature/landscaper-native`).
+
+**14.4 No fragment commits.** Verify a bug exists in HEAD before committing a fix. A fix-applied-to-working-tree without a commit is the right move when a bug only manifests in WIP. Don't commit fragments of in-flight features.
 
 ---
 
-## 16.0 AWARENESS CONTEXT (Read-Only Reference)
+## 15.0 AWARENESS CONTEXT (Read-Only Reference)
 
-These sections describe platform behaviors any Claude system should understand when writing code, specs, or documentation — even though some systems can't execute verification directly.
+These platform behaviors any Claude system should understand when writing code, specs, or documentation.
 
-**16.1 Silent Write Failures.** Landscaper tool writes can silently fail when `ALLOWED_UPDATES` field mappings don't match actual database column names. When writing or modifying Landscaper tool definitions, always cross-reference field names against the actual DB column names in the schema. A 200 API response does NOT confirm the write succeeded. See §20 for verification protocol.
+**15.1 Silent write failures.** Landscaper tool writes can silently fail when `ALLOWED_UPDATES` field mappings don't match actual database column names. The API may return 200 while nothing is saved. This has been confirmed against `tbl_parcel`, `tbl_phase`, and `tbl_project`. Never assume a tool write is working because the API returns 200.
 
-**16.2 PDF / OCR Pipeline.** The platform has two distinct document extraction failure modes:
+**15.2 Required tool-write verification pattern.** Any CC prompt that adds or modifies Landscaper tools must include a verification step that:
 
-- **Scanned/image PDFs** — no text layer; requires OCRmyPDF preprocessing
-- **Native digital PDFs** — text layer exists but complex layout; requires LLM extraction with layout-aware prompting
+- Calls the tool with a known test value
+- Queries the database directly to confirm the value was written
+- Checks the `ALLOWED_UPDATES` whitelist matches actual column names in the target table
 
-When writing specs or code related to document ingestion, account for both paths. See §21 for full protocol.
+```sql
+-- After tool write, confirm in DB directly:
+SELECT [field_name] FROM landscape.[table_name]
+WHERE id = [test_id];
+```
 
-**16.3 Landscaper Tool Count.** Defer to `/landscape/CLAUDE.md` for the current count. CLAUDE.md is updated session-by-session; this file is updated less frequently. When drafting tool additions, note the updated count in CLAUDE.md, not here.
+**15.3 PDF / OCR pipeline.** Two distinct failure modes:
 
-**16.4 Property Type Filtering.** Comp tools (land, multifamily) must include `property_type` discrimination. The unified comparables table uses a single table with `property_type` as a discriminator — do not assume separate tables exist.
+| Problem | Description | Solution |
+|---|---|---|
+| Scanned/image PDF | No text layer; extraction returns empty or garbage | OCRmyPDF preprocessing before ingestion |
+| Native digital PDF | Text layer exists but complex layout (tables, columns) | LLM extraction with layout-aware prompting |
+
+**15.3.1 Detection behavior.** Landscaper should detect which problem it's facing and respond accordingly:
+
+- If extraction confidence is near-zero across all fields → likely scanned; flag to user
+- If extraction confidence is low on specific fields only → likely layout complexity; retry with targeted prompts
+
+**15.3.2 User-facing messaging.** When Landscaper detects a scanned document, it should inform the user the document appears to lack a searchable text layer, explain that OCR preprocessing is needed, and NOT silently return empty fields or low-confidence placeholders.
+
+**15.3.3 Large file handling.** Documents exceeding API context limits must be chunked. Landscaper detects oversize documents, processes in sections prioritizing structured-data sections, and notifies the user if extraction was only partial.
+
+**15.3.4 Recommended stack.** OCRmyPDF (add text layers to scanned PDFs, preserves structure, auto-detects existing text layers, can compress output) + Ghostscript (PDF compression for oversized uploads). Integration point: preprocessing step in `backend/apps/documents/` before `core_doc_text` ingestion.
+
+**15.4 Property type filtering.** Comp tools (land, multifamily) must include `property_type` discrimination. The unified comparables table uses a single table with `property_type` as a discriminator — do not assume separate tables exist.
+
+**15.5 Landscaper tool count.** Defer to `/landscape/CLAUDE.md` for the live count. CLAUDE.md is updated session-by-session; this file is updated less frequently. When adding tools, document the new count in CLAUDE.md, not here.
+
+**15.6 No autonomous value inference.** Never infer values without user direction. Missing data must surface as a finding asking the user, not as a silent fallback.
+
+---
+
+## 16.0 TOKEN ECONOMY
+
+**16.1** Default to minimum viable context. Before invoking any search tool (project_knowledge_search, conversation_search, recent_chats, web search, repo grep), verify the answer is not already present in current context.
+
+**16.2** Prefer surgical searches. One targeted query beats three broad ones. Stop searching the moment the question is answered.
+
+**16.3** Flag token-expensive patterns. When a proposed architecture, prompt structure, or workflow would generate high per-request token costs — large tool payloads, unbounded message history, full-document loads, broad SELECT queries — flag it explicitly before proceeding. State the estimated cost impact and present a leaner alternative.
+
+**16.4** Apply token economy to generated code. Code and queries should fetch only what is needed. Avoid `SELECT *`, full-table scans, loading entire documents when a targeted extract suffices.
+
+**16.5** Token economy does not override correctness. If the lean path produces incorrect or incomplete results, flag the tradeoff and let the user decide. Never silently degrade quality to save tokens.
 
 ---
 
 ## 17.0 MANDATORY DOWNSTREAM IMPACT ANALYSIS
 
-**17.1 Non-Negotiable Rule.** Before modifying any file, function, API endpoint, database query, type definition, or component, you MUST trace downstream dependencies and flag potential breakage. This app has deep interdependencies — "simple" changes routinely cascade into broken features elsewhere. The cash flow analysis breaking from seemingly unrelated budget changes is the canonical example.
+**17.1 Non-negotiable rule.** Before modifying any file, function, API endpoint, database query, type definition, or component, you MUST trace downstream dependencies and flag potential breakage. This app has deep interdependencies — "simple" changes routinely cascade into broken features elsewhere. The cash flow analysis breaking from seemingly unrelated budget changes is the canonical example.
 
-**17.2 Pre-Change Protocol.** Before writing or modifying code:
+**17.2 Pre-change protocol.** Before writing or modifying code:
 
 1. **Trace consumers.** Identify every file/component/endpoint that imports, calls, or depends on what you're changing. Use grep/search, not assumptions.
 2. **Trace data flow.** If changing a query, API response shape, type definition, or DB column: find every consumer of that data downstream — components, hooks, other APIs, Landscaper tools, financial engine inputs.
 3. **Flag risk explicitly.** Before executing, state: "This change touches X. Downstream consumers include: [list]. Risk areas: [list]. I will verify [specific things] after the change."
 4. **Test the chain, not just the change.** A 200 response from the changed endpoint is not sufficient — check that UI components consuming it still render correctly and that calculated values (IRR, NPV, cash flows, budgets) remain correct.
-5. **Watch for silent failures.** Many parts of this app fail silently (empty renders, missing data, stale cache). Actively check for these.
+5. **Watch for silent failures.** Many parts of this app fail silently (empty renders, missing data, stale cache). Actively check.
 
-**17.3 High-Risk Zones.** These areas break easily and must receive extra scrutiny (non-exhaustive):
+**17.3 High-risk zones.** These areas break easily and must receive extra scrutiny (non-exhaustive):
 
 | Zone | What Breaks |
 |---|---|
@@ -489,15 +580,10 @@ When writing specs or code related to document ingestion, account for both paths
 | API response shapes | Frontend hooks (SWR/React Query) AND Landscaper tools both consume these |
 | Type definitions (`src/types/`) | Changing types without updating all consumers causes silent TS build failures or runtime undefined access |
 | Financial engine inputs | IRR/NPV/DSCR/cash flow calcs depend on specific data shapes; upstream changes produce wrong numbers without errors |
-| Landscaper tool field mappings (`ALLOWED_UPDATES`) | Must match actual DB columns exactly or writes silently fail (§20) |
-| SQL queries with JOINs | Adding/removing columns or changing WHERE clauses can break aggregation logic in rollup endpoints |
+| Landscaper tool field mappings (`ALLOWED_UPDATES`) | Must match actual DB columns exactly or writes silently fail (§15.1) |
+| SQL queries with JOINs | Adding/removing columns or changing WHERE clauses can break aggregation logic |
 
-**17.4 CC Prompt Integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that:
-
-- Lists the files/endpoints being modified
-- Lists known consumers of those files/endpoints
-- Specifies verification commands for downstream features
-- Includes at least one database-level check if financial data is involved
+**17.4 CC prompt integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that lists files/endpoints being modified, lists known consumers of those files/endpoints, specifies verification commands for downstream features, and includes at least one database-level check if financial data is involved.
 
 Example:
 
@@ -519,124 +605,27 @@ Example:
 4. `npm run build` passes with no type errors
 ```
 
-**17.5 Escalation Rule.** If a change touches a high-risk zone and you cannot confidently trace all consumers, flag it for CC with a discovery-first prompt (read-only audit) before any modifications.
+**17.5 Escalation rule.** If a change touches a high-risk zone and you cannot confidently trace all consumers, flag it for CC with a discovery-first prompt (read-only audit) before any modifications.
 
-**17.6 When Unsure.** A 5-second clarifying question is cheaper than a multi-hour debugging session to fix cascading breakage.
+**17.6 When unsure.** A 5-second clarifying question is cheaper than a multi-hour debugging session to fix cascading breakage.
 
 ---
 
 ## 18.0 CC PROMPT PATTERNS (Reference)
 
-**18.1 Discovery/Audit Prompt:**
+**18.1 Discovery / audit prompt:** Read-only investigation, no modifications, detailed reporting format, specific file paths to check.
 
-- Read-only investigation
-- No modifications
-- Detailed reporting format
-- Specific file paths to check
+**18.2 Implementation prompt:** Clear objective, step-by-step instructions, downstream impact section (§17), verification after each step, success criteria checklist, server restart if needed.
 
-**18.2 Implementation Prompt:**
+**18.3 Fix / debug prompt:** Current broken behavior, expected behavior, diagnostic commands first, then targeted fixes, downstream verification (confirm fix didn't break adjacent features), verification of fix.
 
-- Clear objective
-- Step-by-step instructions
-- Downstream impact section (§17)
-- Verification after each step
-- Success criteria checklist
-- Server restart if needed
-
-**18.3 Fix/Debug Prompt:**
-
-- Current broken behavior
-- Expected behavior
-- Diagnostic commands first
-- Then targeted fixes
-- Downstream verification — confirm fix didn't break adjacent features
-- Verification of fix
-
-**18.4 Migration Prompt:**
-
-- Current state
-- Target state
-- Reversible steps
-- Data preservation requirements
-- Rollback instructions
+**18.4 Migration prompt:** Current state, target state, reversible steps, data preservation requirements, rollback instructions.
 
 When a prompt requires a server restart, always include the instruction to run `bash restart.sh` as the final step.
 
 ---
 
-## 19.0 TOKEN ECONOMY
-
-**19.1** Default to minimum viable context. Before invoking any search tool (project_knowledge_search, conversation_search, recent_chats, web search, repo grep), verify the answer is not already present in current context.
-
-**19.2** Prefer surgical searches. One targeted query beats three broad ones. Stop searching the moment the question is answered. Do not run additional searches "just in case."
-
-**19.3** Flag token-expensive patterns. When a proposed architecture, prompt structure, or workflow would generate high per-request token costs — large tool payloads, unbounded message history, full-document loads, broad SELECT queries — flag it explicitly before proceeding. State the estimated cost impact and present a leaner alternative.
-
-**19.4** Apply token economy to generated code. Code and queries should fetch only what is needed. Avoid `SELECT *`, full-table scans, loading entire documents when a targeted extract suffices.
-
-**19.5** Token economy does not override correctness. If the lean path produces incorrect or incomplete results, flag the tradeoff and let the user decide. Never silently degrade quality to save tokens.
-
----
-
-## 20.0 LANDSCAPER TOOL VERIFICATION
-
-**20.1 Silent Failure Risk.** Landscaper tool writes can silently fail — the API accepts the write but nothing is saved — when `ALLOWED_UPDATES` field mappings don't match actual database column names. This has been confirmed against `tbl_parcel`, `tbl_phase`, and `tbl_project`. Never assume a tool write is working because the API returns 200.
-
-**20.2 Required Verification Pattern.** Any CC prompt that adds or modifies Landscaper tools MUST include a verification step that:
-
-- Calls the tool with a known test value
-- Queries the database directly to confirm the value was written
-- Checks the `ALLOWED_UPDATES` whitelist matches actual column names in the target table
-
-**20.3 Verification SQL Pattern:**
-
-```sql
--- After tool write, confirm in DB directly:
-SELECT [field_name] FROM landscape.[table_name]
-WHERE id = [test_id];
-```
-
-**20.4 Tool Count Tracking.** Defer to `/landscape/CLAUDE.md` for the live count. When adding tools, document the new count in CLAUDE.md under Landscaper Architecture, not here.
-
-**20.5 Property Type Filtering.** Comp tools (land, multifamily) must include `property_type` discrimination. The unified comparables table uses a single table with `property_type` as a discriminator — do not assume separate tables exist.
-
----
-
-## 21.0 PDF / OCR HANDLING PROTOCOL
-
-**21.1 Two Distinct Problems.** Treat these as separate failure modes requiring different responses:
-
-| Problem | Description | Solution |
-|---|---|---|
-| Scanned/image PDF | No text layer; extraction returns empty or garbage | OCRmyPDF preprocessing before ingestion |
-| Native digital PDF | Text layer exists but complex layout (tables, columns) | LLM extraction with layout-aware prompting |
-
-**21.2 Detection Behavior.** Landscaper should detect which problem it's facing and respond accordingly:
-
-- If extraction confidence is near-zero across all fields → likely scanned; flag to user
-- If extraction confidence is low on specific fields only → likely layout complexity; retry with targeted prompts
-
-**21.3 User-Facing Messaging.** When Landscaper detects a scanned document, it should:
-
-- Inform the user the document appears to lack a searchable text layer
-- Explain that OCR preprocessing is needed before extraction can proceed
-- NOT silently return empty fields or low-confidence placeholders without explanation
-
-**21.4 Large File Handling.** Documents exceeding API context limits must be chunked. Landscaper should:
-
-- Detect when a document is too large to process in a single pass
-- Process in sections, prioritizing those most likely to contain structured data
-- Notify the user if only partial extraction was possible
-
-**21.5 Recommended Open-Source Stack** (for future OCR pipeline integration):
-
-- **OCRmyPDF** — Preferred for adding text layers to scanned PDFs before ingestion. Preserves PDF structure, auto-detects existing text layers, can compress output.
-- **Ghostscript** — PDF compression for oversized uploads before processing.
-- Integration point: preprocessing step in `backend/apps/documents/` before `core_doc_text` ingestion.
-
----
-
-## 22.0 CLAUDE.md SYNC RULE
+## 19.0 CLAUDE.md SYNC RULE
 
 Whenever a session produces a significant architectural decision, a new pattern, or a change to system behavior (Landscaper tools, schema migrations, API endpoints, financial engine, alpha readiness), update `/landscape/CLAUDE.md` in the same session or flag it explicitly in the handoff. CLAUDE.md should never be more than one session out of date.
 
@@ -651,9 +640,9 @@ Sync triggers:
 
 ---
 
-## 23.0 SUCCESS METRICS
+## 20.0 SUCCESS METRICS
 
-- User can build on your work without re-explaining context
+- User can build on prior work without re-explaining context
 - Code artifacts are complete and functional
 - Previous conversations inform current responses
 - Teaching happens through demonstration, not theory
@@ -665,28 +654,19 @@ Sync triggers:
 - Thread state file is kept current and trusted over compaction summary [COWORK] (§1.4)
 - Specs in working directory are read before drafting implementation prompts (§1.4.4)
 - Specs are delivered in dual format — tech `.md` + plain-English HTML — never tech-only (§10.5)
+- Chat replies are in plain English; technical jargon never bleeds into normal conversation (§5.7)
 - All Claude systems read the same canonical instructions (this file)
 
 ---
 
 ## CHANGELOG
 
-**v3.0 (2026-04-25)** — Unified Cowork v1.2 + Claude.ai v2.4 into single canonical document. Saved to repo at `/landscape/docs/PROJECT_INSTRUCTIONS.md`. Mirror discipline: when this file changes, sync to Cowork project settings and Claude.ai project knowledge.
+**v4.0 (2026-04-30)** — Full rewrite. Tightened structure, removed redundant section overlap (consolidated former §16 + §20 + §21 into single §15 awareness-context section), absorbed §12 ID strings into §5.10, added §10.6 HTML-first rule, §13.3 content provenance tags, §13.4 inline liner notes, §14.4 no fragment commits, §15.6 no autonomous value inference, §4.6 session ID + echo-back. Reframed header — three intended homes (master file, Cowork project instructions, Claude project instructions), no longer references nonexistent personal-pref layer.
 
-**Notable consolidations from v2.4:**
-- Tabular formatting (§7.5), CLAUDE.md sync rule (§22), tool verification (§20), PDF/OCR protocol (§21), token economy (§19), downstream impact analysis (§17)
+**v3.1 (2026-04-30)** — Added explicit Plain-English Chat Replies rule at §5.7 with single carve-out. Added matching anti-pattern entry in §6.
 
-**Notable consolidations from v1.2:**
-- Capability boundaries (§1.2 — generalized into a matrix), thread state protocol (§1.4 — Cowork-specific), recovery protocol cross-ref (§8.1)
-
-**Removed from v2.4:**
-- Hard-coded Landscaper tool count (now defers to CLAUDE.md, §16.3 / §20.4)
-
-**Added in v3.0:**
-- §0 "How to use this file" — multi-system applicability tags, sync discipline
-- §1.2 Capability Matrix — explicit capability differences across Claude systems
-- §7.6 Canonical Table Pattern (from user feedback memory)
+**v3.0 (2026-04-25)** — Unified prior Cowork v1.2 + Claude.ai v2.4 into single canonical document. Saved to repo at `/landscape/docs/PROJECT_INSTRUCTIONS.md`. Added §0 multi-system applicability tags + sync discipline. Added §1.2 capability matrix. Added §7.6 canonical table pattern. Removed hard-coded Landscaper tool count (deferred to CLAUDE.md).
 
 ---
 
-End of Landscape Project Instructions v3.0
+End of Landscape Project Instructions v4.0
