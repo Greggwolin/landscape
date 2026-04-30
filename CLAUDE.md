@@ -485,30 +485,31 @@ Django uses DRF serializers with consistent envelope:
 
 ---
 
-## Alpha Readiness Assessment (Audited 2026-02-15)
+## Alpha Readiness Assessment (Audited 2026-04-30)
 
 ### Target Workflow: MF Appraiser Valuation
 
-**Overall Status: ~90% Alpha-Ready** — Core valuation workflow functional, reconciliation complete, reports system fully wired with PDF/Excel export, operations save migrated to Django.
+**Overall Status: ~92% Alpha-Ready on the legacy `/projects/[id]` surface.** Core valuation workflow functional; reconciliation, reports, and operations save complete. Demographics + location intelligence promoted to working with caveats. Known remaining alpha gap is the scanned-PDF / OCR pipeline. The chat-first `/w/` surface is the active design target but is not the alpha shipping surface — alpha is measured against the legacy folder/tab UI.
 
 ### Feature Status by Workflow Step
 
 | Step | Feature | Status | Key Gap |
 |------|---------|--------|---------|
-| 1 | Project Creation | ✅ WORKS | No Landscaper during creation |
-| 2 | Document Upload & Extraction | ⚠️ PARTIAL | Async pipeline orchestration unclear; scanned PDFs require OCR preprocessing |
-| 3 | Document Management | ✅ WORKS | Full DMS with 30+ API routes |
+| 1 | Project Creation | ✅ WORKS | Landscaper now supports pre-project chat with location-brief tool; full project-creation handoff still has gaps |
+| 2 | Document Upload & Extraction | ⚠️ PARTIAL | Ingestion Workbench shipped; scanned-PDF / OCR pipeline still not implemented (OCRmyPDF identified as preferred) |
+| 3 | Document Management | ✅ WORKS | Full DMS + 4 Landscaper management tools (rename, profile-update, move, reprocess) |
 | 4 | Property Tab | ✅ WORKS | Rent roll, units, leases complete |
-| 5 | Market / GIS | ⚠️ PARTIAL | Demographics incomplete, GIS persistence partial |
-| 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); legacy Next.js route retained as dead code |
-| 7 | Landscaper Chat | ✅ WORKS | 262 tools, thread-based, mutations; unassigned (pre-project) threads supported |
+| 5 | Market / GIS | ✅ WORKS | Geo auto-seeding for US cities (Mar 2026), on-demand state-level demographics loading, μSA support, location brief tool. Caveat: ACS data lags 2–3 years and underreports in resort/luxury markets |
+| 6 | Operations Tab | ✅ WORKS | Full P&L migrated to Django (GET + save); new `get_operating_statement` Landscaper tool renders P&L as an artifact |
+| 7 | Landscaper Chat | ✅ WORKS | ~268 tools (artifacts system + get_operating_statement added Apr 25–30); thread-based with unassigned (pre-project) threads, tightened firing discipline, cross-property fabrication blocked |
 | 8 | Sales Comparison | ✅ WORKS | Full grid + adjustments + map |
 | 9 | Cost Approach | ✅ WORKS | Land + improvements + depreciation |
 | 10 | Income Approach | ✅ WORKS | Direct Cap + DCF, 3 NOI bases + expense comps |
 | 11 | Reconciliation | ✅ WORKS | Weights, narrative versioning, IndicatedValueSummary |
 | 12 | Capitalization | ✅ WORKS | Waterfall calc endpoint wired (Next.js proxy → Django → Python engine) |
 | 13 | Reports | ✅ WORKS | 20 generators with real SQL + PDF/Excel export; all generators produce preview data with graceful degradation |
-| 14 | Knowledge Base | ⚠️ PARTIAL | RAG works, pgvector Phase 2, no Library UI |
+| 14 | Knowledge Base | ⚠️ PARTIAL | RAG works (3-source retrieval including cost library + benchmarks), pgvector Phase 2, no Library UI |
+| 15 | Artifacts System | ✅ WORKS | Phases 1–4.5 shipped Apr 25–30: storage, tools, renderer, right-panel workspace, firing rules, dependency cascades, chat cards, real update path |
 
 ### Alpha Blockers (Priority Order)
 
@@ -533,15 +534,17 @@ Django uses DRF serializers with consistent envelope:
 
 ### Navigation Architecture
 
-- **8-folder ARGUS-style tabs** with dynamic sub-tabs per property type
-- URL-driven state: `/projects/[id]?folder={folder}&tab={tab}`
-- `ProjectContentRouter` maps folder/tab combos to components
-- `folderTabConfig.ts` generates tabs per property type + analysis type
-- Two-row folder tabs with badge support (processing/error/pending)
+The application has two coexisting navigation surfaces. Active development is on the chat-first surface; the legacy folder/tab surface is retained but no longer the design target.
+
+**Primary (chat-first / unified UI) — `/w/` route layer.** This is the target experience and the active line of work on `feature/unified-ui`. Three-panel shell: left sidebar (project list + recent threads), center Landscaper chat, right context-aware artifacts/content panel. Routes include `/w/projects`, `/w/projects/[projectId]`, `/w/chat`, `/w/chat/[threadId]`, `/w/admin`, `/w/help`, `/w/tools`, `/w/landscaper-ai`. See the "Chat Canvas / Unified UI" section below for component-level detail.
+
+**Legacy (folder/tab) — `/projects/[id]` route.** The original ARGUS-style 8-folder layout with two-row tabs and `?folder={folder}&tab={tab}` URL state. `ProjectContentRouter.tsx` still maps folder/tab combos to legacy components, and `FolderTabs.tsx` and `useFolderNavigation.ts` are still wired. The `folderTabConfig.ts` config file no longer exists — only a stranded test (`folderTabConfig.test.ts`) references it. Post-login lands here today; cutover to `/w/` as the default destination is pending.
+
+**Implication for new work:** new product surfaces should be built into the `/w/` shell (with right-panel artifacts and Landscaper as the primary navigation), not as new folders/tabs in the legacy layout.
 
 ### Landscaper Architecture
 
-- **Left panel** (320px, collapsible to 64px strip)
+- **Center panel in the chat-first UI** (`/w/` shell). Landscaper is the primary navigation surface — sidebar on the left, Landscaper chat in the center, artifacts/content on the right. In the legacy `/projects/[id]` layout, Landscaper still renders as a left flyout panel (320px, collapsible to a 64px strip), but new surfaces should target the chat-first layout.
 - Claude AI with **264 registered, 261 advertised** (`@register_tool` decorator + dict-based registration, verified via registry inspection; 3 LoopNet tools registered but not advertised — see deferral note below; +2 this session: `run_sources_uses` Phase 6 + `compute_trust_score` Phase 7) — includes 5 ingestion-specific tools + 3 parcel import tools + 4 appraisal knowledge tools added Mar 2026 + `update_land_use_pricing` + `open_input_modal` + 5 excel_audit tools added Apr 2026 + `generate_map_artifact` (interactive MapLibre maps in artifacts panel, with pin-placement input mode for projects missing coordinates) + 8 P1 analysis tools added Apr 2026 (`list_projects_summary`, `get_deal_summary`, `get_data_completeness`, `calculate_project_metrics`, `calculate_cash_flow`, `generate_report_preview`, `export_report`, `list_available_reports`) + 3 P2 analysis tools added Apr 2026 (`get_demographics`, `calculate_waterfall`, `calculate_mf_cashflow`) + 6 CRUD gap fixes Apr 21 (3 expense comparable tools, 3 acquisition event tools) + 4 DMS management tools Apr 21 (`rename_document`, `update_document_profile`, `move_document_to_folder`, `reprocess_document`) + ~~3 LoopNet deal-sourcing tools Apr 21~~ **DEFERRED 2026-04-25 (gx14)** — Akamai SCF challenge hard-blocks LoopNet from datacenter IPs (Railway egress), and Crexi recon found the public JSON API gates filters behind auth + Google Place IDs. Schemas removed from `tool_schemas.py`; `loopnet_tools.py` and the `loopnet-mcp` Railway service remain for revival once a paid feed (ATTOM/Reonomy) is procured post-alpha + 3 cost-taxonomy tools Apr 21 (`delete_budget_category` soft-delete with child-safety check, `get_category_lifecycle_stages` and `update_category_lifecycle_stages` for the `core_category_lifecycle_stages` junction against `VALID_ACTIVITIES` = Acquisition/Planning & Engineering/Improvements/Operations/Disposition/Financing). Same commit added Source 3 to `query_platform_knowledge` RAG retrieval — ILIKE text-match bridge into `core_unit_cost_item` and `tbl_global_benchmark_registry` so cost library + benchmark data surface alongside document chunks + `generate_location_brief` Apr 23 — universal, pre-project, property-type-aware economic brief (Nominatim geocoding + FRED + Census ACS 5-Year 2023 + Anthropic narrative). Renders in right artifacts panel on `/w/chat` unassigned routes. Persistent cache in `landscape.tbl_location_brief` keyed on `(user_id, location_key, depth)` with release-schedule invalidation (FRED `next_release`, ACS annual Dec 15 drop). Depth tiers: condensed (~1400 tok) / standard (~2400) / comprehensive (~4000). Registered in both `UNIVERSAL_TOOLS` and `UNASSIGNED_SAFE_TOOLS`
 - **Location brief firing discipline** (Apr 25, S7 v2 verified): `generate_location_brief` fires ONLY on explicit artifact-noun triggers (brief, report, overview, profile, snapshot, summary). Soft asks ("how's the market", "tell me about [city]") trigger an OFFER pattern with template phrase ("I can pull together a location brief... would you like that?"), not autonomous generation. Context-only statements ("I'm evaluating a deal in...") trigger a follow-up question, not a brief. Rules live in `tool_schemas.py` description + `BASE_INSTRUCTIONS` "LOCATION BRIEF — STRICT FIRE/OFFER RULES" section in `ai_handler.py`. Verified by S7 v2 calibration: 91% pass rate (32/35), all 4 category thresholds met. Same discipline should apply to any future artifact-generating tool — do not write tool descriptions like "use when the user asks about X" without an explicit-trigger constraint.
 - Level 2 Autonomy: propose mutations → user confirm/reject
@@ -552,9 +555,9 @@ Django uses DRF serializers with consistent envelope:
 - **Comp tools:** Use unified comparables table with `property_type` discriminator — not separate land/MF tables
 - **Unassigned threads:** Backend supports `project_id IS NULL` threads (pre-project chat). Most tools require project context and will fail gracefully; only `UNIVERSAL_TOOLS` work without a project. See `docs/02-features/chat-canvas-tool-gaps.md` for full audit.
 
-### Chat Canvas / Unified UI (WIP — Apr 2026)
+### Chat Canvas / Unified UI
 
-New layout architecture replacing the original ARGUS-style 8-folder tabs with a chat-centric "canvas" approach. Coexists with original layout during transition.
+The chat-first navigation layer is the primary target experience. The legacy ARGUS-style 8-folder layout is retained but no longer the design target. Active development happens on `feature/unified-ui`; merge to main is pending. Until cutover, post-login still lands on the legacy `/dashboard` route.
 
 **Route structure:** `/w/` prefix — `src/app/w/layout.tsx` (shell), `/w/projects/` (project list), `/w/projects/[projectId]/` (project view), `/w/chat/` (unassigned chat), `/w/chat/[threadId]/` (specific thread).
 
@@ -589,7 +592,21 @@ New layout architecture replacing the original ARGUS-style 8-folder tabs with a 
 - `thread_service.py` updated to handle null project context
 - `ai_handler.py` skips project lookup for unassigned threads
 
-### Excel Model Audit Pipeline (Implemented incrementally — Apr 2026)
+### Artifacts System (Implemented incrementally — Apr 2026)
+
+Persistent, versioned visual outputs that render in the right panel of the chat-first UI. Artifacts replace one-shot inline tool output with a durable, addressable, dependency-aware surface. Phases 1 through 4.5 shipped between Apr 25–30, 2026.
+
+**Phase 1 — Storage + tools + REST.** New tables for artifacts and version history. New Landscaper tools: `create_artifact`, `update_artifact`, `get_artifact_history`, `restore_artifact_state`, `find_dependent_artifacts`. REST endpoints for read, create, update, version restore.
+
+**Phase 2 — Renderer.** `ArtifactRenderer` component, type definitions, hook for retrieval, dedicated test route. Single component dispatches to per-artifact-type sub-renderers (location brief, operating statement, map, Excel audit, etc.).
+
+**Phase 3 — Right-panel workspace.** Artifact state + auto-open dispatch wired into the `/w/` shell. New artifacts surface in the right panel automatically when Landscaper creates them; existing artifacts are addressable from the sidebar.
+
+**Phase 4 — Firing rules + cascades + chat cards + real update path.** System-prompt firing rules govern when Landscaper auto-creates an artifact vs. asking. Dependency hooks let one artifact trigger refresh of dependent artifacts. Chat cards render compact previews inline in the chat thread that link to the full artifact in the right panel. Update path is real (not append-only) — artifacts can mutate in place with version history retained.
+
+**Phase 4.5 — Firing discipline + new tool + flat rendering.** Tightened firing rules to reduce false-positive auto-creation. New tool `get_operating_statement` (P&L pulled and rendered as an artifact). "Flat" rendering mode for tabular artifacts that don't need a custom visual.
+
+**Pattern for new tools:** any tool whose output is a durable visual or report should produce an artifact, not return a JSON blob inline. Follow the same explicit-trigger discipline used by `generate_location_brief` (see Landscaper Architecture above) when writing the tool description.
 
 Server-side port of the Cowork `excel-model-audit` skill. Purpose: on any Excel upload, Landscaper can (a) classify the workbook, (b) run formula-integrity checks, (c) extract labeled assumptions to `ai_extraction_staging` with `source: excel_audit`, (d) Python-replicate waterfall + debt math to verify Excel's computed values, and (e) render an HTML audit report.
 
@@ -601,7 +618,7 @@ Server-side port of the Cowork `excel-model-audit` skill. Purpose: on any Excel 
 
 **Phases implemented (as of Apr 27, 2026):** 0 (classifier), 1 (structural_scan), 2 (formula_integrity — 2a error cells, 2b broken refs, 2c hardcoded overrides, 2e range consistency), **2f (downstream impact tracer — `impact_tracer.py`; BFS forward from errors to headline outputs IRR/EM/DSCR/net CF, auto-run for `full_model` tier; returns `impact_summary` with `errors_reaching_headline` vs `errors_quarantined`)**, 3 (assumption_extractor), 4 (waterfall_classifier), **6 (sources_uses — `sources_uses.py`; locates S&U schedule via label anchors, balance check within $1, gap > $100 flagged as finding)**, **7 partial (`trust_score.py` aggregator — weighted 0-100 score across all persisted phases; profile-aware per skill spec; v3-style verdict block in `ExcelAuditArtifact.tsx`; HTML report file generation deferred)**. Phase 5 (Python waterfall replication) is the only major follow-on piece — when it lands, trust score's `python_replication` component goes from 0% to up-to-100% and the headline status flips from `partial` → `verified`.
 
-**Phase 4 (waterfall classifier) added Apr 2026.** Tool: `classify_waterfall(doc_id)`. Returns `waterfall_type` enum (`tiered_irr_hurdle` | `pref_then_split` | `pref_catchup_split` | `em_hurdle` | `hybrid` | `custom` | `none`), tier list with hurdles + LP/GP splits + `source_cells` map keyed to `Sheet!Cell` refs, plus pref rate/compounding and sponsor co-invest %. Persists opportunistically to new `tbl_excel_audit` table (with `tbl_excel_audit_finding` for severity-tagged caveats). Phase 5/5b/6/7 remain follow-on.
+**Phase 4 (waterfall classifier) added Apr 2026.** Tool: `classify_waterfall(doc_id)`. Returns `waterfall_type` enum (`tiered_irr_hurdle` | `pref_then_split` | `pref_catchup_split` | `em_hurdle` | `hybrid` | `custom` | `none`), tier list with hurdles + LP/GP splits + `source_cells` map keyed to `Sheet!Cell` refs, plus pref rate/compounding and sponsor co-invest %. Persists opportunistically to new `tbl_excel_audit` table (with `tbl_excel_audit_finding` for severity-tagged caveats). Phase 5 (Python waterfall replication) is the only remaining major piece — Phases 6 (sources_uses) and partial 7 (trust_score) are implemented, despite older footer language to the contrary.
 
 **Apr 15 hardening:** Phase 2e false-positive rate reduced ~92% via tighter heuristics in `formula_integrity.py`. Loader hardened to accept HTTPS UploadThing URIs in addition to `ut://` refs, and `LandscaperPanel.tsx` now falls back to a direct Excel drop path when doc metadata is unavailable. Excel audit tools registered in `UNIVERSAL_TOOLS` (`tool_registry.py`) — Landscaper can invoke `classify_excel_file` / `run_structural_scan` / `run_formula_integrity` / `extract_assumptions` / `classify_waterfall` from any page, not just the Ingestion Workbench.
 
@@ -867,7 +884,7 @@ When the user says **"Document"** (standalone or as part of a message), **prepen
 2. Use CoreUI components as base; CSS vars only (no hardcoded hex)
 3. Follow PascalCase naming
 4. Add 'use client' directive if using hooks/state
-5. Implement all three complexity modes if data-heavy
+5. Target the chat-first `/w/` shell for new product surfaces — render content panels inside `RightContentPanel` or as artifacts where applicable
 6. Follow tabular formatting rules if component includes a grid/table
 
 ### Adding a New Landscaper Tool
@@ -964,8 +981,8 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-04-25 (LoopNet deal-sourcing tools deferred (gx14) — Akamai SCF blocks LoopNet from Railway IPs; Crexi public API gates filters behind auth + Google Place IDs. Three schemas pulled from `tool_schemas.py`, registry retained for revival post-alpha when a paid feed is procured. Same day: S7 v2 location brief intent resolution at 91% pass rate.)*
-*Last audit: 2026-02-15 — Alpha Readiness Assessment (14-step workflow audit)*
-*Landscaper tool count: **262 registered, 259 advertised** (8 P1 + 3 P2 analysis tools + 6 CRUD gap fixes Apr 21 + 4 DMS management tools Apr 21 + 3 LoopNet deal-sourcing tools Apr 21 [DEFERRED 2026-04-25 gx14 — registered but unadvertised] + 3 cost-taxonomy tools Apr 21 + `generate_location_brief` Apr 23 + `classify_waterfall` Apr 25). CRUD gap fixes: 3 expense comparable tools (get/update/delete), 3 acquisition event tools (get/create/delete). DMS tools: rename_document, update_document_profile, move_document_to_folder, reprocess_document. LoopNet tools (deferred): loopnet_search_listings, loopnet_get_listing_detail, loopnet_search_similar. Cost-taxonomy tools: delete_budget_category, get_category_lifecycle_stages, update_category_lifecycle_stages. Also expanded: LOAN_COLUMNS 25→65, SALES_COMP_COLUMNS +3, LEASE_COLUMNS +3. Includes 5 excel_audit tools + `generate_map_artifact` + 4 appraisal knowledge tools + `log_alpha_feedback`. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4. Phases 5-7 remain follow-on.*
+*Last updated: 2026-04-30 — staleness audit + re-audit. Navigation, Landscaper layout, Chat Canvas framing, Excel Audit phase status, and Alpha Readiness table all corrected. Artifacts system added as a new top-level section. Apr 25–30 work brought into the doc: Artifacts Phases 1–4.5, `get_operating_statement` tool, cross-property data fabrication block, thread-load performance fixes, 401-redirect auth fix, cashflow routing fix by project type. Branch state: `feature/unified-ui` is the active development line; merge to main pending.*
+*Last audit: 2026-04-30 — Alpha Readiness Assessment (15-step workflow audit, includes Artifacts system)*
+*Landscaper tool count: **~268 registered** (+5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). New since prior audit: `create_artifact`, `update_artifact`, `get_artifact_history`, `restore_artifact_state`, `find_dependent_artifacts`, `get_operating_statement`. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
