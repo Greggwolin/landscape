@@ -329,14 +329,36 @@
 }
 
 /* Section divider row (Income / Operating Expenses inside the same big
-   table). Regular weight, larger top padding, thin bottom rule under the
-   label. The label sits in column 1; other cells are blank by design. */
+   table). Acts as an inline section header — col 0 has the section name,
+   the numeric columns carry their column labels (Annual, $/Unit). The
+   bottom rule sits ONLY under the numeric cells (the label cell stays
+   open) per the operating statement spec.
+
+   Numeric cells are bold (they're acting as column headers in this row);
+   the label cell is regular weight. */
 .sectionDividerRow td {
-  border-bottom: 1px solid var(--cui-body-color);
   padding-top: 12px;
   padding-bottom: 4px;
-  font-weight: 400;
   font-size: 13px;
+}
+
+.sectionDividerRow td:first-child,
+.sectionDividerRow td.driftCell + td {
+  font-weight: 400;
+  border-bottom: 0;
+}
+
+.sectionDividerRow td:not(:first-child) {
+  font-weight: 700;
+  border-bottom: 1px solid var(--cui-body-color);
+}
+
+/* Drift-cell-aware: when the drift indicator column is present, the
+   actual label cell is .driftCell + td. That cell should NOT have the
+   bottom border (it's the section name). Override the not-first-child
+   rule above. */
+.sectionDividerRow td.driftCell + td {
+  border-bottom: 0;
 }
 
 /* Subsection row (Taxes & Insurance, Utilities, etc.). Regular weight, no

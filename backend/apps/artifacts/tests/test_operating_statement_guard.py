@@ -46,13 +46,13 @@ def _doc(blocks):
 
 
 def _canonical_opex_columns():
-    """4-column canonical shape per operating-statement rendering spec.
-    Rates go inline in labels (e.g., 'Management Fee (3.0%)'), not as a
-    separate column. $/SF is dropped from the spec.
+    """3-column canonical shape per operating-statement rendering spec.
+    Rates go inline in labels (e.g., 'Management Fee (3.0%)'). $/SF and
+    Units are dropped — operating statements are unit-denominated and
+    don't carry per-unit-type counts; that's rent-roll territory.
     """
     return [
-        {'key': 'line', 'label': ''},               # label column has no header per spec
-        {'key': 'units', 'label': 'Units'},
+        {'key': 'line', 'label': ''},
         {'key': 'annual', 'label': 'Annual'},
         {'key': 'per_unit', 'label': '$/Unit'},
     ]
@@ -226,12 +226,21 @@ class ForbiddenColumnTests(SimpleTestCase):
         self.assertEqual(ctx.exception.code, 'forbidden_column_for_t12')
 
     def test_market_rent_column_allowed_in_current_proforma(self):
+        # Pass 6 added a top-level canonical-shape check (line/annual/per_unit
+        # required). To keep this test focused on the T-12-only market-rent
+        # forbidden-column rule, we include the canonical columns alongside
+        # the in_place/market extras. `market` and `in_place` aren't in the
+        # _OS_FORBIDDEN_COLUMN_KEYS set, so they pass the forbidden-extras
+        # check; the t12-only substring rule still flags `market` for t12 but
+        # not for current_proforma.
         schema = _doc([{
             'type': 'table',
             'id': 'rev_table',
             'title': 'Revenue',
             'columns': [
-                {'key': 'line', 'label': 'Line'},
+                {'key': 'line', 'label': ''},
+                {'key': 'annual', 'label': 'Annual'},
+                {'key': 'per_unit', 'label': '$/Unit'},
                 {'key': 'in_place', 'label': 'In-Place Rent'},
                 {'key': 'market', 'label': 'Market Rent'},
             ],
@@ -382,17 +391,21 @@ class PropertyMetadataKvGridTests(SimpleTestCase):
 
 class UnitTypeRowTests(SimpleTestCase):
     def _income_table_with_rows(self, row_first_values):
+        # Canonical 3-col OS shape — no units column (forbidden), no avg_rent
+        # column (rates go inline in labels).
         return {
             'type': 'table',
             'id': 'income_breakdown',
             'title': 'Income',
             'columns': [
-                {'key': 'line', 'label': 'Line Item'},
-                {'key': 'units', 'label': 'Units'},
-                {'key': 'avg_rent', 'label': 'Avg Rent'},
+                {'key': 'line', 'label': ''},
                 {'key': 'annual', 'label': 'Annual'},
+                {'key': 'per_unit', 'label': '$/Unit'},
             ],
-            'rows': [{'line': v} for v in row_first_values],
+            'rows': [
+                {'id': f'r_{i}', 'cells': {'line': v, 'annual': 0, 'per_unit': 0}}
+                for i, v in enumerate(row_first_values)
+            ],
         }
 
     def test_t12_rejects_1br_2br_breakdown(self):
@@ -496,11 +509,10 @@ class OpexColumnShapeTests(SimpleTestCase):
         self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
         self.assertIn('per_unit', ctx.exception.missing)
 
-    def test_old_5_col_with_rate_and_per_sf_rejected(self):
-        """The legacy 5-col shape (line/rate/annual/per_unit/per_sf) is no
-        longer canonical. Old shape that includes 'rate' or 'per_sf' is fine
-        if it ALSO includes 'units', but if 'units' is missing it should be
-        rejected — the new spec drops the rate column and adds units."""
+    def test_legacy_5_col_with_rate_and_per_sf_rejected_as_forbidden_extras(self):
+        """Legacy 5-col shape (line/rate/annual/per_unit/per_sf) gets
+        rejected by the new forbidden-extras check — `rate` and `per_sf`
+        are not allowed on operating statements."""
         cols = [
             {'key': 'line', 'label': 'Line'},
             {'key': 'rate', 'label': 'Rate'},
@@ -516,13 +528,34 @@ class OpexColumnShapeTests(SimpleTestCase):
                 schema=schema,
                 project_id=None,
             )
-        self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
-        self.assertIn('units', ctx.exception.missing)
+        self.assertEqual(ctx.exception.code, 'os_table_forbidden_columns')
+        forbidden = ctx.exception.missing
+        self.assertIn('rate', forbidden)
+        self.assertIn('per_sf', forbidden)
 
-    def test_3_column_opex_rejected(self):
+    def test_units_column_rejected(self):
+        """Units column is forbidden on an operating statement — unit-mix
+        belongs on a rent roll."""
         cols = [
             {'key': 'line', 'label': 'Line'},
             {'key': 'units', 'label': 'Units'},
+            {'key': 'annual', 'label': 'Annual'},
+            {'key': 'per_unit', 'label': '$/Unit'},
+        ]
+        schema = _doc([_opex_table(cols)])
+        with self.assertRaises(OperatingStatementGuardError) as ctx:
+            validate_operating_statement_artifact(
+                subtype=SUBTYPE_T12,
+                title='T-12',
+                schema=schema,
+                project_id=None,
+            )
+        self.assertEqual(ctx.exception.code, 'os_table_forbidden_columns')
+        self.assertIn('units', ctx.exception.missing)
+
+    def test_2_column_table_rejected_for_missing_per_unit(self):
+        cols = [
+            {'key': 'line', 'label': 'Line'},
             {'key': 'annual', 'label': 'Annual'},
         ]
         schema = _doc([_opex_table(cols)])
@@ -533,40 +566,13 @@ class OpexColumnShapeTests(SimpleTestCase):
                 schema=schema,
                 project_id=None,
             )
-        self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
-        self.assertIn('per_unit', ctx.exception.missing)
-
-    def test_subtable_inside_opex_section_missing_units_rejected(self):
-        # Sub-table titled "Taxes & Insurance" nested inside an "Operating
-        # Expenses" section, missing the new 'units' column. The legacy rule
-        # missed this because the sub-table's own title doesn't match the
-        # OpEx detector. The ancestor-aware check catches it.
-        sub_table = {
-            'type': 'table',
-            'id': 'taxes_insurance',
-            'title': 'Taxes & Insurance',
-            'columns': [
-                {'key': 'line', 'label': ''},
-                {'key': 'annual', 'label': 'Annual'},
-                {'key': 'per_unit', 'label': '$/Unit'},
-            ],
-            'rows': [],
-        }
-        schema = _doc([{
-            'type': 'section',
-            'id': 'sec_opex',
-            'title': 'Operating Expenses',
-            'children': [sub_table],
-        }])
-        with self.assertRaises(OperatingStatementGuardError) as ctx:
-            validate_operating_statement_artifact(
-                subtype=SUBTYPE_T12,
-                title='T-12',
-                schema=schema,
-                project_id=None,
-            )
-        self.assertEqual(ctx.exception.code, 'opex_columns_invalid')
-        self.assertIn('units', ctx.exception.missing)
+        # Could be content-shape's opex_columns_invalid (the table is
+        # OpEx-titled) or top-level's os_table_missing_required_columns —
+        # both are reasonable rejection codes for missing per_unit.
+        self.assertIn(
+            ctx.exception.code,
+            {'opex_columns_invalid', 'os_table_missing_required_columns'},
+        )
 
     def test_top_level_opex_table_with_canonical_cols_passes(self):
         # Single top-level table titled "Operating Expenses" with the

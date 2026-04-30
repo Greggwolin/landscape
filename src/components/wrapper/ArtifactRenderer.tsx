@@ -501,24 +501,35 @@ function TableBlockRenderer({
 }: TableBlockRendererProps) {
   const hasAnySourceRefs = block.rows.some((r) => Boolean(r.source_ref || r.cell_source_refs));
 
+  // When the table has section_divider rows, those rows act as inline
+  // section headers — the section name goes in col 0, the column labels
+  // (Annual / $/Unit / etc.) go in the numeric cells of that same row.
+  // The standalone <thead> column header row is suppressed in that case
+  // because its labels are now embedded in each section_divider row.
+  const hasSectionDividers = block.rows.some(
+    (r) => classifyRow(r, block.columns) === 'section_divider',
+  );
+
   return (
     <div className={styles.tableWrap}>
       {block.title && <div className={styles.tableTitle}>{block.title}</div>}
       <table className={styles.table}>
-        <thead>
-          <tr>
-            {hasAnySourceRefs && <th className={styles.driftCell} aria-label="drift" />}
-            {block.columns.map((col) => (
-              <th
-                key={col.key}
-                className={alignClass(col.align)}
-                // size: undefined per CLAUDE.md tabular formatting rules
-              >
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {!hasSectionDividers && (
+          <thead>
+            <tr>
+              {hasAnySourceRefs && <th className={styles.driftCell} aria-label="drift" />}
+              {block.columns.map((col) => (
+                <th
+                  key={col.key}
+                  className={alignClass(col.align)}
+                  // size: undefined per CLAUDE.md tabular formatting rules
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody>
           {(() => {
             // Stateful pass over rows so line-item depth depends on whether
@@ -572,11 +583,40 @@ function TableBlockRenderer({
                     <DriftIndicator state={driftState} row={row} sourcePointers={sourcePointers} currentValues={currentValues} rowPath={rowPath} />
                   </td>
                 )}
-                {block.columns.map((col) => {
+                {block.columns.map((col, colIdx) => {
                   const cellValue = row.cells[col.key];
                   const cellEditable = Boolean(row.editable);
                   const cellPath = [...rowPath, 'cells', col.key];
                   const isLabelCol = col.key === labelKey;
+
+                  // Section divider rows: label cell shows section name,
+                  // numeric cells show the column label (acting as the
+                  // section's header). Bottom border styling is handled in
+                  // CSS via .sectionDividerRow + :not(:first-child).
+                  if (kind === 'section_divider') {
+                    return (
+                      <td
+                        key={col.key}
+                        className={alignClass(col.align)}
+                      >
+                        {isLabelCol ? cellValue ?? '' : col.label}
+                      </td>
+                    );
+                  }
+
+                  // Subsection rows: label only, numeric cells empty (no
+                  // em-dash placeholder — just blank).
+                  if (kind === 'subsection') {
+                    return (
+                      <td
+                        key={col.key}
+                        className={alignClass(col.align)}
+                      >
+                        {isLabelCol ? cellValue ?? '' : ''}
+                      </td>
+                    );
+                  }
+
                   return (
                     <td
                       key={col.key}

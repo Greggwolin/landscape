@@ -107,13 +107,21 @@ _FORBIDDEN_COLUMN_SUBSTRINGS_T12_ONLY = (
     'pro-forma rent',
 )
 
-# Canonical 4-column shape for any Operating Expenses table. Required keys —
+# Canonical 3-column shape for any Operating Expenses table. Required keys —
 # label / display name can vary, but the column key must be one of these
-# (case-insensitive). Rates (e.g., "9.7%" vacancy, "3.0%" management fee) go
-# INLINE in the line-item label per the rendering spec, not as a separate
-# column. $/SF is dropped from the spec — operating statements are unit-
-# denominated, not SF-denominated.
-_OPEX_REQUIRED_COLUMN_KEYS = ('line', 'units', 'annual', 'per_unit')
+# (case-insensitive). Per the spec:
+#   - Rates (e.g., "9.7%" vacancy, "3.0%" management fee) go INLINE in the
+#     line-item label, not as a separate column.
+#   - $/SF is dropped — operating statements are unit-denominated.
+#   - Units count column is dropped — not part of a traditional operating
+#     statement (unit-mix data belongs on a Rent Roll artifact instead).
+_OPEX_REQUIRED_COLUMN_KEYS = ('line', 'annual', 'per_unit')
+
+# Columns that are NOT allowed on operating-statement tables.
+#   units    — unit counts belong on a Rent Roll, not an OS
+#   rate     — rates go inline in the line label, not as a column
+#   per_sf   — operating statements are unit-denominated
+_OS_FORBIDDEN_COLUMN_KEYS = frozenset({'units', 'rate', 'per_sf'})
 
 # Section-title substrings (case-insensitive) that mark an "Operating Expenses"
 # section. Any table nested inside such a section gets the canonical 5-column
@@ -345,31 +353,27 @@ def _walk_blocks(
 def _row_first_cell_value(row: Any, columns: list) -> str | None:
     """Return the line-item / first-column cell value for a row, as a string.
 
-    Handles both row shapes — list-of-dicts (keyed by column key/field) and
-    list-of-lists (positional). Returns None when the value can't be
-    extracted as a non-empty string.
+    Per the canonical schema (apps.artifacts.schema_validation), rows have
+    a `cells` dict keyed by column key. We look in `row['cells']` first.
+    Falls back to flat row shape for legacy/test data.
     """
-    if isinstance(row, dict):
-        for key in ('line', 'line_item', 'category', 'name', 'label', 'item'):
-            v = row.get(key)
+    if not isinstance(row, dict):
+        return None
+
+    # Schema-correct shape: row.cells is a dict
+    cells = row.get('cells')
+    bag = cells if isinstance(cells, dict) else row
+
+    for key in ('line', 'line_item', 'category', 'name', 'label', 'item'):
+        v = bag.get(key)
+        if isinstance(v, str) and v.strip():
+            return v
+    if columns and isinstance(columns[0], dict):
+        first_key = columns[0].get('key') or columns[0].get('field')
+        if isinstance(first_key, str):
+            v = bag.get(first_key)
             if isinstance(v, str) and v.strip():
                 return v
-        if columns and isinstance(columns[0], dict):
-            first_key = columns[0].get('key') or columns[0].get('field')
-            if isinstance(first_key, str):
-                v = row.get(first_key)
-                if isinstance(v, str) and v.strip():
-                    return v
-        return None
-    if isinstance(row, list) and row:
-        first = row[0]
-        if isinstance(first, str) and first.strip():
-            return first
-        if isinstance(first, dict):
-            for key in ('value', 'text', 'label', 'display'):
-                v = first.get(key)
-                if isinstance(v, str) and v.strip():
-                    return v
     return None
 
 
@@ -492,6 +496,49 @@ def _check_top_level_structure(*, subtype: str, schema: Any) -> None:
                 'inside that one table, not separate tables.'
             ),
         )
+
+    # The (single) top-level table must have the canonical 3-column shape:
+    # line / annual / per_unit. No units, rate, or per_sf columns.
+    table_blocks = [b for b in blocks if isinstance(b, dict) and b.get('type') == 'table']
+    if len(table_blocks) == 1:
+        table = table_blocks[0]
+        cols = table.get('columns') or []
+        col_keys = [_column_key(c) for c in cols if c]
+        missing = [k for k in _OPEX_REQUIRED_COLUMN_KEYS if k not in col_keys]
+        if missing:
+            raise OperatingStatementGuardError(
+                code='os_table_missing_required_columns',
+                subtype=subtype,
+                missing=missing,
+                message=(
+                    f'operating statement table is missing required column(s) '
+                    f'{missing}; canonical shape is {list(_OPEX_REQUIRED_COLUMN_KEYS)}'
+                ),
+                guidance=(
+                    'Operating statement tables must have exactly these column '
+                    f'keys: {list(_OPEX_REQUIRED_COLUMN_KEYS)}. The label '
+                    'column has no header text; the numeric columns are '
+                    "labeled 'Annual' and '$/Unit'."
+                ),
+            )
+        forbidden_extras = [k for k in col_keys if k in _OS_FORBIDDEN_COLUMN_KEYS]
+        if forbidden_extras:
+            raise OperatingStatementGuardError(
+                code='os_table_forbidden_columns',
+                subtype=subtype,
+                missing=forbidden_extras,
+                message=(
+                    f'operating statement table has forbidden column(s) '
+                    f'{forbidden_extras}; not allowed in a traditional OS'
+                ),
+                guidance=(
+                    "Remove these columns. Rates (vacancy %, management fee %, "
+                    "etc.) go INLINE in the line-item label, e.g., 'Less: "
+                    "Physical Vacancy (9.7%)' or 'Management Fee (3.0%)'. Unit "
+                    "counts belong on a Rent Roll artifact. $/SF isn't part of "
+                    'the canonical operating-statement shape.'
+                ),
+            )
 
 
 def _check_content_shape(*, subtype: str, schema: Any) -> None:
