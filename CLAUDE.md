@@ -353,6 +353,7 @@ lu_product               -- Level 3: Product (e.g., 50' Lot)
 - Naming: `NNN_description.sql` (e.g., `017_add_land_use_labels.sql`)
 - Always include rollback section
 - Test on Peoria Meadows project before committing
+- `*.sql` is gitignored globally; new migrations need `git add -f` (a `!migrations/*.sql` unignore was tried and reverted in `LSCMD-GITIGNORE-CLEANUP-0501-DA44` — it surfaced ~60 inert historical SQL files with real code/doc references)
 
 ---
 
