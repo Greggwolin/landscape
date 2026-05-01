@@ -893,7 +893,6 @@ TOOL_DOMAIN_MAP = {
 
     # Operations
     'get_operating_statement': 'operations',
-    'get_proforma': 'operations',
     'update_operating_expenses': 'operations',
     'get_cashflow_results': 'operations',
 
@@ -1755,20 +1754,13 @@ Industry benchmarks are FORBIDDEN as a first step.
 
 For the most common artifact requests, use these tools in this order:
 
-  Operating statement — T-12 (pure historical) / P&L:
+  Operating statement / T-12 / P&L:
       1. get_operating_statement   (returns the full structured P&L —
                                     revenue by floorplan, vacancy/credit/
                                     concessions, expenses grouped by
                                     category, totals, NOI)
       2. (optional) get_units, get_unit_types — for unit-mix detail
-      3. compose the artifact from the structured payload (artifact_subtype: 't12')
-
-  Operating statement — F-12 PROFORMA (T-12 trended forward — ~90% of "proforma" asks):
-      1. get_proforma  (ONE call — composes the artifact server-side from T-12
-                        + project growth rates and persists it. Optional input:
-                        income_growth, expense_growth as decimal overrides.)
-      DO NOT call get_operating_statement + create_artifact for F-12.
-      The server owns composition so F-12 cannot drift from T-12.
+      3. compose the artifact from the structured payload
 
   Rent roll:
       1. get_cre_rent_roll OR get_units + get_unit_types
@@ -1786,109 +1778,6 @@ If the DB read returns empty for a category that should hold data (e.g.
 operating expenses are empty but the project is fully underwritten),
 report that as a finding in the artifact's empty-state CTA — do not silently
 fall back to documents.
-
-═══ F-12 PROFORMA — USE get_proforma, DO NOT COMPOSE ═══
-
-For ANY request phrased as "proforma", "F-12", "F12", "forecast 12 months",
-"project the operations", "12-month forecast", "next year's operating
-statement", or anything similar:
-
-  CALL get_proforma — ONE tool call, no input args needed.
-
-The server pulls T-12, applies the project's income/expense growth rates,
-composes the artifact with the SAME structure as T-12 (only numbers change),
-and persists it. The right panel auto-opens. Reply in chat with a brief
-1-3 sentence summary that names the growth rates used (the tool returns
-them in `growth_assumptions`).
-
-DO NOT for an F-12:
-  ❌ Call get_operating_statement → compose → create_artifact yourself.
-     This path drifts from T-12 every time (collapsed expense detail,
-     phantom expense lines, wrong unit-mix counts). The server-side
-     get_proforma path is the only correct way to produce an F-12.
-  ❌ Add a unit-mix breakdown to the income section. T-12 doesn't have
-     one, so F-12 doesn't have one — this is a hard rule, even though F-12
-     is allowed by the guard to include unit-mix where T-12 isn't.
-  ❌ Recategorize or collapse expense lines. Whatever line items the T-12
-     has, the F-12 has — same labels, same order.
-
-If the user wants a custom growth rate ("run the proforma at 4% income, 2.5%
-expenses"), pass income_growth and expense_growth as decimals on the
-get_proforma call.
-
-If the user explicitly asks for a CURRENT proforma (asking/market rents),
-that's a different subtype (`current_proforma`); the dedicated server-derived
-tool for that has not been built yet — confirm whether F-12 satisfies the
-request before composing manually with create_artifact.
-
-═══ T-12 / OPERATING STATEMENT — STRICT CONTENT RULES ═══
-
-A T-12 (or "operating statement" or "P&L") is a HISTORICAL view of a single
-property's actual operations over the trailing 12 months.
-
-YOU MAY NOT INCLUDE in a T-12 artifact:
-  ❌ A "Property Overview" / "Property Details" block. NO units count,
-     year built, location, square feet, occupancy, average unit size as
-     a separate metadata block. (Square feet and unit count belong only
-     in the per-unit / per-SF columns of the line tables.)
-  ❌ A unit-mix table (UNIT TYPE / COUNT / CURRENT RENT / MARKET RENT /
-     ANNUAL INCOME / LOSS-TO-LEASE). That is a rent roll. It does NOT
-     belong in a T-12.
-  ❌ A "Market Rent" column anywhere.
-  ❌ A "Value-Add Opportunity" / "Loss to Lease" / "Market NOI Potential"
-     section. That is a proforma, not historical.
-  ❌ A "VALUE-ADD" or "PROFORMA" section header.
-
-The ENTIRE valid structure of a T-12 artifact has EXACTLY THREE top-level
-sections, in this order:
-
-  Section 1: type=section, id="income", title="Income"
-    Contains:
-      - One `table` block (id="income_table") with columns:
-          [{key:"line", label:"Line Item", align:"left"},
-           {key:"rate", label:"Rate", align:"right"},
-           {key:"annual", label:"Annual", align:"right"},
-           {key:"per_unit", label:"$/Unit", align:"right"},
-           {key:"per_sf", label:"$/SF", align:"right"}]
-      - Rows in this order:
-          • Gross Potential Rent  (Annual / $/Unit / $/SF; rate empty)
-          • Less: Physical Vacancy  (Rate=9.7%, Annual negative)
-          • Less: Credit Loss  (Rate=0.5%, Annual negative)
-          • Less: Concessions  (Rate=1.0%, Annual negative)
-          • Other Income  (Annual / $/Unit / $/SF)
-          • Effective Gross Income  (totals row, bold by convention —
-            but the renderer doesn't currently support bold, so just
-            put it as the last row of the table)
-
-  Section 2: type=section, id="opex", title="Operating Expenses"
-    Contains:
-      - One `table` block per expense category (Taxes & Insurance,
-        Utilities, Repairs & Maintenance, Administrative, Management,
-        Reserves, Other). Each table has the SAME columns as Income:
-          [{key:"line"}, {key:"rate"}, {key:"annual"},
-           {key:"per_unit"}, {key:"per_sf"}]
-      - Rate column is empty for expenses (only used by vacancy lines).
-
-  Section 3: type=section, id="noi", title="Net Operating Income"
-    Contains:
-      - One `key_value_grid` block (id="noi_summary"), columns: 1
-      - Pairs in this order:
-          • Total Operating Expenses
-          • Net Operating Income
-          • Operating Expense Ratio (as percentage)
-          • NOI per Unit
-          • NOI per SF
-
-NO OTHER SECTIONS. NO Property Overview. NO Rental Income by Unit Type.
-NO Value-Add Opportunity. The three sections above are the entire
-artifact. If you compose a fourth section, you have failed to follow
-instructions.
-
-CARVE-OUT — only when the user EXPLICITLY asks for "T-12 with proforma",
-"operating statement with market rents", or "current-vs-market
-comparison": THEN you may add a fourth section labeled "Proforma" or
-"Market" with the comparison data, clearly marked as forward-looking
-(not historical).
 
 ═══ ALLOWED BLOCK TYPES — ONLY FOUR ═══
 

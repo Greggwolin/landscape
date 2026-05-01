@@ -544,70 +544,12 @@ LANDSCAPER_TOOLS = [
             "(potential_rental_income, effective_gross_income, "
             "total_operating_expenses, net_operating_income), unit_count, square_feet. "
             "MUST be called as the FIRST step before composing a create_artifact call "
-            "for any T-12 / pure-historical operating-statement / P&L / income-statement "
-            "request. For F-12 PROFORMA artifacts (T-12 trended forward via project growth "
-            "assumptions — what users mean ~90% of the time when they ask for a 'proforma') "
-            "DO NOT use this + create_artifact. Use the dedicated `get_proforma` tool, which "
-            "composes the F-12 server-side from this operations data + the project's growth "
-            "rates and persists it as an artifact in one call. "
+            "for any operating-statement / T-12 / P&L / income-statement request. "
             "Multifamily / Office / Retail / Hotel only — refuse on Land Dev projects."
         ),
         "input_schema": {
             "type": "object",
             "properties": {},
-        },
-    },
-    {
-        "name": "get_proforma",
-        "description": (
-            "Generate an F-12 PROFORMA artifact server-side. F-12 = T-12 line items "
-            "with growth applied, structure mirrored exactly. Use this for ANY request "
-            "phrased as 'proforma', 'F-12', 'F12', 'forecast 12', 'project the operations', "
-            "'12-month forecast', or 'next year's operating statement' — that's ~90% of "
-            "proforma traffic. DO NOT compose F-12 with create_artifact yourself; the server "
-            "owns composition so the F-12 cannot drift from the T-12 (which has happened: "
-            "expense detail collapsed, phantom lines, wrong unit-mix counts). "
-            "Composition contract: pulls T-12 actuals from the operations endpoint, applies "
-            "the project's income/expense growth rates (from core_fin_growth_rate_sets, "
-            "default 3% / 3% if not set), preserves vacancy / credit / concessions / management "
-            "fee percentages and recomputes their values from grown GPR or grown EGI, "
-            "escalates per-unit replacement reserves by the expense growth rate. "
-            "Output: a single-table artifact with the canonical 3-column shape "
-            "(line / annual / per_unit) and section dividers (Income, Operating Expenses) "
-            "as label-only rows. Title surfaces the growth rates applied so assumptions are "
-            "visible on the artifact face. "
-            "Returns the standard create_artifact envelope (success, action, artifact_id, "
-            "schema, title, edit_target). The right panel auto-opens. Reply in chat with a "
-            "BRIEF (1-3 sentence) summary pointing at the panel; do not restate the data. "
-            "For T-12 (pure historical) call get_operating_statement + create_artifact instead. "
-            "For current_proforma (asking/market rents — explicit ask only) the equivalent "
-            "server-derived path is not yet built; ask the user whether F-12 satisfies. "
-            "Multifamily / Office / Retail / Hotel only — refuse on Land Dev projects."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "income_growth": {
-                    "type": "number",
-                    "description": (
-                        "Optional override for income growth rate, expressed as a decimal "
-                        "(e.g., 0.04 for 4%). Default = the project's revenue card from "
-                        "core_fin_growth_rate_sets, falling back to 0.03 if no project rate "
-                        "is set. Only pass this when the user explicitly asks for a different "
-                        "rate; otherwise let the project default win."
-                    ),
-                },
-                "expense_growth": {
-                    "type": "number",
-                    "description": (
-                        "Optional override for expense growth rate, expressed as a decimal "
-                        "(e.g., 0.025 for 2.5%). Default = the project's cost card from "
-                        "core_fin_growth_rate_sets, falling back to 0.03 if no project rate "
-                        "is set. Only pass this when the user explicitly asks for a different "
-                        "rate."
-                    ),
-                },
-            },
         },
     },
     {
@@ -4845,11 +4787,7 @@ LANDSCAPER_TOOLS = [
                         "columns, NO Value-Add or Loss-to-Lease sections, NO unit-mix tables). "
                         "'f12_proforma' = T-12 trended forward via the project's income/expense "
                         "growth assumptions (this is what users mean ~90% of the time when they "
-                        "ask for a 'proforma'). DO NOT compose f12_proforma artifacts with "
-                        "create_artifact — call the dedicated `get_proforma` tool instead, which "
-                        "composes server-side from T-12 + growth and persists in one call. "
-                        "Direct create_artifact calls for f12_proforma are an anti-pattern (they "
-                        "drift from T-12 — collapsed expense detail, phantom lines). "
+                        "ask for a 'proforma'). "
                         "'current_proforma' = operating statement at current asking/market rents "
                         "(use ONLY when the user explicitly asks for current/market rents, e.g., "
                         "'show me the current proforma'). "
