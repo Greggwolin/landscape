@@ -3708,38 +3708,173 @@ def handle_get_revenue_rent(
 # Operating Statement (full structured P&L)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Human-friendly labels for the statement_discriminator values seen in
+# production. Used to build rendering_label strings the model can copy verbatim
+# into artifact titles. Year-string discriminators (e.g., "2023") are handled
+# inline by the lookup function below.
+#
+# `default` is the legacy untagged sentinel — present on 945 rows / 63 projects
+# as of the chat DA audit (2026-05-01). Its label intentionally flags the
+# ambiguity rather than guessing a scenario. Future re-tagging UX (Phase 1.5+)
+# can promote per-project `default` data to a specific discriminator.
+_DISCRIMINATOR_LABEL_MAP = {
+    'T3_ANNUALIZED': 'T-3 Annualized',
+    'T12': 'T-12',
+    'T-12': 'T-12',
+    'CURRENT_PRO_FORMA': 'Current Pro Forma',
+    'BROKER_PRO_FORMA': 'Broker Pro Forma',
+    'POST_RENO_PRO_FORMA': 'Post-Reno Pro Forma',
+    'default': 'Default (untagged)',
+}
+
+# Heuristic: descriptive scenarios reflect what IS happening; prescriptive
+# scenarios reflect what someone is ASSUMING about a future state; `unknown`
+# is reserved for the legacy `default` sentinel where the source extraction
+# didn't tag the data with a specific scenario. Used in `available_scenarios`
+# payloads so the model can surface this distinction to the user verbatim per
+# the surface-with-provenance rule.
+_DISCRIMINATOR_EPISTEMIC_STATUS = {
+    'T3_ANNUALIZED': 'descriptive',
+    'T12': 'descriptive',
+    'T-12': 'descriptive',
+    'CURRENT_PRO_FORMA': 'prescriptive',
+    'BROKER_PRO_FORMA': 'prescriptive',
+    'POST_RENO_PRO_FORMA': 'prescriptive',
+    'default': 'unknown',
+}
+
+
+def _human_discriminator_label(discriminator: Optional[str]) -> str:
+    """Convert a statement_discriminator to a human-friendly label.
+
+    Year-string discriminators ('2023', '2024', etc.) become 'YYYY Actuals'.
+    Unknown discriminators fall back to a Title Case version of the raw value.
+    """
+    if not discriminator:
+        return 'Operating Statement'
+    if discriminator in _DISCRIMINATOR_LABEL_MAP:
+        return _DISCRIMINATOR_LABEL_MAP[discriminator]
+    if discriminator.isdigit() and len(discriminator) == 4:
+        return f'{discriminator} Actuals'
+    return discriminator.replace('_', ' ').title()
+
+
+def _discriminator_epistemic_status(discriminator: Optional[str]) -> str:
+    """descriptive | prescriptive | unknown — for surface-with-provenance UX."""
+    if not discriminator:
+        return 'unknown'
+    if discriminator in _DISCRIMINATOR_EPISTEMIC_STATUS:
+        return _DISCRIMINATOR_EPISTEMIC_STATUS[discriminator]
+    if discriminator.isdigit() and len(discriminator) == 4:
+        return 'descriptive'
+    return 'unknown'
+
+
+def _build_available_scenarios_block(
+    project_id: int,
+    available_discriminators: list,
+) -> list:
+    """Build the `available_scenarios` payload the model surfaces to the user.
+
+    For each discriminator on file, returns:
+      - discriminator (raw value)
+      - label (human-friendly)
+      - epistemic_status (descriptive | prescriptive | unknown)
+      - row_count (how many opex rows this scenario carries)
+      - extracted_from_doc_id (best-effort: the doc whose extraction wrote
+        these rows, when knowable from tbl_operating_expenses metadata)
+
+    The doc lookup is best-effort and silent on failure — if we can't find
+    a source doc, the entry just omits that field.
+    """
+    if not available_discriminators:
+        return []
+
+    from django.db import connection
+    out = []
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT statement_discriminator, COUNT(*)::int AS row_count
+                FROM landscape.tbl_operating_expenses
+                WHERE project_id = %s AND statement_discriminator IS NOT NULL
+                GROUP BY statement_discriminator
+                """,
+                [project_id],
+            )
+            counts = {row[0]: row[1] for row in cur.fetchall()}
+    except Exception:  # pragma: no cover — defensive
+        logger.debug('get_operating_statement: row-count probe failed', exc_info=True)
+        counts = {d: None for d in available_discriminators}
+
+    for disc in available_discriminators:
+        out.append({
+            'discriminator': disc,
+            'label': _human_discriminator_label(disc),
+            'epistemic_status': _discriminator_epistemic_status(disc),
+            'row_count': counts.get(disc),
+        })
+    return out
+
+
+def _build_rendering_label(
+    project_name: Optional[str],
+    discriminator: Optional[str],
+) -> str:
+    """Build the artifact title the model should use verbatim.
+
+    Pattern: '<Project Name> — <Human Discriminator Label> Operating Statement'
+    Example: 'Chadron Terrace — Current Pro Forma Operating Statement'
+    """
+    label = _human_discriminator_label(discriminator)
+    project_part = project_name.strip() if project_name else 'Operating Statement'
+    if not project_name:
+        return f'{label} Operating Statement'
+    return f'{project_part} — {label} Operating Statement'
+
+
 @register_tool('get_operating_statement')
 def handle_get_operating_statement(
     tool_input: Dict[str, Any],
     project_id: int,
+    user_id: Any = None,
     **kwargs,
 ) -> Dict[str, Any]:
-    """Return the full structured operating statement / T-12 / P&L for a project.
+    """Return the full structured operating statement / T-12 / P&L for a project,
+    with the resolved scenario clearly labeled.
 
-    Wraps the same view that powers the Operations tab — `GET
-    /api/projects/<id>/operations/`. Use this BEFORE composing a `create_artifact`
-    call for any operating-statement / T-12 / P&L request. Returns a dict with:
+    Resolution order (per the discriminator-honesty design, chat DA 2026-05-01):
+      1. If `tool_input['scenario']` is set literally → use it directly.
+      2. Else if `tool_input['user_phrasing']` is set → consult the user's
+         vocab table (tbl_user_scenario_vocab, domain='operating_statement_scenario').
+         If a learned mapping exists → use it.
+      3. Else if neither is set → fall back to the project's preferred scenario
+         (active_opex_discriminator pin OR system priority).
+      4. If a scenario was REQUESTED (literal or via phrasing) but the project
+         doesn't have it on file → return {success: false, code: 'scenario_not_on_file',
+         available: [...]} so the model can surface the alternatives.
+      5. If user_phrasing was given but vocab lookup failed AND no literal scenario
+         AND the project has multiple scenarios on file → return {success: false,
+         code: 'ambiguous_scenario', available: [...]} so the model can surface options.
 
-        - project metadata (project_id, project_name, project_type_code,
-          analysis_type, value_add_enabled, active_opex_discriminator)
-        - assumptions (physical_vacancy_pct, bad_debt_pct, concessions_pct,
-          management_fee_pct, replacement_reserve_pct, ...)
-        - rental_income (rows + total)
-        - vacancy_deductions (rows + total)
-        - other_income (rows + total)
-        - operating_expenses (rows grouped by category + total)
-        - totals (potential_rental_income, effective_gross_income,
-          total_operating_expenses, net_operating_income)
-        - unit_count, square_feet
-
-    Composition tip: use the categorized operating_expenses to build a `table`
-    block per category (Taxes & Insurance, Utilities, Repairs & Maintenance,
-    Administrative, Other Expenses, Management & Reserves), then a totals
-    `key_value_grid`.
+    On success, response includes:
+      - project metadata + the existing operations payload (rental_income,
+        vacancy_deductions, other_income, operating_expenses, totals, etc.)
+      - scenario_resolved: the discriminator backing the data
+      - scenario_resolution_source: 'literal' | 'user_phrasing_lookup' |
+        'default_priority' (no user input given) | 'fallback_no_data'
+      - rendering_label: the honest artifact title the model should use verbatim
+      - available_scenarios: list with metadata for chat-side option surfacing
     """
+    tool_input = tool_input or {}
+    requested_scenario = tool_input.get('scenario')
+    user_phrasing = tool_input.get('user_phrasing')
+
     try:
         from django.test import RequestFactory
         from apps.financial.views_operations import operations_data
+        from .tools.vocab_tools import lookup_user_vocab
     except Exception as exc:  # noqa: BLE001
         logger.exception('get_operating_statement: import failed')
         return {'success': False, 'error': f'failed to import operations view: {exc}'}
@@ -3760,8 +3895,111 @@ def handle_get_operating_statement(
             'error': f'operations endpoint returned HTTP {status_code}',
             'detail': payload,
         }
+
+    # Pull the scenario inventory + project metadata from the payload.
+    available = list(payload.get('available_scenarios') or [])
+    payload_preferred = payload.get('preferred_scenario')
+    project_name = None
+    # operations_data doesn't echo project_name in its payload, so pull it
+    # straight from the DB. Cheap one-row query.
+    try:
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT project_name FROM landscape.tbl_project WHERE project_id = %s",
+                [int(project_id)],
+            )
+            row = cur.fetchone()
+            project_name = row[0] if row else None
+    except Exception:  # pragma: no cover — defensive
+        project_name = None
+
+    available_block = _build_available_scenarios_block(int(project_id), available)
+
+    # ── Resolution order ────────────────────────────────────────────────
+    resolved_scenario = None
+    resolution_source = None
+
+    if requested_scenario:
+        if requested_scenario in available:
+            resolved_scenario = requested_scenario
+            resolution_source = 'literal'
+        else:
+            return {
+                'success': False,
+                'code': 'scenario_not_on_file',
+                'requested_scenario': requested_scenario,
+                'available_scenarios': available_block,
+                'project_name': project_name,
+                'message': (
+                    f"Scenario {requested_scenario!r} isn't on file for this project. "
+                    f"Available: {[a['label'] for a in available_block]}. Surface the "
+                    f"options to the user, get a pick, save vocab, re-call with the "
+                    f"resolved scenario."
+                ),
+            }
+    elif user_phrasing:
+        vocab_hit = lookup_user_vocab(
+            user_id=user_id,
+            resolution_domain='operating_statement_scenario',
+            phrasing=user_phrasing,
+        ) if user_id else None
+
+        if vocab_hit and vocab_hit.get('resolved_value') in available:
+            resolved_scenario = vocab_hit['resolved_value']
+            resolution_source = 'user_phrasing_lookup'
+        elif len(available) == 1:
+            # Collapse-list-of-one: only one scenario available, treat as the
+            # implicit answer but flag it so the model can confirm with the user.
+            resolved_scenario = available[0]
+            resolution_source = 'fallback_no_data'  # caller should still confirm
+            # Return ambiguous so the model is forced to confirm + save vocab.
+            return {
+                'success': False,
+                'code': 'ambiguous_scenario',
+                'requested_phrasing': user_phrasing,
+                'vocab_hit': vocab_hit,
+                'available_scenarios': available_block,
+                'project_name': project_name,
+                'message': (
+                    f"User said {user_phrasing!r} and no learned mapping exists. Only "
+                    f"one scenario is on file ({available_block[0]['label']}). "
+                    f"Confirm with the user using the single-option pattern, then call "
+                    f"save_user_vocab and re-call this tool with scenario="
+                    f"{available[0]!r}."
+                ),
+            }
+        else:
+            return {
+                'success': False,
+                'code': 'ambiguous_scenario',
+                'requested_phrasing': user_phrasing,
+                'vocab_hit': vocab_hit,
+                'available_scenarios': available_block,
+                'project_name': project_name,
+                'message': (
+                    f"User said {user_phrasing!r} and no learned mapping exists. "
+                    f"Multiple scenarios on file. Surface the options to the user "
+                    f"with provenance and epistemic status, get a pick, call "
+                    f"save_user_vocab, re-call this tool with the resolved scenario."
+                ),
+            }
+    else:
+        # No literal, no phrasing — fall back to whatever the operations endpoint
+        # picked (active_opex_discriminator OR priority-map default). This is the
+        # legacy behavior, retained for backward compatibility but flagged.
+        resolved_scenario = payload_preferred
+        resolution_source = 'default_priority'
+
+    rendering_label = _build_rendering_label(project_name, resolved_scenario)
+
     return {
         'success': True,
+        'scenario_resolved': resolved_scenario,
+        'scenario_resolution_source': resolution_source,
+        'rendering_label': rendering_label,
+        'available_scenarios': available_block,
+        'project_name': project_name,
         'data': payload,
     }
 
@@ -19003,3 +19241,4 @@ from .tools import location_brief_tools  # noqa: E402, F401
 from .tools import analysis_tools  # noqa: E402, F401
 from .tools import loopnet_tools  # noqa: E402, F401
 from .tools import artifact_tools  # noqa: E402, F401
+from .tools import vocab_tools  # noqa: E402, F401

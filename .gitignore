@@ -48,6 +48,12 @@ next-env.d.ts
 *.zip
 *.tar.gz
 *.sql
+
+# Migrations are version-controlled (overrides global *.sql ignore above)
+!**/migrations/*.sql
+!**/migrations/*.up.sql
+!**/migrations/*.down.sql
+
 /LocalFiles/
 
 # Office temp files

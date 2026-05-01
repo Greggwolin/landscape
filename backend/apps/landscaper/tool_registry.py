@@ -105,6 +105,8 @@ UNIVERSAL_TOOLS = [
     "get_artifact_history",
     "restore_artifact_state",
     "find_dependent_artifacts",
+    # User vocabulary learning (chat DA — universal pattern across domains)
+    "save_user_vocab",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -242,6 +244,8 @@ UNASSIGNED_SAFE_TOOLS = [
     "list_projects_summary", "list_available_reports",
     # Universal location intelligence (FRED + Census, no project required)
     "generate_location_brief",
+    # User vocabulary learning — pre-project vocab works the same as project-scoped
+    "save_user_vocab",
     # Generative Artifacts (Finding #4, Phase 1) — pre-project artifacts
     # are saved with project_id NULL; same lifecycle tools apply.
     "create_artifact",

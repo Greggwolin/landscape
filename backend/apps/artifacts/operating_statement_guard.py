@@ -146,6 +146,28 @@ _UNIT_TYPE_ROW_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Title keyword sets used by the label-data-consistency check. The check enforces
+# that the artifact title doesn't claim a scenario type that conflicts with the
+# declared subtype. Catches the canonical Chadron failure: subtype=t12 declared
+# but title says "Current Pro Forma" (or vice versa).
+#
+# t12 subtype: title MUST NOT claim a prescriptive (pro-forma) scenario.
+# current_proforma subtype: title MUST NOT claim a descriptive (historical) scenario.
+# f12_proforma subtype: forward-looking but rooted in T-12; both keyword families
+# are defensible (e.g., "F-12 Pro Forma derived from T-12") so we don't enforce
+# title vs subtype here for f12.
+_T12_FORBIDDEN_TITLE_KEYWORDS = (
+    'pro forma', 'pro-forma', 'proforma',
+    'broker proforma', 'broker pro forma',
+    'current proforma', 'current pro forma',
+    'market rent', 'asking rent',
+)
+_CURRENT_PROFORMA_FORBIDDEN_TITLE_KEYWORDS = (
+    't-12', 't12', 'trailing 12', 'trailing twelve',
+    't-3', 't3 annualized', 't-3 annualized',
+)
+
+
 # Property-metadata labels. An operating statement artifact should NOT contain
 # kv_grid pairs whose label is property metadata (units, square feet, year
 # built, address, zoning, etc.). Property NAME and Reporting PERIOD are allowed
@@ -305,6 +327,12 @@ def validate_operating_statement_artifact(
     # headers). Runs after content-shape so specific issues are surfaced
     # before the structural fallback fires.
     _check_top_level_structure(subtype=subtype, schema=schema)
+
+    # 2c. Label-data consistency — the artifact's title must not claim a
+    # scenario type that conflicts with the declared subtype. Catches the
+    # canonical Chadron failure (subtype=t12 + title contains "Pro Forma").
+    # Per the discriminator-aware design (chat DA, 2026-05-01).
+    _check_label_data_consistency(subtype=subtype, title=title)
 
     # 3. Source data presence (skip for pre-project threads)
     if project_id:
@@ -684,6 +712,97 @@ def _check_content_shape(*, subtype: str, schema: Any) -> None:
                             'Recompose the table with these column keys.'
                         ),
                     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Label-data consistency check (chat DA, 2026-05-01)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _check_label_data_consistency(*, subtype: str, title: Any) -> None:
+    """Reject artifacts whose title claims a scenario type that conflicts with
+    the declared subtype.
+
+    Canonical failure this catches: user asks for "the T-12" on a project where
+    only CURRENT_PRO_FORMA data exists; model declares subtype=t12 (correct in
+    spirit — user asked for historical) but composes a title like "T-12
+    Operating Statement" while the underlying data is current pro forma.
+
+    The honest path: the model should call get_operating_statement with
+    user_phrasing, get back rendering_label, and use it verbatim. If the
+    rendering_label says "Current Pro Forma," the subtype must be
+    current_proforma — not t12.
+
+    Rules enforced:
+      - subtype=t12 → title must NOT contain pro-forma / market / asking
+        keywords (those are prescriptive scenarios)
+      - subtype=current_proforma → title must NOT contain T-12 / T-3 / trailing
+        keywords (those are descriptive scenarios)
+      - subtype=f12_proforma → no title-keyword check (forward-looking but
+        rooted in T-12; both keyword families are defensible)
+
+    Title-keyword check is permissive on phrasing but firm on direction:
+    "Current Pro Forma Operating Statement" with subtype=t12 will reject; a
+    neutral title like "Chadron Terrace Operating Statement" with subtype=t12
+    passes (the subtype declaration is authoritative when no scenario claim
+    is in the title).
+    """
+    if not isinstance(title, str) or not title.strip():
+        return
+    title_lower = title.lower()
+
+    if subtype == SUBTYPE_T12:
+        offending = [kw for kw in _T12_FORBIDDEN_TITLE_KEYWORDS if kw in title_lower]
+        if offending:
+            raise OperatingStatementGuardError(
+                code='label_data_mismatch_t12_vs_proforma',
+                subtype=subtype,
+                missing=offending,
+                message=(
+                    f'artifact title {title!r} contains pro-forma / market scenario '
+                    f'keyword(s) {offending} but subtype is declared as t12 (pure '
+                    f'historical). The title and subtype contradict each other.'
+                ),
+                guidance=(
+                    'Pick one and recompose: (a) if the data backing this artifact is '
+                    'truly historical (T-12 actuals on file), use a neutral title or '
+                    'a "T-12" claim — but not "Pro Forma" or "Current/Market" wording; '
+                    '(b) if the data is actually a pro forma extracted from an OM, '
+                    'change subtype to current_proforma and let the title reflect that. '
+                    'Use rendering_label from get_operating_statement verbatim to avoid '
+                    'this kind of drift.'
+                ),
+                suggested_question=(
+                    "It looks like you're asking for a T-12 but the data on file is a "
+                    "pro forma scenario. Should I compose what's actually on file (and "
+                    "label it accurately as a pro forma), or stop and ask you to "
+                    "upload a true T-12?"
+                ),
+            )
+
+    elif subtype == SUBTYPE_CURRENT_PROFORMA:
+        offending = [kw for kw in _CURRENT_PROFORMA_FORBIDDEN_TITLE_KEYWORDS if kw in title_lower]
+        if offending:
+            raise OperatingStatementGuardError(
+                code='label_data_mismatch_proforma_vs_t12',
+                subtype=subtype,
+                missing=offending,
+                message=(
+                    f'artifact title {title!r} contains historical scenario keyword(s) '
+                    f'{offending} but subtype is declared as current_proforma. The '
+                    f'title and subtype contradict each other.'
+                ),
+                guidance=(
+                    'Pick one and recompose: (a) if the data is genuinely current/market '
+                    'rents, drop the T-12 / T-3 / trailing wording from the title; '
+                    '(b) if the data is historical, change subtype to t12. Use '
+                    'rendering_label from get_operating_statement verbatim.'
+                ),
+            )
+
+    # f12_proforma intentionally has no title-keyword rule. By definition it
+    # IS T-12 trended forward into a pro-forma view, so both word families
+    # are defensible in the title.
 
 
 # ──────────────────────────────────────────────────────────────────────────────

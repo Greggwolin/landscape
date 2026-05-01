@@ -537,19 +537,103 @@ LANDSCAPER_TOOLS = [
         "name": "get_operating_statement",
         "description": (
             "Return the full structured operating statement / T-12 / P&L for the "
-            "active project. Wraps the same view that powers the Operations tab. "
-            "Returns a dict with project metadata, assumptions, rental_income rows + "
-            "total, vacancy_deductions rows + total, other_income rows + total, "
-            "operating_expenses rows grouped by category + total, totals "
-            "(potential_rental_income, effective_gross_income, "
-            "total_operating_expenses, net_operating_income), unit_count, square_feet. "
+            "active project, with the resolved scenario clearly labeled in the "
+            "response. Wraps the view that powers the Operations tab. "
+            "Returns project metadata, assumptions, rental_income, vacancy_deductions, "
+            "other_income, operating_expenses (grouped by category), totals, unit_count, "
+            "square_feet — PLUS scenario_resolved (the statement_discriminator backing "
+            "the data, e.g. 'CURRENT_PRO_FORMA'), scenario_resolution_source (how it "
+            "was picked: 'literal', 'user_phrasing_lookup', 'default_priority'), "
+            "rendering_label (the honest title to use for the artifact), and "
+            "available_scenarios (other discriminators on file with metadata).\n\n"
+            "USER PHRASING + AMBIGUOUS RESOLUTION: pass `user_phrasing` with the user's "
+            "verbatim wording (e.g., 'the T-12', 'last year's operating statement', "
+            "'Year 1 proforma'). The tool consults this user's vocab table; learned "
+            "mappings resolve silently. If no mapping AND no literal scenario was supplied, "
+            "the tool returns {success: false, code: 'ambiguous_scenario', available: [...]}. "
+            "When you receive that, surface the available scenarios to the user with "
+            "provenance and epistemic status (descriptive vs prescriptive), let the user "
+            "pick, then call `save_user_vocab` AND re-call this tool with the literal "
+            "`scenario`. NEVER pick silently from a priority list. NEVER label an artifact "
+            "with a scenario the data isn't actually backed by — use `rendering_label` "
+            "from this tool's response verbatim as the artifact title.\n\n"
             "MUST be called as the FIRST step before composing a create_artifact call "
             "for any operating-statement / T-12 / P&L / income-statement request. "
             "Multifamily / Office / Retail / Hotel only — refuse on Land Dev projects."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "scenario": {
+                    "type": "string",
+                    "description": (
+                        "Optional literal statement_discriminator to use directly without "
+                        "consulting user vocab. Examples: 'T-12', 'T12', 'T3_ANNUALIZED', "
+                        "'CURRENT_PRO_FORMA', 'BROKER_PRO_FORMA', or a year string like "
+                        "'2023'. If the project has no rows for the requested scenario, "
+                        "the tool returns {success: false, code: 'scenario_not_on_file', "
+                        "available: [...]}."
+                    ),
+                },
+                "user_phrasing": {
+                    "type": "string",
+                    "description": (
+                        "Optional — the user's verbatim phrasing of what they asked for. "
+                        "Tool consults the user's vocab table; if no mapping exists the "
+                        "tool returns {success: false, code: 'ambiguous_scenario', "
+                        "available: [...]} for the model to surface to the user."
+                    ),
+                },
+            },
+        },
+    },
+    {
+        "name": "save_user_vocab",
+        "description": (
+            "Save (upsert) a user's phrasing → canonical-value mapping. Call this AFTER "
+            "the user confirms a resolution to an ambiguous phrasing in chat. The same "
+            "phrasing won't re-prompt that user next time — it resolves silently via the "
+            "vocab table. First domain in production: 'operating_statement_scenario' "
+            "(resolved_value is a statement_discriminator string). Universal pattern; "
+            "future domains include cap_rate, growth_rate, hold_period, exit_assumption, "
+            "vacancy_assumption."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phrasing": {
+                    "type": "string",
+                    "description": "The user's verbatim wording, e.g., 'the T-12', 'Year 1 proforma'.",
+                },
+                "resolution_domain": {
+                    "type": "string",
+                    "enum": [
+                        "operating_statement_scenario",
+                        "cap_rate",
+                        "growth_rate",
+                        "hold_period",
+                        "exit_assumption",
+                        "vacancy_assumption",
+                    ],
+                    "description": "Namespace for the mapping.",
+                },
+                "resolved_value": {
+                    "type": "string",
+                    "description": (
+                        "The canonical value the phrase maps to. For "
+                        "operating_statement_scenario this is a statement_discriminator "
+                        "string like 'CURRENT_PRO_FORMA' or 'T-12'."
+                    ),
+                },
+                "context_note": {
+                    "type": "string",
+                    "description": (
+                        "Optional free-text note captured at confirmation time, e.g., "
+                        "'user picked this when project had no true T-12 on file'."
+                    ),
+                },
+            },
+            "required": ["phrasing", "resolution_domain", "resolved_value"],
         },
     },
     {
