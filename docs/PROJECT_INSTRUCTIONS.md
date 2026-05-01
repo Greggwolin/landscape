@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.0
-**Last Updated:** April 30, 2026
-**Supersedes:** v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.1
+**Last Updated:** May 1, 2026
+**Supersedes:** v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -255,6 +255,7 @@ Things that cause friction. Do not do these.
 - Trusting the compaction summary over `THREAD_STATE.md` for file paths, line numbers, or decisions (§1.4.3)
 - Delivering a technical spec as a single tech-heavy `.md` without the plain-English HTML companion (§10.5)
 - Slipping technical jargon (file names, branch names, table names, infrastructure terms) into plain conversation when no technical question was asked (§5.7)
+- Designing or building any tool / artifact / data-flow change without first auditing the schema for discriminator / scenario / source / vintage columns (§17.7). Skipping the schema audit is the failure mode that produced the F-12 / discriminator-taxonomy mismatch in chat hx — the user is non-technical and cannot backstop a missed schema-level concept
 
 ---
 
@@ -609,6 +610,26 @@ Example:
 
 **17.6 When unsure.** A 5-second clarifying question is cheaper than a multi-hour debugging session to fix cascading breakage.
 
+**17.7 Schema audit before architectural proposals.** Before designing, building, or extending any tool, artifact, or data-flow change that touches existing operations / financial / valuation / extraction tables, the schema must be read first. Specifically:
+
+1. **Enumerate.** List the tables touched, the columns on those tables, and any discriminator / scenario / source / vintage / period / type-tag / `*_type` / `*_kind` / `as_of` / `effective_date` columns. These columns almost always encode domain semantics that the chat-first UI hasn't surfaced yet but the legacy folder/tab UI did.
+
+2. **Translate to plain English.** Write a 1-3 sentence summary of what the schema already encodes. If the summary cannot be written, the audit is incomplete.
+
+3. **State findings explicitly to Gregg before designing.** Even when the audit confirms a design is sound, name what was checked. Gregg cannot review code or schema; the audit summary is his only signal that the design is grounded in the existing architecture.
+
+4. **Treat unfamiliar concepts as red flags, not noise.** When unfamiliar terms appear in opened files (`discriminator`, `scenario`, `vintage`, `card_type`, `source_type`, `analysis_type`, `statement_type`, `statement_discriminator`, etc.) — do not skim. Investigate what they classify before proceeding.
+
+5. **Iteration count is a signal.** When a project has been through many design iterations (Gregg's wording: "this project was iterated at least 10 times"), assume the schema is more sophisticated than the immediate code path suggests. Read related migrations, related tools, related service files — not just the file being modified.
+
+**Direct loss event 2026-05-01 (chat hx)** — F-12 server-derivation was built across two sessions and one full commit (`fae31fe`) as "T-12 × growth," only discovering on follow-up that the schema already encodes a `statement_discriminator` taxonomy (`T3_ANNUALIZED` / `T12` / `T-12` / `CURRENT_PRO_FORMA` / `BROKER_PRO_FORMA` / year strings) plus an `active_opex_discriminator` switcher on `tbl_project`. The discriminator code was in a file already opened during the work. Skipping the audit produced an artifact tool that conflicted with the existing scenario architecture and would have shipped misleading labels on real data.
+
+**17.8 New high-risk zone discovered.** Add to §17.3:
+
+| Zone | What Breaks |
+|---|---|
+| `tbl_operating_expenses.statement_discriminator` + `tbl_project.active_opex_discriminator` | Operating-statement classification (T3_ANNUALIZED / T12 / T-12 / CURRENT_PRO_FORMA / BROKER_PRO_FORMA / year strings). Tools that render operating statements MUST be discriminator-aware — labeling DB data as "T-12" when the discriminator is `CURRENT_PRO_FORMA` is a content error, not just a naming one. The legacy folder/tab UI exposes a scenario switcher; the chat-first `/w/` layer does not yet. |
+
 ---
 
 ## 18.0 CC PROMPT PATTERNS (Reference)
@@ -661,6 +682,8 @@ Sync triggers:
 
 ## CHANGELOG
 
+**v4.1 (2026-05-01)** — Added §17.7 (schema audit before architectural proposals) after a direct loss event in chat hx where F-12 server-derivation was built across two sessions before discovering the existing `statement_discriminator` scenario taxonomy. Added §17.8 with the new high-risk zone (operating-expense discriminator + active_opex_discriminator). Updated §6 anti-patterns with the matching skip-the-schema-audit failure mode. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+
 **v4.0 (2026-04-30)** — Full rewrite. Tightened structure, removed redundant section overlap (consolidated former §16 + §20 + §21 into single §15 awareness-context section), absorbed §12 ID strings into §5.10, added §10.6 HTML-first rule, §13.3 content provenance tags, §13.4 inline liner notes, §14.4 no fragment commits, §15.6 no autonomous value inference, §4.6 session ID + echo-back. Reframed header — three intended homes (master file, Cowork project instructions, Claude project instructions), no longer references nonexistent personal-pref layer.
 
 **v3.1 (2026-04-30)** — Added explicit Plain-English Chat Replies rule at §5.7 with single carve-out. Added matching anti-pattern entry in §6.
@@ -669,4 +692,4 @@ Sync triggers:
 
 ---
 
-End of Landscape Project Instructions v4.0
+End of Landscape Project Instructions v4.1
