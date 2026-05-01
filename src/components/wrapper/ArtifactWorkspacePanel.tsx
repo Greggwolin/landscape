@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Pin, Clock, Database } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database } from 'lucide-react';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
@@ -14,6 +15,53 @@ import {
 } from '@/hooks/useArtifact';
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
+
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('auth_tokens');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access) return { Authorization: `Bearer ${parsed.access}` };
+    }
+  } catch { /* ignore */ }
+  return {};
+}
+
+interface ProjectDocument {
+  doc_id: number;
+  doc_name: string;
+  doc_type: string;
+  status: string;
+  created_at: string;
+}
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  general: 'General',
+  lease: 'Lease',
+  appraisal: 'Appraisal',
+  financial: 'Financial',
+  report: 'Report',
+  contract: 'Contract',
+  permit: 'Permit',
+  title: 'Title',
+  survey: 'Survey',
+  market: 'Market',
+  om: 'OM',
+  excel: 'Excel',
+  pdf: 'PDF',
+};
+
+function docTypeLabel(docType: string): string {
+  return DOC_TYPE_LABELS[docType] ?? docType;
+}
+
+function formatDocDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 interface ArtifactWorkspacePanelProps {
   /** Project context — null for unassigned threads. */
@@ -40,6 +88,7 @@ interface ArtifactWorkspacePanelProps {
  * Spec: SPEC_FINDING4_GENERATIVE_ARTIFACTS.md §9
  */
 export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProps) {
+  const router = useRouter();
   const { activeArtifactId, setActiveArtifactId, toggleArtifacts } = useWrapperUI();
   const modalRegistry = useModalRegistrySafe();
 
@@ -77,10 +126,47 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
   const restoreMutation = useArtifactRestore();
   const updateStateMutation = useArtifactUpdateState();
 
-  // Section collapsed state — Pinned and Recent default collapsed; Source Pointers default collapsed.
+  // Section collapsed state — all collapsed by default to keep the panel
+  // compact; expand on demand.
   const [pinnedCollapsed, setPinnedCollapsed] = useState(true);
   const [recentCollapsed, setRecentCollapsed] = useState(true);
   const [pointersCollapsed, setPointersCollapsed] = useState(true);
+  const [documentsCollapsed, setDocumentsCollapsed] = useState(true);
+
+  // Project documents — only fetched when projectId is set (unassigned threads
+  // have no project context, so the section is hidden in that case). Fetched
+  // on mount so the count badge is accurate; the list itself stays collapsed
+  // until the user opens it.
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (projectId == null) {
+      setDocuments([]);
+      return;
+    }
+    let cancelled = false;
+    setDocumentsLoading(true);
+    fetch(`${DJANGO_API_URL}/api/dms/documents/?project_id=${projectId}`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setDocuments(data);
+        } else if (Array.isArray(data?.results)) {
+          setDocuments(data.results);
+        } else if (Array.isArray(data?.documents)) {
+          setDocuments(data.documents);
+        }
+      })
+      .catch(() => { /* swallow — empty state shows */ })
+      .finally(() => {
+        if (!cancelled) setDocumentsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   return (
     <div
@@ -136,6 +222,35 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
           ))
         )}
       </CollapsibleSection>
+
+      {/* ── Project Documents ── (project-scoped only; hidden on unassigned
+          threads). Quick-access shortcut to the project's source files —
+          modeled on the Claude.ai project-page side panel which has Memory /
+          Instructions / Files as separate sections. Click any document → open
+          the dedicated documents page. Added chat DA 2026-05-01. */}
+      {projectId != null && (
+        <CollapsibleSection
+          title="Project Documents"
+          icon={<Folder size={12} />}
+          count={documents.length}
+          collapsed={documentsCollapsed}
+          onToggle={() => setDocumentsCollapsed((v) => !v)}
+        >
+          {documentsLoading ? (
+            <EmptyRow text="Loading…" />
+          ) : documents.length === 0 ? (
+            <EmptyRow text="No documents yet. Upload via the Documents page." />
+          ) : (
+            documents.map((doc) => (
+              <DocumentListRow
+                key={doc.doc_id}
+                doc={doc}
+                onClick={() => router.push(`/w/projects/${projectId}/documents`)}
+              />
+            ))
+          )}
+        </CollapsibleSection>
+      )}
 
       {/* ── Active Artifact (always expanded, takes remaining space) ── */}
       <div
@@ -403,6 +518,75 @@ function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) 
           {formatRelative(artifact.last_edited_at)}
         </div>
       </div>
+    </button>
+  );
+}
+
+interface DocumentListRowProps {
+  doc: ProjectDocument;
+  onClick: () => void;
+}
+
+function DocumentListRow({ doc, onClick }: DocumentListRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        padding: '6px 12px',
+        background: 'transparent',
+        border: 'none',
+        borderLeft: '3px solid transparent',
+        color: 'var(--cui-body-color)',
+        fontSize: 12,
+        textAlign: 'left',
+        cursor: 'pointer',
+      }}
+    >
+      <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontWeight: 500,
+          }}
+          title={doc.doc_name}
+        >
+          {doc.doc_name}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: 'var(--cui-secondary-color)',
+            marginTop: 1,
+          }}
+        >
+          {docTypeLabel(doc.doc_type)} · {formatDocDate(doc.created_at)}
+        </div>
+      </div>
+      {doc.status && (
+        <span
+          style={{
+            fontSize: 9,
+            padding: '1px 5px',
+            borderRadius: 3,
+            background: 'var(--cui-secondary-bg)',
+            color: 'var(--cui-secondary-color)',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            letterSpacing: 0.3,
+            flexShrink: 0,
+          }}
+        >
+          {doc.status}
+        </span>
+      )}
     </button>
   );
 }
