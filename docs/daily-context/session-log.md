@@ -4,6 +4,21 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Release Cut — Alpha18 → unified-ui as new main — 2026-05-01
+
+**What was discussed:**
+- Archived previous main (legacy folder/tab UI / alpha18 line) as branch `Alpha18-UI` for future hotfix access.
+- Promoted `feature/unified-ui` to be the new `main`. Force-pushed to origin after local-beat verification.
+- Vercel + Railway auto-deployed from new `main`. Production now serving the chat-first `/w/` shell + Phase 5 artifacts system + F-12 revert.
+- Created new working branch `chat-artifacts` off new `main` for the next phase (discriminator-aware operating statements per chat DA).
+- `feature/unified-ui` deleted (local + origin) — fully merged into main.
+
+**Open items:**
+- Gregg to mirror PROJECT_INSTRUCTIONS v4.1 to Cowork project settings + Claude project knowledge per §0.4 (CC scope ends at the repo).
+- Discriminator-aware operating-statement design picks back up on `chat-artifacts` (chat DA, questions 1–5 still open).
+
+---
+
 ## Generative Artifacts Item #1 — Source-Check Fix After Live Verify (Cowork chat gx) — 2026-04-30
 
 **What was discussed:**
