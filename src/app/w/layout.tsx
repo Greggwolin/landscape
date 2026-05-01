@@ -392,14 +392,22 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         projectId={
           // On /w/chat routes, chat is always unassigned — never leak lastProjectId.
           // On /w/chat/[threadId], initialThreadId carries its own scope.
-          // Everywhere else, prefer current URL projectId, then last-visited.
-          isChatRoute ? undefined : (projectId ?? lastProjectId)
+          // On /w/projects (the project LIST page, no specific project selected),
+          // chat is also unassigned — this panel is for general chats not tied to
+          // a specific project. Don't bleed lastProjectId here either (chat DA
+          // 2026-05-01 — Gregg flagged that /w/projects was inheriting the last
+          // visited project's chat context).
+          // Everywhere else (specific project pages, sub-routes), prefer current
+          // URL projectId, then last-visited as a navigation-continuity fallback.
+          isChatRoute || pathname === '/w/projects'
+            ? undefined
+            : (projectId ?? lastProjectId)
         }
         initialThreadId={initialThreadId}
         sessionKey={chatSessionKey}
-        projectName={isChatRoute ? undefined : projectData?.project_name}
-        projectLocation={isChatRoute ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
-        projectTypeCode={isChatRoute ? undefined : projectData?.project_type_code}
+        projectName={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_name}
+        projectLocation={isChatRoute || pathname === '/w/projects' ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
+        projectTypeCode={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_type_code}
       />
       {!isChatRoute && (
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
