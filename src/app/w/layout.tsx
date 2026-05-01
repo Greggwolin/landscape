@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
 import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifact';
@@ -38,6 +38,7 @@ interface ProjectData {
 function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toggleHelp, isLoading: isHelpLoading } = useHelpLandscaper();
   const { theme, toggleTheme } = useTheme();
   const {
@@ -92,9 +93,19 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const projectIdMatch = pathname.match(/\/projects\/(\d+)/);
   const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined;
 
-  // Extract threadId from /w/chat/[threadId] routes (Chat Canvas unassigned threads)
+  // Extract threadId from one of two URL forms:
+  //   - /w/chat/[threadId]                       (unassigned chat)
+  //   - /w/projects/[projectId]?thread=[threadId] (project-scoped resume)
+  // The query-param form is what the sidebar uses when clicking a project
+  // thread, so the chat panel resumes that exact thread inside the project
+  // context instead of being routed to the unassigned /w/chat layout.
   const chatThreadIdMatch = pathname.match(/\/chat\/([0-9a-fA-F-]{36})$/);
-  const initialThreadId = chatThreadIdMatch ? chatThreadIdMatch[1] : undefined;
+  const queryThreadId = searchParams?.get('thread') ?? null;
+  const initialThreadId = chatThreadIdMatch
+    ? chatThreadIdMatch[1]
+    : queryThreadId && /^[0-9a-fA-F-]{36}$/.test(queryThreadId)
+      ? queryThreadId
+      : undefined;
 
   // Persist last projectId so project-scoped nav items resume from any page
   const [lastProjectId, setLastProjectId] = useState<number | undefined>(undefined);
@@ -313,7 +324,16 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       name: label,
       projectName: t.projectName ?? undefined,
       isActive: t.threadId === activeSidebarThreadId,
-      onClick: () => router.push(`/w/chat/${t.threadId}`),
+      onClick: () => {
+        // Project-scoped threads route into their project context so the
+        // chat panel keeps the project's tools, artifacts, and side panels.
+        // Unassigned threads still route to /w/chat/[threadId].
+        if (t.projectId) {
+          router.push(`/w/projects/${t.projectId}?thread=${t.threadId}`);
+        } else {
+          router.push(`/w/chat/${t.threadId}`);
+        }
+      },
     };
   });
 

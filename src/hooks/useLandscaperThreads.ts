@@ -356,25 +356,40 @@ export function useLandscaperThreads({
 
   /**
    * Load messages for a specific thread.
+   *
+   * Decoupled from the parent abort controller (`fetchWithTimeout`) on
+   * purpose — the parent controller is shared with initializeThread and
+   * gets aborted on every context change, which was silently dropping the
+   * messages fetch on thread switches even when the click handler was
+   * correct. Each call here uses its own AbortController + a request-id
+   * guard so a stale response can't clobber a fresher one.
    */
+  const loadMsgsRequestIdRef = useRef(0);
   const loadThreadMessages = useCallback(async (threadId: string) => {
+    const requestId = ++loadMsgsRequestIdRef.current;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetchWithTimeout(
+      const response = await fetch(
         `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/messages/`,
         {
           headers: getAuthHeaders(false),
+          signal: controller.signal,
         }
       );
       const data = await response.json();
-
+      // Drop stale response — only the most recent call wins.
+      if (loadMsgsRequestIdRef.current !== requestId) return;
       if (data.success && data.messages) {
         setMessages(data.messages);
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('[LandscaperThreads] Failed to load messages:', err);
+    } finally {
+      clearTimeout(timeoutId);
     }
-  }, [fetchWithTimeout, getAuthHeaders]);
+  }, [getAuthHeaders]);
 
   /**
    * Load a single thread by UUID. Used by URL-based thread resumption
@@ -386,11 +401,19 @@ export function useLandscaperThreads({
    */
   const loadThreadById = useCallback(
     async (threadId: string): Promise<ChatThread | null> => {
+      // Decoupled from the parent abort controller for the same reason
+      // loadThreadMessages is decoupled — clicking a thread that isn't in
+      // the local cache otherwise gets its single-thread fetch silently
+      // aborted by the context-change effect, and selectThread bails out
+      // before it ever calls setActiveThread.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       try {
-        const response = await fetchWithTimeout(
+        const response = await fetch(
           `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`,
           {
             headers: getAuthHeaders(false),
+            signal: controller.signal,
           }
         );
         if (!response.ok) return null;
@@ -403,9 +426,11 @@ export function useLandscaperThreads({
         if (err instanceof DOMException && err.name === 'AbortError') return null;
         console.error('[LandscaperThreads] Failed to load thread by id:', err);
         return null;
+      } finally {
+        clearTimeout(timeoutId);
       }
     },
-    [fetchWithTimeout, getAuthHeaders]
+    [getAuthHeaders]
   );
 
   /**
@@ -538,6 +563,15 @@ export function useLandscaperThreads({
    * Select a different thread.
    */
   const selectThread = useCallback(async (threadId: string) => {
+    // Refresh the abort controller before kicking off the message fetch.
+    // The context-change effect aborts this controller when the URL or
+    // page context shifts; without resetting it here, fetchWithTimeout
+    // sees parentSignal.aborted=true and throws AbortError immediately,
+    // silently dropping the messages call. That was the "click thread →
+    // title updates but messages stay empty" bug.
+    abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
+
     const thread =
       threads.find((t) => t.threadId === threadId) ??
       allThreads.find((t) => t.threadId === threadId) ??
@@ -861,6 +895,29 @@ export function useLandscaperThreads({
   useEffect(() => {
     activeThreadRef.current = activeThread;
   }, [activeThread]);
+
+  // Force-load messages whenever the active thread id transitions to a new
+  // value. This is the belt-and-suspenders companion to selectThread —
+  // selectThread already calls loadThreadMessages, but if the call gets
+  // aborted, dropped, or otherwise silently fails, this effect will retry
+  // on the next render cycle with a fresh abort controller and an
+  // unambiguous threadId. Tracks the last-loaded id in a ref so we don't
+  // refetch on unrelated re-renders.
+  const lastLoadedThreadIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = activeThread?.threadId ?? null;
+    if (!currentId) {
+      lastLoadedThreadIdRef.current = null;
+      return;
+    }
+    if (currentId === lastLoadedThreadIdRef.current) return;
+    lastLoadedThreadIdRef.current = currentId;
+    // Refresh the abort controller so a stale aborted signal from a
+    // prior context-change effect can't suppress this fetch.
+    abortControllerRef.current.abort();
+    abortControllerRef.current = new AbortController();
+    void loadThreadMessages(currentId);
+  }, [activeThread?.threadId, loadThreadMessages]);
 
   // Initialize thread when page context, subtab, or URL-pinned thread changes.
   // NOTE: initializeThread intentionally excluded from deps to prevent

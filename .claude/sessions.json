@@ -1,6 +1,66 @@
 {
   "sessions": [
     {
+      "date": "2026-04-30",
+      "topic": "claudemd-phase5-sync",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — claudemd-phase5-sync"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-single-header-borders",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-single-header-borders"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-units-and-merge",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-units-and-merge"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-header-and-structure",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-header-and-structure"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-os-layout",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-os-layout"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-kvgrid-and-compose",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-kvgrid-and-compose"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "artifact-renderer-format",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — artifact-renderer-format"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "guard-4col-shape",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — guard-4col-shape"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "guard-content-tighten",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui — guard-content-tighten"
+    },
+    {
+      "date": "2026-04-30",
+      "topic": "guard-source-fix — broadened Phase 1 operating-statement guard source-presence check (doc_type taxonomy + extracted-text fallback)",
+      "cowork_chat": "gx (2026-04-30)",
+      "cc_session": "feature/unified-ui"
+    },
+    {
       "date": "2026-04-28",
       "topic": "Daily Brief redesign — feedback tracker spec, mockup iterations, C5/C6/C7 implementation",
       "cowork_chat": "gx",

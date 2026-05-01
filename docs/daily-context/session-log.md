@@ -4,6 +4,47 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Generative Artifacts Item #1 — Source-Check Fix After Live Verify (Cowork chat gx) — 2026-04-30
+
+**What was discussed:**
+- Phase 1 guard shipped earlier today as `c2d18dd`. First live test on Chadron Terrace failed: model asked "generate a t12 operating statement" and the guard rejected with `missing_t12_source` even though the project has an OM that produced a successful T-12 composition earlier in the same thread.
+- Root cause: my `doc_type` LIKE patterns were too narrow. Found canonical taxonomy in `docs/02-features/financial-engine/data_validation_lists_reference.md` — TitleCase values: Offering Memorandum, Operating Statement, Rent Roll, Appraisal, Site Plan, Financial Model, Legal Document, Survey, Environmental Report, Other. My patterns missed Financial Model, Appraisal, etc., and didn't have a NULL/custom-value catch-all.
+- Also confirmed: right-panel UI labels (Diligence, Property Data, Market Data, Leases) are FOLDER names, not doc_type values. Different fields entirely.
+- Fix written directly to `/Users/5150east/landscape/backend/apps/artifacts/operating_statement_guard.py`: broadened `doc_type` patterns in both `_has_t12_source` and `_has_market_rent_source` to cover the canonical taxonomy plus folder-style fallbacks; added a permissive last-resort probe joining `core_doc` to `core_doc_text` so any non-deleted doc with extracted text content passes. Test mock counts updated to match new probe sequences (t12 rejection: 2→3 fetchones; current_proforma rejection: 5→6).
+- F4 item #2 (new-conversation-appends-to-existing-thread) surfaced as a side effect — every "new" thread the user started in /w/chat appended to the original. Means clean Phase 1 verify can't run until item #2 is fixed. Decision: ship the source-check fix now, then tackle item #2, then come back for clean live verify.
+- CC handoff prompt drafted with the new session-name pattern (session ID at top, Step 0 echo-back, ID in commit footer) per the feedback memory established earlier this session.
+
+**Open items:**
+- CC commit/build/restart pass for the source-check fix (drafted prompt: `Landscape app/CC_PHASE1_GUARD_SOURCE_FIX.md`).
+- F4 item #2 (new-thread-bug) is now blocking clean live-verify. Should be the next focus after the source-check fix ships.
+- Phase 2 (multi-source conflict detection) still deferred until Phase 1 is observed in production — and with the broader source-presence check (permissive doc-text fallback), Phase 2's value goes UP because the false-positive rate goes up too.
+- BASE_INSTRUCTIONS T-12 strict content rules (~80 lines) still NOT removed. Will migrate when Phase 1 is confirmed stable in production with clean threads.
+
+---
+
+## Generative Artifacts Item #1 — Phase 1 Guard Implemented (Cowork chat gx) — 2026-04-30
+
+**What was discussed:**
+- Continuation of chat F4 handoff. Original Item #1 ("programmatic content guard for T-12 artifacts") expanded into a richer behavior: subtype-aware enforcement + no-fabrication contract. Mental model: "Claude.ai reviewing an OM as its only knowledge" — surface conflicts as user choices, never silently pick.
+- Locked three-subtype taxonomy: `t12` (pure historical, <10% of traffic), `f12_proforma` (T-12 trended forward via project growth assumptions, ~90% of traffic — the default for "show me a proforma"), `current_proforma` (operating statement at current asking/market rents, explicit ask only).
+- Architecture: model declares `artifact_subtype` in `create_artifact` payload, guard cross-checks content matches subtype AND verifies required source data exists. Rejection envelope carries `guard_code` / `subtype` / `missing` / `guidance` / `suggested_user_question` so the model's retry path knows what to ask the user.
+- Phasing decision: Phase 1 = subtype declaration + content-shape validation + permissive source-presence check (any source counts). Phase 2 = multi-source conflict detection — DEFERRED. Reasoning: Phase 1 alone fixes ~80% of the bleeding; Phase 2 needs real failure-mode data before material-conflict thresholds can be designed correctly. False positives = noise, false negatives = fabrication leaks.
+- User opted out of dual-output spec drafting ("over my head, don't need to see a spec"). Went straight to implementation.
+- Code shipped to `feature/unified-ui` (uncommitted, awaiting CC verify-and-ship pass). Files: new `backend/apps/artifacts/operating_statement_guard.py` (~370 lines, full Phase 1 logic + structured error type with envelope-extras helper); new `backend/apps/artifacts/tests/test_operating_statement_guard.py` (SimpleTestCase coverage of detection, subtype declaration, forbidden sections both all-subtypes and T-12-only, forbidden columns, OpEx 5-column shape, source-presence with mocked DB); edits to `services.py` (guard call after generic schema validation, before persistence), `artifact_tools.py` (thread `artifact_subtype` through), `tool_schemas.py` (added `artifact_subtype` enum field with full taxonomy in description).
+- CC handoff prompt drafted: `Landscape app/CC_PHASE1_GUARD_VERIFY_AND_SHIP.md`. Includes downstream-impact analysis, schema-column existence check (`core_doc.is_deleted`, `tbl_unit_inventory.market_rent`), test commands, build verification, server restart, commit instructions. CC explicitly told NOT to add Phase 2 and NOT to touch BASE_INSTRUCTIONS in this pass.
+- THREAD_STATE.md updated with full design rationale, source-data presence contract per subtype, files-touched manifest for the continuation session, architectural notes (lazy DB import for testability, raw SQL with try/except per probe, `project_id=None` skips source check), and known Phase 1 limitations.
+
+**Open items:**
+- CC verify-and-ship pass not yet run. Most likely real-world hiccup: `core_doc.is_deleted` column may have a different name in the live schema. CC instructed to confirm or adjust before running tests.
+- Risk to watch: existing `OperationsTab` may generate OpEx artifacts with column keys that don't match the canonical `line/rate/annual/per_unit/per_sf` shape. Live verification will surface.
+- Phase 2 spec design (task #4) waiting for Phase 1 to be live. Need real fabrication-failure data before designing conflict-detection thresholds.
+- BASE_INSTRUCTIONS T-12 strict content rules (~80 lines) NOT removed in this pass. Migration deferred until Phase 1 confirmed stable in production. Will bring system prompt back under 15K soft ceiling.
+- Items #2–#5 from F4 handoff (new-thread bug, right-panel default, draggable resize, delete/archive UI) untouched this session.
+
+---
+
+
+
 ## Ingestion Workbench "Finish Later" + DMS Filter Endpoints — 2026-04-02
 
 **What was discussed:**
