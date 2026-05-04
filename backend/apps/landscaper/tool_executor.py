@@ -3730,6 +3730,7 @@ _DISCRIMINATOR_LABEL_MAP = {
     'T-12': 'T-12',
     'CURRENT_PRO_FORMA': 'Current Pro Forma',
     'BROKER_PRO_FORMA': 'Broker Pro Forma',
+    'MARKET_PRO_FORMA': 'Market Pro Forma',     # added PU60
     'POST_RENO_PRO_FORMA': 'Post-Reno Pro Forma',
     'default': 'Default (untagged)',
 }
@@ -3746,6 +3747,7 @@ _DISCRIMINATOR_EPISTEMIC_STATUS = {
     'T-12': 'descriptive',
     'CURRENT_PRO_FORMA': 'prescriptive',
     'BROKER_PRO_FORMA': 'prescriptive',
+    'MARKET_PRO_FORMA': 'prescriptive',         # added PU60 — forward-looking, market-rate based
     'POST_RENO_PRO_FORMA': 'prescriptive',
     'default': 'unknown',
 }
@@ -19373,3 +19375,4 @@ from .tools import analysis_tools  # noqa: E402, F401
 from .tools import loopnet_tools  # noqa: E402, F401
 from .tools import artifact_tools  # noqa: E402, F401
 from .tools import vocab_tools  # noqa: E402, F401
+from .tools import platform_knowledge_tools  # noqa: E402, F401

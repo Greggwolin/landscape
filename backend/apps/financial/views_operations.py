@@ -119,6 +119,7 @@ SCENARIO_PRIORITY_MAP = {
     'T-12': 3,
     'CURRENT_PRO_FORMA': 4,
     'BROKER_PRO_FORMA': 5,
+    'MARKET_PRO_FORMA': 6,    # added PU60 — most prescriptive / least directly observable
 }
 
 

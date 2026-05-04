@@ -142,6 +142,13 @@ class ScenarioS16(BaseAgent):
         self.test_user_id: Optional[int] = None
         self.fresh_thread_id: Optional[str] = None
 
+        # PU60 — second synthetic project for Phase 9 (MARKET_PRO_FORMA test).
+        # Created in Phase 9, tagged MARKET_PRO_FORMA so the new discriminator
+        # gets exercised end-to-end through the synonym dict + tool composition.
+        # Cleanup is automatic via _created_project_ids (set by the API helper).
+        self.market_synthetic_project_id: Optional[int] = None
+        self.market_synthetic_project_name: Optional[str] = None
+
         # Pollution to clean up at end
         self._artifact_ids_created: list[int] = []
 
@@ -181,6 +188,16 @@ class ScenarioS16(BaseAgent):
         # keeping them together makes the transition cleaner.
         logger.info('--- Phase 8: Synonym-dict hit ---')
         self._phase8_synonym_dict_hit()
+
+        # Step 9 — MARKET_PRO_FORMA discriminator end-to-end (added PU60) ──
+        # Seeds a SECOND synthetic project with opex tagged MARKET_PRO_FORMA,
+        # then asks "show me the market pro forma." Synonym dict resolves
+        # the phrase to the new MARKET_PRO_FORMA canonical, and the artifact
+        # composes against the seeded data. Verifies the new discriminator
+        # is wired through the validator allow-list, the priority map, the
+        # epistemic-status map, the label map, and the synonym dict.
+        logger.info('--- Phase 9: MARKET_PRO_FORMA end-to-end ---')
+        self._phase9_market_pro_forma()
 
         # Step 6 — Untagged-data honesty (Chadron) ───────────────────
         logger.info('--- Phase 6: Untagged-data honesty (Chadron) ---')
@@ -401,10 +418,32 @@ class ScenarioS16(BaseAgent):
         tools_used = [tc.tool_name for tc in chat_resp.tool_calls]
         self.validator.observe('p4_tools', tools_used)
 
-        os_call = chat_resp.find_tool_call('get_operating_statement')
+        # Find ALL get_operating_statement calls and pick the most-
+        # authoritative result. The model occasionally fires twice in
+        # this turn — first with truncated user_phrasing (e.g. just
+        # "T-12") that misses user-vocab and synonym-hits to T-12, which
+        # isn't in available_scenarios → ambiguous; then retries with
+        # the full phrase that DOES hit vocab. Reading the first call
+        # would catch the ambiguous-then-recovered path as a false
+        # negative. Prefer a non-ambiguous result; fall back to the
+        # last call if all were ambiguous.
+        os_calls = [
+            tc for tc in chat_resp.tool_calls
+            if tc.tool_name == 'get_operating_statement'
+        ]
+        self.validator.observe('p4_os_call_count', len(os_calls))
         self.validator.assert_field_equals(
-            'p4_get_operating_statement_called', os_call is not None, True
+            'p4_get_operating_statement_called', len(os_calls) > 0, True
         )
+
+        os_call = None
+        for tc in reversed(os_calls):
+            r = tc.result or {}
+            if r.get('code') != 'ambiguous_scenario':
+                os_call = tc
+                break
+        if os_call is None and os_calls:
+            os_call = os_calls[-1]
 
         # On the vocab-hit path, result.code should be absent (success) or
         # explicitly 'success' depending on tool implementation; what matters
@@ -680,6 +719,165 @@ class ScenarioS16(BaseAgent):
             artifact_id = (artifact_call.result or {}).get('artifact_id')
             if artifact_id:
                 self.validator.observe('p8_artifact_id', artifact_id)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Phase 9 — MARKET_PRO_FORMA discriminator end-to-end (added PU60)
+    #
+    # Validates that the new MARKET_PRO_FORMA canonical scenario is wired
+    # through every layer that needs to know about it:
+    #   - vocab_tools._OS_SCENARIO_DISCRIMINATORS allow-list
+    #   - vocab_tools._DOMAIN_SYNONYMS (new "market pro forma" entry)
+    #   - tool_executor._DISCRIMINATOR_LABEL_MAP / _EPISTEMIC_STATUS
+    #   - views_operations.SCENARIO_PRIORITY_MAP
+    #   - operating_statement_guard (unchanged — uses current_proforma rules)
+    #
+    # Setup: a SECOND synthetic project seeded with opex tagged
+    # MARKET_PRO_FORMA. Then the simulated user asks "show me the market
+    # pro forma" — phrase resolves via synonym dict to MARKET_PRO_FORMA,
+    # tool composes against the seeded data, artifact lands with the right
+    # honest title.
+    #
+    # Hard contracts:
+    #   - get_operating_statement returns success (not ambiguous_scenario)
+    #   - scenario_resolved = MARKET_PRO_FORMA
+    #   - scenario_resolution_source = 'synonym_dict'
+    #   - artifact title contains "Market" (not "Current", not "T-12",
+    #     not "Trailing")
+    #   - artifact_subtype = current_proforma (MARKET reuses existing
+    #     prescriptive subtype rules per the PU60 audit)
+    #   - no save_user_vocab call (synonym dict hits don't save)
+    # ──────────────────────────────────────────────────────────────────
+    def _phase9_market_pro_forma(self):
+        # 1a. Create second synthetic test project
+        market_project_name = f'{config.TEST_PROJECT_PREFIX}S16_Market_Source'
+        # Reset self.project_id from the API helper so create_project_via_api
+        # registers the new project as the active one. The helper appends to
+        # _created_project_ids automatically, which means cleanup deletes
+        # both synthetic projects without extra plumbing.
+        self.create_project_via_api(
+            project_name=market_project_name,
+            project_type_code='MF',
+        )
+        self.market_synthetic_project_id = self.project_id
+        self.market_synthetic_project_name = market_project_name
+
+        self.validator.assert_field_equals(
+            'p9_market_project_created',
+            self.market_synthetic_project_id is not None, True,
+        )
+        self.validator.observe('p9_market_project_id', self.market_synthetic_project_id)
+
+        # 1b. Seed fixture with opex tagged MARKET_PRO_FORMA. Reuses the
+        # same seeder used in Phase 1 — the seeder accepts arbitrary
+        # discriminator strings; the new canonical is in the allow-list
+        # via vocab_tools so the validator side accepts it too.
+        seed_result = self._run_seeder(
+            project_id=self.market_synthetic_project_id,
+            discriminator='MARKET_PRO_FORMA',
+            units_payload=FIXTURE_UNITS,
+            opex_payload=FIXTURE_OPEX_ROWS,
+            set_active=True,
+        )
+        self.validator.assert_field_equals(
+            'p9_seed_succeeded', seed_result.get('success', False), True
+        )
+        self.validator.assert_field_equals(
+            'p9_opex_seeded', seed_result.get('opex_inserted', 0), len(FIXTURE_OPEX_ROWS)
+        )
+
+        # 2. Open a fresh thread on the new project
+        self.create_thread(
+            project_id=self.market_synthetic_project_id,
+            page_context='operations',
+            force_new=True,
+        )
+
+        # 3. Send the chat message — synonym dict path
+        chat_resp = self.send_message(
+            content='Show me the market pro forma.',
+            page_context='operations',
+        )
+        self.validator.assert_response_not_error(chat_resp)
+
+        tools_used = [tc.tool_name for tc in chat_resp.tool_calls]
+        self.validator.observe('p9_tools', tools_used)
+
+        os_call = chat_resp.find_tool_call('get_operating_statement')
+        self.validator.assert_field_equals(
+            'p9_get_operating_statement_called', os_call is not None, True
+        )
+
+        if os_call:
+            tool_result = os_call.result or {}
+            tool_code = tool_result.get('code')
+            scenario_resolved = tool_result.get('scenario_resolved')
+            resolution_source = tool_result.get('scenario_resolution_source')
+
+            self.validator.observe('p9_tool_result_code', tool_code)
+            self.validator.observe('p9_scenario_resolved', scenario_resolved)
+            self.validator.observe('p9_resolution_source', resolution_source)
+
+            # Hard contract: tool did NOT return ambiguous_scenario
+            self.validator.assert_field_equals(
+                'p9_not_ambiguous', tool_code != 'ambiguous_scenario', True
+            )
+
+            # Hard contract: resolved to MARKET_PRO_FORMA
+            self.validator.assert_field_equals(
+                'p9_resolved_market_proforma',
+                scenario_resolved, 'MARKET_PRO_FORMA',
+            )
+
+            # Hard contract: synonym dict path fired
+            self.validator.assert_field_equals(
+                'p9_resolution_source_synonym_dict',
+                resolution_source, 'synonym_dict',
+            )
+
+        # Hard contract: save_user_vocab NOT called
+        vocab_save_call = chat_resp.find_tool_call('save_user_vocab')
+        self.validator.assert_field_equals(
+            'p9_no_vocab_save', vocab_save_call is None, True
+        )
+
+        # Hard contract: artifact composed
+        artifact_call = chat_resp.find_tool_call('create_artifact')
+        self.validator.assert_field_equals(
+            'p9_artifact_created', artifact_call is not None, True
+        )
+
+        if artifact_call:
+            title = (artifact_call.tool_input or {}).get('title') or ''
+            subtype = (artifact_call.tool_input or {}).get('artifact_subtype')
+            title_lower = title.lower()
+            self.validator.observe('p9_artifact_title', title)
+            self.validator.observe('p9_artifact_subtype', subtype)
+
+            # Hard contract: title says "Market" (the new label from
+            # _DISCRIMINATOR_LABEL_MAP)
+            self.validator.assert_field_equals(
+                'p9_title_says_market', 'market' in title_lower, True
+            )
+
+            # Hard contract: title MUST NOT contain T-12 / trailing
+            # (descriptive scenario keywords that don't apply here)
+            title_dirty = any(
+                kw in title_lower for kw in ('t-12', 't12', 'trailing')
+            )
+            self.validator.assert_field_equals('p9_title_no_t12', title_dirty, False)
+
+            # Hard contract: artifact_subtype = current_proforma. MARKET
+            # reuses the existing prescriptive subtype per the PU60 audit
+            # — no new subtype was added. The OS guard's existing rules
+            # accept this combination.
+            self.validator.assert_field_equals(
+                'p9_subtype_current_proforma', subtype, 'current_proforma'
+            )
+
+            # Capture artifact_id for symmetry
+            artifact_id = (artifact_call.result or {}).get('artifact_id')
+            if artifact_id:
+                self.validator.observe('p9_artifact_id', artifact_id)
 
     # ──────────────────────────────────────────────────────────────────
     # Phase 6 — untagged-data honesty against Chadron

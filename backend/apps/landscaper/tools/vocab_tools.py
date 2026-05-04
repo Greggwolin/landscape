@@ -47,6 +47,7 @@ VALID_RESOLUTION_DOMAINS = frozenset({
 _OS_SCENARIO_DISCRIMINATORS = frozenset({
     'T-12', 'T12', 'T3_ANNUALIZED',
     'CURRENT_PRO_FORMA', 'BROKER_PRO_FORMA',
+    'MARKET_PRO_FORMA',                   # added PU60 — market rates applied to subject
     'POST_RENO_PRO_FORMA',
     'default',
 })
@@ -214,6 +215,19 @@ _DOMAIN_SYNONYMS: Dict[str, Dict[str, str]] = {
         'sellers pro forma': 'BROKER_PRO_FORMA',      # "seller's pro forma" → "sellers pro forma"
         'seller pro forma': 'BROKER_PRO_FORMA',
         'listing pro forma': 'BROKER_PRO_FORMA',
+
+        # ── Market pro forma family (added PU60 with MARKET_PRO_FORMA discriminator) ──
+        # Conceptually distinct from CURRENT_PRO_FORMA — based on market rates
+        # (from rental comparables / market studies / user-specified market
+        # rates), not the subject property's actual asking rents. Returns to
+        # the dictionary now that the canonical MARKET_PRO_FORMA exists; in
+        # PU57 these entries were deliberately excluded because no canonical
+        # existed and they fell through to the future mixed-source tool.
+        'market pro forma': 'MARKET_PRO_FORMA',
+        'market rent pro forma': 'MARKET_PRO_FORMA',
+        'market scenario': 'MARKET_PRO_FORMA',
+        'at market': 'MARKET_PRO_FORMA',
+        'market rates': 'MARKET_PRO_FORMA',     # see Q2 — risk of false-positive routing into rent-comp territory; queue item #3 (firing-discipline) addresses
 
         # ── Post-renovation pro forma family ─────────────────────────
         'post reno pro forma': 'POST_RENO_PRO_FORMA',

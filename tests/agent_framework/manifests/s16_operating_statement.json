@@ -1,6 +1,6 @@
 {
   "field_equals:p1_synthetic_created": true,
-  "observe:p1_synthetic_project_id": 925,
+  "observe:p1_synthetic_project_id": 945,
   "field_equals:p1_seed_succeeded": true,
   "field_equals:p1_units_seeded": 60,
   "field_equals:p1_opex_seeded": 10,
@@ -24,7 +24,6 @@
   "observe:p3_tools": [
     "save_user_vocab",
     "get_operating_statement",
-    "create_artifact",
     "create_artifact"
   ],
   "field_equals:p3_save_user_vocab_called": true,
@@ -41,6 +40,7 @@
     "get_operating_statement",
     "create_artifact"
   ],
+  "observe:p4_os_call_count": 1,
   "field_equals:p4_get_operating_statement_called": true,
   "observe:p4_scenario_resolved": "CURRENT_PRO_FORMA",
   "observe:p4_resolution_source": "user_vocab",
@@ -53,7 +53,7 @@
   "field_equals:p5a_guard_raised": true,
   "observe:p5a_error_code": "label_data_mismatch_t12_vs_proforma",
   "field_equals:p5a_error_code_correct": true,
-  "observe:p5b_response_length": 543,
+  "observe:p5b_response_length": 858,
   "observe:p5b_tools": [
     "get_operating_statement",
     "create_artifact"
@@ -64,6 +64,7 @@
   "observe:p5b_retry_recovered": false,
   "observe:p8_tools": [
     "get_operating_statement",
+    "create_artifact",
     "create_artifact"
   ],
   "field_equals:p8_get_operating_statement_called": true,
@@ -79,7 +80,28 @@
   "field_equals:p8_title_honest": true,
   "field_equals:p8_title_no_t12": false,
   "field_equals:p8_subtype_current_proforma": "current_proforma",
-  "observe:p6_chadron_thread": "349fe38c-82f7-4d17-88ff-cece6c6bcdfb",
+  "field_equals:p9_market_project_created": true,
+  "observe:p9_market_project_id": 946,
+  "field_equals:p9_seed_succeeded": true,
+  "field_equals:p9_opex_seeded": 10,
+  "observe:p9_tools": [
+    "get_operating_statement",
+    "create_artifact"
+  ],
+  "field_equals:p9_get_operating_statement_called": true,
+  "observe:p9_scenario_resolved": "MARKET_PRO_FORMA",
+  "observe:p9_resolution_source": "synonym_dict",
+  "field_equals:p9_not_ambiguous": true,
+  "field_equals:p9_resolved_market_proforma": "MARKET_PRO_FORMA",
+  "field_equals:p9_resolution_source_synonym_dict": "synonym_dict",
+  "field_equals:p9_no_vocab_save": true,
+  "field_equals:p9_artifact_created": true,
+  "observe:p9_artifact_title": "AGENT_TEST_S16_Market_Source \u2014 Market Pro Forma Operating Statement",
+  "observe:p9_artifact_subtype": "current_proforma",
+  "field_equals:p9_title_says_market": true,
+  "field_equals:p9_title_no_t12": false,
+  "field_equals:p9_subtype_current_proforma": "current_proforma",
+  "observe:p6_chadron_thread": "b7fa3876-73ae-402c-8c0c-887118b5d01c",
   "observe:p6_turn1_tools": [
     "get_operating_statement"
   ],
@@ -87,7 +109,6 @@
   "observe:p6_tools": [
     "save_user_vocab",
     "get_operating_statement",
-    "create_artifact",
     "create_artifact",
     "create_artifact"
   ],
