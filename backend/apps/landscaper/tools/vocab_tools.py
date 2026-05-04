@@ -76,18 +76,63 @@ def _resolve_user_id(kwargs: Dict[str, Any]) -> Optional[Any]:
     return kwargs.get('user_id') or kwargs.get('user_email') or None
 
 
+# Stop-word list applied during normalization. Conservative: only filler
+# tokens that carry no semantic content for any of the resolution domains
+# we care about. Domain-meaningful terms ("operating", "statement", "rate",
+# "vacancy", "growth", etc.) are intentionally NOT in this set — they
+# disambiguate between domains and resolutions.
+#
+# Goal: collapse common phrasing variants to the same lookup key, e.g.,
+#   "show me the T-12"   → "t12"
+#   "T-12 please"        → "t12"
+#   "the T-12"           → "t12"
+#   "T-12"               → "t12"
+# while preserving distinctions like
+#   "T-12 operating statement" → "t12 operating statement"  (different)
+#   "T-12 cap rate"            → "t12 cap rate"             (different)
+_STOP_WORDS = frozenset({
+    'a', 'an', 'the',
+    'show', 'see', 'view', 'display', 'pull', 'fetch',
+    'me', 'my', 'us', 'our',
+    'i', 'you', 'we',
+    'please', 'just', 'really',
+    'can', 'could', 'would', 'should', 'will',
+    'give', 'get', 'let', 'pull',
+    'want', 'need', 'like',
+    'this', 'that', 'these', 'those',
+    'is', 'are', 'was', 'were', 'be',
+    'do', 'did', 'does',
+    'now', 'then', 'again',
+    'on', 'in', 'of', 'for', 'to',
+    's',  # possessive 's after lowercase + alnum-only strip ("user's" → "users", but "year's" → "years"; bare 's' tokens get dropped)
+})
+
+
 def _normalize_phrase(phrase: str) -> str:
     """
     Normalize a phrase for vocab lookup.
 
-    Mirrors the pattern in opex_utils._normalize_label: lowercase, replace
-    '&' with 'and', drop non-alphanumeric (keep spaces), collapse whitespace.
+    Steps:
+      1. Lowercase
+      2. Replace '&' with 'and'
+      3. Drop non-alphanumeric (keep spaces) — strips dashes, punctuation
+      4. Tokenize on whitespace
+      5. Drop tokens matching `_STOP_WORDS`
+      6. Collapse whitespace
+
+    Returns '' if the phrase is empty or normalizes to nothing after
+    stop-word filtering. Callers (lookup_user_vocab, handle_save_user_vocab)
+    treat the empty-string case as a legitimate skip rather than an error.
+
+    Mirrors the pattern in opex_utils._normalize_label, with stop-word
+    filtering added 2026-05-04 (PU41) for prompt-variation tolerance.
     """
     if not phrase:
         return ''
     cleaned = phrase.lower().replace('&', 'and')
     cleaned = ''.join(ch for ch in cleaned if ch.isalnum() or ch.isspace())
-    return ' '.join(cleaned.split())
+    tokens = [t for t in cleaned.split() if t and t not in _STOP_WORDS]
+    return ' '.join(tokens)
 
 
 def lookup_user_vocab(

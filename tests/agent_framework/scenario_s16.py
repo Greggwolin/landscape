@@ -443,7 +443,7 @@ class ScenarioS16(BaseAgent):
 
         self.validator.observe('p5a_returncode', proc.returncode)
         if proc.returncode != 0:
-            logger.warning(f'  Phase 5a subprocess stderr: {proc.stderr[:500]}')
+            logger.warning(f'  Phase 5a subprocess stderr: {proc.stderr[-4000:]}')
             self.validator.assert_field_equals(
                 'p5a_subprocess_ok', False, True
             )
@@ -682,12 +682,18 @@ class ScenarioS16(BaseAgent):
         )
 
         if proc.returncode != 0:
-            logger.warning(f'  Seeder stderr: {proc.stderr[:500]}')
+            # Capture the tail of stderr — Python tracebacks put the
+            # actual exception class + message at the end, after the
+            # banner/warnings noise. 4KB is enough for any traceback
+            # we'd care to read; bigger than that and we want to look
+            # at the file directly.
+            stderr_tail = proc.stderr[-4000:]
+            logger.warning(f'  Seeder stderr: {stderr_tail}')
             self._fail_step(
                 f'Fixture seeder failed (returncode={proc.returncode})',
-                {'stderr': proc.stderr[:500]},
+                {'stderr': stderr_tail},
             )
-            return {'success': False, 'error': proc.stderr[:500]}
+            return {'success': False, 'error': stderr_tail}
 
         # Last JSON line in stdout is the result envelope
         for line in reversed(proc.stdout.strip().splitlines()):
@@ -761,7 +767,7 @@ class ScenarioS16(BaseAgent):
             logger.warning(f'  user_id lookup subprocess failed: {e}')
             return None
         if proc.returncode != 0:
-            logger.warning(f'  user_id lookup stderr: {proc.stderr[:300]}')
+            logger.warning(f'  user_id lookup stderr: {proc.stderr[-4000:]}')
             return None
         for line in proc.stdout.splitlines():
             line = line.strip()
@@ -834,7 +840,7 @@ class ScenarioS16(BaseAgent):
             if proc.returncode == 0:
                 logger.info(f'  Vocab cleanup output: {proc.stdout.strip()[-200:]}')
             else:
-                logger.warning(f'  Vocab cleanup stderr: {proc.stderr[:300]}')
+                logger.warning(f'  Vocab cleanup stderr: {proc.stderr[-4000:]}')
         except Exception as e:
             logger.warning(f'  Vocab cleanup subprocess failed: {e}')
 

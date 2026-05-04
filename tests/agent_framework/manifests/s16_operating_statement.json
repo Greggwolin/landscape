@@ -1,6 +1,6 @@
 {
   "field_equals:p1_synthetic_created": true,
-  "observe:p1_synthetic_project_id": 920,
+  "observe:p1_synthetic_project_id": 922,
   "field_equals:p1_seed_succeeded": true,
   "field_equals:p1_units_seeded": 60,
   "field_equals:p1_opex_seeded": 10,
@@ -52,16 +52,17 @@
   "field_equals:p5a_guard_raised": true,
   "observe:p5a_error_code": "label_data_mismatch_t12_vs_proforma",
   "field_equals:p5a_error_code_correct": true,
-  "observe:p5b_response_length": 733,
+  "observe:p5b_response_length": 956,
   "observe:p5b_tools": [
     "get_operating_statement",
+    "create_artifact",
     "create_artifact"
   ],
-  "observe:p5b_artifact_attempts": 1,
+  "observe:p5b_artifact_attempts": 2,
   "observe:p5b_final_title": "T-12 Operating Statement",
   "observe:p5b_final_subtype": "current_proforma",
   "observe:p5b_retry_recovered": false,
-  "observe:p6_chadron_thread": "4fd0b251-9481-42d3-984a-e1b73d84ebb5",
+  "observe:p6_chadron_thread": "62bedf0e-951f-451e-bc6f-1122c6355e74",
   "observe:p6_turn1_tools": [
     "get_operating_statement"
   ],
