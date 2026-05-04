@@ -159,7 +159,7 @@
 /* ─── LEFT SIDEBAR ─── */
 .wrapper-sidebar {
   width: 260px;
-  background: var(--w-bg-sidebar);
+  background: #060708;
   border-right: 1px solid var(--w-border);
   display: flex;
   flex-direction: column;
@@ -999,6 +999,7 @@
   width: 320px;
   height: 100%;
   overflow: hidden;
+  background: var(--w-bg-sidebar);
   border-left: 1px solid var(--w-border);
 }
 

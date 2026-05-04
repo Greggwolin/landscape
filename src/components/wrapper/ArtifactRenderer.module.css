@@ -15,7 +15,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--cui-body-bg);
+  background: var(--w-bg-sidebar);
   color: var(--cui-body-color);
   font-size: 13px;
 }

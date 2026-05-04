@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2 } from 'lucide-react';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
@@ -126,6 +126,69 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
   const restoreMutation = useArtifactRestore();
   const updateStateMutation = useArtifactUpdateState();
 
+  // Row actions — rename and delete (soft-delete via is_archived).
+  const handleRenameArtifact = (artifact: ArtifactSummary) => {
+    if (typeof window === 'undefined') return;
+    const next = window.prompt('Rename artifact:', artifact.title);
+    if (next == null) return; // cancelled
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === artifact.title) return;
+    patchMutation.mutate(
+      {
+        artifactId: artifact.artifact_id,
+        patch: { title: trimmed },
+      },
+      {
+        onSuccess: () => {
+          pinnedQuery.refetch();
+          recentQuery.refetch();
+        },
+        onError: (err) => {
+          console.error('[ArtifactWorkspacePanel] rename failed', err);
+          window.alert(
+            `Could not rename artifact: ${err instanceof Error ? err.message : 'unknown error'}`
+          );
+        },
+      }
+    );
+  };
+
+  const handleDeleteArtifact = (artifact: ArtifactSummary) => {
+    if (typeof window === 'undefined') return;
+    console.log('[ArtifactWorkspacePanel] delete clicked', {
+      artifact_id: artifact.artifact_id,
+      title: artifact.title,
+    });
+    const confirmed = window.confirm(
+      `Delete this artifact?\n\n${artifact.title}\n\nIt will be archived and removed from the panel.`
+    );
+    if (!confirmed) return;
+    if (activeArtifactId === artifact.artifact_id) {
+      setActiveArtifactId(null);
+    }
+    patchMutation.mutate(
+      {
+        artifactId: artifact.artifact_id,
+        patch: { is_archived: true },
+      },
+      {
+        onSuccess: () => {
+          // Force the panel queries to refetch immediately so the row
+          // disappears even if React Query's prefix invalidation doesn't
+          // match the active filter object.
+          pinnedQuery.refetch();
+          recentQuery.refetch();
+        },
+        onError: (err) => {
+          console.error('[ArtifactWorkspacePanel] delete failed', err);
+          window.alert(
+            `Could not delete artifact: ${err instanceof Error ? err.message : 'unknown error'}`
+          );
+        },
+      }
+    );
+  };
+
   // Section collapsed state — all collapsed by default to keep the panel
   // compact; expand on demand.
   const [pinnedCollapsed, setPinnedCollapsed] = useState(true);
@@ -175,59 +238,14 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--cui-body-bg)',
+        background: 'var(--w-bg-sidebar)',
         color: 'var(--cui-body-color)',
       }}
     >
-      {/* ── Pinned Artifacts ── */}
-      <CollapsibleSection
-        title="Pinned Artifacts"
-        icon={<Pin size={12} />}
-        count={pinnedArtifacts.length}
-        collapsed={pinnedCollapsed}
-        onToggle={() => setPinnedCollapsed((v) => !v)}
-      >
-        {pinnedArtifacts.length === 0 ? (
-          <EmptyRow text="No pinned artifacts." />
-        ) : (
-          pinnedArtifacts.map((a) => (
-            <ArtifactListRow
-              key={a.artifact_id}
-              artifact={a}
-              isActive={a.artifact_id === activeArtifactId}
-              onClick={() => setActiveArtifactId(a.artifact_id)}
-            />
-          ))
-        )}
-      </CollapsibleSection>
-
-      {/* ── Recent Artifacts ── */}
-      <CollapsibleSection
-        title="Recent Artifacts"
-        icon={<Clock size={12} />}
-        count={recentArtifacts.length}
-        collapsed={recentCollapsed}
-        onToggle={() => setRecentCollapsed((v) => !v)}
-      >
-        {recentArtifacts.length === 0 ? (
-          <EmptyRow text="No recent artifacts." />
-        ) : (
-          recentArtifacts.map((a) => (
-            <ArtifactListRow
-              key={a.artifact_id}
-              artifact={a}
-              isActive={a.artifact_id === activeArtifactId}
-              onClick={() => setActiveArtifactId(a.artifact_id)}
-            />
-          ))
-        )}
-      </CollapsibleSection>
-
       {/* ── Project Documents ── (project-scoped only; hidden on unassigned
-          threads). Quick-access shortcut to the project's source files —
-          modeled on the Claude.ai project-page side panel which has Memory /
-          Instructions / Files as separate sections. Click any document → open
-          the dedicated documents page. Added chat DA 2026-05-01. */}
+          threads). Surfaced at the top of the panel so the project's source
+          files are the first thing visible — Pinned + Recent are derivative
+          views over those files. */}
       {projectId != null && (
         <CollapsibleSection
           title="Project Documents"
@@ -252,6 +270,54 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
         </CollapsibleSection>
       )}
 
+      {/* ── Pinned Artifacts ── */}
+      <CollapsibleSection
+        title="Pinned Artifacts"
+        icon={<Pin size={12} />}
+        count={pinnedArtifacts.length}
+        collapsed={pinnedCollapsed}
+        onToggle={() => setPinnedCollapsed((v) => !v)}
+      >
+        {pinnedArtifacts.length === 0 ? (
+          <EmptyRow text="No pinned artifacts." />
+        ) : (
+          pinnedArtifacts.map((a) => (
+            <ArtifactListRow
+              key={a.artifact_id}
+              artifact={a}
+              isActive={a.artifact_id === activeArtifactId}
+              onClick={() => setActiveArtifactId(a.artifact_id)}
+              onRename={handleRenameArtifact}
+              onDelete={handleDeleteArtifact}
+            />
+          ))
+        )}
+      </CollapsibleSection>
+
+      {/* ── Recent Artifacts ── */}
+      <CollapsibleSection
+        title="Recent Artifacts"
+        icon={<Clock size={12} />}
+        count={recentArtifacts.length}
+        collapsed={recentCollapsed}
+        onToggle={() => setRecentCollapsed((v) => !v)}
+      >
+        {recentArtifacts.length === 0 ? (
+          <EmptyRow text="No recent artifacts." />
+        ) : (
+          recentArtifacts.map((a) => (
+            <ArtifactListRow
+              key={a.artifact_id}
+              artifact={a}
+              isActive={a.artifact_id === activeArtifactId}
+              onClick={() => setActiveArtifactId(a.artifact_id)}
+              onRename={handleRenameArtifact}
+              onDelete={handleDeleteArtifact}
+            />
+          ))
+        )}
+      </CollapsibleSection>
+
       {/* ── Active Artifact (always expanded, takes remaining space) ── */}
       <div
         style={{
@@ -259,9 +325,9 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          borderTop: '1px solid var(--cui-border-color)',
-          borderBottom: '1px solid var(--cui-border-color)',
-          background: 'var(--cui-body-bg)',
+          borderTop: '1px solid var(--w-border-subtle-dark)',
+          borderBottom: '1px solid var(--w-border-subtle-dark)',
+          background: 'var(--w-bg-sidebar)',
         }}
       >
         {activeArtifactId == null ? (
@@ -394,17 +460,24 @@ function CollapsibleSection({
   compact = false,
   children,
 }: CollapsibleSectionProps) {
+  const [hovered, setHovered] = useState(false);
+  // Mirror left-panel nav behavior: bright when hovered or expanded
+  // (the "selected" state for a collapsible), muted otherwise.
+  const headerColor = hovered || !collapsed ? '#E5E5E5' : '#A7A7A8';
+
   return (
     <div
       style={{
         flexShrink: 0,
-        borderBottom: '1px solid var(--cui-border-color)',
-        background: 'var(--cui-tertiary-bg)',
+        borderBottom: '1px solid var(--w-border-subtle-dark)',
+        background: 'transparent',
       }}
     >
       <button
         type="button"
         onClick={onToggle}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -413,11 +486,13 @@ function CollapsibleSection({
           padding: compact ? '4px 12px' : '6px 12px',
           background: 'transparent',
           border: 'none',
-          color: 'var(--cui-body-color)',
-          fontSize: 11,
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: 0.3,
+          outline: 'none',
+          boxShadow: 'none',
+          color: headerColor,
+          fontSize: 12,
+          fontWeight: 400,
+          textTransform: 'none',
+          letterSpacing: 0,
           cursor: 'pointer',
           textAlign: 'left',
         }}
@@ -429,11 +504,11 @@ function CollapsibleSection({
           <span
             style={{
               fontSize: 10,
-              color: 'var(--cui-secondary-color)',
+              color: 'var(--w-text-muted)',
               fontWeight: 500,
               padding: '0 6px',
               borderRadius: 8,
-              background: 'var(--cui-secondary-bg)',
+              background: 'var(--w-bg-surface)',
             }}
           >
             {count}
@@ -445,8 +520,8 @@ function CollapsibleSection({
           style={{
             maxHeight: 240,
             overflowY: 'auto',
-            background: 'var(--cui-body-bg)',
-            borderTop: '1px solid var(--cui-border-color)',
+            background: 'var(--w-bg-sidebar)',
+            borderTop: '1px solid var(--w-border-subtle-dark)',
           }}
         >
           {children}
@@ -460,13 +535,37 @@ interface ArtifactListRowProps {
   artifact: ArtifactSummary;
   isActive: boolean;
   onClick: () => void;
+  onRename: (artifact: ArtifactSummary) => void;
+  onDelete: (artifact: ArtifactSummary) => void;
 }
 
-function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) {
+function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: ArtifactListRowProps) {
+  // Build the visible title:
+  //   1. Strip the "<ProjectName> — " prefix (server composes titles as
+  //      "<project_name> — <title>" with an em dash). The user is already
+  //      inside the project, so repeating it on every row adds noise.
+  //   2. Strip a leading "Default (untagged) " or "Default " token. Those
+  //      come from the operating-statement scenario discriminator. They're
+  //      meaningful inside the artifact (epistemic provenance) but the
+  //      sidebar list doesn't need them.
+  let displayTitle = artifact.title;
+  if (displayTitle.includes(' — ')) {
+    displayTitle = displayTitle.slice(displayTitle.indexOf(' — ') + 3);
+  }
+  displayTitle = displayTitle.replace(/^Default \(untagged\)\s+/i, '');
+  displayTitle = displayTitle.replace(/^Default\s+/i, '');
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -474,7 +573,6 @@ function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) 
         width: '100%',
         padding: '6px 12px',
         background: isActive ? 'var(--cui-secondary-bg)' : 'transparent',
-        border: 'none',
         borderLeft: isActive
           ? '3px solid var(--cui-primary)'
           : '3px solid transparent',
@@ -484,7 +582,6 @@ function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) 
         cursor: 'pointer',
       }}
     >
-      <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -506,7 +603,7 @@ function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) 
               [{artifact.pinned_label}]
             </span>
           )}
-          {artifact.title}
+          {displayTitle}
         </div>
         <div
           style={{
@@ -518,9 +615,58 @@ function ArtifactListRow({ artifact, isActive, onClick }: ArtifactListRowProps) 
           {formatRelative(artifact.last_edited_at)}
         </div>
       </div>
-    </button>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          flexShrink: 0,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Rename artifact"
+          title="Rename"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRename(artifact);
+          }}
+          style={iconButtonStyle}
+        >
+          <Pencil size={12} />
+        </button>
+        <button
+          type="button"
+          aria-label="Delete artifact"
+          title="Delete"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(artifact);
+          }}
+          style={iconButtonStyle}
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
+    </div>
   );
 }
+
+const iconButtonStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 22,
+  height: 22,
+  padding: 0,
+  background: 'transparent',
+  border: 'none',
+  outline: 'none',
+  boxShadow: 'none',
+  borderRadius: 4,
+  color: 'var(--w-text-muted)',
+  cursor: 'pointer',
+};
 
 interface DocumentListRowProps {
   doc: ProjectDocument;
