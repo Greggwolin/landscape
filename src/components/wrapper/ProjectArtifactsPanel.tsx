@@ -76,8 +76,26 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
   }
 
   /* ── Expanded panel ── */
+  // The parent <main class="wrapper-main wrapper-main-narrow"> is
+  // flex-direction: column, which would stack the drag handle ABOVE the
+  // panel as a zero-height horizontal strip (it has explicit width: 6 but
+  // no height). Wrap the handle + panel in a row-direction container so
+  // the handle sits to the LEFT of the panel as designed, regardless of
+  // the parent's flex direction.
   return (
-    <>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        height: '100%',
+        // alignSelf: flex-start prevents the column-flex parent from
+        // stretching this wrapper to fill the cross-axis (width). Content
+        // sizing then comes from the row-flex children (handle + panel),
+        // so <main> can resize as panelWidth changes.
+        alignSelf: 'flex-start',
+        width: 'max-content',
+      }}
+    >
       <div
         className="wrapper-drag-handle"
         onPointerDown={handleResizeStart}
@@ -141,6 +159,6 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         <ArtifactWorkspacePanel projectId={projectId} />
       )}
       </div>
-    </>
+    </div>
   );
 }

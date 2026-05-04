@@ -64,7 +64,7 @@ export interface WrapperSidebarProps {
 // Simple inline SVG icon component
 const NavIcon: React.FC<{ d: string | string[] }> = ({ d }) => (
   <span className="sb-nav-icon">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       {(Array.isArray(d) ? d : [d]).map((path, i) => (
         <path key={i} d={path} />
       ))}
@@ -87,7 +87,7 @@ const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: str
 // Static by default; spin state is driven by help chat's thinking status.
 const PropellerBeanieIcon: React.FC<{ isThinking?: boolean }> = ({ isThinking = false }) => (
   <span className="sb-nav-icon sb-nav-icon-help">
-    <HelpIcon isThinking={isThinking} style={{ width: 22, height: 22 }} />
+    <HelpIcon isThinking={isThinking} style={{ width: 24, height: 24 }} />
   </span>
 );
 
@@ -223,7 +223,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                       <span
                         style={{
                           display: 'block',
-                          fontSize: 10,
+                          fontSize: 12,
                           opacity: 0.55,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',

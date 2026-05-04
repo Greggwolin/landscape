@@ -201,7 +201,7 @@
   position: relative;
 }
 .wrapper-sidebar.collapsed .sb-nav-item span:not(.sb-nav-icon) { display: none; }
-.wrapper-sidebar.collapsed .sb-nav-icon { width: auto; font-size: 16px; }
+.wrapper-sidebar.collapsed .sb-nav-icon { width: auto; font-size: 18px; }
 .wrapper-sidebar.collapsed .sb-nav-item:hover::after {
   content: attr(data-label);
   position: absolute;
@@ -242,12 +242,12 @@
 }
 
 .sb-logo-img {
-  height: 22px;
+  height: 24px;
   width: auto;
   opacity: 0.8;
 }
 
-.wrapper-sidebar.collapsed .sb-logo-img { height: 18px; }
+.wrapper-sidebar.collapsed .sb-logo-img { height: 20px; }
 
 .sb-collapse {
   width: 24px;
@@ -269,11 +269,11 @@
   width: calc(100% - 24px);
   justify-content: flex-start;
 }
-.sb-new-icon { font-size: 14px; color: var(--w-text-tertiary); }
-.sb-new-icon svg { width: 14px; height: 14px; display: block; }
-.sb-search-icon svg { width: 14px; height: 14px; display: block; }
-.sb-collapse svg { width: 16px; height: 16px; display: block; }
-.sb-footer-actions .w-btn-icon svg { width: 14px; height: 14px; display: block; }
+.sb-new-icon { font-size: 16px; color: var(--w-text-tertiary); }
+.sb-new-icon svg { width: 16px; height: 16px; display: block; }
+.sb-search-icon svg { width: 16px; height: 16px; display: block; }
+.sb-collapse svg { width: 18px; height: 18px; display: block; }
+.sb-footer-actions .w-btn-icon svg { width: 16px; height: 16px; display: block; }
 
 .sb-search {
   margin: 0 12px 10px;
@@ -299,9 +299,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -314,7 +314,7 @@
 }
 .sb-nav-item:hover { background: var(--w-bg-surface-hover); color: var(--w-text-primary); }
 .sb-nav-item.active { background: var(--w-bg-surface); color: var(--w-text-primary); font-weight: 500; }
-.sb-nav-icon { width: 18px; text-align: center; font-size: 13px; color: var(--w-text-tertiary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.sb-nav-icon { width: 20px; text-align: center; font-size: 15px; color: var(--w-text-tertiary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .sb-nav-item.active .sb-nav-icon { color: var(--w-accent-text); }
 
 .sb-nav-label {
@@ -326,8 +326,8 @@
 
 .sb-nav-badge {
   margin-left: auto;
-  font-size: 9px;
-  padding: 1px 6px;
+  font-size: 11px;
+  padding: 2px 7px;
   border-radius: 8px;
   background: var(--w-accent-dim);
   color: var(--w-accent-text);
@@ -338,10 +338,10 @@
 /* ─── Sections ─── */
 .sb-section { padding: 0 8px; flex-shrink: 0; }
 .sb-section-label {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--w-text-muted);
   font-weight: 600;
-  padding: 12px 10px 6px;
+  padding: 14px 10px 6px;
   white-space: nowrap;
 }
 .sb-section-label--toggle {
@@ -354,7 +354,7 @@
   text-transform: uppercase;
 }
 .sb-section-label--toggle:hover { color: var(--w-text-tertiary); }
-.sb-section-chev { font-size: 8px; opacity: 0.7; }
+.sb-section-chev { font-size: 10px; opacity: 0.7; }
 
 /* ─── Scrollable Section (Threads, Agents, Recent) ─── */
 .sb-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
@@ -364,9 +364,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -380,7 +380,7 @@
 }
 .sb-thread:hover { background: var(--w-bg-surface-hover); color: var(--w-text-primary); }
 .sb-thread.active { background: var(--w-bg-surface); color: var(--w-text-primary); font-weight: 500; }
-.sb-thread-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sb-thread-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .sb-thread-dot.active { background: var(--w-accent); }
 .sb-thread-dot.idle { background: var(--w-text-muted); }
 
@@ -391,7 +391,7 @@
   gap: 8px;
   padding: 5px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -404,7 +404,7 @@
   text-overflow: ellipsis;
 }
 .sb-agent-status {
-  font-size: 8px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 6px;
   margin-left: auto;
@@ -425,8 +425,8 @@
   gap: 8px;
 }
 .sb-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--w-accent);
   display: flex;
@@ -437,8 +437,8 @@
   font-weight: 600;
   flex-shrink: 0;
 }
-.sb-user-name { font-size: 12px; color: var(--w-text-secondary); flex: 1; }
-.sb-user-plan { font-size: 9px; color: var(--w-text-tertiary); }
+.sb-user-name { font-size: 14px; color: var(--w-text-secondary); flex: 1; }
+.sb-user-plan { font-size: 11px; color: var(--w-text-tertiary); }
 .sb-footer-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .sb-help-btn { color: var(--w-accent-text, #38bdf8); }
 
@@ -1806,7 +1806,7 @@
 }
 
 /* Help nav icon sizing (propeller-beanie rendered larger than other nav glyphs) */
-.sb-nav-icon-help { width: 22px; height: 22px; }
+.sb-nav-icon-help { width: 24px; height: 24px; }
 .sb-nav-icon-help svg { display: block; }
 
 /* ─── Admin page content (Preferences/Benchmarks/Cost Lib/DMS/Reports/Users) ─── */
