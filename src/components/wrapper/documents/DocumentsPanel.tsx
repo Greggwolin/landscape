@@ -52,6 +52,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
   const [docsByType, setDocsByType] = useState<Record<string, DMSDoc[]>>({});
   const [loadingType, setLoadingType] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DMSDoc | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   // ── Selection state ────────────────────────────────────────
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
@@ -446,12 +447,19 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
   return (
     <div className={`w-doc-layout${selectedDoc ? ' has-detail' : ''}`}>
       <div className="w-panel w-panel-main">
-        <div className="w-panel-head">
+        <div
+          className="w-panel-head"
+          onClick={() => setCollapsed((v) => !v)}
+          style={{ cursor: 'pointer' }}
+        >
+          <span className="w-panel-chev">{collapsed ? '▸' : '▾'}</span>
           <span className="w-panel-head-title">
             {viewingTrash ? 'Trash' : 'Project Documents'}
           </span>
         </div>
 
+        {!collapsed && (
+          <>
         {/* ── Toolbar ─────────────────────────────────── */}
         <div className="w-doc-toolbar">
           <span className="w-doc-toolbar-selection" onClick={selectAll} style={{ cursor: 'pointer' }}>
@@ -596,9 +604,11 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
         <div className="w-doc-add" onClick={handleOpenAddType} style={{ cursor: 'pointer' }}>
           + Add Type
         </div>
+          </>
+        )}
       </div>
 
-      {selectedDoc && (
+      {!collapsed && selectedDoc && (
         <div className="w-panel w-panel-detail">
           <DocumentDetailPanel doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
         </div>
