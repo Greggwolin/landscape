@@ -1580,6 +1580,10 @@
   color: var(--w-text-tertiary);
 }
 
+.w-media-action-btn:hover {
+  background: var(--cui-tertiary-bg);
+}
+
 /* ─── Projects list ─── */
 .w-projects-body {
   padding: 16px;
