@@ -1000,7 +1000,6 @@
   height: 100%;
   overflow: hidden;
   background: var(--w-bg-sidebar);
-  border-left: 1px solid var(--w-border);
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */
