@@ -165,6 +165,25 @@ from .tool_registry import (
 logger = logging.getLogger(__name__)
 
 
+def _log_cache_usage(label: str, response: Any) -> None:
+    """
+    Emit a single line summarizing token usage including cache hit/miss
+    counts. Permanent observability so per-call spend is visible in the
+    Django log going forward. `getattr` with default 0 keeps this safe if
+    the SDK ever returns a usage object lacking the cache fields.
+    """
+    usage = getattr(response, 'usage', None)
+    if usage is None:
+        return
+    logger.info(
+        f"[CACHE] {label} usage="
+        f"input={getattr(usage, 'input_tokens', 0)} "
+        f"output={getattr(usage, 'output_tokens', 0)} "
+        f"cache_create={getattr(usage, 'cache_creation_input_tokens', 0)} "
+        f"cache_read={getattr(usage, 'cache_read_input_tokens', 0)}"
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Platform Knowledge Integration
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2355,6 +2374,17 @@ When the user asks for an operating statement, T-12, P&L, or pro forma:
 6. NEVER fabricate a scenario label. NEVER pick from the priority list silently.
    NEVER label an artifact "T-12" if the data is actually pro forma.
 
+7. SOURCE POINTERS — PASS THROUGH VERBATIM. When get_operating_statement returns
+   success=true, its response includes a `source_pointers` array (one entry per
+   line item with a backing database row — opex lines, rental income aggregations,
+   vacancy/credit/concession assumptions). When you call create_artifact for the
+   operating statement, pass that array directly into create_artifact's
+   `source_pointers` parameter without modification. Do NOT compose your own
+   pointer map; do NOT drop the array; do NOT transform it. The Source Pointers
+   panel on the artifact reads from this field — dropping it produces an empty
+   audit trail. If the array is empty (rare — happens when no data backs the
+   artifact), pass the empty array through as-is.
+
 ASSUMPTION CHOICES — SURFACE WITH PROVENANCE (UNIVERSAL):
 The same surface-don't-pick rule applies to ANY input value the platform can
 resolve from multiple sources — vacancy, cap rate, growth rate, hold period,
@@ -3557,11 +3587,25 @@ def get_landscaper_response(
             f"page_context={page_context}"
         )
 
-        # Make API call with tools if executor is provided
+        # Make API call with tools if executor is provided.
+        # Prompt caching is enabled on the system prompt and (below) on the tool
+        # list. Both segments are stable across turns of a given chat, so caching
+        # them cuts repeat-call cost ~90% on the cached portion. The cache key is
+        # the full content up to and including the last block carrying
+        # cache_control; segments hit the cache for ~5 minutes after first write.
+        # Applies to ALL six client.messages.create() call sites in this file
+        # because every one of them either uses api_kwargs directly or derives
+        # from it via dict spread / comprehension.
         api_kwargs = {
             'model': CLAUDE_MODEL,
             'max_tokens': MAX_TOKENS,
-            'system': full_system,
+            'system': [
+                {
+                    'type': 'text',
+                    'text': full_system,
+                    'cache_control': {'type': 'ephemeral'},
+                }
+            ],
             'messages': claude_messages
         }
 
@@ -3597,7 +3641,19 @@ def get_landscaper_response(
                 tool for tool in LANDSCAPER_TOOLS
                 if tool.get('name') in _allowed
             ]
-            api_kwargs['tools'] = filtered_tools
+            # Prompt caching: mark the LAST tool with cache_control so the
+            # entire tool list (everything up to and including that tool) is
+            # cached as a single segment. Build a new list with a shallow-merged
+            # final entry so the global LANDSCAPER_TOOLS registry is never
+            # mutated. If filtered_tools is empty we just pass it through.
+            if filtered_tools:
+                _last_tool_with_cache = {
+                    **filtered_tools[-1],
+                    'cache_control': {'type': 'ephemeral'},
+                }
+                api_kwargs['tools'] = filtered_tools[:-1] + [_last_tool_with_cache]
+            else:
+                api_kwargs['tools'] = filtered_tools
             # DIAGNOSTIC: Log which tools are sent to Claude
             tool_names_sent = [t.get('name', '?') for t in filtered_tools]
             # QL_49 debug: check if extraction tools were forced by awaiting_delta_review flag
@@ -3692,6 +3748,7 @@ def get_landscaper_response(
 
         logger.info(f"[AI_HANDLER] Calling Claude with {len(claude_messages)} messages, last message: {claude_messages[-1]['content'][:100] if claude_messages else 'none'}...")
         response = client.messages.create(**api_kwargs)
+        _log_cache_usage('initial', response)
 
         # Process response with potential tool use loop
         field_updates = []
@@ -3761,6 +3818,7 @@ def get_landscaper_response(
 
                 logger.info(f"[AI_HANDLER] Retrying with hallucination correction prompt")
                 response = client.messages.create(**retry_kwargs)
+                _log_cache_usage('retry', response)
                 logger.info(f"[AI_HANDLER] Retry response stop_reason={response.stop_reason}")
 
         # Tool loop safeguards
@@ -3929,6 +3987,7 @@ def get_landscaper_response(
                 **api_kwargs,
                 'messages': claude_messages
             })
+            _log_cache_usage('tool_loop_continuation', response)
 
             total_input_tokens += response.usage.input_tokens
             total_output_tokens += response.usage.output_tokens
@@ -3967,6 +4026,7 @@ def get_landscaper_response(
                 summary_kwargs = {k: v for k, v in api_kwargs.items() if k != 'tools'}
                 summary_kwargs['messages'] = claude_messages
                 response = client.messages.create(**summary_kwargs)
+                _log_cache_usage('summary', response)
                 total_input_tokens += response.usage.input_tokens
                 total_output_tokens += response.usage.output_tokens
             except Exception as e:
@@ -4023,6 +4083,7 @@ def get_landscaper_response(
                 narration_kwargs = {k: v for k, v in api_kwargs.items() if k != 'tools'}
                 narration_kwargs['messages'] = claude_messages
                 narration_response = client.messages.create(**narration_kwargs)
+                _log_cache_usage('narration', narration_response)
                 total_input_tokens += narration_response.usage.input_tokens
                 total_output_tokens += narration_response.usage.output_tokens
                 for block in narration_response.content:

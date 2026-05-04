@@ -393,11 +393,29 @@ def get_help_response(
                 'metadata': {'error': 'ANTHROPIC_API_KEY not configured'},
             }
 
+        # Prompt caching: cache the system prompt as one ephemeral segment.
+        # The page-context suffix is included in full_system, so cache hits are
+        # per-page within a ~5-minute window — which matches the realistic
+        # usage pattern (user asks several questions while on the same page).
         response = client.messages.create(
             model=CLAUDE_MODEL,
-            system=full_system,
+            system=[
+                {
+                    'type': 'text',
+                    'text': full_system,
+                    'cache_control': {'type': 'ephemeral'},
+                }
+            ],
             messages=messages,
             max_tokens=400,  # Keep help responses short — 3 sentences max
+        )
+
+        logger.info(
+            f"[CACHE] help usage="
+            f"input={getattr(response.usage, 'input_tokens', 0)} "
+            f"output={getattr(response.usage, 'output_tokens', 0)} "
+            f"cache_create={getattr(response.usage, 'cache_creation_input_tokens', 0)} "
+            f"cache_read={getattr(response.usage, 'cache_read_input_tokens', 0)}"
         )
 
         # Extract text content
