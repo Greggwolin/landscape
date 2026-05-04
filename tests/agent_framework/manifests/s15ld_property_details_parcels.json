@@ -1,0 +1,71 @@
+{
+  "observe:project_id": 909,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "observe:p1_tools": [
+    "create_land_dev_containers",
+    "get_land_use_types",
+    "get_land_use_types",
+    "create_land_dev_containers",
+    "get_areas",
+    "get_phases",
+    "update_lot_mix"
+  ],
+  "field_equals:p1_some_write_attempted": true,
+  "observe:p2_parcel_count_actual": 5,
+  "field_equals:p2_parcel_count_at_least_one": true,
+  "observe:p2_total_units_actual": 56,
+  "field_equals:p2_total_units_at_least_floor": true,
+  "observe:p2_lot_widths_seen": [
+    24,
+    50,
+    60
+  ],
+  "observe:p2_expected_widths_present": [
+    24,
+    50,
+    60
+  ],
+  "observe:p2_total_acres": 0.0,
+  "observe:p3_tools": [
+    "get_data_completeness",
+    "get_land_use_budget",
+    "get_parcel_sale_assumptions",
+    "get_project_fields",
+    "get_cashflow_results"
+  ],
+  "observe:p3_response_length": 1077,
+  "observe:p3_used_read_tool": true,
+  "observe:p3_concepts_mentioned": [
+    "absorption",
+    "sale price",
+    "price per lot",
+    "infrastructure",
+    "planning",
+    "development",
+    "velocity",
+    "entitlement"
+  ],
+  "field_equals:p3_at_least_one_concept": true,
+  "observe:p4_tools": [
+    "get_project_fields"
+  ],
+  "observe:p4_response_length": 665,
+  "field_equals:p4_response_present": true,
+  "observe:p5_tools": [
+    "open_input_modal"
+  ],
+  "field_equals:p5_open_input_modal_called": true,
+  "calibrate:p5_modal_name": "parcels",
+  "field_equals:p5_correct_modal": true,
+  "calibrate:p5_had_mutation": false,
+  "observe:p6_tools": [],
+  "observe:p6_mentions_present": [
+    "SFD mention",
+    "SFD-50 count",
+    "lot count",
+    "townhome count",
+    "townhome mention"
+  ],
+  "field_equals:p6_at_least_two_mentions": true
+}

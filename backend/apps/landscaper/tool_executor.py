@@ -199,6 +199,13 @@ ALLOWED_UPDATES = {
             'transitscore': 'transit_score',
             'parking': 'parking_spaces',
             'zoning': 'current_zoning',
+            # Percent-suffix aliases the model produces when the user phrases
+            # an input as a percentage. Column names are bare; without these
+            # aliases the model's "_pct" form silently lands in get_current_value
+            # as a missing-column warning and the update goes nowhere.
+            'planning_efficiency_pct': 'planning_efficiency',
+            'discount_rate_pct': 'discount_rate_pct',  # already canonical, harmless
+            'cost_of_capital_pct': 'cost_of_capital_pct',
         },
         'pk_field': 'project_id',
         'schema': 'landscape'
