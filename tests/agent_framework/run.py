@@ -36,6 +36,8 @@ SCENARIOS = {
     's11': 'scenario_s11',
     's12': 'scenario_s12',
     's13': 'scenario_s13',
+    's14': 'scenario_s14',
+    's15': 'scenario_s15',
 }
 
 
@@ -105,6 +107,16 @@ def run_scenario(name: str, report: TestReport):
     elif name == 's13':
         from .scenario_s13 import ScenarioS13
         agent = ScenarioS13()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's14':
+        from .scenario_s14 import ScenarioS14
+        agent = ScenarioS14()
+        result, validation = agent.get_results()
+        report.add_scenario(result, validation)
+    elif name == 's15':
+        from .scenario_s15 import ScenarioS15
+        agent = ScenarioS15()
         result, validation = agent.get_results()
         report.add_scenario(result, validation)
 

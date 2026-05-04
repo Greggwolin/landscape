@@ -387,6 +387,20 @@ MUTABLE_FIELDS = {
     ],
 }
 
+# tbl_project carries two parallel column families for jurisdiction
+# (city/jurisdiction_city, state/jurisdiction_state, county/jurisdiction_county).
+# The minimal create endpoint populates both; updates must too, or downstream
+# consumers reading the unwritten side see stale/null values. This map drives
+# write-through propagation in field_update and bulk_update.
+TBL_PROJECT_MIRRORED_COLUMNS = {
+    "city": "jurisdiction_city",
+    "jurisdiction_city": "city",
+    "state": "jurisdiction_state",
+    "jurisdiction_state": "state",
+    "county": "jurisdiction_county",
+    "jurisdiction_county": "county",
+}
+
 # Primary key column for each table
 PK_COLUMNS = {
     "tbl_project": "project_id",
@@ -1013,12 +1027,24 @@ class MutationService:
                     # Cast value to appropriate type
                     typed_value = cls._cast_value(field_name, proposed_value)
 
-                    # Execute update
+                    # Mirror writes across paired tbl_project columns so the
+                    # jurisdiction_* and bare city/state/county families stay
+                    # in sync regardless of which name the caller used.
+                    set_parts = [f"{field_name} = %s"]
+                    values: List[Any] = [typed_value]
+                    if table_name == "tbl_project":
+                        mirror = TBL_PROJECT_MIRRORED_COLUMNS.get(field_name)
+                        if mirror:
+                            set_parts.append(f"{mirror} = %s")
+                            values.append(typed_value)
+                    set_parts.append("updated_at = NOW()")
+                    values.append(target_id)
+
                     cursor.execute(f"""
                         UPDATE landscape.{table_name}
-                        SET {field_name} = %s, updated_at = NOW()
+                        SET {', '.join(set_parts)}
                         WHERE {pk_column} = %s
-                    """, [typed_value, target_id])
+                    """, values)
 
                     if cursor.rowcount == 0:
                         return {"success": False, "error": f"No record found with {pk_column}={target_id}"}
@@ -1042,10 +1068,23 @@ class MutationService:
                     # Build SET clause
                     set_parts = []
                     values = []
+                    seen_columns = set()
+                    allowed_fields = MUTABLE_FIELDS.get(table_name, [])
                     for fld, val in proposed_value.items():
-                        if fld in MUTABLE_FIELDS.get(table_name, []):
-                            set_parts.append(f"{fld} = %s")
-                            values.append(cls._cast_value(fld, val))
+                        if fld not in allowed_fields or fld in seen_columns:
+                            continue
+                        cast_val = cls._cast_value(fld, val)
+                        set_parts.append(f"{fld} = %s")
+                        values.append(cast_val)
+                        seen_columns.add(fld)
+                        if table_name == "tbl_project":
+                            mirror = TBL_PROJECT_MIRRORED_COLUMNS.get(fld)
+                            # Only mirror if the caller didn't already provide
+                            # the paired column explicitly — explicit value wins.
+                            if mirror and mirror not in proposed_value and mirror not in seen_columns:
+                                set_parts.append(f"{mirror} = %s")
+                                values.append(cast_val)
+                                seen_columns.add(mirror)
 
                     if not set_parts:
                         return {"success": False, "error": "No valid fields to update"}
@@ -1129,30 +1168,79 @@ class MutationService:
 
                     if table_name == "tbl_multifamily_unit_type":
                         for rec in records:
-                            cursor.execute("""
+                            # Resolve rent across the field aliases the model
+                            # legitimately uses (market_rent / current_market_rent
+                            # / current_rent_avg). Without this, the dispatcher
+                            # would silently drop a non-canonical name.
+                            rent_val = (
+                                rec.get("market_rent")
+                                if rec.get("market_rent") is not None
+                                else (
+                                    rec.get("current_market_rent")
+                                    if rec.get("current_market_rent") is not None
+                                    else rec.get("current_rent_avg")
+                                )
+                            )
+                            # Same for unit count — model may send total_units
+                            # OR unit_count.
+                            count_val = (
+                                rec.get("total_units")
+                                if rec.get("total_units") is not None
+                                else rec.get("unit_count")
+                            )
+
+                            # Partial-update friendly: build UPDATE clauses
+                            # only for fields the caller actually provided.
+                            # Naive ON CONFLICT DO UPDATE ... = EXCLUDED.x
+                            # would zero out avg_square_feet (and trip the
+                            # chk_avg_square_feet constraint) when the model
+                            # sends an incremental edit like
+                            # {"unit_type_code": "3BR/2BA", "market_rent": 2400}.
+                            update_fields: list[tuple[str, Any]] = []
+                            if rec.get("unit_type_name") is not None:
+                                update_fields.append(("unit_type_name", rec["unit_type_name"]))
+                            if rec.get("bedrooms") is not None:
+                                update_fields.append(("bedrooms", rec["bedrooms"]))
+                            if rec.get("bathrooms") is not None:
+                                update_fields.append(("bathrooms", rec["bathrooms"]))
+                            if rec.get("avg_square_feet") is not None:
+                                update_fields.append(("avg_square_feet", rec["avg_square_feet"]))
+                            if rent_val is not None:
+                                update_fields.append(("market_rent", rent_val))
+                            if count_val is not None:
+                                update_fields.append(("total_units", count_val))
+
+                            update_set = ", ".join(
+                                f"{col} = %s" for col, _ in update_fields
+                            )
+                            update_set = (
+                                f"{update_set}, updated_at = NOW()"
+                                if update_set else "updated_at = NOW()"
+                            )
+
+                            insert_unit_type_name = (
+                                rec.get("unit_type_name")
+                                or rec.get("unit_type_code", "")
+                            )
+
+                            cursor.execute(f"""
                                 INSERT INTO landscape.tbl_multifamily_unit_type
                                 (project_id, unit_type_code, unit_type_name, bedrooms, bathrooms,
                                  avg_square_feet, market_rent, total_units, created_at, updated_at)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                                 ON CONFLICT (project_id, unit_type_code)
-                                DO UPDATE SET
-                                    unit_type_name = EXCLUDED.unit_type_name,
-                                    bedrooms = EXCLUDED.bedrooms,
-                                    bathrooms = EXCLUDED.bathrooms,
-                                    avg_square_feet = EXCLUDED.avg_square_feet,
-                                    market_rent = EXCLUDED.market_rent,
-                                    total_units = EXCLUDED.total_units,
-                                    updated_at = NOW()
+                                DO UPDATE SET {update_set}
                                 RETURNING unit_type_id, (xmax = 0) as is_insert
                             """, [
                                 project_id,
                                 _normalize_unit_type(rec.get("unit_type_code", "")),
-                                rec.get("unit_type_name") or rec.get("unit_type_code", ""),
+                                insert_unit_type_name,
                                 rec.get("bedrooms", 0),
                                 rec.get("bathrooms", 1),
                                 rec.get("avg_square_feet", 0),
-                                rec.get("market_rent", 0),
-                                rec.get("total_units", 0),
+                                rent_val if rent_val is not None else 0,
+                                count_val if count_val is not None else 0,
+                                *(v for _, v in update_fields),
                             ])
                             row = cursor.fetchone()
                             if row[1]:  # is_insert
@@ -1691,6 +1779,63 @@ class MutationService:
                             )
                     return response
 
+                elif mutation_type == "assumption_upsert" and isinstance(proposed_value, dict):
+                    # Upsert one row in a per-project assumption table.
+                    # Mirrors tool_executor._upsert_assumption_record so the
+                    # propose-then-confirm path produces the same DB state as
+                    # propose_only=False. Tables: tbl_property_acquisition,
+                    # tbl_revenue_rent, tbl_revenue_other, tbl_vacancy_assumption,
+                    # tbl_lease_assumptions, tbl_value_add_assumptions, tbl_cost_approach.
+                    allowed = MUTABLE_FIELDS.get(table_name)
+                    if allowed is None:
+                        return {"success": False, "error": f"assumption_upsert not allowed on table: {table_name}"}
+
+                    updates = {
+                        fld: cls._cast_value(fld, val)
+                        for fld, val in proposed_value.items()
+                        if fld in allowed and val is not None
+                    }
+                    if not updates:
+                        return {"success": False, "error": "No valid fields to upsert"}
+
+                    cursor.execute(f"""
+                        SELECT {pk_column} FROM landscape.{table_name}
+                        WHERE project_id = %s
+                        LIMIT 1
+                    """, [project_id])
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        pk_id = existing[0]
+                        set_parts = [f"{fld} = %s" for fld in updates.keys()]
+                        set_parts.append("updated_at = NOW()")
+                        cursor.execute(f"""
+                            UPDATE landscape.{table_name}
+                            SET {', '.join(set_parts)}
+                            WHERE {pk_column} = %s
+                        """, list(updates.values()) + [pk_id])
+                        return {
+                            "success": True,
+                            "action": "updated",
+                            pk_column: pk_id,
+                            "fields_updated": list(updates.keys()),
+                        }
+                    else:
+                        col_names = ["project_id"] + list(updates.keys())
+                        placeholders = ", ".join(["%s"] * len(col_names))
+                        cursor.execute(f"""
+                            INSERT INTO landscape.{table_name} ({', '.join(col_names)})
+                            VALUES ({placeholders})
+                            RETURNING {pk_column}
+                        """, [project_id] + list(updates.values()))
+                        pk_id = cursor.fetchone()[0]
+                        return {
+                            "success": True,
+                            "action": "created",
+                            pk_column: pk_id,
+                            "fields_updated": list(updates.keys()),
+                        }
+
                 elif mutation_type == "unit_delete" and isinstance(proposed_value, dict):
                     # Batch delete units and their dependents
                     unit_ids = proposed_value.get("unit_ids", [])
@@ -1801,6 +1946,12 @@ class MutationService:
 
         if value is None:
             return None
+
+        # Per-field input normalization (mirrors the minimal-create endpoint).
+        # County columns: strip trailing "County" so "Maricopa County" stored
+        # via chat matches "Maricopa" stored via the create form.
+        if field_name in ("county", "jurisdiction_county") and isinstance(value, str):
+            value = re.sub(r'\s+county\s*$', '', value, flags=re.IGNORECASE).strip()
 
         try:
             if field_type == "integer":

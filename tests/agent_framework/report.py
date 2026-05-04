@@ -120,9 +120,9 @@ class TestReport:
                 for r in vs.get('results', []):
                     if not r.get('passed'):
                         print(f'    ✗ {r["name"]}: {r.get("message", "")}')
-                        if r.get('expected'):
+                        if r.get('expected') is not None:
                             print(f'      expected: {r["expected"]}')
-                            print(f'      actual:   {r["actual"]}')
+                            print(f'      actual:   {r.get("actual")}')
 
         print()
         overall = 'PASS' if s['scenarios_failed'] == 0 else 'FAIL'

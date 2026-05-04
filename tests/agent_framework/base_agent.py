@@ -106,15 +106,35 @@ class ChatResponse:
         return bool(self.field_updates)
 
     def get_mutation_ids(self) -> dict:
-        """Extract mutation_id and/or batch_id from tool call results."""
-        ids = {}
+        """
+        Collect every mutation/batch id across all tool calls.
+
+        When the model produces multiple individual mutations in one turn
+        (e.g. 7× update_project_field instead of one bulk_update_fields),
+        each tool result carries its own mutation_id; we need them all so
+        the caller can confirm each rather than dropping all but the last.
+        """
+        mutation_ids: list = []
+        batch_ids: list = []
+        proposal_ids: list = []
         for tc in self.tool_calls:
             r = tc.result
-            if isinstance(r, dict):
-                for key in ('mutation_id', 'batch_id', 'proposal_id'):
-                    if key in r:
-                        ids[key] = r[key]
-        return ids
+            if not isinstance(r, dict):
+                continue
+            if 'mutation_id' in r:
+                mutation_ids.append(r['mutation_id'])
+            if 'batch_id' in r:
+                batch_ids.append(r['batch_id'])
+            if 'proposal_id' in r:
+                proposal_ids.append(r['proposal_id'])
+        out: dict = {}
+        if mutation_ids:
+            out['mutation_ids'] = mutation_ids
+        if batch_ids:
+            out['batch_ids'] = batch_ids
+        if proposal_ids:
+            out['proposal_ids'] = proposal_ids
+        return out
 
     def __repr__(self):
         tools = ', '.join(tc.tool_name for tc in self.tool_calls)
@@ -315,10 +335,19 @@ class BaseAgent:
 
     def confirm_mutation(self, chat_response: ChatResponse) -> dict:
         """
-        Confirm a mutation proposal from a ChatResponse.
+        Confirm every mutation proposed in a ChatResponse.
 
-        Handles both single mutation_id and batch_id confirmation.
-        Returns the confirmation response data.
+        Handles three id shapes returned by Landscaper tool calls:
+        - batch_id  (one batch covering N fields, e.g. bulk_update_fields)
+        - mutation_id (single field_update)
+        - proposal_id (legacy)
+
+        When the model fires N individual update tools in one turn we get
+        N separate mutation_ids — every one must be confirmed or the writes
+        silently drop on the floor.
+
+        Returns aggregated stats: {'success': bool, 'confirmed': int,
+        'attempts': int, 'last_response': dict}.
         """
         self._ensure_auth()
         ids = chat_response.get_mutation_ids()
@@ -327,30 +356,73 @@ class BaseAgent:
             self._log_step('confirm_mutation', 'No mutation IDs found — skipping', {})
             return {}
 
-        self._log_step('confirm_mutation', 'Confirming mutation', ids)
+        urls: list[str] = []
+        # Batches first — one POST clears N field updates at once.
+        for bid in ids.get('batch_ids', []):
+            urls.append(config.BATCH_CONFIRM_ENDPOINT.format(batch_id=bid))
+        for mid in ids.get('mutation_ids', []):
+            urls.append(config.MUTATION_CONFIRM_ENDPOINT.format(mutation_id=mid))
+        for pid in ids.get('proposal_ids', []):
+            # Treat proposal_id as a mutation_id for the confirm endpoint.
+            urls.append(config.MUTATION_CONFIRM_ENDPOINT.format(mutation_id=pid))
 
-        # Prefer batch_id if present, else mutation_id
-        if 'batch_id' in ids:
-            url = config.BATCH_CONFIRM_ENDPOINT.format(batch_id=ids['batch_id'])
-        elif 'mutation_id' in ids:
-            url = config.MUTATION_CONFIRM_ENDPOINT.format(mutation_id=ids['mutation_id'])
+        self._log_step('confirm_mutation', f'Confirming {len(urls)} mutation(s)', ids)
+
+        confirmed = 0
+        errors: list[dict] = []
+        last_data: dict = {}
+        for url in urls:
+            try:
+                resp = self.session.post(url, json={}, timeout=config.API_TIMEOUT)
+            except requests.RequestException as e:
+                # Network failure is unrecoverable — bail out hard.
+                self._fail_step(f'Mutation confirm request failed: {e}')
+                raise AgentError(f'Mutation confirmation failed: {e}')
+
+            try:
+                data = resp.json()
+            except ValueError:
+                data = {}
+            last_data = data
+
+            ok = resp.status_code == 200 and data.get('success', False)
+            if ok:
+                confirmed += 1
+            else:
+                # An individual mutation can fail validly (e.g. Landscaper
+                # proposed a field_update missing a record_id). Don't crash
+                # the scenario — record the error and let the outcome-based
+                # assertions in the calling phase decide whether the goal
+                # was met.
+                errors.append({
+                    'url': url,
+                    'status': resp.status_code,
+                    'response': data,
+                })
+                logger.warning(
+                    f'Mutation confirm partial failure {resp.status_code} '
+                    f'at {url}: {json.dumps(data)[:200]}'
+                )
+
+        if errors and confirmed == 0:
+            self._fail_step(
+                f'All {len(urls)} mutation confirms failed; first: '
+                f'{json.dumps(errors[0])[:300]}'
+            )
         else:
-            self._fail_step(f'Unknown mutation ID type: {ids}')
-            raise AgentError(f'Cannot confirm mutation — unknown ID keys: {list(ids.keys())}')
+            self._pass_step(
+                f'Confirmed {confirmed}/{len(urls)} mutation(s)'
+                + (f' ({len(errors)} failed)' if errors else ''),
+                last_data,
+            )
 
-        try:
-            resp = self.session.post(url, json={}, timeout=config.API_TIMEOUT)
-        except requests.RequestException as e:
-            self._fail_step(f'Mutation confirm request failed: {e}')
-            raise AgentError(f'Mutation confirmation failed: {e}')
-
-        data = resp.json()
-        if resp.status_code != 200 or not data.get('success', False):
-            self._fail_step(f'Mutation confirm returned {resp.status_code}: {json.dumps(data)[:300]}')
-            raise AgentError(f'Mutation confirmation failed: {resp.status_code}')
-
-        self._pass_step('Mutation confirmed', data)
-        return data
+        return {
+            'success': confirmed > 0,
+            'confirmed': confirmed,
+            'attempts': len(urls),
+            'errors': errors,
+            'last_response': last_data,
+        }
 
     # ── Project Creation ─────────────────────────────────────────────────
 

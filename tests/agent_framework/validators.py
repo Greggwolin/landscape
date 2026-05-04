@@ -293,6 +293,26 @@ class Validator:
         self.results.append(result)
         return result
 
+    def observe(self, name: str, actual: Any) -> ValidationResult:
+        """
+        Record a value purely for observability — saved to the manifest in
+        calibration mode for diffing, but never asserted in test mode.
+
+        Use this for values that are legitimately non-deterministic across
+        runs (LLM tool choice, fresh project IDs, response length, etc.) so
+        they don't flake the suite while still leaving a trail in the
+        manifest for cross-run analysis.
+        """
+        result = ValidationResult(
+            name=f'observe:{name}',
+            passed=True,
+            actual=actual,
+            message=f'Observation: {name} = {actual!r}',
+            calibration_value=actual if config.CALIBRATION_MODE else None,
+        )
+        self.results.append(result)
+        return result
+
     # ── Summary ──────────────────────────────────────────────────────────
 
     @property
