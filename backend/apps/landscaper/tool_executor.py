@@ -3834,6 +3834,111 @@ def _build_rendering_label(
     return f'{project_part} — {label} Operating Statement'
 
 
+def _build_operating_statement_source_pointers(
+    payload: Dict[str, Any],
+    project_id: int,
+) -> List[Dict[str, Any]]:
+    """Walk the operations payload and return a flat list of source pointers
+    suitable for `create_artifact`'s `source_pointers` field.
+
+    Each entry is keyed by the line_item_key (used as `path`) and references
+    the underlying database row(s) that contributed to the displayed value.
+    Computed/subtotal lines (Effective Gross Income, Total Operating Expenses,
+    Net Operating Income) get no entry — they're derivations.
+
+    For aggregated lines (rental income across many units of a unit_type),
+    the pointer carries a synthetic row_id of the form
+    'project_<id>|unit_type_<type>' since there's no single backing row.
+
+    Returned shape (array form) — each item:
+        {
+          'path': <line_item_key>,
+          'table': <DB table name>,
+          'row_id': <int | str>,
+          'column': <DB column>,
+          'captured_at': <ISO timestamp>,
+          'captured_value': <number>,
+        }
+    """
+    from datetime import datetime, timezone
+
+    pointers: List[Dict[str, Any]] = []
+    captured_at = datetime.now(timezone.utc).isoformat()
+
+    def _push(path: str, table: str, row_id: Any, column: str, value: Any) -> None:
+        pointers.append({
+            'path': path,
+            'table': table,
+            'row_id': row_id,
+            'column': column,
+            'captured_at': captured_at,
+            'captured_value': value,
+        })
+
+    # ── Rental income — aggregated over tbl_multifamily_unit by unit_type ──
+    rental = payload.get('rental_income') or {}
+    for row in rental.get('rows') or []:
+        key = row.get('line_item_key')
+        if not key:
+            continue
+        unit_type = key.removeprefix('rental_') if key.startswith('rental_') else key
+        as_is = row.get('as_is') or {}
+        _push(
+            path=key,
+            table='tbl_multifamily_unit',
+            row_id=f'project_{project_id}|unit_type_{unit_type}',
+            column='current_rent',
+            value=as_is.get('total'),
+        )
+
+    # ── Vacancy / credit / concessions — assumption columns on tbl_project ──
+    vacancy = payload.get('vacancy_deductions') or {}
+    vacancy_columns = {
+        'physical_vacancy': 'physical_vacancy_pct',
+        'credit_loss': 'bad_debt_pct',
+        'concessions': 'concessions_pct',
+    }
+    for row in vacancy.get('rows') or []:
+        key = row.get('line_item_key')
+        if not key or key not in vacancy_columns:
+            continue
+        as_is = row.get('as_is') or {}
+        _push(
+            path=key,
+            table='tbl_project',
+            row_id=int(project_id),
+            column=vacancy_columns[key],
+            value=as_is.get('rate'),
+        )
+
+    # ── Operating expenses — walk hierarchy, emit pointer per leaf with opex_id ──
+    def _walk_opex(rows: Any) -> None:
+        if not isinstance(rows, list):
+            return
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            opex_id = r.get('opex_id')
+            key = r.get('line_item_key')
+            as_is = r.get('as_is') or {}
+            if opex_id and key:
+                _push(
+                    path=key,
+                    table='tbl_operating_expenses',
+                    row_id=int(opex_id),
+                    column='annual_amount',
+                    value=as_is.get('total'),
+                )
+            children = r.get('children')
+            if children:
+                _walk_opex(children)
+
+    opex = payload.get('operating_expenses') or {}
+    _walk_opex(opex.get('rows'))
+
+    return pointers
+
+
 @register_tool('get_operating_statement')
 def handle_get_operating_statement(
     tool_input: Dict[str, Any],
@@ -3993,6 +4098,19 @@ def handle_get_operating_statement(
 
     rendering_label = _build_rendering_label(project_name, resolved_scenario)
 
+    # Build source pointers in array form so the LLM can pass them through
+    # to create_artifact verbatim. Wrapped in try/except so a pointer-build
+    # failure can never break the operating-statement payload itself —
+    # missing pointers degrades to an empty Source Pointers section, which
+    # is the legacy behavior.
+    try:
+        source_pointers = _build_operating_statement_source_pointers(
+            payload, int(project_id)
+        )
+    except Exception:  # pragma: no cover — defensive
+        logger.exception('get_operating_statement: source_pointers build failed')
+        source_pointers = []
+
     return {
         'success': True,
         'scenario_resolved': resolved_scenario,
@@ -4001,6 +4119,7 @@ def handle_get_operating_statement(
         'available_scenarios': available_block,
         'project_name': project_name,
         'data': payload,
+        'source_pointers': source_pointers,
     }
 
 
