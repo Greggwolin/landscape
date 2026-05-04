@@ -79,7 +79,7 @@ function WrapperDocumentsPageInner({
     <RightContentPanel title="Documents & Media" subtitle={project.project_name} actions={actions}>
       <div className="w-page-body">
         <DocumentsPanel refreshKey={refreshKey} onChange={onChange} />
-        <MediaPanel />
+        <MediaPanel projectId={project.project_id} />
       </div>
 
       <StagingTray />
