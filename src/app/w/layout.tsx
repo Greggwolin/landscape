@@ -421,11 +421,22 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
             <div
               className="wrapper-drag-handle"
               onPointerDown={handleRightResizeStart}
+              title="Drag to resize artifact panel"
               style={{
                 cursor: 'col-resize',
-                width: 4,
+                width: 6,
                 flexShrink: 0,
-                background: 'transparent',
+                background: 'var(--cui-border-color)',
+                opacity: 0.5,
+                transition: 'opacity 0.15s ease, background 0.15s ease',
+              }}
+              onPointerEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.opacity = '1';
+                (e.currentTarget as HTMLDivElement).style.background = 'var(--cui-primary)';
+              }}
+              onPointerLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.opacity = '0.5';
+                (e.currentTarget as HTMLDivElement).style.background = 'var(--cui-border-color)';
               }}
             />
             <aside
