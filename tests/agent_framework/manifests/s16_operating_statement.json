@@ -1,6 +1,6 @@
 {
   "field_equals:p1_synthetic_created": true,
-  "observe:p1_synthetic_project_id": 922,
+  "observe:p1_synthetic_project_id": 925,
   "field_equals:p1_seed_succeeded": true,
   "field_equals:p1_units_seeded": 60,
   "field_equals:p1_opex_seeded": 10,
@@ -24,6 +24,7 @@
   "observe:p3_tools": [
     "save_user_vocab",
     "get_operating_statement",
+    "create_artifact",
     "create_artifact"
   ],
   "field_equals:p3_save_user_vocab_called": true,
@@ -42,27 +43,43 @@
   ],
   "field_equals:p4_get_operating_statement_called": true,
   "observe:p4_scenario_resolved": "CURRENT_PRO_FORMA",
-  "observe:p4_resolution_source": "user_phrasing_lookup",
+  "observe:p4_resolution_source": "user_vocab",
   "field_equals:p4_not_ambiguous_anymore": true,
   "field_equals:p4_resolved_current_proforma": "CURRENT_PRO_FORMA",
-  "calibrate:p4_resolution_source_value": "user_phrasing_lookup",
+  "calibrate:p4_resolution_source_value": "user_vocab",
   "field_equals:p4_artifact_in_same_turn": true,
   "observe:p5a_returncode": 0,
   "observe:p5a_raw_stdout_tail": "{\"raised\": true, \"code\": \"label_data_mismatch_t12_vs_proforma\", \"subtype_seen\": \"t12\"}",
   "field_equals:p5a_guard_raised": true,
   "observe:p5a_error_code": "label_data_mismatch_t12_vs_proforma",
   "field_equals:p5a_error_code_correct": true,
-  "observe:p5b_response_length": 956,
+  "observe:p5b_response_length": 543,
   "observe:p5b_tools": [
     "get_operating_statement",
-    "create_artifact",
     "create_artifact"
   ],
-  "observe:p5b_artifact_attempts": 2,
+  "observe:p5b_artifact_attempts": 1,
   "observe:p5b_final_title": "T-12 Operating Statement",
   "observe:p5b_final_subtype": "current_proforma",
   "observe:p5b_retry_recovered": false,
-  "observe:p6_chadron_thread": "62bedf0e-951f-451e-bc6f-1122c6355e74",
+  "observe:p8_tools": [
+    "get_operating_statement",
+    "create_artifact"
+  ],
+  "field_equals:p8_get_operating_statement_called": true,
+  "observe:p8_scenario_resolved": "CURRENT_PRO_FORMA",
+  "observe:p8_resolution_source": "synonym_dict",
+  "field_equals:p8_not_ambiguous": true,
+  "field_equals:p8_resolved_current_proforma": "CURRENT_PRO_FORMA",
+  "field_equals:p8_resolution_source_synonym_dict": "synonym_dict",
+  "field_equals:p8_no_vocab_save": true,
+  "field_equals:p8_artifact_created": true,
+  "observe:p8_artifact_title": "AGENT_TEST_S16_CPF_Source \u2014 Current Pro Forma Operating Statement",
+  "observe:p8_artifact_subtype": "current_proforma",
+  "field_equals:p8_title_honest": true,
+  "field_equals:p8_title_no_t12": false,
+  "field_equals:p8_subtype_current_proforma": "current_proforma",
+  "observe:p6_chadron_thread": "349fe38c-82f7-4d17-88ff-cece6c6bcdfb",
   "observe:p6_turn1_tools": [
     "get_operating_statement"
   ],
@@ -70,6 +87,7 @@
   "observe:p6_tools": [
     "save_user_vocab",
     "get_operating_statement",
+    "create_artifact",
     "create_artifact",
     "create_artifact"
   ],

@@ -4059,7 +4059,12 @@ def handle_get_operating_statement(
 
         if vocab_hit and vocab_hit.get('resolved_value') in available:
             resolved_scenario = vocab_hit['resolved_value']
-            resolution_source = 'user_phrasing_lookup'
+            # Pass through the resolution_source from lookup_user_vocab so the
+            # caller (and tests) can distinguish 'user_vocab' hits from
+            # 'synonym_dict' hits. Falls back to the legacy
+            # 'user_phrasing_lookup' label if the lookup function predates the
+            # synonym layer (PU57) and didn't include the field.
+            resolution_source = vocab_hit.get('resolution_source') or 'user_phrasing_lookup'
         elif len(available) == 1:
             # Collapse-list-of-one: only one scenario available, treat as the
             # implicit answer but flag it so the model can confirm with the user.

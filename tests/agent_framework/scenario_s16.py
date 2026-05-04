@@ -171,6 +171,17 @@ class ScenarioS16(BaseAgent):
         logger.info('--- Phase 5b: Model-coaxing observe-only ---')
         self._phase5b_model_coaxing()
 
+        # Step 8 — Synonym-dict hit (added PU58) ────────────────────
+        # Tests the new synonym layer in lookup_user_vocab. A phrasing not
+        # previously in this user's vocab but present in the static synonym
+        # dictionary should resolve directly to the canonical scenario,
+        # source='synonym_dict', no save_user_vocab call needed.
+        # Slotted between 5b and 6 because both 8 and 6 are post-Chadron-
+        # transition phases against the synthetic project + Chadron, and
+        # keeping them together makes the transition cleaner.
+        logger.info('--- Phase 8: Synonym-dict hit ---')
+        self._phase8_synonym_dict_hit()
+
         # Step 6 — Untagged-data honesty (Chadron) ───────────────────
         logger.info('--- Phase 6: Untagged-data honesty (Chadron) ---')
         self._phase6_untagged_honesty()
@@ -539,6 +550,136 @@ class ScenarioS16(BaseAgent):
                  and 'pro forma' not in final_title and 'proforma' not in final_title)
             )
             self.validator.observe('p5b_retry_recovered', recovered)
+
+    # ──────────────────────────────────────────────────────────────────
+    # Phase 8 — synonym-dict hit (added PU58)
+    #
+    # Tests the new synonym layer in vocab_tools.lookup_user_vocab. The
+    # static synonym dictionary maps "asking pro forma" → CURRENT_PRO_FORMA
+    # in the operating_statement_scenario domain. The synthetic project
+    # from Phase 1 has CURRENT_PRO_FORMA tagged data on file. The test
+    # user does NOT have a per-user vocab entry for "asking pro forma"
+    # (Phase 3 saved a different phrasing, "Show me the T-12 operating
+    # statement"), so the synonym layer is what resolves the request —
+    # not per-user vocab.
+    #
+    # Note: an earlier draft used "Show me today's rents." but that phrase
+    # is naturally rent-roll/units-leaning — the model interpreted it as
+    # a unit-level query and called `get_units` instead of
+    # `get_operating_statement`, so the synonym dict never had a chance
+    # to fire. "Asking pro forma" is unambiguously operating-statement-y.
+    #
+    # Hard contracts:
+    #   - get_operating_statement returns success (not ambiguous_scenario)
+    #   - scenario_resolved = CURRENT_PRO_FORMA
+    #   - scenario_resolution_source = 'synonym_dict' (the new field value
+    #     introduced when lookup_user_vocab gained the synonym layer)
+    #   - save_user_vocab NOT called (synonym hits don't require saves;
+    #     the dictionary is platform-shared, not per-user)
+    #   - artifact composed in a single round-trip with an honest title
+    # ──────────────────────────────────────────────────────────────────
+    def _phase8_synonym_dict_hit(self):
+        if not self.synthetic_project_id:
+            self.validator.assert_field_equals(
+                'p8_synthetic_available', False, True
+            )
+            return
+
+        # Fresh thread on the synthetic project — keeps the test independent
+        # of any vocab-hit state from Phase 4 and avoids in-thread message
+        # history bleed.
+        self.create_thread(
+            project_id=self.synthetic_project_id,
+            page_context='operations',
+            force_new=True,
+        )
+
+        chat_resp = self.send_message(
+            content='Show me the asking pro forma.',
+            page_context='operations',
+        )
+        self.validator.assert_response_not_error(chat_resp)
+
+        tools_used = [tc.tool_name for tc in chat_resp.tool_calls]
+        self.validator.observe('p8_tools', tools_used)
+
+        os_call = chat_resp.find_tool_call('get_operating_statement')
+        self.validator.assert_field_equals(
+            'p8_get_operating_statement_called', os_call is not None, True
+        )
+
+        if os_call:
+            tool_result = os_call.result or {}
+            tool_code = tool_result.get('code')
+            scenario_resolved = tool_result.get('scenario_resolved')
+            resolution_source = tool_result.get('scenario_resolution_source')
+
+            self.validator.observe('p8_tool_result_code', tool_code)
+            self.validator.observe('p8_scenario_resolved', scenario_resolved)
+            self.validator.observe('p8_resolution_source', resolution_source)
+
+            # Hard contract: tool did NOT return ambiguous_scenario — the
+            # synonym dict resolved the phrase before the ambiguous flow
+            # could fire.
+            self.validator.assert_field_equals(
+                'p8_not_ambiguous', tool_code != 'ambiguous_scenario', True
+            )
+
+            # Hard contract: resolved to CURRENT_PRO_FORMA (what the synthetic
+            # project has on file, matching the synonym dict mapping).
+            self.validator.assert_field_equals(
+                'p8_resolved_current_proforma',
+                scenario_resolved, 'CURRENT_PRO_FORMA',
+            )
+
+            # Hard contract: resolution_source identifies the synonym dict
+            # path. NOT 'user_vocab' (this user has no vocab for "today's
+            # rents") and NOT the legacy 'user_phrasing_lookup' label.
+            self.validator.assert_field_equals(
+                'p8_resolution_source_synonym_dict',
+                resolution_source, 'synonym_dict',
+            )
+
+        # Hard contract: save_user_vocab NOT called. Synonym dict hits don't
+        # require per-user persistence — the mapping is platform-shared.
+        vocab_save_call = chat_resp.find_tool_call('save_user_vocab')
+        self.validator.assert_field_equals(
+            'p8_no_vocab_save', vocab_save_call is None, True
+        )
+
+        # Hard contract: artifact composed in a single round-trip with an
+        # honest title (mentioning current pro forma, not T-12).
+        artifact_call = chat_resp.find_tool_call('create_artifact')
+        self.validator.assert_field_equals(
+            'p8_artifact_created', artifact_call is not None, True
+        )
+
+        if artifact_call:
+            title = (artifact_call.tool_input or {}).get('title') or ''
+            subtype = (artifact_call.tool_input or {}).get('artifact_subtype')
+            self.validator.observe('p8_artifact_title', title)
+            self.validator.observe('p8_artifact_subtype', subtype)
+
+            title_lower = title.lower()
+            title_ok = ('current' in title_lower
+                        and ('pro forma' in title_lower or 'proforma' in title_lower))
+            self.validator.assert_field_equals('p8_title_honest', title_ok, True)
+
+            # Title MUST NOT contain T-12 / trailing keywords
+            title_dirty = any(
+                kw in title_lower for kw in ('t-12', 't12', 'trailing')
+            )
+            self.validator.assert_field_equals('p8_title_no_t12', title_dirty, False)
+
+            # Subtype must be current_proforma to match the resolved scenario
+            self.validator.assert_field_equals(
+                'p8_subtype_current_proforma', subtype, 'current_proforma'
+            )
+
+            # Capture artifact_id for symmetry with other phases
+            artifact_id = (artifact_call.result or {}).get('artifact_id')
+            if artifact_id:
+                self.validator.observe('p8_artifact_id', artifact_id)
 
     # ──────────────────────────────────────────────────────────────────
     # Phase 6 — untagged-data honesty against Chadron
