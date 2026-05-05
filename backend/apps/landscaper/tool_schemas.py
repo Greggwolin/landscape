@@ -4864,6 +4864,20 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "update_project_msa",
+        "description": "Update the project's MSA (Metropolitan Statistical Area) by resolving a city/state reference to the canonical msa_id. Use this — NOT update_project_field — whenever the user asks to change the MSA, market designation, or metro area (e.g., 'set the MSA to Phoenix', 'change the market to Los Angeles', 'this is in the Dallas metro'). The generic field-update path writes the literal string to a free-text fallback column that the artifact display ignores; this tool resolves the user's reference to an integer msa_id and writes that, which the artifact's MSA display reads via JOIN. Returns a mutation proposal for user approval (Level 2 autonomy). On ambiguous matches, returns a candidate list so you can ask the user to pick before re-calling.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "User's MSA reference. Examples: 'Los Angeles', 'Phoenix, AZ', 'Dallas-Fort Worth', 'NYC metro'.",
+                },
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "get_data_completeness",
         "description": "Check what data is populated vs missing for a project. Returns per-section completeness with missing field lists. Guides onboarding.",
         "input_schema": {

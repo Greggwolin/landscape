@@ -90,6 +90,7 @@ UNIVERSAL_TOOLS = [
     "list_projects_summary",
     "get_deal_summary",
     "get_project_profile",  # Read-only profile artifact (chat PV, May 2026)
+    "update_project_msa",   # FK-aware MSA update (chat PV, May 2026)
     "get_data_completeness",
     "calculate_project_metrics",
     "calculate_cash_flow",

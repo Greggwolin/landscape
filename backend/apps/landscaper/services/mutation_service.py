@@ -82,6 +82,9 @@ MUTABLE_FIELDS = {
         "project_address", "street_address", "city", "state", "zip_code",
         "county", "jurisdiction_city", "jurisdiction_county", "jurisdiction_state",
         "market", "submarket",
+        # MSA — foreign key to tbl_msa. Resolved from city/state name by
+        # update_project_msa tool, which writes the integer msa_id here.
+        "msa_id",
         # Property details
         "property_subtype", "property_class", "year_built", "stories",
         "lot_size_sf", "lot_size_acres", "gross_sf", "acres_gross",
@@ -512,6 +515,7 @@ FIELD_TYPES = {
     "stories": "integer",
     "square_feet": "integer",
     "floor_number": "integer",
+    "msa_id": "integer",
     "downtime_months": "integer",
     "start_period": "integer",
     "units_total": "integer",
