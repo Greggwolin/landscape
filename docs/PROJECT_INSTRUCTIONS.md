@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.2
+**Version:** 4.3
 **Last Updated:** May 5, 2026
-**Supersedes:** v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Supersedes:** v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -742,11 +742,50 @@ Stdout is ignored — the append is silent. If the command errors (bad fb_id, mi
 
 **21.7 Pickup behavior.** When Cowork opens a chat tied to a feedback item AND the row already has a `working_summary` from prior work, read the summary first, treat the most recent line as the current state of the world (especially `[blocker]` or `[user-input]` lines), and start work from that point. Do NOT re-litigate decisions captured in `[decision]` or `[user-input]` lines unless Gregg explicitly asks to revisit them.
 
-**21.8 Closing the loop.** Append a `[resolved]` line when the fix is complete and a CC handoff is being prepared. Append a `[closed]` line (with the commit hash if known) once CC has landed the commit. Both append-only — they don't change `tbl_feedback.status`; the existing `close_feedback` / `start_feedback` management commands and the daily-brief auto-resolution path own the status column.
+**21.8 Closing the loop.** Append a `[resolved]` line when the fix is complete and a CC handoff is being prepared. Append a `[closed]` line (with the commit hash if known) once CC has landed the commit. Both are append-only entries to `working_summary`. The status column transition (in_progress → addressed → closed) is owned by §21.9 (resolution-language detection) and the existing `close_feedback` / daily-brief auto-resolution paths.
+
+**21.9 Resolution-language detection [Phase 5].** When working in a chat tied to a feedback item, watch Gregg's messages for resolution-language signals: "fixed," "done," "that worked," "looks good," "nailed it," "ship it," "that did it," and bare "yes" when it's clearly answering an "is this fixed?" question. When detected, evaluate confidence and either auto-proceed or ask.
+
+**21.9.1 HIGH-confidence threshold (auto-proceed).** All three must be true:
+
+1. **Cowork's immediately prior turn** announced the fix is complete — not a sub-step, not a draft, not an offer, not a question. Things like "Done.", "Fixed — verified the change is in place.", "That should be it." count. Things like "Saved a draft," "How does this look?", "Updated the typo above" do NOT.
+2. **Gregg's message** is short, unambiguous resolution language with no qualifier and no question attached. The trigger word set is the list above.
+3. **Recent few turns** have been continuously about this one feedback item — no topic switches.
+
+If all three hold → AUTO-PROCEED per §21.9.3.
+
+**21.9.2 ASK-first fallback (medium / low confidence).** If any of the three conditions in §21.9.1 fails, do NOT auto-proceed. Instead, post:
+
+> Confirming — does this resolve FB-N? If yes, I'll mark it addressed and draft the commit prompt. If no, just say no.
+
+If Gregg confirms → execute the auto-action set per §21.9.3. If Gregg says no → keep working; append a `[note]` line capturing what the resolution language was actually about (e.g., "[note] 'fixed' referred to the typo edit, not the FB").
+
+**21.9.3 Auto-action set on confirmed resolution.** When auto-proceed conditions are met (or Gregg confirms after an ASK), do all of the following:
+
+1. Run `python manage.py mark_feedback_addressed FB-N` — flips `tbl_feedback.status` from `in_progress` to `addressed` and stamps `addressed_at = NOW()`.
+2. Append a `[resolved]` line to `working_summary` via `append_feedback_line` (§21.5).
+3. Draft a CC commit-and-push prompt as a downloadable `.md` file in the workspace folder. The prompt must follow §4 standards (session ID + echo-back, ⚠️ BEFORE YOU START block, downstream-impact section, verification commands, success criteria), reference the FB id, and include the file list pulled from `git status` in the prompt body.
+4. Tell Gregg in chat — exactly one line per §5.7: `Marked addressed; commit prompt saved.` followed by a link to the `.md` file. NOTHING else — no narration of the steps above.
+
+**21.9.4 Closing the loop after CC commits.** When CC reports back that the commit landed (Cowork sees the commit hash in chat or in transcript), Cowork:
+
+1. Runs `mark_feedback_addressed FB-N --commit-sha <sha> --commit-url <url>` to backfill the commit reference. (Re-running on an already-addressed row merges the new info; see the command's `COALESCE` behavior.)
+2. Appends a `[closed]` line to `working_summary` with the commit SHA.
+3. Tells Gregg in one line: `FB-N closed. Commit <short-sha> landed.`
+
+The status transition from `addressed` → `closed` happens via the daily-brief auto-resolution path (`fixes FB-N` / `closes FB-N` / `resolves FB-N` regex on commit messages), or explicitly via `close_feedback FB-N --note "..."`. Cowork itself does NOT flip to `closed` directly — that boundary belongs to the existing close paths so the audit trail stays unified.
+
+**21.9.5 Edge-case behaviors.**
+
+- **False-positive correction.** If Gregg pushes back after an auto-fire ("no, that's not what I meant"), Cowork: (a) reverts the status flip via `UPDATE tbl_feedback SET status = 'in_progress', addressed_at = NULL WHERE id = N` (or via a future `unmark_feedback_addressed` command), (b) appends a `[note]` correction line, (c) acknowledges briefly: "Reverted. Continuing." Then keeps working. The CC commit prompt artifact stays on disk — Gregg can ignore or delete it.
+- **Resolution language without context.** If trigger words appear in a message that is otherwise unrelated to the feedback item (e.g., Gregg posts a quote with "fixed" in it), Rule 21.9.1.3 fails (topic switch) → ASK fires → Gregg says no → handled.
+- **Multiple FB items in one chat.** If a single chat is tied to multiple feedback items (rare, but possible if Gregg explicitly pivots), the ASK should name a specific FB id. Cowork picks the most recently active one — the one whose working_summary has the most recent append. If ambiguous, ask which: "Confirming — does this resolve FB-A or FB-B?"
 
 ---
 
 ## CHANGELOG
+
+**v4.3 (2026-05-05)** — Added §21.9 (Resolution-language detection) for LSCMD-FBLOG-0505-kp Phase 5. HIGH-confidence threshold locked at three conditions (prior-turn announces completion + clean trigger word + continuous topic). ASK-first fallback for anything below HIGH. Auto-action set: flip status to addressed, append [resolved], draft commit prompt, one-line confirmation. New `mark_feedback_addressed` Django management command added as the in_progress → addressed transition path (close_feedback already owns terminal states). Closing-loop semantics: Cowork stamps the commit on the addressed row but never flips to closed itself — that boundary stays with close_feedback and the daily-brief auto-resolver. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
 **v4.2 (2026-05-05)** — Added §21 (Feedback Lifecycle Tracking) for the silent `working_summary` append behavior introduced in LSCMD-FBLOG-0505-kp Phase 3. Inflection-point taxonomy locked at start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. User-input firing discipline (§21.3) clarifies what counts as direction-changing input vs conversational filler. New `append_feedback_line` Django management command is the append mechanism. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
@@ -760,4 +799,4 @@ Stdout is ignored — the append is silent. If the command errors (bad fb_id, mi
 
 ---
 
-End of Landscape Project Instructions v4.2
+End of Landscape Project Instructions v4.3
