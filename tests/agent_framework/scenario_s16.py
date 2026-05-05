@@ -1140,8 +1140,11 @@ class ScenarioS16(BaseAgent):
             return
         for aid in self._artifact_ids_created:
             try:
+                # ?force=true triggers a hard delete; without it the endpoint
+                # would soft-archive (set is_archived=True) and orphans would
+                # accumulate forever under the archived flag.
                 resp = self.session.delete(
-                    f'{config.DJANGO_BASE_URL}/api/artifacts/{aid}/',
+                    f'{config.DJANGO_BASE_URL}/api/artifacts/{aid}/?force=true',
                     timeout=config.API_TIMEOUT,
                 )
                 if resp.status_code in (200, 204):

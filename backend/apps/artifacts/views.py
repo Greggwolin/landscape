@@ -5,6 +5,8 @@ Endpoints:
     GET    /api/artifacts/?project_id=X    — list (used by panel)
     GET    /api/artifacts/<id>/            — full retrieval
     PATCH  /api/artifacts/<id>/            — pin/unpin/archive/title
+    DELETE /api/artifacts/<id>/            — soft archive (default) or
+                                             hard delete (?force=true)
     POST   /api/artifacts/<id>/update_state/  — inline edit write path (Phase 4)
     GET    /api/artifacts/<id>/versions/   — version log
     POST   /api/artifacts/<id>/restore/    — restore to a prior state
@@ -95,6 +97,38 @@ class ArtifactViewSet(viewsets.ViewSet):
         for field, value in serializer.validated_data.items():
             setattr(artifact, field, value)
         artifact.save(update_fields=list(serializer.validated_data.keys()))
+        return Response(ArtifactDetailSerializer(artifact).data)
+
+    def destroy(self, request, pk=None):
+        """Soft-archive (default) or hard-delete an artifact.
+
+        Default behavior is a soft archive: ``is_archived`` flips to ``True``
+        and the row + its version history remain. The list endpoint already
+        excludes archived artifacts unless ``?archived=true`` is passed, so
+        archived rows disappear from the panel UI.
+
+        Pass ``?force=true`` (or ``1`` / ``yes``) to permanently remove the
+        row. The ``tbl_artifact_version.artifact_id`` foreign key is declared
+        ``ON DELETE CASCADE``, so version history is cleaned up automatically
+        by the database — no application-level cascade needed.
+
+        Responses:
+            - 204 No Content on hard delete success.
+            - 200 OK with the archived artifact body on soft archive success.
+            - 404 if the artifact does not exist.
+        """
+        artifact = get_object_or_404(Artifact, pk=pk)
+
+        force_param = (request.query_params.get('force') or '').strip().lower()
+        is_force = force_param in ('1', 'true', 'yes')
+
+        if is_force:
+            artifact.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        if not artifact.is_archived:
+            artifact.is_archived = True
+            artifact.save(update_fields=['is_archived'])
         return Response(ArtifactDetailSerializer(artifact).data)
 
     @action(detail=True, methods=['get'], url_path='versions')
