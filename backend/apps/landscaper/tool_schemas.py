@@ -4855,6 +4855,15 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_project_profile",
+        "description": "Render the project's profile metadata as an artifact in the right panel — project name, address, county, MSA, APN, ownership, property type and subtype, units, gross acres, perspective, purpose, asking price, analysis start date. Read-only companion to the project_details modal. Use when the user asks 'show me the project details', 'show me the profile', 'what's this project's overview', or similar read-only requests. Use open_input_modal('project_details') instead when the user wants to EDIT the profile.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
         "name": "get_data_completeness",
         "description": "Check what data is populated vs missing for a project. Returns per-section completeness with missing field lists. Guides onboarding.",
         "input_schema": {

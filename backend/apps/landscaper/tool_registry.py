@@ -89,6 +89,7 @@ UNIVERSAL_TOOLS = [
     # P1 Analysis tools (Apr 2026)
     "list_projects_summary",
     "get_deal_summary",
+    "get_project_profile",  # Read-only profile artifact (chat PV, May 2026)
     "get_data_completeness",
     "calculate_project_metrics",
     "calculate_cash_flow",
