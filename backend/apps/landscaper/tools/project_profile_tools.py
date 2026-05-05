@@ -100,49 +100,149 @@ _PROPERTY_TYPE_LABELS = {
 }
 
 
-def _build_address_value(project) -> str:
-    """Two-line address rendering: street \\n city, state zip."""
-    street = (project.project_address or '').strip()
-    city = (project.jurisdiction_city or '').strip()
-    state = (project.jurisdiction_state or '').strip()
-    # Project model has no zip field at the project level; the modal pulls
-    # it from a nested location. For the artifact, render what we have.
-    parts = [p for p in (city, state) if p]
-    line2 = ', '.join([p for p in [city] if p]) + (' ' + state if state else '')
-    line2 = line2.strip()
+def _fetch_profile_row(project_id: int) -> Dict[str, Any] | None:
+    """Read the canonical profile row via raw SQL.
+
+    Mirrors the field-resolution priority of
+    `src/app/api/projects/[projectId]/profile/route.ts` so the artifact
+    and the existing profile endpoint render the same data:
+
+      - street_address (with project_address as legacy fallback)
+      - city / jurisdiction_city
+      - county / jurisdiction_county
+      - state / jurisdiction_state
+      - zip_code
+      - msa_name via JOIN tbl_msa ON msa_id  ← this is why an ORM-only
+        read of the project row showed MSA as empty: MSA lives on a
+        separate table, not on tbl_project.
+      - apn_primary  ← not `apn`
+      - target_units / total_units (live count of multifamily_unit rows
+        as final fallback for property types where units are tracked
+        per-row)
+
+    Returning a plain dict (not a Project model instance) so the
+    pair-building code uses dict semantics consistently with what the
+    canonical API would have surfaced.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                p.project_id,
+                p.project_name,
+                p.project_type,
+                p.project_type_code,
+                p.property_subtype,
+                p.analysis_perspective,
+                p.analysis_purpose,
+                p.target_units,
+                p.total_units,
+                (
+                    SELECT COUNT(*)::integer
+                    FROM landscape.tbl_multifamily_unit u
+                    WHERE u.project_id = p.project_id
+                ) AS calculated_units,
+                p.acres_gross AS gross_acres,
+                p.asking_price,
+                COALESCE(p.street_address, p.project_address) AS address,
+                COALESCE(p.city, p.jurisdiction_city) AS city,
+                COALESCE(p.county, p.jurisdiction_county) AS county,
+                COALESCE(p.state, p.jurisdiction_state) AS state,
+                p.zip_code,
+                p.analysis_start_date,
+                p.msa_id,
+                m.msa_name,
+                m.state_abbreviation AS msa_state,
+                COALESCE(p.apn_primary, '') AS apn,
+                p.ownership_type,
+                p.market AS market_freetext
+            FROM landscape.tbl_project p
+            LEFT JOIN landscape.tbl_msa m ON p.msa_id = m.msa_id
+            WHERE p.project_id = %s
+            """,
+            [project_id],
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        cols = [c[0] for c in cur.description]
+        return dict(zip(cols, row))
+
+
+def _build_address_value(profile: Dict[str, Any]) -> str:
+    """Two-line address rendering: street \\n city, state zip.
+
+    `address` from the SQL is COALESCE(street_address, project_address). When
+    the legacy `project_address` is the fallback source it sometimes has the
+    full address text already (street + city + state + zip embedded). We
+    render line 1 verbatim and append line 2 (city, state zip) only when
+    line 1 looks like a street-only string. Heuristic: line 1 is street-only
+    if it does NOT contain the city already.
+    """
+    street = (profile.get('address') or '').strip()
+    city = (profile.get('city') or '').strip()
+    state = (profile.get('state') or '').strip()
+    zip_code = (profile.get('zip_code') or '').strip()
+
+    # Build line 2 from canonical city/state/zip
+    line2_parts = []
+    if city:
+        line2_parts.append(city)
+    line2 = ', '.join(line2_parts)
+    if state:
+        line2 = (line2 + (' ' if line2 else '') + state).strip()
+    if zip_code:
+        line2 = (line2 + (' ' if line2 else '') + zip_code).strip()
+
+    # If the street string already contains the city (legacy free-text
+    # project_address fallback), use it as-is to avoid duplication.
+    if street and city and city.lower() in street.lower():
+        return street
+
     if street and line2:
         return f'{street}\n{line2}'
     return street or line2 or ''
 
 
-def _build_profile_pairs(project) -> List[Dict[str, str]]:
+def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, str]]:
     """Construct the kv_grid pair list mirroring the ProjectProfileTile order."""
-    name_value = (project.project_name or '').strip()
-    address_value = _build_address_value(project)
+    name_value = (profile.get('project_name') or '').strip()
+    address_value = _build_address_value(profile)
 
-    units_value = _fmt_int(project.target_units)
-    acres_value = _fmt_acres(project.acres_gross)
+    units_value = _fmt_int(
+        profile.get('target_units')
+        or profile.get('total_units')
+        or profile.get('calculated_units')
+    )
+    acres_value = _fmt_acres(profile.get('gross_acres'))
 
-    county_value = (project.jurisdiction_county or project.county or '').strip()
-    # The project model does not store MSA directly on the project row in
-    # the canonical schema; it's derived from city+state via geo_xwalk on
-    # the read endpoint. Pull whatever is on the model if present.
-    msa_value = getattr(project, 'jurisdiction_msa', None) or ''
+    county_value = (profile.get('county') or '').strip()
 
-    apn_value = (getattr(project, 'apn', None) or '').strip() if hasattr(project, 'apn') else ''
-    ownership_value = _fmt_label(project.ownership_type)
+    # MSA: prefer the JOINed msa_name. The msa_name column on tbl_msa
+    # already encodes the canonical "Region, ST" suffix (e.g.,
+    # "Los Angeles-Long Beach-Anaheim, CA"), so do NOT append msa_state
+    # — that would produce "..., CA, CA". Mirrors formatMSADisplay() at
+    # src/types/project-profile.ts:194 which uses msa_name verbatim.
+    # Fall back to free-text `market` field if no MSA row is linked.
+    msa_value = (profile.get('msa_name') or '').strip() \
+        or (profile.get('market_freetext') or '').strip()
+
+    apn_value = (profile.get('apn') or '').strip()
+    ownership_value = _fmt_label(profile.get('ownership_type'))
 
     type_value = _fmt_label(
-        project.project_type_code or project.project_type,
+        profile.get('project_type_code') or profile.get('project_type'),
         _PROPERTY_TYPE_LABELS,
     )
-    subtype_value = (project.property_subtype or '').strip()
+    subtype_value = (profile.get('property_subtype') or '').strip()
 
-    perspective_value = _fmt_label(project.analysis_perspective, _PERSPECTIVE_LABELS)
-    purpose_value = _fmt_label(project.analysis_purpose, _PURPOSE_LABELS)
+    perspective_value = _fmt_label(profile.get('analysis_perspective'), _PERSPECTIVE_LABELS)
+    purpose_value = _fmt_label(profile.get('analysis_purpose'), _PURPOSE_LABELS)
 
-    asking_value = _fmt_currency(project.asking_price)
-    analysis_start_value = _fmt_date(project.analysis_start_date)
+    asking_value = _fmt_currency(profile.get('asking_price'))
+    analysis_start_value = _fmt_date(profile.get('analysis_start_date'))
 
     pairs: List[Dict[str, str]] = []
 
@@ -199,7 +299,6 @@ def get_project_profile_tool(
         Or a structured error envelope on failure.
     """
     from apps.artifacts.services import create_artifact_record
-    from apps.projects.models import Project
 
     tool_input = tool_input or kwargs.get('tool_input', {})
 
@@ -214,20 +313,22 @@ def get_project_profile_tool(
         }
 
     try:
-        project = Project.objects.get(pk=int(project_id))
-    except Project.DoesNotExist:
-        return {
-            'success': False,
-            'error': f'Project {project_id} not found.',
-        }
+        pid = int(project_id)
     except (TypeError, ValueError):
         return {
             'success': False,
             'error': f'project_id must be an integer; got {project_id!r}.',
         }
 
+    profile = _fetch_profile_row(pid)
+    if profile is None:
+        return {
+            'success': False,
+            'error': f'Project {pid} not found.',
+        }
+
     try:
-        pairs = _build_profile_pairs(project)
+        pairs = _build_profile_pairs(profile)
     except Exception as exc:
         logger.exception(f'get_project_profile failed building pairs: {exc}')
         return {
@@ -235,14 +336,15 @@ def get_project_profile_tool(
             'error': f'Failed to build profile pairs: {exc}',
         }
 
-    title = f'{project.project_name or f"Project {project_id}"} — Profile'
+    project_name = (profile.get('project_name') or '').strip() or f'Project {pid}'
+    title = f'{project_name} — Profile'
     schema = {
         'blocks': [
             {
                 'id': 'project_profile_grid',
                 'type': 'key_value_grid',
                 'pairs': pairs,
-                'columns': 2,
+                'columns': 1,
             },
         ],
     }
@@ -251,11 +353,11 @@ def get_project_profile_tool(
         return create_artifact_record(
             title=title,
             schema=schema,
-            project_id=int(project_id),
+            project_id=pid,
             thread_id=thread_id,
             user_id=user_id,
             tool_name='get_project_profile',
-            params_json={'project_id': int(project_id)},
+            params_json={'project_id': pid},
         )
     except Exception as exc:
         logger.exception(f'get_project_profile failed creating artifact: {exc}')
