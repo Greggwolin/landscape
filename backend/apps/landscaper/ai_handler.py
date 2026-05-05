@@ -822,6 +822,97 @@ ANTHROPIC_TIMEOUT_SECONDS = 120
 # Maximum tokens for response
 MAX_TOKENS = 4096  # Lowered from 16384 — forces concise responses; tool calls still fit
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-tool turn continuation (SPEC-Multi-Tool-Continuation-PV-2026-05-05)
+# ─────────────────────────────────────────────────────────────────────────────
+# When a multi-tool turn cuts off mid-chain because output hits MAX_TOKENS, we
+# detect, classify, and either re-prompt the model to continue or accept the
+# truncation gracefully. Bounded by MAX_CONTINUATION_ATTEMPTS so a runaway
+# pathological prompt cannot hammer the API in an infinite retry loop.
+
+MAX_CONTINUATION_ATTEMPTS = 2
+
+# Cutoff classification — see SPEC §3 for the four scenarios.
+_CUTOFF_MID_CHAIN_CONTINUE = 'mid_chain_continue'      # tool_use complete, more chain expected
+_CUTOFF_MID_TOOL_USE_RESTART = 'mid_tool_use_restart'  # tool_use partial / unparseable args
+_CUTOFF_POST_TOOL_TRUNCATED = 'post_tool_truncated'    # text after successful tools, just user msg cut
+_CUTOFF_LONG_ANSWER_TRUNCATED = 'long_answer_truncated'  # pure text answer, no tools
+
+# User-visible truncation markers appended to final_content when the cutoff is
+# accepted rather than continued.
+_TRUNCATION_MARKER_POST_TOOL = '\n\n…(response truncated for length; tool actions completed successfully)'
+_TRUNCATION_MARKER_LONG_ANSWER = "\n\n…(response truncated; ask 'continue' to see the rest)"
+
+
+def _classify_max_tokens_cutoff(response) -> str:
+    """Classify how a max_tokens stop_reason should be handled.
+
+    Walks the response content blocks and returns one of the four
+    _CUTOFF_* constants. See SPEC-Multi-Tool-Continuation-PV-2026-05-05 §4.
+    """
+    blocks = list(response.content) if response and response.content else []
+    if not blocks:
+        # No content at all — treat as long-answer truncation; safest default.
+        return _CUTOFF_LONG_ANSWER_TRUNCATED
+
+    last_block = blocks[-1]
+    last_is_tool_use = getattr(last_block, 'type', None) == 'tool_use'
+    has_any_tool_use = any(getattr(b, 'type', None) == 'tool_use' for b in blocks)
+
+    if last_is_tool_use:
+        # If input is empty {} or missing, the tool_use was cut off mid-args.
+        # Anthropic's SDK delivers a partial input dict (or None) in this case.
+        tool_input = getattr(last_block, 'input', None)
+        if tool_input is None or (isinstance(tool_input, dict) and len(tool_input) == 0):
+            return _CUTOFF_MID_TOOL_USE_RESTART
+        # tool_use looks complete — model was about to do MORE after this one.
+        # Continuation should pick up the chain.
+        return _CUTOFF_MID_CHAIN_CONTINUE
+
+    # Last block is text (or non-tool_use)
+    if has_any_tool_use:
+        # Tool use blocks fired earlier in this response. The model started
+        # writing post-tool narrative and got cut off.
+        return _CUTOFF_POST_TOOL_TRUNCATED
+
+    return _CUTOFF_LONG_ANSWER_TRUNCATED
+
+
+def _continuation_prompt_for(scenario: str) -> Optional[str]:
+    """Return the user-message text that asks the model to resume.
+
+    None for scenarios that don't trigger a re-call (POST_TOOL_TRUNCATED,
+    LONG_ANSWER_TRUNCATED).
+    """
+    if scenario == _CUTOFF_MID_CHAIN_CONTINUE:
+        return (
+            "[CONTINUATION] Your previous response was cut off by the response "
+            "length limit before completing the tool chain. Continue from where "
+            "you left off — call the next intended tool now without re-explaining "
+            "what you've already said."
+        )
+    if scenario == _CUTOFF_MID_TOOL_USE_RESTART:
+        return (
+            "[CONTINUATION] Your previous response was cut off mid-tool-call. "
+            "The partial call has been discarded. Re-issue that tool call now "
+            "with complete arguments."
+        )
+    return None
+
+
+def _strip_partial_tool_use_block(response_content):
+    """For MID_TOOL_USE_RESTART: drop the trailing partial tool_use block.
+
+    Returns a new list of content blocks safe to append to claude_messages
+    as the assistant turn (without the unparseable partial call).
+    """
+    if not response_content:
+        return list(response_content)
+    blocks = list(response_content)
+    if blocks and getattr(blocks[-1], 'type', None) == 'tool_use':
+        return blocks[:-1]
+    return blocks
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool Definitions — compressed schemas imported from tool_schemas.py
@@ -3760,6 +3851,12 @@ def get_landscaper_response(
         total_input_tokens = response.usage.input_tokens
         total_output_tokens = response.usage.output_tokens
 
+        # Multi-tool turn continuation state (SPEC-Multi-Tool-Continuation-PV-2026-05-05).
+        # Counters are shared across the initial-response handler and the in-loop
+        # handler so the total continuation budget for a single user turn is bounded.
+        continuation_attempts = 0
+        continuation_truncation_marker = None
+
         logger.info(f"[AI_HANDLER] Initial response stop_reason={response.stop_reason}, tool_executor={'present' if tool_executor else 'None'}")
         # DIAGNOSTIC: Log what Claude's initial response contains
         for _diag_block in response.content:
@@ -3769,6 +3866,56 @@ def get_landscaper_response(
             elif hasattr(_diag_block, 'text'):
                 logger.info(f"[DIAGNOSTIC] CLAUDE TEXT (first 300 chars): {_diag_block.text[:300]}")
                 print(f"=== DIAGNOSTIC: CLAUDE TEXT RESPONSE (first 200 chars): {_diag_block.text[:200]} ===")
+
+        # ──────────────────────────────────────────────────────────────────
+        # Multi-tool turn continuation — initial-response handler
+        # SPEC-Multi-Tool-Continuation-PV-2026-05-05 §5
+        #
+        # If the initial response was cut off by max_tokens, classify the
+        # cutoff and either (a) re-prompt the model to continue, or
+        # (b) accept the truncation with a user-visible marker. Loops
+        # internally because a continuation can itself overflow; bounded by
+        # MAX_CONTINUATION_ATTEMPTS.
+        # ──────────────────────────────────────────────────────────────────
+        while response.stop_reason == "max_tokens" and continuation_attempts < MAX_CONTINUATION_ATTEMPTS:
+            scenario = _classify_max_tokens_cutoff(response)
+            logger.info(
+                f"[Continuation] Initial-response max_tokens detected, "
+                f"scenario={scenario}, attempt={continuation_attempts + 1}/{MAX_CONTINUATION_ATTEMPTS}"
+            )
+
+            if scenario == _CUTOFF_POST_TOOL_TRUNCATED:
+                continuation_truncation_marker = _TRUNCATION_MARKER_POST_TOOL
+                break
+            if scenario == _CUTOFF_LONG_ANSWER_TRUNCATED:
+                continuation_truncation_marker = _TRUNCATION_MARKER_LONG_ANSWER
+                break
+
+            # MID_CHAIN_CONTINUE or MID_TOOL_USE_RESTART — re-prompt
+            if scenario == _CUTOFF_MID_TOOL_USE_RESTART:
+                continuation_content = _strip_partial_tool_use_block(response.content)
+            else:
+                continuation_content = list(response.content)
+
+            claude_messages.append({"role": "assistant", "content": continuation_content})
+            claude_messages.append({"role": "user", "content": _continuation_prompt_for(scenario)})
+
+            continuation_attempts += 1
+            response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
+            _log_cache_usage('continuation_initial', response)
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
+            logger.info(
+                f"[Continuation] Re-call returned stop_reason={response.stop_reason}, "
+                f"output_tokens={response.usage.output_tokens}"
+            )
+
+        if response.stop_reason == "max_tokens" and continuation_attempts >= MAX_CONTINUATION_ATTEMPTS:
+            logger.warning(
+                f"[Continuation] Max attempts ({MAX_CONTINUATION_ATTEMPTS}) exhausted on initial-response path; "
+                f"accepting truncation"
+            )
+            continuation_truncation_marker = continuation_truncation_marker or _TRUNCATION_MARKER_LONG_ANSWER
 
         # Hallucination detection: if Claude claims to have executed mutations
         # but didn't make any tool calls, force a retry with explicit instruction
@@ -3993,6 +4140,58 @@ def get_landscaper_response(
             total_output_tokens += response.usage.output_tokens
             logger.info(f"[Tool Loop] Continuation response: stop_reason={response.stop_reason}, tokens={response.usage.output_tokens}")
 
+            # ──────────────────────────────────────────────────────────────
+            # Multi-tool turn continuation — in-loop handler
+            # SPEC-Multi-Tool-Continuation-PV-2026-05-05 §5
+            #
+            # Mirrors the initial-response handler. Shares the
+            # continuation_attempts counter, so the per-turn budget covers
+            # both paths. After this block runs, response.stop_reason is
+            # one of: "tool_use" (loop continues), "end_turn" (loop exits
+            # naturally), or "max_tokens" with attempts exhausted (we set
+            # loop_broke_early so the graceful summary call fires).
+            # ──────────────────────────────────────────────────────────────
+            while response.stop_reason == "max_tokens" and continuation_attempts < MAX_CONTINUATION_ATTEMPTS:
+                scenario = _classify_max_tokens_cutoff(response)
+                logger.info(
+                    f"[Continuation] In-loop max_tokens detected, "
+                    f"scenario={scenario}, attempt={continuation_attempts + 1}/{MAX_CONTINUATION_ATTEMPTS}"
+                )
+
+                if scenario == _CUTOFF_POST_TOOL_TRUNCATED:
+                    continuation_truncation_marker = _TRUNCATION_MARKER_POST_TOOL
+                    break
+                if scenario == _CUTOFF_LONG_ANSWER_TRUNCATED:
+                    continuation_truncation_marker = _TRUNCATION_MARKER_LONG_ANSWER
+                    break
+
+                if scenario == _CUTOFF_MID_TOOL_USE_RESTART:
+                    continuation_content = _strip_partial_tool_use_block(response.content)
+                else:
+                    continuation_content = list(response.content)
+
+                claude_messages.append({"role": "assistant", "content": continuation_content})
+                claude_messages.append({"role": "user", "content": _continuation_prompt_for(scenario)})
+
+                continuation_attempts += 1
+                response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
+                _log_cache_usage('continuation_in_loop', response)
+                total_input_tokens += response.usage.input_tokens
+                total_output_tokens += response.usage.output_tokens
+                logger.info(
+                    f"[Continuation] In-loop re-call returned stop_reason={response.stop_reason}, "
+                    f"output_tokens={response.usage.output_tokens}"
+                )
+
+            if response.stop_reason == "max_tokens" and continuation_attempts >= MAX_CONTINUATION_ATTEMPTS:
+                logger.warning(
+                    f"[Continuation] Max attempts ({MAX_CONTINUATION_ATTEMPTS}) exhausted in tool loop; "
+                    f"breaking with graceful-summary fallback"
+                )
+                continuation_truncation_marker = continuation_truncation_marker or _TRUNCATION_MARKER_LONG_ANSWER
+                loop_broke_early = True
+                break
+
         # If loop broke early, make one final call WITHOUT tools to get a summary
         if loop_broke_early and tool_executor:
             logger.info("[Tool Loop] Making final summary call (no tools)")
@@ -4044,6 +4243,15 @@ def get_landscaper_response(
         for block in response.content:
             if hasattr(block, 'text'):
                 final_content += block.text
+
+        # Multi-tool turn continuation — surface the truncation marker if the
+        # cutoff was accepted (POST_TOOL_TRUNCATED, LONG_ANSWER_TRUNCATED, or
+        # MAX_CONTINUATION_ATTEMPTS exhausted). See SPEC §5.3 / §5.4.
+        if continuation_truncation_marker:
+            final_content = (final_content or '').rstrip() + continuation_truncation_marker
+            logger.info(
+                f"[Continuation] Appended truncation marker (attempts={continuation_attempts})"
+            )
 
         total_elapsed = time.time() - tool_loop_start
         logger.info(f"[Tool Loop] Complete: {tool_iteration} iterations, {total_elapsed:.1f}s total, {len(tool_calls_made)} tool calls")
