@@ -384,6 +384,39 @@
 .sb-thread-dot.active { background: var(--w-accent); }
 .sb-thread-dot.idle { background: var(--w-text-muted); }
 
+/* ─── Universal Archive Pattern Phase 1a — row action icons ─── */
+.sb-thread-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.sb-thread:hover .sb-thread-actions { display: inline-flex; }
+.sb-thread-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--w-text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sb-thread-action:hover {
+  background: var(--w-bg-surface);
+  color: var(--w-text-primary);
+}
+.sb-thread-action.danger:hover {
+  color: var(--cui-danger, #e55353);
+}
+.sb-thread-archived { font-style: italic; }
+.sb-thread-archived .sb-thread-actions { display: inline-flex; }
+
 /* ─── Scheduled Agent entries ─── */
 .sb-agent {
   display: flex;
@@ -1482,6 +1515,15 @@
 
 .w-doc-type-row-head:hover {
   background: var(--w-bg-surface-hover);
+}
+
+/* Drag-to-reclassify drop target — highlights the doc-type header when
+   a document row is being dragged over it. The state is set by
+   DocTypeRowView's headerDragEnter handler. */
+.w-doc-type-row.is-drop-target > .w-doc-type-row-head {
+  background: var(--w-accent-dim, rgba(14, 165, 233, 0.18));
+  outline: 2px dashed var(--w-accent, #0ea5e9);
+  outline-offset: -2px;
 }
 
 .w-doc-type-chev {

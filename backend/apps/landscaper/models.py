@@ -84,6 +84,25 @@ class ChatThread(models.Model):
         default=True,
         help_text='Whether this thread is currently active'
     )
+    is_archived = models.BooleanField(
+        default=False,
+        help_text=(
+            'Universal Archive Pattern: TRUE = soft-archived (hidden from '
+            'default lists, recoverable). FALSE = live. Distinct from '
+            'is_active (which encodes open vs closed lifecycle).'
+        ),
+    )
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the thread was archived (NULL when is_archived = FALSE).',
+    )
+    archived_by_user_id = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='User who archived the thread (NULL when is_archived = FALSE).',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(

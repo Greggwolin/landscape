@@ -10,6 +10,8 @@ interface Thread {
   id: string;
   name: string;
   isActive?: boolean;
+  /** Universal Archive Pattern: TRUE when rendered in the Archived section. */
+  isArchived?: boolean;
   onClick?: () => void;
   /** Optional project name shown beneath the title as a faint hint. */
   projectName?: string;
@@ -42,6 +44,9 @@ export interface WrapperSidebarProps {
 
   // Data
   threads?: Thread[];
+  /** Archived threads (Universal Archive Pattern Phase 1a). Rendered in a
+   *  separate collapsible "Archived" section below the live threads list. */
+  archivedThreads?: Thread[];
   scheduledAgents?: ScheduledAgent[];
   recentProjects?: RecentProject[];
 
@@ -51,6 +56,13 @@ export interface WrapperSidebarProps {
   onThemeToggle?: () => void;
   onLogout?: () => void;
   currentTheme?: 'light' | 'dark';
+
+  /** Soft-archive a live thread. Hover-revealed icon on each live-thread row. */
+  onArchiveThread?: (threadId: string) => void;
+  /** Restore an archived thread. Hover-revealed icon on each archived-thread row. */
+  onRestoreThread?: (threadId: string) => void;
+  /** Permanently delete an archived thread. Hover-revealed icon on archived rows. */
+  onDeleteThreadPermanently?: (threadId: string) => void;
 
   // User
   userName?: string;
@@ -94,6 +106,55 @@ const PropellerBeanieIcon: React.FC<{ isThinking?: boolean }> = ({ isThinking = 
 // Mountain logo PNG (inverted white version for dark sidebar)
 const LOGO_SVG = '/logo-invert.png';
 
+/* ── Thread row action icons (Universal Archive Pattern Phase 1a) ──────────
+ * Inline SVG icons keep us off any extra icon-library dep. Each button stops
+ * propagation so clicking the action doesn't also fire the row's onClick
+ * (which would navigate to the thread). Visibility is hover-driven via the
+ * `.sb-thread-actions` CSS class — see styles in wrapper.css.
+ */
+const ArchiveIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="2" y="3" width="20" height="5" rx="1" />
+    <path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8" />
+    <path d="M10 12h4" />
+  </svg>
+);
+const RestoreIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 12a9 9 0 109-9 9.74 9.74 0 00-7 3" />
+    <path d="M3 4v5h5" />
+  </svg>
+);
+const TrashIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+    <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+  </svg>
+);
+
+interface ThreadRowActionProps {
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  variant?: 'default' | 'danger';
+  children: React.ReactNode;
+}
+
+const ThreadRowAction: React.FC<ThreadRowActionProps> = ({ label, onClick, variant = 'default', children }) => (
+  <button
+    type="button"
+    className={`sb-thread-action${variant === 'danger' ? ' danger' : ''}`}
+    title={label}
+    aria-label={label}
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick(e);
+    }}
+  >
+    {children}
+  </button>
+);
+
 export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   activePage,
   onNavigate,
@@ -102,6 +163,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   sidebarWidth,
   onResizeStart,
   threads = [],
+  archivedThreads = [],
   scheduledAgents = [],
   recentProjects = [],
   onNewChat,
@@ -113,9 +175,13 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   userPlan = 'Crescent Bay Holdings',
   userInitials = 'GW',
   isHelpThinking = false,
+  onArchiveThread,
+  onRestoreThread,
+  onDeleteThreadPermanently,
 }) => {
   const router = useRouter();
   const [threadsCollapsed, setThreadsCollapsed] = useState(false);
+  const [archivedCollapsed, setArchivedCollapsed] = useState(true);
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
   const [projectsCollapsed, setProjectsCollapsed] = useState(false);
   // Thread "See more" state — capped at DEFAULT_THREAD_CAP by default.
@@ -234,6 +300,16 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                       </span>
                     )}
                   </span>
+                  {onArchiveThread && (
+                    <span className="sb-thread-actions">
+                      <ThreadRowAction
+                        label="Archive"
+                        onClick={() => onArchiveThread(t.id)}
+                      >
+                        <ArchiveIcon />
+                      </ThreadRowAction>
+                    </span>
+                  )}
                 </div>
               ))}
               {!threadsCollapsed && hiddenThreadCount > 0 && (
@@ -252,6 +328,80 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                     : `See more (${hiddenThreadCount})`}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Archived threads (Universal Archive Pattern Phase 1a).
+              Default collapsed; the count is shown in the header. */}
+          {archivedThreads.length > 0 && (
+            <div className="sb-section">
+              <div
+                className="sb-section-label sb-section-label--toggle"
+                onClick={() => setArchivedCollapsed((v) => !v)}
+              >
+                <span>Archived ({archivedThreads.length})</span>
+                <span className="sb-section-chev">{archivedCollapsed ? '▸' : '▾'}</span>
+              </div>
+              {!archivedCollapsed && archivedThreads.map((t) => (
+                <div
+                  key={t.id}
+                  className="sb-thread sb-thread-archived"
+                  onClick={t.onClick}
+                  title={t.projectName ? `${t.name} — ${t.projectName} (archived)` : `${t.name} (archived)`}
+                  style={{ opacity: 0.65 }}
+                >
+                  <span className="sb-thread-dot idle" />
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                    {t.projectName && (
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: 12,
+                          opacity: 0.55,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {t.projectName}
+                      </span>
+                    )}
+                  </span>
+                  <span className="sb-thread-actions">
+                    {onRestoreThread && (
+                      <ThreadRowAction
+                        label="Restore"
+                        onClick={() => onRestoreThread(t.id)}
+                      >
+                        <RestoreIcon />
+                      </ThreadRowAction>
+                    )}
+                    {onDeleteThreadPermanently && (
+                      <ThreadRowAction
+                        label="Delete permanently"
+                        variant="danger"
+                        onClick={() => {
+                          if (window.confirm(`Permanently delete "${t.name}"? This cannot be undone.`)) {
+                            onDeleteThreadPermanently(t.id);
+                          }
+                        }}
+                      >
+                        <TrashIcon />
+                      </ThreadRowAction>
+                    )}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 

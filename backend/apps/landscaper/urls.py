@@ -235,8 +235,18 @@ urlpatterns = [
         ChatThreadViewSet.as_view({
             'get': 'retrieve',
             'patch': 'partial_update',
+            # PV05 — Universal Archive Pattern Phase 1a. DELETE soft-archives
+            # by default; ?force=true hard-deletes. See destroy() in views.py.
+            'delete': 'destroy',
         }),
         name='landscaper-thread-detail'
+    ),
+    path(
+        # PV05 — Universal Archive Pattern Phase 1a. POST un-archives a
+        # soft-archived thread. See restore() in views.py.
+        'landscaper/threads/<uuid:pk>/restore/',
+        ChatThreadViewSet.as_view({'post': 'restore'}),
+        name='landscaper-thread-restore'
     ),
     path(
         'landscaper/threads/<uuid:pk>/close/',

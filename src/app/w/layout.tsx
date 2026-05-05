@@ -277,6 +277,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const activeSidebarThreadId = initialThreadId ?? null;
 
   const [sidebarThreads, setSidebarThreads] = useState<SidebarThreadRaw[]>([]);
+  const [archivedSidebarThreads, setArchivedSidebarThreads] = useState<SidebarThreadRaw[]>([]);
   // Bumping this re-runs the fetch (e.g., after a new thread is created).
   // Wired up below via a window event so child components don't need a
   // direct callback path through the WrapperUIContext yet.
@@ -284,6 +285,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Live (non-archived) threads — what the user is actively working on.
     fetch(`${DJANGO_API_URL}/api/landscaper/threads/?all_user_threads=true`, {
       headers: getAuthHeaders(),
     })
@@ -293,6 +295,20 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         setSidebarThreads(data.threads as SidebarThreadRaw[]);
       })
       .catch(() => {});
+
+    // Archived threads — Universal Archive Pattern Phase 1a.
+    // Fetched in parallel; renders in a separate collapsible section below
+    // the live threads list.
+    fetch(`${DJANGO_API_URL}/api/landscaper/threads/?all_user_threads=true&archived=true`, {
+      headers: getAuthHeaders(),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.threads || !Array.isArray(data.threads)) return;
+        setArchivedSidebarThreads(data.threads as SidebarThreadRaw[]);
+      })
+      .catch(() => {});
+
     return () => { cancelled = true; };
   }, [sidebarThreadsRefreshKey, DJANGO_API_URL]);
 
@@ -316,7 +332,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   //   2. firstUserMessage truncated to 40 chars
   //   3. "New conversation"
   // Project name is appended as a hint when the thread is project-scoped.
-  const sidebarThreadItems = sidebarThreads.map((t) => {
+  const buildThreadItem = (t: SidebarThreadRaw, isArchived: boolean) => {
     let label: string;
     if (t.title && t.title.trim()) {
       label = t.title.trim();
@@ -331,6 +347,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       name: label,
       projectName: t.projectName ?? undefined,
       isActive: t.threadId === activeSidebarThreadId,
+      isArchived,
       onClick: () => {
         // Project-scoped threads route into their project context so the
         // chat panel keeps the project's tools, artifacts, and side panels.
@@ -342,7 +359,53 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         }
       },
     };
-  });
+  };
+  const sidebarThreadItems = sidebarThreads.map((t) => buildThreadItem(t, false));
+  const archivedSidebarThreadItems = archivedSidebarThreads.map((t) => buildThreadItem(t, true));
+
+  // ─── Archive lifecycle handlers (Universal Archive Pattern Phase 1a) ──
+  // All three call the backend then bump the refresh key to re-fetch both
+  // lists. Optimistic UI updates aren't worth the complexity here — the
+  // sidebar lists are small and a re-fetch is fast.
+  const handleArchiveThread = useCallback(async (threadId: string) => {
+    try {
+      await fetch(`${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      setSidebarThreadsRefreshKey((k) => k + 1);
+      // If the user just archived the thread they're viewing, kick them off it.
+      if (activeSidebarThreadId === threadId) {
+        router.push('/w/chat');
+      }
+    } catch (err) {
+      console.error('[WrapperLayout] Failed to archive thread:', err);
+    }
+  }, [DJANGO_API_URL, activeSidebarThreadId, router]);
+
+  const handleRestoreThread = useCallback(async (threadId: string) => {
+    try {
+      await fetch(`${DJANGO_API_URL}/api/landscaper/threads/${threadId}/restore/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      setSidebarThreadsRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('[WrapperLayout] Failed to restore thread:', err);
+    }
+  }, [DJANGO_API_URL]);
+
+  const handleDeleteThreadPermanently = useCallback(async (threadId: string) => {
+    try {
+      await fetch(`${DJANGO_API_URL}/api/landscaper/threads/${threadId}/?force=true`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      setSidebarThreadsRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('[WrapperLayout] Failed to permanently delete thread:', err);
+    }
+  }, [DJANGO_API_URL]);
 
   const mockScheduled = [
     { id: 's1', emoji: '📊', name: 'FRED market data pull', status: 'active' as const },
@@ -382,6 +445,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         onResizeStart={handleResizeStart}
         onNewChat={handleNewChat}
         threads={sidebarThreadItems}
+        archivedThreads={archivedSidebarThreadItems}
+        onArchiveThread={handleArchiveThread}
+        onRestoreThread={handleRestoreThread}
+        onDeleteThreadPermanently={handleDeleteThreadPermanently}
         scheduledAgents={mockScheduled}
         recentProjects={recentProjects.map((p) => ({
           ...p,
