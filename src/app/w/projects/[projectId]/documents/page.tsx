@@ -1,98 +1,31 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
-import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
-import { DocumentsPanel } from '@/components/wrapper/documents/DocumentsPanel';
-import { MediaPanel } from '@/components/wrapper/documents/MediaPanel';
-import { useWrapperProject } from '@/contexts/WrapperProjectContext';
-import {
-  UploadStagingProvider,
-  useUploadStaging,
-} from '@/contexts/UploadStagingContext';
-import StagingTray from '@/components/dms/staging/StagingTray';
-import IntakeChoiceModal from '@/components/intelligence/IntakeChoiceModal';
+import React, { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useWrapperUI } from '@/contexts/WrapperUIContext';
 
-export default function WrapperDocumentsPage() {
-  const project = useWrapperProject();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+/**
+ * Legacy per-project documents route — preserved as a redirect.
+ *
+ * The dedicated documents page was removed in the right-panel toggle work
+ * (chat qm, May 2026). Per-project documents now render inside the right
+ * panel of the project workspace via the Artifacts | Documents toggle.
+ *
+ * This page redirects any cached /w/projects/[id]/documents URLs to the
+ * project root and pre-selects the Documents view in the right panel so
+ * users land where they expected.
+ */
+export default function WrapperDocumentsRedirect() {
+  const params = useParams();
+  const router = useRouter();
+  const { setProjectRightPanelView } = useWrapperUI();
+  const projectId = params?.projectId as string | undefined;
 
-  // key={project_id} forces UploadStagingProvider (and the useUploadThing
-  // hook inside it) to remount when the user navigates between projects.
-  // Without this, the x-project-id header captured at first mount stays
-  // pinned. Mirrors the guard in DMSView.tsx.
-  return (
-    <UploadStagingProvider
-      key={project.project_id}
-      projectId={project.project_id}
-      workspaceId={1}
-      onUploadComplete={bumpRefresh}
-    >
-      <WrapperDocumentsPageInner refreshKey={refreshKey} onChange={bumpRefresh} />
-    </UploadStagingProvider>
-  );
-}
+  useEffect(() => {
+    if (!projectId) return;
+    setProjectRightPanelView('documents');
+    router.replace(`/w/projects/${projectId}`);
+  }, [projectId, router, setProjectRightPanelView]);
 
-function WrapperDocumentsPageInner({
-  refreshKey,
-  onChange,
-}: {
-  refreshKey: number;
-  onChange: () => void;
-}) {
-  const project = useWrapperProject();
-  const { stageFiles, pendingIntakeDocs, clearPendingIntakeDocs } = useUploadStaging();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleUploadClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFilesSelected = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []);
-      if (files.length > 0) {
-        stageFiles(files);
-      }
-      // reset so selecting the same file again re-triggers onChange
-      e.target.value = '';
-    },
-    [stageFiles]
-  );
-
-  const actions = (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        style={{ display: 'none' }}
-        onChange={handleFilesSelected}
-      />
-      <button className="wrapper-btn wrapper-btn-primary" onClick={handleUploadClick}>
-        Upload New
-      </button>
-    </>
-  );
-
-  return (
-    <RightContentPanel title="Documents & Media" subtitle={project.project_name} actions={actions}>
-      <div className="w-page-body">
-        <DocumentsPanel refreshKey={refreshKey} onChange={onChange} />
-        <MediaPanel projectId={project.project_id} />
-      </div>
-
-      <StagingTray />
-
-      <IntakeChoiceModal
-        visible={pendingIntakeDocs.length > 0}
-        projectId={project.project_id}
-        docs={pendingIntakeDocs}
-        onClose={() => {
-          clearPendingIntakeDocs();
-          onChange();
-        }}
-      />
-    </RightContentPanel>
-  );
+  return null;
 }

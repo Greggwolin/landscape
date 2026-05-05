@@ -77,7 +77,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Derive active nav page from URL
   const activePage = (() => {
-    if (pathname.includes('/documents')) return 'documents';
+    if (pathname.includes('/platform-knowledge')) return 'platform-knowledge';
     if (pathname.includes('/reports')) return 'reports';
     if (pathname.includes('/map')) return 'map';
     if (pathname.includes('/landscaper-ai')) return 'landscaper';
@@ -147,7 +147,13 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const projectScoped = ['documents', 'reports', 'map'];
+      // Project-scoped pages render inside /w/projects/[id]/<page>.
+      // 'documents' was removed from this list — per-project documents now
+      // live as a toggle inside the right panel of the project workspace,
+      // not as a dedicated page. The 'platform-knowledge' link is the
+      // cross-project knowledge library and routes to its own top-level
+      // destination.
+      const projectScoped = ['reports', 'map'];
       // Use current projectId if present; otherwise fall back to last-visited
       const pid = projectId ?? lastProjectId;
 
@@ -161,6 +167,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           landscaper: 'landscaper-ai',
           admin: 'admin',
           tools: 'tools',
+          'platform-knowledge': 'platform-knowledge',
         };
         router.push(`/w/${routeMap[page] || page}`);
       }

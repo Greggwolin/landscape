@@ -7,6 +7,7 @@ import { LocationBriefArtifact } from './LocationBriefArtifact';
 import { ExcelAuditArtifact } from './ExcelAuditArtifact';
 import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
+import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
@@ -24,6 +25,8 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
     activeLocationBrief,
     activeExcelAudit,
     activeArtifactId,
+    projectRightPanelView,
+    setProjectRightPanelView,
   } = useWrapperUI();
 
   // Draggable width (LEFT-edge handle, dragging left widens the panel)
@@ -107,14 +110,35 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }}
       />
       <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
-      {/* Header */}
+      {/* Header — Artifacts | Documents view toggle.
+          Active label is white, inactive is muted. Clicking either swaps
+          the panel body without navigating away or losing the active chat
+          thread. Persists across project sub-routes via WrapperUIContext. */}
       <WrapperHeader
-        title="Artifacts"
+        title={
+          <div className="project-right-panel-toggle">
+            <button
+              type="button"
+              className={`prp-toggle-btn${projectRightPanelView === 'artifacts' ? ' is-active' : ''}`}
+              onClick={() => setProjectRightPanelView('artifacts')}
+            >
+              Artifacts
+            </button>
+            <span className="prp-toggle-sep" aria-hidden>|</span>
+            <button
+              type="button"
+              className={`prp-toggle-btn${projectRightPanelView === 'documents' ? ' is-active' : ''}`}
+              onClick={() => setProjectRightPanelView('documents')}
+            >
+              Documents
+            </button>
+          </div>
+        }
         trailing={
           <button
             className="w-btn w-btn-ghost w-btn-sm"
             onClick={toggleArtifacts}
-            title="Collapse artifacts panel"
+            title="Collapse panel"
             style={{ fontSize: '14px', padding: '2px 6px' }}
           >
             ☰
@@ -122,17 +146,20 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — artifact priority:
-          generative artifact (Phase 3) > location brief > map > excel audit > workspace empty state.
+      {/* Body — view dispatch.
+          Documents view: panel-sized DMS surface (DocumentsPanel + MediaPanel).
+          Artifacts view: priority chain — generative artifact (Phase 3) >
+          location brief > map > excel audit > workspace empty state.
           Generative artifact wins when explicitly selected. The legacy slots
-          (location brief / map / excel audit) handle their own dedicated tools.
-          The fallback is ALWAYS the ArtifactWorkspacePanel itself, which
-          shows Pinned + Recent collapsibles plus a clean "no artifact selected"
-          empty state — so closing an artifact never leaves the user stranded
-          on a confusing surface (was: project documents list, fixed chat DA
-          2026-05-01 after Gregg flagged it as disorienting). For documents,
-          users navigate to the dedicated Documents page via the sidebar. */}
-      {activeArtifactId != null ? (
+          (location brief / map / excel audit) handle their own dedicated
+          tools. The fallback is the ArtifactWorkspacePanel itself, which
+          shows Pinned + Recent collapsibles plus a clean "no artifact
+          selected" empty state. */}
+      {projectRightPanelView === 'documents' ? (
+        <div className="project-right-panel-body project-right-panel-body--documents">
+          <ProjectDocumentsBody />
+        </div>
+      ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} />
       ) : activeLocationBrief ? (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>

@@ -107,6 +107,9 @@ UNIVERSAL_TOOLS = [
     "find_dependent_artifacts",
     # User vocabulary learning (chat DA — universal pattern across domains)
     "save_user_vocab",
+    # Cross-project document library search (chat qm — Platform Knowledge page)
+    "find_documents",
+    "summarize_document_library",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -253,6 +256,9 @@ UNASSIGNED_SAFE_TOOLS = [
     "get_artifact_history",
     "restore_artifact_state",
     "find_dependent_artifacts",
+    # Cross-project document library search (chat qm — Platform Knowledge page)
+    "find_documents",
+    "summarize_document_library",
 ]
 
 

@@ -89,7 +89,7 @@ interface ArtifactWorkspacePanelProps {
  */
 export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProps) {
   const router = useRouter();
-  const { activeArtifactId, setActiveArtifactId, toggleArtifacts } = useWrapperUI();
+  const { activeArtifactId, setActiveArtifactId, toggleArtifacts, setProjectRightPanelView } = useWrapperUI();
   const modalRegistry = useModalRegistrySafe();
 
   // Pinned artifacts — always show (small list).
@@ -257,13 +257,13 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
           {documentsLoading ? (
             <EmptyRow text="Loading…" />
           ) : documents.length === 0 ? (
-            <EmptyRow text="No documents yet. Upload via the Documents page." />
+            <EmptyRow text="No documents yet. Switch to Documents in the panel header to upload." />
           ) : (
             documents.map((doc) => (
               <DocumentListRow
                 key={doc.doc_id}
                 doc={doc}
-                onClick={() => router.push(`/w/projects/${projectId}/documents`)}
+                onClick={() => setProjectRightPanelView('documents')}
               />
             ))
           )}
