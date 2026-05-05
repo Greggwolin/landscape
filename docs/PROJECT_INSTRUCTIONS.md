@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.1
-**Last Updated:** May 1, 2026
-**Supersedes:** v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.2
+**Last Updated:** May 5, 2026
+**Supersedes:** v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -677,10 +677,78 @@ Sync triggers:
 - Specs are delivered in dual format — tech `.md` + plain-English HTML — never tech-only (§10.5)
 - Chat replies are in plain English; technical jargon never bleeds into normal conversation (§5.7)
 - All Claude systems read the same canonical instructions (this file)
+- When tied to a feedback item, Cowork maintains `working_summary` silently and never narrates the append (§21)
+
+---
+
+## 21.0 FEEDBACK LIFECYCLE TRACKING [COWORK]
+
+When Cowork is working in a chat that is tied to a specific `tbl_feedback` row, it should silently maintain that row's `working_summary` column as a chronological log of inflection points. The summary lets Gregg pick up where prior work left off without re-litigating decisions, and feeds the "Prior work on this item" section that surfaces in the row's Fix Prompt the next time it's clicked.
+
+**21.1 When this section applies.** A Cowork chat is "tied to a feedback item" if either of the following is true:
+
+1. The chat was started from the Fix Prompt button on a specific FB row — the pasted prompt opens with `Triage feedback item FB-N from the Landscape app.`
+2. Gregg's first message or the active context explicitly references a feedback id by name (e.g., "look at FB-281," "fix this — it's FB-291").
+
+If neither is true, this section is a no-op for that chat.
+
+**21.2 Inflection-point taxonomy.** Append a new line to `working_summary` at each of the following inflection points, and only at these:
+
+- `[start]` — Cowork picks up the item (read the row, opened relevant files).
+- `[decision]` — A direction-shaping call locked in (architecture choice, scope cut, naming).
+- `[edit]` — A code, schema-spec, or config edit was made.
+- `[blocker]` — A blocker surfaced (unanswered question, broken dependency, infra gap).
+- `[user-input]` — Gregg's message supplied a decision, constraint, correction, answer, or new information that changed the direction of the work (see §21.3).
+- `[artifact]` — A new artifact was generated for the item (file in workspace folder, HTML companion, diagram).
+- `[prompt]` — A CC handoff prompt was drafted for the item.
+- `[resolved]` — The fix is complete, awaiting commit/push.
+- `[closed]` — The CC commit landed; the item is fully closed.
+- `[note]` — Catch-all for things that should be in the trail but don't fit the above (use sparingly).
+
+NOT every back-and-forth is an inflection point. Skip routine conversation, restating, and thinking-out-loud.
+
+**21.3 User-input firing discipline.** A user message is `[user-input]` worth logging if it carries a decision, a constraint, a correction, an answer to a question Cowork asked, or new information that changes Cowork's next action. The signal is: would Cowork's next action change based on this message? If yes, log. If no, skip.
+
+Examples that DO log:
+
+- "Yes, do that" / "No, use option B instead" / "Skip the validation step"
+- "It needs to handle the case where the file is empty"
+- Answers to numbered questions Cowork posed (1a, 2b, etc.)
+
+Examples that do NOT log:
+
+- "Thanks" / "Got it" / "OK" / "Sounds good" / "Cool"
+- Acknowledgments without new information
+- Small-talk or tangents
+
+Edge case: a bare "yes" or "no" answering a substantive question Cowork posed counts as `[user-input]` — what matters is whether Cowork's next action changes.
+
+If Cowork mis-fires (logs something Gregg clearly didn't intend as input), Gregg will say so. Cowork then appends a `[note]` correction line — never silently rewrites prior content.
+
+**21.4 Silent append requirement.** The append happens in the background. NEVER narrate the append in chat dialogue. Do not say "I'm logging this to the working summary," "Adding a [decision] line," etc. The whole point is that the trail builds without breaking Gregg's focus on the actual work.
+
+**21.5 Append mechanism.** Cowork uses the Django management command `append_feedback_line` (added in LSCMD-FBLOG-0505-kp Phase 3). Call it from bash when an inflection point fires:
+
+```bash
+cd /sessions/*/mnt/landscape && \
+  python backend/manage.py append_feedback_line FB-N \
+    --tag <tag> \
+    --content "<one-line description>"
+```
+
+Stdout is ignored — the append is silent. If the command errors (bad fb_id, missing row, invalid tag, embedded newline), capture the error in private reasoning and proceed; never bring the failure up in chat unless Gregg asks. The nightly daily-briefing skill is the safety net for any individual append loss.
+
+**21.6 Format.** Each line is rendered as `YYYY-MM-DD HH:MM [tag] one-line description`. The command stamps the timestamp and tag; Cowork supplies only the description. Keep descriptions terse — file paths, decisions, fact-shaped — not narrative prose. Append-only, never rewritten.
+
+**21.7 Pickup behavior.** When Cowork opens a chat tied to a feedback item AND the row already has a `working_summary` from prior work, read the summary first, treat the most recent line as the current state of the world (especially `[blocker]` or `[user-input]` lines), and start work from that point. Do NOT re-litigate decisions captured in `[decision]` or `[user-input]` lines unless Gregg explicitly asks to revisit them.
+
+**21.8 Closing the loop.** Append a `[resolved]` line when the fix is complete and a CC handoff is being prepared. Append a `[closed]` line (with the commit hash if known) once CC has landed the commit. Both append-only — they don't change `tbl_feedback.status`; the existing `close_feedback` / `start_feedback` management commands and the daily-brief auto-resolution path own the status column.
 
 ---
 
 ## CHANGELOG
+
+**v4.2 (2026-05-05)** — Added §21 (Feedback Lifecycle Tracking) for the silent `working_summary` append behavior introduced in LSCMD-FBLOG-0505-kp Phase 3. Inflection-point taxonomy locked at start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. User-input firing discipline (§21.3) clarifies what counts as direction-changing input vs conversational filler. New `append_feedback_line` Django management command is the append mechanism. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
 **v4.1 (2026-05-01)** — Added §17.7 (schema audit before architectural proposals) after a direct loss event in chat hx where F-12 server-derivation was built across two sessions before discovering the existing `statement_discriminator` scenario taxonomy. Added §17.8 with the new high-risk zone (operating-expense discriminator + active_opex_discriminator). Updated §6 anti-patterns with the matching skip-the-schema-audit failure mode. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
@@ -692,4 +760,4 @@ Sync triggers:
 
 ---
 
-End of Landscape Project Instructions v4.1
+End of Landscape Project Instructions v4.2
