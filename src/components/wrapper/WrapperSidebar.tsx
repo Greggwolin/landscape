@@ -17,8 +17,10 @@ interface Thread {
   projectName?: string;
 }
 
-// Default visible-thread cap — Claude pattern: show recent N, expand to all.
-const DEFAULT_THREAD_CAP = 7;
+// Default visible-row caps for the sidebar's two scrollable lists.
+// Claude pattern: show recent N, expand to all via "See more (N)".
+const DEFAULT_THREAD_CAP = 5;
+const DEFAULT_PROJECT_CAP = 5;
 
 interface ScheduledAgent {
   id: string;
@@ -92,6 +94,7 @@ const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: str
   { id: 'reports', label: 'Reports', paths: ['M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2', 'M8 2h8v4H8z'], badge: '15' },
   { id: 'landscaper', label: 'Landscaper AI', paths: ['M11 20A7 7 0 019.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10z', 'M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12'] },
   { id: 'admin', label: 'Admin', paths: ['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2', 'M12 11a4 4 0 100-8 4 4 0 000 8z'] },
+  { id: 'admin-feedback', label: 'Feedback', paths: ['M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z'] },
   { id: 'help', label: 'Help', paths: [] },
 ];
 
@@ -198,6 +201,17 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   const visibleThreads = threadsExpanded ? threads : threads.slice(0, DEFAULT_THREAD_CAP);
   const hiddenThreadCount = Math.max(0, threads.length - DEFAULT_THREAD_CAP);
 
+  // Recent Projects "See more" — same shape as threads but no auto-expand,
+  // since there's no concept of an "active" project row in the recent list.
+  const [projectsExpanded, setProjectsExpanded] = useState(false);
+  const visibleProjects = projectsExpanded
+    ? recentProjects
+    : recentProjects.slice(0, DEFAULT_PROJECT_CAP);
+  const hiddenProjectCount = Math.max(
+    0,
+    recentProjects.length - DEFAULT_PROJECT_CAP,
+  );
+
   const handleNewChat = () => {
     if (onNewChat) onNewChat();
     else router.push('/w/chat');
@@ -289,8 +303,8 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                       <span
                         style={{
                           display: 'block',
-                          fontSize: 12,
-                          opacity: 0.55,
+                          fontSize: 13,
+                          opacity: 0.6,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -366,8 +380,8 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                       <span
                         style={{
                           display: 'block',
-                          fontSize: 12,
-                          opacity: 0.55,
+                          fontSize: 13,
+                          opacity: 0.6,
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -434,12 +448,28 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 <span>Recent Projects</span>
                 <span className="sb-section-chev">{projectsCollapsed ? '▸' : '▾'}</span>
               </div>
-              {!projectsCollapsed && recentProjects.map((p) => (
+              {!projectsCollapsed && visibleProjects.map((p) => (
                 <div key={p.id} className="sb-thread" onClick={p.onClick}>
                   <span className="sb-thread-dot idle" />
                   {p.name}
                 </div>
               ))}
+              {!projectsCollapsed && hiddenProjectCount > 0 && (
+                <div
+                  className="sb-thread sb-thread-more"
+                  onClick={() => setProjectsExpanded((v) => !v)}
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.7,
+                    cursor: 'pointer',
+                    paddingLeft: 22,
+                  }}
+                >
+                  {projectsExpanded
+                    ? 'See less'
+                    : `See more (${hiddenProjectCount})`}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -162,6 +162,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       } else if (projectScoped.includes(page)) {
         if (pid) router.push(`/w/projects/${pid}/${page}`);
         else router.push('/w/projects');
+      } else if (page === 'admin-feedback') {
+        // Feedback queue lives outside the /w/ shell on the admin route layer.
+        // Direct push (loses chat context); revisit if we wrap the admin pages in /w/ later.
+        router.push('/admin/feedback');
       } else {
         const routeMap: Record<string, string> = {
           landscaper: 'landscaper-ai',
