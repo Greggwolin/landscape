@@ -861,18 +861,6 @@ function FeedbackAdminContent() {
     );
   };
 
-  // Category filter tiles — match the CoreUI badge colors used in the table
-  // (CATEGORY_COLORS: bug=danger, feature_request=info, ux_confusion=warning,
-  // question=secondary). Active state uses the full CoreUI color variable
-  // (so a tile reads as a "filled badge"); inactive state shows the count
-  // tinted in the same color so the visual identity carries through.
-  const CATEGORY_ACCENT: Record<string, { activeBg: string; activeFg: string; numColor: string }> = {
-    bug:             { activeBg: 'var(--cui-danger)',    activeFg: '#fff',                  numColor: 'var(--cui-danger)' },
-    feature_request: { activeBg: 'var(--cui-info)',      activeFg: '#fff',                  numColor: 'var(--cui-info)' },
-    ux_confusion:    { activeBg: 'var(--cui-warning)',   activeFg: 'var(--cui-warning-text-emphasis, #1f1500)', numColor: 'var(--cui-warning)' },
-    question:        { activeBg: 'var(--cui-secondary)', activeFg: '#fff',                  numColor: 'var(--cui-secondary)' },
-    _uncategorized:  { activeBg: 'var(--cui-tertiary-bg)', activeFg: 'var(--cui-body-color)', numColor: 'var(--cui-secondary-color)' },
-  };
   const CATEGORY_DISPLAY: Record<string, string> = {
     bug: 'Bug',
     feature_request: 'Feature',
@@ -881,31 +869,43 @@ function FeedbackAdminContent() {
     _uncategorized: 'Uncategorized',
   };
 
+  // Category filter tiles — same CoreUI badge as in the table (CATEGORY_COLORS),
+  // just larger so the count fits comfortably alongside the label.
   const renderCategoryTile = (cat: string) => {
     const active = categoryFilters.has(cat);
-    const accent = CATEGORY_ACCENT[cat];
     const count = categoryCounts[cat] || 0;
-    if (count === 0 && cat === '_uncategorized') return null; // hide empty uncategorized
+    if (count === 0 && cat === '_uncategorized') return null;
+    const badgeColor = CATEGORY_COLORS[cat] || 'secondary';
     return (
       <button
         key={cat}
         type="button"
         onClick={() => toggleCategory(cat)}
-        className="d-inline-flex align-items-baseline gap-2 border rounded px-3 py-2"
+        aria-pressed={active}
         style={{
-          background: active ? accent.activeBg : 'var(--cui-card-bg)',
-          color: active ? accent.activeFg : 'var(--cui-body-color)',
-          borderColor: active ? accent.activeBg : 'var(--cui-border-color)',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
           cursor: 'pointer',
-          fontSize: '13px',
-          userSelect: 'none',
-          transition: 'background 0.12s ease, border-color 0.12s ease, color 0.12s ease',
+          opacity: active || categoryFilters.size === 0 ? 1 : 0.45,
+          transition: 'opacity 0.12s ease',
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: '17px', lineHeight: 1, color: active ? 'inherit' : accent.numColor }}>
-          {count}
-        </span>
-        <span>{CATEGORY_DISPLAY[cat]}</span>
+        <CBadge
+          color={badgeColor}
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            padding: '7px 12px',
+            display: 'inline-flex',
+            alignItems: 'baseline',
+            gap: '6px',
+            borderRadius: '4px',
+          }}
+        >
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>{count}</span>
+          <span>{CATEGORY_DISPLAY[cat]}</span>
+        </CBadge>
       </button>
     );
   };
