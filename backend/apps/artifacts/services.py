@@ -125,6 +125,7 @@ def create_artifact_record(
     tool_name: str = 'create_artifact',
     params_json: Any | None = None,
     artifact_subtype: str | None = None,
+    dedup_key: str | None = None,
 ) -> dict:
     """Create a new artifact + version 1 entry. Returns spec §6.1 envelope.
 
@@ -132,6 +133,24 @@ def create_artifact_record(
     proforma artifacts. The Phase 1 guard in `operating_statement_guard.py`
     rejects on missing/invalid subtype, forbidden content shape per subtype,
     or absent source data. See guard module docstring for details.
+
+    `dedup_key` (optional) — when provided (including empty string), the
+    service looks up an existing non-archived artifact with matching
+    (project_id, tool_name, dedup_key) and updates it in place via the
+    versioned-update path instead of creating a new row. This is the
+    canonical way to express "one artifact per project per tool slot."
+    Tools opt in by passing dedup_key; the model's freeform create_artifact
+    keeps dedup_key=None so each call creates a new row.
+
+    Conventions:
+      - dedup_key=None  → no dedup (legacy / freeform). Always creates new.
+      - dedup_key=''    → one canonical artifact per (project_id, tool_name).
+                          Used by tools like get_project_profile.
+      - dedup_key='xyz' → additional dimension (e.g., operating-statement
+                          subtype). Each distinct value gets its own slot.
+
+    On dedup match, returns the same envelope shape as a fresh create —
+    callers don't need to distinguish between "first call" and "update."
     """
     if not isinstance(title, str) or not title.strip():
         return {'success': False, 'error': 'title is required (non-empty string)'}
@@ -162,6 +181,72 @@ def create_artifact_record(
     if not isinstance(pointers, (dict, list)):
         return {'success': False, 'error': 'source_pointers must be an object or array'}
 
+    # ── Dedup-on-create lookup ──────────────────────────────────────────
+    # When dedup_key is provided (even as ''), check for an existing
+    # matching artifact and route to the update path to avoid creating
+    # duplicates. project_id is required for dedup — without a project
+    # scope there's no meaningful "one per slot" interpretation.
+    if dedup_key is not None and project_id is not None:
+        existing = (
+            Artifact.objects
+            .filter(
+                project_id=project_id,
+                tool_name=tool_name,
+                dedup_key=dedup_key,
+                is_archived=False,
+            )
+            .order_by('-last_edited_at')
+            .first()
+        )
+        if existing is not None:
+            # Route through the versioned update path. Passes the new
+            # schema as a full replacement (full_schema), not a diff —
+            # since this is a fresh tool fetch, the new state is the
+            # authoritative snapshot.
+            update_result = update_artifact_record(
+                artifact_id=existing.artifact_id,
+                schema_diff=None,
+                full_schema=schema,
+                source_pointers_diff=pointers,
+                # 'cascade' is the system-driven (non-user) update_source
+                # in the version-log enum. Dedup-refresh isn't its own
+                # enum value — system-driven snapshot replacement is the
+                # right semantic bucket. ('create' is reserved for the
+                # initial v1 entry on a brand-new artifact row.)
+                edit_source='cascade',
+                user_id=_coerce_user_id(user_id),
+            )
+            if update_result.get('success'):
+                # Reshape the response to match the create envelope so
+                # callers don't need to special-case dedup hits.
+                # Also refresh the artifact title / pointers in case the
+                # tool produced a different label this run.
+                Artifact.objects.filter(pk=existing.artifact_id).update(
+                    title=title[:255],
+                    source_pointers_json=pointers,
+                    edit_target_json=edit_target,
+                    last_edited_at=_now(),
+                )
+                return {
+                    'success': True,
+                    'action': 'show_artifact',
+                    'artifact_id': existing.artifact_id,
+                    'schema': update_result.get('new_state', schema),
+                    'title': title[:255],
+                    'edit_target': edit_target,
+                    'dedup_hit': True,
+                    'version_id': update_result.get('version_id'),
+                }
+            # Update path failed — fall through and create a new row
+            # rather than blocking the caller. Log the issue so we can
+            # diagnose without dropping the user's tool call.
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                '[artifact_dedup] update path failed for existing artifact '
+                f'{existing.artifact_id}; falling back to fresh create. '
+                f'error={update_result.get("error")!r}'
+            )
+
     now = _now()
     artifact = Artifact.objects.create(
         project_id=project_id,
@@ -178,6 +263,7 @@ def create_artifact_record(
         created_at=now,
         last_edited_at=now,
         created_by_user_id=_coerce_user_id(user_id),
+        dedup_key=dedup_key,
     )
     _append_version(
         artifact_id=artifact.artifact_id,

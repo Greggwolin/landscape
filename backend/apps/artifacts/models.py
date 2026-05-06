@@ -40,6 +40,16 @@ class Artifact(models.Model):
     last_edited_at = models.DateTimeField(auto_now_add=False)
     created_by_user_id = models.CharField(max_length=50)
     is_archived = models.BooleanField(default=False)
+    dedup_key = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        help_text=(
+            'Per-tool deduplication key. NULL = no dedup. Empty string = '
+            'single canonical artifact per (project_id, tool_name). '
+            'Non-empty = additional dimension (e.g., operating statement subtype).'
+        ),
+    )
 
     class Meta:
         db_table = 'tbl_artifact'  # search_path resolves to landscape schema

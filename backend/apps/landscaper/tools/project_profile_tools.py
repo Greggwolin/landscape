@@ -358,6 +358,12 @@ def get_project_profile_tool(
             user_id=user_id,
             tool_name='get_project_profile',
             params_json={'project_id': pid},
+            # Dedup on create — every "show me the project details" request
+            # against the same project updates the canonical profile artifact
+            # in place rather than creating a duplicate. Empty string means
+            # "single canonical slot per (project_id, tool_name)."
+            # See create_artifact_record() for the full convention.
+            dedup_key='',
         )
     except Exception as exc:
         logger.exception(f'get_project_profile failed creating artifact: {exc}')
