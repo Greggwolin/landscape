@@ -624,7 +624,7 @@ function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
   );
 }
 
-type SortKey = 'date' | 'fb' | 'status' | 'user' | 'category' | 'summary';
+type SortKey = 'date' | 'fb' | 'status' | 'category' | 'summary';
 
 function FeedbackAdminContent() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -789,10 +789,6 @@ function FeedbackAdminContent() {
         case 'status':
           av = a.status;
           bv = b.status;
-          break;
-        case 'user':
-          av = (a.username || '').toLowerCase();
-          bv = (b.username || '').toLowerCase();
           break;
         case 'category':
           av = (a.category || 'zzz').toLowerCase();
@@ -1002,9 +998,6 @@ function FeedbackAdminContent() {
                 <th className="p-3 fb-sortable" style={{ width: '120px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('status')}>
                   Status <span className="text-muted small">{sortIndicator('status')}</span>
                 </th>
-                <th className="p-3 fb-sortable" style={{ width: '140px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('user')}>
-                  User <span className="text-muted small">{sortIndicator('user')}</span>
-                </th>
                 <th className="p-3 fb-sortable" style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('category')}>
                   Category <span className="text-muted small">{sortIndicator('category')}</span>
                 </th>
@@ -1017,7 +1010,7 @@ function FeedbackAdminContent() {
               {sortedFeedback.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={5}
                     className="text-center py-8"
                     style={{ color: 'var(--cui-secondary-color)' }}
                   >
@@ -1045,7 +1038,6 @@ function FeedbackAdminContent() {
                             {STATUS_LABELS[item.status]}
                           </CBadge>
                         </td>
-                        <td className="p-3">{item.username}</td>
                         <td className="p-3">
                           {item.category ? (
                             <CBadge color={CATEGORY_COLORS[item.category]}>
@@ -1065,7 +1057,7 @@ function FeedbackAdminContent() {
                       </tr>
                       {isExpanded && (
                         <tr className="feedback-row-expansion">
-                          <td colSpan={6} style={{ padding: 0, background: 'var(--cui-tertiary-bg)' }}>
+                          <td colSpan={5} style={{ padding: 0, background: 'var(--cui-tertiary-bg)' }}>
                             <ExpandedRowPanel item={item} onSave={updateFeedback} />
                           </td>
                         </tr>
