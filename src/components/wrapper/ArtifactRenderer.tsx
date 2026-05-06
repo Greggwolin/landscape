@@ -43,6 +43,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     pinnedLabel,
     onClose,
     onUpdate,
+    onCommitFieldEdit,
     onPin,
     onUnpin,
     onSaveAsNewVersion,
@@ -115,6 +116,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
           removedRowPaths={removedRowPaths}
           basePath={['blocks']}
           onUpdate={onUpdate}
+          onCommitFieldEdit={onCommitFieldEdit}
         />
       </div>
     </div>
@@ -350,6 +352,7 @@ interface BlockListRendererProps {
   removedRowPaths?: Set<string>;
   basePath: string[];
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
 function BlockListRenderer({
@@ -359,6 +362,7 @@ function BlockListRenderer({
   removedRowPaths,
   basePath,
   onUpdate,
+  onCommitFieldEdit,
 }: BlockListRendererProps) {
   return (
     <>
@@ -373,6 +377,7 @@ function BlockListRenderer({
             currentValues={currentValues}
             removedRowPaths={removedRowPaths}
             onUpdate={onUpdate}
+            onCommitFieldEdit={onCommitFieldEdit}
           />
         );
       })}
@@ -387,9 +392,10 @@ interface BlockRendererProps {
   currentValues: CurrentValueMap;
   removedRowPaths?: Set<string>;
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
-function BlockRenderer({ block, blockPath, sourcePointers, currentValues, removedRowPaths, onUpdate }: BlockRendererProps) {
+function BlockRenderer({ block, blockPath, sourcePointers, currentValues, removedRowPaths, onUpdate, onCommitFieldEdit }: BlockRendererProps) {
   switch (block.type) {
     case 'section':
       return (
@@ -400,6 +406,7 @@ function BlockRenderer({ block, blockPath, sourcePointers, currentValues, remove
           currentValues={currentValues}
           removedRowPaths={removedRowPaths}
           onUpdate={onUpdate}
+          onCommitFieldEdit={onCommitFieldEdit}
         />
       );
     case 'table':
@@ -421,6 +428,7 @@ function BlockRenderer({ block, blockPath, sourcePointers, currentValues, remove
           sourcePointers={sourcePointers}
           currentValues={currentValues}
           onUpdate={onUpdate}
+          onCommitFieldEdit={onCommitFieldEdit}
         />
       );
     case 'text':
@@ -448,6 +456,7 @@ interface SectionBlockRendererProps {
   currentValues: CurrentValueMap;
   removedRowPaths?: Set<string>;
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
 function SectionBlockRenderer({
@@ -457,6 +466,7 @@ function SectionBlockRenderer({
   currentValues,
   removedRowPaths,
   onUpdate,
+  onCommitFieldEdit,
 }: SectionBlockRendererProps) {
   const childrenPath = [...blockPath, 'children'];
 
@@ -474,6 +484,7 @@ function SectionBlockRenderer({
           removedRowPaths={removedRowPaths}
           basePath={childrenPath}
           onUpdate={onUpdate}
+          onCommitFieldEdit={onCommitFieldEdit}
         />
       </div>
     </section>
@@ -941,6 +952,7 @@ interface KeyValueGridBlockRendererProps {
   sourcePointers: SourcePointersMap;
   currentValues: CurrentValueMap;
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
 function KeyValueGridBlockRenderer({
@@ -949,6 +961,7 @@ function KeyValueGridBlockRenderer({
   sourcePointers,
   currentValues,
   onUpdate,
+  onCommitFieldEdit,
 }: KeyValueGridBlockRendererProps) {
   const cols = block.columns ?? 2;
   return (
@@ -968,6 +981,7 @@ function KeyValueGridBlockRenderer({
               driftState={driftState}
               path={pairPath}
               onUpdate={onUpdate}
+              onCommitFieldEdit={onCommitFieldEdit}
             />
           );
         })}
@@ -981,12 +995,16 @@ interface KeyValuePairRendererProps {
   driftState: DriftState;
   path: string[];
   onUpdate: (patch: JsonPatchOp[]) => void;
+  onCommitFieldEdit?: ArtifactRendererProps['onCommitFieldEdit'];
 }
 
-function KeyValuePairRenderer({ pair, driftState, path, onUpdate }: KeyValuePairRendererProps) {
+function KeyValuePairRenderer({ pair, driftState, path, onUpdate, onCommitFieldEdit }: KeyValuePairRendererProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(String(pair.value ?? ''));
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const editable = Boolean(pair.editable);
+  const hasSourceRef = Boolean(pair.source_ref) && Boolean(onCommitFieldEdit);
 
   // Apply role-based bold styling for pairs that match subtotal/total keywords.
   // This catches cases where the model composes summary metrics (Net Operating
@@ -1006,6 +1024,65 @@ function KeyValuePairRenderer({ pair, driftState, path, onUpdate }: KeyValuePair
   // parens for negatives, em-dash for zero/null, no $ symbol).
   const display = formatCellValue(pair.value as string | number | null);
 
+  /**
+   * Commit handler.
+   *
+   * Two paths:
+   *  - source_ref present + onCommitFieldEdit wired → write-back path.
+   *    Posts to the new commit_field_edit endpoint, which writes the
+   *    underlying source row, re-reads the artifact, and returns the
+   *    refreshed snapshot. Errors render inline below the field.
+   *  - otherwise → snapshot-only JSON Patch path (existing Phase 4 flow).
+   *
+   * The em-dash placeholder rendered for empty values is normalized away
+   * before comparing, so editing "—" then leaving it unchanged is a no-op.
+   */
+  const commit = async () => {
+    const currentDisplayed = String(pair.value ?? '');
+    if (draft === currentDisplayed || draft === '—') {
+      setEditing(false);
+      return;
+    }
+    setErrorMsg(null);
+
+    if (hasSourceRef && onCommitFieldEdit) {
+      setSaving(true);
+      try {
+        const result = await onCommitFieldEdit(path, draft);
+        if (!result?.success) {
+          // Prefer the user-facing question over the raw error code.
+          setErrorMsg(
+            result?.suggested_user_question
+              || result?.detail
+              || result?.error
+              || 'Could not save the change.',
+          );
+          return;
+        }
+        // Success — close edit; the parent's cache invalidation will
+        // re-fetch and the canonical value will render in place.
+        setEditing(false);
+      } catch (exc: unknown) {
+        const msg = exc instanceof Error ? exc.message : String(exc);
+        setErrorMsg(msg || 'Network error saving the change.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Fallback: snapshot-only patch (no source_ref).
+    setEditing(false);
+    const coerced = coerceCellValue(draft, pair.value);
+    onUpdate([
+      {
+        op: 'replace',
+        path: '/' + [...path, 'value'].map(escapeJsonPointer).join('/'),
+        value: coerced,
+      },
+    ]);
+  };
+
   return (
     <div className={`${styles.kvPair} ${roleClass}`}>
       <span className={styles.kvLabel}>
@@ -1017,34 +1094,46 @@ function KeyValuePairRenderer({ pair, driftState, path, onUpdate }: KeyValuePair
         {pair.label}
       </span>
       {editing ? (
-        <input
-          type="text"
-          className={styles.editInput}
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => {
-            setEditing(false);
-            if (draft !== String(pair.value ?? '')) {
-              const coerced = coerceCellValue(draft, pair.value);
-              onUpdate([
-                {
-                  op: 'replace',
-                  path: '/' + [...path, 'value'].map(escapeJsonPointer).join('/'),
-                  value: coerced,
-                },
-              ]);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            if (e.key === 'Escape') setEditing(false);
-          }}
-        />
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <input
+            type="text"
+            className={styles.editInput}
+            autoFocus
+            disabled={saving}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') {
+                setEditing(false);
+                setErrorMsg(null);
+              }
+            }}
+          />
+          {errorMsg && (
+            <span
+              role="alert"
+              style={{
+                fontSize: '11px',
+                color: 'var(--cui-danger)',
+                maxWidth: '240px',
+                textAlign: 'right',
+                lineHeight: 1.3,
+              }}
+            >
+              {errorMsg}
+            </span>
+          )}
+        </span>
       ) : (
         <span
           className={valueClass}
-          onDoubleClick={editable ? () => setEditing(true) : undefined}
+          onDoubleClick={editable ? () => {
+            setDraft(String(pair.value ?? ''));
+            setErrorMsg(null);
+            setEditing(true);
+          } : undefined}
           title={editable ? 'Double-click to edit' : undefined}
         >
           {display}

@@ -206,8 +206,35 @@ def _build_address_value(profile: Dict[str, Any]) -> str:
     return street or line2 or ''
 
 
-def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, str]]:
-    """Construct the kv_grid pair list mirroring the ProjectProfileTile order."""
+def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Construct the kv_grid pair list mirroring the ProjectProfileTile order.
+
+    Pairs that should be inline-editable carry an ``editable: True`` flag
+    plus a ``source_ref`` pointing at ``(table, row_id, column)``. The
+    renderer uses ``source_ref`` to route the user's edit to the
+    write-back endpoint (POST /api/artifacts/<id>/commit_field_edit/)
+    instead of the snapshot-only JSON Patch path.
+
+    v1 editable set (project profile only, all writing through tbl_project):
+      - Project Name        (project_name)
+      - Total Units         (target_units)
+      - Gross Acres         (acres_gross)
+      - County              (county)
+      - Market (MSA)        (msa_id, FK resolver)
+      - APN                 (apn_primary)
+      - Subtype             (property_subtype)
+      - Asking Price        (asking_price)
+      - Analysis Start Date (analysis_start_date)
+
+    Read-only in v1 (kept here for future opt-in):
+      - Address          — multi-field, needs distinct UX
+      - Property Type    — enum, needs picker
+      - Perspective      — enum, needs picker
+      - Purpose          — enum, needs picker
+      - Ownership        — enum, needs picker
+    """
+    project_id = profile.get('project_id')
+
     name_value = (profile.get('project_name') or '').strip()
     address_value = _build_address_value(profile)
 
@@ -244,26 +271,63 @@ def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, str]]:
     asking_value = _fmt_currency(profile.get('asking_price'))
     analysis_start_value = _fmt_date(profile.get('analysis_start_date'))
 
-    pairs: List[Dict[str, str]] = []
+    pairs: List[Dict[str, Any]] = []
 
-    def add(label: str, value: str) -> None:
+    def _ref(column: str) -> Dict[str, Any] | None:
+        """Build a SourceRef pointing at this project row's column."""
+        if project_id is None:
+            return None
+        return {
+            'table': 'tbl_project',
+            'row_id': int(project_id),
+            'column': column,
+            # captured_at lets future drift detection compare snapshots —
+            # populated lazily here since the renderer treats absence as
+            # "not yet captured" and skips drift checks for that pair.
+        }
+
+    def add(
+        label: str,
+        value: str,
+        *,
+        editable: bool = False,
+        column: str | None = None,
+    ) -> None:
         # Preserve empty values as em-dash so the artifact renders evenly.
-        pairs.append({'label': label, 'value': value if value else '—'})
+        pair: Dict[str, Any] = {
+            'label': label,
+            'value': value if value else '—',
+        }
+        if editable and column:
+            ref = _ref(column)
+            if ref is not None:
+                pair['editable'] = True
+                pair['source_ref'] = ref
+        pairs.append(pair)
 
-    add('Project Name', name_value)
+    add('Project Name', name_value, editable=True, column='project_name')
+    # Address stays read-only in v1 — multi-field render needs a distinct edit
+    # surface (street + city + state + zip in one go) rather than a single
+    # double-click input.
     add('Address', address_value)
-    add('Total Units', units_value)
-    add('Gross Acres', acres_value)
-    add('County', county_value)
-    add('Market (MSA)', msa_value)
-    add('APN', apn_value)
+    add('Total Units', units_value, editable=True, column='target_units')
+    add('Gross Acres', acres_value, editable=True, column='acres_gross')
+    add('County', county_value, editable=True, column='county')
+    # MSA edits route through the FK resolver server-side.
+    add('Market (MSA)', msa_value, editable=True, column='msa_id')
+    add('APN', apn_value, editable=True, column='apn_primary')
+    # Ownership / Property Type / Perspective / Purpose stay read-only in
+    # v1 — all are enums that want a picker, not a free-text input.
     add('Ownership', ownership_value)
     add('Property Type', type_value)
-    add('Subtype', subtype_value)
+    add('Subtype', subtype_value, editable=True, column='property_subtype')
     add('Perspective', perspective_value)
     add('Purpose', purpose_value)
-    add('Asking Price', asking_value)
-    add('Analysis Start Date', analysis_start_value)
+    add('Asking Price', asking_value, editable=True, column='asking_price')
+    add(
+        'Analysis Start Date', analysis_start_value,
+        editable=True, column='analysis_start_date',
+    )
 
     return pairs
 

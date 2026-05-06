@@ -8,6 +8,7 @@ import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
   type ArtifactSummary,
   useArtifact,
+  useArtifactCommitFieldEdit,
   useArtifactList,
   useArtifactPatch,
   useArtifactRestore,
@@ -125,6 +126,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
   const patchMutation = useArtifactPatch();
   const restoreMutation = useArtifactRestore();
   const updateStateMutation = useArtifactUpdateState();
+  const commitFieldEditMutation = useArtifactCommitFieldEdit();
 
   // Row actions — rename and delete (soft-delete via is_archived).
   const handleRenameArtifact = (artifact: ArtifactSummary) => {
@@ -359,16 +361,17 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
               patchMutation.isPending
               || restoreMutation.isPending
               || updateStateMutation.isPending
+              || commitFieldEditMutation.isPending
             }
             onClose={() => {
               setActiveArtifactId(null);
             }}
             onUpdate={(patch: JsonPatchOp[]) => {
-              // Phase 4 — real write path. Lands in update_artifact_record on
-              // the backend (same code as the Landscaper tool dispatcher),
-              // appends a version log entry, fires the dependency cascade
-              // hook for the project. Detail + versions cache are invalidated
-              // on success.
+              // Phase 4 — snapshot-only patch path. Used when an editable
+              // pair has no `source_ref` (older artifacts, or pairs whose
+              // values aren't backed by a writable DB column). Lands in
+              // update_artifact_record on the backend, appends a version
+              // log entry, fires the dependency cascade hook.
               if (!patch || patch.length === 0) return;
               updateStateMutation.mutate({
                 artifactId: active.artifact_id,
@@ -377,6 +380,28 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
                   edit_source: 'user_edit',
                 },
               });
+            }}
+            onCommitFieldEdit={async (pairPath, newValue) => {
+              // Phase 5 — write-back path. Used when the edited pair
+              // carries a `source_ref`. The backend writes the source
+              // row, re-builds the artifact via its tool's schema
+              // builder, and returns the refreshed snapshot. We don't
+              // need to do anything with new_state here because the
+              // mutation's onSuccess already invalidates the artifact
+              // detail cache, which causes useArtifact to refetch.
+              const result = await commitFieldEditMutation.mutateAsync({
+                artifactId: active.artifact_id,
+                input: {
+                  pair_path: pairPath,
+                  new_value: newValue,
+                },
+              });
+              return {
+                success: Boolean(result?.success),
+                error: result?.error,
+                detail: result?.detail,
+                suggested_user_question: result?.suggested_user_question,
+              };
             }}
             onPin={(label: string) => {
               patchMutation.mutate({

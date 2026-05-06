@@ -145,6 +145,29 @@ export interface ArtifactRendererProps {
   onClose: () => void;
   /** Called with an RFC-6902 JSON Patch for inline edits and bulk drift refreshes. */
   onUpdate: (patch: JsonPatchOp[]) => void;
+  /**
+   * Phase 5 — write-back path for kv_pairs that carry a `source_ref`.
+   * When provided, the KeyValuePairRenderer routes inline edits on
+   * editable+source_ref pairs to this callback (which posts to
+   * `/api/artifacts/<id>/commit_field_edit/`) rather than emitting a
+   * JSON Patch via `onUpdate`. Pairs without `source_ref` continue to
+   * use the patch path even when this callback is wired.
+   *
+   * Returns a structured envelope so the renderer can show inline
+   * errors (field-level, not toast) when validation fails or an FK
+   * lookup is ambiguous. On success the parent invalidates its
+   * artifact detail cache and the renderer re-renders with the
+   * canonical formatted value.
+   */
+  onCommitFieldEdit?: (
+    pairPath: string[],
+    newValue: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    detail?: string;
+    suggested_user_question?: string;
+  }>;
   onPin: (label: string) => void;
   onUnpin: () => void;
   /** Optional label for the pinned new-version reference. */

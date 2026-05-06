@@ -88,6 +88,9 @@ MUTABLE_FIELDS = {
         # Property details
         "property_subtype", "property_class", "year_built", "stories",
         "lot_size_sf", "lot_size_acres", "gross_sf", "acres_gross",
+        # Parcel identification — added 2026-05-06 for inline-edit-with-write-back
+        # path. apn_primary renders as "APN" on the project profile artifact.
+        "apn_primary",
         # Unit counts
         "target_units", "total_units",
         # Pricing
