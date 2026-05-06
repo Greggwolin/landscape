@@ -12,6 +12,10 @@ export interface Thread {
   updatedAt: string;
   isActive: boolean;
   messageCount: number;
+  /** AI-generated 1-2 sentence summary; populated on threshold cross or close. */
+  summary?: string | null;
+  /** Server-truncated first user message (≤120 chars); used as a summary fallback. */
+  firstUserMessage?: string | null;
 }
 
 interface ThreadListProps {
@@ -242,11 +246,25 @@ export function ThreadList({
             const isEditing = editingThreadId === thread.threadId;
             const displayTitle = thread.title || `New conversation`;
 
+            // FB-292 — collapsed (non-active) rows render a 1-2 sentence
+            // summary line + interaction count below the title. Active row
+            // skips both since the chat body already shows the conversation.
+            // "summary" prefers the AI-generated thread.summary, falls back
+            // to the server-truncated first user message when summary is
+            // null (threads below the first regen threshold of 5 messages).
+            const showPreviewMeta = !isEditing && !isActive;
+            const previewText = showPreviewMeta
+              ? (thread.summary?.trim() || thread.firstUserMessage?.trim() || '')
+              : '';
+            const interactionLabel = thread.messageCount === 1
+              ? '1 message'
+              : `${thread.messageCount} messages`;
+
             return (
               <div
                 key={thread.threadId}
                 onClick={() => !isEditing && onSelectThread(thread.threadId)}
-                className="d-flex align-items-center gap-2 px-3 py-2"
+                className="d-flex flex-column px-3 py-2"
                 style={{
                   cursor: isEditing ? 'default' : 'pointer',
                   transition: 'background-color 150ms ease',
@@ -254,8 +272,11 @@ export function ThreadList({
                     ? 'var(--cui-body-bg)'
                     : 'transparent',
                   borderLeft: isActive ? '2px solid var(--cui-primary)' : '2px solid transparent',
+                  gap: '2px',
                 }}
               >
+                {/* Header row: icon + title + count/timestamp */}
+                <div className="d-flex align-items-center gap-2">
                 {/* Thread icon */}
                 <CIcon
                   icon={cilCommentSquare}
@@ -388,6 +409,53 @@ export function ThreadList({
                     >
                       {formatRelativeTime(thread.updatedAt)}
                     </span>
+                  </div>
+                )}
+                </div>
+
+                {/* FB-292 — preview meta on collapsed (non-active) rows.
+                    Renders summary line + interaction count below the
+                    header row. Active row skips this since the chat body
+                    already shows the conversation. */}
+                {showPreviewMeta && (previewText || thread.messageCount > 0) && (
+                  <div
+                    style={{
+                      // Indent under the icon column (icon ~16px + 8px gap ≈ 24px)
+                      paddingLeft: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {previewText && (
+                      <span
+                        style={{
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.75rem',
+                          lineHeight: 1.35,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={previewText}
+                      >
+                        {previewText}
+                      </span>
+                    )}
+                    {thread.messageCount > 0 && (
+                      <span
+                        style={{
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.6875rem',
+                          opacity: 0.85,
+                        }}
+                      >
+                        {interactionLabel}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

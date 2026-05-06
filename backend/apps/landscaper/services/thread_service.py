@@ -145,9 +145,25 @@ class ThreadService:
         """
         Close a thread and optionally generate a summary.
 
+        Material-change rule (FB-292): summary is only refreshed on close when
+        the thread content has materially changed since the last summary write.
+        Lifecycle close alone — or a UI collapse/expand toggle — must NOT
+        regenerate the summary. We approximate "material change" without an
+        extra tracking column by comparing message count against the most
+        recent regen threshold (5/15/30/60):
+
+          - summary is NULL and messages exist → write initial summary
+          - messages count is >=3 past the last threshold crossed → refresh
+          - otherwise → leave existing summary in place
+
+        UI collapse/expand toggles are pure frontend state; they don't call
+        this method at all, so they can't trigger regen by construction.
+
         Args:
             thread_id: Thread UUID
-            generate_summary: Whether to generate an AI summary
+            generate_summary: Whether to consider regenerating an AI summary.
+                              The material-change check still gates whether
+                              regen actually fires.
 
         Returns:
             Updated ChatThread instance, or None
@@ -158,11 +174,38 @@ class ThreadService:
             thread.closed_at = timezone.now()
 
             if generate_summary:
-                messages = list(thread.messages.all()[:20])  # Limit for summary
-                if messages:
+                msg_count = thread.messages.count()
+                # Last threshold crossed (0 if below the first threshold).
+                last_threshold = max(
+                    [t for t in ThreadService.SUMMARY_REGEN_THRESHOLDS if t <= msg_count],
+                    default=0,
+                )
+                messages_since_threshold = msg_count - last_threshold
+                has_summary = bool(thread.summary and thread.summary.strip())
+                # Regenerate when:
+                #   (a) summary missing but conversation has content, OR
+                #   (b) at least 3 new messages since the last threshold cross
+                #       (heuristic for "material change" without a column add)
+                should_regen = (msg_count > 0) and (
+                    (not has_summary) or (messages_since_threshold >= 3)
+                )
+                if should_regen:
+                    messages = list(
+                        thread.messages.all().order_by('created_at')[:20]
+                    )
                     summary = ThreadService.generate_thread_summary(messages)
                     if summary:
                         thread.summary = summary
+                        logger.info(
+                            f"Refreshed summary on close for thread {thread_id} "
+                            f"(msg_count={msg_count}, since_threshold={messages_since_threshold})"
+                        )
+                else:
+                    logger.debug(
+                        f"Skipped summary regen on close for thread {thread_id} "
+                        f"(material-change check; msg_count={msg_count}, "
+                        f"since_threshold={messages_since_threshold})"
+                    )
 
             thread.save()
             logger.info(f"Closed thread {thread_id}")
@@ -314,6 +357,58 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
         except Exception as e:
             logger.warning(f"Failed to generate thread title: {e}")
             return None
+
+    # Message-count thresholds that trigger an opportunistic summary
+    # regeneration. Keeps Haiku cost bounded — at most ~4 calls per heavy
+    # thread over its lifetime — while ensuring active threads accumulate
+    # a usable preview summary as they grow. close_thread() applies a
+    # material-change check on top of these thresholds so that closing a
+    # thread (or toggling visibility in the UI) does not re-trigger the
+    # summary call needlessly.
+    SUMMARY_REGEN_THRESHOLDS = (5, 15, 30, 60)
+
+    @staticmethod
+    def maybe_regenerate_summary(thread_id: UUID) -> Optional[str]:
+        """
+        Opportunistically regenerate a thread summary when the thread crosses
+        a message-count threshold (5, 15, 30, 60). No-op otherwise.
+
+        Used by ThreadMessageViewSet.create after each assistant turn to keep
+        active-thread previews fresh in the center-panel drawer (FB-292 — show
+        1-2 sentence summary on collapsed thread previews).
+
+        Args:
+            thread_id: Thread UUID
+
+        Returns:
+            Newly written summary string, or None if no regeneration occurred
+            (count not at a threshold, no messages, or generator failed).
+        """
+        try:
+            thread = ChatThread.objects.get(id=thread_id)
+        except ChatThread.DoesNotExist:
+            return None
+
+        msg_count = thread.messages.count()
+        if msg_count not in ThreadService.SUMMARY_REGEN_THRESHOLDS:
+            return None
+
+        messages = list(thread.messages.all().order_by('created_at')[:20])
+        if not messages:
+            return None
+
+        summary = ThreadService.generate_thread_summary(messages)
+        if not summary:
+            return None
+
+        # save() instead of update_fields=['summary'] so any concurrent column
+        # writes (e.g., title generation in the same request) aren't clobbered.
+        thread.summary = summary
+        thread.save(update_fields=['summary'])
+        logger.info(
+            f"Refreshed summary for thread {thread_id} at message count {msg_count}"
+        )
+        return summary
 
     @staticmethod
     def generate_thread_summary(messages: list) -> Optional[str]:

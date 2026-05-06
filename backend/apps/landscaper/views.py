@@ -2327,6 +2327,18 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 logger.warning(f"Failed to embed messages: {e}")
 
+            # FB-292 — refresh thread summary opportunistically when message
+            # count crosses (5, 15, 30, 60). Summary feeds the collapsed
+            # thread-preview rows in the center-panel drawer (ThreadList).
+            # Threshold-only — does not run on every turn. Failure here must
+            # never block the assistant response.
+            try:
+                ThreadService.maybe_regenerate_summary(thread.id)
+            except Exception as e:
+                logger.warning(
+                    f"[THREAD_SUMMARY] Skipped regen for thread {thread.id}: {e}"
+                )
+
             # Generate title after first exchange if needed
             generated_title = None
             if thread.messages.count() >= 2 and not thread.title:
