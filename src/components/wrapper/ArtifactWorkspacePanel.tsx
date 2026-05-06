@@ -249,7 +249,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       {projectId != null && (
         <CollapsibleSection
           title="Project Documents"
-          icon={<Folder size={12} />}
+          icon={<Folder size={15} />}
           count={documents.length}
           collapsed={documentsCollapsed}
           onToggle={() => setDocumentsCollapsed((v) => !v)}
@@ -273,7 +273,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       {/* ── Pinned Artifacts ── */}
       <CollapsibleSection
         title="Pinned Artifacts"
-        icon={<Pin size={12} />}
+        icon={<Pin size={15} />}
         count={pinnedArtifacts.length}
         collapsed={pinnedCollapsed}
         onToggle={() => setPinnedCollapsed((v) => !v)}
@@ -297,7 +297,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       {/* ── Recent Artifacts ── */}
       <CollapsibleSection
         title="Recent Artifacts"
-        icon={<Clock size={12} />}
+        icon={<Clock size={15} />}
         count={recentArtifacts.length}
         collapsed={recentCollapsed}
         onToggle={() => setRecentCollapsed((v) => !v)}
@@ -417,7 +417,7 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       {/* ── Source Pointers ── */}
       <CollapsibleSection
         title="Source Pointers"
-        icon={<Database size={12} />}
+        icon={<Database size={15} />}
         count={countSourcePointers(active?.source_pointers_json)}
         collapsed={pointersCollapsed}
         onToggle={() => setPointersCollapsed((v) => !v)}
@@ -489,7 +489,7 @@ function CollapsibleSection({
           outline: 'none',
           boxShadow: 'none',
           color: headerColor,
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: 400,
           textTransform: 'none',
           letterSpacing: 0,
@@ -497,13 +497,13 @@ function CollapsibleSection({
           textAlign: 'left',
         }}
       >
-        {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+        {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         {icon}
         <span style={{ flex: 1 }}>{title}</span>
         {typeof count === 'number' && count > 0 && (
           <span
             style={{
-              fontSize: 10,
+              fontSize: 11,
               color: 'var(--w-text-muted)',
               fontWeight: 500,
               padding: '0 6px',
@@ -571,13 +571,13 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
         alignItems: 'center',
         gap: 8,
         width: '100%',
-        padding: '6px 12px',
+        padding: '7px 12px',
         background: isActive ? 'var(--cui-secondary-bg)' : 'transparent',
         borderLeft: isActive
           ? '3px solid var(--cui-primary)'
           : '3px solid transparent',
         color: 'var(--cui-body-color)',
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'left',
         cursor: 'pointer',
       }}
@@ -595,7 +595,7 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
           {artifact.pinned_label && (
             <span
               style={{
-                fontSize: 10,
+                fontSize: 11,
                 color: 'var(--cui-warning)',
                 marginRight: 4,
               }}
@@ -607,7 +607,7 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
         </div>
         <div
           style={{
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--cui-secondary-color)',
             marginTop: 1,
           }}
@@ -633,7 +633,7 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
           }}
           style={iconButtonStyle}
         >
-          <Pencil size={12} />
+          <Pencil size={14} />
         </button>
         <button
           type="button"
@@ -645,7 +645,7 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
           }}
           style={iconButtonStyle}
         >
-          <Trash2 size={12} />
+          <Trash2 size={14} />
         </button>
       </div>
     </div>
@@ -656,8 +656,8 @@ const iconButtonStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 22,
-  height: 22,
+  width: 26,
+  height: 26,
   padding: 0,
   background: 'transparent',
   border: 'none',
@@ -683,17 +683,17 @@ function DocumentListRow({ doc, onClick }: DocumentListRowProps) {
         alignItems: 'center',
         gap: 8,
         width: '100%',
-        padding: '6px 12px',
+        padding: '7px 12px',
         background: 'transparent',
         border: 'none',
         borderLeft: '3px solid transparent',
         color: 'var(--cui-body-color)',
-        fontSize: 12,
+        fontSize: 14,
         textAlign: 'left',
         cursor: 'pointer',
       }}
     >
-      <FileText size={12} style={{ flexShrink: 0, opacity: 0.6 }} />
+      <FileText size={15} style={{ flexShrink: 0, opacity: 0.6 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -708,7 +708,7 @@ function DocumentListRow({ doc, onClick }: DocumentListRowProps) {
         </div>
         <div
           style={{
-            fontSize: 10,
+            fontSize: 11,
             color: 'var(--cui-secondary-color)',
             marginTop: 1,
           }}
@@ -719,7 +719,7 @@ function DocumentListRow({ doc, onClick }: DocumentListRowProps) {
       {doc.status && (
         <span
           style={{
-            fontSize: 9,
+            fontSize: 10,
             padding: '1px 5px',
             borderRadius: 3,
             background: 'var(--cui-secondary-bg)',
@@ -742,7 +742,7 @@ function EmptyRow({ text }: { text: string }) {
     <div
       style={{
         padding: '10px 12px',
-        fontSize: 11,
+        fontSize: 13,
         color: 'var(--cui-secondary-color)',
         fontStyle: 'italic',
       }}

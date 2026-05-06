@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.3
+**Version:** 4.4
 **Last Updated:** May 5, 2026
-**Supersedes:** v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Supersedes:** v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -29,6 +29,8 @@ When any of the three drift, the master copy in the project files wins. When a r
 **0.3 Capability differences.** Different Claude systems have different powers. See §1.2. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
 
 **0.4 Sync discipline.** When this file is edited, the editor must also update the Cowork project instructions and the Claude project's instructions. Drift between the three is the failure mode this rule prevents.
+
+**0.5 Reference templates.** Long-form templates referenced from this file (CC prompt header, server-restart footer, verification block, success-criteria pattern, handoff doc format, downstream-impact example) live in `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` to keep the canonical rules lean. Read on demand when drafting the deliverable.
 
 ---
 
@@ -126,36 +128,13 @@ When a task requires a capability a system lacks, that system completes preparat
 
 ## 4.0 CC / CODEX PROMPT DRAFTING
 
-**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title:
+**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title.
 
-```markdown
----
-## ⚠️ BEFORE YOU START
-Read this entire prompt thoroughly, then ask any clarifying questions before writing code.
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.1.*
 
-⚠️ DO NOT process, import, or write any data to the database during verification steps.
-Verification is read-only. Confirm pipeline routing by tracing code paths only — do not
-upload test files or trigger extraction runs.
+**4.2 Required footer (when applicable).** If the prompt requires a server restart, append the SERVER RESTART block.
 
-If anything is unclear about:
-- [List 4-6 specific areas relevant to the task]
-- File structure or naming conventions
-- How this integrates with existing code
-...ask first. Do not assume.
----
-```
-
-**4.2 Required footer (when applicable).** If the prompt requires a server restart:
-
-```markdown
----
-## SERVER RESTART
-After completing this task, restart the servers:
-\`\`\`bash
-bash restart.sh
-\`\`\`
-This restarts both the Next.js app and Django backend.
-```
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.2.*
 
 **4.3 Prompt structure.** Every CC/Codex prompt should include:
 
@@ -172,26 +151,13 @@ This restarts both the Next.js app and Django backend.
 | VERIFICATION | Commands to confirm completion + downstream checks |
 | SERVER RESTART | If applicable |
 
-**4.4 Verification requirements.** All prompts must include explicit verification commands:
+**4.4 Verification requirements.** All prompts must include explicit verification commands.
 
-```bash
-# Example verification block
-cat src/components/NewComponent.tsx | head -50
-npm run build  # Confirm no TypeScript errors
-curl http://localhost:3000/api/test-endpoint
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.4.*
 
-**4.5 Success criteria pattern.** Use numbered checkpoints:
+**4.5 Success criteria pattern.** Use numbered checkpoints.
 
-```markdown
-## SUCCESS CRITERIA
-All must pass:
-1. [ ] Component renders without console errors
-2. [ ] API endpoint returns expected data
-3. [ ] No TypeScript warnings
-4. [ ] Existing tests still pass
-5. [ ] Downstream features verified (see DOWNSTREAM IMPACT section)
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.5.*
 
 **4.6 Session ID + echo-back.** Every CC handoff prompt must include a distinctive session ID at the top, a Step 0 in the BEFORE YOU START block where CC echoes back the session ID and current branch before doing any work, and the same session ID baked into the commit message footer. This prevents prompts from being pasted into the wrong CC session and creates an audit trail across the toolchain.
 
@@ -358,50 +324,9 @@ These rules apply to Claude.ai chat where context windows are bounded. Cowork an
 | Database State | Migration numbers, table counts if relevant |
 | Continuation Instructions | Exact prompt for next chat |
 
-**9.4.1 Handoff format.** Use this template:
+**9.4.1 Handoff format.** Use the canonical handoff template.
 
-```markdown
-# CONTEXT HANDOFF FOR NEW CHAT
-
-**Date:** [today]
-**Session IDs:** [list all relevant session codes]
-**Branch:** [current working branch]
-
-## Current Project
-[specific app/feature being built]
-
-## Status
-[exactly where we left off]
-
-## Completed This Session
-1. [task with commit ref]
-2. [task with commit ref]
-
-## Pending Tasks
-1. [priority 1 task]
-2. [priority 2 task]
-
-## Next Steps
-1. [specific immediate action]
-2. [specific immediate action]
-
-## Key Files Referenced
-- [filename] — [purpose]
-- [filename] — [purpose]
-
-## Critical Context
-[essential background from project knowledge]
-
-## Database State
-- Migrations: [last migration number]
-- Tables: [count if changed]
-
-## For New Chat
-Start with: "[exact continuation prompt]"
-
-## File References for Upload
-- [list files to upload to new chat if needed]
-```
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §9.4.1.*
 
 ---
 
@@ -586,25 +511,7 @@ WHERE id = [test_id];
 
 **17.4 CC prompt integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that lists files/endpoints being modified, lists known consumers of those files/endpoints, specifies verification commands for downstream features, and includes at least one database-level check if financial data is involved.
 
-Example:
-
-```markdown
-## DOWNSTREAM IMPACT
-**Files being modified:**
-- `backend/apps/financial/views.py` — budget rollup endpoint
-
-**Known consumers:**
-- `src/components/budget/BudgetGridTab.tsx` — renders rollup totals
-- `src/hooks/useBudgetSummary.ts` — SWR hook consuming this endpoint
-- `backend/apps/landscaper/tools/budget_tools.py` — Landscaper reads rollup
-- `services/financial_engine_py/cash_flow.py` — cash flow pulls budget data
-
-**Post-change verification:**
-1. Budget grid renders correct totals for Peoria Lakes
-2. Cash flow analysis produces same output as before change
-3. Landscaper can answer "what's the total budget?" correctly
-4. `npm run build` passes with no type errors
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §17.4.*
 
 **17.5 Escalation rule.** If a change touches a high-risk zone and you cannot confidently trace all consumers, flag it for CC with a discovery-first prompt (read-only audit) before any modifications.
 
@@ -785,6 +692,8 @@ The status transition from `addressed` → `closed` happens via the daily-brief 
 
 ## CHANGELOG
 
+**v4.4 (2026-05-05)** — Session-credit / context-budget pass. Extracted long-form templates (CC prompt header, handoff doc format, formal correspondence rules, downstream-impact example block) to a new reference file `docs/PROJECT_INSTRUCTIONS_REFERENCE.md`. Behavioral rules unchanged; only literal template bodies moved. Auto-load surface area for this file reduced. Companion change: CLAUDE.md session-log footer also extracted to `docs/CLAUDE_SESSION_HISTORY.md`. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+
 **v4.3 (2026-05-05)** — Added §21.9 (Resolution-language detection) for LSCMD-FBLOG-0505-kp Phase 5. HIGH-confidence threshold locked at three conditions (prior-turn announces completion + clean trigger word + continuous topic). ASK-first fallback for anything below HIGH. Auto-action set: flip status to addressed, append [resolved], draft commit prompt, one-line confirmation. New `mark_feedback_addressed` Django management command added as the in_progress → addressed transition path (close_feedback already owns terminal states). Closing-loop semantics: Cowork stamps the commit on the addressed row but never flips to closed itself — that boundary stays with close_feedback and the daily-brief auto-resolver. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
 **v4.2 (2026-05-05)** — Added §21 (Feedback Lifecycle Tracking) for the silent `working_summary` append behavior introduced in LSCMD-FBLOG-0505-kp Phase 3. Inflection-point taxonomy locked at start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. User-input firing discipline (§21.3) clarifies what counts as direction-changing input vs conversational filler. New `append_feedback_line` Django management command is the append mechanism. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
@@ -799,4 +708,4 @@ The status transition from `addressed` → `closed` happens via the daily-brief 
 
 ---
 
-End of Landscape Project Instructions v4.3
+End of Landscape Project Instructions v4.4

@@ -11,7 +11,7 @@ import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
-const MAX_ARTIFACTS_WIDTH = 900;
+const MAX_ARTIFACTS_WIDTH = 1600;
 
 interface ProjectArtifactsPanelProps {
   projectId: number;

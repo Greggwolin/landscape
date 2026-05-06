@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Landscape Repo Review — 2026-05-05</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --surface: #121a2b;
+    --surface-2: #182338;
+    --border: #283552;
+    --text: #e7ecf7;
+    --muted: #94a3b8;
+    --accent: #4f8cff;
+    --green: #2eb85c;
+    --yellow: #f9b115;
+    --red: #e55353;
+    --cyan: #22d3ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top right, rgba(79, 140, 255, 0.18), transparent 28rem),
+      linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  .hero {
+    background: linear-gradient(135deg, rgba(79, 140, 255, 0.14), rgba(34, 211, 238, 0.08));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+  .subtitle {
+    margin: 0;
+    color: var(--muted);
+    max-width: 880px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+  }
+  .stat .value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .stat .label {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .section {
+    margin-bottom: 24px;
+  }
+  .section h2 {
+    margin: 0 0 12px;
+    font-size: 1.1rem;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .panel-body {
+    padding: 20px;
+  }
+  .findings {
+    display: grid;
+    gap: 14px;
+  }
+  .finding {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+    padding: 16px;
+  }
+  .finding-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .severity {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .p1 { background: rgba(229, 83, 83, 0.14); color: var(--red); }
+  .p2 { background: rgba(249, 177, 21, 0.14); color: var(--yellow); }
+  .p3 { background: rgba(34, 211, 238, 0.14); color: var(--cyan); }
+  .finding h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .finding p {
+    margin: 8px 0 0;
+    color: #d6dfef;
+  }
+  .cols {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 16px;
+  }
+  .list {
+    margin: 0;
+    padding-left: 18px;
+    color: #d6dfef;
+  }
+  .list li + li { margin-top: 8px; }
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  .table th,
+  .table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .table th {
+    color: var(--muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .table tr:last-child td { border-bottom: none; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    color: #c8dcff;
+  }
+  .footnote {
+    color: var(--muted);
+    font-size: 0.86rem;
+  }
+  @media (max-width: 900px) {
+    .cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <section class="hero">
+    <h1>Landscape Repo Review</h1>
+    <p class="subtitle">Status review generated from the live working tree on Tuesday, May 5, 2026. This artifact reflects the active <code>chat-artifacts</code> branch, the latest daily sync, the current manifest, and the current automated test surface.</p>
+    <div class="meta">
+      <span class="chip">Branch <code>chat-artifacts</code></span>
+      <span class="chip">Repo version <code>0.1.18</code></span>
+      <span class="chip">Working tree dirty</span>
+      <span class="chip">Latest sync <code>2026-05-04</code></span>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="stat">
+      <div class="value">13</div>
+      <div class="label">WIP Files In Working Tree</div>
+    </div>
+    <div class="stat">
+      <div class="value">473</div>
+      <div class="label">Next.js API Files</div>
+    </div>
+    <div class="stat">
+      <div class="value">25</div>
+      <div class="label">Django Apps</div>
+    </div>
+    <div class="stat">
+      <div class="value">4 / 4</div>
+      <div class="label">Jest Token Tests Passed</div>
+    </div>
+    <div class="stat">
+      <div class="value">2 / 2</div>
+      <div class="label">Playwright Contrast Tests Failed To Launch</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Primary Findings</h2>
+    <div class="findings">
+      <article class="finding">
+        <div class="finding-header">
+          <h3>Test entrypoint is not green in a stock checkout</h3>
+          <span class="severity p1">P1</span>
+        </div>
+        <p><code>npm test</code> currently passes the token Jest suite but fails before running browser checks because Playwright cannot find the local Chromium executable. The current package scripts still present that command as the default verification path.</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-header">
+          <h3>Implementation status document is behind active branch reality</h3>
+          <span class="severity p2">P2</span>
+        </div>
+        <p>The canonical high-level status file was last updated on April 17, 2026 and still frames the app as broadly “Production Ready,” while the active May 4 branch sync explicitly lists uncommitted work and open follow-through items on the same branch.</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-header">
+          <h3>README contains stale links and incorrect runtime claims</h3>
+          <span class="severity p2">P2</span>
+        </div>
+        <p>The top-level README still points to non-existent documentation targets and claims React <code>19.1.0</code>, while the current manifest is React <code>18.2.0</code>. That makes README-driven onboarding unreliable.</p>
+      </article>
+
+      <article class="finding">
+        <div class="finding-header">
+          <h3>Status reporting is fragmented across multiple note trees</h3>
+          <span class="severity p3">P3</span>
+        </div>
+        <p>Daily sync artifacts now live under three parallel paths: <code>docs/09_session_notes</code>, <code>docs/09-session-notes</code>, and <code>docs/session-notes</code>. The information exists, but discoverability and confidence both degrade.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section cols">
+    <div class="panel">
+      <div class="panel-body">
+        <h2>What Is Actively Moving</h2>
+        <ul class="list">
+          <li><strong>Branch focus:</strong> the repo’s center of gravity is now the <code>chat-artifacts</code> branch, not <code>main</code>.</li>
+          <li><strong>Current WIP:</strong> uncommitted changes touch Landscaper thread/document linkage, artifact workspace UI, wrapper sidebars, and documents/media panels.</li>
+          <li><strong>Recent shipped work:</strong> operating-statement provenance, synonym/discriminator hardening, artifacts workspace polish, MediaPanel real-data wiring, and new agent framework scenarios S14-S16.</li>
+          <li><strong>Remaining blocker called out in latest sync:</strong> scanned-PDF / OCR pipeline is still the named alpha blocker.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Open Risk Areas</h2>
+        <ul class="list">
+          <li>Default verification path depends on local Playwright browser installation.</li>
+          <li>Repo health story is split between docs, daily syncs, and branch-local WIP.</li>
+          <li>High-level “production ready” language is stronger than the current evidence trail.</li>
+          <li>Working tree is not clean, so the active status is partly committed and partly in-flight.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Working Tree Snapshot</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Observed State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Branch</td>
+              <td><code>chat-artifacts</code> tracking <code>origin/chat-artifacts</code></td>
+            </tr>
+            <tr>
+              <td>Modified files</td>
+              <td><code>backend/apps/landscaper/models.py</code>, <code>serializers.py</code>, <code>urls.py</code>, <code>views.py</code>, <code>src/components/landscaper/ThreadList.tsx</code>, wrapper/documents/media panels, <code>src/styles/wrapper.css</code></td>
+            </tr>
+            <tr>
+              <td>Untracked files</td>
+              <td><code>backend/apps/landscaper/migrations/0005_thread_doc_link.py</code>, <code>backend/apps/landscaper/services/doc_chat_service.py</code></td>
+            </tr>
+            <tr>
+              <td>Recent top commit</td>
+              <td><code>049000d</code> — <code>docs(claude.md): sync LSCMD-FBLOG-0505-kp series</code></td>
+            </tr>
+            <tr>
+              <td>Latest sync artifact</td>
+              <td><code>docs/09_session_notes/2026-05-04-daily-sync.md</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Evidence Matrix</h2>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Claim</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Package version and test scripts</td>
+              <td><code>package.json</code> version <code>0.1.18</code>; <code>npm test</code> chains token and contrast suites</td>
+            </tr>
+            <tr>
+              <td>README drift</td>
+              <td>README still claims React <code>19.1.0</code> and links to <code>docs/00_overview/IMPLEMENTATION_STATUS.md</code> and <code>Documentation/App-Development-Status.md</code></td>
+            </tr>
+            <tr>
+              <td>Implementation-status drift</td>
+              <td><code>docs/00-overview/IMPLEMENTATION_STATUS_3-8-26.md</code> last updated <code>2026-04-17</code>; latest branch sync lives at <code>docs/09_session_notes/2026-05-04-daily-sync.md</code></td>
+            </tr>
+            <tr>
+              <td>Current branch work</td>
+              <td>Latest sync lists artifacts/media/discriminator work and still calls out uncommitted WIP</td>
+            </tr>
+            <tr>
+              <td>Codebase breadth</td>
+              <td><code>473</code> files under <code>src/app/api</code>; <code>25</code> Django apps under <code>backend/apps</code></td>
+            </tr>
+            <tr>
+              <td>Test state</td>
+              <td>Jest token suite passed; Playwright contrast suite failed to launch due to missing Chromium executable</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="panel">
+      <div class="panel-body">
+        <h2>Review Method</h2>
+        <p>I refreshed the live git state, recent branch history, the package manifest, README, implementation-status doc, latest daily sync, and the default test surface. I did not run the full application or validate database-backed flows in this review.</p>
+        <p class="footnote">Generated for artifact delivery on May 5, 2026 in the local workspace.</p>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

@@ -244,7 +244,12 @@
 .sb-logo-img {
   height: 24px;
   width: auto;
-  opacity: 0.8;
+  opacity: 1;
+  /* Source PNG has the wordmark as mid-grey pixels, so a mild brightness
+     boost wasn't visible. brightness(0) invert(1) forces every non-
+     transparent pixel to pure white — silhouette treatment, max contrast
+     against the near-black sidebar. */
+  filter: brightness(0) invert(1);
 }
 
 .wrapper-sidebar.collapsed .sb-logo-img { height: 20px; }
@@ -1621,6 +1626,30 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  margin: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.w-doc-type-list-chat:hover {
+  color: var(--w-text-primary);
+  background: var(--w-bg-surface-hover);
+}
+
+/* Active state — doc has an existing chat thread. The accent color
+   signals "previously discussed" so the user can scan a list and see
+   which docs have prior conversation. Grey = none, accent = thread. */
+.w-doc-type-list-chat.has-thread {
+  color: var(--w-accent, #38bdf8);
+}
+
+.w-doc-type-list-chat.has-thread:hover {
+  color: var(--w-accent, #38bdf8);
+  background: var(--w-accent-dim, rgba(14, 165, 233, 0.15));
 }
 
 .w-doc-type-list-main {

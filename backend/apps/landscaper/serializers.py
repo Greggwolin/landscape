@@ -51,6 +51,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     threadId = serializers.UUIDField(source='id', read_only=True)
     projectId = serializers.IntegerField(source='project_id', read_only=True, allow_null=True)
     projectName = serializers.SerializerMethodField()
+    docId = serializers.IntegerField(source='doc_id', read_only=True, allow_null=True)
     pageContext = serializers.CharField(source='page_context', allow_null=True, required=False)
     subtabContext = serializers.CharField(source='subtab_context', allow_null=True, required=False)
     isActive = serializers.BooleanField(source='is_active', read_only=True)
@@ -69,6 +70,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'threadId',
             'projectId',
             'projectName',
+            'docId',
             'pageContext',
             'subtabContext',
             'title',
@@ -84,7 +86,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'firstUserMessage',
         ]
         read_only_fields = [
-            'threadId', 'projectId', 'projectName', 'isActive',
+            'threadId', 'projectId', 'projectName', 'docId', 'isActive',
             'isArchived', 'archivedAt', 'archivedByUserId',
             'createdAt', 'updatedAt', 'closedAt', 'messageCount',
             'firstUserMessage',

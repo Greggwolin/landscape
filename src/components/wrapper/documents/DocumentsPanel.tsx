@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWrapperProject } from '@/contexts/WrapperProjectContext';
 import { useUploadStaging } from '@/contexts/UploadStagingContext';
 import { DocumentDetailPanel, DocumentDetailDoc } from './DocumentDetailPanel';
@@ -56,6 +57,93 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
 
   // ── Selection state ────────────────────────────────────────
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+
+  // ── Doc-chat thread state ──────────────────────────────────
+  // Map of doc_id → existing thread_id when the doc has a "Chat with this
+  // document" thread already open. Drives the icon color on each row and
+  // routes the user to the existing thread when the chat icon is clicked.
+  const router = useRouter();
+  const [docThreads, setDocThreads] = useState<Record<string, string>>({});
+  const [docChatPending, setDocChatPending] = useState<string | null>(null);
+
+  // Bulk-fetch the doc-chat thread mapping for a set of doc_ids. Cheap
+  // (single query, partial index on doc_id IS NOT NULL) and short-circuits
+  // if every passed id is already in the map.
+  const fetchDocThreadMap = useCallback(
+    async (docIds: string[]) => {
+      const missing = docIds.filter((id) => !(id in docThreads));
+      if (missing.length === 0) return;
+      try {
+        const res = await fetch(
+          `/api/landscaper/threads/for-docs/?doc_ids=${missing.join(',')}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const mapping = (data?.mapping || {}) as Record<
+          string,
+          { thread_id: string; project_id: number | null }
+        >;
+        setDocThreads((prev) => {
+          const next = { ...prev };
+          for (const [docId, info] of Object.entries(mapping)) {
+            if (info?.thread_id) next[docId] = info.thread_id;
+          }
+          return next;
+        });
+      } catch (err) {
+        // Silent — chat-state is non-critical; leave icons greyed.
+        console.debug('[DocumentsPanel] for-docs lookup failed', err);
+      }
+    },
+    [docThreads]
+  );
+
+  // Open or create the doc-chat thread for a given document. If a thread
+  // already exists, route there. Otherwise POST to the get-or-create
+  // endpoint, update local map, then route. Wraps a debounce-by-doc-id
+  // so back-to-back clicks don't fire two creates.
+  const handleOpenDocChat = useCallback(
+    async (doc: DMSDoc) => {
+      const existing = docThreads[doc.doc_id];
+      if (existing) {
+        if (project_id) {
+          router.push(`/w/projects/${project_id}?thread=${existing}`);
+        } else {
+          router.push(`/w/chat/${existing}`);
+        }
+        return;
+      }
+      if (docChatPending === doc.doc_id) return;
+      setDocChatPending(doc.doc_id);
+      try {
+        const res = await fetch('/api/landscaper/threads/doc-chat/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            doc_id: parseInt(doc.doc_id, 10),
+            project_id: project_id ?? null,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success || !data.thread?.threadId) {
+          console.error('[DocumentsPanel] doc-chat create failed', data);
+          return;
+        }
+        const threadId = data.thread.threadId as string;
+        setDocThreads((prev) => ({ ...prev, [doc.doc_id]: threadId }));
+        if (project_id) {
+          router.push(`/w/projects/${project_id}?thread=${threadId}`);
+        } else {
+          router.push(`/w/chat/${threadId}`);
+        }
+      } catch (err) {
+        console.error('[DocumentsPanel] doc-chat create error', err);
+      } finally {
+        setDocChatPending(null);
+      }
+    },
+    [docThreads, project_id, router, docChatPending]
+  );
 
   const allVisibleDocs = useMemo(() => {
     const out: DMSDoc[] = [];
@@ -267,6 +355,11 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
         const data = await res.json();
         const results: DMSDoc[] = data?.results ?? [];
         setDocsByType((prev) => ({ ...prev, [docType]: results }));
+        // Lazy-fetch doc-chat thread state for this batch so the chat
+        // icon can render colored vs greyed without an extra round-trip
+        // per row. Silent on failure — icons just stay grey.
+        const ids = results.map((d) => d.doc_id).filter(Boolean);
+        if (ids.length > 0) void fetchDocThreadMap(ids);
       }
     } catch (err) {
       console.error('[DocumentsPanel] failed to load docs for', docType, err);
@@ -293,6 +386,8 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
         const data = await res.json();
         const results: DMSDoc[] = data?.results ?? [];
         setDocsByType((prev) => ({ ...prev, [docType]: results }));
+        const ids = results.map((d) => d.doc_id).filter(Boolean);
+        if (ids.length > 0) void fetchDocThreadMap(ids);
       }
     } catch (err) {
       console.error('[DocumentsPanel] failed to load docs for', docType, err);
@@ -397,6 +492,41 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     }
     triggerRefresh();
   }, [trashedDocs, selectedDocIds, project_id, clearSelection, loadTrash, triggerRefresh]);
+
+  // ── Drag-to-reclassify ────────────────────────────────────
+  // Mirrors the pattern in legacy AccordionFilters: dragging a doc row
+  // onto a doc-type header reclassifies the doc(s) by PATCHing the
+  // doc_type field on each affected document. If the dragged doc is part
+  // of a multi-selection, all selected docs move together.
+  const handleDocumentReclassify = useCallback(
+    async (docIds: string[], targetDocType: string) => {
+      if (!docIds.length) return;
+      const errors: string[] = [];
+      for (const docId of docIds) {
+        try {
+          const res = await fetch(`/api/dms/documents/${docId}/profile`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: { doc_type: targetDocType } }),
+          });
+          if (!res.ok) {
+            errors.push(`${docId}: ${res.status}`);
+          }
+        } catch (err) {
+          errors.push(`${docId}: ${err instanceof Error ? err.message : 'error'}`);
+        }
+      }
+      if (errors.length > 0) {
+        console.error('[DocumentsPanel] reclassify errors:', errors);
+      }
+      clearSelection();
+      // Drop the cached doc list for the source type(s) so the next
+      // expand re-fetches; bump global refreshKey to refresh counts.
+      setDocsByType({});
+      triggerRefresh();
+    },
+    [clearSelection, triggerRefresh]
+  );
 
   const handleBulkPermanentDelete = useCallback(async () => {
     const errors: string[] = [];
@@ -577,6 +707,9 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
                   onSelectDoc={setSelectedDoc}
                   selectedDocIds={selectedDocIds}
                   onToggleCheck={toggleDocSelection}
+                  onReclassify={handleDocumentReclassify}
+                  docThreads={docThreads}
+                  onChatWithDoc={handleOpenDocChat}
                 />
               ))}
             </div>
@@ -594,6 +727,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
                     onSelectDoc={setSelectedDoc}
                     selectedDocIds={selectedDocIds}
                     onToggleCheck={toggleDocSelection}
+                    onReclassify={handleDocumentReclassify}
                   />
                 ))}
               </div>
@@ -720,6 +854,9 @@ function DocTypeRowView({
   onSelectDoc,
   selectedDocIds,
   onToggleCheck,
+  onReclassify,
+  docThreads,
+  onChatWithDoc,
 }: {
   row: DocTypeWithCount;
   expanded: boolean;
@@ -730,10 +867,73 @@ function DocTypeRowView({
   onSelectDoc: (doc: DMSDoc) => void;
   selectedDocIds: Set<string>;
   onToggleCheck: (docId: string, e: React.MouseEvent) => void;
+  onReclassify?: (docIds: string[], targetDocType: string) => void;
+  docThreads?: Record<string, string>;
+  onChatWithDoc?: (doc: DMSDoc) => void;
 }) {
+  const [isDropTarget, setIsDropTarget] = useState(false);
+
+  // Drop handlers on the doc-type header — accept the reclassify drag
+  // payload from any doc row and dispatch to onReclassify with the new
+  // target type. Reject drops where source type === target type so a
+  // doc dropped back on its own header is a no-op.
+  const headerDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!onReclassify) return;
+      if (!Array.from(e.dataTransfer.types).includes('application/x-dms-reclassify')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    },
+    [onReclassify]
+  );
+
+  const headerDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      if (!onReclassify) return;
+      if (!Array.from(e.dataTransfer.types).includes('application/x-dms-reclassify')) return;
+      e.preventDefault();
+      const sourceType = e.dataTransfer.getData('application/x-dms-current-type');
+      if (sourceType && sourceType === row.doc_type_name) return;
+      setIsDropTarget(true);
+    },
+    [onReclassify, row.doc_type_name]
+  );
+
+  const headerDragLeave = useCallback(
+    (e: React.DragEvent) => {
+      // Only clear when leaving the actual header, not the children
+      if (e.currentTarget === e.target) setIsDropTarget(false);
+      else setIsDropTarget(false);
+    },
+    []
+  );
+
+  const headerDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (!onReclassify) return;
+      if (!Array.from(e.dataTransfer.types).includes('application/x-dms-reclassify')) return;
+      e.preventDefault();
+      setIsDropTarget(false);
+      const payload = e.dataTransfer.getData('application/x-dms-reclassify');
+      const sourceType = e.dataTransfer.getData('application/x-dms-current-type');
+      if (sourceType && sourceType === row.doc_type_name) return;
+      const ids = (payload || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (!ids.length) return;
+      onReclassify(ids, row.doc_type_name);
+    },
+    [onReclassify, row.doc_type_name]
+  );
+
   return (
-    <div className={`w-doc-type-row${expanded ? ' expanded' : ''}`}>
-      <div className="w-doc-type-row-head" onClick={onExpand}>
+    <div className={`w-doc-type-row${expanded ? ' expanded' : ''}${isDropTarget ? ' is-drop-target' : ''}`}>
+      <div
+        className="w-doc-type-row-head"
+        onClick={onExpand}
+        onDragOver={headerDragOver}
+        onDragEnter={headerDragEnter}
+        onDragLeave={headerDragLeave}
+        onDrop={headerDrop}
+      >
         <span className="w-doc-type-chev">{expanded ? '▾' : '▸'}</span>
         <span className="w-doc-type-icon" aria-hidden>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
@@ -777,6 +977,41 @@ function DocTypeRowView({
                     key={d.doc_id}
                     className={`w-doc-type-list-item${isDetailSelected ? ' is-selected' : ''}${isChecked ? ' is-checked' : ''}`}
                     onClick={() => onSelectDoc(d)}
+                    draggable={!!onReclassify}
+                    onDragStart={(e) => {
+                      if (!onReclassify) return;
+                      // If the dragged doc is part of a multi-selection,
+                      // drag all selected. Otherwise drag just this one.
+                      const isInSelection = selectedDocIds.has(d.doc_id);
+                      const ids =
+                        isInSelection && selectedDocIds.size > 1
+                          ? Array.from(selectedDocIds)
+                          : [d.doc_id];
+                      e.dataTransfer.setData(
+                        'application/x-dms-reclassify',
+                        ids.join(',')
+                      );
+                      e.dataTransfer.setData(
+                        'application/x-dms-current-type',
+                        row.doc_type_name
+                      );
+                      e.dataTransfer.effectAllowed = 'move';
+                      // Visual: dim the dragged row
+                      (e.currentTarget as HTMLElement).style.opacity = '0.5';
+                      // Multi-select drag image badge
+                      if (ids.length > 1) {
+                        const badge = document.createElement('div');
+                        badge.textContent = `${ids.length} documents`;
+                        badge.style.cssText =
+                          'padding:4px 10px;background:var(--w-accent,#0ea5e9);color:#fff;border-radius:4px;font-size:12px;position:absolute;top:-9999px;';
+                        document.body.appendChild(badge);
+                        e.dataTransfer.setDragImage(badge, 0, 0);
+                        setTimeout(() => document.body.removeChild(badge), 0);
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      (e.currentTarget as HTMLElement).style.opacity = '1';
+                    }}
                   >
                     <input
                       type="checkbox"
@@ -786,11 +1021,23 @@ function DocTypeRowView({
                       onChange={() => {}}
                     />
                     <span className={`w-doc-type-list-dot ${dotColor}`} aria-hidden />
-                    <span className="w-doc-type-list-chat" aria-hidden>
+                    <button
+                      type="button"
+                      className={`w-doc-type-list-chat${docThreads?.[d.doc_id] ? ' has-thread' : ''}`}
+                      title={
+                        docThreads?.[d.doc_id]
+                          ? 'Continue chat about this document'
+                          : 'Chat with this document'
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onChatWithDoc?.(d);
+                      }}
+                    >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                       </svg>
-                    </span>
+                    </button>
                     <span className="w-doc-type-list-main">
                       <span className="w-doc-type-list-name">{name}</span>
                       <span className="w-doc-type-list-meta">

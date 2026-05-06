@@ -262,6 +262,22 @@ urlpatterns = [
         }),
         name='landscaper-thread-promote'
     ),
+    # Doc-chat (chat qm — wrapper DMS "Chat with this document").
+    path(
+        'landscaper/threads/by-doc/<int:doc_id>/',
+        ChatThreadViewSet.as_view({'get': 'by_doc'}),
+        name='landscaper-thread-by-doc',
+    ),
+    path(
+        'landscaper/threads/for-docs/',
+        ChatThreadViewSet.as_view({'get': 'for_docs'}),
+        name='landscaper-thread-for-docs',
+    ),
+    path(
+        'landscaper/threads/doc-chat/',
+        ChatThreadViewSet.as_view({'post': 'doc_chat'}),
+        name='landscaper-thread-doc-chat',
+    ),
 
     # Thread messages
     path(

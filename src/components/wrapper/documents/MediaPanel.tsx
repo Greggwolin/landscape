@@ -186,7 +186,10 @@ export interface MediaPanelProps {
 }
 
 export function MediaPanel({ projectId }: MediaPanelProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsed by default — the section is supplementary; users open it on
+  // demand rather than scrolling past expanded thumbnail grids on every
+  // project visit.
+  const [collapsed, setCollapsed] = useState(true);
   const [tab, setTab] = useState<MediaTab>('all');
 
   const [favorites, setFavorites] = useState<Set<number>>(() => {

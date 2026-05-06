@@ -306,8 +306,8 @@ export function ThreadList({
                         className="small text-truncate d-inline-block"
                         style={{
                           color: thread.isActive ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)',
-                          fontSize: '0.75rem',
-                          maxWidth: '140px',
+                          fontSize: '0.875rem',
+                          maxWidth: '180px',
                           fontStyle: thread.isActive ? 'normal' : 'italic',
                         }}
                         title={`${displayTitle}${!thread.isActive ? ' (closed)' : ''}`}
@@ -321,7 +321,7 @@ export function ThreadList({
                           style={{
                             backgroundColor: 'var(--cui-tertiary-bg)',
                             color: 'var(--cui-secondary-color)',
-                            fontSize: '0.625rem',
+                            fontSize: '0.75rem',
                           }}
                         >
                           {getPageContextLabel(thread.pageContext)}
@@ -375,8 +375,8 @@ export function ThreadList({
                         style={{
                           backgroundColor: 'var(--cui-secondary-bg)',
                           color: 'var(--cui-secondary-color)',
-                          fontSize: '0.6rem',
-                          padding: '1px 5px',
+                          fontSize: '0.6875rem',
+                          padding: '1px 6px',
                         }}
                       >
                         {thread.messageCount}
@@ -384,7 +384,7 @@ export function ThreadList({
                     )}
                     <span
                       className="small text-nowrap"
-                      style={{ color: 'var(--cui-secondary-color)', fontSize: '0.625rem' }}
+                      style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}
                     >
                       {formatRelativeTime(thread.updatedAt)}
                     </span>
