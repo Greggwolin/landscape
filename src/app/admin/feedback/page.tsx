@@ -941,15 +941,12 @@ function FeedbackAdminContent() {
           <span className="text-muted small">{sortedFeedback.length} of {feedback.length} items</span>
         </div>
 
-        {/* Status count chips (click-to-filter, same shape as the Cowork artifact) */}
-        <div className="d-flex flex-wrap gap-2 mb-2">
+        {/* Status count chips on the left, category filter tiles on the right — single row */}
+        <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
           {renderCountChip('open')}
           {renderCountChip('in_progress')}
           {renderCountChip('closed')}
-        </div>
-
-        {/* Category filter tiles (click-to-toggle; empty selection shows all) */}
-        <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
+          <div style={{ width: '12px' }} />
           {renderCategoryTile('bug')}
           {renderCategoryTile('feature_request')}
           {renderCategoryTile('ux_confusion')}
