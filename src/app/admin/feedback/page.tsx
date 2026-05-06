@@ -85,6 +85,15 @@ const STATUS_LABELS: Record<string, string> = {
   addressed: 'Closed',
 };
 
+// FB-id extraction: rows backfilled from tbl_feedback have an admin_notes prefix
+// like "[migrated FB-281 on 2026-05-06]" — parse it for display. Rows submitted
+// natively to tester_feedback won't have that marker; fall back to the local id.
+function fbIdLabel(item: FeedbackItem): string {
+  const m = (item.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+  if (m) return `FB-${m[1]}`;
+  return `F-${item.id}`;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   bug: 'danger',
   feature_request: 'info',
@@ -615,7 +624,7 @@ function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
   );
 }
 
-type SortKey = 'date' | 'status' | 'user' | 'category' | 'summary';
+type SortKey = 'date' | 'fb' | 'status' | 'user' | 'category' | 'summary';
 
 function FeedbackAdminContent() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -763,6 +772,19 @@ function FeedbackAdminContent() {
         case 'date':
           av = new Date(a.created_at).getTime();
           bv = new Date(b.created_at).getTime();
+          break;
+        case 'fb':
+          // Sort by extracted FB-N when present, else by tester_feedback.id.
+          // Migrated rows sort numerically by the original FB id; native rows
+          // sort by their local id (no clean cross-comparison, just stable).
+          av = (() => {
+            const m = (a.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+            return m ? parseInt(m[1], 10) : a.id;
+          })();
+          bv = (() => {
+            const m = (b.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+            return m ? parseInt(m[1], 10) : b.id;
+          })();
           break;
         case 'status':
           av = a.status;
@@ -971,8 +993,11 @@ function FeedbackAdminContent() {
           <table className="table table-hover m-0" style={{ color: 'var(--cui-body-color)' }}>
             <thead>
               <tr style={{ background: 'var(--cui-tertiary-bg)' }}>
-                <th className="p-3 fb-sortable" style={{ width: '120px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('date')}>
+                <th className="p-3 fb-sortable" style={{ width: '110px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('date')}>
                   Date <span className="text-muted small">{sortIndicator('date')}</span>
+                </th>
+                <th className="p-3 fb-sortable" style={{ width: '90px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('fb')}>
+                  FB <span className="text-muted small">{sortIndicator('fb')}</span>
                 </th>
                 <th className="p-3 fb-sortable" style={{ width: '120px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('status')}>
                   Status <span className="text-muted small">{sortIndicator('status')}</span>
@@ -992,7 +1017,7 @@ function FeedbackAdminContent() {
               {sortedFeedback.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-8"
                     style={{ color: 'var(--cui-secondary-color)' }}
                   >
@@ -1011,6 +1036,9 @@ function FeedbackAdminContent() {
                       >
                         <td className="p-3" style={{ color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
                           {new Date(item.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-3" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: '12.5px', color: 'var(--cui-body-color)', whiteSpace: 'nowrap' }}>
+                          {fbIdLabel(item)}
                         </td>
                         <td className="p-3">
                           <CBadge color={STATUS_COLORS[item.status]}>
@@ -1037,7 +1065,7 @@ function FeedbackAdminContent() {
                       </tr>
                       {isExpanded && (
                         <tr className="feedback-row-expansion">
-                          <td colSpan={5} style={{ padding: 0, background: 'var(--cui-tertiary-bg)' }}>
+                          <td colSpan={6} style={{ padding: 0, background: 'var(--cui-tertiary-bg)' }}>
                             <ExpandedRowPanel item={item} onSave={updateFeedback} />
                           </td>
                         </tr>
