@@ -20,6 +20,7 @@ rendered into the right panel for at-a-glance reference.
 """
 
 import logging
+from datetime import datetime, timezone as dt_timezone
 from decimal import Decimal
 from typing import Any, Dict, List
 
@@ -273,6 +274,14 @@ def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     pairs: List[Dict[str, Any]] = []
 
+    # Single capture stamp shared across all source_refs in this build —
+    # the schema validator requires `captured_at` as a non-empty ISO string
+    # (`backend/apps/artifacts/schema_validation.py:171`). Drift detection
+    # uses the captured value + this timestamp to decide whether to flag a
+    # pair as stale. Stamping all pairs with the same instant keeps the
+    # render coherent.
+    _captured_at = datetime.now(dt_timezone.utc).isoformat()
+
     def _ref(column: str) -> Dict[str, Any] | None:
         """Build a SourceRef pointing at this project row's column."""
         if project_id is None:
@@ -281,9 +290,7 @@ def _build_profile_pairs(profile: Dict[str, Any]) -> List[Dict[str, Any]]:
             'table': 'tbl_project',
             'row_id': int(project_id),
             'column': column,
-            # captured_at lets future drift detection compare snapshots —
-            # populated lazily here since the renderer treats absence as
-            # "not yet captured" and skips drift checks for that pair.
+            'captured_at': _captured_at,
         }
 
     def add(
