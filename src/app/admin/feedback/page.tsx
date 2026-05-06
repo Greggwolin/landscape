@@ -622,7 +622,9 @@ function FeedbackAdminContent() {
   const [statusBuckets, setStatusBuckets] = useState<Set<'open' | 'in_progress' | 'closed'>>(
     new Set(['open', 'in_progress'])
   );
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  // Category filter tiles — same Set-based multi-toggle as status. Empty set
+  // means "show all categories"; populated set means "only these."
+  const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -723,15 +725,28 @@ function FeedbackAdminContent() {
     return counts;
   }, [feedback]);
 
+  // Category counts for the filter tiles (computed off ALL feedback)
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { bug: 0, feature_request: 0, ux_confusion: 0, question: 0, _uncategorized: 0 };
+    for (const i of feedback) {
+      const k = i.category || '_uncategorized';
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    return counts;
+  }, [feedback]);
+
   const filteredFeedback = useMemo(
     () =>
       feedback.filter((item) => {
         const bucket = STATUS_BUCKET_MAP[item.status];
         if (!bucket || !statusBuckets.has(bucket)) return false;
-        if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
+        if (categoryFilters.size > 0) {
+          const k = item.category || '_uncategorized';
+          if (!categoryFilters.has(k)) return false;
+        }
         return true;
       }),
-    [feedback, statusBuckets, categoryFilter]
+    [feedback, statusBuckets, categoryFilters]
   );
 
   const sortedFeedback = useMemo(() => {
@@ -797,6 +812,15 @@ function FeedbackAdminContent() {
     });
   };
 
+  const toggleCategory = (c: string) => {
+    setCategoryFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
+
   const sortIndicator = (key: SortKey) => {
     if (sortBy !== key) return ' ';
     return sortDir === 'asc' ? '↑' : '↓';
@@ -837,6 +861,55 @@ function FeedbackAdminContent() {
     );
   };
 
+  // Category filter tiles — match the CoreUI badge colors used in the table
+  // (CATEGORY_COLORS: bug=danger, feature_request=info, ux_confusion=warning,
+  // question=secondary). Active state uses the full CoreUI color variable
+  // (so a tile reads as a "filled badge"); inactive state shows the count
+  // tinted in the same color so the visual identity carries through.
+  const CATEGORY_ACCENT: Record<string, { activeBg: string; activeFg: string; numColor: string }> = {
+    bug:             { activeBg: 'var(--cui-danger)',    activeFg: '#fff',                  numColor: 'var(--cui-danger)' },
+    feature_request: { activeBg: 'var(--cui-info)',      activeFg: '#fff',                  numColor: 'var(--cui-info)' },
+    ux_confusion:    { activeBg: 'var(--cui-warning)',   activeFg: 'var(--cui-warning-text-emphasis, #1f1500)', numColor: 'var(--cui-warning)' },
+    question:        { activeBg: 'var(--cui-secondary)', activeFg: '#fff',                  numColor: 'var(--cui-secondary)' },
+    _uncategorized:  { activeBg: 'var(--cui-tertiary-bg)', activeFg: 'var(--cui-body-color)', numColor: 'var(--cui-secondary-color)' },
+  };
+  const CATEGORY_DISPLAY: Record<string, string> = {
+    bug: 'Bug',
+    feature_request: 'Feature',
+    ux_confusion: 'UX',
+    question: 'Question',
+    _uncategorized: 'Uncategorized',
+  };
+
+  const renderCategoryTile = (cat: string) => {
+    const active = categoryFilters.has(cat);
+    const accent = CATEGORY_ACCENT[cat];
+    const count = categoryCounts[cat] || 0;
+    if (count === 0 && cat === '_uncategorized') return null; // hide empty uncategorized
+    return (
+      <button
+        key={cat}
+        type="button"
+        onClick={() => toggleCategory(cat)}
+        className="d-inline-flex align-items-baseline gap-2 border rounded px-3 py-2"
+        style={{
+          background: active ? accent.activeBg : 'var(--cui-card-bg)',
+          color: active ? accent.activeFg : 'var(--cui-body-color)',
+          borderColor: active ? accent.activeBg : 'var(--cui-border-color)',
+          cursor: 'pointer',
+          fontSize: '13px',
+          userSelect: 'none',
+          transition: 'background 0.12s ease, border-color 0.12s ease, color 0.12s ease',
+        }}
+      >
+        <span style={{ fontWeight: 600, fontSize: '17px', lineHeight: 1, color: active ? 'inherit' : accent.numColor }}>
+          {count}
+        </span>
+        <span>{CATEGORY_DISPLAY[cat]}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       <AdminNavBar />
@@ -846,25 +919,30 @@ function FeedbackAdminContent() {
           <span className="text-muted small">{sortedFeedback.length} of {feedback.length} items</span>
         </div>
 
-        {/* Count chips (click-to-filter, same shape as the Cowork artifact) */}
-        <div className="d-flex flex-wrap gap-2 mb-3">
+        {/* Status count chips (click-to-filter, same shape as the Cowork artifact) */}
+        <div className="d-flex flex-wrap gap-2 mb-2">
           {renderCountChip('open')}
           {renderCountChip('in_progress')}
           {renderCountChip('closed')}
-          <div className="d-flex align-items-end ms-auto">
-            <CFormSelect
-              size="sm"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ minWidth: '180px' }}
+        </div>
+
+        {/* Category filter tiles (click-to-toggle; empty selection shows all) */}
+        <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
+          {renderCategoryTile('bug')}
+          {renderCategoryTile('feature_request')}
+          {renderCategoryTile('ux_confusion')}
+          {renderCategoryTile('question')}
+          {renderCategoryTile('_uncategorized')}
+          {categoryFilters.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilters(new Set())}
+              className="btn btn-link btn-sm p-0 ms-2"
+              style={{ fontSize: '12px', textDecoration: 'none' }}
             >
-              <option value="all">All Categories</option>
-              <option value="bug">Bug</option>
-              <option value="feature_request">Feature Request</option>
-              <option value="ux_confusion">UX Issue</option>
-              <option value="question">Question</option>
-            </CFormSelect>
-          </div>
+              clear
+            </button>
+          )}
         </div>
 
         {error && (
