@@ -77,6 +77,62 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
+// ── Working-summary + Fix Prompt helpers (mirror the Cowork feedback_status_live artifact) ──
+// During the Layer 2 bridge backfill (LSCMD-FBLOG-0505-kp), the Cowork-side
+// `working_summary` content from tbl_feedback was stuffed into admin_notes
+// under a "--- Working summary ---" header. This helper extracts it for
+// display in the detail modal so the chat-tied lifecycle log is visible
+// here, not only in the legacy Cowork artifact.
+function parseWorkingSummary(adminNotes: string | undefined | null): string | null {
+  if (!adminNotes) return null;
+  const idx = adminNotes.indexOf('--- Working summary ---');
+  if (idx < 0) return null;
+  return adminNotes.substring(idx + '--- Working summary ---'.length).trim() || null;
+}
+
+// Build the same paste-ready triage prompt the Cowork artifact's "Fix Prompt"
+// button copies to clipboard. Includes a "Prior work on this item" section
+// when the row already has a working summary, so a fresh chat can pick up
+// where the prior one left off.
+function buildFixPrompt(item: FeedbackItem): string {
+  const dateOnly = (item.created_at || '').slice(0, 10);
+  const where = item.affected_module || 'Unknown';
+  const statusLabel = STATUS_LABELS[item.status] || item.status;
+  const ws = parseWorkingSummary(item.admin_notes);
+  const hasPriorWork = !!ws;
+  const lines: string[] = [];
+
+  lines.push(`Triage feedback item FB-${item.id} from the Landscape app.`);
+  lines.push(``);
+  lines.push(`Reported: ${dateOnly} on the ${where} surface`);
+  lines.push(`Status: ${statusLabel}`);
+  lines.push(``);
+  lines.push(`User's wording:`);
+  lines.push(`"${(item.message || '').trim()}"`);
+  lines.push(``);
+
+  if (hasPriorWork) {
+    lines.push(`──── Prior work on this item ────`);
+    lines.push(`Working summary (chronological — newest at bottom):`);
+    lines.push(ws as string);
+    lines.push(``);
+    lines.push(`Pick up where prior work left off. Do NOT re-litigate decisions already locked in (look for [decision] / [user-input] tags). If the most recent line is a [blocker], that's where to start.`);
+    lines.push(``);
+  }
+
+  lines.push(`Investigate ${hasPriorWork ? 'and finish' : 'this end-to-end and make'} the fix directly:`);
+  lines.push(`  1. Read the relevant code paths and trace downstream consumers per §17.`);
+  lines.push(`  2. ${hasPriorWork ? 'Confirm what remains based on the Prior Work section above, then state the planned change before editing.' : 'Identify the root cause and state the planned change before editing.'}`);
+  lines.push(`  3. Make all code, schema-spec, and config edits yourself with the file tools — do not draft a CC prompt for work Cowork can do.`);
+  lines.push(`  4. Verify the change in-place where possible (read the edited file back, check types, sanity-check call sites).`);
+  lines.push(``);
+  lines.push(`Only hand off to CC when the remaining step requires a capability Cowork lacks: running terminal commands, executing the build, running tests, committing/pushing to git, executing database migrations, or restarting servers. In those cases, deliver a downloadable .md prompt per Landscape standards.`);
+  lines.push(``);
+  lines.push(`If the fix requires a decision Gregg owns (UX, scope, naming, behavior tradeoff), surface a single targeted question before editing.`);
+
+  return lines.join('\n');
+}
+
 interface FeedbackDetailModalProps {
   item: FeedbackItem | null;
   isOpen: boolean;
@@ -90,14 +146,38 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
   const [adminResponse, setAdminResponse] = useState('');
   const [saving, setSaving] = useState(false);
   const [showRawChat, setShowRawChat] = useState(false);
+  const [showWorkingSummary, setShowWorkingSummary] = useState(false);
+  const [showFixPrompt, setShowFixPrompt] = useState(false);
+  const [fixPromptCopied, setFixPromptCopied] = useState(false);
 
   useEffect(() => {
     if (item) {
       setStatus(item.status);
       setAdminNotes(item.admin_notes || '');
       setAdminResponse(item.admin_response || '');
+      // Reset disclosures + copied state on item change
+      setShowWorkingSummary(false);
+      setShowFixPrompt(false);
+      setFixPromptCopied(false);
     }
   }, [item]);
+
+  // Resolve working summary + fix prompt for the current item (memoised on every render is fine here — strings are small)
+  const workingSummary = item ? parseWorkingSummary(item.admin_notes) : null;
+  const fixPromptText = item ? buildFixPrompt(item) : '';
+
+  const handleCopyFixPrompt = async () => {
+    if (!item) return;
+    try {
+      await navigator.clipboard.writeText(fixPromptText);
+      setFixPromptCopied(true);
+      setShowFixPrompt(true);
+      setTimeout(() => setFixPromptCopied(false), 1500);
+    } catch {
+      // Clipboard blocked — show the text inline so the user can copy manually
+      setShowFixPrompt(true);
+    }
+  };
 
   const handleSave = async () => {
     if (!item) return;
@@ -225,6 +305,66 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
           >
             {item.page_path}
           </a>
+        </div>
+
+        {workingSummary && (
+          <div className="mb-3">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowWorkingSummary((v) => !v)}
+            >
+              {showWorkingSummary ? 'Hide' : 'Show'} Working Summary ({workingSummary.split('\n').length} lines)
+            </button>
+            {showWorkingSummary && (
+              <div
+                className="mt-2 p-3 rounded"
+                style={{
+                  backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+                  border: '1px solid var(--cui-border-color, #e2e8f0)',
+                  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                  fontSize: '12.5px',
+                  lineHeight: 1.65,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  color: 'var(--cui-body-color)',
+                }}
+              >
+                {workingSummary}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mb-3">
+          <button
+            type="button"
+            className={`btn btn-sm ${fixPromptCopied ? 'btn-success' : 'btn-outline-primary'}`}
+            onClick={handleCopyFixPrompt}
+          >
+            {fixPromptCopied ? 'Copied to clipboard' : 'Fix Prompt'}
+          </button>
+          {showFixPrompt && (
+            <div
+              className="mt-2 p-3 rounded"
+              style={{
+                backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+                border: '1px solid var(--cui-border-color, #e2e8f0)',
+                fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                fontSize: '12px',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: '320px',
+                overflowY: 'auto',
+                color: 'var(--cui-body-color)',
+              }}
+            >
+              {fixPromptText}
+            </div>
+          )}
         </div>
 
         <hr />
