@@ -69,16 +69,20 @@ interface FeedbackItem {
   context_url?: string;
 }
 
+// Display nomenclature is Open / In Progress / Closed (matches the count chips
+// and the Cowork artifact). The DB column stays as submitted/under_review/addressed
+// — only the rendering changes. Keep these maps as the single source of truth so
+// every badge / select / sort key stays consistent.
 const STATUS_COLORS: Record<string, string> = {
-  submitted: 'warning',
-  under_review: 'info',
-  addressed: 'success',
+  submitted: 'danger',     // Open
+  under_review: 'warning', // In Progress
+  addressed: 'success',    // Closed
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  addressed: 'Addressed',
+  submitted: 'Open',
+  under_review: 'In Progress',
+  addressed: 'Closed',
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -392,9 +396,9 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
         <div className="mb-3">
           <label className="form-label fw-bold">Status</label>
           <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="submitted">Submitted</option>
-            <option value="under_review">Under Review</option>
-            <option value="addressed">Addressed</option>
+            <option value="submitted">Open</option>
+            <option value="under_review">In Progress</option>
+            <option value="addressed">Closed</option>
           </CFormSelect>
         </div>
 
@@ -582,9 +586,9 @@ function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
       <div className="mb-3">
         <label className="form-label fw-bold">Status</label>
         <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="submitted">Submitted</option>
-          <option value="under_review">Under Review</option>
-          <option value="addressed">Addressed</option>
+          <option value="submitted">Open</option>
+          <option value="under_review">In Progress</option>
+          <option value="addressed">Closed</option>
         </CFormSelect>
       </div>
 

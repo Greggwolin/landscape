@@ -20,15 +20,17 @@ interface FeedbackItem {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  submitted: 'warning',
-  under_review: 'info',
-  addressed: 'success',
+  submitted: 'danger',     // Open
+  under_review: 'warning', // In Progress
+  addressed: 'success',    // Closed
 };
 
+// Display nomenclature is Open / In Progress / Closed (matches /admin/feedback
+// and the count chips). DB column stays as submitted/under_review/addressed.
 const STATUS_LABELS: Record<string, string> = {
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  addressed: 'Addressed',
+  submitted: 'Open',
+  under_review: 'In Progress',
+  addressed: 'Closed',
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
