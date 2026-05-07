@@ -21,8 +21,10 @@ from ..models import ChatThread, ThreadMessage
 
 logger = logging.getLogger(__name__)
 
-# Model for title/summary generation (use Haiku for speed/cost)
-HAIKU_MODEL = "claude-3-5-haiku-20241022"
+# Model for title/summary generation (use Haiku for speed/cost).
+# claude-3-5-haiku-20241022 was retired; bumped 2026-05-07 to match
+# the current ID already in use by sister service ai_fact_extractor.py.
+HAIKU_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_TIMEOUT_SECONDS = 30
 
 
