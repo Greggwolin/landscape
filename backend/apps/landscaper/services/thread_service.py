@@ -368,21 +368,40 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
     SUMMARY_REGEN_THRESHOLDS = (5, 15, 30, 60)
 
     @staticmethod
+    def _highest_threshold_at_or_below(msg_count: int) -> int:
+        """Return the largest threshold ≤ msg_count, or 0 if below first."""
+        return max(
+            (t for t in ThreadService.SUMMARY_REGEN_THRESHOLDS if t <= msg_count),
+            default=0,
+        )
+
+    @staticmethod
     def maybe_regenerate_summary(thread_id: UUID) -> Optional[str]:
         """
-        Opportunistically regenerate a thread summary when the thread crosses
-        a message-count threshold (5, 15, 30, 60). No-op otherwise.
+        Opportunistically regenerate a thread summary when the thread has
+        either (a) crossed a new threshold this turn, or (b) reached at
+        least the first threshold without ever having a summary yet.
 
-        Used by ThreadMessageViewSet.create after each assistant turn to keep
-        active-thread previews fresh in the center-panel drawer (FB-292 — show
-        1-2 sentence summary on collapsed thread previews).
+        FIX (PG28): the original implementation used an exact-match check
+        (`msg_count in (5, 15, 30, 60)`) which silently never fired the
+        5- and 15-message thresholds because each turn appends BOTH the
+        user message AND the assistant reply, so the message count grows
+        by 2 per turn. The count goes 4 → 6 → 8, never landing exactly
+        on 5 or 15. The current logic uses crossing detection (compare
+        the highest threshold passed at msg_count vs at msg_count - 1)
+        plus a one-time backfill for threads that pre-existed this code.
+
+        Used by ThreadMessageViewSet.create after each assistant turn to
+        keep active-thread previews fresh in the center-panel drawer
+        (FB-292 — show 1-2 sentence summary on collapsed thread previews).
 
         Args:
             thread_id: Thread UUID
 
         Returns:
-            Newly written summary string, or None if no regeneration occurred
-            (count not at a threshold, no messages, or generator failed).
+            Newly written summary string, or None if no regeneration
+            occurred (no threshold crossed and no backfill needed, no
+            messages, or the Haiku generator failed).
         """
         try:
             thread = ChatThread.objects.get(id=thread_id)
@@ -390,7 +409,24 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
             return None
 
         msg_count = thread.messages.count()
-        if msg_count not in ThreadService.SUMMARY_REGEN_THRESHOLDS:
+        first_threshold = ThreadService.SUMMARY_REGEN_THRESHOLDS[0]
+        if msg_count < first_threshold:
+            # Below the first threshold — too few messages to summarize.
+            return None
+
+        # Did this message-create cross a new threshold? (e.g., count
+        # jumped 14 → 16, crossing 15; or 4 → 6, crossing 5.)
+        cur_t = ThreadService._highest_threshold_at_or_below(msg_count)
+        prev_t = ThreadService._highest_threshold_at_or_below(msg_count - 2)
+        crossed_threshold = cur_t > prev_t
+
+        # Backfill: thread already past first threshold but has no
+        # summary (created before FB-292, never crossed a threshold
+        # while the code was running, etc.). Generate once.
+        has_summary = bool(thread.summary and thread.summary.strip())
+        needs_backfill = (not has_summary) and msg_count >= first_threshold
+
+        if not (crossed_threshold or needs_backfill):
             return None
 
         messages = list(thread.messages.all().order_by('created_at')[:20])
@@ -401,12 +437,15 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
         if not summary:
             return None
 
-        # save() instead of update_fields=['summary'] so any concurrent column
-        # writes (e.g., title generation in the same request) aren't clobbered.
+        # update_fields=['summary'] keeps the write narrow; any concurrent
+        # column writes (e.g., title generation in the same request)
+        # aren't clobbered because they target different fields.
         thread.summary = summary
         thread.save(update_fields=['summary'])
+        reason = 'crossed_threshold' if crossed_threshold else 'backfill'
         logger.info(
-            f"Refreshed summary for thread {thread_id} at message count {msg_count}"
+            f"Refreshed summary for thread {thread_id} at message count "
+            f"{msg_count} (reason={reason}, prev_t={prev_t}, cur_t={cur_t})"
         )
         return summary
 
