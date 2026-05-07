@@ -413,13 +413,21 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
     @staticmethod
     def generate_thread_summary(messages: list) -> Optional[str]:
         """
-        Generate a summary of a thread for RAG context.
+        Generate a summary of a thread for RAG context and the
+        center-panel preview row (FB-292).
+
+        Output is a small fragment of HTML (not Markdown, not plain text)
+        so the frontend ThreadList renderer can present key terms with
+        light emphasis without a separate parsing step. Allowed tags are
+        constrained to a safe inline set: <b>, <strong>, <i>, <em>, <br>.
+        No block-level tags, no anchors, no scripts.
 
         Args:
             messages: List of ThreadMessage instances
 
         Returns:
-            Generated summary (2-3 sentences), or None on failure
+            Generated summary HTML fragment (2-3 sentences), or None on
+            failure.
         """
         if not messages:
             return None
@@ -435,29 +443,74 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
 
             conversation = "\n".join(conversation_parts)
 
-            prompt = f"""Summarize this conversation in 2-3 sentences. Focus on:
+            prompt = f"""Summarize this conversation in 2-3 sentences as a small HTML fragment. Focus on:
 - Key topics discussed
 - Decisions made or conclusions reached
 - Important data points mentioned
 
+Formatting rules:
+- Output is HTML, not Markdown.
+- You may use these inline tags only: <b>, <strong>, <i>, <em>, <br>.
+- Bold the 1-3 most important terms with <b>...</b>. Use sparingly.
+- No <p>, <div>, <a>, <script>, no block tags, no links, no images.
+- No surrounding <html> or <body> wrapper.
+
 Conversation:
 {conversation}
 
-Return ONLY the summary, no introduction or explanation."""
+Return ONLY the HTML fragment, no introduction or explanation."""
 
             response = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=150,
+                max_tokens=200,
                 messages=[{"role": "user", "content": prompt}]
             )
 
             summary = response.content[0].text.strip()
+            summary = ThreadService._sanitize_summary_html(summary)
             logger.debug(f"Generated thread summary: {summary[:100]}...")
-            return summary
+            return summary or None
 
         except Exception as e:
             logger.warning(f"Failed to generate thread summary: {e}")
             return None
+
+    # Allowed tag set for thread-summary HTML. Anything else is stripped.
+    # Kept intentionally narrow — these are inline emphasis tags only.
+    _SUMMARY_ALLOWED_TAGS = ('b', 'strong', 'i', 'em', 'br')
+
+    @staticmethod
+    def _sanitize_summary_html(raw: str) -> str:
+        """Strip everything outside the allowed inline-emphasis tag set.
+
+        Defense-in-depth — even though the source is our own Haiku call,
+        the result is rendered with dangerouslySetInnerHTML on the client,
+        so we don't want to assume the model's output is well-formed.
+        Removes any tag whose name (case-insensitive) is not in
+        _SUMMARY_ALLOWED_TAGS, and strips all attributes from the tags
+        that survive (no onclick, no style, no href).
+        """
+        if not raw:
+            return ''
+
+        import re
+
+        allowed = set(t.lower() for t in ThreadService._SUMMARY_ALLOWED_TAGS)
+
+        def _replace(match: 're.Match[str]') -> str:
+            closing = match.group(1) == '/'
+            name = match.group(2).lower()
+            if name not in allowed:
+                return ''
+            # Self-closing for <br>; otherwise emit bare opening or closing tag
+            # with NO attributes preserved.
+            if name == 'br':
+                return '<br>'
+            return f'</{name}>' if closing else f'<{name}>'
+
+        # Match either an opening, closing, or self-closing tag.
+        cleaned = re.sub(r'<\s*(/?)\s*([a-zA-Z][a-zA-Z0-9]*)[^>]*?>', _replace, raw)
+        return cleaned.strip()
 
     @staticmethod
     def update_thread_title(thread_id: UUID, title: str) -> Optional[ChatThread]:
