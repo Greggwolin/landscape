@@ -201,6 +201,9 @@ playwright-report/
 # Set up per project_cowork_direct_access_setup memory entry; mode 600 on disk
 .cowork-*
 
+# EDGAR extraction outputs — regenerable by re-running scripts/edgar/fetch_concept_data.py
+scripts/edgar/output/
+
 
 # Large reference materials (keep local only — too large for GitHub)
 reference/netlease/
