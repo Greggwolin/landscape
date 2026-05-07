@@ -14,7 +14,7 @@
 
 ### Documentation Updated
 
-- **PROJECT_INSTRUCTIONS.md** bumped to v4.5 (uncommitted): Added §22 (Working-Tree Hygiene) — session-start triage in Cowork plus daily-brief audit section for aged uncommitted files. Closes recurring "stale items pile up across sessions" failure mode. Added matching anti-pattern in §6 and two success metrics in §20. Changelog notes v4.2–v4.4 backlog (Cowork-only edits that hadn't been synced to the repo file).
+- **PROJECT_INSTRUCTIONS.md** bumped to v4.6 (uncommitted): Added §22 (Working-Tree Hygiene) — session-start triage in Cowork plus daily-brief audit section for aged uncommitted files. Closes recurring "stale items pile up across sessions" failure mode. Added matching anti-pattern in §6 and two success metrics in §20. Changelog notes v4.2–v4.4 backlog (Cowork-only edits that hadn't been synced to the repo file).
 
 ### Infrastructure
 
@@ -52,12 +52,12 @@ babe9d59 feat(landscaper/threads): FB-292 follow-up — HTML-fragment summaries 
 
 - [ ] Re-run demo project clones on host: `cd backend && ./venv/bin/python manage.py clone_demo_projects` — cloner now includes MF units, leases, and cost approach but existing clones (projects 125, 126) were created before the fix. Need to delete and re-clone.
 - [ ] PropertyTab.tsx floor plan double-counting fix (commit fd54a3e or similar) — deployed? Verify "Units: 113 / 178" no longer appears on Chadron Terrace Rent Roll.
-- [ ] Commit `docs/PROJECT_INSTRUCTIONS.md` v4.5 + `generate_daily_brief.py` aged-WT audit additions — currently uncommitted on `feature/net-lease-foundation`.
+- [ ] Commit `docs/PROJECT_INSTRUCTIONS.md` v4.6 + `generate_daily_brief.py` aged-WT audit additions — currently uncommitted on `feature/net-lease-foundation`.
 - [ ] Reference PDFs in `reference/netlease/` — decide: gitignore, `.wt-defer/`, or commit. These are CM deal packages for net lease foundation work; likely should not be committed to git (large binaries).
 - [ ] `.cowork-*` scratch files — should be added to `.gitignore`.
 - [ ] Net lease Increment 2+ — Operator entity is schema-only; Django models, serializers, Landscaper tools, and extraction pipeline integration still ahead.
 - [ ] Backport PROJECT_INSTRUCTIONS v4.2–v4.4 content (§21 Feedback Lifecycle, §21.9 resolution-language detection) into the repo file — currently Cowork/Claude-only.
-- [ ] Mirror PROJECT_INSTRUCTIONS v4.5 to Cowork project settings + Claude project knowledge per §0.4.
+- [ ] Mirror PROJECT_INSTRUCTIONS v4.6 to Cowork project settings + Claude project knowledge per §0.4.
 
 ## Alpha Readiness Impact
 
