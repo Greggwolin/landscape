@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.4
-**Last Updated:** May 5, 2026
-**Supersedes:** v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.6
+**Last Updated:** May 7, 2026
+**Supersedes:** v4.5 (May 6, 2026), v4.4 (May 5, 2026), v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -29,8 +29,6 @@ When any of the three drift, the master copy in the project files wins. When a r
 **0.3 Capability differences.** Different Claude systems have different powers. See §1.2. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
 
 **0.4 Sync discipline.** When this file is edited, the editor must also update the Cowork project instructions and the Claude project's instructions. Drift between the three is the failure mode this rule prevents.
-
-**0.5 Reference templates.** Long-form templates referenced from this file (CC prompt header, server-restart footer, verification block, success-criteria pattern, handoff doc format, downstream-impact example) live in `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` to keep the canonical rules lean. Read on demand when drafting the deliverable.
 
 ---
 
@@ -128,13 +126,36 @@ When a task requires a capability a system lacks, that system completes preparat
 
 ## 4.0 CC / CODEX PROMPT DRAFTING
 
-**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title.
+**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title:
 
-*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.1.*
+```markdown
+---
+## ⚠️ BEFORE YOU START
+Read this entire prompt thoroughly, then ask any clarifying questions before writing code.
 
-**4.2 Required footer (when applicable).** If the prompt requires a server restart, append the SERVER RESTART block.
+⚠️ DO NOT process, import, or write any data to the database during verification steps.
+Verification is read-only. Confirm pipeline routing by tracing code paths only — do not
+upload test files or trigger extraction runs.
 
-*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.2.*
+If anything is unclear about:
+- [List 4-6 specific areas relevant to the task]
+- File structure or naming conventions
+- How this integrates with existing code
+...ask first. Do not assume.
+---
+```
+
+**4.2 Required footer (when applicable).** If the prompt requires a server restart:
+
+```markdown
+---
+## SERVER RESTART
+After completing this task, restart the servers:
+\`\`\`bash
+bash restart.sh
+\`\`\`
+This restarts both the Next.js app and Django backend.
+```
 
 **4.3 Prompt structure.** Every CC/Codex prompt should include:
 
@@ -151,13 +172,26 @@ When a task requires a capability a system lacks, that system completes preparat
 | VERIFICATION | Commands to confirm completion + downstream checks |
 | SERVER RESTART | If applicable |
 
-**4.4 Verification requirements.** All prompts must include explicit verification commands.
+**4.4 Verification requirements.** All prompts must include explicit verification commands:
 
-*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.4.*
+```bash
+# Example verification block
+cat src/components/NewComponent.tsx | head -50
+npm run build  # Confirm no TypeScript errors
+curl http://localhost:3000/api/test-endpoint
+```
 
-**4.5 Success criteria pattern.** Use numbered checkpoints.
+**4.5 Success criteria pattern.** Use numbered checkpoints:
 
-*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.5.*
+```markdown
+## SUCCESS CRITERIA
+All must pass:
+1. [ ] Component renders without console errors
+2. [ ] API endpoint returns expected data
+3. [ ] No TypeScript warnings
+4. [ ] Existing tests still pass
+5. [ ] Downstream features verified (see DOWNSTREAM IMPACT section)
+```
 
 **4.6 Session ID + echo-back.** Every CC handoff prompt must include a distinctive session ID at the top, a Step 0 in the BEFORE YOU START block where CC echoes back the session ID and current branch before doing any work, and the same session ID baked into the commit message footer. This prevents prompts from being pasted into the wrong CC session and creates an audit trail across the toolchain.
 
@@ -177,18 +211,25 @@ When a task requires a capability a system lacks, that system completes preparat
 
 **5.6** Always include numbers and letters (no bullet points) in questions for easy reference. Multi-part questions use 1a, 1b, 1c style.
 
-**5.7 Plain-English chat replies.** All chat dialogue with Gregg must be written in plain English. The following are not permitted in normal conversation:
+**5.7 Plain-English chat replies — HARD RULE, NO LATITUDE.** All chat dialogue with Gregg is plain English. Period. The following NEVER appear in chat replies, regardless of context, framing, or perceived utility:
 
 - File names, folder names, or paths (e.g., `CLAUDE.md`, `tool_schemas.py`, `/w/`)
 - Database table, column, schema, or migration names
 - Code-construct names (functions, classes, methods, hooks, components, decorators)
-- Branch names, commit hashes, session IDs, ticket numbers
-- Server, deployment, or infrastructure terms (commit, push, deploy, build, endpoint, API, merge, stage, diff, stash)
+- Branch names, commit hashes (full or short), session IDs, ticket numbers
+- Server, deployment, or infrastructure terms (commit, push, deploy, build, endpoint, API, merge, stage, diff, stash, branch, worktree, repo, gitignore)
 - Programming language or framework names (React, Python, TypeScript, SQL, Django)
+- Code blocks of any kind
+- SQL of any kind, inline or block
+- Inline code spans (backticks)
 
-**Single carve-out.** When Gregg's own message asks a specifically technical question (e.g., "what's the file path?", "what branch are we on?", "what does the function return?"), Cowork may answer in technical terms appropriate to that question. The carve-out is narrow: it fires only when Gregg's message asks for a technical answer, not when Cowork is summarizing technical work it just did.
+**Single-fact carve-out.** If Gregg's message asks for one specific technical fact (e.g., "what's the file path?", "what branch are we on?"), reply with that fact alone, on one line, with no surrounding explanation. Anything that needs more than one line of technical content goes into a file or artifact and gets linked from chat. The carve-out does NOT cover summaries, status updates, or descriptions of technical work performed.
 
-**Files are exempt.** Documents and prompts produced for technical audiences (CC prompts, code, audits, spec files, this document itself) may contain full technical detail — that's their purpose. The rule applies to chat dialogue only.
+**The most common slippage** is summarizing technical work after completing it. Stop. Write a one-line plain-English summary of what changed in user-visible terms ("merged the missing section back in," "tightened the rule about formatting"). Put any technical detail into the file or artifact that holds the work, and link it.
+
+**Files are exempt.** Documents and prompts produced for technical audiences (CC prompts, code, audits, spec files, this document itself) carry full technical detail — that's what they're for. The rule applies to chat dialogue only.
+
+**Why this is hard-and-fast.** Chat threads get long fast. Gregg loses track of which CC sessions tie to which threads when chat is cluttered with technical chatter. Plain English keeps thread state navigable. A response that violates §5.7 is a defect, not a stylistic preference.
 
 **Translation pattern.** Describe the thing, don't name it: "the file that tells the coding assistant how the project works" instead of `CLAUDE.md`; "the chat-first version of the app" instead of `the /w/ route layer`; "saved the changes" instead of "committed".
 
@@ -197,6 +238,23 @@ When a task requires a capability a system lacks, that system completes preparat
 **5.9** Do NOT include "time to complete" estimates for tasks or processes.
 
 **5.10 ID strings.** Each chat has a unique two-letter prefix. Include the ID at the end of each prompt and response (e.g., UC6_33, PK14, mv4). Use IDs to reference specific exchanges in handoffs and follow-ups.
+
+**5.11 Brevity — HARD RULE.** Every Cowork chat reply cuts to roughly half the first-pass length without losing content. Conclusion first. One line per item. Elaborate only when Gregg asks.
+
+Cut these patterns aggressively:
+
+- Restating context Gregg already has
+- Meta-commentary about the reply itself ("two layers to flag here," "worth pointing out," "the irony is")
+- Trailing victory laps ("done," "now we're good," "and that's it")
+- Re-explaining a thing in different words after naming it once
+- Hedge adverbs ("clearly," "actually," "essentially," "basically," "fundamentally")
+- Conditional hedges when a direct call works ("you might consider," "it could make sense to," "one option would be")
+- Restating the user's question before answering it
+- Setup phrases ("OK, here's the deal," "let me think about this," "to be clear")
+
+A reply that survives a 50% cut without losing meaning was over-written. Treat that as a defect, same severity as §5.7. Gregg has 35 years of CRE experience and pays attention — assume he gets it the first time.
+
+**Worked example.** A 320-word triage recommendation with five groups of items can be delivered in ~80 words: one line per group, action verb up front, no preamble, no recap, no closing offer. The user prefers the 80-word version.
 
 ---
 
@@ -222,6 +280,9 @@ Things that cause friction. Do not do these.
 - Delivering a technical spec as a single tech-heavy `.md` without the plain-English HTML companion (§10.5)
 - Slipping technical jargon (file names, branch names, table names, infrastructure terms) into plain conversation when no technical question was asked (§5.7)
 - Designing or building any tool / artifact / data-flow change without first auditing the schema for discriminator / scenario / source / vintage columns (§17.7). Skipping the schema audit is the failure mode that produced the F-12 / discriminator-taxonomy mismatch in chat hx — the user is non-technical and cannot backstop a missed schema-level concept
+- Starting a session and silently editing files without first surfacing pre-existing untracked / uncommitted items from prior sessions (§22.1). Each Cowork session must run startup triage on the working tree and confront aged items before adding new work on top of them.
+- Creating a new branch or worktree on top of uncommitted work without confronting the source-branch state first (§22.6)
+- Drafting chat replies that bloat past their first cut — restated context, meta-commentary, victory laps, hedge adverbs, setup phrases (§5.11). If the reply survives a 50% cut without losing meaning, it was over-written.
 
 ---
 
@@ -324,9 +385,50 @@ These rules apply to Claude.ai chat where context windows are bounded. Cowork an
 | Database State | Migration numbers, table counts if relevant |
 | Continuation Instructions | Exact prompt for next chat |
 
-**9.4.1 Handoff format.** Use the canonical handoff template.
+**9.4.1 Handoff format.** Use this template:
 
-*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §9.4.1.*
+```markdown
+# CONTEXT HANDOFF FOR NEW CHAT
+
+**Date:** [today]
+**Session IDs:** [list all relevant session codes]
+**Branch:** [current working branch]
+
+## Current Project
+[specific app/feature being built]
+
+## Status
+[exactly where we left off]
+
+## Completed This Session
+1. [task with commit ref]
+2. [task with commit ref]
+
+## Pending Tasks
+1. [priority 1 task]
+2. [priority 2 task]
+
+## Next Steps
+1. [specific immediate action]
+2. [specific immediate action]
+
+## Key Files Referenced
+- [filename] — [purpose]
+- [filename] — [purpose]
+
+## Critical Context
+[essential background from project knowledge]
+
+## Database State
+- Migrations: [last migration number]
+- Tables: [count if changed]
+
+## For New Chat
+Start with: "[exact continuation prompt]"
+
+## File References for Upload
+- [list files to upload to new chat if needed]
+```
 
 ---
 
@@ -511,7 +613,25 @@ WHERE id = [test_id];
 
 **17.4 CC prompt integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that lists files/endpoints being modified, lists known consumers of those files/endpoints, specifies verification commands for downstream features, and includes at least one database-level check if financial data is involved.
 
-*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §17.4.*
+Example:
+
+```markdown
+## DOWNSTREAM IMPACT
+**Files being modified:**
+- `backend/apps/financial/views.py` — budget rollup endpoint
+
+**Known consumers:**
+- `src/components/budget/BudgetGridTab.tsx` — renders rollup totals
+- `src/hooks/useBudgetSummary.ts` — SWR hook consuming this endpoint
+- `backend/apps/landscaper/tools/budget_tools.py` — Landscaper reads rollup
+- `services/financial_engine_py/cash_flow.py` — cash flow pulls budget data
+
+**Post-change verification:**
+1. Budget grid renders correct totals for Peoria Lakes
+2. Cash flow analysis produces same output as before change
+3. Landscaper can answer "what's the total budget?" correctly
+4. `npm run build` passes with no type errors
+```
 
 **17.5 Escalation rule.** If a change touches a high-risk zone and you cannot confidently trace all consumers, flag it for CC with a discovery-first prompt (read-only audit) before any modifications.
 
@@ -584,7 +704,11 @@ Sync triggers:
 - Specs are delivered in dual format — tech `.md` + plain-English HTML — never tech-only (§10.5)
 - Chat replies are in plain English; technical jargon never bleeds into normal conversation (§5.7)
 - All Claude systems read the same canonical instructions (this file)
+- Working-tree hygiene check fires at the start of every Cowork session; stale items either get committed, discarded, or explicitly deferred — never silently ignored (§22)
+- The daily brief surfaces aged uncommitted files so silent buildup gets caught even when a session skips startup triage (§22.2)
 - When tied to a feedback item, Cowork maintains `working_summary` silently and never narrates the append (§21)
+- Chat replies cut to roughly half the first-pass length without losing content; bloat patterns (restated context, meta-commentary, victory laps, hedge adverbs) get caught and trimmed before sending (§5.11)
+- Every new branch or worktree starts on a clean foundation; pending commits get plain-English descriptions to Gregg, never bare hashes (§22.6)
 
 ---
 
@@ -651,7 +775,7 @@ Stdout is ignored — the append is silent. If the command errors (bad fb_id, mi
 
 **21.8 Closing the loop.** Append a `[resolved]` line when the fix is complete and a CC handoff is being prepared. Append a `[closed]` line (with the commit hash if known) once CC has landed the commit. Both are append-only entries to `working_summary`. The status column transition (in_progress → addressed → closed) is owned by §21.9 (resolution-language detection) and the existing `close_feedback` / daily-brief auto-resolution paths.
 
-**21.9 Resolution-language detection [Phase 5].** When working in a chat tied to a feedback item, watch Gregg's messages for resolution-language signals: "fixed," "done," "that worked," "looks good," "nailed it," "ship it," "that did it," and bare "yes" when it's clearly answering an "is this fixed?" question. When detected, evaluate confidence and either auto-proceed or ask.
+**21.9 Resolution-language detection.** When working in a chat tied to a feedback item, watch Gregg's messages for resolution-language signals: "fixed," "done," "that worked," "looks good," "nailed it," "ship it," "that did it," and bare "yes" when it's clearly answering an "is this fixed?" question. When detected, evaluate confidence and either auto-proceed or ask.
 
 **21.9.1 HIGH-confidence threshold (auto-proceed).** All three must be true:
 
@@ -671,14 +795,14 @@ If Gregg confirms → execute the auto-action set per §21.9.3. If Gregg says no
 
 1. Run `python manage.py mark_feedback_addressed FB-N` — flips `tbl_feedback.status` from `in_progress` to `addressed` and stamps `addressed_at = NOW()`.
 2. Append a `[resolved]` line to `working_summary` via `append_feedback_line` (§21.5).
-3. Draft a CC commit-and-push prompt as a downloadable `.md` file in the workspace folder. The prompt must follow §4 standards (session ID + echo-back, ⚠️ BEFORE YOU START block, downstream-impact section, verification commands, success criteria), reference the FB id, and include the file list pulled from `git status` in the prompt body.
-4. Tell Gregg in chat — exactly one line per §5.7: `Marked addressed; commit prompt saved.` followed by a link to the `.md` file. NOTHING else — no narration of the steps above.
+3. Draft a CC commit-and-push prompt as a downloadable `.md` file in the workspace folder. The prompt must follow §4 standards (session ID + echo-back, ⚠️ BEFORE YOU START block, downstream-impact section, verification commands, success criteria), reference the FB id, and include the file list pulled from `git status` in the prompt body. Per §22.6, the prompt's commit-list section uses plain-English descriptions of each pending change, not bare file paths.
+4. Tell Gregg in chat — exactly one line per §5.7: a single short plain-English confirmation followed by a link to the saved prompt file. NOTHING else — no narration of the steps above.
 
 **21.9.4 Closing the loop after CC commits.** When CC reports back that the commit landed (Cowork sees the commit hash in chat or in transcript), Cowork:
 
 1. Runs `mark_feedback_addressed FB-N --commit-sha <sha> --commit-url <url>` to backfill the commit reference. (Re-running on an already-addressed row merges the new info; see the command's `COALESCE` behavior.)
 2. Appends a `[closed]` line to `working_summary` with the commit SHA.
-3. Tells Gregg in one line: `FB-N closed. Commit <short-sha> landed.`
+3. Tells Gregg in one plain-English line that the item closed and the work landed. Per §5.7, no SHA or branch name in chat.
 
 The status transition from `addressed` → `closed` happens via the daily-brief auto-resolution path (`fixes FB-N` / `closes FB-N` / `resolves FB-N` regex on commit messages), or explicitly via `close_feedback FB-N --note "..."`. Cowork itself does NOT flip to `closed` directly — that boundary belongs to the existing close paths so the audit trail stays unified.
 
@@ -690,22 +814,48 @@ The status transition from `addressed` → `closed` happens via the daily-brief 
 
 ---
 
-## CHANGELOG
+## 22.0 WORKING-TREE HYGIENE [COWORK + CC]
 
-**v4.4 (2026-05-05)** — Session-credit / context-budget pass. Extracted long-form templates (CC prompt header, handoff doc format, formal correspondence rules, downstream-impact example block) to a new reference file `docs/PROJECT_INSTRUCTIONS_REFERENCE.md`. Behavioral rules unchanged; only literal template bodies moved. Auto-load surface area for this file reduced. Companion change: CLAUDE.md session-log footer also extracted to `docs/CLAUDE_SESSION_HISTORY.md`. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+This section closes the recurring "stale items pile up across sessions" failure mode. Multiple chats in a row committed targeted file lists (no `git add -A`) and left orphan modifications and untracked detritus behind. Items like an admin feedback page edit and stray reference PDFs accumulated for weeks without anyone confronting them. The rule below makes the buildup visible at session start and again every night.
 
-**v4.3 (2026-05-05)** — Added §21.9 (Resolution-language detection) for LSCMD-FBLOG-0505-kp Phase 5. HIGH-confidence threshold locked at three conditions (prior-turn announces completion + clean trigger word + continuous topic). ASK-first fallback for anything below HIGH. Auto-action set: flip status to addressed, append [resolved], draft commit prompt, one-line confirmation. New `mark_feedback_addressed` Django management command added as the in_progress → addressed transition path (close_feedback already owns terminal states). Closing-loop semantics: Cowork stamps the commit on the addressed row but never flips to closed itself — that boundary stays with close_feedback and the daily-brief auto-resolver. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+**22.1 Working-tree triage at session start [COWORK].** When Cowork picks up a Landscape chat, before doing any other work on the user's request, run a working-tree inventory and surface aged items in plain English to Gregg. Specifically:
 
-**v4.2 (2026-05-05)** — Added §21 (Feedback Lifecycle Tracking) for the silent `working_summary` append behavior introduced in LSCMD-FBLOG-0505-kp Phase 3. Inflection-point taxonomy locked at start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. User-input firing discipline (§21.3) clarifies what counts as direction-changing input vs conversational filler. New `append_feedback_line` Django management command is the append mechanism. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+1. Enumerate every uncommitted-modified file and every untracked file in the repo working tree. Include `git status --porcelain` output as the source.
+2. Bucket each item by file mtime:
+   - 0–2 days = "fresh"
+   - 3–7 days = "stale"
+   - 8+ days = "abandoned"
+3. If any "stale" or "abandoned" items exist, surface them in plain English BEFORE starting the user's actual request. Group by folder where useful. For each group, ask whether the items should be committed, discarded, or deferred. One question per group, not one question per file. Use AskUserQuestion.
+4. Do NOT silently work around stale items as if they don't exist. Each new session must either confront the buildup or have it explicitly deferred by the user.
+5. Carve-out: items that the active task is about to write to (the same file Cowork is editing) skip triage — they're not detritus.
+6. Carve-out: items registered in `.wt-defer/`-style explicit deferrals (see §22.4) skip triage.
 
-**v4.1 (2026-05-01)** — Added §17.7 (schema audit before architectural proposals) after a direct loss event in chat hx where F-12 server-derivation was built across two sessions before discovering the existing `statement_discriminator` scenario taxonomy. Added §17.8 with the new high-risk zone (operating-expense discriminator + active_opex_discriminator). Updated §6 anti-patterns with the matching skip-the-schema-audit failure mode. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+**22.2 Daily brief WT audit [CC infrastructure].** The nightly daily brief at `scripts/brief/generate_daily_brief.py` includes a "Uncommitted ≥ 2 days" section listing aged uncommitted and untracked files visible across the repo, grouped by age (Stale 3–7 days / Abandoned 8+ days). This is the safety net for sessions where Cowork's startup triage was skipped or the user chose "defer" — the buildup still appears in the morning brief until it's resolved.
 
-**v4.0 (2026-04-30)** — Full rewrite. Tightened structure, removed redundant section overlap (consolidated former §16 + §20 + §21 into single §15 awareness-context section), absorbed §12 ID strings into §5.10, added §10.6 HTML-first rule, §13.3 content provenance tags, §13.4 inline liner notes, §14.4 no fragment commits, §15.6 no autonomous value inference, §4.6 session ID + echo-back. Reframed header — three intended homes (master file, Cowork project instructions, Claude project instructions), no longer references nonexistent personal-pref layer.
+**22.3 Carry-over discipline.** When the user picks "defer" for a stale item, Cowork records the deferral with a date stamp and the reason in the chat-tied feedback row (if any) or in a session note. Indefinite deferral with no recorded reason is the failure mode this rule prevents.
 
-**v3.1 (2026-04-30)** — Added explicit Plain-English Chat Replies rule at §5.7 with single carve-out. Added matching anti-pattern entry in §6.
+**22.4 Explicit indefinite holds.** Items the user has explicitly tagged for long-term hold (vendor sample uploads, reference PDFs that aren't going into the repo) can be moved into a `.wt-defer/` folder (gitignored) or added to `.gitignore` to remove them from triage. This requires explicit user direction at hold time, not assumption.
 
-**v3.0 (2026-04-25)** — Unified prior Cowork v1.2 + Claude.ai v2.4 into single canonical document. Saved to repo at `/landscape/docs/PROJECT_INSTRUCTIONS.md`. Added §0 multi-system applicability tags + sync discipline. Added §1.2 capability matrix. Added §7.6 canonical table pattern. Removed hard-coded Landscaper tool count (deferred to CLAUDE.md).
+**22.5 Why both layers.** Session-start triage (§22.1) catches the buildup before Cowork does new work on top of it. Daily-brief audit (§22.2) catches what session-start triage missed (sessions Cowork didn't run, sessions where the user chose defer-and-forget). The two together make silent decay impossible: every uncommitted file is either acted on within a few days or explicitly held.
+
+**22.6 Pre-branch/worktree commit discipline [COWORK + CC].** Before any Claude system creates a new branch or git worktree, all current uncommitted and unpushed work on the source branch must be confronted: committed and pushed, explicitly stashed (with a name describing what the stash holds), or explicitly discarded with Gregg's confirmation. The next branch always starts on a clean foundation.
+
+1. **Cowork preparing a CC handoff that involves branching.** Surface the source-branch state to Gregg first, in plain English, before drafting the prompt. List each pending change as a short plain-English description: what the work was about, what the user-visible change is, why it was paused. Never list a bare commit hash to Gregg.
+2. **CC executing a branch-creation prompt.** Verify the source branch is clean as Step 0, before any branch operation. If not clean, halt and report. The prompt itself must include this verification step — branch creation is never the first action when the working tree has uncommitted changes.
+3. **Plain-English summary applies to all commit lists shown to Gregg** — pre-branch checks, daily brief, working-tree triage, post-commit confirmations. A commit hash without an English summary is treated the same as no summary: insufficient. Gregg cannot interpret a SHA on its own.
+4. **This rule supersedes §14.3 and §14.4 when they conflict** — branch hygiene is upstream of branch strategy. A new branch on a dirty foundation is the failure mode this rule prevents.
+5. **Carve-out.** Single-file scratch branches that the user explicitly directs Cowork to create on a dirty tree (e.g., "spin up a quick branch for X, leave the other stuff where it is") are exempt — but only when Gregg's direction is explicit. Default behavior remains clean-first.
 
 ---
 
-End of Landscape Project Instructions v4.4
+## CHANGELOG
+
+**v4.6 (2026-05-07)** — Four changes. (1) Tightened §5.7 to a hard rule with a single-fact carve-out — closes the recurring slippage of technical jargon and code/SQL bleeding into chat replies. (2) Added §5.11 (Brevity hard rule) — chat replies cut to ~50% of first-pass length, with a concrete cut-list of bloat patterns (restated context, meta-commentary, victory laps, hedge adverbs, setup phrases). Catches the over-writing that §5.7's prose-only rule alone doesn't address. (3) Added §22.6 (Pre-branch/worktree commit discipline) — every new branch starts on a clean foundation, every commit list shown to Gregg gets a plain-English description, never a bare hash. (4) Back-ported §21 (Feedback Lifecycle Tracking, including §21.9 resolution-language detection) from Cowork-side v4.2/v4.3/v4.4 — closes the v4.1→v4.5 drift the v4.5 changelog flagged. Full version history moved to `docs/PROJECT_INSTRUCTIONS_CHANGELOG.md`. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+
+**v4.5 (2026-05-06)** — Added §22 (Working-Tree Hygiene). Session-start triage in Cowork plus a daily-brief audit section. Closes the recurring "stale items pile up across sessions" failure mode.
+
+Prior versions: see `docs/PROJECT_INSTRUCTIONS_CHANGELOG.md`.
+
+---
+
+End of Landscape Project Instructions v4.6

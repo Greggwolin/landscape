@@ -23,6 +23,7 @@ Refs: daily-brief/MOCKUP-redesign.html (design source of truth)
 
 import json
 import os
+import time
 import re
 import shutil
 import subprocess
@@ -213,6 +214,88 @@ def gather_uncommitted_summary() -> dict:
         'modified': modified,
         'deleted': deleted,
         'untracked_count': untracked_count,
+    }
+
+
+def gather_aged_uncommitted(stale_after_days: int = 2,
+                            abandoned_after_days: int = 8) -> dict:
+    """Working-tree audit (PROJECT_INSTRUCTIONS §22.2 — daily safety net).
+
+    Returns items grouped by age based on filesystem mtime, NOT git
+    timestamps. The point is to catch silent buildup of uncommitted work
+    across sessions — files that were touched days ago and never landed
+    in a commit. The session-start triage in Cowork (§22.1) is the
+    primary defense; this is the morning-after net for sessions where
+    triage was skipped or the user chose to defer.
+
+    Buckets:
+      stale     — last modified ≥ stale_after_days, < abandoned_after_days
+      abandoned — last modified ≥ abandoned_after_days
+    Items younger than stale_after_days are not surfaced (they're still
+    fresh; expected churn).
+
+    Returns:
+        {
+          'stale':     [{'path': str, 'days': int, 'kind': 'modified'|'untracked'|'deleted'|'staged'}, ...],
+          'abandoned': [{'path': str, 'days': int, 'kind': ...}, ...],
+          'thresholds': {'stale': N, 'abandoned': M},
+        }
+    """
+    porcelain = _git('status', '--porcelain')
+    now = time.time()
+    stale: list[dict] = []
+    abandoned: list[dict] = []
+
+    for line in porcelain.splitlines():
+        if not line:
+            continue
+        xy = line[:2]
+        path = line[3:]
+        # `git status --porcelain` quotes paths containing spaces or special
+        # chars — strip surrounding quotes so the resolved Path is correct.
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+
+        if xy == '??':
+            kind = 'untracked'
+        elif 'D' in xy:
+            kind = 'deleted'
+        elif xy[0] != ' ' and xy[0] != '?':
+            # Index-side change (staged but not committed)
+            kind = 'staged'
+        else:
+            kind = 'modified'
+
+        # Resolve mtime against the repo root; deleted files have no
+        # filesystem entry, so we fall back to "abandoned" by default.
+        full = REPO_ROOT / path
+        if kind == 'deleted' or not full.exists():
+            # Treat deleted entries as 0-age — they show up under
+            # uncommitted-right-now anyway. Skip the age audit for these
+            # so they don't double-surface.
+            continue
+        try:
+            mtime = full.stat().st_mtime
+        except OSError:
+            continue
+        days = int((now - mtime) // 86400)
+        if days >= abandoned_after_days:
+            abandoned.append({'path': path, 'days': days, 'kind': kind})
+        elif days >= stale_after_days:
+            stale.append({'path': path, 'days': days, 'kind': kind})
+
+    # Sort each bucket oldest-first within bucket so the most-aged items
+    # surface at the top of each group.
+    stale.sort(key=lambda r: r['days'], reverse=True)
+    abandoned.sort(key=lambda r: r['days'], reverse=True)
+
+    return {
+        'stale': stale,
+        'abandoned': abandoned,
+        'thresholds': {
+            'stale': stale_after_days,
+            'abandoned': abandoned_after_days,
+        },
     }
 
 
@@ -816,6 +899,57 @@ def render_uncommitted(summary: dict) -> str:
     )
 
 
+def render_aged_uncommitted(audit: dict) -> str:
+    """Aged-WT audit (§22.2) — safety net for uncommitted items that
+    survived past the session-start triage cadence. Renders nothing
+    when both buckets are empty, so a clean tree shows no clutter.
+    """
+    stale = audit['stale']
+    abandoned = audit['abandoned']
+    if not stale and not abandoned:
+        return '<div class="empty">No uncommitted items older than 2 days. Working tree is current.</div>'
+
+    kind_label = {
+        'modified': 'Modified',
+        'untracked': 'Untracked',
+        'staged': 'Staged',
+        'deleted': 'Deleted',
+    }
+
+    def _row(item: dict) -> str:
+        days = item['days']
+        kind = kind_label.get(item['kind'], item['kind'])
+        path = _esc(item['path'])
+        day_word = 'day' if days == 1 else 'days'
+        return (
+            f'<div class="meta-row">'
+            f'<strong>{kind}</strong> · <code>{path}</code> '
+            f'<span style="color:var(--muted);">— {days} {day_word} since edit</span>'
+            f'</div>'
+        )
+
+    parts: list[str] = []
+    if abandoned:
+        n = len(abandoned)
+        parts.append(
+            f'<div class="item"><div class="body">'
+            f'<div class="what"><strong>Abandoned ({n}):</strong> 8+ days since last edit, '
+            f'still uncommitted. Confront before adding new work on top.</div>'
+            f'<div class="meta">{"".join(_row(r) for r in abandoned)}</div>'
+            f'</div></div>'
+        )
+    if stale:
+        n = len(stale)
+        parts.append(
+            f'<div class="item"><div class="body">'
+            f'<div class="what"><strong>Stale ({n}):</strong> 3–7 days since last edit. '
+            f'Either commit, discard, or formally defer.</div>'
+            f'<div class="meta">{"".join(_row(r) for r in stale)}</div>'
+            f'</div></div>'
+        )
+    return ''.join(parts)
+
+
 def render_system_status(health: dict, today: date) -> str:
     if health['status'] == 'fresh':
         failures = health.get('failures') or []
@@ -857,7 +991,8 @@ def render_system_status(health: dict, today: date) -> str:
 def render_html(*, today: date, branch: str, open_feedback: list[dict],
                 resolved_recent: list[dict], wip_rows: list[dict],
                 sessions: list[dict], worktree_count: int,
-                uncommitted: dict, health: dict) -> str:
+                uncommitted: dict, aged_uncommitted: dict,
+                health: dict) -> str:
     in_progress_count = sum(1 for r in open_feedback if r['status'] == 'in_progress')
     summary = render_summary(
         today=today,
@@ -889,6 +1024,8 @@ def render_html(*, today: date, branch: str, open_feedback: list[dict],
 {render_parallel(worktree_count)}
 <h2>Uncommitted Right Now</h2>
 {render_uncommitted(uncommitted)}
+<h2>Uncommitted ≥ 2 days (aged)</h2>
+{render_aged_uncommitted(aged_uncommitted)}
 <h2>System Status</h2>
 {render_system_status(health, today)}
 <div class="footer">
@@ -924,6 +1061,7 @@ def main() -> int:
     commits = gather_commits_24h()
     health = gather_health_status()
     uncommitted = gather_uncommitted_summary()
+    aged_uncommitted = gather_aged_uncommitted()
     wip_rows = gather_wip_branches()
     sessions = gather_sessions_3day(today)
     worktree_count = count_worktrees()
@@ -941,6 +1079,7 @@ def main() -> int:
         sessions=sessions,
         worktree_count=worktree_count,
         uncommitted=uncommitted,
+        aged_uncommitted=aged_uncommitted,
         health=health,
     )
     dated, current = write_outputs(html, today)
