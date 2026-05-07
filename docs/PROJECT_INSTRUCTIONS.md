@@ -1,8 +1,8 @@
 # Landscape Project Instructions
 
-**Version:** 4.1
-**Last Updated:** May 1, 2026
-**Supersedes:** v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
+**Version:** 4.4
+**Last Updated:** May 5, 2026
+**Supersedes:** v4.3 (May 5, 2026), v4.2 (May 5, 2026), v4.1 (May 1, 2026), v4.0 (April 30, 2026), v3.1 (April 30, 2026), v3.0 (April 25, 2026), Cowork Edition v1.2, Claude.ai v2.4
 
 This is the single canonical version of the project instructions for the Landscape app. The same text is intended to live in three places:
 
@@ -29,6 +29,8 @@ When any of the three drift, the master copy in the project files wins. When a r
 **0.3 Capability differences.** Different Claude systems have different powers. See §1.2. When a rule references a capability a given system doesn't have, that rule is a no-op for that system.
 
 **0.4 Sync discipline.** When this file is edited, the editor must also update the Cowork project instructions and the Claude project's instructions. Drift between the three is the failure mode this rule prevents.
+
+**0.5 Reference templates.** Long-form templates referenced from this file (CC prompt header, server-restart footer, verification block, success-criteria pattern, handoff doc format, downstream-impact example) live in `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` to keep the canonical rules lean. Read on demand when drafting the deliverable.
 
 ---
 
@@ -126,36 +128,13 @@ When a task requires a capability a system lacks, that system completes preparat
 
 ## 4.0 CC / CODEX PROMPT DRAFTING
 
-**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title:
+**4.1 Required header.** All CC/Codex prompts must include this section immediately after the title.
 
-```markdown
----
-## ⚠️ BEFORE YOU START
-Read this entire prompt thoroughly, then ask any clarifying questions before writing code.
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.1.*
 
-⚠️ DO NOT process, import, or write any data to the database during verification steps.
-Verification is read-only. Confirm pipeline routing by tracing code paths only — do not
-upload test files or trigger extraction runs.
+**4.2 Required footer (when applicable).** If the prompt requires a server restart, append the SERVER RESTART block.
 
-If anything is unclear about:
-- [List 4-6 specific areas relevant to the task]
-- File structure or naming conventions
-- How this integrates with existing code
-...ask first. Do not assume.
----
-```
-
-**4.2 Required footer (when applicable).** If the prompt requires a server restart:
-
-```markdown
----
-## SERVER RESTART
-After completing this task, restart the servers:
-\`\`\`bash
-bash restart.sh
-\`\`\`
-This restarts both the Next.js app and Django backend.
-```
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.2.*
 
 **4.3 Prompt structure.** Every CC/Codex prompt should include:
 
@@ -172,26 +151,13 @@ This restarts both the Next.js app and Django backend.
 | VERIFICATION | Commands to confirm completion + downstream checks |
 | SERVER RESTART | If applicable |
 
-**4.4 Verification requirements.** All prompts must include explicit verification commands:
+**4.4 Verification requirements.** All prompts must include explicit verification commands.
 
-```bash
-# Example verification block
-cat src/components/NewComponent.tsx | head -50
-npm run build  # Confirm no TypeScript errors
-curl http://localhost:3000/api/test-endpoint
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.4.*
 
-**4.5 Success criteria pattern.** Use numbered checkpoints:
+**4.5 Success criteria pattern.** Use numbered checkpoints.
 
-```markdown
-## SUCCESS CRITERIA
-All must pass:
-1. [ ] Component renders without console errors
-2. [ ] API endpoint returns expected data
-3. [ ] No TypeScript warnings
-4. [ ] Existing tests still pass
-5. [ ] Downstream features verified (see DOWNSTREAM IMPACT section)
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §4.5.*
 
 **4.6 Session ID + echo-back.** Every CC handoff prompt must include a distinctive session ID at the top, a Step 0 in the BEFORE YOU START block where CC echoes back the session ID and current branch before doing any work, and the same session ID baked into the commit message footer. This prevents prompts from being pasted into the wrong CC session and creates an audit trail across the toolchain.
 
@@ -358,50 +324,9 @@ These rules apply to Claude.ai chat where context windows are bounded. Cowork an
 | Database State | Migration numbers, table counts if relevant |
 | Continuation Instructions | Exact prompt for next chat |
 
-**9.4.1 Handoff format.** Use this template:
+**9.4.1 Handoff format.** Use the canonical handoff template.
 
-```markdown
-# CONTEXT HANDOFF FOR NEW CHAT
-
-**Date:** [today]
-**Session IDs:** [list all relevant session codes]
-**Branch:** [current working branch]
-
-## Current Project
-[specific app/feature being built]
-
-## Status
-[exactly where we left off]
-
-## Completed This Session
-1. [task with commit ref]
-2. [task with commit ref]
-
-## Pending Tasks
-1. [priority 1 task]
-2. [priority 2 task]
-
-## Next Steps
-1. [specific immediate action]
-2. [specific immediate action]
-
-## Key Files Referenced
-- [filename] — [purpose]
-- [filename] — [purpose]
-
-## Critical Context
-[essential background from project knowledge]
-
-## Database State
-- Migrations: [last migration number]
-- Tables: [count if changed]
-
-## For New Chat
-Start with: "[exact continuation prompt]"
-
-## File References for Upload
-- [list files to upload to new chat if needed]
-```
+*Template body: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §9.4.1.*
 
 ---
 
@@ -586,25 +511,7 @@ WHERE id = [test_id];
 
 **17.4 CC prompt integration.** Every implementation or fix/debug CC prompt MUST include a DOWNSTREAM IMPACT section that lists files/endpoints being modified, lists known consumers of those files/endpoints, specifies verification commands for downstream features, and includes at least one database-level check if financial data is involved.
 
-Example:
-
-```markdown
-## DOWNSTREAM IMPACT
-**Files being modified:**
-- `backend/apps/financial/views.py` — budget rollup endpoint
-
-**Known consumers:**
-- `src/components/budget/BudgetGridTab.tsx` — renders rollup totals
-- `src/hooks/useBudgetSummary.ts` — SWR hook consuming this endpoint
-- `backend/apps/landscaper/tools/budget_tools.py` — Landscaper reads rollup
-- `services/financial_engine_py/cash_flow.py` — cash flow pulls budget data
-
-**Post-change verification:**
-1. Budget grid renders correct totals for Peoria Lakes
-2. Cash flow analysis produces same output as before change
-3. Landscaper can answer "what's the total budget?" correctly
-4. `npm run build` passes with no type errors
-```
+*Example block: see `docs/PROJECT_INSTRUCTIONS_REFERENCE.md` §17.4.*
 
 **17.5 Escalation rule.** If a change touches a high-risk zone and you cannot confidently trace all consumers, flag it for CC with a discovery-first prompt (read-only audit) before any modifications.
 
@@ -677,10 +584,119 @@ Sync triggers:
 - Specs are delivered in dual format — tech `.md` + plain-English HTML — never tech-only (§10.5)
 - Chat replies are in plain English; technical jargon never bleeds into normal conversation (§5.7)
 - All Claude systems read the same canonical instructions (this file)
+- When tied to a feedback item, Cowork maintains `working_summary` silently and never narrates the append (§21)
+
+---
+
+## 21.0 FEEDBACK LIFECYCLE TRACKING [COWORK]
+
+When Cowork is working in a chat that is tied to a specific `tbl_feedback` row, it should silently maintain that row's `working_summary` column as a chronological log of inflection points. The summary lets Gregg pick up where prior work left off without re-litigating decisions, and feeds the "Prior work on this item" section that surfaces in the row's Fix Prompt the next time it's clicked.
+
+**21.1 When this section applies.** A Cowork chat is "tied to a feedback item" if either of the following is true:
+
+1. The chat was started from the Fix Prompt button on a specific FB row — the pasted prompt opens with `Triage feedback item FB-N from the Landscape app.`
+2. Gregg's first message or the active context explicitly references a feedback id by name (e.g., "look at FB-281," "fix this — it's FB-291").
+
+If neither is true, this section is a no-op for that chat.
+
+**21.2 Inflection-point taxonomy.** Append a new line to `working_summary` at each of the following inflection points, and only at these:
+
+- `[start]` — Cowork picks up the item (read the row, opened relevant files).
+- `[decision]` — A direction-shaping call locked in (architecture choice, scope cut, naming).
+- `[edit]` — A code, schema-spec, or config edit was made.
+- `[blocker]` — A blocker surfaced (unanswered question, broken dependency, infra gap).
+- `[user-input]` — Gregg's message supplied a decision, constraint, correction, answer, or new information that changed the direction of the work (see §21.3).
+- `[artifact]` — A new artifact was generated for the item (file in workspace folder, HTML companion, diagram).
+- `[prompt]` — A CC handoff prompt was drafted for the item.
+- `[resolved]` — The fix is complete, awaiting commit/push.
+- `[closed]` — The CC commit landed; the item is fully closed.
+- `[note]` — Catch-all for things that should be in the trail but don't fit the above (use sparingly).
+
+NOT every back-and-forth is an inflection point. Skip routine conversation, restating, and thinking-out-loud.
+
+**21.3 User-input firing discipline.** A user message is `[user-input]` worth logging if it carries a decision, a constraint, a correction, an answer to a question Cowork asked, or new information that changes Cowork's next action. The signal is: would Cowork's next action change based on this message? If yes, log. If no, skip.
+
+Examples that DO log:
+
+- "Yes, do that" / "No, use option B instead" / "Skip the validation step"
+- "It needs to handle the case where the file is empty"
+- Answers to numbered questions Cowork posed (1a, 2b, etc.)
+
+Examples that do NOT log:
+
+- "Thanks" / "Got it" / "OK" / "Sounds good" / "Cool"
+- Acknowledgments without new information
+- Small-talk or tangents
+
+Edge case: a bare "yes" or "no" answering a substantive question Cowork posed counts as `[user-input]` — what matters is whether Cowork's next action changes.
+
+If Cowork mis-fires (logs something Gregg clearly didn't intend as input), Gregg will say so. Cowork then appends a `[note]` correction line — never silently rewrites prior content.
+
+**21.4 Silent append requirement.** The append happens in the background. NEVER narrate the append in chat dialogue. Do not say "I'm logging this to the working summary," "Adding a [decision] line," etc. The whole point is that the trail builds without breaking Gregg's focus on the actual work.
+
+**21.5 Append mechanism.** Cowork uses the Django management command `append_feedback_line` (added in LSCMD-FBLOG-0505-kp Phase 3). Call it from bash when an inflection point fires:
+
+```bash
+cd /sessions/*/mnt/landscape && \
+  python backend/manage.py append_feedback_line FB-N \
+    --tag <tag> \
+    --content "<one-line description>"
+```
+
+Stdout is ignored — the append is silent. If the command errors (bad fb_id, missing row, invalid tag, embedded newline), capture the error in private reasoning and proceed; never bring the failure up in chat unless Gregg asks. The nightly daily-briefing skill is the safety net for any individual append loss.
+
+**21.6 Format.** Each line is rendered as `YYYY-MM-DD HH:MM [tag] one-line description`. The command stamps the timestamp and tag; Cowork supplies only the description. Keep descriptions terse — file paths, decisions, fact-shaped — not narrative prose. Append-only, never rewritten.
+
+**21.7 Pickup behavior.** When Cowork opens a chat tied to a feedback item AND the row already has a `working_summary` from prior work, read the summary first, treat the most recent line as the current state of the world (especially `[blocker]` or `[user-input]` lines), and start work from that point. Do NOT re-litigate decisions captured in `[decision]` or `[user-input]` lines unless Gregg explicitly asks to revisit them.
+
+**21.8 Closing the loop.** Append a `[resolved]` line when the fix is complete and a CC handoff is being prepared. Append a `[closed]` line (with the commit hash if known) once CC has landed the commit. Both are append-only entries to `working_summary`. The status column transition (in_progress → addressed → closed) is owned by §21.9 (resolution-language detection) and the existing `close_feedback` / daily-brief auto-resolution paths.
+
+**21.9 Resolution-language detection [Phase 5].** When working in a chat tied to a feedback item, watch Gregg's messages for resolution-language signals: "fixed," "done," "that worked," "looks good," "nailed it," "ship it," "that did it," and bare "yes" when it's clearly answering an "is this fixed?" question. When detected, evaluate confidence and either auto-proceed or ask.
+
+**21.9.1 HIGH-confidence threshold (auto-proceed).** All three must be true:
+
+1. **Cowork's immediately prior turn** announced the fix is complete — not a sub-step, not a draft, not an offer, not a question. Things like "Done.", "Fixed — verified the change is in place.", "That should be it." count. Things like "Saved a draft," "How does this look?", "Updated the typo above" do NOT.
+2. **Gregg's message** is short, unambiguous resolution language with no qualifier and no question attached. The trigger word set is the list above.
+3. **Recent few turns** have been continuously about this one feedback item — no topic switches.
+
+If all three hold → AUTO-PROCEED per §21.9.3.
+
+**21.9.2 ASK-first fallback (medium / low confidence).** If any of the three conditions in §21.9.1 fails, do NOT auto-proceed. Instead, post:
+
+> Confirming — does this resolve FB-N? If yes, I'll mark it addressed and draft the commit prompt. If no, just say no.
+
+If Gregg confirms → execute the auto-action set per §21.9.3. If Gregg says no → keep working; append a `[note]` line capturing what the resolution language was actually about (e.g., "[note] 'fixed' referred to the typo edit, not the FB").
+
+**21.9.3 Auto-action set on confirmed resolution.** When auto-proceed conditions are met (or Gregg confirms after an ASK), do all of the following:
+
+1. Run `python manage.py mark_feedback_addressed FB-N` — flips `tbl_feedback.status` from `in_progress` to `addressed` and stamps `addressed_at = NOW()`.
+2. Append a `[resolved]` line to `working_summary` via `append_feedback_line` (§21.5).
+3. Draft a CC commit-and-push prompt as a downloadable `.md` file in the workspace folder. The prompt must follow §4 standards (session ID + echo-back, ⚠️ BEFORE YOU START block, downstream-impact section, verification commands, success criteria), reference the FB id, and include the file list pulled from `git status` in the prompt body.
+4. Tell Gregg in chat — exactly one line per §5.7: `Marked addressed; commit prompt saved.` followed by a link to the `.md` file. NOTHING else — no narration of the steps above.
+
+**21.9.4 Closing the loop after CC commits.** When CC reports back that the commit landed (Cowork sees the commit hash in chat or in transcript), Cowork:
+
+1. Runs `mark_feedback_addressed FB-N --commit-sha <sha> --commit-url <url>` to backfill the commit reference. (Re-running on an already-addressed row merges the new info; see the command's `COALESCE` behavior.)
+2. Appends a `[closed]` line to `working_summary` with the commit SHA.
+3. Tells Gregg in one line: `FB-N closed. Commit <short-sha> landed.`
+
+The status transition from `addressed` → `closed` happens via the daily-brief auto-resolution path (`fixes FB-N` / `closes FB-N` / `resolves FB-N` regex on commit messages), or explicitly via `close_feedback FB-N --note "..."`. Cowork itself does NOT flip to `closed` directly — that boundary belongs to the existing close paths so the audit trail stays unified.
+
+**21.9.5 Edge-case behaviors.**
+
+- **False-positive correction.** If Gregg pushes back after an auto-fire ("no, that's not what I meant"), Cowork: (a) reverts the status flip via `UPDATE tbl_feedback SET status = 'in_progress', addressed_at = NULL WHERE id = N` (or via a future `unmark_feedback_addressed` command), (b) appends a `[note]` correction line, (c) acknowledges briefly: "Reverted. Continuing." Then keeps working. The CC commit prompt artifact stays on disk — Gregg can ignore or delete it.
+- **Resolution language without context.** If trigger words appear in a message that is otherwise unrelated to the feedback item (e.g., Gregg posts a quote with "fixed" in it), Rule 21.9.1.3 fails (topic switch) → ASK fires → Gregg says no → handled.
+- **Multiple FB items in one chat.** If a single chat is tied to multiple feedback items (rare, but possible if Gregg explicitly pivots), the ASK should name a specific FB id. Cowork picks the most recently active one — the one whose working_summary has the most recent append. If ambiguous, ask which: "Confirming — does this resolve FB-A or FB-B?"
 
 ---
 
 ## CHANGELOG
+
+**v4.4 (2026-05-05)** — Session-credit / context-budget pass. Extracted long-form templates (CC prompt header, handoff doc format, formal correspondence rules, downstream-impact example block) to a new reference file `docs/PROJECT_INSTRUCTIONS_REFERENCE.md`. Behavioral rules unchanged; only literal template bodies moved. Auto-load surface area for this file reduced. Companion change: CLAUDE.md session-log footer also extracted to `docs/CLAUDE_SESSION_HISTORY.md`. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+
+**v4.3 (2026-05-05)** — Added §21.9 (Resolution-language detection) for LSCMD-FBLOG-0505-kp Phase 5. HIGH-confidence threshold locked at three conditions (prior-turn announces completion + clean trigger word + continuous topic). ASK-first fallback for anything below HIGH. Auto-action set: flip status to addressed, append [resolved], draft commit prompt, one-line confirmation. New `mark_feedback_addressed` Django management command added as the in_progress → addressed transition path (close_feedback already owns terminal states). Closing-loop semantics: Cowork stamps the commit on the addressed row but never flips to closed itself — that boundary stays with close_feedback and the daily-brief auto-resolver. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
+
+**v4.2 (2026-05-05)** — Added §21 (Feedback Lifecycle Tracking) for the silent `working_summary` append behavior introduced in LSCMD-FBLOG-0505-kp Phase 3. Inflection-point taxonomy locked at start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. User-input firing discipline (§21.3) clarifies what counts as direction-changing input vs conversational filler. New `append_feedback_line` Django management command is the append mechanism. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
 **v4.1 (2026-05-01)** — Added §17.7 (schema audit before architectural proposals) after a direct loss event in chat hx where F-12 server-derivation was built across two sessions before discovering the existing `statement_discriminator` scenario taxonomy. Added §17.8 with the new high-risk zone (operating-expense discriminator + active_opex_discriminator). Updated §6 anti-patterns with the matching skip-the-schema-audit failure mode. **Mirror this update to Cowork project settings and Claude project knowledge per §0.4.**
 
@@ -692,4 +708,4 @@ Sync triggers:
 
 ---
 
-End of Landscape Project Instructions v4.1
+End of Landscape Project Instructions v4.4

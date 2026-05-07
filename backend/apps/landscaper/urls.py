@@ -235,8 +235,18 @@ urlpatterns = [
         ChatThreadViewSet.as_view({
             'get': 'retrieve',
             'patch': 'partial_update',
+            # PV05 — Universal Archive Pattern Phase 1a. DELETE soft-archives
+            # by default; ?force=true hard-deletes. See destroy() in views.py.
+            'delete': 'destroy',
         }),
         name='landscaper-thread-detail'
+    ),
+    path(
+        # PV05 — Universal Archive Pattern Phase 1a. POST un-archives a
+        # soft-archived thread. See restore() in views.py.
+        'landscaper/threads/<uuid:pk>/restore/',
+        ChatThreadViewSet.as_view({'post': 'restore'}),
+        name='landscaper-thread-restore'
     ),
     path(
         'landscaper/threads/<uuid:pk>/close/',
@@ -251,6 +261,22 @@ urlpatterns = [
             'post': 'promote',
         }),
         name='landscaper-thread-promote'
+    ),
+    # Doc-chat (chat qm — wrapper DMS "Chat with this document").
+    path(
+        'landscaper/threads/by-doc/<int:doc_id>/',
+        ChatThreadViewSet.as_view({'get': 'by_doc'}),
+        name='landscaper-thread-by-doc',
+    ),
+    path(
+        'landscaper/threads/for-docs/',
+        ChatThreadViewSet.as_view({'get': 'for_docs'}),
+        name='landscaper-thread-for-docs',
+    ),
+    path(
+        'landscaper/threads/doc-chat/',
+        ChatThreadViewSet.as_view({'post': 'doc_chat'}),
+        name='landscaper-thread-doc-chat',
     ),
 
     # Thread messages

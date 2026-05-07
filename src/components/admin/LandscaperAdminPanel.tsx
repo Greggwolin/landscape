@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Sparkles, History, MessageSquare, Settings2, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, Sparkles, History, MessageSquare, Settings2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { LandscapeButton, SemanticBadge } from '@/components/ui/landscape';
 
@@ -11,10 +11,10 @@ const ExtractionMappingAdmin = dynamic(
   { ssr: false }
 );
 
-const KnowledgeLibraryPanel = dynamic(
-  () => import('@/components/admin/knowledge-library/KnowledgeLibraryPanel'),
-  { ssr: false }
-);
+// NOTE: Knowledge Library was removed from the legacy AdminModal in May 2026
+// (chat qm). It now lives at the dedicated /w/platform-knowledge route in the
+// chat-first shell \u2014 sidebar entry "Platform Knowledge". Kept here as a
+// breadcrumb so future readers don't reintroduce the duplicate entry point.
 
 interface LandscaperSection {
   key: string;
@@ -25,13 +25,6 @@ interface LandscaperSection {
 }
 
 const LANDSCAPER_SECTIONS: LandscaperSection[] = [
-  {
-    key: 'knowledge_library',
-    label: 'Knowledge Library',
-    description: 'Search, browse, and manage Landscaper\u2019s document knowledge base',
-    icon: <BookOpen size={18} />,
-    available: true
-  },
   {
     key: 'extraction_mappings',
     label: 'AI Extraction Mappings',
@@ -145,7 +138,6 @@ export default function LandscaperAdminPanel() {
                 {isExpanded && section.available && (
                   <div className="p-4" style={{ backgroundColor: 'var(--cui-body-bg)' }}>
                     {section.key === 'extraction_mappings' && <ExtractionMappingAdmin />}
-                    {section.key === 'knowledge_library' && <KnowledgeLibraryPanel />}
                   </div>
                 )}
               </div>

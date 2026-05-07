@@ -12,6 +12,15 @@ export interface Thread {
   updatedAt: string;
   isActive: boolean;
   messageCount: number;
+  /**
+   * AI-generated 1-2 sentence summary as a small HTML fragment.
+   * Allowed tags: <b>, <strong>, <i>, <em>, <br> — sanitized
+   * server-side by ThreadService._sanitize_summary_html. Populated on
+   * threshold cross or material-change close.
+   */
+  summary?: string | null;
+  /** Server-truncated first user message (≤120 chars); used as a summary fallback. */
+  firstUserMessage?: string | null;
 }
 
 interface ThreadListProps {
@@ -242,11 +251,40 @@ export function ThreadList({
             const isEditing = editingThreadId === thread.threadId;
             const displayTitle = thread.title || `New conversation`;
 
+            // FB-292 — collapsed (non-active) rows render a 1-2 sentence
+            // summary line + interaction count below the title. Active row
+            // skips both since the chat body already shows the conversation.
+            //
+            // Source precedence:
+            //   1. thread.summary  — Haiku-generated HTML fragment (allowed
+            //                         tags: b/strong/i/em/br; sanitized
+            //                         server-side in
+            //                         ThreadService._sanitize_summary_html).
+            //                         Rendered via dangerouslySetInnerHTML.
+            //   2. thread.firstUserMessage — first user-typed message,
+            //                         server-truncated to 120 chars. Rendered
+            //                         as TEXT (escaped) — never as HTML, since
+            //                         it is user-typed input.
+            //   3. ""              — skip the preview line entirely.
+            const showPreviewMeta = !isEditing && !isActive;
+            const summaryHtml = showPreviewMeta ? (thread.summary?.trim() || '') : '';
+            const fallbackText = showPreviewMeta && !summaryHtml
+              ? (thread.firstUserMessage?.trim() || '')
+              : '';
+            // tooltip-friendly plain-text version of whichever source is shown
+            const previewTooltip = summaryHtml
+              ? summaryHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+              : fallbackText;
+            const hasPreviewText = Boolean(summaryHtml || fallbackText);
+            const interactionLabel = thread.messageCount === 1
+              ? '1 message'
+              : `${thread.messageCount} messages`;
+
             return (
               <div
                 key={thread.threadId}
                 onClick={() => !isEditing && onSelectThread(thread.threadId)}
-                className="d-flex align-items-center gap-2 px-3 py-2"
+                className="d-flex flex-column px-3 py-2"
                 style={{
                   cursor: isEditing ? 'default' : 'pointer',
                   transition: 'background-color 150ms ease',
@@ -254,8 +292,11 @@ export function ThreadList({
                     ? 'var(--cui-body-bg)'
                     : 'transparent',
                   borderLeft: isActive ? '2px solid var(--cui-primary)' : '2px solid transparent',
+                  gap: '2px',
                 }}
               >
+                {/* Header row: icon + title + count/timestamp */}
+                <div className="d-flex align-items-center gap-2">
                 {/* Thread icon */}
                 <CIcon
                   icon={cilCommentSquare}
@@ -306,8 +347,8 @@ export function ThreadList({
                         className="small text-truncate d-inline-block"
                         style={{
                           color: thread.isActive ? 'var(--cui-body-color)' : 'var(--cui-secondary-color)',
-                          fontSize: '0.75rem',
-                          maxWidth: '140px',
+                          fontSize: '0.875rem',
+                          maxWidth: '180px',
                           fontStyle: thread.isActive ? 'normal' : 'italic',
                         }}
                         title={`${displayTitle}${!thread.isActive ? ' (closed)' : ''}`}
@@ -321,7 +362,7 @@ export function ThreadList({
                           style={{
                             backgroundColor: 'var(--cui-tertiary-bg)',
                             color: 'var(--cui-secondary-color)',
-                            fontSize: '0.625rem',
+                            fontSize: '0.75rem',
                           }}
                         >
                           {getPageContextLabel(thread.pageContext)}
@@ -375,8 +416,8 @@ export function ThreadList({
                         style={{
                           backgroundColor: 'var(--cui-secondary-bg)',
                           color: 'var(--cui-secondary-color)',
-                          fontSize: '0.6rem',
-                          padding: '1px 5px',
+                          fontSize: '0.6875rem',
+                          padding: '1px 6px',
                         }}
                       >
                         {thread.messageCount}
@@ -384,10 +425,82 @@ export function ThreadList({
                     )}
                     <span
                       className="small text-nowrap"
-                      style={{ color: 'var(--cui-secondary-color)', fontSize: '0.625rem' }}
+                      style={{ color: 'var(--cui-secondary-color)', fontSize: '0.75rem' }}
                     >
                       {formatRelativeTime(thread.updatedAt)}
                     </span>
+                  </div>
+                )}
+                </div>
+
+                {/* FB-292 — preview meta on collapsed (non-active) rows.
+                    Renders summary line + interaction count below the
+                    header row. Active row skips this since the chat body
+                    already shows the conversation. */}
+                {showPreviewMeta && (hasPreviewText || thread.messageCount > 0) && (
+                  <div
+                    style={{
+                      // Indent under the icon column (icon ~16px + 8px gap ≈ 24px)
+                      paddingLeft: '24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                      marginTop: '2px',
+                    }}
+                  >
+                    {summaryHtml ? (
+                      // Trusted: thread.summary is generated by our own
+                      // Haiku call and sanitized server-side via
+                      // ThreadService._sanitize_summary_html down to the
+                      // <b>/<strong>/<i>/<em>/<br> allowlist with no
+                      // attributes preserved. Rendering as HTML lets the
+                      // model emphasize key terms; the line clamp still
+                      // applies to the rendered output.
+                      <span
+                        style={{
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.75rem',
+                          lineHeight: 1.35,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={previewTooltip}
+                        dangerouslySetInnerHTML={{ __html: summaryHtml }}
+                      />
+                    ) : fallbackText ? (
+                      // Untrusted: thread.firstUserMessage is user-typed
+                      // input. Render as text so the browser escapes any
+                      // accidental markup (no XSS surface).
+                      <span
+                        style={{
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.75rem',
+                          lineHeight: 1.35,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={previewTooltip}
+                      >
+                        {fallbackText}
+                      </span>
+                    ) : null}
+                    {thread.messageCount > 0 && (
+                      <span
+                        style={{
+                          color: 'var(--cui-secondary-color)',
+                          fontSize: '0.6875rem',
+                          opacity: 0.85,
+                        }}
+                      >
+                        {interactionLabel}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

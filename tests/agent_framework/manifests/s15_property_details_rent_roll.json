@@ -1,0 +1,83 @@
+{
+  "observe:project_id": 899,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "observe:p1_tools": [
+    "update_unit_types",
+    "update_project_field"
+  ],
+  "observe:p1_used_unit_type_tool": true,
+  "field_equals:p1_some_write_attempted": true,
+  "field_equals:p1_confirm_success": true,
+  "observe:p2_unit_type_count_actual": 4,
+  "field_equals:p2_unit_type_count_at_least_expected": true,
+  "calibrate:p2_total_unit_count_actual": 84,
+  "field_equals:p2_total_unit_count": 84,
+  "calibrate:p2_bd0_present": true,
+  "field_equals:p2_bd0_present_assert": true,
+  "calibrate:p2_bd0_unit_count_actual": 12,
+  "field_equals:p2_bd0_unit_count": 12,
+  "calibrate:p2_bd0_market_rent_actual": 1300,
+  "field_equals:p2_bd0_market_rent": 1300,
+  "calibrate:p2_bd1_present": true,
+  "field_equals:p2_bd1_present_assert": true,
+  "calibrate:p2_bd1_unit_count_actual": 36,
+  "field_equals:p2_bd1_unit_count": 36,
+  "calibrate:p2_bd1_market_rent_actual": 1500,
+  "field_equals:p2_bd1_market_rent": 1500,
+  "calibrate:p2_bd2_present": true,
+  "field_equals:p2_bd2_present_assert": true,
+  "calibrate:p2_bd2_unit_count_actual": 24,
+  "field_equals:p2_bd2_unit_count": 24,
+  "calibrate:p2_bd2_market_rent_actual": 1850,
+  "field_equals:p2_bd2_market_rent": 1850,
+  "calibrate:p2_bd3_present": true,
+  "field_equals:p2_bd3_present_assert": true,
+  "calibrate:p2_bd3_unit_count_actual": 12,
+  "field_equals:p2_bd3_unit_count": 12,
+  "calibrate:p2_bd3_market_rent_actual": 2300,
+  "field_equals:p2_bd3_market_rent": 2300,
+  "observe:p3_tools": [
+    "get_units",
+    "get_data_completeness",
+    "get_multifamily_property",
+    "get_project_fields"
+  ],
+  "observe:p3_response_length": 772,
+  "observe:p3_used_read_tool": true,
+  "observe:p3_concepts_mentioned": [
+    "occupanc",
+    "lease",
+    "tenant",
+    "unit number",
+    "building",
+    "renovation"
+  ],
+  "field_equals:p3_at_least_one_concept": true,
+  "observe:p4_bd3_tools": [
+    "update_unit_types",
+    "update_unit_types"
+  ],
+  "calibrate:p4_bd3_market_rent_actual": 2400,
+  "field_equals:p4_bd3_market_rent_persisted": 2400,
+  "observe:p5_tools": [
+    "open_input_modal"
+  ],
+  "field_equals:p5_open_input_modal_called": true,
+  "calibrate:p5_modal_name": "rent_roll",
+  "field_equals:p5_correct_modal": true,
+  "calibrate:p5_had_mutation": false,
+  "observe:p6_tools": [
+    "get_unit_types",
+    "get_units"
+  ],
+  "observe:p6_mentions_present": [
+    "1BR rent",
+    "2BR rent",
+    "3BR rent (post-bump)",
+    "studio mention",
+    "studio rent",
+    "total units"
+  ],
+  "field_equals:p6_at_least_two_mentions": true
+}

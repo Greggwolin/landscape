@@ -89,6 +89,8 @@ UNIVERSAL_TOOLS = [
     # P1 Analysis tools (Apr 2026)
     "list_projects_summary",
     "get_deal_summary",
+    "get_project_profile",  # Read-only profile artifact (chat PV, May 2026)
+    "update_project_msa",   # FK-aware MSA update (chat PV, May 2026)
     "get_data_completeness",
     "calculate_project_metrics",
     "calculate_cash_flow",
@@ -107,6 +109,9 @@ UNIVERSAL_TOOLS = [
     "find_dependent_artifacts",
     # User vocabulary learning (chat DA — universal pattern across domains)
     "save_user_vocab",
+    # Cross-project document library search (chat qm — Platform Knowledge page)
+    "find_documents",
+    "summarize_document_library",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -253,6 +258,9 @@ UNASSIGNED_SAFE_TOOLS = [
     "get_artifact_history",
     "restore_artifact_state",
     "find_dependent_artifacts",
+    # Cross-project document library search (chat qm — Platform Knowledge page)
+    "find_documents",
+    "summarize_document_library",
 ]
 
 

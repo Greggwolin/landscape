@@ -245,3 +245,84 @@ export function useArtifactUpdateState() {
     },
   });
 }
+
+/* ─── Phase 5 — inline-edit-with-write-back ──────────────────────────────
+ * POSTs to `commit_field_edit` when an editable kv_pair carries a
+ * `source_ref`. The backend resolves the ref to (table, row_id, column),
+ * coerces the user's input, writes through to the underlying source row,
+ * then re-builds the artifact via its tool's schema builder so the user
+ * sees the canonical formatted value (currency, dates, MSA name) come
+ * back even when their input was loose ("$5.5M" / "5/1/26" / "phoenix").
+ *
+ * Errors come back as a structured envelope. Common ones:
+ *   - field_not_writable   — column not in MUTABLE_FIELDS
+ *   - invalid_value        — coercion failed
+ *   - ambiguous            — multiple FK candidates; carries
+ *                            `suggested_user_question` + `candidates`
+ *   - no FK match          — `suggested_user_question` only
+ *   - db_error             — constraint violation, etc.
+ *
+ * The renderer surfaces `error` + (optional) `suggested_user_question`
+ * inline below the field so the user can correct without context-switch.
+ */
+
+export interface ArtifactCommitFieldEditInput {
+  /** Path to the kv_pair, shaped like ["blocks", "0", "pairs", "12"]. */
+  pair_path: string[];
+  /** Raw input string from the user. Backend coerces by column type. */
+  new_value: string;
+  user_id?: string;
+}
+
+export interface ArtifactCommitFieldEditResponse {
+  success: boolean;
+  action?: string;
+  artifact_id?: number;
+  /** Refreshed block document — the renderer should drop its draft. */
+  new_state?: BlockDocument;
+  /** Echoed back so the chat layer can log the change. */
+  coerced_value?: unknown;
+  /** Per-field metadata (e.g. resolved msa_name on FK writes). */
+  meta?: Record<string, unknown>;
+  /** Error code on failure (field_not_writable, invalid_value, ambiguous, ...). */
+  error?: string;
+  detail?: string;
+  /** Surfaced verbatim in the inline error UI when the writer wants the
+   *  renderer to ask a follow-up (e.g. ambiguous FK match). */
+  suggested_user_question?: string;
+  candidates?: Array<Record<string, unknown>>;
+}
+
+export function useArtifactCommitFieldEdit() {
+  const qc = useQueryClient();
+  return useMutation<
+    ArtifactCommitFieldEditResponse,
+    Error,
+    { artifactId: number; input: ArtifactCommitFieldEditInput }
+  >({
+    mutationFn: async ({ artifactId, input }) => {
+      const res = await fetch(
+        `${DJANGO_API_URL}/api/artifacts/${artifactId}/commit_field_edit/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      );
+      const data = await res
+        .json()
+        .catch(() => ({} as ArtifactCommitFieldEditResponse));
+      // We intentionally do NOT throw on non-2xx here. The renderer wants
+      // the structured error envelope (error code + suggested_user_question)
+      // so it can show inline UI rather than a red toast.
+      return data;
+    },
+    onSuccess: (data, vars) => {
+      if (data?.success) {
+        qc.invalidateQueries({ queryKey: ['artifacts', 'detail', vars.artifactId] });
+        qc.invalidateQueries({ queryKey: ['artifacts', 'versions', vars.artifactId] });
+        qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
+      }
+    },
+  });
+}

@@ -1,0 +1,72 @@
+{
+  "observe:project_id": 881,
+  "field_equals:project_created": true,
+  "field_equals:thread_created": true,
+  "observe:p1_tools": [
+    "bulk_update_fields"
+  ],
+  "observe:p1_used_bulk_update": true,
+  "observe:p1_single_update_count": 0,
+  "field_equals:p1_some_write_attempted": true,
+  "field_equals:p1_confirm_success": true,
+  "calibrate:p2_total_units_actual": 84,
+  "calibrate:p2_total_units_matches": true,
+  "calibrate:p2_gross_sf_actual": 75000,
+  "calibrate:p2_gross_sf_matches": true,
+  "calibrate:p2_year_built_actual": 1985,
+  "calibrate:p2_year_built_matches": true,
+  "calibrate:p2_jurisdiction_city_actual": "Phoenix",
+  "calibrate:p2_jurisdiction_city_matches": true,
+  "calibrate:p2_jurisdiction_state_actual": "AZ",
+  "calibrate:p2_jurisdiction_state_matches": true,
+  "calibrate:p2_jurisdiction_county_actual": "Maricopa",
+  "calibrate:p2_jurisdiction_county_matches": true,
+  "observe:p3_tools": [
+    "get_data_completeness",
+    "get_project_fields",
+    "get_multifamily_property",
+    "get_units",
+    "get_operating_statement"
+  ],
+  "observe:p3_response_length": 687,
+  "observe:p3_used_read_tool": true,
+  "observe:p3_concepts_mentioned": [
+    "purchase",
+    "price",
+    "cap rate",
+    "target",
+    "class"
+  ],
+  "field_equals:p3_at_least_one_concept": true,
+  "observe:p4_analysis_perspective_tools": [
+    "get_project_fields"
+  ],
+  "calibrate:p4_analysis_perspective_actual": "INVESTMENT",
+  "observe:p4_analysis_perspective_found_on": "project",
+  "field_equals:p4_analysis_perspective_persisted": "INVESTMENT",
+  "observe:p4_target_acquisition_date_tools": [
+    "update_project_field"
+  ],
+  "calibrate:p4_target_acquisition_date_confirm_success": true,
+  "calibrate:p4_target_acquisition_date_actual": "2026-09-01",
+  "observe:p4_target_acquisition_date_found_on": "project",
+  "field_equals:p4_target_acquisition_date_persisted": "2026-09-01",
+  "observe:p5_tools": [
+    "open_input_modal"
+  ],
+  "field_equals:p5_open_input_modal_called": true,
+  "calibrate:p5_modal_name": "project_details",
+  "field_equals:p5_correct_modal": true,
+  "calibrate:p5_had_mutation": false,
+  "observe:p6_tools": [
+    "get_deal_summary",
+    "get_project_fields"
+  ],
+  "observe:p6_mentions_present": [
+    "unit count",
+    "year built",
+    "city",
+    "analysis type"
+  ],
+  "field_equals:p6_at_least_two_mentions": true
+}

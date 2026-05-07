@@ -8,10 +8,9 @@ import {
   CButton,
   CBadge,
   CSpinner,
-  CCollapse,
 } from '@coreui/react';
 import CIcon from '@coreui/icons-react';
-import { cilCheckCircle, cilXCircle, cilWarning, cilChevronBottom, cilChevronTop } from '@coreui/icons';
+import { cilCheckCircle, cilXCircle, cilWarning } from '@coreui/icons';
 
 // =============================================================================
 // Types
@@ -114,7 +113,6 @@ export function MutationProposalCard({
 }: MutationProposalCardProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState(true);
 
   // Normalize proposals
   const normalizedProposals = proposals.map(normalizeProposal);
@@ -189,9 +187,7 @@ export function MutationProposalCard({
           padding: '8px 12px',
           backgroundColor: 'var(--cui-warning, #ffc107)',
           color: 'var(--cui-dark, #212529)',
-          cursor: 'pointer',
         }}
-        onClick={() => setExpanded(!expanded)}
       >
         <div className="d-flex align-items-center gap-2">
           <span className="fw-semibold">Proposed Changes</span>
@@ -210,10 +206,7 @@ export function MutationProposalCard({
             <CButton
               color="success"
               size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirmAll();
-              }}
+              onClick={() => handleConfirmAll()}
               disabled={loadingId !== null}
             >
               {loadingId === 'batch' ? (
@@ -223,13 +216,19 @@ export function MutationProposalCard({
               )}
             </CButton>
           )}
-          <CIcon icon={expanded ? cilChevronTop : cilChevronBottom} />
         </div>
       </CCardHeader>
 
-      <CCollapse visible={expanded}>
-        <CCardBody style={{ padding: '8px' }}>
-          <div className="d-flex flex-column gap-2">
+      {/*
+        Body renders directly. CCollapse was previously wrapping this body
+        and is the documented cause of the recurring "content flashes and
+        disappears" symptom — see the standing canonical-UI-governance rule
+        banning CCollapse / accordion components platform-wide. The header's
+        click-to-toggle behavior was removed alongside the collapse — there
+        is no longer a collapse state to toggle.
+      */}
+      <CCardBody style={{ padding: '8px' }}>
+        <div className="d-flex flex-column gap-2">
             {pendingProposals.map((proposal) => (
               <div
                 key={proposal.mutationId}
@@ -340,7 +339,6 @@ export function MutationProposalCard({
             )}
           </div>
         </CCardBody>
-      </CCollapse>
     </CCard>
   );
 }

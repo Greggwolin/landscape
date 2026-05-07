@@ -381,6 +381,8 @@ Captures `#FB`-tagged messages from the Help panel for tracking, surfaces open i
 | `in_progress_branch`, `in_progress_session_slug` | Set by `start_feedback` CLI |
 | `discord_message_id`, `discord_posted_at` | Discord webhook bookkeeping |
 | `source_help_message_id` | For `backfill` rows: FK to `tbl_help_message.id` so the original LLM reply can be surfaced in the brief |
+| `working_summary` | Chronological inflection-point log appended by Cowork via `append_feedback_line` during chats tied to this feedback (PROJECT_INSTRUCTIONS.md §21). Append-only, never rewritten. |
+| `active_chat_slug` | Slug of the most recent Cowork chat to reference this feedback id; populated by the hourly `feedback-active-chat-poller` scheduled task. Distinct from `in_progress_session_slug` (manual ownership assignment via `start_feedback`). |
 
 ### Capture path
 
@@ -397,8 +399,12 @@ Captures `#FB`-tagged messages from the Help panel for tracking, surfaces open i
 | `python manage.py list_feedback [--status open] [--limit 50]` | Print open (or filtered) FB items to stdout |
 | `python manage.py close_feedback FB-N --note "..." [--status closed\|wontfix\|duplicate] [--duplicate-of N]` | Close an item; allows transitioning from `open` or `in_progress` |
 | `python manage.py start_feedback FB-N --branch <branch> --session <slug>` | Flip an item to `in_progress` and stamp the branch + session working on it |
+| `python manage.py append_feedback_line FB-N --tag <tag> --content "<line>"` | Silently append a timestamped, tagged inflection-point line to a row's `working_summary`. Used by Cowork in chats tied to a specific feedback item (PROJECT_INSTRUCTIONS.md §21). Tag set: start / decision / edit / blocker / user-input / artifact / prompt / resolved / closed / note. |
+| `python manage.py mark_feedback_addressed FB-N [--commit-sha <sha>] [--commit-url <url>] [--resolution-notes "..."]` | Flip an item from `in_progress` (or `open`) to `addressed` and stamp `addressed_at`. Used by Cowork on confirmed resolution per PROJECT_INSTRUCTIONS.md §21.9. Re-run is idempotent via COALESCE — commit metadata can be backfilled after the fact. Distinct from `close_feedback` (terminal states only). |
 
 Both bare ID (`123`) and `FB-N` form (`FB-123`) are accepted.
+
+**Note on stale CLI:** `list_feedback`'s `VALID_STATUSES` constant predates the `in_progress` lifecycle state and silently rejects `--status in_progress`. One-line fix queued for a future cleanup pass.
 
 ### Auto-resolution
 
@@ -415,6 +421,19 @@ Commit messages matching the regex `(?i)\b(?:fixes|closes|resolves)\s+FB-(\d+)\b
 | Schedule | Nightly 23:30 local via launchd (`~/Library/LaunchAgents/com.landscape.daily-brief.plist`) |
 | Output | `~/.../OneDrive/.../Landscape app/daily-brief/YYYY-MM-DD-brief.html` + `current.html` |
 | Sections (in order) | Summary · Work In Progress · Today's Sessions (rolling 3-day) · Open Feedback · Resolved Recently · Parallel Sessions · Uncommitted · System Status |
+
+### Live refresh tasks (LSCMD-FBLOG-0505-kp Phases 2 + 4)
+
+Two Cowork-side scheduled tasks keep the `feedback_status_live` artifact fresh between nightly runs of the Daily Brief skill. Both terminate at Cowork (the only thing that can update Cowork artifacts) and read `tbl_feedback` directly via `psycopg2`.
+
+| Task | Cadence | Purpose | Behavior |
+|------|---------|---------|----------|
+| `feedback-log-near-push` | Every 5 minutes (notifications disabled) | Catch state changes (new feedback, status flips) within ~5 min of the write. | Compares `MAX(GREATEST(created_at, started_at, addressed_at, closed_at))` to the artifact's current `generated_at`. If DB is newer → run the same refresh routine the nightly skill uses. If not → exit silently. Cheap when nothing has changed (single SELECT). Cadence dropped from 2 min to 5 min after Cowork desktop scheduled tasks proved to skip runs whenever the Mac is asleep — the cause of "missed run" popups, not polling cadence. The morning Daily Brief skill is the safety net for runs missed during sleep. |
+| `feedback-active-chat-poller` | Hourly (cron `0 * * * *`, fires at :06 due to scheduler delay) | Refresh `active_chat_slug` on in-progress items by scanning recent Cowork chat transcripts for `FB-N` references. Also catches `working_summary` appends (Phase 3) that don't bump any timestamp. | Scans last 48h of sessions via `mcp__session_info__list_sessions` + `read_transcript`; updates `active_chat_slug`; runs the artifact refresh unconditionally at the end of each tick. |
+
+Failure isolation: each task wraps its work in try/catch and posts a single one-line confirmation. Errors do not block — the nightly Daily Brief task is the safety net.
+
+Task files live at `~/Documents/Claude/Scheduled/feedback-log-near-push/SKILL.md` and `~/Documents/Claude/Scheduled/feedback-active-chat-poller/SKILL.md`.
 
 ### Manual labels (read by the brief)
 
@@ -1006,9 +1025,13 @@ DO ask clarifying questions when:
 
 ---
 
-*Last updated: 2026-05-01 (release cut, afternoon — Session: LSCMD-RELEASE-CUT-0501-DA4) — Cut release of chat-first UI to production: force-pushed `feature/unified-ui` to `main` after archiving previous main as `Alpha18-UI`; Vercel + Railway redeploying. Working branch is now `chat-artifacts`; `feature/unified-ui` deleted. Earlier same day (chat hx, Friday morning), F-12 server-derivation work HELD pending discriminator-aware redesign. Round-2 commit (mgmt-fee fix + T-12/F-12 unified composer) was DRAFTED but not committed; Gregg caught a more fundamental architectural error before the merge. Discovery: `tbl_operating_expenses.statement_discriminator` already encodes a scenario taxonomy (`T3_ANNUALIZED` priority 1 / `T12` priority 2 / `T-12` priority 3 / `CURRENT_PRO_FORMA` priority 4 / `BROKER_PRO_FORMA` priority 5 / year strings) plus an `active_opex_discriminator` switcher on `tbl_project`. The legacy folder/tab UI surfaces this as a scenario picker; the chat-first `/w/` layer hadn't yet, and `get_proforma` ignored the entire system. Implication: rendering an artifact labeled "T-12" against data whose discriminator is `CURRENT_PRO_FORMA` (which is what Chadron actually has — extracted from OM page 17 "Current" column, NOT a real T-12) is a content error, not just a naming one. The "T-12 × growth = F-12" model I built fundamentally conflicts with how the system models projections (it stores them as separate discriminators, not transforms). Procedural failure: the discriminator code was in a file I had already opened (`backend/apps/financial/views_operations.py` — `SCENARIO_PRIORITY_MAP`, `available_scenarios`, `active_opex_discriminator`); skimming past it cost two sessions of work. New rule §17.7 in `docs/PROJECT_INSTRUCTIONS.md` (Schema audit before architectural proposals) added to prevent recurrence; new high-risk zone §17.8 added for the discriminator system. PROJECT_INSTRUCTIONS.md bumped to v4.1; needs to be mirrored to Cowork project settings + Claude project knowledge per §0.4. Branch state: `feature/unified-ui` active. Yesterday's commit `fae31fe` (round-1 F-12 server-derivation) is on the branch but the artifact it produces is mislabeled; should be reverted or the tool must be rewritten to be discriminator-aware before merge to main. Tool count after revert: ~270 (drop `get_proforma`). Round-2 changes (mgmt-fee fix + T-12 path) live in the working tree but uncommitted — should be discarded as part of the rewrite. Carryover: rent-roll guard still queued; `current_proforma` server-derived path no longer the right framing — replaced by "discriminator-aware operating statement" architecture. Prior session-log entry: Artifacts Phase 5 (OS guard + universal tabular formatting standard) shipped between commits `c2d18dd` and `f21f2bf`. BASE_INSTRUCTIONS T-12 strict content rules (~80 lines) still superseded but not yet removed.*
-*Phase 1 of discriminator-aware operating-statement design shipped 2026-05-01 evening (chat DA, sessions LSCMD-OS-PHASE1-IMPL-0501-DA30 + LSCMD-OS-PHASE1-RETEST-0501-DA36, commit `13346bf` on `chat-artifacts`). New tool `save_user_vocab` (per-user phrasing → canonical-value mappings; universal pattern across resolution domains; first domain `operating_statement_scenario`). Modified `get_operating_statement` v2: accepts literal `scenario` OR `user_phrasing`; consults `tbl_user_scenario_vocab` for learned mappings; returns `code='ambiguous_scenario'` with `available_scenarios` block when no mapping exists; response includes `scenario_resolved`, `scenario_resolution_source`, and `rendering_label` (the honest title for the artifact). New table `landscape.tbl_user_scenario_vocab` (migration `20260501_user_scenario_vocab.up.sql`). New OS guard rule `_check_label_data_consistency` rejects subtype-vs-title scenario-keyword mismatches (closes the Chadron failure). BASE_INSTRUCTIONS adds two universal sections: "OPERATING STATEMENT — DISCRIMINATOR HONESTY" and "ASSUMPTION CHOICES — SURFACE WITH PROVENANCE" (the second applies platform-wide to any input with multiple sources). Production audit during live verify: `default` is the dominant `statement_discriminator` tag (945 rows / 63 projects), `POST_RENO_PRO_FORMA` exists too — both added to label map / epistemic-status map / validator allow-list with honest labeling (`default` → "Default (untagged)" / status `unknown`, NOT dressed up as a specific scenario). Spec at `Landscape app/SPEC-OS-DiscriminatorAware-DA-2026-05-01.md` (technical) + `.html` (plain-English). Two non-blocking follow-ups from live verify: (a) `.gitignore` `**/migrations/*.sql` unignore was too broad — exposed ~140 untracked historical SQL files in `git status`; need narrower pattern + per-file decision; (b) `_normalize_phrase` in `vocab_tools.py` doesn't strip stop words ("show me", "the", "again") so vocab-lookup hit rate is lower than design intent — small fix queued. Phase 2 (ephemeral artifacts + inline cell edit live recalc) queued separately.*
+## Session History
+
+Detailed session-log entries (architectural decisions, schema changes, implementation notes from each working session) live in `/landscape/docs/CLAUDE_SESSION_HISTORY.md`. Read on demand.
+
+---
+
 *Last audit: 2026-04-30 — Alpha Readiness Assessment (15-step workflow audit, includes Artifacts system)*
-*Landscaper tool count: **~271 registered** (+`save_user_vocab` from chat DA Phase 1 ship; +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
+*Landscaper tool count: **273 registered** (+`find_documents` + `summarize_document_library` from DMS restructure 2026-05-04; +`save_user_vocab` from chat DA Phase 1 ship; +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
-*Maintainer: Update when architecture decisions change. Never let this file fall more than one session behind.*
+*Maintainer: Update when architecture decisions change. Append session entries to CLAUDE_SESSION_HISTORY.md, not here.*

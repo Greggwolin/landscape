@@ -9,7 +9,7 @@ import { LandscaperChatThreaded, LandscaperChatHandle } from '@/components/lands
 import { ProjectHomepage } from '@/components/wrapper/ProjectHomepage';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
-import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
+import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
@@ -95,18 +95,29 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     if (isChatRoute && !chatOpen) openChat();
   }, [isChatRoute, chatOpen, openChat]);
 
-  // Bridge: Landscaper tool results → ModalRegistry
-  // When open_input_modal returns { action: 'open_modal', modal_name }, dispatch to the registry.
-  // Uses safe variant — returns null when outside ModalRegistryProvider (unassigned chats).
-  const modalRegistry = useModalRegistrySafe();
+  // Bridge: Landscaper tool results → command bus
+  //
+  // Architectural note: we used to call useModalRegistrySafe() here and
+  // dispatch directly to the modal registry. That silently failed on
+  // /w/projects/* routes because the chat panel lives in the OUTER /w/
+  // layout shell while ModalRegistryProvider is mounted in the CHILD
+  // /w/projects/[projectId]/ layout — React context flows down the tree,
+  // not up, so the chat panel couldn't see the provider mounted below it.
+  //
+  // The command bus inverts the dependency: emit a command from up here,
+  // a subscriber mounted inside the provider's tree handles it. See
+  // /src/lib/landscape-command-bus.ts and
+  // /src/components/wrapper/LandscapeCommandSubscriber.tsx.
 
   const handleToolResult = useCallback(
     (toolName: string, result: Record<string, unknown>) => {
       if (toolName === 'open_input_modal' && result.action === 'open_modal' && typeof result.modal_name === 'string') {
-        if (modalRegistry) {
-          modalRegistry.openModal(result.modal_name, (result.context as Record<string, unknown>) || undefined);
-        }
-        // Update content context for Landscaper page context enrichment
+        emitLandscapeCommand('open_modal', {
+          modal_name: result.modal_name,
+          context: (result.context as Record<string, unknown>) || undefined,
+        });
+        // Update content context for Landscaper page context enrichment.
+        // Local state in this component — no bus dispatch needed.
         const derivedContext = MODAL_TO_CONTEXT[result.modal_name];
         if (derivedContext) {
           setActiveContentContext(derivedContext);
@@ -153,12 +164,16 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         if (!artifactsOpen) toggleArtifacts();
       }
     },
-    [modalRegistry, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext],
+    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)
   const [homepageThreadId, setHomepageThreadId] = useState<string | null>(null);
-  const [threadTitle, setThreadTitle] = useState<string | null>(null);
+  // threadTitle is tracked for downstream effects (auto-clear on new chat,
+  // capture on thread select) but no longer rendered — the header now shows
+  // only the project name. The thread title appears at the top of the thread
+  // body itself.
+  const [, setThreadTitle] = useState<string | null>(null);
   const [isStartingChat, setIsStartingChat] = useState(false);
 
   // Thread count for the badge on the thread-history toggle button.
@@ -596,31 +611,18 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         </div>
       )}
 
-      {/* ── Unified center-panel header: icon + breadcrumb title ── */}
+      {/* ── Unified center-panel header: icon + project title ──
+          Thread name is intentionally NOT shown here — it appears at the
+          top of the thread itself, so repeating it in the header is just
+          duplication and forces the breadcrumb to truncate. */}
       <WrapperHeader
         leading={
-          <LandscaperIcon style={{ width: 24, height: 24, flexShrink: 0 }} />
+          <LandscaperIcon style={{ width: 32, height: 32, flexShrink: 0 }} />
         }
         title={
-          showHomepage ? (
-            <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
-              {projectName || 'Landscaper'}
-            </span>
-          ) : (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, fontSize: '12px' }}>
-              {projectName && (
-                <>
-                  <span style={{ opacity: 0.55, whiteSpace: 'nowrap', flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {projectName}
-                  </span>
-                  <span style={{ opacity: 0.35, flexShrink: 0 }}>/</span>
-                </>
-              )}
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 2 }}>
-                {threadTitle || 'New conversation'}
-              </span>
-            </span>
-          )
+          <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
+            {projectName || 'Landscaper'}
+          </span>
         }
         trailing={
           <>

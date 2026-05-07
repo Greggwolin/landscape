@@ -16,6 +16,10 @@ export interface ChatThread {
   title: string | null;
   summary: string | null;
   isActive: boolean;
+  /** Universal Archive Pattern: TRUE = soft-archived, hidden from default lists. */
+  isArchived?: boolean;
+  archivedAt?: string | null;
+  archivedByUserId?: string | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -636,10 +640,14 @@ export function useLandscaperThreads({
   }, [projectId, pageContext, subtabContext, loadThreads, fetchWithTimeout, getAuthHeaders]);
 
   /**
-   * Delete a thread. Knowledge is retained in separate tables — this only
-   * removes the conversational transcript.
+   * Archive a thread (Universal Archive Pattern Phase 1a).
+   *
+   * Soft-archive the thread: it disappears from the default Recent Threads
+   * list but is recoverable via restoreThread. Messages are NOT deleted.
+   *
+   * Backend: DELETE /api/landscaper/threads/{id}/ (no force flag).
    */
-  const deleteThread = useCallback(async (threadId: string) => {
+  const archiveThread = useCallback(async (threadId: string) => {
     try {
       const response = await fetchWithTimeout(
         `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/`,
@@ -651,10 +659,10 @@ export function useLandscaperThreads({
 
       const data = await response.json();
       if (data.success) {
-        // Remove from local state
+        // Remove from live-thread lists; the archived view fetches separately.
         setThreads((prev) => prev.filter((t) => t.threadId !== threadId));
         setAllThreads((prev) => prev.filter((t) => t.threadId !== threadId));
-        // If we deleted the active thread, clear it so recovery kicks in
+        // If we archived the active thread, clear it so recovery kicks in.
         if (activeThread?.threadId === threadId) {
           setActiveThread(null);
           setMessages([]);
@@ -662,9 +670,80 @@ export function useLandscaperThreads({
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      console.error('[LandscaperThreads] Failed to delete thread:', err);
+      console.error('[LandscaperThreads] Failed to archive thread:', err);
     }
   }, [activeThread, fetchWithTimeout, getAuthHeaders]);
+
+  /**
+   * Restore a previously archived thread (Universal Archive Pattern Phase 1a).
+   *
+   * Backend: POST /api/landscaper/threads/{id}/restore/.
+   * Caller is responsible for refreshing whichever lists need to reflect
+   * the un-archived thread (typically loadThreads after this resolves).
+   */
+  const restoreThread = useCallback(async (threadId: string) => {
+    try {
+      const response = await fetchWithTimeout(
+        `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/restore/`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+      return data.success === true;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return false;
+      console.error('[LandscaperThreads] Failed to restore thread:', err);
+      return false;
+    }
+  }, [fetchWithTimeout, getAuthHeaders]);
+
+  /**
+   * Permanently delete a thread (Universal Archive Pattern Phase 1a).
+   *
+   * Hard-deletes the thread row + cascades to messages. Frontend should
+   * only invoke this from the archived view, where the user has already
+   * committed to "this is going away."
+   *
+   * Backend: DELETE /api/landscaper/threads/{id}/?force=true.
+   */
+  const deleteThreadPermanently = useCallback(async (threadId: string) => {
+    try {
+      const response = await fetchWithTimeout(
+        `${DJANGO_API_URL}/api/landscaper/threads/${threadId}/?force=true`,
+        {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        setThreads((prev) => prev.filter((t) => t.threadId !== threadId));
+        setAllThreads((prev) => prev.filter((t) => t.threadId !== threadId));
+        if (activeThread?.threadId === threadId) {
+          setActiveThread(null);
+          setMessages([]);
+        }
+      }
+      return data.success === true;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return false;
+      console.error('[LandscaperThreads] Failed to permanently delete thread:', err);
+      return false;
+    }
+  }, [activeThread, fetchWithTimeout, getAuthHeaders]);
+
+  /**
+   * @deprecated Use archiveThread (soft) or deleteThreadPermanently (hard).
+   * Retained as an alias for archiveThread to preserve existing call sites
+   * during the Phase 1a rollout. Existing trash buttons now soft-archive
+   * by default — semantically a behavior change for callers, but the API
+   * surface (deleteThread takes a threadId, returns void) is unchanged.
+   */
+  const deleteThread = archiveThread;
 
   /**
    * Update a thread's title.
@@ -1009,7 +1088,10 @@ export function useLandscaperThreads({
     selectThread,
     startNewThread,
     updateThreadTitle,
-    deleteThread,
+    deleteThread, // alias for archiveThread (deprecated; new code should use archiveThread)
+    archiveThread,
+    restoreThread,
+    deleteThreadPermanently,
     // Message actions
     sendMessage,
     loadThreadMessages,

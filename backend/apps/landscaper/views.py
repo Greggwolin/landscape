@@ -1422,6 +1422,22 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         if not include_closed:
             queryset = queryset.filter(is_active=True)
 
+        # Universal Archive Pattern (Phase 1a): default excludes archived
+        # threads. ?archived=true = archived only. ?include_archived=true =
+        # both. Spec: SPEC-Universal-Archive-Pattern-PV-2026-05-05.md §5.4.
+        #
+        # Skip the archived filter for action methods that must find an
+        # archived row by id — `restore` un-archives, and `destroy` with
+        # ?force=true on an archived row hard-deletes. Without this carve-out
+        # both 404 against the live-only default queryset.
+        if self.action not in ('restore', 'destroy'):
+            archived_param = self.request.query_params.get('archived', '').lower()
+            include_archived = self.request.query_params.get('include_archived', '').lower() == 'true'
+            if archived_param == 'true':
+                queryset = queryset.filter(is_archived=True)
+            elif not include_archived:
+                queryset = queryset.filter(is_archived=False)
+
         return queryset.order_by('-updated_at')
 
     def list(self, request, *args, **kwargs):
@@ -1542,19 +1558,85 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def destroy(self, request, *args, **kwargs):
-        """DELETE a thread and its messages. Knowledge is retained in separate tables."""
+        """Universal Archive Pattern (Phase 1a): soft archive (default) or
+        hard delete (?force=true).
+
+        Default behavior is a soft archive: ``is_archived`` flips to ``TRUE``,
+        ``archived_at`` is set to NOW(), and the thread + its messages remain
+        in the database. The default queryset hides archived threads, so they
+        disappear from the sidebar UI.
+
+        Pass ``?force=true`` (or ``1`` / ``yes``) to permanently destroy the
+        thread and CASCADE-delete its messages. Hard delete is intended for
+        archived items only — frontend exposes the force path only from the
+        archived view, but the endpoint itself accepts force on any thread.
+
+        Responses:
+            - 200 OK with the soft-archived thread on default DELETE.
+            - 200 OK with deletion summary on ?force=true.
+            - 404 if the thread does not exist.
+
+        Spec: SPEC-Universal-Archive-Pattern-PV-2026-05-05.md §5.1, §5.2.
+        """
+        from .serializers import ChatThreadSerializer
+
         instance = self.get_object()
         thread_id = str(instance.id)
-        msg_count = instance.messages.count()
 
-        # Hard delete — CASCADE removes ThreadMessage rows automatically
-        instance.delete()
-        logger.info(f"Deleted thread {thread_id} ({msg_count} messages)")
+        force_param = (request.query_params.get('force') or '').strip().lower()
+        is_force = force_param in ('1', 'true', 'yes')
+
+        if is_force:
+            msg_count = instance.messages.count()
+            # Hard delete — CASCADE removes ThreadMessage rows automatically
+            instance.delete()
+            logger.info(f"Hard-deleted thread {thread_id} ({msg_count} messages)")
+            return Response({
+                'success': True,
+                'deleted_thread_id': thread_id,
+                'deleted_message_count': msg_count,
+                'mode': 'hard_delete',
+            }, status=status.HTTP_200_OK)
+
+        # Soft archive
+        if not instance.is_archived:
+            instance.is_archived = True
+            instance.archived_at = timezone.now()
+            instance.archived_by_user_id = str(getattr(request.user, 'id', '') or '') or None
+            instance.save(update_fields=['is_archived', 'archived_at', 'archived_by_user_id'])
+            logger.info(f"Archived thread {thread_id}")
 
         return Response({
             'success': True,
-            'deleted_thread_id': thread_id,
-            'deleted_message_count': msg_count,
+            'thread': ChatThreadSerializer(instance).data,
+            'mode': 'archive',
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        """Restore a soft-archived thread.
+
+        Sets ``is_archived = FALSE``, clears ``archived_at`` and
+        ``archived_by_user_id``. Returns 200 with the restored thread.
+        Idempotent — restoring an already-live thread is a no-op success.
+
+        Spec: SPEC-Universal-Archive-Pattern-PV-2026-05-05.md §5.3.
+        """
+        from .serializers import ChatThreadSerializer
+
+        instance = self.get_object()
+        thread_id = str(instance.id)
+
+        if instance.is_archived:
+            instance.is_archived = False
+            instance.archived_at = None
+            instance.archived_by_user_id = None
+            instance.save(update_fields=['is_archived', 'archived_at', 'archived_by_user_id'])
+            logger.info(f"Restored thread {thread_id}")
+
+        return Response({
+            'success': True,
+            'thread': ChatThreadSerializer(instance).data,
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['get'], url_path='recent')
@@ -1562,12 +1644,18 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         """
         List recent threads across all accessible projects for the current user.
         Returns threads sorted by updated_at desc, with project name included.
+
+        Universal Archive Pattern (Phase 1a): default excludes archived threads.
+        Pass ``?archived=true`` for archived only, or ``?include_archived=true``
+        for both.
         """
         from .models import ChatThread
         from django.db.models import Count
 
         limit = int(request.query_params.get('limit', 50))
         include_closed = request.query_params.get('include_closed', 'false').lower() == 'true'
+        archived_param = request.query_params.get('archived', '').lower()
+        include_archived = request.query_params.get('include_archived', '').lower() == 'true'
 
         queryset = ChatThread.objects.select_related('project').annotate(
             msg_count=Count('messages')
@@ -1575,6 +1663,11 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
 
         if not include_closed:
             queryset = queryset.filter(is_active=True)
+
+        if archived_param == 'true':
+            queryset = queryset.filter(is_archived=True)
+        elif not include_archived:
+            queryset = queryset.filter(is_archived=False)
 
         queryset = queryset[:limit]
 
@@ -1589,6 +1682,8 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                 'subtabContext': t.subtab_context,
                 'title': t.title,
                 'isActive': t.is_active,
+                'isArchived': t.is_archived,
+                'archivedAt': t.archived_at.isoformat() if t.archived_at else None,
                 'messageCount': t.msg_count,
                 'createdAt': t.created_at.isoformat(),
                 'updatedAt': t.updated_at.isoformat(),
@@ -1815,6 +1910,179 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
                 'success': False,
                 'error': str(e),
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # ─── Document chat (chat qm — wrapper DMS "Chat with this document") ───
+    # Three actions that back the per-document chat surface:
+    #   - by_doc      → singular lookup (exists / 404)
+    #   - for_docs    → bulk lookup (icon-coloring on doc list load)
+    #   - doc_chat    → get-or-create + seed bounded summary
+
+    @action(detail=False, methods=['get'], url_path='by-doc/(?P<doc_id>[0-9]+)')
+    def by_doc(self, request, doc_id=None):
+        """
+        GET /api/landscaper/threads/by-doc/<doc_id>/
+
+        Returns the active doc-chat thread for a given document, or 404 if
+        no thread exists yet. Used by the wrapper DMS to decide whether
+        clicking the chat icon should open an existing thread or trigger
+        the create-and-seed path.
+        """
+        from .models import ChatThread
+        from .serializers import ChatThreadSerializer
+
+        try:
+            doc_id_int = int(doc_id)
+        except (TypeError, ValueError):
+            return Response({'success': False, 'error': 'Invalid doc_id'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        thread = (
+            ChatThread.objects
+            .filter(doc_id=doc_id_int, is_archived=False, is_active=True)
+            .order_by('-updated_at')
+            .first()
+        )
+        if thread is None:
+            return Response({'success': False, 'error': 'No thread for this document'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if thread.project_id is not None:
+            try:
+                _require_project_access(request.user, int(thread.project_id))
+            except Exception:
+                return Response({'success': False, 'error': 'Forbidden'},
+                                status=status.HTTP_403_FORBIDDEN)
+
+        return Response({
+            'success': True,
+            'thread': ChatThreadSerializer(thread).data,
+        })
+
+    @action(detail=False, methods=['get'], url_path='for-docs')
+    def for_docs(self, request):
+        """
+        GET /api/landscaper/threads/for-docs/?doc_ids=1,2,3
+
+        Bulk lookup for the wrapper DMS doc list — returns a map of
+        { doc_id: thread_id } for every doc that has an active thread.
+        Docs without threads are simply omitted from the response. Cheap
+        — uses the partial index on doc_id IS NOT NULL.
+        """
+        from .models import ChatThread
+
+        raw = request.query_params.get('doc_ids', '')
+        ids: list[int] = []
+        for part in raw.split(','):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                ids.append(int(part))
+            except ValueError:
+                continue
+        if not ids:
+            return Response({'success': True, 'mapping': {}})
+
+        rows = (
+            ChatThread.objects
+            .filter(doc_id__in=ids, is_archived=False, is_active=True)
+            .values('doc_id', 'id', 'project_id', 'updated_at')
+            .order_by('doc_id', '-updated_at')
+        )
+        mapping: dict[str, dict] = {}
+        for row in rows:
+            key = str(row['doc_id'])
+            # First-seen wins per ordering above (latest active thread per doc).
+            if key in mapping:
+                continue
+            mapping[key] = {
+                'thread_id': str(row['id']),
+                'project_id': row['project_id'],
+            }
+        return Response({'success': True, 'mapping': mapping})
+
+    @action(detail=False, methods=['post'], url_path='doc-chat')
+    def doc_chat(self, request):
+        """
+        POST /api/landscaper/threads/doc-chat/
+        Body: { "doc_id": <int>, "project_id": <int|null> }
+
+        Get-or-create the persistent thread bound to a document. When the
+        thread is newly created, seeds a bounded factual summary as the
+        first assistant message ("[Type]: [Name]. Parties: X. ... What
+        would you like to discuss?") so the user lands in a primed
+        conversation rather than an empty one.
+
+        Returns the thread record + a `created` flag. Frontend routes the
+        user to /w/projects/<pid>?thread=<tid> when project_id is set,
+        or /w/chat/<tid> when null (Platform Knowledge docs).
+        """
+        from .models import ChatThread
+        from .serializers import ChatThreadSerializer
+        from .services.doc_chat_service import build_doc_seed_summary
+
+        doc_id = request.data.get('doc_id')
+        try:
+            doc_id_int = int(doc_id)
+        except (TypeError, ValueError):
+            return Response({'success': False, 'error': 'doc_id is required'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        project_id_raw = request.data.get('project_id')
+        if project_id_raw in (None, '', 'null'):
+            resolved_project_id = None
+        else:
+            try:
+                resolved_project_id = int(project_id_raw)
+            except (TypeError, ValueError):
+                return Response({'success': False, 'error': 'Invalid project_id'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            _require_project_access(request.user, resolved_project_id)
+
+        # Get-or-create — return the existing active thread if one exists.
+        existing = (
+            ChatThread.objects
+            .filter(doc_id=doc_id_int, is_archived=False, is_active=True)
+            .order_by('-updated_at')
+            .first()
+        )
+        if existing is not None:
+            return Response({
+                'success': True,
+                'thread': ChatThreadSerializer(existing).data,
+                'created': False,
+            })
+
+        try:
+            seed = build_doc_seed_summary(doc_id_int)
+        except Exception as e:
+            logger.exception(f"doc seed summary failed for doc_id={doc_id_int}: {e}")
+            seed = {
+                'title': f'Document {doc_id_int}',
+                'summary_text': 'What would you like to discuss?',
+            }
+
+        # Title falls back to the doc name; user can rename via PATCH later.
+        thread = ChatThread.objects.create(
+            project_id=resolved_project_id,
+            doc_id=doc_id_int,
+            page_context='document',
+            title=seed.get('title') or f'Document {doc_id_int}',
+        )
+
+        # Seed the assistant message so the user lands in a primed thread.
+        from .models import ThreadMessage
+        ThreadMessage.objects.create(
+            thread=thread,
+            role='assistant',
+            content=seed.get('summary_text') or 'What would you like to discuss?',
+        )
+
+        return Response({
+            'success': True,
+            'thread': ChatThreadSerializer(thread).data,
+            'created': True,
+        }, status=status.HTTP_201_CREATED)
 
 
 class ThreadMessageViewSet(viewsets.ModelViewSet):
@@ -2058,6 +2326,18 @@ class ThreadMessageViewSet(viewsets.ModelViewSet):
                 EmbeddingService.embed_message(assistant_message)
             except Exception as e:
                 logger.warning(f"Failed to embed messages: {e}")
+
+            # FB-292 — refresh thread summary opportunistically when message
+            # count crosses (5, 15, 30, 60). Summary feeds the collapsed
+            # thread-preview rows in the center-panel drawer (ThreadList).
+            # Threshold-only — does not run on every turn. Failure here must
+            # never block the assistant response.
+            try:
+                ThreadService.maybe_regenerate_summary(thread.id)
+            except Exception as e:
+                logger.warning(
+                    f"[THREAD_SUMMARY] Skipped regen for thread {thread.id}: {e}"
+                )
 
             # Generate title after first exchange if needed
             generated_title = None

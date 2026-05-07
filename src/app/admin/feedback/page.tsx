@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CModal,
   CModalHeader,
@@ -15,6 +15,26 @@ import {
 } from '@coreui/react';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+
+// ── Display-bucket map: collapse Layer 2's three states into the same
+// three-bucket taxonomy the Cowork artifact uses, so the Open/In Progress/Closed
+// count chips read the same way. submitted → open, under_review → in_progress,
+// addressed → closed. Pure display layer; the database column stays as-is.
+const STATUS_BUCKET_MAP: Record<string, 'open' | 'in_progress' | 'closed'> = {
+  submitted: 'open',
+  under_review: 'in_progress',
+  addressed: 'closed',
+};
+const BUCKET_LABEL: Record<'open' | 'in_progress' | 'closed', string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  closed: 'Closed',
+};
+const BUCKET_ACCENT: Record<'open' | 'in_progress' | 'closed', { bg: string; bgActive: string; fg: string; fgActive: string; numColor: string }> = {
+  open:        { bg: '#fafafa', bgActive: '#fee2e2', fg: '#475569', fgActive: '#991b1b', numColor: '#dc2626' },
+  in_progress: { bg: '#fafafa', bgActive: '#fef3c7', fg: '#475569', fgActive: '#92400e', numColor: '#d97706' },
+  closed:      { bg: '#fafafa', bgActive: '#dcfce7', fg: '#475569', fgActive: '#166534', numColor: '#16a34a' },
+};
 
 interface FeedbackItem {
   id: number;
@@ -49,17 +69,30 @@ interface FeedbackItem {
   context_url?: string;
 }
 
+// Display nomenclature is Open / In Progress / Closed (matches the count chips
+// and the Cowork artifact). The DB column stays as submitted/under_review/addressed
+// — only the rendering changes. Keep these maps as the single source of truth so
+// every badge / select / sort key stays consistent.
 const STATUS_COLORS: Record<string, string> = {
-  submitted: 'warning',
-  under_review: 'info',
-  addressed: 'success',
+  submitted: 'danger',     // Open
+  under_review: 'warning', // In Progress
+  addressed: 'success',    // Closed
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  submitted: 'Submitted',
-  under_review: 'Under Review',
-  addressed: 'Addressed',
+  submitted: 'Open',
+  under_review: 'In Progress',
+  addressed: 'Closed',
 };
+
+// FB-id extraction: rows backfilled from tbl_feedback have an admin_notes prefix
+// like "[migrated FB-281 on 2026-05-06]" — parse it for display. Rows submitted
+// natively to tester_feedback won't have that marker; fall back to the local id.
+function fbIdLabel(item: FeedbackItem): string {
+  const m = (item.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+  if (m) return `FB-${m[1]}`;
+  return `F-${item.id}`;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   bug: 'danger',
@@ -77,6 +110,62 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
+// ── Working-summary + Fix Prompt helpers (mirror the Cowork feedback_status_live artifact) ──
+// During the Layer 2 bridge backfill (LSCMD-FBLOG-0505-kp), the Cowork-side
+// `working_summary` content from tbl_feedback was stuffed into admin_notes
+// under a "--- Working summary ---" header. This helper extracts it for
+// display in the detail modal so the chat-tied lifecycle log is visible
+// here, not only in the legacy Cowork artifact.
+function parseWorkingSummary(adminNotes: string | undefined | null): string | null {
+  if (!adminNotes) return null;
+  const idx = adminNotes.indexOf('--- Working summary ---');
+  if (idx < 0) return null;
+  return adminNotes.substring(idx + '--- Working summary ---'.length).trim() || null;
+}
+
+// Build the same paste-ready triage prompt the Cowork artifact's "Fix Prompt"
+// button copies to clipboard. Includes a "Prior work on this item" section
+// when the row already has a working summary, so a fresh chat can pick up
+// where the prior one left off.
+function buildFixPrompt(item: FeedbackItem): string {
+  const dateOnly = (item.created_at || '').slice(0, 10);
+  const where = item.affected_module || 'Unknown';
+  const statusLabel = STATUS_LABELS[item.status] || item.status;
+  const ws = parseWorkingSummary(item.admin_notes);
+  const hasPriorWork = !!ws;
+  const lines: string[] = [];
+
+  lines.push(`Triage feedback item FB-${item.id} from the Landscape app.`);
+  lines.push(``);
+  lines.push(`Reported: ${dateOnly} on the ${where} surface`);
+  lines.push(`Status: ${statusLabel}`);
+  lines.push(``);
+  lines.push(`User's wording:`);
+  lines.push(`"${(item.message || '').trim()}"`);
+  lines.push(``);
+
+  if (hasPriorWork) {
+    lines.push(`──── Prior work on this item ────`);
+    lines.push(`Working summary (chronological — newest at bottom):`);
+    lines.push(ws as string);
+    lines.push(``);
+    lines.push(`Pick up where prior work left off. Do NOT re-litigate decisions already locked in (look for [decision] / [user-input] tags). If the most recent line is a [blocker], that's where to start.`);
+    lines.push(``);
+  }
+
+  lines.push(`Investigate ${hasPriorWork ? 'and finish' : 'this end-to-end and make'} the fix directly:`);
+  lines.push(`  1. Read the relevant code paths and trace downstream consumers per §17.`);
+  lines.push(`  2. ${hasPriorWork ? 'Confirm what remains based on the Prior Work section above, then state the planned change before editing.' : 'Identify the root cause and state the planned change before editing.'}`);
+  lines.push(`  3. Make all code, schema-spec, and config edits yourself with the file tools — do not draft a CC prompt for work Cowork can do.`);
+  lines.push(`  4. Verify the change in-place where possible (read the edited file back, check types, sanity-check call sites).`);
+  lines.push(``);
+  lines.push(`Only hand off to CC when the remaining step requires a capability Cowork lacks: running terminal commands, executing the build, running tests, committing/pushing to git, executing database migrations, or restarting servers. In those cases, deliver a downloadable .md prompt per Landscape standards.`);
+  lines.push(``);
+  lines.push(`If the fix requires a decision Gregg owns (UX, scope, naming, behavior tradeoff), surface a single targeted question before editing.`);
+
+  return lines.join('\n');
+}
+
 interface FeedbackDetailModalProps {
   item: FeedbackItem | null;
   isOpen: boolean;
@@ -90,14 +179,38 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
   const [adminResponse, setAdminResponse] = useState('');
   const [saving, setSaving] = useState(false);
   const [showRawChat, setShowRawChat] = useState(false);
+  const [showWorkingSummary, setShowWorkingSummary] = useState(false);
+  const [showFixPrompt, setShowFixPrompt] = useState(false);
+  const [fixPromptCopied, setFixPromptCopied] = useState(false);
 
   useEffect(() => {
     if (item) {
       setStatus(item.status);
       setAdminNotes(item.admin_notes || '');
       setAdminResponse(item.admin_response || '');
+      // Reset disclosures + copied state on item change
+      setShowWorkingSummary(false);
+      setShowFixPrompt(false);
+      setFixPromptCopied(false);
     }
   }, [item]);
+
+  // Resolve working summary + fix prompt for the current item (memoised on every render is fine here — strings are small)
+  const workingSummary = item ? parseWorkingSummary(item.admin_notes) : null;
+  const fixPromptText = item ? buildFixPrompt(item) : '';
+
+  const handleCopyFixPrompt = async () => {
+    if (!item) return;
+    try {
+      await navigator.clipboard.writeText(fixPromptText);
+      setFixPromptCopied(true);
+      setShowFixPrompt(true);
+      setTimeout(() => setFixPromptCopied(false), 1500);
+    } catch {
+      // Clipboard blocked — show the text inline so the user can copy manually
+      setShowFixPrompt(true);
+    }
+  };
 
   const handleSave = async () => {
     if (!item) return;
@@ -227,14 +340,74 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
           </a>
         </div>
 
+        {workingSummary && (
+          <div className="mb-3">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setShowWorkingSummary((v) => !v)}
+            >
+              {showWorkingSummary ? 'Hide' : 'Show'} Working Summary ({workingSummary.split('\n').length} lines)
+            </button>
+            {showWorkingSummary && (
+              <div
+                className="mt-2 p-3 rounded"
+                style={{
+                  backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+                  border: '1px solid var(--cui-border-color, #e2e8f0)',
+                  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                  fontSize: '12.5px',
+                  lineHeight: 1.65,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  color: 'var(--cui-body-color)',
+                }}
+              >
+                {workingSummary}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mb-3">
+          <button
+            type="button"
+            className={`btn btn-sm ${fixPromptCopied ? 'btn-success' : 'btn-outline-primary'}`}
+            onClick={handleCopyFixPrompt}
+          >
+            {fixPromptCopied ? 'Copied to clipboard' : 'Fix Prompt'}
+          </button>
+          {showFixPrompt && (
+            <div
+              className="mt-2 p-3 rounded"
+              style={{
+                backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+                border: '1px solid var(--cui-border-color, #e2e8f0)',
+                fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+                fontSize: '12px',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: '320px',
+                overflowY: 'auto',
+                color: 'var(--cui-body-color)',
+              }}
+            >
+              {fixPromptText}
+            </div>
+          )}
+        </div>
+
         <hr />
 
         <div className="mb-3">
           <label className="form-label fw-bold">Status</label>
           <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="submitted">Submitted</option>
-            <option value="under_review">Under Review</option>
-            <option value="addressed">Addressed</option>
+            <option value="submitted">Open</option>
+            <option value="under_review">In Progress</option>
+            <option value="addressed">Closed</option>
           </CFormSelect>
         </div>
 
@@ -276,15 +449,198 @@ function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailMo
   );
 }
 
+// ── Inline expansion panel: replaces the modal. Same content, rendered
+// directly below the row in a colspan'd cell. Per-row state lives here.
+interface ExpandedRowPanelProps {
+  item: FeedbackItem;
+  onSave: (id: number, data: Partial<FeedbackItem>) => Promise<void>;
+}
+
+function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
+  const [status, setStatus] = useState<string>(item.status);
+  const [adminNotes, setAdminNotes] = useState(item.admin_notes || '');
+  const [adminResponse, setAdminResponse] = useState(item.admin_response || '');
+  const [saving, setSaving] = useState(false);
+  const [showRawChat, setShowRawChat] = useState(false);
+  const [showWorkingSummary, setShowWorkingSummary] = useState(false);
+  const [showFixPrompt, setShowFixPrompt] = useState(false);
+  const [fixPromptCopied, setFixPromptCopied] = useState(false);
+
+  const workingSummary = parseWorkingSummary(item.admin_notes);
+  const fixPromptText = buildFixPrompt(item);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(item.id, {
+        status: status as FeedbackItem['status'],
+        admin_notes: adminNotes,
+        admin_response: adminResponse,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyFixPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(fixPromptText);
+      setFixPromptCopied(true);
+      setShowFixPrompt(true);
+      setTimeout(() => setFixPromptCopied(false), 1500);
+    } catch {
+      setShowFixPrompt(true);
+    }
+  };
+
+  return (
+    <div className="p-3" style={{ background: 'var(--cui-tertiary-bg)' }}>
+      <div className="mb-3">
+        <strong>Summary:</strong>
+        <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>
+          {item.landscaper_summary || item.message}
+        </p>
+      </div>
+
+      {item.landscaper_summary && item.landscaper_summary !== item.message && (
+        <div className="mb-3">
+          <strong>Original Message:</strong>
+          <p className="mb-0 mt-1 text-muted" style={{ whiteSpace: 'pre-wrap' }}>{item.message}</p>
+        </div>
+      )}
+
+      {item.browser_context && Object.keys(item.browser_context).length > 0 && (
+        <div className="mb-3">
+          <strong>Browser Context:</strong>
+          <div className="mt-1 p-2 rounded small" style={{ background: 'var(--cui-card-bg)' }}>
+            {item.browser_context.browser && <div>Browser: {item.browser_context.browser}</div>}
+            {item.browser_context.os && <div>OS: {item.browser_context.os}</div>}
+            {item.browser_context.screenSize && <div>Screen: {item.browser_context.screenSize}</div>}
+            {item.browser_context.currentUrl && (
+              <div className="text-truncate">URL: {item.browser_context.currentUrl}</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {item.landscaper_raw_chat && item.landscaper_raw_chat.length > 0 && (
+        <div className="mb-3">
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setShowRawChat(!showRawChat)}>
+            {showRawChat ? 'Hide' : 'Show'} Chat History ({item.landscaper_raw_chat.length} messages)
+          </button>
+          {showRawChat && (
+            <div className="mt-2 p-2 rounded" style={{ background: 'var(--cui-card-bg)', maxHeight: '200px', overflowY: 'auto' }}>
+              {item.landscaper_raw_chat.map((msg, idx) => (
+                <div key={idx} className={`mb-2 p-2 rounded ${msg.role === 'user' ? 'bg-primary text-white ms-4' : ''}`} style={msg.role !== 'user' ? { background: 'var(--cui-tertiary-bg)' } : undefined}>
+                  <small className="d-block mb-1 fw-bold">{msg.role === 'user' ? 'User' : 'Assistant'}</small>
+                  {msg.content}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mb-3">
+        <strong>Page:</strong>{' '}
+        <a href={item.context_url || item.page_url} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
+          {item.page_path}
+        </a>
+      </div>
+
+      {workingSummary && (
+        <div className="mb-3">
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setShowWorkingSummary((v) => !v)}>
+            {showWorkingSummary ? 'Hide' : 'Show'} Working Summary ({workingSummary.split('\n').length} lines)
+          </button>
+          {showWorkingSummary && (
+            <div className="mt-2 p-3 rounded" style={{
+              backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+              border: '1px solid var(--cui-border-color, #e2e8f0)',
+              fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+              fontSize: '12.5px',
+              lineHeight: 1.65,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              maxHeight: '320px',
+              overflowY: 'auto',
+              color: 'var(--cui-body-color)',
+            }}>{workingSummary}</div>
+          )}
+        </div>
+      )}
+
+      <div className="mb-3">
+        <button type="button" className={`btn btn-sm ${fixPromptCopied ? 'btn-success' : 'btn-outline-primary'}`} onClick={handleCopyFixPrompt}>
+          {fixPromptCopied ? 'Copied to clipboard' : 'Fix Prompt'}
+        </button>
+        {showFixPrompt && (
+          <div className="mt-2 p-3 rounded" style={{
+            backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
+            border: '1px solid var(--cui-border-color, #e2e8f0)',
+            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+            fontSize: '12px',
+            lineHeight: 1.6,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            maxHeight: '320px',
+            overflowY: 'auto',
+            color: 'var(--cui-body-color)',
+          }}>{fixPromptText}</div>
+        )}
+      </div>
+
+      <hr />
+
+      <div className="mb-3">
+        <label className="form-label fw-bold">Status</label>
+        <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="submitted">Open</option>
+          <option value="under_review">In Progress</option>
+          <option value="addressed">Closed</option>
+        </CFormSelect>
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label fw-bold">Internal Notes (private)</label>
+        <CFormTextarea rows={3} value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} />
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label fw-bold">Response to Tester (visible to user)</label>
+        <CFormTextarea rows={3} value={adminResponse} onChange={(e) => setAdminResponse(e.target.value)} />
+        {item.admin_responded_at && (
+          <small className="text-muted">Last responded: {new Date(item.admin_responded_at).toLocaleString()}</small>
+        )}
+      </div>
+
+      <div className="d-flex gap-2 justify-content-end">
+        <CButton color="primary" onClick={handleSave} disabled={saving}>
+          {saving ? <CSpinner size="sm" className="me-2" /> : null}
+          Save Changes
+        </CButton>
+      </div>
+    </div>
+  );
+}
+
+type SortKey = 'date' | 'fb' | 'status' | 'category' | 'summary';
+
 function FeedbackAdminContent() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [moduleFilter, setModuleFilter] = useState<string>('all');
-  const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Bucket-based status filter (Set lets multiple buckets be active at once;
+  // start with 'open' + 'in_progress' active, 'closed' off — same defaults as the Cowork artifact)
+  const [statusBuckets, setStatusBuckets] = useState<Set<'open' | 'in_progress' | 'closed'>>(
+    new Set(['open', 'in_progress'])
+  );
+  // Category filter tiles — same Set-based multi-toggle as status. Empty set
+  // means "show all categories"; populated set means "only these."
+  const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [sortBy, setSortBy] = useState<SortKey>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const fetchFeedback = useCallback(async () => {
     setLoading(true);
@@ -372,25 +728,124 @@ function FeedbackAdminContent() {
     await fetchFeedback();
   };
 
-  const uniqueModules = useMemo(() => {
-    const modules = new Set(feedback.map((item) => item.affected_module).filter(Boolean));
-    return Array.from(modules).sort();
+  // Bucket counts for the count chips (computed off ALL feedback, not the filtered set)
+  const bucketCounts = useMemo(() => {
+    const counts: Record<'open' | 'in_progress' | 'closed', number> = { open: 0, in_progress: 0, closed: 0 };
+    for (const i of feedback) {
+      const b = STATUS_BUCKET_MAP[i.status];
+      if (b) counts[b]++;
+    }
+    return counts;
+  }, [feedback]);
+
+  // Category counts for the filter tiles (computed off ALL feedback)
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { bug: 0, feature_request: 0, ux_confusion: 0, question: 0, _uncategorized: 0 };
+    for (const i of feedback) {
+      const k = i.category || '_uncategorized';
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    return counts;
   }, [feedback]);
 
   const filteredFeedback = useMemo(
     () =>
       feedback.filter((item) => {
-        if (statusFilter !== 'all' && item.status !== statusFilter) return false;
-        if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
-        if (moduleFilter !== 'all' && item.affected_module !== moduleFilter) return false;
+        const bucket = STATUS_BUCKET_MAP[item.status];
+        if (!bucket || !statusBuckets.has(bucket)) return false;
+        if (categoryFilters.size > 0) {
+          const k = item.category || '_uncategorized';
+          if (!categoryFilters.has(k)) return false;
+        }
         return true;
       }),
-    [feedback, statusFilter, categoryFilter, moduleFilter]
+    [feedback, statusBuckets, categoryFilters]
   );
 
-  const handleRowClick = (item: FeedbackItem) => {
-    setSelectedItem(item);
-    setIsModalOpen(true);
+  const sortedFeedback = useMemo(() => {
+    const arr = filteredFeedback.slice();
+    const dir = sortDir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: string | number = '';
+      let bv: string | number = '';
+      switch (sortBy) {
+        case 'date':
+          av = new Date(a.created_at).getTime();
+          bv = new Date(b.created_at).getTime();
+          break;
+        case 'fb':
+          // Sort by extracted FB-N when present, else by tester_feedback.id.
+          // Migrated rows sort numerically by the original FB id; native rows
+          // sort by their local id (no clean cross-comparison, just stable).
+          av = (() => {
+            const m = (a.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+            return m ? parseInt(m[1], 10) : a.id;
+          })();
+          bv = (() => {
+            const m = (b.admin_notes || '').match(/^\[migrated FB-(\d+)/);
+            return m ? parseInt(m[1], 10) : b.id;
+          })();
+          break;
+        case 'status':
+          av = a.status;
+          bv = b.status;
+          break;
+        case 'category':
+          av = (a.category || 'zzz').toLowerCase();
+          bv = (b.category || 'zzz').toLowerCase();
+          break;
+        case 'summary':
+          av = (a.landscaper_summary || a.message || '').toLowerCase();
+          bv = (b.landscaper_summary || b.message || '').toLowerCase();
+          break;
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [filteredFeedback, sortBy, sortDir]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortBy === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      // Default direction per column type — date desc, text asc
+      setSortDir(key === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const toggleExpanded = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleBucket = (b: 'open' | 'in_progress' | 'closed') => {
+    setStatusBuckets((prev) => {
+      const next = new Set(prev);
+      if (next.has(b)) next.delete(b);
+      else next.add(b);
+      return next;
+    });
+  };
+
+  const toggleCategory = (c: string) => {
+    setCategoryFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
+  };
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortBy !== key) return ' ';
+    return sortDir === 'asc' ? '↑' : '↓';
   };
 
   if (loading) {
@@ -401,67 +856,112 @@ function FeedbackAdminContent() {
     );
   }
 
+  const renderCountChip = (bucket: 'open' | 'in_progress' | 'closed') => {
+    const active = statusBuckets.has(bucket);
+    const accent = BUCKET_ACCENT[bucket];
+    return (
+      <button
+        key={bucket}
+        type="button"
+        onClick={() => toggleBucket(bucket)}
+        className="d-inline-flex align-items-baseline gap-2 border rounded px-3 py-2"
+        style={{
+          background: active ? accent.bgActive : accent.bg,
+          color: active ? accent.fgActive : accent.fg,
+          borderColor: active ? accent.numColor : 'var(--cui-border-color)',
+          cursor: 'pointer',
+          fontSize: '13.5px',
+          userSelect: 'none',
+          transition: 'background 0.12s ease, border-color 0.12s ease, color 0.12s ease',
+        }}
+      >
+        <span style={{ fontWeight: 600, fontSize: '19px', lineHeight: 1, color: active ? 'inherit' : accent.numColor }}>
+          {bucketCounts[bucket]}
+        </span>
+        <span>{BUCKET_LABEL[bucket].toLowerCase()}</span>
+      </button>
+    );
+  };
+
+  const CATEGORY_DISPLAY: Record<string, string> = {
+    bug: 'Bug',
+    feature_request: 'Feature',
+    ux_confusion: 'UX',
+    question: 'Question',
+    _uncategorized: 'Uncategorized',
+  };
+
+  // Category filter tiles — same CoreUI badge as in the table (CATEGORY_COLORS),
+  // just larger so the count fits comfortably alongside the label.
+  const renderCategoryTile = (cat: string) => {
+    const active = categoryFilters.has(cat);
+    const count = categoryCounts[cat] || 0;
+    if (count === 0 && cat === '_uncategorized') return null;
+    const badgeColor = CATEGORY_COLORS[cat] || 'secondary';
+    return (
+      <button
+        key={cat}
+        type="button"
+        onClick={() => toggleCategory(cat)}
+        aria-pressed={active}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          opacity: active || categoryFilters.size === 0 ? 1 : 0.45,
+          transition: 'opacity 0.12s ease',
+        }}
+      >
+        <CBadge
+          color={badgeColor}
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            padding: '7px 12px',
+            display: 'inline-flex',
+            alignItems: 'baseline',
+            gap: '6px',
+            borderRadius: '4px',
+          }}
+        >
+          <span style={{ fontWeight: 700, fontSize: '15px' }}>{count}</span>
+          <span>{CATEGORY_DISPLAY[cat]}</span>
+        </CBadge>
+      </button>
+    );
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--cui-tertiary-bg)' }}>
       <AdminNavBar />
       <div className="p-4">
-        <div className="d-flex justify-content-between align-items-center mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
           <h1 className="h3 m-0">Feedback Queue</h1>
-          <div className="d-flex gap-2 align-items-center">
-            <span className="text-muted small">{filteredFeedback.length} items</span>
-          </div>
+          <span className="text-muted small">{sortedFeedback.length} of {feedback.length} items</span>
         </div>
 
-        {/* Filters */}
-        <div
-          className="d-flex gap-3 mb-4 p-3 rounded"
-          style={{ backgroundColor: 'var(--cui-card-bg)' }}
-        >
-          <div>
-            <label className="form-label small mb-1">Status</label>
-            <CFormSelect
-              size="sm"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '140px' }}
+        {/* Status count chips on the left, category filter tiles on the right — single row */}
+        <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
+          {renderCountChip('open')}
+          {renderCountChip('in_progress')}
+          {renderCountChip('closed')}
+          <div style={{ width: '12px' }} />
+          {renderCategoryTile('bug')}
+          {renderCategoryTile('feature_request')}
+          {renderCategoryTile('ux_confusion')}
+          {renderCategoryTile('question')}
+          {renderCategoryTile('_uncategorized')}
+          {categoryFilters.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilters(new Set())}
+              className="btn btn-link btn-sm p-0 ms-2"
+              style={{ fontSize: '12px', textDecoration: 'none' }}
             >
-              <option value="all">All Status</option>
-              <option value="submitted">Submitted</option>
-              <option value="under_review">Under Review</option>
-              <option value="addressed">Addressed</option>
-            </CFormSelect>
-          </div>
-          <div>
-            <label className="form-label small mb-1">Category</label>
-            <CFormSelect
-              size="sm"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ minWidth: '140px' }}
-            >
-              <option value="all">All Categories</option>
-              <option value="bug">Bug</option>
-              <option value="feature_request">Feature Request</option>
-              <option value="ux_confusion">UX Issue</option>
-              <option value="question">Question</option>
-            </CFormSelect>
-          </div>
-          <div>
-            <label className="form-label small mb-1">Module</label>
-            <CFormSelect
-              size="sm"
-              value={moduleFilter}
-              onChange={(e) => setModuleFilter(e.target.value)}
-              style={{ minWidth: '140px' }}
-            >
-              <option value="all">All Modules</option>
-              {uniqueModules.map((module) => (
-                <option key={module} value={module}>
-                  {module}
-                </option>
-              ))}
-            </CFormSelect>
-          </div>
+              clear
+            </button>
+          )}
         </div>
 
         {error && (
@@ -486,32 +986,28 @@ function FeedbackAdminContent() {
           <table className="table table-hover m-0" style={{ color: 'var(--cui-body-color)' }}>
             <thead>
               <tr style={{ background: 'var(--cui-tertiary-bg)' }}>
-                <th className="p-3" style={{ width: '100px' }}>
-                  Status
+                <th className="p-3 fb-sortable" style={{ width: '110px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('date')}>
+                  Date <span className="text-muted small">{sortIndicator('date')}</span>
                 </th>
-                <th className="p-3" style={{ width: '120px' }}>
-                  User
+                <th className="p-3 fb-sortable" style={{ width: '90px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('fb')}>
+                  FB <span className="text-muted small">{sortIndicator('fb')}</span>
                 </th>
-                <th className="p-3" style={{ width: '110px' }}>
-                  Category
+                <th className="p-3 fb-sortable" style={{ width: '120px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('status')}>
+                  Status <span className="text-muted small">{sortIndicator('status')}</span>
                 </th>
-                <th className="p-3" style={{ width: '120px' }}>
-                  Module
+                <th className="p-3 fb-sortable" style={{ width: '130px', cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('category')}>
+                  Category <span className="text-muted small">{sortIndicator('category')}</span>
                 </th>
-                <th className="p-3">Summary</th>
-                <th className="p-3" style={{ width: '80px' }}>
-                  Reports
-                </th>
-                <th className="p-3" style={{ width: '100px' }}>
-                  Date
+                <th className="p-3 fb-sortable" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => handleSort('summary')}>
+                  Summary <span className="text-muted small">{sortIndicator('summary')}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {filteredFeedback.length === 0 ? (
+              {sortedFeedback.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="text-center py-8"
                     style={{ color: 'var(--cui-secondary-color)' }}
                   >
@@ -519,69 +1015,68 @@ function FeedbackAdminContent() {
                   </td>
                 </tr>
               ) : (
-                filteredFeedback.map((item) => (
-                  <tr
-                    key={item.id}
-                    onClick={() => handleRowClick(item)}
-                    style={{ cursor: 'pointer' }}
-                    className="feedback-row"
-                  >
-                    <td className="p-3">
-                      <CBadge color={STATUS_COLORS[item.status]}>
-                        {STATUS_LABELS[item.status]}
-                      </CBadge>
-                    </td>
-                    <td className="p-3">{item.username}</td>
-                    <td className="p-3">
-                      {item.category ? (
-                        <CBadge color={CATEGORY_COLORS[item.category]}>
-                          {CATEGORY_LABELS[item.category]}
-                        </CBadge>
-                      ) : (
-                        <span className="text-muted">—</span>
+                sortedFeedback.map((item) => {
+                  const isExpanded = expandedIds.has(item.id);
+                  return (
+                    <Fragment key={item.id}>
+                      <tr
+                        onClick={() => toggleExpanded(item.id)}
+                        style={{ cursor: 'pointer' }}
+                        className={`feedback-row ${isExpanded ? 'feedback-row-expanded' : ''}`}
+                      >
+                        <td className="p-3" style={{ color: 'var(--cui-secondary-color)', whiteSpace: 'nowrap' }}>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="p-3" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: '12.5px', color: 'var(--cui-body-color)', whiteSpace: 'nowrap' }}>
+                          {fbIdLabel(item)}
+                        </td>
+                        <td className="p-3">
+                          <CBadge color={STATUS_COLORS[item.status]}>
+                            {STATUS_LABELS[item.status]}
+                          </CBadge>
+                        </td>
+                        <td className="p-3">
+                          {item.category ? (
+                            <CBadge color={CATEGORY_COLORS[item.category]}>
+                              {CATEGORY_LABELS[item.category]}
+                            </CBadge>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div>
+                            {(item.landscaper_summary || item.message).length > 140
+                              ? `${(item.landscaper_summary || item.message).substring(0, 140)}…`
+                              : item.landscaper_summary || item.message}
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="feedback-row-expansion">
+                          <td colSpan={5} style={{ padding: 0, background: 'var(--cui-tertiary-bg)' }}>
+                            <ExpandedRowPanel item={item} onSave={updateFeedback} />
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="p-3">
-                      <span className="small">{item.affected_module || '—'}</span>
-                    </td>
-                    <td className="p-3">
-                      <div style={{ maxWidth: '350px' }}>
-                        {(item.landscaper_summary || item.message).length > 120
-                          ? `${(item.landscaper_summary || item.message).substring(0, 120)}...`
-                          : item.landscaper_summary || item.message}
-                      </div>
-                    </td>
-                    <td className="p-3 text-center">
-                      {item.report_count > 1 ? (
-                        <CBadge color="primary">{item.report_count}</CBadge>
-                      ) : (
-                        <span className="text-muted">1</span>
-                      )}
-                    </td>
-                    <td className="p-3" style={{ color: 'var(--cui-secondary-color)' }}>
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <FeedbackDetailModal
-        item={selectedItem}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedItem(null);
-        }}
-        onSave={updateFeedback}
-      />
-
       <style jsx>{`
         .feedback-row:hover {
           background: var(--cui-tertiary-bg);
+        }
+        .feedback-row-expanded {
+          background: var(--cui-tertiary-bg);
+        }
+        .fb-sortable:hover {
+          color: var(--cui-primary);
         }
       `}</style>
     </div>

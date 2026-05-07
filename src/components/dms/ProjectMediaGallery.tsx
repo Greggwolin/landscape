@@ -19,6 +19,7 @@ import {
 } from '@coreui/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
+import { ALL_CLASSIFICATIONS, badgeColorToCssVar, type Classification } from '@/lib/dms/classifications';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -44,13 +45,6 @@ interface MediaItem {
  classification_id?: number;
  } | null;
  source_doc_name?: string;
-}
-
-interface Classification {
- classification_id: number;
- code: string;
- name: string;
- badge_color: string;
 }
 
 interface DocMediaResponse {
@@ -117,27 +111,6 @@ const FILTER_LABELS: { key: FilterKey; label: string }[] = [
  { key: 'charts', label: 'Charts' },
  { key: 'renders', label: 'Renders' },
  { key: 'other', label: 'Other' },
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// All 14 classification types (from lu_media_classification)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ALL_CLASSIFICATIONS: Classification[] = [
- { classification_id: 1, code: 'property_photo', name: 'Property Photo', badge_color: 'success' },
- { classification_id: 2, code: 'aerial_photo', name: 'Aerial Photo', badge_color: 'info' },
- { classification_id: 3, code: 'site_plan', name: 'Site Plan', badge_color: 'primary' },
- { classification_id: 4, code: 'floor_plan', name: 'Floor Plan', badge_color: 'primary' },
- { classification_id: 5, code: 'rendering', name: 'Rendering', badge_color: 'warning' },
- { classification_id: 6, code: 'aerial_map', name: 'Aerial Map', badge_color: 'info' },
- { classification_id: 7, code: 'zoning_map', name: 'Zoning Map', badge_color: 'dark' },
- { classification_id: 8, code: 'location_map', name: 'Location Map', badge_color: 'secondary' },
- { classification_id: 9, code: 'planning_map', name: 'Planning Map', badge_color: 'dark' },
- { classification_id: 10, code: 'chart', name: 'Chart / Graph', badge_color: 'warning' },
- { classification_id: 11, code: 'infographic', name: 'Infographic', badge_color: 'warning' },
- { classification_id: 12, code: 'before_after', name: 'Before / After', badge_color: 'success' },
- { classification_id: 13, code: 'logo', name: 'Logo / Branding', badge_color: 'light' },
- { classification_id: 14, code: 'other', name: 'Other', badge_color: 'secondary' },
 ];
 
 const TILE_MAX_WIDTH = 320;
@@ -1445,12 +1418,12 @@ export default function ProjectMediaGallery({
  borderColor: isSelected
  ? isPrimary
  ? 'var(--cui-primary)'
- : `var(--cui-${cls.badge_color || 'secondary'})`
+ : badgeColorToCssVar(cls.badge_color)
  : 'var(--cui-border-color)',
  backgroundColor: isSelected
  ? isPrimary
  ? 'var(--cui-primary)'
- : `var(--cui-${cls.badge_color || 'secondary'})`
+ : badgeColorToCssVar(cls.badge_color)
  : 'transparent',
  color: isSelected ? '#fff' : 'var(--cui-body-color)',
  }}

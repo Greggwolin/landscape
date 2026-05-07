@@ -196,3 +196,6 @@ CC_*.md
 
 # Playwright reports
 playwright-report/
+
+# Cowork GitHub PAT (local secret)
+.cowork-*

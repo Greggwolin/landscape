@@ -185,6 +185,9 @@ export interface ExcelAuditArtifactConfig {
     | 'trust_score';
 }
 
+/** Which view the project right panel is showing — artifacts workspace or documents. */
+export type ProjectRightPanelView = 'artifacts' | 'documents';
+
 interface WrapperUIContextValue {
   chatOpen: boolean;
   toggleChat: () => void;
@@ -196,6 +199,14 @@ interface WrapperUIContextValue {
   /** Whether the artifacts right panel is expanded (true) or collapsed to strip (false). */
   artifactsOpen: boolean;
   toggleArtifacts: () => void;
+  /**
+   * Active view inside the project's right panel — toggles between the
+   * artifacts workspace and the per-project document management surface.
+   * Defaults to 'artifacts'. Persisted across navigation within the session
+   * (project sub-routes preserve the user's last toggle choice).
+   */
+  projectRightPanelView: ProjectRightPanelView;
+  setProjectRightPanelView: (v: ProjectRightPanelView) => void;
   /** Active map artifact — set by Landscaper tool result, rendered in artifacts panel. */
   activeMapArtifact: MapArtifactConfig | null;
   setActiveMapArtifact: (config: MapArtifactConfig | null) => void;
@@ -289,6 +300,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
   // Server-safe default: always start expanded to avoid SSR/client hydration mismatch.
   // Actual viewport-based value is applied in the useEffect below after mount.
   const [artifactsOpen, setArtifactsOpen] = useState(true);
+  const [projectRightPanelView, setProjectRightPanelView] = useState<ProjectRightPanelView>('artifacts');
 
   // Sync to viewport after mount + auto-collapse/expand on resize
   useEffect(() => {
@@ -312,6 +324,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
       chatOpen, toggleChat, openChat, closeChat,
       rightPanelNarrow, setRightPanelNarrow,
       artifactsOpen, toggleArtifacts,
+      projectRightPanelView, setProjectRightPanelView,
       activeMapArtifact, setActiveMapArtifact,
       activeLocationBrief, setActiveLocationBrief,
       activeExcelAudit, setActiveExcelAudit, mergeActiveExcelAudit,

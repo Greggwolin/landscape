@@ -637,6 +637,144 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "find_documents",
+        "description": (
+            "Search the cross-project document library by metadata + free-text query. "
+            "Use this when the user asks about documents that span multiple projects, "
+            "or wants to narrow by property type / geography / document type / format. "
+            "Returns trimmed document summaries (id, name, type, project, geography, "
+            "format, modified date). Limit is capped at 50.\n\n"
+            "Examples that should fire this tool:\n"
+            "  - 'find all the offering memos for multifamily'\n"
+            "  - 'which projects have rent rolls older than a year'\n"
+            "  - 'show me everything I have for Texas multifamily'\n"
+            "  - 'do I have any appraisals on file?'\n\n"
+            "Do NOT use for textbook / methodology questions — use "
+            "`query_platform_knowledge` for semantic search over the reference corpus."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Free-text search query. Optional — leave empty to browse "
+                        "by metadata only."
+                    ),
+                },
+                "property_type": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Property type code(s), e.g. 'MF', 'OFF', 'LAND'.",
+                },
+                "doc_type": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": (
+                        "Document type code(s), e.g. 'offering_memo', 'rent_roll', "
+                        "'appraisal'."
+                    ),
+                },
+                "format": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "File format / extension, e.g. 'pdf', 'xlsx'.",
+                },
+                "geography": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Geography code(s) recognized by the library.",
+                },
+                "project_ids": {
+                    "anyOf": [
+                        {"type": "integer"},
+                        {"type": "array", "items": {"type": "integer"}},
+                    ],
+                    "description": "Optional list of project ids to constrain the search.",
+                },
+                "source": {
+                    "type": "string",
+                    "enum": ["all", "user", "platform"],
+                    "description": (
+                        "'user' = user-uploaded docs only, 'platform' = platform "
+                        "reference corpus only, 'all' (default) = both."
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 20, max 50).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "summarize_document_library",
+        "description": (
+            "Return facet counts (geography, property type, doc type, format, "
+            "project) for the cross-project document library. Use when the user "
+            "wants a high-level inventory view rather than specific documents.\n\n"
+            "Examples that should fire this tool:\n"
+            "  - 'how many documents do I have'\n"
+            "  - 'what's my doc-type breakdown'\n"
+            "  - 'which states do I have data on'"
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "enum": ["all", "user", "platform"],
+                    "description": "'all' (default), 'user', or 'platform'.",
+                },
+                "property_type": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Optional pre-filter.",
+                },
+                "doc_type": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Optional pre-filter.",
+                },
+                "format": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Optional pre-filter.",
+                },
+                "geography": {
+                    "anyOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ],
+                    "description": "Optional pre-filter.",
+                },
+                "project_ids": {
+                    "anyOf": [
+                        {"type": "integer"},
+                        {"type": "array", "items": {"type": "integer"}},
+                    ],
+                    "description": "Optional pre-filter list of project ids.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "update_revenue_rent",
         "description": "Update rent revenue assumptions.",
         "input_schema": {
@@ -4714,6 +4852,29 @@ LANDSCAPER_TOOLS = [
             "type": "object",
             "properties": {},
             "required": [],
+        },
+    },
+    {
+        "name": "get_project_profile",
+        "description": "Render the project's profile metadata as an artifact in the right panel — project name, address, county, MSA, APN, ownership, property type and subtype, units, gross acres, perspective, purpose, asking price, analysis start date. Read-only companion to the project_details modal. Use when the user asks 'show me the project details', 'show me the profile', 'what's this project's overview', or similar read-only requests. Use open_input_modal('project_details') instead when the user wants to EDIT the profile.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "update_project_msa",
+        "description": "Update the project's MSA (Metropolitan Statistical Area) by resolving a city/state reference to the canonical msa_id. Use this — NOT update_project_field — whenever the user asks to change the MSA, market designation, or metro area (e.g., 'set the MSA to Phoenix', 'change the market to Los Angeles', 'this is in the Dallas metro'). The generic field-update path writes the literal string to a free-text fallback column that the artifact display ignores; this tool resolves the user's reference to an integer msa_id and writes that, which the artifact's MSA display reads via JOIN. Returns a mutation proposal for user approval (Level 2 autonomy). On ambiguous matches, returns a candidate list so you can ask the user to pick before re-calling.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "User's MSA reference. Examples: 'Los Angeles', 'Phoenix, AZ', 'Dallas-Fort Worth', 'NYC metro'.",
+                },
+            },
+            "required": ["query"],
         },
     },
     {

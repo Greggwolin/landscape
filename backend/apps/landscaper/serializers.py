@@ -51,9 +51,13 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     threadId = serializers.UUIDField(source='id', read_only=True)
     projectId = serializers.IntegerField(source='project_id', read_only=True, allow_null=True)
     projectName = serializers.SerializerMethodField()
+    docId = serializers.IntegerField(source='doc_id', read_only=True, allow_null=True)
     pageContext = serializers.CharField(source='page_context', allow_null=True, required=False)
     subtabContext = serializers.CharField(source='subtab_context', allow_null=True, required=False)
     isActive = serializers.BooleanField(source='is_active', read_only=True)
+    isArchived = serializers.BooleanField(source='is_archived', read_only=True)
+    archivedAt = serializers.DateTimeField(source='archived_at', read_only=True, allow_null=True)
+    archivedByUserId = serializers.CharField(source='archived_by_user_id', read_only=True, allow_null=True)
     createdAt = serializers.DateTimeField(source='created_at', read_only=True)
     updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
     closedAt = serializers.DateTimeField(source='closed_at', read_only=True, allow_null=True)
@@ -66,11 +70,15 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'threadId',
             'projectId',
             'projectName',
+            'docId',
             'pageContext',
             'subtabContext',
             'title',
             'summary',
             'isActive',
+            'isArchived',
+            'archivedAt',
+            'archivedByUserId',
             'createdAt',
             'updatedAt',
             'closedAt',
@@ -78,7 +86,8 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'firstUserMessage',
         ]
         read_only_fields = [
-            'threadId', 'projectId', 'projectName', 'isActive',
+            'threadId', 'projectId', 'projectName', 'docId', 'isActive',
+            'isArchived', 'archivedAt', 'archivedByUserId',
             'createdAt', 'updatedAt', 'closedAt', 'messageCount',
             'firstUserMessage',
         ]

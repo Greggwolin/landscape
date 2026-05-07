@@ -4,6 +4,59 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## FB-290 Artifacts Panel Drag Handle — 2026-05-04
+
+**What was discussed:**
+- Triaged FB-290 ("artifacts panel width needs to be draggable") — capability already existed (built Apr 23), but visible-handle Pass 5 fix from commit `6f34429` (Apr 25) was applied only to `ProjectArtifactsPanel.tsx`, never to the matching `/w/chat` aside in `src/app/w/layout.tsx`.
+- Fix: brought `layout.tsx` lines 421–441 to inline-style parity with `ProjectArtifactsPanel.tsx` lines 83–103 (6px / `var(--cui-border-color)` / 0.5 opacity / hover-to-primary / `title` tooltip).
+- Frontend-only, single-file change. No backend, schema, or dependency impact.
+
+**Open items:**
+- Sidebar drag handle (`WrapperSidebar.tsx` line 329) uses the same invisible pattern — separate ticket if user reports it.
+- `/w/chat` aside render gate excludes `activeArtifactId` (Phase 3 generative artifacts don't open the panel on unassigned threads) — separate ticket.
+
+---
+
+## Chat DA — Discriminator-Aware OS, Right-Panel Fix, Production Stabilization, S14 Testing — 2026-05-01
+
+**What was discussed:**
+
+- **Discriminator-aware operating statement (Phase 1 shipped).** Locked five design questions plus two edge cases plus the broader compositional reframe. Wrote the spec in dual format (tech `.md` + plain-English HTML) at `Landscape app/SPEC-OS-DiscriminatorAware-DA-2026-05-01.{md,html}`. Implemented Phase 1 directly: new `tbl_user_scenario_vocab` migration (universal per-user phrasing → canonical-value table), new `save_user_vocab` tool, `get_operating_statement` v2 with literal-or-phrasing resolution and ambiguous-scenario response path, BASE_INSTRUCTIONS additions for discriminator honesty + surface-with-provenance, OS guard `_check_label_data_consistency` rule. Production audit revealed `default` (945 rows / 63 projects) and `POST_RENO_PRO_FORMA` weren't in my canonical taxonomy — added with honest labeling (`default` → "Default (untagged)" / status `unknown`, NOT dressed up as a specific scenario). Commit `13346bf`. Tool count now ~271.
+
+- **Right-panel artifacts fix.** Project landing page right panel was reverting to a project-documents list when no artifact was active — disorienting. Fixed `ProjectArtifactsPanel.tsx` to fall back to `ArtifactWorkspacePanel`'s empty state (Pinned + Recent + "No artifact selected"). Then per Gregg's pushback (modeled on Claude.ai's Memory/Instructions/Files pattern), added Project Documents back as a collapsible SECTION inside the workspace alongside Pinned, Recent, and Source Pointers. Commits `92ee2bb` + `dea1a68`.
+
+- **Production stabilization.** Vercel builds were failing on every push since April 6 because `JWT_SIGNING_KEY` was set on Production but not on Preview env vars (and turned out also missing for the chat-artifacts pushes). Adding to all environments unblocked builds. Then Phase 1's larger BASE_INSTRUCTIONS pushed multi-tool Anthropic round-trips past gunicorn's default 30s worker timeout — bumped Railway's gunicorn to `--timeout 180` (commit `3f8d31c`). Production now stable end-to-end.
+
+- **Chat panel projects-list fix.** On `/w/projects` (the project list page), the center chat panel was inheriting the last-visited project's chat context via the `lastProjectId` fallback. Per the design intent, that page is for general / unassigned chats. Fixed the layout's projectId computation to pass `undefined` when `pathname === '/w/projects'`. Same fix for projectName/projectLocation/projectTypeCode props.
+
+- **Gitignore noise cleanup (settled with revert).** Earlier in this chat the `!**/migrations/*.sql` unignore from the release cut was exposing ~140 historical files. Multiple cleanup approaches discussed and rejected (deletion was unsafe — investigation revealed real code references like `backend/run_migration.py` reading `016_subdivision_underwriting_v1.sql`). Reverted the unignore entirely; documented the `git add -f` convention.
+
+- **UI testing agent — S14 complete; framework `observe_only` fix landed; S15 in flight at chat close.** Wrote the first of a workflow-test family covering chat-driven equivalents of the legacy alpha18 input screens. S14 = Project Info Input via Chat Workflow (six phases). Process surfaced a chain of real bugs that all got fixed: JWT signing key being silently truncated by Next.js dotenv-expand on the `$5i` substring (fixed by escaping the `$` in `.env.local`), `config.NEXTJS_API_BASE` typo in test (fixed to `NEXTJS_BASE_URL`), missing `assumption_upsert` mutation handler (added), Next.js GET route omitting `total_units` / `gross_sf` / `year_built` / `acquisition_date` from SELECT (added), parallel `city/state/county` and `jurisdiction_*` column families on `tbl_project` getting written inconsistently (option (b) propagation: field_update mutation handler now mirrors writes to both sides, defending against silent divergence). Also discovered: `analysis_type` is a derived/legacy column — `analysis_perspective` is the directly-writable one (Landscaper correctly refused; test was updated). Framework structural defect addressed: `Validator.calibrate(...)` was becoming a hard equality assertion in test mode; added `observe_only=True` flag for stochastic values (tool names, project_id, response length). S14 finalized with 48 checks total (~16 hard outcome assertions, rest observability). S15 — Property Details — was in flight at chat close, CC executing.
+
+**Open items:**
+
+The natural-language and artifact-generation testing thread is in flight. The continuation handoff at `Landscape app/HANDOFF-NextSession-Workflow-Testing-2026-05-01.md` is the canonical pickup document for the next session — it has full context plus prioritized next steps. Highlights:
+
+1. **Framework structural defect (priority 1, gates everything).** `Validator.calibrate(...)` becomes a hard equality assertion in test mode (`tests/agent_framework/validators.py:284`). Any LLM stochasticity (tool name choice, project_id, response length) flips test mode red even when the actual contract is intact. Fix: add `observe_only=True` flag — two-line change to `validators.py` plus pass-through at call sites that record stochastic values. CC has the design ready.
+
+2. **Phase 1 prompt-discipline tweaks.** Model sometimes called `create_artifact` after `get_operating_statement` returned `code='ambiguous_scenario'` (should have stopped and asked the user). Also sometimes fired no tool at all on prompts like "Set the analysis perspective to investment." BASE_INSTRUCTIONS needs a tightening pass to address both. Same lineage as the discriminator-honesty rules.
+
+3. **S15 — Property Details.** Next workflow scenario in the chain. Rent roll / units for MF; parcels / land use for Land Dev. Can be drafted in parallel with item 2 once item 1 lands.
+
+4. **OPENAI_API_KEY missing on Railway.** Pre-existing (visible since at least Apr 12). Embeddings silently fail on Railway, degrading knowledge/RAG queries. Set the env var on Railway.
+
+5. **BASE_INSTRUCTIONS bloat at 17.8K tokens.** ~80 lines of legacy T-12 strict-content rules in `backend/apps/landscaper/ai_handler.py` are superseded by the OS guard and can be removed for context-budget headroom.
+
+6. **`_normalize_phrase` doesn't strip stop words.** "Show me the T-12" and "T-12" don't collapse to the same vocab key, so the silent-resolution path only fires when the model passes a normalized noun consistently. Small fix in `backend/apps/landscaper/tools/vocab_tools.py`.
+
+7. **`/w/` routing restructure deferred.** Drop `/w/` prefix so chat-first lives at root paths; retire legacy folder/tab navigation surface entirely. Investigation surfaced collisions with existing `src/app/page.tsx` and the legacy `src/app/projects/[projectId]/page.tsx`. Multi-hour refactor — its own focused session.
+
+8. **Cosmetic: county suffix normalization.** `bulk_update_fields` writes "Maricopa County"; minimal-create endpoint strips to "Maricopa". Input-layer fix in chat tool description, not a backend bug.
+
+9. **F4 carryover from earlier sessions:** new-thread bug verification (`useLandscaperThreads.ts`), right-panel artifact selector default state on hard refresh, drag-handle resize verification, delete/archive thread UI affordance.
+
+---
+
 ## Release Cut — Alpha18 → unified-ui as new main — 2026-05-01
 
 **What was discussed:**

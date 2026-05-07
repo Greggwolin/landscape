@@ -159,7 +159,7 @@
 /* ─── LEFT SIDEBAR ─── */
 .wrapper-sidebar {
   width: 260px;
-  background: var(--w-bg-sidebar);
+  background: #060708;
   border-right: 1px solid var(--w-border);
   display: flex;
   flex-direction: column;
@@ -201,7 +201,7 @@
   position: relative;
 }
 .wrapper-sidebar.collapsed .sb-nav-item span:not(.sb-nav-icon) { display: none; }
-.wrapper-sidebar.collapsed .sb-nav-icon { width: auto; font-size: 16px; }
+.wrapper-sidebar.collapsed .sb-nav-icon { width: auto; font-size: 18px; }
 .wrapper-sidebar.collapsed .sb-nav-item:hover::after {
   content: attr(data-label);
   position: absolute;
@@ -242,12 +242,17 @@
 }
 
 .sb-logo-img {
-  height: 22px;
+  height: 24px;
   width: auto;
-  opacity: 0.8;
+  opacity: 1;
+  /* Source PNG has the wordmark as mid-grey pixels, so a mild brightness
+     boost wasn't visible. brightness(0) invert(1) forces every non-
+     transparent pixel to pure white — silhouette treatment, max contrast
+     against the near-black sidebar. */
+  filter: brightness(0) invert(1);
 }
 
-.wrapper-sidebar.collapsed .sb-logo-img { height: 18px; }
+.wrapper-sidebar.collapsed .sb-logo-img { height: 20px; }
 
 .sb-collapse {
   width: 24px;
@@ -269,11 +274,11 @@
   width: calc(100% - 24px);
   justify-content: flex-start;
 }
-.sb-new-icon { font-size: 14px; color: var(--w-text-tertiary); }
-.sb-new-icon svg { width: 14px; height: 14px; display: block; }
-.sb-search-icon svg { width: 14px; height: 14px; display: block; }
-.sb-collapse svg { width: 16px; height: 16px; display: block; }
-.sb-footer-actions .w-btn-icon svg { width: 14px; height: 14px; display: block; }
+.sb-new-icon { font-size: 16px; color: var(--w-text-tertiary); }
+.sb-new-icon svg { width: 16px; height: 16px; display: block; }
+.sb-search-icon svg { width: 16px; height: 16px; display: block; }
+.sb-collapse svg { width: 18px; height: 18px; display: block; }
+.sb-footer-actions .w-btn-icon svg { width: 16px; height: 16px; display: block; }
 
 .sb-search {
   margin: 0 12px 10px;
@@ -299,9 +304,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -314,7 +319,7 @@
 }
 .sb-nav-item:hover { background: var(--w-bg-surface-hover); color: var(--w-text-primary); }
 .sb-nav-item.active { background: var(--w-bg-surface); color: var(--w-text-primary); font-weight: 500; }
-.sb-nav-icon { width: 18px; text-align: center; font-size: 13px; color: var(--w-text-tertiary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.sb-nav-icon { width: 20px; text-align: center; font-size: 15px; color: var(--w-text-tertiary); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .sb-nav-item.active .sb-nav-icon { color: var(--w-accent-text); }
 
 .sb-nav-label {
@@ -326,8 +331,8 @@
 
 .sb-nav-badge {
   margin-left: auto;
-  font-size: 9px;
-  padding: 1px 6px;
+  font-size: 11px;
+  padding: 2px 7px;
   border-radius: 8px;
   background: var(--w-accent-dim);
   color: var(--w-accent-text);
@@ -338,10 +343,10 @@
 /* ─── Sections ─── */
 .sb-section { padding: 0 8px; flex-shrink: 0; }
 .sb-section-label {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--w-text-muted);
   font-weight: 600;
-  padding: 12px 10px 6px;
+  padding: 14px 10px 6px;
   white-space: nowrap;
 }
 .sb-section-label--toggle {
@@ -354,7 +359,7 @@
   text-transform: uppercase;
 }
 .sb-section-label--toggle:hover { color: var(--w-text-tertiary); }
-.sb-section-chev { font-size: 8px; opacity: 0.7; }
+.sb-section-chev { font-size: 10px; opacity: 0.7; }
 
 /* ─── Scrollable Section (Threads, Agents, Recent) ─── */
 .sb-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
@@ -364,9 +369,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -380,9 +385,42 @@
 }
 .sb-thread:hover { background: var(--w-bg-surface-hover); color: var(--w-text-primary); }
 .sb-thread.active { background: var(--w-bg-surface); color: var(--w-text-primary); font-weight: 500; }
-.sb-thread-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sb-thread-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .sb-thread-dot.active { background: var(--w-accent); }
 .sb-thread-dot.idle { background: var(--w-text-muted); }
+
+/* ─── Universal Archive Pattern Phase 1a — row action icons ─── */
+.sb-thread-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.sb-thread:hover .sb-thread-actions { display: inline-flex; }
+.sb-thread-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--w-text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sb-thread-action:hover {
+  background: var(--w-bg-surface);
+  color: var(--w-text-primary);
+}
+.sb-thread-action.danger:hover {
+  color: var(--cui-danger, #e55353);
+}
+.sb-thread-archived { font-style: italic; }
+.sb-thread-archived .sb-thread-actions { display: inline-flex; }
 
 /* ─── Scheduled Agent entries ─── */
 .sb-agent {
@@ -391,7 +429,7 @@
   gap: 8px;
   padding: 5px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--w-text-secondary);
   cursor: pointer;
   margin-bottom: 1px;
@@ -404,7 +442,7 @@
   text-overflow: ellipsis;
 }
 .sb-agent-status {
-  font-size: 8px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 6px;
   margin-left: auto;
@@ -425,8 +463,8 @@
   gap: 8px;
 }
 .sb-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--w-accent);
   display: flex;
@@ -437,8 +475,8 @@
   font-weight: 600;
   flex-shrink: 0;
 }
-.sb-user-name { font-size: 12px; color: var(--w-text-secondary); flex: 1; }
-.sb-user-plan { font-size: 9px; color: var(--w-text-tertiary); }
+.sb-user-name { font-size: 14px; color: var(--w-text-secondary); flex: 1; }
+.sb-user-plan { font-size: 11px; color: var(--w-text-tertiary); }
 .sb-footer-actions { display: flex; gap: 2px; flex-shrink: 0; }
 .sb-help-btn { color: var(--w-accent-text, #38bdf8); }
 
@@ -999,7 +1037,7 @@
   width: 320px;
   height: 100%;
   overflow: hidden;
-  border-left: 1px solid var(--w-border);
+  background: var(--w-bg-sidebar);
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */
@@ -1031,6 +1069,89 @@
 .artifacts-expand-btn:hover {
   color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.07);
+}
+
+/* ─── Project Right Panel — Artifacts | Documents toggle ─── */
+.project-right-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.prp-toggle-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: 1;
+  transition: color 0.12s ease;
+}
+
+.prp-toggle-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.prp-toggle-btn.is-active {
+  color: #ffffff;
+  cursor: default;
+}
+
+.prp-toggle-sep {
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 400;
+  user-select: none;
+}
+
+/* Body container for documents view inside the right panel — fills the
+   remaining height beneath the WrapperHeader and provides scroll. */
+.project-right-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.project-right-panel-body--documents {
+  padding: 0;
+  background: var(--w-bg-body);
+}
+
+/* Upload toolbar inside the per-project documents panel — compact strip
+   that sits just below the header. Keeps the "+ Upload New" affordance
+   reachable without taking the full WrapperHeader trailing slot. */
+.project-docs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--w-border);
+  background: var(--w-bg-sidebar);
+  flex-shrink: 0;
+}
+
+.project-docs-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* Force the doc-type grid into a single column when rendered inside the
+   panel (the legacy two-column grid is too wide for a 320–900px panel).
+   The dedicated /documents page used a 2-col grid in a wider container —
+   that page is going away. */
+.project-right-panel-body--documents .w-doc-type-grid {
+  grid-template-columns: 1fr;
 }
 
 /* ─── Center Chat Panel ─── */
@@ -1265,6 +1386,44 @@
   border-color: var(--w-danger, #e55353);
 }
 
+.w-doc-detail-action[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.w-doc-detail-action[disabled]:hover {
+  border-color: var(--w-border);
+  background: transparent;
+  color: var(--w-text-secondary);
+}
+
+/* Preview pane — shown above the detail rows for renderable file types
+   (PDF + images). Other types skip the preview and rely on the Open
+   button to hand off to the user's local default app via the browser. */
+.w-doc-detail-preview {
+  margin-bottom: var(--w-sp-3);
+  border: 1px solid var(--w-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--w-bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.w-doc-detail-preview-frame {
+  width: 100%;
+  height: 320px;
+  border: 0;
+  background: #ffffff;
+}
+
+.w-doc-detail-preview-image {
+  max-width: 100%;
+  max-height: 320px;
+  display: block;
+}
+
 .w-doc-type-list-item.is-selected {
   background: var(--w-bg-surface);
 }
@@ -1363,6 +1522,15 @@
   background: var(--w-bg-surface-hover);
 }
 
+/* Drag-to-reclassify drop target — highlights the doc-type header when
+   a document row is being dragged over it. The state is set by
+   DocTypeRowView's headerDragEnter handler. */
+.w-doc-type-row.is-drop-target > .w-doc-type-row-head {
+  background: var(--w-accent-dim, rgba(14, 165, 233, 0.18));
+  outline: 2px dashed var(--w-accent, #0ea5e9);
+  outline-offset: -2px;
+}
+
 .w-doc-type-chev {
   color: var(--w-text-tertiary);
   width: 12px;
@@ -1458,6 +1626,30 @@
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  margin: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.w-doc-type-list-chat:hover {
+  color: var(--w-text-primary);
+  background: var(--w-bg-surface-hover);
+}
+
+/* Active state — doc has an existing chat thread. The accent color
+   signals "previously discussed" so the user can scan a list and see
+   which docs have prior conversation. Grey = none, accent = thread. */
+.w-doc-type-list-chat.has-thread {
+  color: var(--w-accent, #38bdf8);
+}
+
+.w-doc-type-list-chat.has-thread:hover {
+  color: var(--w-accent, #38bdf8);
+  background: var(--w-accent-dim, rgba(14, 165, 233, 0.15));
 }
 
 .w-doc-type-list-main {
@@ -1577,6 +1769,10 @@
 
 .w-media-thumb-page {
   color: var(--w-text-tertiary);
+}
+
+.w-media-action-btn:hover {
+  background: var(--cui-tertiary-bg);
 }
 
 /* ─── Projects list ─── */
@@ -1802,7 +1998,7 @@
 }
 
 /* Help nav icon sizing (propeller-beanie rendered larger than other nav glyphs) */
-.sb-nav-icon-help { width: 22px; height: 22px; }
+.sb-nav-icon-help { width: 24px; height: 24px; }
 .sb-nav-icon-help svg { display: block; }
 
 /* ─── Admin page content (Preferences/Benchmarks/Cost Lib/DMS/Reports/Users) ─── */

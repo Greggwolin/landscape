@@ -56,6 +56,20 @@ class ChatThread(models.Model):
         null=True,
         blank=True,
     )
+    # Optional document link — populated when the thread is the persistent
+    # "chat with this document" surface bound to a single core_doc.doc_id.
+    # NULL for ad-hoc and general project chats. Intentionally not a FK
+    # (different domain; soft-delete on the doc should not cascade into
+    # thread loss). App layer enforces cleanup on permanent doc deletes.
+    doc_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_column='doc_id',
+        help_text=(
+            'Optional core_doc.doc_id this thread is bound to. NULL for general '
+            'project chats and ad-hoc threads.'
+        ),
+    )
     page_context = models.CharField(
         max_length=50,
         choices=PAGE_CONTEXT_CHOICES,
@@ -83,6 +97,25 @@ class ChatThread(models.Model):
     is_active = models.BooleanField(
         default=True,
         help_text='Whether this thread is currently active'
+    )
+    is_archived = models.BooleanField(
+        default=False,
+        help_text=(
+            'Universal Archive Pattern: TRUE = soft-archived (hidden from '
+            'default lists, recoverable). FALSE = live. Distinct from '
+            'is_active (which encodes open vs closed lifecycle).'
+        ),
+    )
+    archived_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the thread was archived (NULL when is_archived = FALSE).',
+    )
+    archived_by_user_id = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='User who archived the thread (NULL when is_archived = FALSE).',
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -6,6 +6,7 @@ import { ProjectContextShell } from '@/components/wrapper/ProjectContextShell';
 import { WrapperChatProvider } from '@/contexts/WrapperChatContext';
 import { ModalRegistryProvider, type ModalProject } from '@/contexts/ModalRegistryContext';
 import { WrapperProjectProvider, type WrapperProject } from '@/contexts/WrapperProjectContext';
+import { LandscapeCommandSubscriber } from '@/components/wrapper/LandscapeCommandSubscriber';
 import '@/components/wrapper/modals'; // Side-effect: registers modal definitions
 
 /**
@@ -51,6 +52,13 @@ export default function WrapperProjectLayout({
       <WrapperChatProvider>
         <WrapperProjectProvider project={project}>
           <ModalRegistryProvider project={modalProject}>
+            {/* Bridges chat-panel command bus → project-scoped UI surfaces.
+                The chat panel lives in the outer /w/ layout shell, ABOVE
+                this provider in the React tree, so it can't reach the
+                modal registry via context. The subscriber listens on the
+                bus and dispatches commands to the registry locally.
+                See /src/lib/landscape-command-bus.ts. */}
+            <LandscapeCommandSubscriber />
             {children}
           </ModalRegistryProvider>
         </WrapperProjectProvider>
