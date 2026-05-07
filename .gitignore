@@ -200,3 +200,10 @@ playwright-report/
 # Cowork sandbox credential files — sensitive, never commit
 # Set up per project_cowork_direct_access_setup memory entry; mode 600 on disk
 .cowork-*
+
+
+# Large reference materials (keep local only — too large for GitHub)
+reference/netlease/
+
+# Generator log output — local-only diagnostic noise
+logs/
