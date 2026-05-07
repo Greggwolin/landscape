@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import CIcon from '@coreui/icons-react';
 import { LandscaperIcon } from '@/components/icons/LandscaperIcon';
-import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilCommentSquare, cilPlus, cilPencil, cilCheck, cilX } from '@coreui/icons';
+import { cilChevronBottom, cilChevronLeft, cilChevronTop, cilCommentSquare, cilPlus, cilPencil, cilCheck, cilX, cilTrash } from '@coreui/icons';
 import { useLandscaperThreads, ThreadMessage, type SendMessageOptions } from '@/hooks/useLandscaperThreads';
 import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
 import { ChatMessageBubble } from './ChatMessageBubble';
@@ -144,10 +144,25 @@ function getPageContextHint(context: string): string {
 
 /**
  * Editable thread title bar displayed above messages — similar to ChatGPT/Claude.
+ *
+ * PG25 follow-up: gained a delete button next to the edit pencil so
+ * the active thread can be deleted from the chat body, not just from
+ * the in-panel ThreadList drawer. Two-click confirmation pattern
+ * mirrors the drawer's behavior — first click arms (turns red), second
+ * click within 3 seconds fires `onDelete`.
  */
-function ThreadTitleBar({ title, onSave }: { title: string | null; onSave: (t: string) => void }) {
+function ThreadTitleBar({
+  title,
+  onSave,
+  onDelete,
+}: {
+  title: string | null;
+  onSave: (t: string) => void;
+  onDelete?: () => void;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayTitle = title || 'New conversation';
@@ -174,6 +189,19 @@ function ThreadTitleBar({ title, onSave }: { title: string | null; onSave: (t: s
     if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
     else if (e.key === 'Escape') { cancelEdit(); }
   }, [saveEdit, cancelEdit]);
+
+  const handleDeleteClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirmDelete) {
+      // Second click — confirm delete
+      onDelete?.();
+      setConfirmDelete(false);
+    } else {
+      // First click — arm confirmation; auto-reset after 3 seconds
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+    }
+  }, [confirmDelete, onDelete]);
 
   return (
     <div
@@ -247,6 +275,27 @@ function ThreadTitleBar({ title, onSave }: { title: string | null; onSave: (t: s
           >
             <CIcon icon={cilPencil} size="sm" style={{ color: 'var(--cui-secondary-color)' }} />
           </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={handleDeleteClick}
+              className="btn btn-sm p-1"
+              style={{ border: 'none', backgroundColor: 'transparent', opacity: 0.5 }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+              title={confirmDelete ? 'Click again to confirm delete' : 'Delete thread'}
+            >
+              <CIcon
+                icon={cilTrash}
+                size="sm"
+                style={{
+                  color: confirmDelete
+                    ? 'var(--cui-danger)'
+                    : 'var(--cui-secondary-color)',
+                }}
+              />
+            </button>
+          )}
         </>
       )}
     </div>
@@ -810,11 +859,14 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
         />
       )}
 
-      {/* Thread Title Bar — ChatGPT/Claude-style editable title */}
+      {/* Thread Title Bar — ChatGPT/Claude-style editable title.
+          PG25 follow-up: gained an inline delete button so the active
+          thread can be removed without opening the drawer. */}
       {activeThread && (
         <ThreadTitleBar
           title={activeThread.title}
           onSave={(newTitle) => updateThreadTitle(activeThread.threadId, newTitle)}
+          onDelete={() => deleteThread(activeThread.threadId)}
         />
       )}
 

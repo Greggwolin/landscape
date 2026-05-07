@@ -83,19 +83,11 @@ const CONTEXT_NORMALIZATION: Record<string, string> = {
   alpha_assistant: 'alpha_assistant',
 };
 
-const PAGE_CONTEXT_LABELS: Record<string, string> = {
-  home: 'Home',
-  property: 'Property',
-  operations: 'Operations',
-  valuation: 'Valuation',
-  capital: 'Capital',
-  budget: 'Budget',
-  schedule: 'Schedule',
-  reports: 'Reports',
-  documents: 'Documents',
-  map: 'Map',
-  alpha_assistant: 'Assistant',
-};
+// PAGE_CONTEXT_LABELS + getPageContextLabel removed PG25 follow-up —
+// the page-context badge in the row UI was dropped because "Home" /
+// "Documents" labels weren't informative; the AI summary line covers
+// what-the-thread-is-about. The normalizers below are still used
+// for thread filtering by current context.
 
 function normalizeContext(context: string): string {
   if (!context) return 'home';
@@ -110,11 +102,6 @@ function normalizeSubtab(subtab: string | null | undefined): string | null {
   if (!subtab) return null;
   // Normalize underscores to hyphens for consistent matching
   return subtab.toLowerCase().replace(/_/g, '-');
-}
-
-function getPageContextLabel(context: string): string {
-  const normalized = normalizeContext(context);
-  return PAGE_CONTEXT_LABELS[normalized] || context;
 }
 
 export function ThreadList({
@@ -251,34 +238,25 @@ export function ThreadList({
             const isEditing = editingThreadId === thread.threadId;
             const displayTitle = thread.title || `New conversation`;
 
-            // FB-292 — collapsed (non-active) rows render a 1-2 sentence
-            // summary line + interaction count below the title. Active row
-            // skips both since the chat body already shows the conversation.
+            // FB-292 — collapsed (non-active) rows render the AI-generated
+            // 1-2 sentence summary below the title row. Active row skips
+            // both since the chat body already shows the conversation.
             //
-            // Source precedence:
-            //   1. thread.summary  — Haiku-generated HTML fragment (allowed
-            //                         tags: b/strong/i/em/br; sanitized
-            //                         server-side in
-            //                         ThreadService._sanitize_summary_html).
-            //                         Rendered via dangerouslySetInnerHTML.
-            //   2. thread.firstUserMessage — first user-typed message,
-            //                         server-truncated to 120 chars. Rendered
-            //                         as TEXT (escaped) — never as HTML, since
-            //                         it is user-typed input.
-            //   3. ""              — skip the preview line entirely.
+            // Per Gregg (PG25 follow-up):
+            //   - DROP the firstUserMessage fallback. The auto-generated
+            //     title IS the first user message; rendering both is just
+            //     duplicate content. Threads under the 5-message regen
+            //     threshold get NO preview line — title alone is enough.
+            //   - DROP the "N messages" line. The count pill in the header
+            //     row already shows it; second copy is duplicate.
+            //   - The brief summary text is what tells the user what the
+            //     thread is about. Until summary is populated, no preview.
             const showPreviewMeta = !isEditing && !isActive;
             const summaryHtml = showPreviewMeta ? (thread.summary?.trim() || '') : '';
-            const fallbackText = showPreviewMeta && !summaryHtml
-              ? (thread.firstUserMessage?.trim() || '')
-              : '';
-            // tooltip-friendly plain-text version of whichever source is shown
+            // tooltip is plain-text version of the summary (HTML stripped)
             const previewTooltip = summaryHtml
               ? summaryHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-              : fallbackText;
-            const hasPreviewText = Boolean(summaryHtml || fallbackText);
-            const interactionLabel = thread.messageCount === 1
-              ? '1 message'
-              : `${thread.messageCount} messages`;
+              : '';
 
             return (
               <div
@@ -355,19 +333,10 @@ export function ThreadList({
                       >
                         {displayTitle}
                       </span>
-                      {/* Page context badge (only shown when viewing all pages) */}
-                      {showAllPages && (
-                        <span
-                          className="badge rounded-pill"
-                          style={{
-                            backgroundColor: 'var(--cui-tertiary-bg)',
-                            color: 'var(--cui-secondary-color)',
-                            fontSize: '0.75rem',
-                          }}
-                        >
-                          {getPageContextLabel(thread.pageContext)}
-                        </span>
-                      )}
+                      {/* Page-context badge intentionally removed (PG25
+                          follow-up): "Home"/"Documents" labels weren't
+                          informative; the AI summary line below covers
+                          what-is-this-thread-about. */}
                       {/* Edit + Delete buttons */}
                       <div className="d-flex align-items-center ms-auto gap-0">
                         <button
@@ -433,74 +402,40 @@ export function ThreadList({
                 )}
                 </div>
 
-                {/* FB-292 — preview meta on collapsed (non-active) rows.
-                    Renders summary line + interaction count below the
-                    header row. Active row skips this since the chat body
-                    already shows the conversation. */}
-                {showPreviewMeta && (hasPreviewText || thread.messageCount > 0) && (
+                {/* FB-292 / PG25 — collapsed-row summary line.
+                    Renders ONLY when the AI summary is populated. Threads
+                    under the 5-message regen threshold (or with regen
+                    failures) skip the preview entirely; the header row's
+                    title + count pill is enough on its own. The "N
+                    messages" duplicate line was removed per PG25 since
+                    the count pill already lives in the header row. */}
+                {showPreviewMeta && summaryHtml && (
                   <div
                     style={{
                       // Indent under the icon column (icon ~16px + 8px gap ≈ 24px)
                       paddingLeft: '24px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '2px',
                       marginTop: '2px',
                     }}
                   >
-                    {summaryHtml ? (
-                      // Trusted: thread.summary is generated by our own
-                      // Haiku call and sanitized server-side via
-                      // ThreadService._sanitize_summary_html down to the
-                      // <b>/<strong>/<i>/<em>/<br> allowlist with no
-                      // attributes preserved. Rendering as HTML lets the
-                      // model emphasize key terms; the line clamp still
-                      // applies to the rendered output.
-                      <span
-                        style={{
-                          color: 'var(--cui-secondary-color)',
-                          fontSize: '0.75rem',
-                          lineHeight: 1.35,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                        title={previewTooltip}
-                        dangerouslySetInnerHTML={{ __html: summaryHtml }}
-                      />
-                    ) : fallbackText ? (
-                      // Untrusted: thread.firstUserMessage is user-typed
-                      // input. Render as text so the browser escapes any
-                      // accidental markup (no XSS surface).
-                      <span
-                        style={{
-                          color: 'var(--cui-secondary-color)',
-                          fontSize: '0.75rem',
-                          lineHeight: 1.35,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                        title={previewTooltip}
-                      >
-                        {fallbackText}
-                      </span>
-                    ) : null}
-                    {thread.messageCount > 0 && (
-                      <span
-                        style={{
-                          color: 'var(--cui-secondary-color)',
-                          fontSize: '0.6875rem',
-                          opacity: 0.85,
-                        }}
-                      >
-                        {interactionLabel}
-                      </span>
-                    )}
+                    {/* Trusted: thread.summary is generated by our own
+                        Haiku call and sanitized server-side via
+                        ThreadService._sanitize_summary_html down to the
+                        <b>/<strong>/<i>/<em>/<br> allowlist with no
+                        attributes preserved. */}
+                    <span
+                      style={{
+                        color: 'var(--cui-secondary-color)',
+                        fontSize: '0.75rem',
+                        lineHeight: 1.35,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={previewTooltip}
+                      dangerouslySetInnerHTML={{ __html: summaryHtml }}
+                    />
                   </div>
                 )}
               </div>
