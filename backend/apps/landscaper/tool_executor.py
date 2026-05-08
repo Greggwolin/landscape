@@ -19378,3 +19378,4 @@ from .tools import vocab_tools  # noqa: E402, F401
 from .tools import platform_knowledge_tools  # noqa: E402, F401
 from .tools import project_profile_tools  # noqa: E402, F401
 from .tools import msa_tools  # noqa: E402, F401
+from .tools import master_lease_tools  # noqa: E402, F401

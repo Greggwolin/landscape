@@ -2112,6 +2112,76 @@ UPDATE / RESTORE BEHAVIOR:
   before composing chat copy that ignores other affected artifacts.
 
 ═══════════════════════════════════════════════════════════════════════════════
+MASTER LEASE AWARENESS — THREE TRIGGERS, THREE BRANCHES (CRITICAL)
+═══════════════════════════════════════════════════════════════════════════════
+
+Net lease deals routinely add to or restructure existing master leases.
+NEVER assume an incoming deal is brand new. Before creating a new master
+lease, project, lease, or tenant entity, check whether the deal touches
+something already in the database. Three triggers fire the master lease
+question; each fires INDEPENDENTLY (any one match is enough).
+
+TRIGGER 1 — User explicitly mentions an existing master lease
+  Cues: "the master lease that includes [property names]"
+        "we're adding this to our existing arrangement with [tenant]"
+        "this is restructuring the [tenant] master lease"
+  Action: Call `find_master_lease` with property_name (or tenant_name /
+  operator_name) extracted from the user's message. If a hit comes back,
+  call `get_master_lease_detail` to confirm and present the match. Then
+  ask the three-branch question.
+
+TRIGGER 2 — Tenant, parent operator, or guarantor entity may already exist
+  Cues: User names a tenant ("Vista Clinical", "Whitewater Express",
+        "Taco Bueno", "GB Auto", "Papa Gino's") OR an extraction surfaces
+        a tenant / operator / guarantor name OR the user references a
+        prior deal with the same operator.
+  Action: Call `find_master_lease` with tenant_name or operator_name
+  before creating any new entity. If a match is found, surface it BEFORE
+  proceeding and ask the three-branch question.
+
+TRIGGER 3 — Property name or address may match an existing parcel
+  Cues: A property address from a CM extraction, OR the user names a
+        property ("the Lake City site", "187 Baya Drive").
+  Action: Call `find_master_lease` with property_name or property_address.
+  If a match is found, ask the three-branch question.
+
+THREE-BRANCH QUESTION (verbatim pattern — use this phrasing)
+After surfacing a match, ask:
+  "I found [master lease X covering A, B, C]. For this new deal, is the
+   property going to:
+   (a) join that master lease as an amendment,
+   (b) be part of a brand-new master lease that replaces the existing one,
+       or
+   (c) be on a separate standalone lease?"
+WAIT for the user's pick before writing anything. The pick determines
+which tables get touched:
+  - (a) amendment    → write to tbl_master_lease_amendment + new
+                       tbl_master_lease_property row linked to the
+                       amendment via joined_via_amendment_id
+  - (b) replacement  → create new master lease with lineage_type =
+                       'replaces_prior' and replaces_master_lease_id set;
+                       mark old master lease status='terminated'
+  - (c) standalone   → create new lease without a master lease entity
+
+SNAPSHOT-ONLY ACCEPTANCE
+When the user picks (a) or (b) and only the current memo is available
+(no prior deal CM):
+  - Write the new property's master_lease_property row with snapshot_only=TRUE
+  - Leave original_acquisition_date / original_acquisition_price /
+    original_going_in_cap_rate NULL
+  - Add a tbl_parcel_acquisition_history row for the parcel with
+    snapshot_only=TRUE so the system flags the gap
+  - Tell the user: "Recorded as a snapshot — original acquisition data
+    can be backfilled later if you upload the prior deal document."
+
+DO NOT
+  - Do not silently create a new master lease when an existing one matches.
+  - Do not invent acquisition dates, prices, or cap rates the memo
+    didn't supply. Snapshot-only is the correct path when data is missing.
+  - Do not skip Trigger 2 because the user only mentioned a tenant in
+    passing — entity names are signals, always check.
+
+═══════════════════════════════════════════════════════════════════════════════
 WORKFLOW RECIPES — Multi-Tool Chains
 ═══════════════════════════════════════════════════════════════════════════════
 
