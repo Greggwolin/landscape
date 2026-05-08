@@ -282,7 +282,7 @@ export function ProjectHomepage({
         style={{
           maxWidth: 880,
           margin: '0 auto',
-          padding: '32px 28px 40px',
+          padding: '32px 12px 40px',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -378,7 +378,7 @@ export function ProjectHomepage({
               width: 200,
               flexShrink: 0,
               borderLeft: '1px solid var(--w-border)',
-              padding: '14px 16px',
+              padding: '14px 10px',
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
@@ -433,7 +433,7 @@ export function ProjectHomepage({
             border: '1px solid var(--w-border)',
             borderRadius: 14,
             background: 'var(--w-bg-input)',
-            padding: '14px 14px 10px',
+            padding: '14px 10px 10px',
             marginBottom: 28,
             transition: 'border-color 0.15s',
           }}
@@ -610,7 +610,7 @@ export function ProjectHomepage({
                       background: 'var(--w-card-bg)',
                       border: '1px solid var(--w-border-subtle)',
                       borderRadius: 10,
-                      padding: '12px 14px',
+                      padding: '12px 10px',
                       cursor: 'pointer',
                       color: 'var(--w-text-primary)',
                       transition: 'border-color 0.12s, background 0.12s',
