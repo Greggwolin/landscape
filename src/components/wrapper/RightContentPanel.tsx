@@ -12,7 +12,7 @@ interface RightContentPanelProps {
 
 /**
  * Right content panel for the /w/ three-panel layout.
- * Owns the page's dark #1a1e28 header with:
+ * Owns the page's dark #08090A header with:
  *   left  = 💬 toggle (opens/closes center chat)
  *   center = title + optional subtitle
  *   right = actions slot (page-specific)
