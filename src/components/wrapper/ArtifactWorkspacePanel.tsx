@@ -235,103 +235,95 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
 
   return (
     <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: 'var(--w-bg-sidebar)',
-        color: 'var(--cui-body-color)',
-      }}
+      className="artifacts-panel-body"
+      style={{ color: 'var(--cui-body-color)' }}
     >
       {/* ── Project Documents ── (project-scoped only; hidden on unassigned
           threads). Surfaced at the top of the panel so the project's source
           files are the first thing visible — Pinned + Recent are derivative
           views over those files. */}
       {projectId != null && (
+        <div className="w-rail-card">
+          <CollapsibleSection
+            title="Project Documents"
+            icon={<Folder size={15} />}
+            count={documents.length}
+            collapsed={documentsCollapsed}
+            onToggle={() => setDocumentsCollapsed((v) => !v)}
+          >
+            {documentsLoading ? (
+              <EmptyRow text="Loading…" />
+            ) : documents.length === 0 ? (
+              <EmptyRow text="No documents yet. Switch to Documents in the panel header to upload." />
+            ) : (
+              documents.map((doc) => (
+                <DocumentListRow
+                  key={doc.doc_id}
+                  doc={doc}
+                  onClick={() => setProjectRightPanelView('documents')}
+                />
+              ))
+            )}
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ── Pinned Artifacts ── */}
+      <div className="w-rail-card">
         <CollapsibleSection
-          title="Project Documents"
-          icon={<Folder size={15} />}
-          count={documents.length}
-          collapsed={documentsCollapsed}
-          onToggle={() => setDocumentsCollapsed((v) => !v)}
+          title="Pinned Artifacts"
+          icon={<Pin size={15} />}
+          count={pinnedArtifacts.length}
+          collapsed={pinnedCollapsed}
+          onToggle={() => setPinnedCollapsed((v) => !v)}
         >
-          {documentsLoading ? (
-            <EmptyRow text="Loading…" />
-          ) : documents.length === 0 ? (
-            <EmptyRow text="No documents yet. Switch to Documents in the panel header to upload." />
+          {pinnedArtifacts.length === 0 ? (
+            <EmptyRow text="No pinned artifacts." />
           ) : (
-            documents.map((doc) => (
-              <DocumentListRow
-                key={doc.doc_id}
-                doc={doc}
-                onClick={() => setProjectRightPanelView('documents')}
+            pinnedArtifacts.map((a) => (
+              <ArtifactListRow
+                key={a.artifact_id}
+                artifact={a}
+                isActive={a.artifact_id === activeArtifactId}
+                onClick={() => setActiveArtifactId(a.artifact_id)}
+                onRename={handleRenameArtifact}
+                onDelete={handleDeleteArtifact}
               />
             ))
           )}
         </CollapsibleSection>
-      )}
-
-      {/* ── Pinned Artifacts ── */}
-      <CollapsibleSection
-        title="Pinned Artifacts"
-        icon={<Pin size={15} />}
-        count={pinnedArtifacts.length}
-        collapsed={pinnedCollapsed}
-        onToggle={() => setPinnedCollapsed((v) => !v)}
-      >
-        {pinnedArtifacts.length === 0 ? (
-          <EmptyRow text="No pinned artifacts." />
-        ) : (
-          pinnedArtifacts.map((a) => (
-            <ArtifactListRow
-              key={a.artifact_id}
-              artifact={a}
-              isActive={a.artifact_id === activeArtifactId}
-              onClick={() => setActiveArtifactId(a.artifact_id)}
-              onRename={handleRenameArtifact}
-              onDelete={handleDeleteArtifact}
-            />
-          ))
-        )}
-      </CollapsibleSection>
+      </div>
 
       {/* ── Recent Artifacts ── */}
-      <CollapsibleSection
-        title="Recent Artifacts"
-        icon={<Clock size={15} />}
-        count={recentArtifacts.length}
-        collapsed={recentCollapsed}
-        onToggle={() => setRecentCollapsed((v) => !v)}
-      >
-        {recentArtifacts.length === 0 ? (
-          <EmptyRow text="No recent artifacts." />
-        ) : (
-          recentArtifacts.map((a) => (
-            <ArtifactListRow
-              key={a.artifact_id}
-              artifact={a}
-              isActive={a.artifact_id === activeArtifactId}
-              onClick={() => setActiveArtifactId(a.artifact_id)}
-              onRename={handleRenameArtifact}
-              onDelete={handleDeleteArtifact}
-            />
-          ))
-        )}
-      </CollapsibleSection>
+      <div className="w-rail-card">
+        <CollapsibleSection
+          title="Recent Artifacts"
+          icon={<Clock size={15} />}
+          count={recentArtifacts.length}
+          collapsed={recentCollapsed}
+          onToggle={() => setRecentCollapsed((v) => !v)}
+        >
+          {recentArtifacts.length === 0 ? (
+            <EmptyRow text="No recent artifacts." />
+          ) : (
+            recentArtifacts.map((a) => (
+              <ArtifactListRow
+                key={a.artifact_id}
+                artifact={a}
+                isActive={a.artifact_id === activeArtifactId}
+                onClick={() => setActiveArtifactId(a.artifact_id)}
+                onRename={handleRenameArtifact}
+                onDelete={handleDeleteArtifact}
+              />
+            ))
+          )}
+        </CollapsibleSection>
+      </div>
 
-      {/* ── Active Artifact (always expanded, takes remaining space) ── */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          borderTop: '1px solid var(--w-border-subtle-dark)',
-          borderBottom: '1px solid var(--w-border-subtle-dark)',
-          background: 'var(--w-bg-sidebar)',
-        }}
-      >
+      {/* ── Active Artifact (always expanded, takes remaining space) ──
+          .is-grow makes this card the one that fills remaining vertical
+          space; the others stack at content height. */}
+      <div className="w-rail-card is-grow">
         {activeArtifactId == null ? (
           <EmptyActiveState
             hasArtifacts={pinnedArtifacts.length + recentArtifacts.length > 0}
@@ -440,20 +432,22 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       </div>
 
       {/* ── Source Pointers ── */}
-      <CollapsibleSection
-        title="Source Pointers"
-        icon={<Database size={15} />}
-        count={countSourcePointers(active?.source_pointers_json)}
-        collapsed={pointersCollapsed}
-        onToggle={() => setPointersCollapsed((v) => !v)}
-        compact
-      >
-        {!active ? (
-          <EmptyRow text="Select an artifact to see its source pointers." />
-        ) : (
-          renderSourcePointers(active.source_pointers_json)
-        )}
-      </CollapsibleSection>
+      <div className="w-rail-card">
+        <CollapsibleSection
+          title="Source Pointers"
+          icon={<Database size={15} />}
+          count={countSourcePointers(active?.source_pointers_json)}
+          collapsed={pointersCollapsed}
+          onToggle={() => setPointersCollapsed((v) => !v)}
+          compact
+        >
+          {!active ? (
+            <EmptyRow text="Select an artifact to see its source pointers." />
+          ) : (
+            renderSourcePointers(active.source_pointers_json)
+          )}
+        </CollapsibleSection>
+      </div>
 
       {/* Phase 3 hint — restore tool unused in this pass; surfaces in Phase 4 */}
       <div style={{ display: 'none' }} aria-hidden>

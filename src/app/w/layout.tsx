@@ -510,27 +510,29 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
               className="artifacts-panel"
               style={{ width: rightPanelWidth, flexShrink: 0 }}
             >
-              {/* Floating card — the aside is the rail (padding + sidebar
-                  bg shows through as the gutter). The card holds the
-                  active artifact and inherits rounded corners. */}
-              <div className="w-rail-card">
-                {/* Priority: location brief > map > excel audit */}
-                {activeLocationBrief ? (
-                  <LocationBriefArtifact
-                    config={activeLocationBrief}
-                    onClose={toggleArtifacts}
-                  />
-                ) : activeMapArtifact ? (
-                  <MapArtifactRenderer
-                    config={activeMapArtifact}
-                    onClose={toggleArtifacts}
-                  />
-                ) : activeExcelAudit ? (
-                  <ExcelAuditArtifact
-                    config={activeExcelAudit}
-                    onClose={toggleArtifacts}
-                  />
-                ) : null}
+              {/* Padded body container hosts the active artifact in a
+                  single fill-height card. .is-grow makes the card take
+                  the full available vertical space inside the rail. */}
+              <div className="artifacts-panel-body">
+                <div className="w-rail-card is-grow">
+                  {/* Priority: location brief > map > excel audit */}
+                  {activeLocationBrief ? (
+                    <LocationBriefArtifact
+                      config={activeLocationBrief}
+                      onClose={toggleArtifacts}
+                    />
+                  ) : activeMapArtifact ? (
+                    <MapArtifactRenderer
+                      config={activeMapArtifact}
+                      onClose={toggleArtifacts}
+                    />
+                  ) : activeExcelAudit ? (
+                    <ExcelAuditArtifact
+                      config={activeExcelAudit}
+                      onClose={toggleArtifacts}
+                    />
+                  ) : null}
+                </div>
               </div>
             </aside>
           </>
