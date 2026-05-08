@@ -209,7 +209,7 @@ function ThreadTitleBar({
       style={{
         minHeight: '36px',
         borderColor: 'var(--cui-border-color)',
-        backgroundColor: 'var(--cui-body-bg)',
+        backgroundColor: 'var(--w-panel-bg)',
       }}
     >
       {isEditing ? (
@@ -692,7 +692,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
         style={{
           padding: '0.5rem 1rem',
           borderColor: 'var(--cui-card-border-color)',
-          backgroundColor: 'var(--cui-card-header-bg)',
+          backgroundColor: 'var(--w-panel-bg)',
         }}
       >
         <LandscaperIcon className="landscaper-panel-icon" aria-hidden="true" />
@@ -873,7 +873,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       {/* Messages */}
       <div
         className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-3"
-        style={{ backgroundColor: 'var(--cui-body-bg)' }}
+        style={{ backgroundColor: 'var(--w-panel-bg)' }}
       >
         {messages.length === 0 ? (
           <div className="py-4 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
