@@ -144,10 +144,168 @@ def capture_feedback(
             logger.info(
                 f"Feedback persisted as FB-{feedback_id} (discord_ok={discord_ok})"
             )
+
+            # 3. Mirror into tester_feedback so the /admin/feedback page surfaces
+            #    the row immediately. The two tables grew up independently — see
+            #    apps/feedback/management/commands/backfill_from_tbl_feedback.py
+            #    for the canonical field-mapping logic this mirror replicates.
+            #    Best-effort: failures are logged but never propagate, since the
+            #    canonical persistence to tbl_feedback already succeeded.
+            try:
+                _mirror_to_tester_feedback(
+                    fb_id=feedback_id,
+                    user_id=user_id,
+                    user_email=user_email,
+                    page_context=page_context,
+                    project_id=project_id,
+                    project_name=project_name,
+                    message=feedback_text,
+                )
+            except Exception as mirror_exc:
+                logger.error(
+                    f"FB-{feedback_id} tester_feedback mirror failed: {mirror_exc}",
+                    exc_info=True,
+                )
+
             return feedback_id
     except Exception as e:
         logger.error(f"Failed to persist feedback to tbl_feedback: {e}", exc_info=True)
         return None
+
+
+# ---- tester_feedback mirror ------------------------------------------------
+# The /admin/feedback page reads from landscape.tester_feedback, while the
+# Help-panel #FB capture writes to landscape.tbl_feedback. To keep the admin
+# page in sync without a heavier unification effort, every successful
+# tbl_feedback insert mirrors a tester_feedback row using the same field
+# derivations the backfill management command uses (classify_feedback,
+# extract_affected_module). Idempotency carries via the admin_notes
+# "[migrated FB-N on YYYY-MM-DD]" marker — the mirror writes one on every
+# row so re-runs of the backfill command stay no-ops.
+
+# Status mapping: tbl_feedback (6 states) -> tester_feedback (3 states). Same
+# table the backfill command uses.
+_TBL_TO_TESTER_STATUS = {
+    'open':         'submitted',
+    'in_progress':  'under_review',
+    'addressed':    'addressed',
+    'closed':       'addressed',
+    'wontfix':      'addressed',
+}
+
+_CATEGORY_TO_FEEDBACK_TYPE = {
+    'bug':              'bug',
+    'feature_request':  'feature',
+    'ux_confusion':     'general',
+    'question':         'question',
+}
+
+
+def _resolve_owner_user_id(user_id: Optional[int], user_email: Optional[str]) -> Optional[int]:
+    """
+    tester_feedback requires a user FK. If the caller already has a user_id,
+    use it. Otherwise fall back to looking up by email. Last resort: pull the
+    fallback owner email from settings (LANDSCAPER_FEEDBACK_OWNER_EMAIL) and
+    look that up. Returns None if no resolvable owner — caller should skip
+    the mirror in that case.
+    """
+    if user_id:
+        return user_id
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    if user_email:
+        try:
+            return User.objects.get(email=user_email).id
+        except User.DoesNotExist:
+            pass
+    fallback = getattr(settings, 'LANDSCAPER_FEEDBACK_OWNER_EMAIL', None)
+    if fallback:
+        try:
+            return User.objects.get(email=fallback).id
+        except User.DoesNotExist:
+            pass
+    return None
+
+
+def _mirror_to_tester_feedback(
+    fb_id: int,
+    user_id: Optional[int],
+    user_email: Optional[str],
+    page_context: Optional[str],
+    project_id: Optional[int],
+    project_name: Optional[str],
+    message: str,
+) -> Optional[int]:
+    """
+    Insert a tester_feedback row mirroring the tbl_feedback row that was just
+    created. Returns the new tester_feedback.id on success, or None on a
+    skipped insert (no resolvable owner FK).
+    """
+    import uuid
+
+    # Re-use the live derivation helpers from apps.feedback.views so the
+    # mirror's category/affected_module match what the legacy submit path
+    # would produce for the same input.
+    from apps.feedback.views import classify_feedback, extract_affected_module
+
+    owner_id = _resolve_owner_user_id(user_id, user_email)
+    if owner_id is None:
+        logger.warning(
+            f"FB-{fb_id} mirror skipped — no resolvable owner user (user_id=None, "
+            f"user_email={user_email!r}, no LANDSCAPER_FEEDBACK_OWNER_EMAIL fallback)"
+        )
+        return None
+
+    page_context = page_context or ''
+    page_path = page_context.replace('Help > ', '', 1).strip() or 'general'
+    category = classify_feedback(message)
+    affected_module = extract_affected_module(page_path, message)
+    feedback_type = _CATEGORY_TO_FEEDBACK_TYPE.get(category, 'general')
+    # All freshly captured rows are status='open' on tbl_feedback (the
+    # capture path doesn't take a status arg). Map that to 'submitted'.
+    tester_status = _TBL_TO_TESTER_STATUS.get('open', 'submitted')
+
+    today_str = datetime.utcnow().strftime('%Y-%m-%d')
+    marker = f"[migrated FB-{fb_id} on {today_str}]"
+    admin_notes = "\n".join([
+        marker,
+        "Source: help_panel",
+        "Original status: open",
+    ])
+
+    now = datetime.utcnow()
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO landscape.tester_feedback (
+                user_id, page_url, page_path, project_id, project_name,
+                feedback_type, message, category, affected_module,
+                landscaper_summary, landscaper_raw_chat, browser_context,
+                status, admin_notes, admin_response, admin_responded_at,
+                report_count, internal_id, created_at, updated_at, duplicate_of_id
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s::jsonb, %s::jsonb,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
+            )
+            RETURNING id
+            """,
+            [
+                owner_id, page_context or '(unknown)', page_path or '/',
+                project_id, project_name,
+                feedback_type, message, category, affected_module,
+                None, '[]', '{}',
+                tester_status, admin_notes, None, None,
+                1, str(uuid.uuid4()),
+                now, now, None,
+            ],
+        )
+        new_id = cursor.fetchone()[0]
+        logger.info(f"FB-{fb_id} mirrored to tester_feedback id={new_id}")
+        return new_id
 
 
 def send_login_notification(
