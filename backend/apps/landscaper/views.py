@@ -1417,10 +1417,25 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         if subtab_context:
             queryset = queryset.filter(subtab_context=subtab_context)
 
-        # Filter by active status
-        include_closed = self.request.query_params.get('include_closed', 'false').lower() == 'true'
-        if not include_closed:
-            queryset = queryset.filter(is_active=True)
+        # Filter by active status — list action only.
+        #
+        # PG34 fix: previously this filter applied to every action, which
+        # meant `retrieve` (and other by-id actions like `partial_update`,
+        # `close`, `promote`) silently returned 404 for any thread with
+        # `is_active=false` — even though those threads are perfectly
+        # listable when the caller passes `?include_closed=true`. Frontend
+        # symptom: list shows 26 closed threads, user clicks one, retrieve
+        # 404s with "Thread not found — redirecting to a new chat."
+        #
+        # The fix mirrors the archived-filter carve-out below: filter
+        # is_active only when the action is genuinely browsing a list.
+        # Single-row by-id actions look up their row regardless of
+        # is_active state — closed threads are still valid history that
+        # the user can re-open and read.
+        if self.action == 'list':
+            include_closed = self.request.query_params.get('include_closed', 'false').lower() == 'true'
+            if not include_closed:
+                queryset = queryset.filter(is_active=True)
 
         # Universal Archive Pattern (Phase 1a): default excludes archived
         # threads. ?archived=true = archived only. ?include_archived=true =
