@@ -458,9 +458,12 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
         center-panel preview row (FB-292).
 
         Output is a small fragment of HTML (not Markdown, not plain text)
-        so the frontend ThreadList renderer can present key terms with
-        light emphasis without a separate parsing step. Allowed tags are
-        constrained to a safe inline set: <b>, <strong>, <i>, <em>, <br>.
+        so the frontend ThreadList renderer can present line breaks and
+        light italic emphasis without a separate parsing step. Allowed
+        tags are constrained to a minimal inline set: <i>, <em>, <br>.
+        Bold (<b>, <strong>) is intentionally excluded — Gregg flagged
+        the bold/normal mix as visually noisy at the 0.75rem font size,
+        and uniform weight reads better in both themes.
         No block-level tags, no anchors, no scripts.
 
         Args:
@@ -491,8 +494,8 @@ Return ONLY the title, no quotes or explanation. Make it descriptive of the topi
 
 Formatting rules:
 - Output is HTML, not Markdown.
-- You may use these inline tags only: <b>, <strong>, <i>, <em>, <br>.
-- Bold the 1-3 most important terms with <b>...</b>. Use sparingly.
+- You may use these inline tags only: <i>, <em>, <br>.
+- Do NOT bold any terms. No <b> or <strong> tags.
 - No <p>, <div>, <a>, <script>, no block tags, no links, no images.
 - No surrounding <html> or <body> wrapper.
 
@@ -517,8 +520,11 @@ Return ONLY the HTML fragment, no introduction or explanation."""
             return None
 
     # Allowed tag set for thread-summary HTML. Anything else is stripped.
-    # Kept intentionally narrow — these are inline emphasis tags only.
-    _SUMMARY_ALLOWED_TAGS = ('b', 'strong', 'i', 'em', 'br')
+    # Bold (<b>, <strong>) is intentionally absent — uniform-weight reads
+    # better at the small preview-font sizes and Gregg flagged the mixed
+    # weight as visually noisy. Italics + line breaks remain available
+    # if Haiku ever needs them.
+    _SUMMARY_ALLOWED_TAGS = ('i', 'em', 'br')
 
     @staticmethod
     def _sanitize_summary_html(raw: str) -> str:

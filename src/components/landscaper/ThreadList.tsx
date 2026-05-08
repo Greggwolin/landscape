@@ -252,13 +252,7 @@ export function ThreadList({
             //   - The brief summary text is what tells the user what the
             //     thread is about. Until summary is populated, no preview.
             const showPreviewMeta = !isEditing && !isActive;
-            // Strip <b>/<strong> tags so the summary renders in a uniform
-            // weight. The sanitizer allowlist still permits italics/<br>,
-            // and existing DB rows keep their bold tags — this is a
-            // render-only suppression, not a data migration.
-            const summaryHtml = showPreviewMeta
-              ? (thread.summary?.trim() || '').replace(/<\/?(?:b|strong)(?:\s[^>]*)?\s*>/gi, '')
-              : '';
+            const summaryHtml = showPreviewMeta ? (thread.summary?.trim() || '') : '';
             // tooltip is plain-text version of the summary (HTML stripped)
             const previewTooltip = summaryHtml
               ? summaryHtml.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()

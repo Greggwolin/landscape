@@ -341,12 +341,7 @@ export function ProjectHomepage({
                         .replace(/<[^>]*>/g, ' ')
                         .replace(/\s+/g, ' ')
                         .trim()}
-                      dangerouslySetInnerHTML={{
-                        __html: thread.summary.replace(
-                          /<\/?(?:b|strong)(?:\s[^>]*)?\s*>/gi,
-                          '',
-                        ),
-                      }}
+                      dangerouslySetInnerHTML={{ __html: thread.summary }}
                     />
                   ) : null}
                   <div style={{ fontSize: '11px', color: 'var(--w-text-muted)', marginTop: '1px' }}>
