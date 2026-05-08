@@ -87,7 +87,7 @@ export function ChatMessageBubble({
         className="rounded px-3 py-2"
         style={{
           maxWidth: isUser ? '80%' : '100%',
-          backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--cui-tertiary-bg)',
+          backgroundColor: isUser ? 'var(--cui-primary)' : 'var(--w-panel-bg, #1a1e28)',
           color: isUser ? 'var(--cui-primary-text)' : 'var(--cui-body-color)',
         }}
       >

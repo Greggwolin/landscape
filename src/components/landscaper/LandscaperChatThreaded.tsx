@@ -821,7 +821,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       {/* Messages */}
       <div
         className="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-3"
-        style={{ backgroundColor: 'var(--cui-body-bg)' }}
+        style={{ backgroundColor: 'var(--w-panel-bg, #1a1e28)' }}
       >
         {messages.length === 0 ? (
           <div className="py-4 text-center" style={{ color: 'var(--cui-secondary-color)' }}>
@@ -871,7 +871,7 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
       {/* Input */}
       <div
         className="border-top p-3"
-        style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--cui-card-bg)' }}
+        style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--w-panel-bg, #1a1e28)' }}
       >
         <div className="d-flex gap-2 align-items-end">
           <textarea
