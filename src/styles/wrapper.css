@@ -51,6 +51,14 @@
   --w-sp-4: 16px;
   --w-sp-5: 24px;
   --w-sp-6: 32px;
+  /* ─── Floating-card rail tokens ─── */
+  /* Used by the right rail (.artifacts-panel) and any future stacked-card
+     surface that wants the "floating CCard" look — rounded corners with a
+     gutter between the card edge and the panel edge. Theme-independent
+     values; colors come from --w-card-bg / --w-border / --w-shadow. */
+  --w-rail-padding: var(--w-sp-3);
+  --w-rail-gap: var(--w-sp-3);
+  --w-card-radius: 12px;
 }
 
 /* ─── Dark mode overrides ─── */
@@ -1030,14 +1038,38 @@
   flex: 0 0 auto;
 }
 
-/* ─── Artifacts Panel ─── */
+/* ─── Artifacts Panel (floating-card rail) ─── */
+/* The panel is the rail — a gutter of --w-rail-padding around an inner
+   card stack. Visual surfaces live on .w-rail-card children, NOT on the
+   panel itself. The sidebar bg shows through the gutter and gives the
+   floating-card effect. Multiple cards stack with --w-rail-gap between
+   them; today only one card lives here, but the pattern accommodates
+   future stacked-card layouts (artifacts + documents + scheduled). */
 .artifacts-panel {
   display: flex;
   flex-direction: column;
+  gap: var(--w-rail-gap);
   width: 320px;
   height: 100%;
   overflow: hidden;
   background: var(--w-bg-sidebar);
+  padding: var(--w-rail-padding);
+}
+
+/* Floating card surface — rounded, bordered, subtly elevated. Used inside
+   .artifacts-panel but reusable anywhere a "CCard look on a dark rail" is
+   wanted. Children flow with flex; overflow:hidden clips them to the
+   rounded shape so headers/bodies inherit the corner radius for free. */
+.w-rail-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--w-card-bg);
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-card-radius);
+  box-shadow: var(--w-shadow);
+  overflow: hidden;
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */

@@ -110,6 +110,10 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }}
       />
       <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
+      {/* Floating card — the panel itself is now the rail (padding +
+          sidebar bg shows through as the gutter). The card holds header
+          + body and inherits the rounded corners via overflow:hidden. */}
+      <div className="w-rail-card">
       {/* Header — Artifacts | Documents view toggle.
           Active label is white, inactive is muted. Clicking either swaps
           the panel body without navigating away or losing the active chat
@@ -185,6 +189,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
       ) : (
         <ArtifactWorkspacePanel projectId={projectId} />
       )}
+      </div>
       </div>
     </div>
   );
