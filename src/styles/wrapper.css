@@ -55,10 +55,13 @@
   /* Used by the right rail (.artifacts-panel) and any future stacked-card
      surface that wants the "floating CCard" look — rounded corners with a
      gutter between the card edge and the panel edge. Theme-independent
-     values; colors come from --w-card-bg / --w-border / --w-shadow. */
-  --w-rail-padding: var(--w-sp-3);
-  --w-rail-gap: var(--w-sp-3);
-  --w-card-radius: 12px;
+     values; colors come from --w-card-bg / --w-border / --w-shadow.
+
+     Padding is intentionally minimal — the rail's purpose is to isolate
+     each section as a discrete card, not to add chrome around them. */
+  --w-rail-padding: var(--w-sp-1);
+  --w-rail-gap: var(--w-sp-2);
+  --w-card-radius: 10px;
 }
 
 /* ─── Dark mode overrides ─── */
@@ -1039,29 +1042,42 @@
 }
 
 /* ─── Artifacts Panel (floating-card rail) ─── */
-/* The panel is the rail — a gutter of --w-rail-padding around an inner
-   card stack. Visual surfaces live on .w-rail-card children, NOT on the
-   panel itself. The sidebar bg shows through the gutter and gives the
-   floating-card effect. Multiple cards stack with --w-rail-gap between
-   them; today only one card lives here, but the pattern accommodates
-   future stacked-card layouts (artifacts + documents + scheduled). */
+/* The panel hosts the WrapperHeader (full-bleed at top, dark chrome) and
+   an .artifacts-panel-body below that. The body is the padded gutter
+   that hosts a stack of .w-rail-card children. Each section is its own
+   card; the rail bg shows through the gutter and between cards. */
 .artifacts-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--w-rail-gap);
   width: 320px;
   height: 100%;
   overflow: hidden;
   background: var(--w-bg-sidebar);
+}
+
+/* Padded body container inside .artifacts-panel — provides the rail
+   gutter and the gap between stacked cards. Sits beneath the
+   WrapperHeader so the dark header chrome stays full-bleed at the top
+   of the rail and only the cards get the gutter. */
+.artifacts-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--w-rail-gap);
   padding: var(--w-rail-padding);
+  overflow: hidden;
 }
 
 /* Floating card surface — rounded, bordered, subtly elevated. Used inside
-   .artifacts-panel but reusable anywhere a "CCard look on a dark rail" is
-   wanted. Children flow with flex; overflow:hidden clips them to the
+   .artifacts-panel-body but reusable anywhere a "CCard look on a dark
+   rail" is wanted. Default is content-sized (flex: 0 0 auto) so cards
+   stack at their natural heights. Add .is-grow on the one card that
+   should fill remaining vertical space (typically the active-artifact
+   slot). Children flow with flex; overflow:hidden clips them to the
    rounded shape so headers/bodies inherit the corner radius for free. */
 .w-rail-card {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1070,6 +1086,10 @@
   border-radius: var(--w-card-radius);
   box-shadow: var(--w-shadow);
   overflow: hidden;
+}
+
+.w-rail-card.is-grow {
+  flex: 1 1 auto;
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */

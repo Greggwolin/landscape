@@ -110,14 +110,11 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }}
       />
       <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
-      {/* Floating card — the panel itself is now the rail (padding +
-          sidebar bg shows through as the gutter). The card holds header
-          + body and inherits the rounded corners via overflow:hidden. */}
-      <div className="w-rail-card">
-      {/* Header — Artifacts | Documents view toggle.
-          Active label is white, inactive is muted. Clicking either swaps
-          the panel body without navigating away or losing the active chat
-          thread. Persists across project sub-routes via WrapperUIContext. */}
+      {/* Header — Artifacts | Documents view toggle. Sits at the top of
+          the rail full-bleed (no gutter). Active label is white, inactive
+          is muted. Clicking either swaps the panel body without navigating
+          away or losing the active chat thread. Persists across project
+          sub-routes via WrapperUIContext. */}
       <WrapperHeader
         title={
           <div className="project-right-panel-toggle">
@@ -150,15 +147,14 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — view dispatch.
-          Documents view: panel-sized DMS surface (DocumentsPanel + MediaPanel).
-          Artifacts view: priority chain — generative artifact (Phase 3) >
-          location brief > map > excel audit > workspace empty state.
-          Generative artifact wins when explicitly selected. The legacy slots
-          (location brief / map / excel audit) handle their own dedicated
-          tools. The fallback is the ArtifactWorkspacePanel itself, which
-          shows Pinned + Recent collapsibles plus a clean "no artifact
-          selected" empty state. */}
+      {/* Body — padded rail gutter that hosts cards. View dispatch:
+          - Documents view: full-bleed DMS surface (no card wrap; the
+            DMS owns the entire body and has its own internal layout).
+          - Artifacts view with active full-artifact (LocationBrief / Map
+            / ExcelAudit): the artifact fills the body in a single
+            flex-grow card.
+          - Default artifacts view: ArtifactWorkspacePanel renders its
+            own per-section card stack inside .artifacts-panel-body. */}
       {projectRightPanelView === 'documents' ? (
         <div className="project-right-panel-body project-right-panel-body--documents">
           <ProjectDocumentsBody />
@@ -166,30 +162,35 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} />
       ) : activeLocationBrief ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <LocationBriefArtifact
-            config={activeLocationBrief}
-            onClose={toggleArtifacts}
-          />
+        <div className="artifacts-panel-body">
+          <div className="w-rail-card is-grow">
+            <LocationBriefArtifact
+              config={activeLocationBrief}
+              onClose={toggleArtifacts}
+            />
+          </div>
         </div>
       ) : activeMapArtifact ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <MapArtifactRenderer
-            config={activeMapArtifact}
-            onClose={toggleArtifacts}
-          />
+        <div className="artifacts-panel-body">
+          <div className="w-rail-card is-grow">
+            <MapArtifactRenderer
+              config={activeMapArtifact}
+              onClose={toggleArtifacts}
+            />
+          </div>
         </div>
       ) : activeExcelAudit ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <ExcelAuditArtifact
-            config={activeExcelAudit}
-            onClose={toggleArtifacts}
-          />
+        <div className="artifacts-panel-body">
+          <div className="w-rail-card is-grow">
+            <ExcelAuditArtifact
+              config={activeExcelAudit}
+              onClose={toggleArtifacts}
+            />
+          </div>
         </div>
       ) : (
         <ArtifactWorkspacePanel projectId={projectId} />
       )}
-      </div>
       </div>
     </div>
   );
