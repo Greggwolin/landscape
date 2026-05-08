@@ -162,32 +162,20 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} />
       ) : activeLocationBrief ? (
-        <div className="artifacts-panel-body">
-          <div className="w-rail-card is-grow">
-            <LocationBriefArtifact
-              config={activeLocationBrief}
-              onClose={toggleArtifacts}
-            />
-          </div>
-        </div>
+        <LocationBriefArtifact
+          config={activeLocationBrief}
+          onClose={toggleArtifacts}
+        />
       ) : activeMapArtifact ? (
-        <div className="artifacts-panel-body">
-          <div className="w-rail-card is-grow">
-            <MapArtifactRenderer
-              config={activeMapArtifact}
-              onClose={toggleArtifacts}
-            />
-          </div>
-        </div>
+        <MapArtifactRenderer
+          config={activeMapArtifact}
+          onClose={toggleArtifacts}
+        />
       ) : activeExcelAudit ? (
-        <div className="artifacts-panel-body">
-          <div className="w-rail-card is-grow">
-            <ExcelAuditArtifact
-              config={activeExcelAudit}
-              onClose={toggleArtifacts}
-            />
-          </div>
-        </div>
+        <ExcelAuditArtifact
+          config={activeExcelAudit}
+          onClose={toggleArtifacts}
+        />
       ) : (
         <ArtifactWorkspacePanel projectId={projectId} />
       )}
