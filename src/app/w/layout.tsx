@@ -510,30 +510,28 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
               className="artifacts-panel"
               style={{ width: rightPanelWidth, flexShrink: 0 }}
             >
-              {/* Padded body container hosts the active artifact in a
-                  single fill-height card. .is-grow makes the card take
-                  the full available vertical space inside the rail. */}
-              <div className="artifacts-panel-body">
-                <div className="w-rail-card is-grow">
-                  {/* Priority: location brief > map > excel audit */}
-                  {activeLocationBrief ? (
-                    <LocationBriefArtifact
-                      config={activeLocationBrief}
-                      onClose={toggleArtifacts}
-                    />
-                  ) : activeMapArtifact ? (
-                    <MapArtifactRenderer
-                      config={activeMapArtifact}
-                      onClose={toggleArtifacts}
-                    />
-                  ) : activeExcelAudit ? (
-                    <ExcelAuditArtifact
-                      config={activeExcelAudit}
-                      onClose={toggleArtifacts}
-                    />
-                  ) : null}
-                </div>
-              </div>
+              {/* Active artifact renders directly in the rail — its own
+                  header (title + close button) sits flush at the top of
+                  the rail, matching the pre-floating-card behavior. The
+                  card-stack treatment applies only to the per-section
+                  workspace view (ArtifactWorkspacePanel), not to a
+                  full-rail single artifact. */}
+              {activeLocationBrief ? (
+                <LocationBriefArtifact
+                  config={activeLocationBrief}
+                  onClose={toggleArtifacts}
+                />
+              ) : activeMapArtifact ? (
+                <MapArtifactRenderer
+                  config={activeMapArtifact}
+                  onClose={toggleArtifacts}
+                />
+              ) : activeExcelAudit ? (
+                <ExcelAuditArtifact
+                  config={activeExcelAudit}
+                  onClose={toggleArtifacts}
+                />
+              ) : null}
             </aside>
           </>
         ) : (

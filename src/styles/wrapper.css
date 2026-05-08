@@ -60,7 +60,7 @@
      Padding is intentionally minimal — the rail's purpose is to isolate
      each section as a discrete card, not to add chrome around them. */
   --w-rail-padding: var(--w-sp-1);
-  --w-rail-gap: var(--w-sp-2);
+  --w-rail-gap: var(--w-sp-3);
   --w-card-radius: 10px;
 }
 
@@ -1216,6 +1216,19 @@
   border-right: 1px solid var(--w-border);
   background: var(--w-panel-bg, #1a1e28);
   overflow: hidden;
+}
+
+/* Hide scrollbar gutter on every scroll container inside the chat center
+   panel — threads list, message stream, etc. Scroll behavior preserved
+   (scrollable via wheel/trackpad/keyboard); only the visual gutter is
+   hidden, matching the Claude chat aesthetic. */
+.wrapper-chat-center *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.wrapper-chat-center * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .wrapper-chat-badge {
