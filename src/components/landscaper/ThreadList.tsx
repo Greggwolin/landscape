@@ -424,7 +424,8 @@ export function ThreadList({
                         attributes preserved. */}
                     <span
                       style={{
-                        color: 'var(--cui-secondary-color)',
+                        color: 'var(--cui-body-color)',
+                        opacity: 0.85,
                         fontSize: '0.75rem',
                         lineHeight: 1.35,
                         display: '-webkit-box',

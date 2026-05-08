@@ -329,7 +329,7 @@ export function ProjectHomepage({
                     <div
                       style={{
                         fontSize: '11px',
-                        color: 'var(--w-text-muted)',
+                        color: 'var(--w-text-secondary)',
                         marginTop: '2px',
                         lineHeight: 1.35,
                         display: '-webkit-box',
