@@ -4,6 +4,22 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Floating-Card Right Rail (v1–v4) — 2026-05-08
+
+**What was discussed:**
+- Built the right artifacts rail as a "floating-card" surface across four iterations on `feature/floating-card-rail` (off `main`, not piled on `feature/net-lease-foundation`). v1 (`82417832`) wrapped header+body in one card with 12px outer padding. v2 (`9a57b15d`) restructured into per-section cards (Project Documents / Pinned / Recent / Active Artifact / Source Pointers) with `.artifacts-panel-body` + `.w-rail-card` (default `flex: 0 0 auto`, `.is-grow` modifier for the active slot), tightened `--w-rail-padding`/`--w-rail-gap`/`--w-card-radius` to 4/8/10px. v3 (`0fc5e84f`) hid scrollbar gutter on `.wrapper-chat-center *`, anchored full-rail single artifacts flush at top by removing the body+card wrap from `LocationBrief` / `Map` / `ExcelAudit` paths in both `ProjectArtifactsPanel.tsx` and the `/w/chat` aside in `src/app/w/layout.tsx`, bumped `--w-rail-gap` to `var(--w-sp-3)` (12px) to match Claude.
+- v4 work (uncommitted as of session end): locked background to `var(--w-panel-bg, #1a1e28)` on `.w-rail-card`, `.wrapper-right-panel`, `.project-right-panel-body--documents`, `.artifacts-collapsed`, the `LandscaperChatThreaded` messages container, the chat input bar, the `ChatMessageBubble` assistant-side bubble, and the `ThreadList` outer panel. Per-token discipline: did NOT bump `--w-card-bg` (other CCard surfaces consume it) — used `--w-panel-bg` directly so the rail stays locked to the chat-panel surface.
+- Stale `.git/index.lock` blocked v1's stash on the first attempt; cleared between checks (transient prompt-spawned `git status` racing for the lock). One `npm run build` hung at 3 min while the dev server held the `.next` cache; killing port 3000 then rebuilding clean unblocked it.
+
+**Open items:**
+- v4 background-unification edits (`wrapper.css` + `LandscaperChatThreaded.tsx` + `ChatMessageBubble.tsx` + `ThreadList.tsx`) not yet committed/pushed. Verified visually via HMR; user said "OK for now."
+- Hover/active row highlights, badges, dropdown surfaces in `ThreadList` still use `--cui-tertiary-bg` / `--cui-secondary-bg` for hierarchy — left intentionally; revisit if any bleed off-color.
+- `LocationBriefArtifact` still uses its hardcoded light palette (per CLAUDE.md, intentional anti-bleed). Not touched.
+- Browser-verification points from each round (eight in v2, four in v1, eight in v3) only spot-checked by the user, not exhaustively walked.
+- `feature/floating-card-rail` not merged to `main`; PR not opened.
+
+---
+
 ## FB-290 Artifacts Panel Drag Handle — 2026-05-04
 
 **What was discussed:**
