@@ -1,0 +1,494 @@
+{
+  "extracted_at": "2026-05-07T14:44:23.448931",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "ADC": {
+      "reit": "ADC",
+      "cik": "0000917251",
+      "filing_date": "2026-02-10",
+      "accession_number": "000091725126000013",
+      "company_name": "AGREE REALTY CORP",
+      "html_size_kb": 2664,
+      "text_size_kb": 376,
+      "sections_found": 2,
+      "sections": [
+        {
+          "section_id": 1,
+          "offset": 66633,
+          "length": 4211,
+          "concepts_count": 0
+        },
+        {
+          "section_id": 2,
+          "offset": 157783,
+          "length": 4222,
+          "concepts_count": 51
+        }
+      ],
+      "concepts": [
+        {
+          "concept": "Walmart",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 5.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $41,155 thousand"
+        },
+        {
+          "concept": "Tractor Supply",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 4.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $35,632 thousand"
+        },
+        {
+          "concept": "Dollar General",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $28,612 thousand"
+        },
+        {
+          "concept": "O'Reilly Auto Parts",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $22,274 thousand"
+        },
+        {
+          "concept": "TJX Companies",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $22,239 thousand"
+        },
+        {
+          "concept": "Best Buy",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $22,123 thousand"
+        },
+        {
+          "concept": "CVS",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $21,288 thousand"
+        },
+        {
+          "concept": "Kroger",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $21,039 thousand"
+        },
+        {
+          "concept": "Lowe's",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $20,974 thousand"
+        },
+        {
+          "concept": "Hobby Lobby",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $20,913 thousand"
+        },
+        {
+          "concept": "Gerber Collision",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $18,933 thousand"
+        },
+        {
+          "concept": "7-Eleven",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $18,037 thousand"
+        },
+        {
+          "concept": "Sunbelt Rentals",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $17,224 thousand"
+        },
+        {
+          "concept": "Burlington",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.1,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $15,133 thousand"
+        },
+        {
+          "concept": "Home Depot",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $14,062 thousand"
+        },
+        {
+          "concept": "Sherwin-Williams",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $13,947 thousand"
+        },
+        {
+          "concept": "Genuine Parts Company (NAPA Auto Parts)",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.7,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $12,172 thousand"
+        },
+        {
+          "concept": "Dollar Tree",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $12,045 thousand"
+        },
+        {
+          "concept": "Wawa",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $11,111 thousand"
+        },
+        {
+          "concept": "Grocery Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 10.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $75,290 thousand"
+        },
+        {
+          "concept": "Home Improvement",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 9.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $66,416 thousand"
+        },
+        {
+          "concept": "Convenience Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 7.7,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $56,237 thousand"
+        },
+        {
+          "concept": "Tire and Auto Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 7.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $55,926 thousand"
+        },
+        {
+          "concept": "Auto Parts",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 6.7,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $49,371 thousand"
+        },
+        {
+          "concept": "Dollar Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 6.4,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $47,315 thousand"
+        },
+        {
+          "concept": "Off-Price Retail",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 6.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $43,863 thousand"
+        },
+        {
+          "concept": "Farm and Rural Supply",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 5.1,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $37,403 thousand"
+        },
+        {
+          "concept": "General Merchandise",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 5.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $36,643 thousand"
+        },
+        {
+          "concept": "Pharmacy",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $26,239 thousand"
+        },
+        {
+          "concept": "Consumer Electronics",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $26,224 thousand"
+        },
+        {
+          "concept": "Crafts and Novelties",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.2,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $23,205 thousand"
+        },
+        {
+          "concept": "Discount Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.8,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $20,861 thousand"
+        },
+        {
+          "concept": "Equipment Rental",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $18,280 thousand"
+        },
+        {
+          "concept": "Health Services",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $18,050 thousand"
+        },
+        {
+          "concept": "Warehouse Clubs",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $16,823 thousand"
+        },
+        {
+          "concept": "Restaurants - Quick Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $16,572 thousand"
+        },
+        {
+          "concept": "Health and Fitness",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.1,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $15,237 thousand"
+        },
+        {
+          "concept": "Dealerships",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.0,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $15,078 thousand"
+        },
+        {
+          "concept": "Sporting Goods",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.8,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $12,911 thousand"
+        },
+        {
+          "concept": "Financial Services",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $9,745 thousand"
+        },
+        {
+          "concept": "Specialty Retail",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $9,271 thousand"
+        },
+        {
+          "concept": "Restaurants - Casual Dining",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.9,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $7,027 thousand"
+        },
+        {
+          "concept": "Shoes",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.7,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $4,897 thousand"
+        },
+        {
+          "concept": "Home Furnishings",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.7,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $4,857 thousand"
+        },
+        {
+          "concept": "Pet Supplies",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.6,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $4,813 thousand"
+        },
+        {
+          "concept": "Theaters",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $3,976 thousand"
+        },
+        {
+          "concept": "Beauty and Cosmetics",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.5,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $3,776 thousand"
+        },
+        {
+          "concept": "Entertainment Retail",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.4,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $2,651 thousand"
+        },
+        {
+          "concept": "Apparel",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.3,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $2,544 thousand"
+        },
+        {
+          "concept": "Miscellaneous",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.2,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $1,270 thousand"
+        },
+        {
+          "concept": "Office Supplies",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 0.1,
+          "revenue_pct": null,
+          "notes": "Annualized base rent $624 thousand"
+        }
+      ],
+      "concepts_count": 51
+    }
+  }
+}

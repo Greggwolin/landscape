@@ -1,0 +1,19 @@
+{
+  "extracted_at": "2026-05-07T14:44:09.809257",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "NNN REIT": {
+      "reit": "NNN REIT",
+      "cik": "0000751364",
+      "filing_date": "2026-02-11",
+      "accession_number": "000119312526045617",
+      "company_name": "NNN REIT, INC.",
+      "html_size_kb": 4797,
+      "text_size_kb": 257,
+      "sections_found": 0,
+      "error": "No concept sections matched in text"
+    }
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "extracted_at": "2026-05-07T14:42:28.409671",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "EPRT": {
+      "reit": "EPRT",
+      "cik": "0001728951",
+      "filing_date": "2026-02-11",
+      "accession_number": "000172895126000008",
+      "company_name": "ESSENTIAL PROPERTIES REALTY TRUST, INC.",
+      "html_size_kb": 5972,
+      "text_size_kb": 543,
+      "sections_found": 2,
+      "sections": [
+        {
+          "section_id": 1,
+          "offset": 271064,
+          "length": 4215,
+          "concepts_count": 18
+        },
+        {
+          "section_id": 2,
+          "offset": 514678,
+          "length": 4215,
+          "concepts_count": 2
+        }
+      ],
+      "concepts": [
+        {
+          "concept": "Car Washes",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 220,
+          "abr_pct": 13.7,
+          "revenue_pct": null,
+          "notes": "Service industry, 1,083,076 sq ft, $69.73 rent per sq ft"
+        },
+        {
+          "concept": "Medical / Dental",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 279,
+          "abr_pct": 12.5,
+          "revenue_pct": null,
+          "notes": "Service industry, 2,273,733 sq ft, $29.97 rent per sq ft"
+        },
+        {
+          "concept": "Early Childhood Education",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 255,
+          "abr_pct": 11.3,
+          "revenue_pct": null,
+          "notes": "Service industry, 2,773,263 sq ft, $22.51 rent per sq ft"
+        },
+        {
+          "concept": "Quick Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 461,
+          "abr_pct": 8.7,
+          "revenue_pct": null,
+          "notes": "Service industry, 1,244,290 sq ft, $39.87 rent per sq ft"
+        },
+        {
+          "concept": "Automotive Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 297,
+          "abr_pct": 8.0,
+          "revenue_pct": null,
+          "notes": "Service industry, 2,314,388 sq ft, $19.08 rent per sq ft"
+        },
+        {
+          "concept": "Convenience Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 178,
+          "abr_pct": 6.7,
+          "revenue_pct": null,
+          "notes": "Service industry, 774,644 sq ft, $48.43 rent per sq ft"
+        },
+        {
+          "concept": "Casual Dining",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 132,
+          "abr_pct": 6.0,
+          "revenue_pct": null,
+          "notes": "Service industry, 936,979 sq ft, $35.91 rent per sq ft"
+        },
+        {
+          "concept": "Equipment Rental and Sales",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 88,
+          "abr_pct": 4.6,
+          "revenue_pct": null,
+          "notes": "Service industry, 1,759,182 sq ft, $14.64 rent per sq ft"
+        },
+        {
+          "concept": "Other Services",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 70,
+          "abr_pct": 3.1,
+          "revenue_pct": null,
+          "notes": "Service industry, 877,164 sq ft, $19.64 rent per sq ft"
+        },
+        {
+          "concept": "Pet Care Services",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 34,
+          "abr_pct": 1.3,
+          "revenue_pct": null,
+          "notes": "Service industry, 270,434 sq ft, $25.29 rent per sq ft"
+        },
+        {
+          "concept": "Family Dining",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 26,
+          "abr_pct": 1.2,
+          "revenue_pct": null,
+          "notes": "Service industry, 205,924 sq ft, $31.75 rent per sq ft"
+        },
+        {
+          "concept": "Entertainment",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 72,
+          "abr_pct": 9.3,
+          "revenue_pct": null,
+          "notes": "Experience industry, 2,523,151 sq ft, $19.22 rent per sq ft"
+        },
+        {
+          "concept": "Health and Fitness",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 46,
+          "abr_pct": 4.3,
+          "revenue_pct": null,
+          "notes": "Experience industry, 1,738,193 sq ft, $13.49 rent per sq ft"
+        },
+        {
+          "concept": "Movie Theaters",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 6,
+          "abr_pct": 0.8,
+          "revenue_pct": null,
+          "notes": "Experience industry, 293,206 sq ft, $15.11 rent per sq ft"
+        },
+        {
+          "concept": "Other Industrial",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 62,
+          "abr_pct": 4.8,
+          "revenue_pct": null,
+          "notes": "Industrial industry, 3,673,369 sq ft, $7.12 rent per sq ft"
+        },
+        {
+          "concept": "Building Materials",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 24,
+          "abr_pct": 0.9,
+          "revenue_pct": null,
+          "notes": "Industrial industry, 1,297,669 sq ft, $3.71 rent per sq ft"
+        },
+        {
+          "concept": "Grocery",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 41,
+          "abr_pct": 2.7,
+          "revenue_pct": null,
+          "notes": "Retail industry, 1,635,542 sq ft, $9.00 rent per sq ft"
+        },
+        {
+          "concept": "Home Furnishings",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 2,
+          "abr_pct": 0.1,
+          "revenue_pct": null,
+          "notes": "Retail industry, 106,898 sq ft, $7.12 rent per sq ft"
+        },
+        {
+          "concept": "Automotive Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 276,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties across multiple states including Alabama (5), Arkansas (1), Arizona (9), California (4), Colorado (7), Connecticut (5), Florida (5), Georgia (26), Iowa (3), Idaho (1), Illinois (9), Indiana (11), Kansas (7), Kentucky (8), Louisiana (2), Massachusetts (1), Maryland (4), Maine (3), Michigan (14), Minnesota (6), Missouri (25), Mississippi (8), North Carolina (10), Nebraska (1), New Jersey (17), New Mexico (2), New York (9), Ohio (9), Oklahoma (26), Oregon (2), Pennsylvania (7), Rhode Island (1), South Carolina (7), Tennessee (4), Texas (18), Virginia (3), Vermont (1), Wisconsin (9), West Virginia (6)"
+        },
+        {
+          "concept": "Building Materials",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": 8,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties in Alabama (2), Colorado (1), Florida (1), Georgia (2), Indiana (2 - partial data shown)"
+        }
+      ],
+      "concepts_count": 20
+    }
+  }
+}

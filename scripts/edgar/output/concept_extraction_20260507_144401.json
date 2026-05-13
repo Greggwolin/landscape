@@ -1,0 +1,425 @@
+{
+  "extracted_at": "2026-05-07T14:43:26.684025",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "Realty Income": {
+      "reit": "Realty Income",
+      "cik": "0000726728",
+      "filing_date": "2026-02-25",
+      "accession_number": "000072672826000011",
+      "company_name": "REALTY INCOME CORP",
+      "html_size_kb": 4001,
+      "text_size_kb": 491,
+      "sections_found": 1,
+      "sections": [
+        {
+          "section_id": 1,
+          "offset": 103372,
+          "length": 4222,
+          "concepts_count": 44
+        }
+      ],
+      "concepts": [
+        {
+          "concept": "Grocery",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 11.0,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Convenience Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 9.6,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Home Improvement",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 6.4,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Dollar Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 6.1,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Restaurants-Quick Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 4.8,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Health and Fitness",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 4.3,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Drug Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 4.3,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Automotive Service",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 4.3,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Restaurants-Casual Dining",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.8,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "General Merchandise",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.6,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Gaming",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 3.1,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Transportation Services",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.9,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Home Furnishings",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.8,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Health Care",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.7,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Apparel Stores",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.6,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Sporting Goods",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.4,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Wholesale Clubs",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 2.2,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Theaters",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.9,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Entertainment",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.9,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Motor Vehicle Dealerships",
+          "type": "industry",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": 1.8,
+          "revenue_pct": null,
+          "notes": "As of December 31, 2025"
+        },
+        {
+          "concept": "Retail",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 14864,
+          "abr_pct": 79.1,
+          "revenue_pct": null,
+          "notes": "14,864 properties, 220,031 thousand sq ft"
+        },
+        {
+          "concept": "Industrial",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 577,
+          "abr_pct": 15.4,
+          "revenue_pct": null,
+          "notes": "577 properties, 125,774 thousand sq ft"
+        },
+        {
+          "concept": "Gaming",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 2,
+          "abr_pct": 3.1,
+          "revenue_pct": null,
+          "notes": "2 properties, 5,053 thousand sq ft"
+        },
+        {
+          "concept": "Other",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 68,
+          "abr_pct": 2.4,
+          "revenue_pct": null,
+          "notes": "68 properties, 4,177 thousand sq ft; includes agriculture, office, country clubs, data centers"
+        },
+        {
+          "concept": "7-Eleven",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 812,
+          "abr_pct": 3.3,
+          "revenue_pct": null,
+          "notes": "812 leases"
+        },
+        {
+          "concept": "Dollar General",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 1797,
+          "abr_pct": 3.2,
+          "revenue_pct": null,
+          "notes": "1,797 leases"
+        },
+        {
+          "concept": "Walgreens",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 400,
+          "abr_pct": 3.1,
+          "revenue_pct": null,
+          "notes": "400 leases"
+        },
+        {
+          "concept": "Family Dollar",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 1257,
+          "abr_pct": 2.6,
+          "revenue_pct": null,
+          "notes": "1,257 leases"
+        },
+        {
+          "concept": "Life Time Fitness",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 41,
+          "abr_pct": 2.1,
+          "revenue_pct": null,
+          "notes": "41 leases"
+        },
+        {
+          "concept": "EG Group",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 414,
+          "abr_pct": 2.0,
+          "revenue_pct": null,
+          "notes": "414 leases"
+        },
+        {
+          "concept": "(B&Q) Kingfisher",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 70,
+          "abr_pct": 2.0,
+          "revenue_pct": null,
+          "notes": "70 leases"
+        },
+        {
+          "concept": "Wynn Resorts",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 1,
+          "abr_pct": 1.9,
+          "revenue_pct": null,
+          "notes": "1 lease"
+        },
+        {
+          "concept": "FedEx",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 81,
+          "abr_pct": 1.8,
+          "revenue_pct": null,
+          "notes": "81 leases"
+        },
+        {
+          "concept": "Asda",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 41,
+          "abr_pct": 1.6,
+          "revenue_pct": null,
+          "notes": "41 leases"
+        },
+        {
+          "concept": "Sainsbury's",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 40,
+          "abr_pct": 1.5,
+          "revenue_pct": null,
+          "notes": "40 leases"
+        },
+        {
+          "concept": "BJ's Wholesale Club",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 45,
+          "abr_pct": 1.5,
+          "revenue_pct": null,
+          "notes": "45 leases"
+        },
+        {
+          "concept": "Tesco",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 30,
+          "abr_pct": 1.4,
+          "revenue_pct": null,
+          "notes": "30 leases"
+        },
+        {
+          "concept": "Tractor Supply",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 243,
+          "abr_pct": 1.4,
+          "revenue_pct": null,
+          "notes": "243 leases"
+        },
+        {
+          "concept": "CVS Pharmacy",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 208,
+          "abr_pct": 1.1,
+          "revenue_pct": null,
+          "notes": "208 leases"
+        },
+        {
+          "concept": "MGM (Bellagio)",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 1,
+          "abr_pct": 1.1,
+          "revenue_pct": null,
+          "notes": "1 lease, proportionate share of unconsolidated joint venture"
+        },
+        {
+          "concept": "Home Depot",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 41,
+          "abr_pct": 1.1,
+          "revenue_pct": null,
+          "notes": "41 leases"
+        },
+        {
+          "concept": "Carrefour",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 37,
+          "abr_pct": 1.0,
+          "revenue_pct": null,
+          "notes": "37 leases"
+        },
+        {
+          "concept": "LA Fitness",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 59,
+          "abr_pct": 1.0,
+          "revenue_pct": null,
+          "notes": "59 leases"
+        },
+        {
+          "concept": "Wal-Mart / Sam's Club",
+          "type": "tenant",
+          "naics_code": null,
+          "properties_count": 62,
+          "abr_pct": 1.0,
+          "revenue_pct": null,
+          "notes": "62 leases"
+        }
+      ],
+      "concepts_count": 44
+    }
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "extracted_at": "2026-05-07T15:33:18.064580",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "Four Corners": {
+      "reit": "Four Corners",
+      "cik": "0001650132",
+      "filing_date": "2026-02-12",
+      "accession_number": "000119312526048898",
+      "company_name": "Four Corners Property Trust, Inc.",
+      "html_size_kb": 7462,
+      "text_size_kb": 394,
+      "sections_found": 2,
+      "sections": [
+        {
+          "section_id": 1,
+          "offset": 375196,
+          "length": 4215,
+          "concepts_count": 2
+        },
+        {
+          "section_id": 2,
+          "offset": 381269,
+          "length": 4215,
+          "concepts_count": 16
+        }
+      ],
+      "concepts": [
+        {
+          "concept": "Quick Service",
+          "type": "concept",
+          "naics_code": null,
+          "properties_count": 214,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties across multiple states including Alabama (25), Arizona (3), California (1), Colorado (4), Connecticut (3), Delaware (1), Florida (4), Georgia (6), Illinois (12), Indiana (25), Iowa (4), Kansas (1), Kentucky (13), Maryland (1), Michigan (15), Mississippi (8), Missouri (3), New Mexico (1), New York (1), North Carolina (11), Ohio (8), Oklahoma (3), Rhode Island (1), South Carolina (7), Tennessee (18), Texas (15), Utah (3), Virginia (4), Wisconsin (13)"
+        },
+        {
+          "concept": "Casual Dining",
+          "type": "concept",
+          "naics_code": null,
+          "properties_count": 275,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties across multiple states including Alabama (12), Arizona (13), Arkansas (8), California (14), Colorado (17), Connecticut (1), Delaware (3), Florida (69), Georgia (50), Idaho (3), Illinois (33), Indiana (22), Iowa (15). Data appears to be cut off mid-table"
+        },
+        {
+          "concept": "North Carolina",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 18,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $56.5M"
+        },
+        {
+          "concept": "North Dakota",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 3,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $9.4M"
+        },
+        {
+          "concept": "Ohio",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 46,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $134.3M"
+        },
+        {
+          "concept": "Oklahoma",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 14,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $39.7M"
+        },
+        {
+          "concept": "Oregon",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 1,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $2.9M"
+        },
+        {
+          "concept": "Pennsylvania",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 19,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $57.8M"
+        },
+        {
+          "concept": "South Carolina",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 21,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $55.2M"
+        },
+        {
+          "concept": "South Dakota",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 2,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $5.9M"
+        },
+        {
+          "concept": "Tennessee",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 26,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $96.0M"
+        },
+        {
+          "concept": "Texas",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 83,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $272.5M"
+        },
+        {
+          "concept": "Utah",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 3,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $5.4M"
+        },
+        {
+          "concept": "Virginia",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 21,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $62.4M"
+        },
+        {
+          "concept": "Washington",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 6,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $14.3M"
+        },
+        {
+          "concept": "West Virginia",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 6,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $17.5M"
+        },
+        {
+          "concept": "Wisconsin",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": 11,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Properties with total gross carrying value of $29.1M"
+        },
+        {
+          "concept": "Medical Retail",
+          "type": "property_type",
+          "naics_code": null,
+          "properties_count": null,
+          "abr_pct": null,
+          "revenue_pct": null,
+          "notes": "Separate category breakdown by state"
+        }
+      ],
+      "concepts_count": 18
+    }
+  }
+}

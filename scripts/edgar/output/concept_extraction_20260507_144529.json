@@ -1,0 +1,19 @@
+{
+  "extracted_at": "2026-05-07T14:45:27.882312",
+  "reit_count": 1,
+  "dry_run": false,
+  "model": "claude-sonnet-4-20250514",
+  "reits": {
+    "Broadstone": {
+      "reit": "Broadstone",
+      "cik": "0001621434",
+      "filing_date": "2026-02-24",
+      "accession_number": "000162143426000018",
+      "company_name": "Black Stone Minerals, L.P.",
+      "html_size_kb": 2046,
+      "text_size_kb": 400,
+      "sections_found": 0,
+      "error": "No concept sections matched in text"
+    }
+  }
+}
