@@ -101,6 +101,20 @@ class Project(models.Model):
     schema_version = models.IntegerField(blank=True, null=True)
     last_calculated_at = models.DateTimeField(blank=True, null=True)
 
+    # Project kind discriminator (LF-USERDASH-0514 Phase 2).
+    # 'real_estate' = real CRE/land deal with property + financial data.
+    # 'user_home'   = per-user placeholder owning non-project chat threads.
+    # See migrations/20260514_add_project_kind.up.sql.
+    project_kind = models.CharField(
+        max_length=20,
+        default='real_estate',
+        choices=[
+            ('real_estate', 'Real Estate'),
+            ('user_home', 'User Home'),
+        ],
+        help_text="real_estate (default) or user_home (per-user placeholder for non-project chats)",
+    )
+
     # Template
     template_id = models.BigIntegerField(blank=True, null=True)
 

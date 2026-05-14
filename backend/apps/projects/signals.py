@@ -8,6 +8,7 @@ Project signals for knowledge graph synchronization and demo provisioning.
 
 import logging
 
+from django.conf import settings
 from django.contrib.auth.signals import user_logged_in
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -26,6 +27,43 @@ def ensure_project_entity(sender, instance: Project, **kwargs) -> None:
         EntitySyncService().ensure_project_entity(instance)
     except Exception as exc:
         logger.warning("Project entity sync failed (non-fatal): %s", exc)
+
+
+@receiver(
+    post_save,
+    sender=settings.AUTH_USER_MODEL,
+    dispatch_uid="projects.create_user_home_project_on_user_save",
+)
+def create_user_home_project_on_user_save(sender, instance, created: bool, **kwargs) -> None:
+    """
+    Create a home project for every new user.
+
+    The home project is a placeholder row that owns the user's non-project
+    chat threads (the threads FK is NOT NULL — every thread needs a parent
+    project). Real-estate-scoped queries filter this row out by
+    project_kind = 'real_estate'.
+
+    Fires on user create only. Re-saves of an existing user (login IP
+    update, profile edit) do nothing because get_or_create_home_project
+    short-circuits on the existence check.
+
+    Non-fatal on error — registration succeeds even if the home project
+    couldn't be created. The dashboard's /api/projects/home endpoint
+    self-heals on first call (see views.ProjectViewSet.home), so a
+    missed signal is recoverable.
+
+    LF-USERDASH-0514 Phase 2.
+    """
+    if not created:
+        return
+    try:
+        from .services.home_project import get_or_create_home_project
+
+        get_or_create_home_project(instance)
+    except Exception as exc:
+        logger.warning(
+            "Home project auto-create on user-save failed (non-fatal): %s", exc, exc_info=True
+        )
 
 
 @receiver(user_logged_in, dispatch_uid="projects.provision_demo_projects")

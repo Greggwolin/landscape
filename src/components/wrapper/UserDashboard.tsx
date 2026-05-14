@@ -5,6 +5,22 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { RecentChatsList } from './RecentChatsList';
 
+const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('auth_tokens');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access) return { Authorization: `Bearer ${parsed.access}` };
+    }
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+
 /**
  * UserDashboard — the authenticated landing surface in the chat-forward UI.
  *
@@ -31,6 +47,28 @@ export function UserDashboard() {
   const { user } = useAuth();
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Home project id — resolved once on mount. Used by tile click logic to
+  // route home-project chats into the dashboard rather than a real project
+  // workspace. /api/projects/home is idempotent (creates on first call),
+  // so this also self-heals for any existing user the backfill missed.
+  const [homeProjectId, setHomeProjectId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${DJANGO_API_URL}/api/projects/home/`, {
+      headers: getAuthHeaders(),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.project_id) setHomeProjectId(Number(data.project_id));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-focus on mount.
   useEffect(() => {
@@ -109,7 +147,10 @@ export function UserDashboard() {
       </div>
 
       <div className="user-dashboard-list-wrap">
-        <RecentChatsList homeProjectLabel={displayName || undefined} />
+        <RecentChatsList
+          homeProjectLabel={displayName || undefined}
+          homeProjectId={homeProjectId}
+        />
       </div>
     </section>
   );

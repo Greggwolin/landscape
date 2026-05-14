@@ -220,7 +220,7 @@ function attachTileConfigToProjects(
   })
 }
 
-async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]> {
+async function queryProjects(includeInactive: boolean, includeHome: boolean = false): Promise<RawProjectRow[]> {
   try {
     return await sql`
       SELECT
@@ -260,17 +260,21 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
       FROM landscape.tbl_project
       WHERE 1 = 1
         ${includeInactive ? sql`` : sql`AND COALESCE(is_active, true)`}
+        ${includeHome ? sql`` : sql`AND COALESCE(project_kind, 'real_estate') = 'real_estate'`}
       ORDER BY updated_at DESC NULLS LAST, project_name
     `
   } catch (error: unknown) {
     const pgError = error as PostgresError
     if (pgError?.code !== '42703') throw error
 
+    // Schema-mismatch fallback (column missing on older databases). Same
+    // project_kind filter applied — defaults to 'real_estate' if the column
+    // doesn't exist yet, so behavior matches the primary query above.
     const fallbackRows = await sql`
-      SELECT 
-        project_id, 
-        project_name, 
-        acres_gross, 
+      SELECT
+        project_id,
+        project_name,
+        acres_gross,
         acres_gross AS acreage,
         location_lat,
         location_lon,
@@ -296,6 +300,8 @@ async function queryProjects(includeInactive: boolean): Promise<RawProjectRow[]>
         NULL::text AS primary_area_type,
         updated_at
       FROM landscape.tbl_project
+      WHERE 1 = 1
+        ${includeHome ? sql`` : sql`AND COALESCE(project_kind, 'real_estate') = 'real_estate'`}
       ORDER BY updated_at DESC NULLS LAST, project_name
     `
 
@@ -319,6 +325,9 @@ export async function GET(request: NextRequest) {
   const propertyTypeFilter = searchParams.get('property_type')
   const includeInactiveParam = searchParams.get('include_inactive')
   const includeInactive = includeInactiveParam === null || includeInactiveParam === 'true'
+  // LF-USERDASH-0514 Phase 2: opt-in to home projects in the list. Defaults
+  // false — real-estate-only matches Django's ProjectViewSet default.
+  const includeHome = searchParams.get('include_home') === 'true'
   const analysisTypeConfigs = await queryAnalysisTypeConfigs()
 
   // Check for Authorization header - if present, proxy to Django for user-scoped filtering
@@ -326,9 +335,11 @@ export async function GET(request: NextRequest) {
 
   if (authHeader) {
     // Proxy to Django backend for authenticated, role-based filtering
+    const djangoUrl = new URL(`${DJANGO_API_BASE}/api/projects/`)
+    if (includeHome) djangoUrl.searchParams.set('include_home', 'true')
     try {
       console.log('Proxying to Django with auth...')
-      const djangoResponse = await fetch(`${DJANGO_API_BASE}/api/projects/`, {
+      const djangoResponse = await fetch(djangoUrl.toString(), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': authHeader,
@@ -377,7 +388,7 @@ export async function GET(request: NextRequest) {
 
   try {
     console.log('Querying landscape.tbl_project directly (no auth)...')
-    rows = await queryProjects(includeInactive)
+    rows = await queryProjects(includeInactive, includeHome)
 
     const hasCarney = rows.some(
       (project) =>

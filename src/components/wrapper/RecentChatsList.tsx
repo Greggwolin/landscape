@@ -51,11 +51,14 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 interface RecentChatsListProps {
-  /** Label used for tiles with no projectId (the user's home project chats). */
+  /** Label used for home-project tiles (typically the user's display name). */
   homeProjectLabel?: string;
+  /** The current user's home project id. Tiles whose projectId matches will
+   *  route to /w/dashboard instead of a project workspace. */
+  homeProjectId?: number | null;
 }
 
-export function RecentChatsList({ homeProjectLabel }: RecentChatsListProps) {
+export function RecentChatsList({ homeProjectLabel, homeProjectId }: RecentChatsListProps) {
   const [threads, setThreads] = useState<ThreadRowFromApi[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -111,6 +114,7 @@ export function RecentChatsList({ homeProjectLabel }: RecentChatsListProps) {
           <RecentChatTile
             key={t.threadId}
             homeProjectLabel={homeProjectLabel}
+            homeProjectId={homeProjectId}
             data={{
               threadId: t.threadId,
               title: t.title,

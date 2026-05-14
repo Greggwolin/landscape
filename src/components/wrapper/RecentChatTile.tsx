@@ -35,6 +35,9 @@ interface RecentChatTileProps {
   data: RecentChatTileData;
   /** Fallback label for threads with no projectId (Phase 1: username; Phase 2: user home project's name field). */
   homeProjectLabel?: string;
+  /** The current user's home project id. When data.projectId matches, the tile
+   *  routes to /w/dashboard instead of /w/projects/[id]. Phase 2. */
+  homeProjectId?: number | null;
 }
 
 function timeAgo(iso: string): string {
@@ -53,7 +56,18 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-function buildLabel(data: RecentChatTileData, homeProjectLabel?: string): string {
+function buildLabel(
+  data: RecentChatTileData,
+  homeProjectLabel?: string,
+  homeProjectId?: number | null,
+): string {
+  // Home-project chats always render with the user-facing home label —
+  // even though the DB stores a real project_name on the home-project row
+  // (the user's display name by default), the dashboard is the surface
+  // and "Personal" / display name reads cleaner than echoing the row.
+  if (homeProjectId != null && data.projectId === homeProjectId) {
+    return homeProjectLabel || 'Personal';
+  }
   if (data.projectName) return data.projectName;
   return homeProjectLabel || 'Personal';
 }
@@ -64,14 +78,15 @@ function buildSnippet(data: RecentChatTileData): string {
   return source.length > 90 ? source.slice(0, 90).trimEnd() + '…' : source;
 }
 
-export function RecentChatTile({ data, homeProjectLabel }: RecentChatTileProps) {
+export function RecentChatTile({ data, homeProjectLabel, homeProjectId }: RecentChatTileProps) {
   const router = useRouter();
-  const label = buildLabel(data, homeProjectLabel);
+  const isHomeChat = homeProjectId != null && data.projectId === homeProjectId;
+  const label = buildLabel(data, homeProjectLabel, homeProjectId);
   const snippet = buildSnippet(data);
   const time = timeAgo(data.updatedAt);
 
-  // Color dot: property-type when known, neutral when this is a personal/home chat.
-  const hasType = !!getPropertyTypeTokenRef(data.projectTypeCode);
+  // Color dot: property-type when known, neutral for home / unassigned chats.
+  const hasType = !isHomeChat && !!getPropertyTypeTokenRef(data.projectTypeCode);
   const dotStyle: React.CSSProperties = hasType
     ? {
         // Use the soft badge background color as the dot color
@@ -82,9 +97,16 @@ export function RecentChatTile({ data, homeProjectLabel }: RecentChatTileProps) 
       };
 
   const handleClick = () => {
-    if (data.projectId) {
+    if (isHomeChat) {
+      // Home-project chats render in the dashboard's center column, NOT
+      // in the project workspace (the home project has no workspace).
+      router.push(`/w/dashboard?thread=${data.threadId}`);
+    } else if (data.projectId) {
       router.push(`/w/projects/${data.projectId}?thread=${data.threadId}`);
     } else {
+      // Threads with no project_id at all are legacy unassigned threads
+      // (pre-Phase-2). New chats will always have a home project id; these
+      // remain for historical threads created before backfill.
       router.push(`/w/chat/${data.threadId}`);
     }
   };

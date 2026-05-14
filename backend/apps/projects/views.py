@@ -258,7 +258,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
             mf_unit_count=mf_count_subquery
         ).filter(is_active=True)
 
-        # Admin users see all projects
+        # Project kind discriminator (LF-USERDASH-0514 Phase 2).
+        # The project list endpoint is for real estate projects. User "home"
+        # projects (per-user placeholder rows owning non-project chats) are
+        # excluded by default. Opt-in by passing ?include_home=true (rarely
+        # needed — the dashboard uses a dedicated /api/projects/home endpoint
+        # to resolve the current user's home project ID).
+        include_home = self.request.query_params.get('include_home', '').lower() == 'true'
+        if not include_home:
+            base_qs = base_qs.filter(project_kind='real_estate')
+
+        # Admin users see all projects (still filtered by kind unless include_home).
         if getattr(user, 'role', None) == 'admin' or user.is_staff:
             return base_qs.all()
 
@@ -281,6 +291,45 @@ class ProjectViewSet(viewsets.ModelViewSet):
             serializer.save(created_by=self.request.user)
         else:
             serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='home')
+    def home(self, request):
+        """
+        GET /api/projects/home/
+
+        Return the current user's home project. Idempotently creates one on
+        first call (so existing users get a home project on first dashboard
+        load even before the backfill management command has run).
+
+        The dashboard uses this to resolve which project_id its center panel
+        runs in, and to mark home-project thread tiles for routing into the
+        dashboard rather than into a real project chat surface.
+
+        LF-USERDASH-0514 Phase 2.
+        """
+        from .services.home_project import get_or_create_home_project
+
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            project, _created = get_or_create_home_project(request.user)
+        except Exception as exc:
+            logger.error("Home project resolve failed for user %s: %s", request.user, exc, exc_info=True)
+            return Response(
+                {'error': 'home project resolve failed', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({
+            'project_id': project.project_id,
+            'project_name': project.project_name,
+            'project_kind': project.project_kind,
+            'created_by_id': getattr(project, 'created_by_id', None),
+        })
 
     def destroy(self, request, *args, **kwargs):
         """
