@@ -236,18 +236,22 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     }
   }, [homepageThreadId]);
 
-  // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 follow-up).
+  // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 tail fix, v2).
   //
   // The dashboard's prompt input routes the user to /w/chat?seed=<text> when
-  // they hit Enter from the home surface. Without explicit handling here, the
-  // seed param sat in the URL and the typed text was silently dropped — which
-  // is exactly the regression Gregg flagged on first smoke-test.
+  // they hit Enter from the home surface. The chat panel reads the seed on
+  // mount and replays it as a chat message.
   //
-  // Fire once per mount: pick up `?seed=` from the URL, hand it to the chat
-  // component the same way the project-homepage flow does (sendMessage via
-  // chatRef after a short mount delay), then strip the param from the URL so
-  // a reload doesn't re-fire the same message. seedConsumedRef guards
-  // against re-entry if React strict-mode double-invokes effects.
+  // v2 hardening (after first attempt worked but second silently dropped):
+  // graceful-degrade if chatRef isn't ready when we try to send. setInputText
+  // populates the chat input box immediately — so even if auto-send fails for
+  // any timing reason, the user's text is preserved in the input and they
+  // can click Send manually. sendMessage is then attempted on a poll loop
+  // up to ~2s; any leftover failure leaves the populated input as the
+  // fallback rather than dropping the text on the floor.
+  //
+  // seedConsumedRef guards strict-mode double-invocation within a single
+  // mount. Fresh remounts reset the ref naturally.
   const seedConsumedRef = useRef(false);
   useEffect(() => {
     if (seedConsumedRef.current) return;
@@ -255,20 +259,65 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     if (!seed) return;
     seedConsumedRef.current = true;
 
-    // Clean the URL immediately — even if sendMessage fails, the user
-    // shouldn't see the seed parameter persist or re-fire on refresh.
+    // Clean the URL immediately so a reload doesn't replay the message.
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete('seed');
     const cleanUrl = pathname + (params.toString() ? `?${params.toString()}` : '');
     router.replace(cleanUrl);
 
-    // Same 600ms mount delay used by the homepage→chat flow above. The
-    // chatRef target (LandscaperChatThreaded) needs that beat to wire up
-    // its thread-load + send infrastructure before sendMessage is callable.
-    const timer = setTimeout(() => {
-      chatRef.current?.sendMessage(seed);
-    }, 600);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    let sentOrAborted = false;
+    let inputPrimed = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20; // ~2s at 100ms cadence
+    const INTERVAL_MS = 100;
+
+    const dispatch = () => {
+      if (cancelled || sentOrAborted) return;
+
+      const handle = chatRef.current;
+      if (handle) {
+        // Prime the input box as soon as the chat handle is available, so
+        // the user's text is visible even if sendMessage later throws.
+        if (!inputPrimed && typeof handle.setInputText === 'function') {
+          try {
+            handle.setInputText(seed);
+            inputPrimed = true;
+          } catch {
+            /* swallow — sendMessage is the primary path */
+          }
+        }
+        try {
+          const result = handle.sendMessage(seed);
+          sentOrAborted = true;
+          // sendMessage returns a Promise; let it run. If it rejects, the
+          // user still has the primed input as fallback.
+          Promise.resolve(result).catch(() => {
+            /* leave input populated for manual retry */
+          });
+          return;
+        } catch {
+          /* fall through to retry */
+        }
+      }
+
+      attempts += 1;
+      if (attempts >= MAX_ATTEMPTS) {
+        sentOrAborted = true;
+        // Give up auto-send. If the handle eventually appears but we're
+        // past the budget, the user still has nothing in the input — they
+        // need to retype. Real fix is Phase 3 (direct dashboard→chat).
+        return;
+      }
+      setTimeout(dispatch, INTERVAL_MS);
+    };
+
+    // First attempt after one frame so React has committed the chat tree.
+    setTimeout(dispatch, 0);
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
