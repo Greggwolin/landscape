@@ -87,6 +87,9 @@ const NavIcon: React.FC<{ d: string | string[] }> = ({ d }) => (
 );
 
 const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: string }> = [
+  // 'dashboard' (Home) routes to /w/dashboard — the chat-forward landing surface
+  // for the user. LF-USERDASH-0514 Phase 1.
+  { id: 'dashboard', label: 'Home', paths: ['M3 12 12 3l9 9', 'M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10'] },
   { id: 'projects', label: 'Projects', paths: ['M4 20h16a2 2 0 002-2V8a2 2 0 00-2-2h-7.93a2 2 0 01-1.66-.9l-.82-1.2A2 2 0 007.93 3H4a2 2 0 00-2 2v13c0 1.1.9 2 2 2z'] },
   { id: 'platform-knowledge', label: 'Platform Knowledge', paths: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2 14 8 20 8'] },
   { id: 'map', label: 'Map', paths: ['M1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6Z', 'M8 2V18', 'M16 6V22'] },

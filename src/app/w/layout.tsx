@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
+import { UserDashboard } from '@/components/wrapper/UserDashboard';
 import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifact';
 import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
 import { ExcelAuditArtifact } from '@/components/wrapper/ExcelAuditArtifact';
@@ -74,9 +75,15 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   // On /w/chat routes, chat IS the content — hide the right <main> panel
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
+  // On /w/dashboard, the center column renders UserDashboard instead of
+  // CenterChatPanel. Same column-collapse rules as chat routes apply:
+  // wrapper-main is hidden and the artifacts rail stays collapsed on mount.
+  // Phase 1 of LF-USERDASH-0514.
+  const isDashboardRoute = /^\/w\/dashboard(\/|$)/.test(pathname);
 
   // Derive active nav page from URL
   const activePage = (() => {
+    if (pathname.includes('/dashboard')) return 'dashboard';
     if (pathname.includes('/platform-knowledge')) return 'platform-knowledge';
     if (pathname.includes('/reports')) return 'reports';
     if (pathname.includes('/map')) return 'map';
@@ -86,7 +93,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     if (pathname.includes('/help')) return 'help';
     if (pathname.includes('/chat')) return 'chat';
     if (pathname.includes('/projects')) return 'projects';
-    return 'projects';
+    return 'dashboard';
   })();
 
   // Extract current projectId from URL
@@ -466,28 +473,32 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         userName={user ? `${user.first_name} ${user.last_name}`.trim() || user.username : undefined}
         userInitials={user ? `${user.first_name?.[0] || ''}${user.last_name?.[0] || ''}`.toUpperCase() || user.username[0].toUpperCase() : undefined}
       />
-      <CenterChatPanel
-        projectId={
-          // On /w/chat routes, chat is always unassigned — never leak lastProjectId.
-          // On /w/chat/[threadId], initialThreadId carries its own scope.
-          // On /w/projects (the project LIST page, no specific project selected),
-          // chat is also unassigned — this panel is for general chats not tied to
-          // a specific project. Don't bleed lastProjectId here either (chat DA
-          // 2026-05-01 — Gregg flagged that /w/projects was inheriting the last
-          // visited project's chat context).
-          // Everywhere else (specific project pages, sub-routes), prefer current
-          // URL projectId, then last-visited as a navigation-continuity fallback.
-          isChatRoute || pathname === '/w/projects'
-            ? undefined
-            : (projectId ?? lastProjectId)
-        }
-        initialThreadId={initialThreadId}
-        sessionKey={chatSessionKey}
-        projectName={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_name}
-        projectLocation={isChatRoute || pathname === '/w/projects' ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
-        projectTypeCode={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_type_code}
-      />
-      {!isChatRoute && (
+      {isDashboardRoute ? (
+        <UserDashboard />
+      ) : (
+        <CenterChatPanel
+          projectId={
+            // On /w/chat routes, chat is always unassigned — never leak lastProjectId.
+            // On /w/chat/[threadId], initialThreadId carries its own scope.
+            // On /w/projects (the project LIST page, no specific project selected),
+            // chat is also unassigned — this panel is for general chats not tied to
+            // a specific project. Don't bleed lastProjectId here either (chat DA
+            // 2026-05-01 — Gregg flagged that /w/projects was inheriting the last
+            // visited project's chat context).
+            // Everywhere else (specific project pages, sub-routes), prefer current
+            // URL projectId, then last-visited as a navigation-continuity fallback.
+            isChatRoute || pathname === '/w/projects'
+              ? undefined
+              : (projectId ?? lastProjectId)
+          }
+          initialThreadId={initialThreadId}
+          sessionKey={chatSessionKey}
+          projectName={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_name}
+          projectLocation={isChatRoute || pathname === '/w/projects' ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
+          projectTypeCode={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_type_code}
+        />
+      )}
+      {!isChatRoute && !isDashboardRoute && (
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
       )}
       {/* Artifacts on chat routes: full panel when open, ☰ strip when collapsed.
