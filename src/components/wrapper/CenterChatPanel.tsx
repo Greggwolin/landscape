@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilCommentSquare } from '@coreui/icons';
@@ -86,6 +86,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // On /w/chat routes, chat IS the content — always visible regardless of chatOpen toggle.
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
@@ -234,6 +235,42 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       return () => clearTimeout(timer);
     }
   }, [homepageThreadId]);
+
+  // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 follow-up).
+  //
+  // The dashboard's prompt input routes the user to /w/chat?seed=<text> when
+  // they hit Enter from the home surface. Without explicit handling here, the
+  // seed param sat in the URL and the typed text was silently dropped — which
+  // is exactly the regression Gregg flagged on first smoke-test.
+  //
+  // Fire once per mount: pick up `?seed=` from the URL, hand it to the chat
+  // component the same way the project-homepage flow does (sendMessage via
+  // chatRef after a short mount delay), then strip the param from the URL so
+  // a reload doesn't re-fire the same message. seedConsumedRef guards
+  // against re-entry if React strict-mode double-invokes effects.
+  const seedConsumedRef = useRef(false);
+  useEffect(() => {
+    if (seedConsumedRef.current) return;
+    const seed = searchParams?.get('seed');
+    if (!seed) return;
+    seedConsumedRef.current = true;
+
+    // Clean the URL immediately — even if sendMessage fails, the user
+    // shouldn't see the seed parameter persist or re-fire on refresh.
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.delete('seed');
+    const cleanUrl = pathname + (params.toString() ? `?${params.toString()}` : '');
+    router.replace(cleanUrl);
+
+    // Same 600ms mount delay used by the homepage→chat flow above. The
+    // chatRef target (LandscaperChatThreaded) needs that beat to wire up
+    // its thread-load + send infrastructure before sendMessage is callable.
+    const timer = setTimeout(() => {
+      chatRef.current?.sendMessage(seed);
+    }, 600);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showHomepage = isProjectRoot && !homepageThreadId && !initialThreadId;
 
