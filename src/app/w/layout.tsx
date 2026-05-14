@@ -455,8 +455,13 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         sidebarWidth={sidebarWidth}
         onResizeStart={handleResizeStart}
         onNewChat={handleNewChat}
-        threads={sidebarThreadItems}
-        archivedThreads={archivedSidebarThreadItems}
+        // On /w/dashboard the center column already lists recent conversations
+        // (UserDashboard → RecentChatsList). Showing the same list in the sidebar
+        // is redundant noise on a launcher-only surface. Suppress both live and
+        // archived sidebar thread sections on this route; reappears everywhere
+        // else. LF-USERDASH-0514 Phase 1 follow-up.
+        threads={isDashboardRoute ? [] : sidebarThreadItems}
+        archivedThreads={isDashboardRoute ? [] : archivedSidebarThreadItems}
         onArchiveThread={handleArchiveThread}
         onRestoreThread={handleRestoreThread}
         onDeleteThreadPermanently={handleDeleteThreadPermanently}
