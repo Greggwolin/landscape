@@ -19,9 +19,13 @@ interface ProjectArtifactsPanelProps {
    *  dashboard which mounts this panel against the user's home project; the
    *  label there is just "Documents" since there's no real project context. */
   documentsLabel?: string;
+  /** Include unassigned (project_id=null) artifacts alongside project-scoped
+   *  ones. Transitional flag for the home page — until Phase 3 attaches
+   *  dashboard chats to the home project, their artifacts are unassigned. */
+  includeUnassigned?: boolean;
 }
 
-export function ProjectArtifactsPanel({ projectId, documentsLabel }: ProjectArtifactsPanelProps) {
+export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassigned }: ProjectArtifactsPanelProps) {
   const {
     artifactsOpen,
     toggleArtifacts,
@@ -164,7 +168,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel }: ProjectArti
           <ProjectDocumentsBody />
         </div>
       ) : activeArtifactId != null ? (
-        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} />
+        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} />
       ) : activeLocationBrief ? (
         <LocationBriefArtifact
           config={activeLocationBrief}
@@ -181,7 +185,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel }: ProjectArti
           onClose={toggleArtifacts}
         />
       ) : (
-        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} />
+        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} />
       )}
       </div>
     </div>

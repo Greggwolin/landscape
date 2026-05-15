@@ -46,27 +46,41 @@ function getAuthHeaders(): Record<string, string> {
 
 /**
  * Quick existence probe — returns true if the home project has at least one
- * artifact OR at least one document. Used to decide whether to mount the
- * artifacts panel at all. Both queries are tiny (just need to know "any?").
+ * artifact (or unassigned artifact) OR at least one document. Used to decide
+ * whether to mount the artifacts panel at all.
+ *
+ * Why include unassigned: until Phase 3 attaches dashboard chats to the home
+ * project, threads created from the home dashboard are unassigned
+ * (project_id=null), and so are their artifacts. Without folding unassigned
+ * into the probe, the user creates an artifact from the home page and it
+ * silently doesn't appear when they come back. The artifacts panel itself
+ * is told to include unassigned for the same reason (see the
+ * includeUnassigned prop on ProjectArtifactsPanel below).
  */
 async function homeHasContent(projectId: number): Promise<boolean> {
   const headers = getAuthHeaders();
-  const [artifactRes, docRes] = await Promise.allSettled([
+  const [artifactsHomeRes, artifactsUnassignedRes, docRes] = await Promise.allSettled([
     fetch(`${DJANGO_API_URL}/api/artifacts/?project_id=${projectId}&limit=1`, { headers }),
+    fetch(`${DJANGO_API_URL}/api/artifacts/?include_unassigned=true&limit=1`, { headers }),
     fetch(`${DJANGO_API_URL}/api/dms/documents/?project_id=${projectId}`, { headers }),
   ]);
 
-  const hasArtifacts = await (async () => {
-    if (artifactRes.status !== 'fulfilled' || !artifactRes.value.ok) return false;
+  const anyArtifacts = async (
+    settled: PromiseSettledResult<Response>,
+  ): Promise<boolean> => {
+    if (settled.status !== 'fulfilled' || !settled.value.ok) return false;
     try {
-      const data = await artifactRes.value.json();
+      const data = await settled.value.json();
       if (Array.isArray(data?.results)) return data.results.length > 0;
       if (Array.isArray(data)) return data.length > 0;
       return false;
     } catch {
       return false;
     }
-  })();
+  };
+
+  const hasArtifacts =
+    (await anyArtifacts(artifactsHomeRes)) || (await anyArtifacts(artifactsUnassignedRes));
 
   const hasDocs = await (async () => {
     if (docRes.status !== 'fulfilled' || !docRes.value.ok) return false;
@@ -124,5 +138,11 @@ export default function WrapperDashboardPage() {
   }, [shouldMount, setRightPanelNarrow]);
 
   if (!shouldMount || !homeProjectId) return null;
-  return <ProjectArtifactsPanel projectId={homeProjectId} documentsLabel="Documents" />;
+  return (
+    <ProjectArtifactsPanel
+      projectId={homeProjectId}
+      documentsLabel="Documents"
+      includeUnassigned
+    />
+  );
 }

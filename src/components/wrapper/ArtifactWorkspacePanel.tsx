@@ -72,6 +72,13 @@ interface ArtifactWorkspacePanelProps {
    *  project should pass "Documents" since there's no project association
    *  to qualify. LF-USERDASH-0514. */
   documentsLabel?: string;
+  /** Include unassigned (project_id=null) artifacts alongside the
+   *  project-scoped ones. Used by the home-page dashboard so artifacts
+   *  created in unassigned threads — which is what dashboard chats are
+   *  until Phase 3 attaches them to the home project — still surface on
+   *  the home rail. Defaults to the existing behavior (only true when
+   *  projectId itself is null). LF-USERDASH-0514. */
+  includeUnassigned?: boolean;
 }
 
 /**
@@ -93,16 +100,25 @@ interface ArtifactWorkspacePanelProps {
  *
  * Spec: SPEC_FINDING4_GENERATIVE_ARTIFACTS.md §9
  */
-export function ArtifactWorkspacePanel({ projectId, documentsLabel = 'Project Documents' }: ArtifactWorkspacePanelProps) {
+export function ArtifactWorkspacePanel({
+  projectId,
+  documentsLabel = 'Project Documents',
+  includeUnassigned,
+}: ArtifactWorkspacePanelProps) {
   const router = useRouter();
   const { activeArtifactId, setActiveArtifactId, toggleArtifacts, setProjectRightPanelView } = useWrapperUI();
   const modalRegistry = useModalRegistrySafe();
 
   // Pinned artifacts — always show (small list).
+  // `includeUnassigned` allows callers to surface project-scoped AND
+  // unassigned artifacts at once (used by the home-page dashboard).
+  // Default behavior preserved: when the prop is omitted, unassigned
+  // artifacts are included only if projectId itself is null.
+  const wantUnassigned = includeUnassigned ?? projectId == null;
   const pinnedQuery = useArtifactList({
     project_id: projectId ?? undefined,
     pinned_only: true,
-    include_unassigned: projectId == null,
+    include_unassigned: wantUnassigned,
     limit: 50,
   });
 
@@ -110,7 +126,7 @@ export function ArtifactWorkspacePanel({ projectId, documentsLabel = 'Project Do
   // unfiltered for pinned. Frontend filters out pinned ids client-side.
   const recentQuery = useArtifactList({
     project_id: projectId ?? undefined,
-    include_unassigned: projectId == null,
+    include_unassigned: wantUnassigned,
     limit: 10,
   });
 
