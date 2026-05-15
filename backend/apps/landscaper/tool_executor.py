@@ -15833,10 +15833,57 @@ def execute_tool(
             'available_tools': list(TOOL_REGISTRY.keys())
         }
 
-    # Guard: block project-requiring tools when project_id is None (unassigned threads)
+    # Guard: block project-requiring tools when project_id is None (unassigned threads).
+    #
+    # LF-USERDASH-0514 Phase 3 — cross-project override:
+    # When the chat is unassigned (home dashboard) BUT the model passes an
+    # explicit project_id in tool_input, promote it to the executor's
+    # project_id. This is the cross-project read path: user asks
+    # "show me Chadron's rent roll" → model resolves Chadron via
+    # list_projects_summary → calls the get_ tool with the resolved id
+    # in tool_input → executor promotes it so the tool can run.
+    #
+    # Mutation tools (is_mutation=True) DO NOT get the override path —
+    # cross-project writes from the home dashboard are blocked. Mutations
+    # require an actual project context to ensure the user understands
+    # which project they're modifying.
     if project_id is None:
         from .tool_registry import UNASSIGNED_SAFE_TOOLS
-        if tool_name not in UNASSIGNED_SAFE_TOOLS:
+
+        override_pid = None
+        try:
+            raw_override = tool_input.get('project_id') if isinstance(tool_input, dict) else None
+            if raw_override is not None:
+                override_pid = int(raw_override)
+        except (TypeError, ValueError):
+            override_pid = None
+
+        is_mutation = bool(getattr(handler, '_is_mutation', False))
+
+        if override_pid is not None and not is_mutation:
+            # Read-only cross-project access — promote the override.
+            project_id = override_pid
+            logger.info(
+                f"Cross-project read promoted: tool='{tool_name}' "
+                f"project_id={override_pid} (from unassigned thread)"
+            )
+        elif tool_name not in UNASSIGNED_SAFE_TOOLS:
+            if override_pid is not None and is_mutation:
+                logger.warning(
+                    f"Cross-project mutation blocked: tool='{tool_name}' "
+                    f"project_id={override_pid} (from unassigned thread)"
+                )
+                return {
+                    'success': False,
+                    'error': 'cross_project_mutation_blocked',
+                    'message': (
+                        f"The tool '{tool_name}' modifies project data and cannot be "
+                        f"called against a different project from the home dashboard. "
+                        f"Navigate to project {override_pid} first, or ask the user "
+                        f"to confirm the cross-project write."
+                    ),
+                    'tool': tool_name,
+                }
             logger.warning(
                 f"Tool '{tool_name}' requires a project but was called "
                 f"from an unassigned thread (thread_id={thread_id})"
