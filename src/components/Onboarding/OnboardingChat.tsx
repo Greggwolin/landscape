@@ -242,7 +242,7 @@ export default function OnboardingChat({ profile, onProfileRefresh }: Onboarding
     setEntering(true);
     try {
       await compileLandscaperInstructions();
-      router.push('/dashboard');
+      router.push('/w/dashboard');
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Unable to enter Landscape yet.');
     } finally {

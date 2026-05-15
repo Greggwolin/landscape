@@ -37,7 +37,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
         router.push('/login');
       } else if (requireAdmin && user && !user.is_staff) {
         // User is authenticated but not admin, redirect to dashboard
-        router.push('/dashboard');
+        router.push('/w/dashboard');
       }
     }
   }, [isLoading, isAuthenticated, requireAdmin, user, router, pathname]);

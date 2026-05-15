@@ -30,7 +30,7 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !redirecting) {
-      router.push('/dashboard');
+      router.push('/w/dashboard');
     }
   }, [isLoading, isAuthenticated, redirecting, router]);
 
@@ -113,11 +113,11 @@ export default function LoginForm() {
       const isAdmin = result.user?.role === 'admin';
       if (isAdmin) {
         setRedirecting(true);
-        router.push('/dashboard');
+        router.push('/w/dashboard');
         return;
       }
       const profile = await fetchLandscaperProfile();
-      const target = profile.survey_completed_at ? '/dashboard' : '/onboarding';
+      const target = profile.survey_completed_at ? '/w/dashboard' : '/onboarding';
       setRedirecting(true);
       router.push(target);
 
