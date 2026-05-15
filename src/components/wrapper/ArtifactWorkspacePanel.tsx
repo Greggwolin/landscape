@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2 } from 'lucide-react';
-import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { useWrapperUI, type LocationBriefArtifactConfig } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
   type ArtifactSummary,
@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useArtifact';
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
+import { LocationBriefArtifact } from './LocationBriefArtifact';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -359,6 +360,25 @@ export function ArtifactWorkspacePanel({
           </div>
         ) : !active ? (
           <div style={emptyStateStyle}>Artifact not found.</div>
+        ) : active.tool_name === 'generate_location_brief' &&
+          active.params_json &&
+          (active.params_json as { location_brief_config?: unknown }).location_brief_config ? (
+          // LF-USERDASH-0514: rich-rendering carve-out for the location-brief
+          // artifact. The generic ArtifactRenderer only knows section/table/
+          // key_value_grid/text blocks; the brief has its own dedicated
+          // renderer with indicator tiles, sources, refreshed-on date, etc.
+          // Pull the stored config (stashed by generate_location_brief_tool's
+          // params_json) and hand it to LocationBriefArtifact so the panel
+          // shows the same rich view it does on the live brief flow — but
+          // surrounded by the sections list above (Pinned / Recent /
+          // Documents), matching the project-page layout.
+          <LocationBriefArtifact
+            config={
+              (active.params_json as { location_brief_config: LocationBriefArtifactConfig })
+                .location_brief_config
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
         ) : (
           <ArtifactRenderer
             artifactId={active.artifact_id}

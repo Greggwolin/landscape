@@ -143,6 +143,18 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         setActiveLocationBrief(
           result.location_brief_config as import('@/contexts/WrapperUIContext').LocationBriefArtifactConfig,
         );
+        // LF-USERDASH-0514: when the wrapped tool also returns an artifact_id
+        // (Phase 4 registration), promote it to activeArtifactId too. The
+        // dispatch in ProjectArtifactsPanel prefers activeArtifactId over
+        // activeLocationBrief, so this routes the panel through
+        // ArtifactWorkspacePanel (sections list + active artifact slot —
+        // same layout as project pages). ArtifactWorkspacePanel's
+        // tool-name carve-out renders the rich LocationBriefArtifact view
+        // inside the active slot, so the user sees BOTH the sections list
+        // AND the rich brief content at once.
+        if (typeof result.artifact_id === 'number') {
+          setActiveArtifactId(result.artifact_id);
+        }
         if (!artifactsOpen) toggleArtifacts();
       }
       // Excel audit artifact → merge into the audit artifact (5 audit tools
