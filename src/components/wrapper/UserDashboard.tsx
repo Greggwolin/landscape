@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFileDrop } from '@/contexts/FileDropContext';
 import { RecentChatsList } from './RecentChatsList';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -45,8 +46,11 @@ const PROMPT_PLACEHOLDER = 'What are we working on today?';
 export function UserDashboard() {
   const router = useRouter();
   const { user } = useAuth();
+  const { addFiles } = useFileDrop();
   const [value, setValue] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Home project id — resolved once on mount. Used by tile click logic to
   // route home-project chats into the dashboard rather than a real project
@@ -81,22 +85,55 @@ export function UserDashboard() {
     setValue(e.target.value);
     const el = e.target;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, []);
+
+  // File picker — opens native file selector. Selected files are queued via
+  // FileDropContext so the chat surface picks them up after navigation via
+  // the same path it already handles drag-drop on. Multi-select supported.
+  const handleAddFiles = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFilesChosen = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files ? Array.from(e.target.files) : [];
+      if (files.length === 0) return;
+      setPendingFiles((prev) => [...prev, ...files]);
+      // Reset the input value so picking the same file again still fires
+      // the change event.
+      e.target.value = '';
+    },
+    []
+  );
+
+  const removeFile = useCallback((idx: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
   }, []);
 
   const submit = useCallback(() => {
     const text = value.trim();
-    if (!text) {
-      // Empty submit = same as "New chat" — go to the chat surface and let
-      // the user start fresh.
+    const hasFiles = pendingFiles.length > 0;
+
+    // Queue files in the shared drop context so the chat panel's existing
+    // dropzone handler picks them up on the other side of the navigation.
+    if (hasFiles) {
+      addFiles(pendingFiles);
+    }
+
+    if (!text && !hasFiles) {
       router.push('/w/chat');
       return;
     }
-    // Phase 1: pass the prompt through a query param. The chat panel reads
-    // this on mount (Phase 3 wires the read; until then the user types again
-    // — acceptable for a layout-only first cut).
-    router.push(`/w/chat?seed=${encodeURIComponent(text)}`);
-  }, [router, value]);
+
+    if (text) {
+      router.push(`/w/chat?seed=${encodeURIComponent(text)}`);
+    } else {
+      // Files only — navigate without a seed; chat panel handles the file
+      // intake flow when it sees pending files in context.
+      router.push('/w/chat');
+    }
+  }, [router, value, pendingFiles, addFiles]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -131,18 +168,64 @@ export function UserDashboard() {
             value={value}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            rows={1}
+            rows={3}
             aria-label="Start a conversation"
           />
-          <button
-            type="button"
-            className="user-dashboard-prompt-send"
-            onClick={submit}
-            aria-label="Send"
-            disabled={!value.trim()}
-          >
-            ↵
-          </button>
+
+          {pendingFiles.length > 0 && (
+            <div className="user-dashboard-prompt-files">
+              {pendingFiles.map((file, idx) => (
+                <span key={`${file.name}-${idx}`} className="user-dashboard-file-chip">
+                  <span className="user-dashboard-file-chip-name" title={file.name}>
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    className="user-dashboard-file-chip-remove"
+                    onClick={() => removeFile(idx)}
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="user-dashboard-prompt-actions">
+            <button
+              type="button"
+              className="user-dashboard-prompt-attach"
+              onClick={handleAddFiles}
+              aria-label="Add document"
+              title="Add document"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              hidden
+              onChange={handleFilesChosen}
+            />
+            <div className="user-dashboard-prompt-spacer" />
+            <button
+              type="button"
+              className="user-dashboard-prompt-send"
+              onClick={submit}
+              aria-label="Send"
+              disabled={!value.trim() && pendingFiles.length === 0}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -50,3 +50,6 @@ psycopg2.OperationalError: could not translate host name "ep-tiny-lab-af0tg3ps.c
 [brief] generating for 2026-05-13
 [brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-13-brief.html
 [brief] open=10 in_progress=1 resolved_recent=0 wip=3 sessions=0 health=fresh
+[brief] generating for 2026-05-14
+[brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-14-brief.html
+[brief] open=10 in_progress=1 resolved_recent=0 wip=3 sessions=0 health=fresh
