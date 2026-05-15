@@ -4249,17 +4249,50 @@ def get_landscaper_response(
                     continuation_content = list(response.content)
 
                 claude_messages.append({"role": "assistant", "content": continuation_content})
-                claude_messages.append({"role": "user", "content": _continuation_prompt_for(scenario)})
 
-                # LF-USERDASH-0514: close any orphaned tool_use blocks before
-                # the continuation API call. The `mid_chain_continue` path
-                # appends the truncated response.content verbatim — which can
-                # carry a partial tool_use block when Claude hit max_tokens
-                # mid-tool-call (e.g., writing a large create_artifact schema).
-                # Without this guard, Anthropic 400s with "tool_use ids were
-                # found without tool_result blocks." Every other API call in
-                # this file runs the same guard before sending.
-                claude_messages = ensure_tool_results_closed(claude_messages)
+                # LF-USERDASH-0514: in mid_chain_continue, continuation_content
+                # can include partial tool_use blocks Claude was mid-writing
+                # when max_tokens fired. Anthropic requires the tool_result
+                # blocks to appear IMMEDIATELY in the next user message —
+                # not eventually, not at the end of the message list. The
+                # generic ensure_tool_results_closed appends placeholders to
+                # the tail, which breaks the immediate-pairing rule when a
+                # string-content continuation user message sits between the
+                # orphan tool_use and the appended placeholder.
+                #
+                # Fix: build the user message in place. Tool_result placeholders
+                # come FIRST in the content list (Anthropic requires this
+                # ordering), continuation prompt text comes after as a text
+                # block in the same user message.
+                orphan_tool_use_ids: list[str] = []
+                for block in continuation_content:
+                    if hasattr(block, 'type') and block.type == 'tool_use':
+                        orphan_tool_use_ids.append(block.id)
+                    elif isinstance(block, dict) and block.get('type') == 'tool_use':
+                        block_id = block.get('id')
+                        if block_id:
+                            orphan_tool_use_ids.append(block_id)
+
+                continuation_text = _continuation_prompt_for(scenario)
+                if orphan_tool_use_ids:
+                    user_content_blocks: list[dict] = []
+                    for tu_id in orphan_tool_use_ids:
+                        user_content_blocks.append({
+                            'type': 'tool_result',
+                            'tool_use_id': tu_id,
+                            'content': (
+                                'Tool call was interrupted by max_tokens. '
+                                'The tool was NOT executed. Do not re-invoke '
+                                'it — continue the response without this tool.'
+                            ),
+                        })
+                    user_content_blocks.append({
+                        'type': 'text',
+                        'text': continuation_text,
+                    })
+                    claude_messages.append({"role": "user", "content": user_content_blocks})
+                else:
+                    claude_messages.append({"role": "user", "content": continuation_text})
 
                 continuation_attempts += 1
                 response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
