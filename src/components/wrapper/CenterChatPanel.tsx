@@ -236,26 +236,31 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     }
   }, [homepageThreadId]);
 
-  // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 tail fix, v2).
+  // Seed-prompt consumption (LF-USERDASH-0514 Phase 1 tail fix, v3).
   //
   // The dashboard's prompt input routes the user to /w/chat?seed=<text> when
-  // they hit Enter from the home surface. The chat panel reads the seed on
-  // mount and replays it as a chat message.
+  // they hit Enter from the home surface. This effect picks up the seed and
+  // populates the chat input box. It deliberately does NOT auto-send — that
+  // path turned out to be timing-fragile across remount scenarios. Phase 3
+  // will replace the seed mechanism entirely with a direct dashboard→chat
+  // submit path.
   //
-  // v2 hardening (after first attempt worked but second silently dropped):
-  // graceful-degrade if chatRef isn't ready when we try to send. setInputText
-  // populates the chat input box immediately — so even if auto-send fails for
-  // any timing reason, the user's text is preserved in the input and they
-  // can click Send manually. sendMessage is then attempted on a poll loop
-  // up to ~2s; any leftover failure leaves the populated input as the
-  // fallback rather than dropping the text on the floor.
-  //
-  // seedConsumedRef guards strict-mode double-invocation within a single
-  // mount. Fresh remounts reset the ref naturally.
+  // v3 changes from v2:
+  //   - No auto-send. setInputText only. User clicks Send themselves to
+  //     submit. Removes the entire class of "did sendMessage fire / did it
+  //     succeed silently" timing questions.
+  //   - No effect cleanup. React strict-mode double-invokes effects, and a
+  //     cleanup that cancels the polling killed v2's poll mid-flight. The
+  //     polling now runs to completion or to MAX_ATTEMPTS regardless of
+  //     strict-mode unmount/remount simulation. MAX_ATTEMPTS caps total
+  //     work at ~2s of polling.
+  //   - Diagnostic console.logs at each branch point so we can see exactly
+  //     which step is failing if the symptom recurs.
   const seedConsumedRef = useRef(false);
   useEffect(() => {
     if (seedConsumedRef.current) return;
     const seed = searchParams?.get('seed');
+    console.log('[seed-fix] effect mount, seed param =', JSON.stringify(seed));
     if (!seed) return;
     seedConsumedRef.current = true;
 
@@ -264,49 +269,26 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     params.delete('seed');
     const cleanUrl = pathname + (params.toString() ? `?${params.toString()}` : '');
     router.replace(cleanUrl);
+    console.log('[seed-fix] URL stripped, polling for chat handle');
 
-    let cancelled = false;
-    let sentOrAborted = false;
-    let inputPrimed = false;
     let attempts = 0;
     const MAX_ATTEMPTS = 20; // ~2s at 100ms cadence
     const INTERVAL_MS = 100;
 
     const dispatch = () => {
-      if (cancelled || sentOrAborted) return;
-
       const handle = chatRef.current;
-      if (handle) {
-        // Prime the input box as soon as the chat handle is available, so
-        // the user's text is visible even if sendMessage later throws.
-        if (!inputPrimed && typeof handle.setInputText === 'function') {
-          try {
-            handle.setInputText(seed);
-            inputPrimed = true;
-          } catch {
-            /* swallow — sendMessage is the primary path */
-          }
-        }
+      if (handle && typeof handle.setInputText === 'function') {
+        console.log('[seed-fix] handle ready after', attempts, 'attempts — populating input');
         try {
-          const result = handle.sendMessage(seed);
-          sentOrAborted = true;
-          // sendMessage returns a Promise; let it run. If it rejects, the
-          // user still has the primed input as fallback.
-          Promise.resolve(result).catch(() => {
-            /* leave input populated for manual retry */
-          });
-          return;
-        } catch {
-          /* fall through to retry */
+          handle.setInputText(seed);
+        } catch (e) {
+          console.error('[seed-fix] setInputText threw:', e);
         }
+        return;
       }
-
       attempts += 1;
       if (attempts >= MAX_ATTEMPTS) {
-        sentOrAborted = true;
-        // Give up auto-send. If the handle eventually appears but we're
-        // past the budget, the user still has nothing in the input — they
-        // need to retype. Real fix is Phase 3 (direct dashboard→chat).
+        console.warn('[seed-fix] gave up after', attempts, 'attempts — chat handle never appeared');
         return;
       }
       setTimeout(dispatch, INTERVAL_MS);
@@ -314,10 +296,6 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
     // First attempt after one frame so React has committed the chat tree.
     setTimeout(dispatch, 0);
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
