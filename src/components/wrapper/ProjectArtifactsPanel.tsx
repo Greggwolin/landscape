@@ -15,9 +15,13 @@ const MAX_ARTIFACTS_WIDTH = 1600;
 
 interface ProjectArtifactsPanelProps {
   projectId: number;
+  /** Override the "Project Documents" section label. Used by the home-page
+   *  dashboard which mounts this panel against the user's home project; the
+   *  label there is just "Documents" since there's no real project context. */
+  documentsLabel?: string;
 }
 
-export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps) {
+export function ProjectArtifactsPanel({ projectId, documentsLabel }: ProjectArtifactsPanelProps) {
   const {
     artifactsOpen,
     toggleArtifacts,
@@ -160,7 +164,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
           <ProjectDocumentsBody />
         </div>
       ) : activeArtifactId != null ? (
-        <ArtifactWorkspacePanel projectId={projectId} />
+        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} />
       ) : activeLocationBrief ? (
         <LocationBriefArtifact
           config={activeLocationBrief}
@@ -177,7 +181,7 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
           onClose={toggleArtifacts}
         />
       ) : (
-        <ArtifactWorkspacePanel projectId={projectId} />
+        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} />
       )}
       </div>
     </div>

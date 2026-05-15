@@ -67,6 +67,11 @@ function formatDocDate(dateStr: string): string {
 interface ArtifactWorkspacePanelProps {
   /** Project context — null for unassigned threads. */
   projectId: number | null;
+  /** Label for the documents section. Defaults to "Project Documents" on
+   *  real-estate projects; pages mounting this panel for the user's home
+   *  project should pass "Documents" since there's no project association
+   *  to qualify. LF-USERDASH-0514. */
+  documentsLabel?: string;
 }
 
 /**
@@ -88,7 +93,7 @@ interface ArtifactWorkspacePanelProps {
  *
  * Spec: SPEC_FINDING4_GENERATIVE_ARTIFACTS.md §9
  */
-export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProps) {
+export function ArtifactWorkspacePanel({ projectId, documentsLabel = 'Project Documents' }: ArtifactWorkspacePanelProps) {
   const router = useRouter();
   const { activeArtifactId, setActiveArtifactId, toggleArtifacts, setProjectRightPanelView } = useWrapperUI();
   const modalRegistry = useModalRegistrySafe();
@@ -241,11 +246,13 @@ export function ArtifactWorkspacePanel({ projectId }: ArtifactWorkspacePanelProp
       {/* ── Project Documents ── (project-scoped only; hidden on unassigned
           threads). Surfaced at the top of the panel so the project's source
           files are the first thing visible — Pinned + Recent are derivative
-          views over those files. */}
+          views over those files.
+          On the home (user) project, callers pass documentsLabel="Documents"
+          since there's no project association to qualify. LF-USERDASH-0514. */}
       {projectId != null && (
         <div className="w-rail-card">
           <CollapsibleSection
-            title="Project Documents"
+            title={documentsLabel}
             icon={<Folder size={15} />}
             count={documents.length}
             collapsed={documentsCollapsed}

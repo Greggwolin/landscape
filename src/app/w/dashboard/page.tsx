@@ -10,14 +10,17 @@ import { useWrapperUI } from '@/contexts/WrapperUIContext';
  * Mirrors the project-landing-page structure: center column hosts UserDashboard
  * (rendered by the layout's route-aware swap in place of CenterChatPanel), and
  * THIS page renders ProjectArtifactsPanel in the wrapper-main slot scoped to
- * the user's home project. Result: same three-pane shell as inside any real
- * project — sidebar / chat / persistent artifacts panel.
+ * the user's home project — BUT only when the home project actually has
+ * artifacts or documents to show. Empty home → no panel rail (a fresh dashboard
+ * is just the greeting + prompt + recent chats, no empty side rail).
+ *
+ * Section labels in the panel are adjusted for the home context: "Project
+ * Documents" → "Documents" (there's no project to qualify the label).
  *
  * The home project id is resolved via /api/projects/home (idempotent — creates
- * on first hit so existing users self-heal). While the id is loading, the
- * artifacts panel skeleton is intentionally hidden rather than rendering a
- * placeholder; the resolution is fast enough that flashing-and-replacing
- * would be more distracting than a brief empty rail.
+ * on first hit so existing users self-heal). Artifact and document counts are
+ * pre-fetched here purely to decide whether to render the panel. The panel
+ * itself re-fetches its own data when mounted.
  *
  * Layout-level details (rightPanelNarrow flag, wrapper-main visibility on
  * the dashboard route) are coordinated by /w/layout.tsx.
@@ -41,36 +44,85 @@ function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
+/**
+ * Quick existence probe — returns true if the home project has at least one
+ * artifact OR at least one document. Used to decide whether to mount the
+ * artifacts panel at all. Both queries are tiny (just need to know "any?").
+ */
+async function homeHasContent(projectId: number): Promise<boolean> {
+  const headers = getAuthHeaders();
+  const [artifactRes, docRes] = await Promise.allSettled([
+    fetch(`${DJANGO_API_URL}/api/artifacts/?project_id=${projectId}&limit=1`, { headers }),
+    fetch(`${DJANGO_API_URL}/api/dms/documents/?project_id=${projectId}`, { headers }),
+  ]);
+
+  const hasArtifacts = await (async () => {
+    if (artifactRes.status !== 'fulfilled' || !artifactRes.value.ok) return false;
+    try {
+      const data = await artifactRes.value.json();
+      if (Array.isArray(data?.results)) return data.results.length > 0;
+      if (Array.isArray(data)) return data.length > 0;
+      return false;
+    } catch {
+      return false;
+    }
+  })();
+
+  const hasDocs = await (async () => {
+    if (docRes.status !== 'fulfilled' || !docRes.value.ok) return false;
+    try {
+      const data = await docRes.value.json();
+      if (Array.isArray(data)) return data.length > 0;
+      if (Array.isArray(data?.results)) return data.results.length > 0;
+      if (Array.isArray(data?.documents)) return data.documents.length > 0;
+      return false;
+    } catch {
+      return false;
+    }
+  })();
+
+  return hasArtifacts || hasDocs;
+}
+
 export default function WrapperDashboardPage() {
   const { setRightPanelNarrow } = useWrapperUI();
   const [homeProjectId, setHomeProjectId] = useState<number | null>(null);
+  const [shouldMount, setShouldMount] = useState<boolean>(false);
 
-  // Mirror project root behavior — shrink wrapper-main to the artifacts panel
-  // width so the chat surface (UserDashboard) gets the rest of the row.
-  useEffect(() => {
-    setRightPanelNarrow(true);
-    return () => setRightPanelNarrow(false);
-  }, [setRightPanelNarrow]);
-
-  // Resolve the current user's home project id. The endpoint is idempotent —
-  // creates on first call if missing, so this also self-heals for any user
-  // the Phase 2 backfill didn't reach.
+  // Resolve the home project id, then probe for existing artifacts/documents.
+  // Panel only mounts if at least one exists — fresh dashboards stay clean.
   useEffect(() => {
     let cancelled = false;
-    fetch(`${DJANGO_API_URL}/api/projects/home/`, {
-      headers: getAuthHeaders(),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.project_id) setHomeProjectId(Number(data.project_id));
-      })
-      .catch(() => {});
+    (async () => {
+      try {
+        const res = await fetch(`${DJANGO_API_URL}/api/projects/home/`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.project_id) return;
+        const pid = Number(data.project_id);
+        setHomeProjectId(pid);
+        const has = await homeHasContent(pid);
+        if (!cancelled && has) setShouldMount(true);
+      } catch {
+        /* swallow — leave panel hidden on errors */
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!homeProjectId) return null;
-  return <ProjectArtifactsPanel projectId={homeProjectId} />;
+  // rightPanelNarrow is only meaningful when the panel actually renders.
+  // Toggling it only when shouldMount flips true prevents a flash of the
+  // narrow-main layout on empty dashboards.
+  useEffect(() => {
+    if (!shouldMount) return;
+    setRightPanelNarrow(true);
+    return () => setRightPanelNarrow(false);
+  }, [shouldMount, setRightPanelNarrow]);
+
+  if (!shouldMount || !homeProjectId) return null;
+  return <ProjectArtifactsPanel projectId={homeProjectId} documentsLabel="Documents" />;
 }
