@@ -671,7 +671,7 @@ export function EditUserModal({ isOpen, onClose, user, onSubmit, onSetPassword, 
     phone: user?.phone || '',
     is_active: user?.is_active ?? true,
     is_staff: user?.is_staff ?? false,
-    role: user?.role || 'viewer',
+    role: (user?.role === 'admin' || user?.role === 'alpha_tester') ? user.role : 'alpha_tester',
   }), [user]);
 
   if (!user) return null;
