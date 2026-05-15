@@ -116,6 +116,16 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
 
   const handleToolResult = useCallback(
     (toolName: string, result: Record<string, unknown>) => {
+      // LF-USERDASH-0514 Phase 3: route the user's browser on navigate
+      // tool results. navigate_to_project / navigate_to_dashboard both
+      // return { action: 'navigate', target_url: '/w/...' }. The /w/ layout
+      // subscribes and calls router.push.
+      if (result.action === 'navigate' && typeof result.target_url === 'string') {
+        emitLandscapeCommand('navigate', {
+          target_url: result.target_url,
+          context: { tool: toolName },
+        });
+      }
       if (toolName === 'open_input_modal' && result.action === 'open_modal' && typeof result.modal_name === 'string') {
         emitLandscapeCommand('open_modal', {
           modal_name: result.modal_name,

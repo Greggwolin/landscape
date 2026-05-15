@@ -81,6 +81,7 @@ def handle_list_projects_summary(
                      WHERE d.project_id = p.project_id AND d.deleted_at IS NULL) AS doc_count
                 FROM landscape.tbl_project p
                 WHERE p.is_active = true
+                  AND COALESCE(p.project_kind, 'real_estate') = 'real_estate'
             """
             params = []
             if property_type_filter:

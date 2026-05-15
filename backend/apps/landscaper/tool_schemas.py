@@ -4540,6 +4540,48 @@ LANDSCAPER_TOOLS = [
             "required": ["modal_name"],
         },
     },
+    {
+        "name": "navigate_to_project",
+        "description": (
+            "Route the user's interface to a real-estate project's workspace. "
+            "Fire ONLY on explicit navigation requests — wording like 'take me to X', "
+            "'open the X deal', 'switch to X', 'go to X'. Do NOT fire for data "
+            "questions like 'show me X's rent roll' or 'what's the cap rate on X' "
+            "— those should be answered in place by reading the project's data "
+            "with cross-project tool calls. The wording must explicitly express "
+            "intent to change surfaces. "
+            "Accepts either a project_id (preferred when known) or a free-text "
+            "project_name that will be fuzzy-matched. Returns navigation directive "
+            "on success; on ambiguous or missing match, returns candidates the "
+            "model should present to the user for disambiguation."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "Exact project id when known (skip the fuzzy lookup).",
+                },
+                "project_name": {
+                    "type": "string",
+                    "description": "Free-text project name — fuzzy matched against tbl_project.",
+                },
+            },
+        },
+    },
+    {
+        "name": "navigate_to_dashboard",
+        "description": (
+            "Route the user back to their home dashboard. Fire on 'go home', "
+            "'back to dashboard', 'take me home', or similar phrasing. No "
+            "arguments needed. Same firing discipline as navigate_to_project — "
+            "wording must express explicit intent to change surfaces."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
     # ── Excel Model Audit tools ────────────────────────────────────────────────
     {
         "name": "classify_excel_file",

@@ -1156,45 +1156,92 @@ _PAGE_MUTATION_HINTS = {
 }
 
 
-def _build_scope_and_authority(current_tab: str = "home") -> str:
+def _build_scope_and_authority(current_page: str = "home") -> str:
     """
     Generate the SCOPE AND AUTHORITY section for the system prompt.
 
     Injected on every turn so the model understands its full-context permissions
-    regardless of which page the user is on.
+    regardless of which surface the user is on.
+
+    LF-USERDASH-0514 Phase 3: parameter renamed from `current_tab` → `current_page`
+    to match the rest of the codebase (page_context); the surrounding prose was
+    swept of "tab" references that predated the unified UI's surface model.
+    Adds an INTENT CLASSIFICATION block and splits the old "don't navigate" rule
+    into data-fetch (kept) and explicit-navigation carve-out (new — points at
+    navigate_to_project / navigate_to_dashboard).
     """
-    # Page-specific mutation hints reduce tool-blindness in 200+ tool contexts
-    tab_lower = (current_tab or "home").strip().lower()
-    mutation_hint = _PAGE_MUTATION_HINTS.get(tab_lower, "")
+    # Surface-specific mutation hints reduce tool-blindness in 200+ tool contexts
+    page_lower = (current_page or "home").strip().lower()
+    mutation_hint = _PAGE_MUTATION_HINTS.get(page_lower, "")
     mutation_block = f"\n\n{mutation_hint}" if mutation_hint else ""
 
     return f"""
 SCOPE AND AUTHORITY:
 
 You are a full-context project agent with access to ALL project data and tools,
-regardless of which page the user is viewing. The user is currently on: {current_tab}.
+regardless of which surface the user is viewing. The user is currently on: {current_page}.
 
 Permission model:
-- Current project — all fields, all tabs: Read YES, Write YES (via mutation proposals)
+- Current project — all fields, all surfaces: Read YES, Write YES (via mutation proposals)
 - Current project — uploaded documents (DMS): Read YES, Write YES
 - Platform knowledge base (IREM benchmarks, appraisal methodology): Read YES, Write NO
 - Other user projects — assumptions and summary data: Read YES, Write NO
 - Other user projects — documents: Read NO, Write NO
 
-You have {TOOL_COUNT} tools available on every turn. You may read data from any tab
-(property, operations, valuation, capitalization, budget, planning, etc.) and propose
-mutations to any writable field — all without the user navigating away from {current_tab}.
+You have {TOOL_COUNT} tools available on every turn. You may read data from any
+content area (property, operations, valuation, capitalization, budget, planning, etc.)
+and propose mutations to any writable field — all without the user navigating away
+from {current_page}.
 
-When the user asks about data on a different tab, fetch it directly. Do NOT say
-"navigate to the Operations tab" or "switch to the Valuation page." You can access
-everything from here.
+INTENT CLASSIFICATION (LF-USERDASH-0514 Phase 3):
+Every user message falls into one of three intents. Classify before responding.
+
+1. GENERAL — questions, knowledge lookups, side-tasks, anything not tied to a
+   specific deal. Examples: "what's a good cap rate for retail in Phoenix?",
+   "explain DSCR", "what's the weather". Answer normally. Do not look up
+   project data unless the user names a specific project. Stay on the current
+   surface; do not navigate.
+
+2. EXISTING-PROJECT — the user references a specific real-estate project by
+   name or context. Two sub-paths, distinguished by the user's wording:
+
+   2a. DATA QUESTION ("show me X's rent roll", "what's the cap rate on the
+       Chadron deal", "compare X and Y's NOI") — answer IN PLACE. Resolve the
+       project name to a project_id via list_projects_summary, then call the
+       relevant get_ tools with that explicit project_id. Do NOT navigate.
+       The user wants the answer, not a context switch.
+
+   2b. NAVIGATION REQUEST ("take me to Chadron", "open the Peoria deal",
+       "switch to X", "go to Y's documents") — call navigate_to_project with
+       the project's name or id. The tool returns a navigation directive and
+       the frontend will route the user. The wording must EXPLICITLY express
+       intent to change surfaces. Soft asks ("can I look at X?", "show me X")
+       are data questions, not navigation. The trigger word set is roughly:
+       take me to / open / switch to / go to / show me X's page / let's
+       work on X.
+
+3. NEW-PROJECT — the user wants to start a new deal. Handled by Phase 4 work;
+   for now respond conversationally and offer to call create_project once
+   sufficient detail is gathered.
+
+If the intent is ambiguous, ask ONE short clarifying question — do not guess
+between answering in place vs. navigating.
+
+DATA-FETCH RULE (preserved from prior behavior, narrowed to non-navigation case):
+When the user asks about data on a different content area (sales tab, valuation
+page, budget grid, etc.) WITHOUT explicit navigation intent, fetch it directly
+via the appropriate get_ tool. Do NOT say "navigate to the Operations page" or
+"switch to the Valuation tab" — you can read everything from here. The
+navigation tools above are for explicit user requests only, not for routing
+the user toward data you could simply fetch yourself.
 
 CONTEXT-AWARE RESPONSES:
-When the user asks about UI elements like "what does this field do?" or "what does
-the Method input do?", assume they are referring to the current page ({current_tab}).
-Answer in that context — do not ask for clarification about which page or tab they mean.
-For example, on the valuation/income approach page, "Method" refers to the cap rate
-derivation method (Comp Sales, Band of Investment, Investor Survey).
+When the user asks about UI elements like "what does this field do?" or "what
+does the Method input do?", assume they are referring to the current surface
+({current_page}). Answer in that context — do not ask for clarification about
+which page they mean. For example, on the valuation/income approach surface,
+"Method" refers to the cap rate derivation method (Comp Sales, Band of
+Investment, Investor Survey).
 
 RESPONSE STYLE:
 Answer the question asked. Do not pad responses with tangentially related market
@@ -1211,13 +1258,15 @@ first call the relevant tool to check. Specifically:
   NEVER say "I don't have comparable sales data" without calling this tool first.
 - For project data questions: call the relevant get_ tool (get_sales_comparables, etc.)
 - For document content: call get_document_content
+- For cross-project lookups from the home dashboard: call list_projects_summary to
+  resolve the project name to a project_id, THEN call the get_ tool with that id.
 Do NOT respond from training data when you have tools that can answer the question.
 If a tool returns no results, THEN you may say the data isn't available.
 
 AVOIDING REDUNDANCY:
-The user can see data on their current page ({current_tab}). When they ask about comps,
-rents, operating expenses, or other data that is already loaded in the project database
-and visible in the current grid/table:
+The user can see data on their current surface ({current_page}). When they ask about
+comps, rents, operating expenses, or other data that is already loaded in the project
+database and visible in the current grid/table:
 - Do NOT restate data already in the project tables (comparables, rent roll, T-12, etc.).
   The user can see it. Assume they have read it.
 - DO add NEW information: comps from the knowledge base that aren't in the project yet,
@@ -3411,7 +3460,7 @@ def get_landscaper_response(
     system_prompt = get_system_prompt(project_type)
 
     # Add scope and authority section (full-context agent — every turn)
-    scope_section = _build_scope_and_authority(current_tab=page_context or "home")
+    scope_section = _build_scope_and_authority(current_page=page_context or "home")
 
     # Add field write rules (calculated field protection — every turn)
     field_rules = _build_field_write_rules()

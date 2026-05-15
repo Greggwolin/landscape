@@ -15,6 +15,7 @@ import { FileDropProvider } from '@/contexts/FileDropContext';
 import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLandscapeCommand } from '@/lib/landscape-command-bus';
 import '@/styles/wrapper.css';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -123,6 +124,22 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (projectId) setLastProjectId(projectId);
   }, [projectId]);
+
+  // LF-USERDASH-0514 Phase 3: subscribe to the 'navigate' command emitted
+  // by the chat panel when Landscaper calls navigate_to_project or
+  // navigate_to_dashboard. The /w/ layout is the highest-up React subtree
+  // that has the router in scope, so the subscriber lives here rather
+  // than in LandscapeCommandSubscriber (which is mounted only inside
+  // project layouts and would miss navigation requests from /w/chat or
+  // /w/dashboard).
+  const handleNavigateCommand = useCallback(
+    (payload: { target_url: string }) => {
+      if (!payload?.target_url || typeof payload.target_url !== 'string') return;
+      router.push(payload.target_url);
+    },
+    [router],
+  );
+  useLandscapeCommand('navigate', handleNavigateCommand);
 
   // LF-USERDASH-0514: clear active-artifact state when the project context
   // changes. activeLocationBrief / activeMapArtifact / activeExcelAudit /

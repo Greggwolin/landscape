@@ -75,6 +75,26 @@ export interface LandscapeCommandPayloadMap {
     modal_name: string;
     context?: Record<string, unknown>;
   };
+
+  /**
+   * Route the user's browser to a different surface inside the app.
+   *
+   * Subscriber: a top-level component mounted inside the /w/ shell
+   * (LandscapeCommandSubscriber). The subscriber calls
+   * router.push(target_url) on receipt.
+   *
+   * Backed by the navigate_to_project and navigate_to_dashboard Landscaper
+   * tools, which return { action: 'navigate', target_url, ... }. The chat
+   * panel's tool-result handler emits this command on any successful tool
+   * result with action='navigate' and a string target_url.
+   *
+   * LF-USERDASH-0514 Phase 3.
+   */
+  navigate: {
+    target_url: string;
+    /** Optional context for diagnostics — project name, friendly title, etc. */
+    context?: Record<string, unknown>;
+  };
 }
 
 export type LandscapeCommand = keyof LandscapeCommandPayloadMap;
