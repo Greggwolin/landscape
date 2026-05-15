@@ -51,6 +51,17 @@
   --w-sp-4: 16px;
   --w-sp-5: 24px;
   --w-sp-6: 32px;
+  /* ─── Floating-card rail tokens ─── */
+  /* Used by the right rail (.artifacts-panel) and any future stacked-card
+     surface that wants the "floating CCard" look — rounded corners with a
+     gutter between the card edge and the panel edge. Theme-independent
+     values; colors come from --w-card-bg / --w-border / --w-shadow.
+
+     Padding is intentionally minimal — the rail's purpose is to isolate
+     each section as a discrete card, not to add chrome around them. */
+  --w-rail-padding: var(--w-sp-1);
+  --w-rail-gap: var(--w-sp-3);
+  --w-card-radius: 10px;
 }
 
 /* ─── Dark mode overrides ─── */
@@ -1030,7 +1041,11 @@
   flex: 0 0 auto;
 }
 
-/* ─── Artifacts Panel ─── */
+/* ─── Artifacts Panel (floating-card rail) ─── */
+/* The panel hosts the WrapperHeader (full-bleed at top, dark chrome) and
+   an .artifacts-panel-body below that. The body is the padded gutter
+   that hosts a stack of .w-rail-card children. Each section is its own
+   card; the rail bg shows through the gutter and between cards. */
 .artifacts-panel {
   display: flex;
   flex-direction: column;
@@ -1038,6 +1053,47 @@
   height: 100%;
   overflow: hidden;
   background: var(--w-bg-sidebar);
+}
+
+/* Padded body container inside .artifacts-panel — provides the rail
+   gutter and the gap between stacked cards. Sits beneath the
+   WrapperHeader so the dark header chrome stays full-bleed at the top
+   of the rail and only the cards get the gutter. */
+.artifacts-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--w-rail-gap);
+  padding: var(--w-rail-padding);
+  overflow: hidden;
+}
+
+/* Floating card surface — rounded, bordered, subtly elevated. Used inside
+   .artifacts-panel-body but reusable anywhere a "CCard look on a dark
+   rail" is wanted. Default is content-sized (flex: 0 0 auto) so cards
+   stack at their natural heights. Add .is-grow on the one card that
+   should fill remaining vertical space (typically the active-artifact
+   slot). Children flow with flex; overflow:hidden clips them to the
+   rounded shape so headers/bodies inherit the corner radius for free. */
+.w-rail-card {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Locked to the chat-panel surface color so the rail cards match the
+     center chat (Claude-style unified surface). Intentionally NOT using
+     --w-card-bg — that token is consumed by other CCard surfaces and
+     should not be repointed here. */
+  background: var(--w-panel-bg, #1a1e28);
+  border: 1px solid var(--w-border);
+  border-radius: var(--w-card-radius);
+  box-shadow: var(--w-shadow);
+  overflow: hidden;
+}
+
+.w-rail-card.is-grow {
+  flex: 1 1 auto;
 }
 
 /* Collapsed strip — mirrors left sidebar collapsed behavior */
@@ -1049,7 +1105,7 @@
   align-items: center;
   padding-top: 12px;
   border-left: 1px solid var(--w-border);
-  background: var(--w-bg-body);
+  background: var(--w-panel-bg, #1a1e28);
   flex-shrink: 0;
 }
 
@@ -1122,7 +1178,7 @@
 
 .project-right-panel-body--documents {
   padding: 0;
-  background: var(--w-bg-body);
+  background: var(--w-panel-bg, #1a1e28);
 }
 
 /* Upload toolbar inside the per-project documents panel — compact strip
@@ -1164,6 +1220,19 @@
   border-right: 1px solid var(--w-border);
   background: var(--w-panel-bg, #1a1e28);
   overflow: hidden;
+}
+
+/* Hide scrollbar gutter on every scroll container inside the chat center
+   panel — threads list, message stream, etc. Scroll behavior preserved
+   (scrollable via wheel/trackpad/keyboard); only the visual gutter is
+   hidden, matching the Claude chat aesthetic. */
+.wrapper-chat-center *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.wrapper-chat-center * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .wrapper-chat-badge {
@@ -1210,7 +1279,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--w-bg-body);
+  background: var(--w-panel-bg, #1a1e28);
 }
 
 .wrapper-right-body {

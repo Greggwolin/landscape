@@ -4,6 +4,37 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Feedback Mirror Fix — 2026-05-08
+
+**What was discussed:**
+- Closed the dual-table drift between `landscape.tbl_feedback` (canonical, written by Help-panel `#FB` captures) and `landscape.tester_feedback` (read by `/admin/feedback`). Seven rows (FB-291, 295, 296, 297, 298, 299, 300) had piled up since the last manual `backfill_from_tbl_feedback` run. Phase 0 was already executed inline by Cowork via psycopg2 against Neon (43 migrated rows verified, was 36); this CC session committed and pushed the going-forward fix.
+- Code change in `backend/apps/landscaper/feedback_utils.py` (commit `71225b42` on `feature/floating-card-rail`, +158 lines): added `_TBL_TO_TESTER_STATUS` and `_CATEGORY_TO_FEEDBACK_TYPE` constants, `_resolve_owner_user_id()` (three-tier fallback: `user_id` → email lookup → `LANDSCAPER_FEEDBACK_OWNER_EMAIL` setting), `_mirror_to_tester_feedback()` (re-uses `apps.feedback.views.classify_feedback` and `extract_affected_module`, stamps `admin_notes` with `[migrated FB-N on YYYY-MM-DD]` so the existing backfill management command stays idempotent), and a try/except mirror call in `capture_feedback` after the parent `tbl_feedback` insert. Mirror failures are logged but never propagate — `tbl_feedback` persistence is canonical.
+- Fix lives in `feedback_utils.capture_feedback` because it's the single choke-point for all four `#FB` write call sites (views_help.py, project chat views, thread message handler, knowledge chat). Alternatives rejected: Django post-save signal (won't fire — `tbl_feedback` uses raw SQL, not ORM), Postgres trigger (would need its own User FK lookup outside Django), rewriting `/api/feedback/` to read `tbl_feedback` directly (substantially larger scope — status enum mismatch, field shape, frontend filters — queued for a separate session).
+- Operational notes: stale `.git/index.lock` (0 bytes, 20 min old, no holding process — only Spotlight had a read FD) blocked `git add` on the first attempt; investigated and removed before staging. `LSCMD-PHOME-VIS-0508-Tx4b` checkout-swap handoff arrived mid-session and was disregarded as sent in error — no state changed, only read-only inspection ran.
+
+**Open items:**
+- Smoke test on Railway: post a fresh `#FB` in the Help panel after redeploy, confirm the new row lands in BOTH `tbl_feedback` and `tester_feedback`, and that `admin_notes` carries the `[migrated FB-N on …]` marker. Watch Railway logs for any `tester_feedback mirror failed` entries.
+- `LANDSCAPER_FEEDBACK_OWNER_EMAIL` env var is not set on Railway. The fallback chain handles its absence gracefully (logs warning, skips mirror), but for paths where the captor is anonymous (no `user_id`, no `user_email`), the mirror will be silently skipped. Add `LANDSCAPER_FEEDBACK_OWNER_EMAIL=gregg@wolinfamily.com` if we want anonymous captures to surface on the admin page.
+- Unification of the two feedback tables (single source for both capture and admin read) — separate, larger session.
+
+---
+
+## Floating-Card Right Rail (v1–v4) — 2026-05-08
+
+**What was discussed:**
+- Built the right artifacts rail as a "floating-card" surface across four iterations on `feature/floating-card-rail` (off `main`, not piled on `feature/net-lease-foundation`). v1 (`82417832`) wrapped header+body in one card with 12px outer padding. v2 (`9a57b15d`) restructured into per-section cards (Project Documents / Pinned / Recent / Active Artifact / Source Pointers) with `.artifacts-panel-body` + `.w-rail-card` (default `flex: 0 0 auto`, `.is-grow` modifier for the active slot), tightened `--w-rail-padding`/`--w-rail-gap`/`--w-card-radius` to 4/8/10px. v3 (`0fc5e84f`) hid scrollbar gutter on `.wrapper-chat-center *`, anchored full-rail single artifacts flush at top by removing the body+card wrap from `LocationBrief` / `Map` / `ExcelAudit` paths in both `ProjectArtifactsPanel.tsx` and the `/w/chat` aside in `src/app/w/layout.tsx`, bumped `--w-rail-gap` to `var(--w-sp-3)` (12px) to match Claude.
+- v4 work (uncommitted as of session end): locked background to `var(--w-panel-bg, #1a1e28)` on `.w-rail-card`, `.wrapper-right-panel`, `.project-right-panel-body--documents`, `.artifacts-collapsed`, the `LandscaperChatThreaded` messages container, the chat input bar, the `ChatMessageBubble` assistant-side bubble, and the `ThreadList` outer panel. Per-token discipline: did NOT bump `--w-card-bg` (other CCard surfaces consume it) — used `--w-panel-bg` directly so the rail stays locked to the chat-panel surface.
+- Stale `.git/index.lock` blocked v1's stash on the first attempt; cleared between checks (transient prompt-spawned `git status` racing for the lock). One `npm run build` hung at 3 min while the dev server held the `.next` cache; killing port 3000 then rebuilding clean unblocked it.
+
+**Open items:**
+- v4 background-unification edits (`wrapper.css` + `LandscaperChatThreaded.tsx` + `ChatMessageBubble.tsx` + `ThreadList.tsx`) not yet committed/pushed. Verified visually via HMR; user said "OK for now."
+- Hover/active row highlights, badges, dropdown surfaces in `ThreadList` still use `--cui-tertiary-bg` / `--cui-secondary-bg` for hierarchy — left intentionally; revisit if any bleed off-color.
+- `LocationBriefArtifact` still uses its hardcoded light palette (per CLAUDE.md, intentional anti-bleed). Not touched.
+- Browser-verification points from each round (eight in v2, four in v1, eight in v3) only spot-checked by the user, not exhaustively walked.
+- `feature/floating-card-rail` not merged to `main`; PR not opened.
+
+---
+
 ## FB-290 Artifacts Panel Drag Handle — 2026-05-04
 
 **What was discussed:**

@@ -510,7 +510,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
               className="artifacts-panel"
               style={{ width: rightPanelWidth, flexShrink: 0 }}
             >
-              {/* Priority: location brief > map > excel audit */}
+              {/* Active artifact renders directly in the rail — its own
+                  header (title + close button) sits flush at the top of
+                  the rail, matching the pre-floating-card behavior. The
+                  card-stack treatment applies only to the per-section
+                  workspace view (ArtifactWorkspacePanel), not to a
+                  full-rail single artifact. */}
               {activeLocationBrief ? (
                 <LocationBriefArtifact
                   config={activeLocationBrief}

@@ -203,7 +203,7 @@ export function ThreadList({
       className="d-flex flex-column border-bottom"
       style={{
         borderColor: 'var(--cui-border-color)',
-        backgroundColor: 'var(--cui-tertiary-bg)',
+        backgroundColor: 'var(--w-panel-bg, #1a1e28)',
         maxHeight: '280px',
       }}
     >

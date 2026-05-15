@@ -110,10 +110,11 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }}
       />
       <div className="artifacts-panel" style={{ width: panelWidth, flexShrink: 0 }}>
-      {/* Header — Artifacts | Documents view toggle.
-          Active label is white, inactive is muted. Clicking either swaps
-          the panel body without navigating away or losing the active chat
-          thread. Persists across project sub-routes via WrapperUIContext. */}
+      {/* Header — Artifacts | Documents view toggle. Sits at the top of
+          the rail full-bleed (no gutter). Active label is white, inactive
+          is muted. Clicking either swaps the panel body without navigating
+          away or losing the active chat thread. Persists across project
+          sub-routes via WrapperUIContext. */}
       <WrapperHeader
         title={
           <div className="project-right-panel-toggle">
@@ -146,15 +147,14 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
         }
       />
 
-      {/* Body — view dispatch.
-          Documents view: panel-sized DMS surface (DocumentsPanel + MediaPanel).
-          Artifacts view: priority chain — generative artifact (Phase 3) >
-          location brief > map > excel audit > workspace empty state.
-          Generative artifact wins when explicitly selected. The legacy slots
-          (location brief / map / excel audit) handle their own dedicated
-          tools. The fallback is the ArtifactWorkspacePanel itself, which
-          shows Pinned + Recent collapsibles plus a clean "no artifact
-          selected" empty state. */}
+      {/* Body — padded rail gutter that hosts cards. View dispatch:
+          - Documents view: full-bleed DMS surface (no card wrap; the
+            DMS owns the entire body and has its own internal layout).
+          - Artifacts view with active full-artifact (LocationBrief / Map
+            / ExcelAudit): the artifact fills the body in a single
+            flex-grow card.
+          - Default artifacts view: ArtifactWorkspacePanel renders its
+            own per-section card stack inside .artifacts-panel-body. */}
       {projectRightPanelView === 'documents' ? (
         <div className="project-right-panel-body project-right-panel-body--documents">
           <ProjectDocumentsBody />
@@ -162,26 +162,20 @@ export function ProjectArtifactsPanel({ projectId }: ProjectArtifactsPanelProps)
       ) : activeArtifactId != null ? (
         <ArtifactWorkspacePanel projectId={projectId} />
       ) : activeLocationBrief ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <LocationBriefArtifact
-            config={activeLocationBrief}
-            onClose={toggleArtifacts}
-          />
-        </div>
+        <LocationBriefArtifact
+          config={activeLocationBrief}
+          onClose={toggleArtifacts}
+        />
       ) : activeMapArtifact ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <MapArtifactRenderer
-            config={activeMapArtifact}
-            onClose={toggleArtifacts}
-          />
-        </div>
+        <MapArtifactRenderer
+          config={activeMapArtifact}
+          onClose={toggleArtifacts}
+        />
       ) : activeExcelAudit ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <ExcelAuditArtifact
-            config={activeExcelAudit}
-            onClose={toggleArtifacts}
-          />
-        </div>
+        <ExcelAuditArtifact
+          config={activeExcelAudit}
+          onClose={toggleArtifacts}
+        />
       ) : (
         <ArtifactWorkspacePanel projectId={projectId} />
       )}
