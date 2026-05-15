@@ -136,11 +136,17 @@ def generate_location_brief_tool(
                 )
 
                 if artifact_envelope.get('success') and 'artifact_id' in artifact_envelope:
-                    # Merge artifact_id into the returned envelope so
-                    # extractArtifactCards on the frontend picks it up.
+                    # Merge artifact_id AND title into the returned envelope
+                    # so extractArtifactCards on the frontend picks both up.
+                    # Without title, the chat card falls back to
+                    # "Artifact #<id>" — confusing for the user.
                     # Keep action='show_location_brief' so the dedicated
                     # renderer drives the live display.
-                    result = {**result, 'artifact_id': artifact_envelope['artifact_id']}
+                    result = {
+                        **result,
+                        'artifact_id': artifact_envelope['artifact_id'],
+                        'title': brief_title,
+                    }
             except Exception as inner:
                 # Artifact registration is best-effort. If it fails the
                 # brief still displays via the legacy path — don't block
