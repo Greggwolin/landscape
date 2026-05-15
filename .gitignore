@@ -199,3 +199,9 @@ playwright-report/
 
 # Cowork GitHub PAT (local secret)
 .cowork-*
+
+# Working-tree orphan exclusions (LSCMD-MERGE-0515-wq1)
+reference/netlease/
+scripts/edgar/output/
+logs/*.err
+docs/UX/health-reports/
