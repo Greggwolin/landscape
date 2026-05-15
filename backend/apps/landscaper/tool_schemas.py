@@ -4587,29 +4587,56 @@ LANDSCAPER_TOOLS = [
         "description": (
             "Render any of the project's registered reports as an artifact in "
             "the right panel. PREFER THIS TOOL over composing tabular schemas "
-            "by hand via create_artifact for any output that comes from one of "
-            "the known reports: rent roll, unit mix, operating statement, "
-            "direct cap, sales comparison, leveraged cash flow, DCF returns, "
-            "sources & uses, debt summary, loan budget, equity waterfall, "
-            "assumptions summary, project summary, parcel table, budget cost "
-            "summary, sales schedule, monthly/annual/by-phase cash flows, "
-            "budget vs actual. The server-side generator builds the full "
+            "by hand via create_artifact for any output that comes from a "
+            "registered report. The server-side generator builds the full "
             "schema from SQL — no size limits, no truncation, no max_tokens "
             "risk. You only pick the report code and project. "
-            "Call list_available_reports first if you need to discover what "
-            "report codes are valid for the current project (the catalog is "
-            "filtered by property type)."
+            "\n\n"
+            "REPORT CODE → REPORT NAME MAPPING (call directly with the code, "
+            "no need to call list_available_reports first for these):\n"
+            "  RPT_01 — Sources & Uses\n"
+            "  RPT_02 — Debt Summary\n"
+            "  RPT_03 — Loan Budget\n"
+            "  RPT_04 — Equity Waterfall\n"
+            "  RPT_05 — Assumptions Summary\n"
+            "  RPT_06 — Project Summary\n"
+            "  RPT_07 — Rent Roll (Detail)\n"
+            "  RPT_07a — Rent Roll (Standard)\n"
+            "  RPT_07b — Rent Roll (Detail) — same as RPT_07\n"
+            "  RPT_08 — Unit Mix\n"
+            "  RPT_09 — Operating Statement\n"
+            "  RPT_10 — Direct Cap Valuation\n"
+            "  RPT_11 — Sales Comparison\n"
+            "  RPT_12 — Leveraged Cash Flow\n"
+            "  RPT_13 — DCF Returns\n"
+            "  RPT_14 — Parcel Table (land dev)\n"
+            "  RPT_15 — Budget Cost Summary (land dev)\n"
+            "  RPT_16 — Sales Schedule (land dev)\n"
+            "  RPT_17 — Cash Flow Monthly (land dev)\n"
+            "  RPT_18 — Cash Flow Annual (land dev)\n"
+            "  RPT_19 — Cash Flow by Phase (land dev)\n"
+            "  RPT_20 — Budget vs Actual\n"
+            "\n"
+            "Use list_available_reports only when the user's request doesn't "
+            "obviously match one of the names above."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "report_code": {
                     "type": "string",
+                    "enum": [
+                        "RPT_01", "RPT_02", "RPT_03", "RPT_04", "RPT_05",
+                        "RPT_06", "RPT_07", "RPT_07a", "RPT_07b", "RPT_08",
+                        "RPT_09", "RPT_10", "RPT_11", "RPT_12", "RPT_13",
+                        "RPT_14", "RPT_15", "RPT_16", "RPT_17", "RPT_18",
+                        "RPT_19", "RPT_20",
+                    ],
                     "description": (
-                        "Report code from the registry, e.g. 'RPT_07' for Rent "
-                        "Roll, 'RPT_09' for Operating Statement, 'RPT_18' for "
-                        "Annual Cash Flow. Call list_available_reports to get "
-                        "the valid codes for the current project type."
+                        "Report code from the registry. See description for "
+                        "the code→name mapping. For 'rent roll' use RPT_07. "
+                        "For 'operating statement' or 'P&L' use RPT_09. For "
+                        "'cash flow' use RPT_12 (leveraged) or RPT_18 (annual)."
                     ),
                 },
                 "project_id": {
@@ -5074,12 +5101,24 @@ LANDSCAPER_TOOLS = [
         "name": "create_artifact",
         "description": (
             "Create a structured artifact in the right-side panel for the user to view "
-            "and edit. THIS IS THE REQUIRED OUTPUT FORMAT for any request that asks for "
-            "tabular financial data (operating statement / T-12 / P&L / income statement, "
-            "rent roll, comp grid, cap stack, sources & uses, debt schedule, cash flow, "
-            "waterfall, IRR table, DCF schedule, budget, draw schedule, variance report) "
-            "OR multi-section summaries / comparisons / synthesis views. "
-            "WHEN A USER REQUEST MATCHES ANY OF THE ABOVE, YOU MUST CALL create_artifact. "
+            "and edit. "
+            "\n\n"
+            "FIRST CHECK: if the request matches a registered report (rent roll, unit mix, "
+            "operating statement, direct cap, sales comparison, leveraged cash flow, DCF "
+            "returns, sources & uses, debt summary, loan budget, equity waterfall, "
+            "assumptions summary, project summary, parcel table, budget cost summary, "
+            "sales schedule, monthly/annual/by-phase cash flows, budget vs actual), use "
+            "`render_report_as_artifact` instead — the server builds the full schema and "
+            "you avoid the max_tokens-mid-tool-use class of bug. Reserve THIS tool "
+            "(create_artifact) for AD-HOC compositions that don't match a registered "
+            "report: synthesis views, custom comparisons, one-off summaries. "
+            "\n\n"
+            "Use create_artifact for tabular financial data (operating statement / T-12 / "
+            "P&L / income statement, rent roll, comp grid, cap stack, sources & uses, "
+            "debt schedule, cash flow, waterfall, IRR table, DCF schedule, budget, draw "
+            "schedule, variance report) ONLY when no registered report covers the request. "
+            "If a registered report covers it, render_report_as_artifact wins. "
+            "Otherwise: WHEN A USER REQUEST MATCHES ANY OF THE ABOVE, YOU MUST CALL create_artifact. "
             "Do not reply in prose. Do not summarize the data in chat. Do not list bullet "
             "points of the values. The user has a panel for structured content — use it. "
             "After this tool returns, your chat reply is 1-3 sentences pointing AT the "
