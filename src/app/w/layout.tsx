@@ -509,7 +509,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           userName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : undefined}
         />
       )}
-      {!isChatRoute && !isDashboardRoute && (
+      {!isChatRoute && (
+        // wrapper-main is hidden on /w/chat routes (chat surface takes the
+        // full width). It renders on every other surface including the
+        // dashboard, where the page mounts the home-project artifacts panel
+        // here — mirroring the project landing page's layout. LF-USERDASH-0514.
         <main className={`wrapper-main${rightPanelNarrow ? ' wrapper-main-narrow' : ''}`}>{children}</main>
       )}
       {/* Artifacts on chat routes: full panel when open, ☰ strip when collapsed.
