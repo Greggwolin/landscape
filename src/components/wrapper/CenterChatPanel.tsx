@@ -282,12 +282,36 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     const dispatch = () => {
       const handle = chatRef.current;
       if (handle && typeof handle.setInputText === 'function') {
-        console.log('[seed-fix] handle ready after', attempts, 'attempts — populating input');
+        console.log('[seed-fix] handle ready after', attempts, 'attempts — populating input + auto-sending');
+        // Populate input first so the user sees their text even if
+        // sendMessage fails for any reason.
         try {
           handle.setInputText(seed);
         } catch (e) {
           console.error('[seed-fix] setInputText threw:', e);
         }
+        // Auto-send. The pre-existing activeThread-watch abort race that
+        // previously made this fragile is closed (useLandscaperThreads
+        // guards on sendingRef during first-message thread creation).
+        // We use a small additional delay so the hook's initialization
+        // has settled before sendMessage runs — the input box has a
+        // visible flash of populated state in the meantime.
+        setTimeout(() => {
+          const h = chatRef.current;
+          if (!h || typeof h.sendMessage !== 'function') {
+            console.warn('[seed-fix] handle disappeared before auto-send');
+            return;
+          }
+          try {
+            const result = h.sendMessage(seed);
+            console.log('[seed-fix] sendMessage invoked');
+            Promise.resolve(result).catch((e) => {
+              console.error('[seed-fix] sendMessage rejected:', e);
+            });
+          } catch (e) {
+            console.error('[seed-fix] sendMessage threw:', e);
+          }
+        }, 150);
         return;
       }
       attempts += 1;
