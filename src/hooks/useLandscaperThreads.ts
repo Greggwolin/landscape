@@ -793,6 +793,15 @@ export function useLandscaperThreads({
           // Unassigned chat, first message — create thread lazily here
           // (Option B semantics). Bypasses get_or_create so we always
           // get a fresh thread rather than resurrecting a stale one.
+          //
+          // LF-USERDASH-0514: set sendingRef.current BEFORE creating the
+          // thread so the activeThread-watch effect (below in this hook)
+          // can detect mid-send and skip the abort+loadThreadMessages that
+          // would otherwise cancel the in-flight POST to .../messages/.
+          // Without this, Landscaper silently fails to respond on the
+          // first message of an unassigned chat — the abort wins the race
+          // against the message POST.
+          sendingRef.current = true;
           try {
             const response = await fetchWithTimeout(
               `${DJANGO_API_URL}/api/landscaper/threads/new/`,
@@ -990,6 +999,20 @@ export function useLandscaperThreads({
       return;
     }
     if (currentId === lastLoadedThreadIdRef.current) return;
+
+    // LF-USERDASH-0514: skip the abort+loadThreadMessages cycle when a send
+    // is in progress. The first-message-creates-thread flow inside
+    // sendMessage sets activeThread, which fires this effect; the abort()
+    // below otherwise cancels the messages/ POST that sendMessage is about
+    // to fire (or is mid-flight on), and Landscaper never responds.
+    // sendMessage owns message state in that path, so suppressing the
+    // recovery load here is safe — sendMessage's response handler
+    // populates messages directly.
+    if (sendingRef.current) {
+      lastLoadedThreadIdRef.current = currentId;
+      return;
+    }
+
     lastLoadedThreadIdRef.current = currentId;
     // Refresh the abort controller so a stale aborted signal from a
     // prior context-change effect can't suppress this fetch.

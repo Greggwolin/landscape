@@ -72,6 +72,10 @@ interface CenterChatPanelProps {
    * "New chat" handler) to reset thread state without a page nav.
    */
   sessionKey?: string | number;
+  /** User's display name. Used as the header fallback when no projectName is
+   *  set (i.e., unassigned/home chats), so the surface reads as the user's
+   *  own space rather than the generic "Landscaper." LF-USERDASH-0514. */
+  userName?: string;
 }
 
 /**
@@ -82,7 +86,7 @@ interface CenterChatPanelProps {
  * full chat UI.  Selecting a thread or submitting the chat starter switches
  * to <LandscaperChatThreaded> with that thread pre-loaded.
  */
-export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey }: CenterChatPanelProps) {
+export function CenterChatPanel({ projectId, initialThreadId, projectName, projectLocation, projectTypeCode, sessionKey, userName }: CenterChatPanelProps) {
   const { chatOpen, closeChat, openChat, setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, toggleArtifacts, artifactsOpen, activeContentContext, setActiveContentContext } = useWrapperUI();
   const pathname = usePathname();
   const router = useRouter();
@@ -685,7 +689,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         }
         title={
           <span className="wrapper-header-title" style={{ fontWeight: 600 }}>
-            {projectName || 'Landscaper'}
+            {projectName || userName || 'Landscaper'}
           </span>
         }
         trailing={

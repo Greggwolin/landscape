@@ -501,6 +501,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           projectName={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_name}
           projectLocation={isChatRoute || pathname === '/w/projects' ? undefined : [projectData?.jurisdiction_city, projectData?.jurisdiction_state].filter(Boolean).join(', ') || undefined}
           projectTypeCode={isChatRoute || pathname === '/w/projects' ? undefined : projectData?.project_type_code}
+          // LF-USERDASH-0514 Phase 2: when a chat isn't tied to a real
+          // project (unassigned / home chats), the center-panel header
+          // reads the user's name instead of falling back to "Landscaper."
+          // Mirrors the dashboard greeting — same identity in every chat
+          // surface the user owns.
+          userName={user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : undefined}
         />
       )}
       {!isChatRoute && !isDashboardRoute && (
