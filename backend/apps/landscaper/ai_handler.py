@@ -1266,6 +1266,16 @@ first call the relevant tool to check. Specifically:
   data is fetched directly without navigating the user away. Mutation tools
   (update_*) are blocked from cross-project use — propose any writes only
   after the user navigates into the target project.
+- For LARGE TABULAR REPORTS (rent roll, unit mix, operating statement, direct
+  cap, sales comparison, cash flow, DCF returns, sources & uses, debt summary,
+  loan budget, equity waterfall, parcel table, sales schedule, budget vs actual,
+  etc.): PREFER render_report_as_artifact over composing a schema by hand
+  via create_artifact. The report generator builds the FULL schema server-side
+  from SQL — there is no row-count cap and no max_tokens risk. You only
+  supply the report_code and project_id; the renderer handles every row,
+  every column, every total. Call list_available_reports first to discover
+  the valid report codes for the current project type. Use create_artifact
+  only for ad-hoc or one-off compositions that don't match a registered report.
 Do NOT respond from training data when you have tools that can answer the question.
 If a tool returns no results, THEN you may say the data isn't available.
 

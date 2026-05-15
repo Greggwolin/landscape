@@ -76,6 +76,11 @@ UNIVERSAL_TOOLS = [
     "open_input_modal",
     "navigate_to_project",
     "navigate_to_dashboard",
+    # Server-side report-as-artifact rendering (LF-USERDASH-0514 Phase 3.5).
+    # Single tool exposes every registered report (RPT_01..RPT_20+) as an
+    # artifact. Schema is built server-side, so large outputs (rent rolls,
+    # cash flows, etc.) aren't bounded by the model's max_tokens budget.
+    "render_report_as_artifact",
     # Excel model audit (cross-cutting — any project type)
     "classify_excel_file",
     "run_structural_scan",
@@ -238,6 +243,9 @@ UNASSIGNED_SAFE_TOOLS = [
     # Navigation tools — route the user to a different surface. Universal
     # (works pre- and post-project). LF-USERDASH-0514 Phase 3.
     "navigate_to_project", "navigate_to_dashboard",
+    # Server-side report-as-artifact rendering. Works from the home
+    # dashboard via cross-project read override on project_id.
+    "render_report_as_artifact",
     # Platform knowledge / reference data
     "query_platform_knowledge", "search_irem_benchmarks",
     "get_knowledge_entities", "get_knowledge_facts", "get_knowledge_insights",

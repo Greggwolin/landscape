@@ -4582,6 +4582,49 @@ LANDSCAPER_TOOLS = [
             "properties": {},
         },
     },
+    {
+        "name": "render_report_as_artifact",
+        "description": (
+            "Render any of the project's registered reports as an artifact in "
+            "the right panel. PREFER THIS TOOL over composing tabular schemas "
+            "by hand via create_artifact for any output that comes from one of "
+            "the known reports: rent roll, unit mix, operating statement, "
+            "direct cap, sales comparison, leveraged cash flow, DCF returns, "
+            "sources & uses, debt summary, loan budget, equity waterfall, "
+            "assumptions summary, project summary, parcel table, budget cost "
+            "summary, sales schedule, monthly/annual/by-phase cash flows, "
+            "budget vs actual. The server-side generator builds the full "
+            "schema from SQL — no size limits, no truncation, no max_tokens "
+            "risk. You only pick the report code and project. "
+            "Call list_available_reports first if you need to discover what "
+            "report codes are valid for the current project (the catalog is "
+            "filtered by property type)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "report_code": {
+                    "type": "string",
+                    "description": (
+                        "Report code from the registry, e.g. 'RPT_07' for Rent "
+                        "Roll, 'RPT_09' for Operating Statement, 'RPT_18' for "
+                        "Annual Cash Flow. Call list_available_reports to get "
+                        "the valid codes for the current project type."
+                    ),
+                },
+                "project_id": {
+                    "type": "integer",
+                    "description": (
+                        "Project id. From the home dashboard, resolve via "
+                        "list_projects_summary first and pass the resolved id "
+                        "here. From a project page, this can be omitted (the "
+                        "executor injects the current project's id)."
+                    ),
+                },
+            },
+            "required": ["report_code"],
+        },
+    },
     # ── Excel Model Audit tools ────────────────────────────────────────────────
     {
         "name": "classify_excel_file",
