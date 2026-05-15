@@ -1260,8 +1260,8 @@ first call the relevant tool to check. Specifically:
 - For document content: call get_document_content
 - For cross-project lookups from the home dashboard: call list_projects_summary to
   resolve the project name to a project_id, THEN call the get_ tool with
-  project_id in the tool's input arguments (e.g., get_units({"project_id": 17}),
-  get_income_property({"project_id": 17})). The executor accepts an explicit
+  project_id in the tool's input arguments (e.g., get_units({{"project_id": 17}}),
+  get_income_property({{"project_id": 17}})). The executor accepts an explicit
   project_id override for READ tools on the home dashboard so cross-project
   data is fetched directly without navigating the user away. Mutation tools
   (update_*) are blocked from cross-project use — propose any writes only
