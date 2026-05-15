@@ -18,7 +18,7 @@
   --w-bg-input: #fff;
   --w-border: #dbdfe6;
   --w-border-hover: #aab3c5;
-  --w-header-bg: #040506; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
+  --w-header-bg: #08090A; /* Always-dark, theme-independent. Nav chrome stays distinct from the panel surface beneath. */
   --w-panel-bg: #1a1e28;           /* Chat panel background — always dark */
   --w-border-subtle: rgba(0, 0, 0, 0.06);   /* Faint divider inside light surfaces */
   --w-border-subtle-dark: rgba(255, 255, 255, 0.06); /* Faint divider inside dark surfaces */
@@ -73,7 +73,7 @@
   --w-border: #323a49;
   --w-border-hover: #4a566d;
   --w-bg-sidebar: #1a1e28; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
-  --w-header-bg: #040506; /* Intentionally always-dark: three-tone shell (nav chrome is theme-independent) */
+  --w-header-bg: #08090A; /* Always-dark, theme-independent. Nav chrome stays distinct from the panel surface beneath. */
   --w-panel-bg: #1a1e28;
   --w-border-subtle: rgba(255, 255, 255, 0.06);
   --w-border-subtle-dark: rgba(255, 255, 255, 0.06);
@@ -119,7 +119,7 @@
 
 /* ─── Wrapper Header (universal dark bar) ─── */
 .wrapper-header {
-  background: var(--w-header-bg, #040506);
+  background: var(--w-header-bg, #08090A);
   height: 42px;
   min-height: 42px;
   max-height: 42px;
@@ -201,7 +201,7 @@
 .wrapper-sidebar.collapsed .sb-thread,
 .wrapper-sidebar.collapsed .sb-agent,
 .wrapper-sidebar.collapsed .sb-nav-badge { display: none; }
-.wrapper-sidebar.collapsed .sb-header { justify-content: center; padding: 0; background: var(--w-header-bg, #040506); }
+.wrapper-sidebar.collapsed .sb-header { justify-content: center; padding: 0; background: var(--w-header-bg, #08090A); }
 .wrapper-sidebar.collapsed .sb-logo { display: none; }
 .wrapper-sidebar.collapsed .sb-collapse { display: flex; margin-left: 0; }
 .wrapper-sidebar.collapsed .sb-nav { padding: 0 6px; }
@@ -240,7 +240,7 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  background: var(--w-header-bg, #040506);
+  background: var(--w-header-bg, #08090A);
   height: 42px;
   min-height: 42px;
   max-height: 42px;
@@ -1346,7 +1346,7 @@
   height: 42px;
   min-height: 42px;
   max-height: 42px;
-  background: var(--w-header-bg, #040506);
+  background: var(--w-header-bg, #08090A);
 }
 
 .w-doc-detail-title {
@@ -1507,7 +1507,7 @@
   max-height: 42px;
   border-bottom: 1px solid var(--w-border);
   user-select: none;
-  background: var(--w-header-bg, #040506);
+  background: var(--w-header-bg, #08090A);
 }
 
 .w-panel-head-title {

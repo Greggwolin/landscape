@@ -21,7 +21,7 @@ interface WrapperHeaderProps {
 
 /**
  * Universal dark header bar used by every panel in the /w/ shell.
- * Background: #040506, height: 42px (pinned in wrapper.css).
+ * Background: #08090A, height: 42px (pinned in wrapper.css).
  * Slot order (locked):
  *   leading → title → subtitle → titleSuffix → [spacer] → trailing
  */

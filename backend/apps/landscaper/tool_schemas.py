@@ -5201,4 +5201,93 @@ LANDSCAPER_TOOLS = [
     # @register_tool decorators in loopnet_tools.py remain — registry stays
     # at 261 — so revival is "paste schemas back + repoint the URL" once a
     # working backend exists (paid feed, ATTOM/Reonomy, post-alpha).
+
+    # ===================================================================
+    # Master lease lookup (Increment 8 — net lease lineage + provenance)
+    # ===================================================================
+    {
+        "name": "find_master_lease",
+        "description": (
+            "Search existing master leases by tenant, operator, guarantor, "
+            "property name, property address, or id. Use whenever the user "
+            "mentions an existing master lease, names properties that may "
+            "already be in the database, or describes a deal where the "
+            "tenant/parent operator/guarantor entity is potentially already "
+            "tracked. ALWAYS check before assuming the deal is brand new.\n\n"
+            "Examples that should fire this tool:\n"
+            "  - 'we're adding this site to the master lease that includes A, B, and C'\n"
+            "  - user mentions a tenant name that may already exist (Vista Clinical, Whitewater, Taco Bueno, Papa Gino's)\n"
+            "  - a credit memo extraction surfaces a tenant or operator entity\n"
+            "  - user says 'this is for the same operator as the [other] deal'\n\n"
+            "Returns trimmed master-lease summaries with their property lists "
+            "(parcel id, name, allocated rent, allocated price, snapshot_only "
+            "flag) so the model can confirm which one the user means before "
+            "asking the three-branch question (amendment / new replaces old / "
+            "standalone)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tenant_name": {
+                    "type": "string",
+                    "description": "Free-text tenant name; partial ILIKE match against tenant_name, tenant_legal_name, dba_name.",
+                },
+                "operator_name": {
+                    "type": "string",
+                    "description": "Free-text operator name; matches against operator legal_name and dba_name.",
+                },
+                "guarantor_name": {
+                    "type": "string",
+                    "description": "Free-text guarantor name (lessee guarantor); matches tenant.guarantor_name.",
+                },
+                "property_name": {
+                    "type": "string",
+                    "description": "Free-text property name fragment (e.g., 'Lake City', 'Baya'); matches parcel_name and parcel_code on properties under each master lease.",
+                },
+                "property_address": {
+                    "type": "string",
+                    "description": "Free-text address fragment; matches parcel_name (which holds address-like values).",
+                },
+                "parcel_id": {
+                    "type": "integer",
+                    "description": "Exact parcel id; finds the master lease(s) containing that parcel.",
+                },
+                "tenant_id": {
+                    "type": "integer",
+                    "description": "Exact tenant id (current_lessee_tenant_id on the master lease).",
+                },
+                "operator_id": {
+                    "type": "integer",
+                    "description": "Exact operator id; finds master leases whose tenant is owned by that operator.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 10, max 25).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_master_lease_detail",
+        "description": (
+            "Return the full record for a single master lease, including all "
+            "property allocations (with snapshot_only and original-acquisition "
+            "flags), the amendment history, and lineage links to any prior or "
+            "absorbed leases. Use after `find_master_lease` returns a candidate "
+            "and the user is about to confirm the three-branch decision "
+            "(amendment / new replaces old / standalone). The detail call gives "
+            "the full context for that decision."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "master_lease_id": {
+                    "type": "integer",
+                    "description": "The master_lease_id returned by find_master_lease.",
+                },
+            },
+            "required": ["master_lease_id"],
+        },
+    },
 ]
