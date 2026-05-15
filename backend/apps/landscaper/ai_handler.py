@@ -3488,16 +3488,39 @@ def get_landscaper_response(
     # Unassigned thread context hint
     project_id = project_context.get('project_id')
     if project_id is None:
+        # LF-USERDASH-0514 Phase 3: the "no project" state is the user's home
+        # dashboard. Cross-project data access IS available — Landscaper can
+        # resolve a project by name via list_projects_summary, then call
+        # project-scoped get_ tools with that explicit project_id. The OLD
+        # version of this block told the model it couldn't access
+        # project-specific data without "selecting a project first," which
+        # conflicted with the new INTENT CLASSIFICATION rules and produced
+        # refusal responses to data questions on the dashboard. Rewritten
+        # to align with the intent classifier.
         full_system += (
-            "\n\n=== GENERAL CHAT (NO PROJECT) ===\n"
-            "You are in a general chat with no project selected. You can:\n"
+            "\n\n=== GENERAL CHAT / HOME DASHBOARD ===\n"
+            "You are in the user's home dashboard with no specific project active. "
+            "Per INTENT CLASSIFICATION above, classify every message into one of:\n"
+            "  1. GENERAL — answer conversationally; no project lookup.\n"
+            "  2. EXISTING-PROJECT data question — resolve the project name via\n"
+            "     list_projects_summary, then call the relevant get_ tool with\n"
+            "     that explicit project_id. ANSWER IN PLACE — do not navigate, "
+            "     do not refuse, do not ask the user to select a project first.\n"
+            "  3. EXISTING-PROJECT navigation request — call navigate_to_project.\n"
+            "  4. NEW-PROJECT — gather details conversationally, then call\n"
+            "     create_project or create_analysis_draft when ready.\n\n"
+            "Capabilities available from the home dashboard:\n"
             "- Analyze uploaded Excel files (classify, audit formulas, extract assumptions)\n"
             "- Answer questions using platform knowledge and benchmarks\n"
-            "- Help the user think through a deal before committing to a project\n"
-            "- Create a new project when the user is ready (use create_project or create_analysis_draft)\n\n"
-            "You cannot access project-specific data (budgets, rent rolls, valuations, comps, etc.) "
-            "until a project is created or selected. If the user asks for something that requires "
-            "a project, explain what you need and offer to create one.\n"
+            "- Look up data from ANY of the user's projects via list_projects_summary +\n"
+            "  project-scoped get_ tools — cross-project reads are explicitly allowed\n"
+            "- Navigate the user to a project workspace on explicit request\n"
+            "- Generate location briefs (FRED + Census) for any US market\n"
+            "- Help think through a deal before committing to a project\n"
+            "- Create a new project when the user is ready\n\n"
+            "Do NOT tell the user you cannot access their project data without a "
+            "project selected — that's outdated. Resolve project names via "
+            "list_projects_summary and read whatever is needed.\n"
             "=== END GENERAL CHAT ===\n"
         )
 
