@@ -19,31 +19,3 @@
 [brief] generating for 2026-05-05
 [brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-05-brief.html
 [brief] open=6 in_progress=1 resolved_recent=27 wip=3 sessions=0 health=skipped
-[brief] generating for 2026-05-08
-[brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-08-brief.html
-[brief] open=10 in_progress=1 resolved_recent=6 wip=3 sessions=0 health=skipped
-[brief] generating for 2026-05-09
-[brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-09-brief.html
-[brief] open=10 in_progress=1 resolved_recent=6 wip=3 sessions=0 health=skipped
-[brief] generating for 2026-05-10
-Traceback (most recent call last):
-  File "/Users/5150east/landscape/scripts/brief/generate_daily_brief.py", line 956, in <module>
-    sys.exit(main())
-             ^^^^^^
-  File "/Users/5150east/landscape/scripts/brief/generate_daily_brief.py", line 931, in main
-    with _connect() as conn:
-         ^^^^^^^^^^
-  File "/Users/5150east/landscape/scripts/brief/generate_daily_brief.py", line 129, in _connect
-    return psycopg2.connect(_load_database_url())
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/5150east/landscape/backend/venv/lib/python3.12/site-packages/psycopg2/__init__.py", line 122, in connect
-    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-psycopg2.OperationalError: could not translate host name "ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech" to address: nodename nor servname provided, or not known
-
-[brief] generating for 2026-05-11
-[brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-11-brief.html
-[brief] open=10 in_progress=1 resolved_recent=3 wip=3 sessions=0 health=skipped
-[brief] generating for 2026-05-12
-[brief] wrote /Users/5150east/Library/CloudStorage/OneDrive-CrescentBayHoldings/2Pursuit/3LandscapeApp/Landscape app/daily-brief/2026-05-12-brief.html
-[brief] open=10 in_progress=1 resolved_recent=2 wip=3 sessions=0 health=skipped
