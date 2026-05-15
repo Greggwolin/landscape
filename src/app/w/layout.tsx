@@ -48,6 +48,10 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     activeLocationBrief,
     activeMapArtifact,
     activeExcelAudit,
+    setActiveLocationBrief,
+    setActiveMapArtifact,
+    setActiveExcelAudit,
+    setActiveArtifactId,
     artifactsOpen,
     toggleArtifacts,
   } = useWrapperUI();
@@ -119,6 +123,30 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (projectId) setLastProjectId(projectId);
   }, [projectId]);
+
+  // LF-USERDASH-0514: clear active-artifact state when the project context
+  // changes. activeLocationBrief / activeMapArtifact / activeExcelAudit /
+  // activeArtifactId live in WrapperUIContext as GLOBAL state, so without
+  // this an artifact opened in one project (or the home dashboard) stays
+  // visible in another project's artifacts panel until manually closed.
+  // We track previous projectId in a ref and clear all four whenever the
+  // value changes (project → other project, project → null, null → project).
+  const prevProjectIdRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevProjectIdRef.current;
+    if (prev !== projectId) {
+      prevProjectIdRef.current = projectId;
+      // Skip the very first run on mount — there's no leak to clear and
+      // clearing here would wipe state freshly set by a different effect
+      // racing for the same tick.
+      if (prev !== undefined || projectId !== undefined) {
+        setActiveLocationBrief(null);
+        setActiveMapArtifact(null);
+        setActiveExcelAudit(null);
+        setActiveArtifactId(null);
+      }
+    }
+  }, [projectId, setActiveLocationBrief, setActiveMapArtifact, setActiveExcelAudit, setActiveArtifactId]);
 
   // Fetch project data when inside a project
   const [projectData, setProjectData] = useState<ProjectData | null>(null);

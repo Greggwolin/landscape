@@ -23,14 +23,22 @@ function extractArtifactCards(
   const executions = message.metadata?.tool_executions;
   if (!Array.isArray(executions) || executions.length === 0) return [];
   const cards: CreateArtifactCardData[] = [];
+  const seen = new Set<number>();
   for (const exec of executions) {
-    if (!exec || exec.tool !== 'create_artifact') continue;
-    if (!exec.success) continue;
+    if (!exec || !exec.success) continue;
     const result = exec.result as Record<string, unknown> | undefined;
     if (!result) continue;
+    // Recognize ANY tool execution whose result carries an artifact_id —
+    // not just the generic create_artifact tool. Tools like
+    // generate_location_brief, generate_map_artifact, get_operating_statement,
+    // and the Excel-audit chain all produce artifacts and should surface
+    // chat cards the same way. Dedupe by id in case multiple executions in
+    // one message reference the same artifact. LF-USERDASH-0514.
     const artifactId = result.artifact_id;
-    const title = result.title;
     if (typeof artifactId !== 'number') continue;
+    if (seen.has(artifactId)) continue;
+    seen.add(artifactId);
+    const title = result.title;
     cards.push({
       artifactId,
       title: typeof title === 'string' ? title : `Artifact #${artifactId}`,
