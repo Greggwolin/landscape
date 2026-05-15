@@ -305,6 +305,17 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
           try {
             const result = h.sendMessage(seed);
             console.log('[seed-fix] sendMessage invoked');
+            // sendMessage doesn't touch the chat's input state (that's
+            // owned by the chat's own Send button handler). When we
+            // invoke sendMessage via the imperative handle, the input
+            // box keeps whatever setInputText put there. Clear it now
+            // so the user sees an empty input after auto-send, same as
+            // a normal Send-button flow.
+            try {
+              h.setInputText('');
+            } catch {
+              /* harmless */
+            }
             Promise.resolve(result).catch((e) => {
               console.error('[seed-fix] sendMessage rejected:', e);
             });
