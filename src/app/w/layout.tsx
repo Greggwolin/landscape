@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { WrapperSidebar } from '@/components/wrapper/WrapperSidebar';
 import { CenterChatPanel } from '@/components/wrapper/CenterChatPanel';
 import { UserDashboard } from '@/components/wrapper/UserDashboard';
+import { ArtifactWorkspacePanel } from '@/components/wrapper/ArtifactWorkspacePanel';
 import { LocationBriefArtifact } from '@/components/wrapper/LocationBriefArtifact';
 import { MapArtifactRenderer } from '@/components/wrapper/MapArtifactRenderer';
 import { ExcelAuditArtifact } from '@/components/wrapper/ExcelAuditArtifact';
@@ -49,6 +50,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     activeLocationBrief,
     activeMapArtifact,
     activeExcelAudit,
+    activeArtifactId,
     setActiveLocationBrief,
     setActiveMapArtifact,
     setActiveExcelAudit,
@@ -563,8 +565,11 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       )}
       {/* Artifacts on chat routes: full panel when open, ☰ strip when collapsed.
           Close from inside an artifact toggles the panel rather than nuking
-          state, so the same artifact can be reopened via the strip. */}
-      {isChatRoute && (activeLocationBrief || activeMapArtifact || activeExcelAudit) && (
+          state, so the same artifact can be reopened via the strip.
+          LF-USERDASH-0514 Phase 3: also mount the rail when activeArtifactId
+          is set (unified Phase 4 artifacts) — inline chat-card "Open" clicks
+          set this, and without it the panel never appears on /w/chat. */}
+      {isChatRoute && (activeLocationBrief || activeMapArtifact || activeExcelAudit || activeArtifactId != null) && (
         artifactsOpen ? (
           <>
             <div
@@ -586,8 +591,13 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
                   the rail, matching the pre-floating-card behavior. The
                   card-stack treatment applies only to the per-section
                   workspace view (ArtifactWorkspacePanel), not to a
-                  full-rail single artifact. */}
-              {activeLocationBrief ? (
+                  full-rail single artifact.
+                  activeArtifactId takes precedence over the legacy
+                  active* slots so chat-card "Open" clicks consistently
+                  route to the unified workspace panel. */}
+              {activeArtifactId != null ? (
+                <ArtifactWorkspacePanel projectId={null} includeUnassigned />
+              ) : activeLocationBrief ? (
                 <LocationBriefArtifact
                   config={activeLocationBrief}
                   onClose={toggleArtifacts}
