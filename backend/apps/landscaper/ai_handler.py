@@ -4251,6 +4251,16 @@ def get_landscaper_response(
                 claude_messages.append({"role": "assistant", "content": continuation_content})
                 claude_messages.append({"role": "user", "content": _continuation_prompt_for(scenario)})
 
+                # LF-USERDASH-0514: close any orphaned tool_use blocks before
+                # the continuation API call. The `mid_chain_continue` path
+                # appends the truncated response.content verbatim — which can
+                # carry a partial tool_use block when Claude hit max_tokens
+                # mid-tool-call (e.g., writing a large create_artifact schema).
+                # Without this guard, Anthropic 400s with "tool_use ids were
+                # found without tool_result blocks." Every other API call in
+                # this file runs the same guard before sending.
+                claude_messages = ensure_tool_results_closed(claude_messages)
+
                 continuation_attempts += 1
                 response = client.messages.create(**{**api_kwargs, 'messages': claude_messages})
                 _log_cache_usage('continuation_in_loop', response)
