@@ -217,15 +217,28 @@ export default function LoginForm() {
                 autoComplete="current-password"
               />
             </div>
+            {/*
+              Forgot-password link hidden 2026-05-16 (LSCMD-AUDIT-PASS-1A).
+              The /api/auth/password-reset/ endpoint is registered but the
+              underlying password_reset_tokens table doesn't exist in the
+              landscape schema — Django thinks migration 0001_initial is
+              applied per django_migrations, but the table is missing on
+              Neon. A click on this link 500s. Restore once the back-end
+              tables are created (either by re-running 0001_initial against
+              landscape schema or by writing a targeted migration).
+              For now, alpha testers who lose their password should contact
+              Gregg directly. Same risk class applies to the API-keys
+              endpoint at /api/auth/api-keys/ — see audit report.
+            */}
             <div className="flex items-center justify-between text-sm">
               <div />
-              <Link
-                href="/forgot-password"
-                className="text-xs font-medium"
-                style={{ color: 'var(--cui-primary)' }}
+              <span
+                className="text-xs"
+                style={{ color: 'var(--cui-secondary-color)' }}
+                title="Password reset is temporarily unavailable. Contact Gregg if you need help signing in."
               >
-                Forgot password?
-              </Link>
+                Password help — contact Gregg
+              </span>
             </div>
             <button
               type="submit"
