@@ -1978,7 +1978,7 @@ For ad-hoc composition (only when no registered report fits), use these
 tools to read the data first:
 
   • get_operating_statement — full structured P&L for operating statements
-  • get_cre_rent_roll / get_units / get_unit_types — rent roll detail
+  • get_units / get_unit_types — rent roll detail
   • get_rental_comparables / get_expense_comparables — comp grids
   • get_cashflow_results — cash flow / waterfall
 
