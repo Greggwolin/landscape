@@ -198,13 +198,13 @@ INCOME_PROPERTY_TOOLS = [
 ]
 
 # CRE-specific tools — tenants, spaces, leases for Office + Retail + Industrial.
-CRE_ONLY_TOOLS = [
-    "get_cre_tenants", "update_cre_tenant", "delete_cre_tenant",
-    "get_cre_spaces", "update_cre_space", "delete_cre_space",
-    "get_cre_leases", "update_cre_lease", "delete_cre_lease",
-    "get_cre_properties", "update_cre_property",
-    "get_cre_rent_roll",
-]
+# DEREGISTERED 2026-05-16: the underlying tbl_cre_* tables don't exist in the
+# current schema. Tool implementations in tool_executor.py and schemas in
+# tool_schemas.py left intact for revival once the commercial-property feature
+# is rebuilt against the live schema. Empty list keeps Office/Retail/Industrial
+# property-type tool registration valid (no NameError on the merge below) while
+# preventing Landscaper from advertising tools that will fail on use.
+CRE_ONLY_TOOLS: list[str] = []
 
 # Ingestion workbench tools — always included (small set, needed for any doc intake).
 INGESTION_TOOLS = [
