@@ -91,14 +91,22 @@ const NAV_ITEMS: Array<{ id: string; label: string; paths: string[]; badge?: str
   // for the user. LF-USERDASH-0514 Phase 1.
   { id: 'dashboard', label: 'Home', paths: ['M3 12 12 3l9 9', 'M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10'] },
   { id: 'projects', label: 'Projects', paths: ['M4 20h16a2 2 0 002-2V8a2 2 0 00-2-2h-7.93a2 2 0 01-1.66-.9l-.82-1.2A2 2 0 007.93 3H4a2 2 0 00-2 2v13c0 1.1.9 2 2 2z'] },
-  { id: 'platform-knowledge', label: 'Platform Knowledge', paths: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2 14 8 20 8'] },
+  // Platform Knowledge — uses the propeller-beanie icon (see PropellerBeanieIcon
+  // below). Paths array unused for this entry; rendering branches on id below.
+  { id: 'platform-knowledge', label: 'Platform Knowledge', paths: [] },
   { id: 'map', label: 'Map', paths: ['M1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6Z', 'M8 2V18', 'M16 6V22'] },
   { id: 'tools', label: 'Tools', paths: ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9c.22.532.68.918 1.241 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z'], badge: '12' },
   { id: 'reports', label: 'Reports', paths: ['M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2', 'M8 2h8v4H8z'], badge: '15' },
   { id: 'landscaper', label: 'Landscaper AI', paths: ['M11 20A7 7 0 019.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10z', 'M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12'] },
   { id: 'admin', label: 'Admin', paths: ['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2', 'M12 11a4 4 0 100-8 4 4 0 000 8z'] },
   { id: 'admin-feedback', label: 'Feedback', paths: ['M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z'] },
-  { id: 'help', label: 'Help', paths: [] },
+  // Help — CoreUI-style question-mark icon (cilQuestion equivalent inline SVG).
+  // Previously used the propeller-beanie icon; that's now on platform-knowledge.
+  { id: 'help', label: 'Help', paths: [
+    'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z',
+    'M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3',
+    'M12 17h.01',
+  ] },
 ];
 
 // Propeller-beanie icon for Help nav item (reuses shared HelpIcon)
@@ -262,7 +270,9 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
                 onClick={() => onNavigate(item.id)}
                 title={item.label}
               >
-                {item.id === 'help' ? <PropellerBeanieIcon isThinking={isHelpThinking} /> : <NavIcon d={item.paths} />}
+                {item.id === 'platform-knowledge'
+                  ? <PropellerBeanieIcon isThinking={isHelpThinking} />
+                  : <NavIcon d={item.paths} />}
                 <span className="sb-nav-label">{item.label}</span>
                 {item.badge && <span className="sb-nav-badge">{item.badge}</span>}
               </div>

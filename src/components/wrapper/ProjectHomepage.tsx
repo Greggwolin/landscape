@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { getGoogleBasemapStyle, isGoogleBasemapAvailable } from '@/lib/maps/googleBasemaps';
+import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { Send, Plus, MessageSquare } from 'lucide-react';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -103,11 +105,12 @@ function buildMetaLine(p: ProjectDetails | null): string[] {
 }
 
 /**
- * Free OSM-tile basemap for the home-page location card. No API key needed.
- * Heavier basemaps (Google satellite) are reserved for the dedicated Map tab
- * — the home page just needs a recognisable location preview.
+ * OSM fallback when no Google Maps API key is configured. The Google hybrid
+ * basemap (satellite + road/label overlay) is preferred per product design;
+ * see getGoogleBasemapStyle('hybrid'). Fallback keeps the page useful in
+ * unkeyed environments (e.g. local dev without GOOGLE_MAPS_API_KEY).
  */
-const HOME_MAP_STYLE: maplibregl.StyleSpecification = {
+const HOME_MAP_FALLBACK_STYLE: maplibregl.StyleSpecification = {
   version: 8,
   sources: {
     'osm-tiles': {
@@ -141,14 +144,26 @@ function ProjectLocationMap({ lat, lon }: ProjectLocationMapProps) {
     if (!containerRef.current) return;
     if (mapRef.current) return; // already initialized
 
+    // Register the Google custom protocol once. Idempotent; safe to call from
+    // multiple components on the same page.
+    registerGoogleProtocol();
+
+    const style = isGoogleBasemapAvailable()
+      ? (getGoogleBasemapStyle('hybrid') as maplibregl.StyleSpecification)
+      : HOME_MAP_FALLBACK_STYLE;
+
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: HOME_MAP_STYLE,
+      style,
       center: [lon, lat],
-      zoom: 13,
+      zoom: 16,
       attributionControl: { compact: true },
-      interactive: false, // home-page preview — full controls live on the Map tab
+      interactive: true, // zoom + pan enabled per project-home design
     });
+
+    // Standard navigation controls (zoom in/out, compass, full-screen).
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
 
     new maplibregl.Marker({ color: '#e85a5a' })
       .setLngLat([lon, lat])

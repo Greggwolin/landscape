@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFileDrop } from '@/contexts/FileDropContext';
 import { RecentChatsList } from './RecentChatsList';
+import { WrapperHeader, ChatToggleButton } from './WrapperHeader';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -151,8 +152,34 @@ export function UserDashboard() {
     return full || user.username || '';
   })();
 
+  // Live date/time for the header bar — updates every minute.
+  const [now, setNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const headerDateTime = useMemo(() => {
+    const dateStr = now.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return `${dateStr} · ${timeStr}`;
+  }, [now]);
+
   return (
     <section className="user-dashboard">
+      <WrapperHeader
+        leading={<ChatToggleButton />}
+        title={displayName || 'Home'}
+        subtitle={headerDateTime}
+      />
       <header className="user-dashboard-header">
         <h1 className="user-dashboard-greeting">
           {displayName ? `Welcome back, ${displayName.split(' ')[0]}.` : 'Welcome back.'}
