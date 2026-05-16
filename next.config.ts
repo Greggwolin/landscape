@@ -45,6 +45,25 @@ const nextConfig = {
     };
     return config;
   },
+  // Legacy folder/tab route redirects to /w/ counterparts.
+  // Source patterns are EXACT MATCH (no trailing wildcards) so specialized
+  // deep routes without /w/ equivalents stay reachable:
+  //   /projects/:id          -> redirected
+  //   /projects/:id/settings -> NOT redirected (no /w/ counterpart)
+  //   /admin                 -> redirected
+  //   /admin/users           -> NOT redirected (no /w/ counterpart)
+  // 307 (permanent: false) — transitional; tighten to 308 after the legacy
+  // folder/tab UI is retired.
+  // Session: LSCMD-LEGACY-REDIRECTS-0515-wq16
+  async redirects() {
+    return [
+      { source: '/dashboard', destination: '/w/dashboard', permanent: false },
+      { source: '/projects/:projectId', destination: '/w/projects/:projectId', permanent: false },
+      { source: '/admin', destination: '/w/admin', permanent: false },
+      { source: '/help', destination: '/w/help', permanent: false },
+      { source: '/landscaper-ai', destination: '/w/landscaper-ai', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;
