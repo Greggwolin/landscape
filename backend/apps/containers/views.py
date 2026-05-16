@@ -11,6 +11,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Prefetch
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models import Container, ContainerType
 from .serializers import (
     ContainerSerializer,
@@ -40,6 +41,9 @@ class ContainerViewSet(viewsets.ModelViewSet):
         Prefetch('children', queryset=Container.objects.order_by('sort_order', 'container_id'))
     )
     serializer_class = ContainerSerializer
+
+    def get_queryset(self):
+        return filter_qs_by_owner_or_staff(self.queryset, self.request, 'project__created_by')
 
     def get_serializer_class(self):
         """Use ContainerCreateSerializer for POST requests."""

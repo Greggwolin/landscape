@@ -5,9 +5,9 @@ API views for Multifamily application.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.db.models import Count, Sum, Q, F, Prefetch
 from decimal import Decimal
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models import (
     MultifamilyUnit,
     MultifamilyUnitType,
@@ -38,15 +38,14 @@ class MultifamilyUnitTypeViewSet(viewsets.ModelViewSet):
 
     queryset = MultifamilyUnitType.objects.select_related('project').all()
     serializer_class = MultifamilyUnitTypeSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project_id if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -78,10 +77,9 @@ class MultifamilyUnitViewSet(viewsets.ModelViewSet):
         )
     ).all()
     serializer_class = MultifamilyUnitSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id or building_name if provided."""
+        """Filter by project_id or building_name if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         building_name = self.request.query_params.get('building_name')
@@ -91,7 +89,7 @@ class MultifamilyUnitViewSet(viewsets.ModelViewSet):
         if building_name:
             queryset = queryset.filter(building_name=building_name)
 
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -131,7 +129,6 @@ class MultifamilyLeaseViewSet(viewsets.ModelViewSet):
 
     queryset = MultifamilyLease.objects.select_related('unit', 'unit__project').all()
     serializer_class = MultifamilyLeaseSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by project_id or lease_status if provided."""

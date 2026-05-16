@@ -8,7 +8,6 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import connection
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -47,7 +46,6 @@ def _get_classification_lookup():
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def scan_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/scan/
@@ -100,7 +98,6 @@ def scan_document_media(request, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def extract_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/extract/
@@ -171,7 +168,6 @@ def extract_document_media(request, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def classify_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/classify/
@@ -213,7 +209,6 @@ def classify_document_media(request, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def reclassify_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/reclassify/
@@ -277,7 +272,6 @@ def reclassify_document_media(request, doc_id):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def list_document_media(request, doc_id):
     """
     GET /api/dms/documents/{doc_id}/media/
@@ -403,7 +397,6 @@ def list_document_media(request, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def submit_media_actions(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/actions/
@@ -672,7 +665,6 @@ VALID_LINK_PURPOSES = {'hero_image', 'thumbnail', 'reference', 'comparison'}
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def media_links(request):
     """
     GET  /api/dms/media/links/?entity_type=comp_sale&entity_id=123
@@ -832,7 +824,6 @@ def _create_media_link(request):
 
 
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
 def delete_media_link(request, link_id):
     """
     DELETE /api/dms/media/links/<link_id>/
@@ -853,7 +844,6 @@ def delete_media_link(request, link_id):
 
 
 @api_view(['PATCH'])
-@permission_classes([AllowAny])
 def reorder_media_links(request):
     """
     PATCH /api/dms/media/links/reorder/
@@ -882,7 +872,6 @@ def reorder_media_links(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def available_media(request):
     """
     GET /api/dms/media/available/?project_id=7&classification=property_photo&entity_type=comp_sale&entity_id=123
@@ -979,7 +968,6 @@ def available_media(request):
 #  SINGLE-ITEM RECLASSIFY
 # ------------------------------------------------------------------ #
 @api_view(['PATCH'])
-@permission_classes([AllowAny])
 def reclassify_single_media(request, media_id):
     """
     PATCH /api/dms/media/{media_id}/reclassify/
@@ -1049,7 +1037,6 @@ def reclassify_single_media(request, media_id):
 #  DISCARD MEDIA ITEM
 # ------------------------------------------------------------------ #
 @api_view(['PATCH'])
-@permission_classes([AllowAny])
 def discard_media(request, media_id):
     """
     PATCH /api/dms/media/{media_id}/discard/
@@ -1104,7 +1091,6 @@ def discard_media(request, media_id):
 #  RESET DOCUMENT MEDIA (delete all + reset status)
 # ------------------------------------------------------------------ #
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def reset_document_media(request, doc_id):
     """
     POST /api/dms/documents/{doc_id}/media/reset/
@@ -1234,7 +1220,6 @@ def reset_document_media(request, doc_id):
 #  LOOKUP ITEMS (generic)
 # ------------------------------------------------------------------ #
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def lookup_items(request, list_code):
     """
     GET /api/lookups/{list_code}/items/

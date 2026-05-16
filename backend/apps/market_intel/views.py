@@ -2,9 +2,9 @@
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db.models import Avg, Min, Max, Count
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models import AIIngestionHistory, RentComparable, MarketRateAnalysis, MarketCompetitiveProject, MarketMacroData, ExpenseComparable
 from .serializers import (
     AIIngestionHistorySerializer,
@@ -70,7 +70,7 @@ class RentComparableViewSet(viewsets.ModelViewSet):
     serializer_class = RentComparableSerializer
 
     def get_queryset(self):
-        """Filter comparables by project."""
+        """Filter comparables by project. Always scoped to the requesting user."""
         project_id = self.kwargs.get('project_pk')
         queryset = RentComparable.objects.filter(project_id=project_id)
 
@@ -84,7 +84,8 @@ class RentComparableViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
 
-        return queryset.order_by('distance_miles', 'asking_rent')
+        queryset = queryset.order_by('distance_miles', 'asking_rent')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         """Auto-set project from URL kwarg."""
@@ -113,7 +114,7 @@ class MarketRateAnalysisViewSet(viewsets.ModelViewSet):
     serializer_class = MarketRateAnalysisSerializer
 
     def get_queryset(self):
-        """Filter analyses by project."""
+        """Filter analyses by project. Always scoped to the requesting user."""
         project_id = self.kwargs.get('project_pk')
         queryset = MarketRateAnalysis.objects.filter(project_id=project_id)
 
@@ -122,7 +123,8 @@ class MarketRateAnalysisViewSet(viewsets.ModelViewSet):
         if unit_type:
             queryset = queryset.filter(unit_type=unit_type)
 
-        return queryset.order_by('bedrooms', 'bathrooms')
+        queryset = queryset.order_by('bedrooms', 'bathrooms')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['post'])
     def calculate(self, request, project_pk=None):
@@ -260,7 +262,7 @@ class MarketCompetitiveProjectViewSet(viewsets.ModelViewSet):
     serializer_class = MarketCompetitiveProjectSerializer
 
     def get_queryset(self):
-        """Filter competitive projects by project."""
+        """Filter competitive projects by project. Always scoped to the requesting user."""
         project_id = self.kwargs.get('project_pk')
         queryset = MarketCompetitiveProject.objects.filter(project_id=project_id)
 
@@ -274,7 +276,8 @@ class MarketCompetitiveProjectViewSet(viewsets.ModelViewSet):
         if data_source:
             queryset = queryset.filter(data_source=data_source)
 
-        return queryset.order_by('-created_at')
+        queryset = queryset.order_by('-created_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
 
 class MarketMacroDataViewSet(viewsets.ModelViewSet):
@@ -292,7 +295,7 @@ class MarketMacroDataViewSet(viewsets.ModelViewSet):
     serializer_class = MarketMacroDataSerializer
 
     def get_queryset(self):
-        """Filter macro data by project."""
+        """Filter macro data by project. Always scoped to the requesting user."""
         project_id = self.kwargs.get('project_pk')
         queryset = MarketMacroData.objects.filter(project_id=project_id)
 
@@ -301,7 +304,8 @@ class MarketMacroDataViewSet(viewsets.ModelViewSet):
         if data_year:
             queryset = queryset.filter(data_year=data_year)
 
-        return queryset.order_by('-data_year', '-created_at')
+        queryset = queryset.order_by('-data_year', '-created_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
 
 class ExpenseComparableViewSet(viewsets.ModelViewSet):
@@ -317,7 +321,6 @@ class ExpenseComparableViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = ExpenseComparableSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_queryset(self):
         project_id = self.kwargs.get('project_pk')
@@ -325,7 +328,8 @@ class ExpenseComparableViewSet(viewsets.ModelViewSet):
         is_active = self.request.query_params.get('is_active')
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
-        return queryset.order_by('distance_miles', 'property_name')
+        queryset = queryset.order_by('distance_miles', 'property_name')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         project_id = self.kwargs.get('project_pk')

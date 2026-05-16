@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Q, Count, Avg
 from django.db import connection
@@ -47,14 +47,13 @@ def _user_can_access_project(user, project: Project) -> bool:
     Minimal project access check until explicit membership model exists.
 
     Rules:
-    - Unauthenticated users allowed (views using AllowAny skip DRF auth)
+    - Unauthenticated users denied (no view should reach here unauthenticated after the auth rollout)
     - Admin/staff can access all projects
     - Project owner can access
-    - Legacy projects without owner are allowed for authenticated users
+    - Legacy projects without owner are allowed for authenticated users (follow-up: backfill created_by then deny)
     """
     if not user or not user.is_authenticated:
-        # AllowAny views reach here with AnonymousUser — allow access
-        return True
+        return False
     if user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin':
         return True
 
@@ -349,14 +348,14 @@ class ChatMessageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Filter messages by project_id from URL."""
+        """Filter messages by project_id from URL. Always scoped to the requesting user."""
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
         project_id = self.kwargs.get('project_id')
-        if project_id:
-            # Return last 100 messages in chronological order
-            return self.queryset.filter(
-                project_id=project_id
-            ).order_by('timestamp')[:100]
-        return self.queryset.none()
+        if not project_id:
+            return self.queryset.none()
+        qs = self.queryset.filter(project_id=project_id).order_by('timestamp')
+        qs = filter_qs_by_owner_or_staff(qs, self.request, 'project__created_by')
+        return qs[:100]
 
     def list(self, request, *args, **kwargs):
         """GET chat history for a project."""
@@ -563,7 +562,6 @@ class VarianceView(APIView):
         "count": 1
     }
     """
-    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get(self, request, project_id):
         """Calculate and return variances above threshold."""
@@ -644,16 +642,15 @@ class ActivityFeedViewSet(viewsets.ModelViewSet):
 
     queryset = ActivityItem.objects.select_related('project')
     serializer_class = ActivityItemSerializer
-    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get_queryset(self):
-        """Filter activities by project_id from URL."""
+        """Filter activities by project_id from URL. Always scoped to the requesting user."""
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
         project_id = self.kwargs.get('project_id')
-        if project_id:
-            return self.queryset.filter(
-                project_id=project_id
-            ).order_by('-created_at')
-        return self.queryset.none()
+        if not project_id:
+            return self.queryset.none()
+        qs = self.queryset.filter(project_id=project_id).order_by('-created_at')
+        return filter_qs_by_owner_or_staff(qs, self.request, 'project__created_by')
 
     def list(self, request, *args, **kwargs):
         """GET activity feed for a project."""
@@ -822,7 +819,6 @@ class ExtractionMappingViewSet(viewsets.ModelViewSet):
 
     queryset = ExtractionMapping.objects.all()
     serializer_class = ExtractionMappingSerializer
-    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get_queryset(self):
         """Filter mappings based on query params."""
@@ -857,7 +853,9 @@ class ExtractionMappingViewSet(viewsets.ModelViewSet):
                 Q(target_field__icontains=search)
             )
 
-        return queryset.order_by('document_type', 'source_pattern')
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
+        queryset = queryset.order_by('document_type', 'source_pattern')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'created_by')
 
     def list(self, request, *args, **kwargs):
         """GET list of mappings."""
@@ -1072,7 +1070,6 @@ class ExtractionLogViewSet(viewsets.ModelViewSet):
 
     queryset = ExtractionLog.objects.select_related('mapping', 'project')
     serializer_class = ExtractionLogSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter logs based on query params."""
@@ -1102,7 +1099,9 @@ class ExtractionLogViewSet(viewsets.ModelViewSet):
         elif review_status == 'rejected':
             queryset = queryset.filter(was_accepted=False)
 
-        return queryset.order_by('-extracted_at')
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
+        queryset = queryset.order_by('-extracted_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def list(self, request, *args, **kwargs):
         """GET list of extraction logs."""
@@ -1158,7 +1157,6 @@ class PendingMutationsView(APIView):
         "count": 5
     }
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id):
         """Get all pending mutations for a project."""
@@ -1213,7 +1211,6 @@ class ConfirmMutationView(APIView):
         "result": {...}
     }
     """
-    permission_classes = [AllowAny]
 
     def post(self, request, mutation_id):
         """Confirm and execute a pending mutation."""
@@ -1255,7 +1252,6 @@ class RejectMutationView(APIView):
         "action": "rejected"
     }
     """
-    permission_classes = [AllowAny]
 
     def post(self, request, mutation_id):
         """Reject a pending mutation."""
@@ -1295,7 +1291,6 @@ class ConfirmBatchView(APIView):
         "failed": 0
     }
     """
-    permission_classes = [AllowAny]
 
     def post(self, request, batch_id):
         """Confirm all mutations in a batch."""
@@ -2419,7 +2414,6 @@ class GlobalChatViewSet(viewsets.ViewSet):
     This endpoint handles chat for pages that don't have a project context,
     such as the DMS (documents across all projects), Admin settings, and Benchmarks.
     """
-    permission_classes = [AllowAny]
 
     def list(self, request):
         """GET chat history for global context (filtered by page_context if provided)."""
@@ -2597,7 +2591,6 @@ class IntakeStartView(APIView):
     Only 'structured_ingestion' intent creates a session;
     'global_intelligence' and 'dms_only' are pass-through to existing pipelines.
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def get(self, request):
         """List intake sessions for a project."""
@@ -2693,7 +2686,6 @@ class IntakeMappingSuggestionsView(APIView):
     GET  /api/intake/{intake_uuid}/mapping_suggestions — Return full registry of available fields
     POST /api/intake/{intake_uuid}/mapping_suggestions — Match source_columns to registry via fuzzy matching
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def _get_session_and_property_type(self, request, intake_uuid):
         """Common session lookup and property type resolution."""
@@ -2808,7 +2800,6 @@ class IntakeLockMappingView(APIView):
 
     Confirm mappings and advance status to mapping_complete.
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def post(self, request, intake_uuid):
         try:
@@ -2845,7 +2836,6 @@ class IntakeExtractedValuesView(APIView):
 
     Return staged values with existing values and conflict flags.
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def get(self, request, intake_uuid):
         try:
@@ -2890,7 +2880,6 @@ class IntakeCommitValuesView(APIView):
     Accept/reject staged values. Accepted values are written to target tables
     via ExtractionWriter with full mutation logging.
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def post(self, request, intake_uuid):
         try:
@@ -3025,7 +3014,6 @@ class IntakeReExtractView(APIView):
     Re-run extraction against current field registry.
     Creates new ai_extraction_staging records (does not overwrite committed rows).
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def post(self, request, intake_uuid):
         try:
@@ -3075,7 +3063,6 @@ class OverrideListView(APIView):
     GET /api/landscaper/projects/{project_id}/overrides/
     Returns active overrides for a project (for red dot indicators).
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def get(self, request, project_id):
         from apps.landscaper.services.override_service import list_overrides, get_override_field_keys
@@ -3099,7 +3086,6 @@ class OverrideToggleView(APIView):
 
     Body: { field_key, override_value, calculated_value?, division_id?, unit_id? }
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def post(self, request, project_id):
         from apps.landscaper.services.override_service import toggle_override
@@ -3131,7 +3117,6 @@ class OverrideRevertView(APIView):
     POST /api/landscaper/overrides/{override_id}/revert/
     Revert an override back to the calculated value.
     """
-    permission_classes = [AllowAny]  # Called directly from frontend browser
 
     def post(self, request, override_id):
         from apps.landscaper.services.override_service import revert_override

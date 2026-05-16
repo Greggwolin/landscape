@@ -13,7 +13,6 @@ import re
 from django.db import connection
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
@@ -116,7 +115,6 @@ def _parse_json_response(text: str) -> dict:
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
-@permission_classes([AllowAny])
 def extract_for_project(request):
     """
     Accept a file upload (PDF or image) via multipart form data,
@@ -299,7 +297,6 @@ def persist_extraction_results(doc_id, extracted_fields, extraction_method='proj
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def persist_extraction(request):
     """
     Persist extraction results for a document that already exists in core_doc.

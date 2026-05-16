@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models_budget_categories import BudgetCategory, CategoryCompletionStatus
 from .models import BudgetItem
 from .serializers_budget_categories import (
@@ -88,7 +89,8 @@ class BudgetCategoryViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
 
-        return queryset.select_related('parent', 'project').order_by('level', 'sort_order', 'name')
+        queryset = queryset.select_related('parent', 'project').order_by('level', 'sort_order', 'name')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def get_serializer_context(self):
         """Add context for serializers"""

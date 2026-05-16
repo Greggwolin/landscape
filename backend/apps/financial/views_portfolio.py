@@ -20,6 +20,7 @@ from .models_portfolio import (
     PortfolioWaterfallTier,
     PortfolioResult,
 )
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .serializers_portfolio import (
     PortfolioSerializer,
     PortfolioListSerializer,
@@ -67,7 +68,7 @@ class PortfolioViewSet(viewsets.ModelViewSet):
                 'members__project',
                 'waterfall_tiers',
             )
-        return qs
+        return filter_qs_by_owner_or_staff(qs, self.request, 'created_by')
 
     def perform_destroy(self, instance):
         """Soft delete — set is_active=False instead of hard delete."""

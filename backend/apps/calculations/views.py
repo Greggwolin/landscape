@@ -10,7 +10,6 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
-from rest_framework.permissions import AllowAny
 from .services import CalculationService
 logger = logging.getLogger(__name__)
 
@@ -299,7 +298,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='project/(?P<project_id>[0-9]+)/debug-cashflows',
-        permission_classes=[AllowAny],
     )
     def debug_cashflows(self, request, project_id=None):
         """Debug endpoint to inspect cash flow computation."""
@@ -368,7 +366,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get', 'post'],
         url_path='project/(?P<project_id>[0-9]+)/waterfall',
-        permission_classes=[AllowAny],  # TODO: tighten back to IsAuthenticated after JWT wiring is verified
     )
     def project_waterfall(self, request, project_id=None):
         """
@@ -410,7 +407,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='project/(?P<project_id>[0-9]+)/waterfall/last-result',
-        permission_classes=[AllowAny],
     )
     def project_waterfall_last_result(self, request, project_id=None):
         """Return persisted last-run waterfall result (no recalculation).
@@ -499,7 +495,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='multifamily/(?P<project_id>[0-9]+)/cash-flows',
-        permission_classes=[AllowAny],
     )
     def multifamily_cash_flows(self, request, project_id=None):
         """
@@ -554,7 +549,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='multifamily/(?P<project_id>[0-9]+)/cash-flows/detailed',
-        permission_classes=[AllowAny],
     )
     def multifamily_cash_flows_detailed(self, request, project_id=None):
         """
@@ -635,7 +629,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='multifamily/(?P<project_id>[0-9]+)/waterfall',
-        permission_classes=[AllowAny],
     )
     def multifamily_waterfall(self, request, project_id=None):
         """
@@ -680,7 +673,6 @@ class CalculationViewSet(viewsets.ViewSet):
         detail=False,
         methods=['get'],
         url_path='multifamily/(?P<project_id>[0-9]+)/amortization',
-        permission_classes=[AllowAny],
     )
     def multifamily_amortization(self, request, project_id=None):
         """

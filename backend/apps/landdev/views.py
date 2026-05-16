@@ -6,7 +6,6 @@ from django.db import connection
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 
 from .serializers import (
     LandPlanningInputSerializer,
@@ -38,7 +37,6 @@ class AcreageAllocationViewSet(viewsets.ViewSet):
     View:         vw_acreage_allocation (enriched read)
     """
 
-    permission_classes = [AllowAny]
 
     def list(self, request, project_id=None):
         """
@@ -260,7 +258,6 @@ class LandPlanningViewSet(viewsets.ViewSet):
         Compute three-case yield analysis (read-only).
     """
 
-    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['post'], url_path='compute')
     def compute(self, request):

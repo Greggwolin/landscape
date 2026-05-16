@@ -5,7 +5,6 @@ Views for Acquisition endpoints.
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.db import connection
@@ -30,7 +29,6 @@ class AcquisitionCategoriesView(APIView):
         - subcategories_by_parent: Child categories grouped by parent_id
     """
 
-    permission_classes = [AllowAny]
 
     def get(self, request):
         """
@@ -132,7 +130,6 @@ class AcquisitionEventViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = AcquisitionEventSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_queryset(self):
         project_id = self.kwargs.get('project_pk')
@@ -162,7 +159,6 @@ class PropertyAcquisitionViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = PropertyAcquisitionSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_queryset(self):
         project_id = self.kwargs.get('project_pk')
@@ -251,7 +247,6 @@ class AcquisitionPriceSummaryView(APIView):
     GET /api/projects/{project_id}/acquisition/price-summary/
     """
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_pk):
         """
@@ -345,7 +340,6 @@ class UpdateAskingPriceView(APIView):
     PATCH /api/projects/{project_id}/acquisition/asking-price/
     """
 
-    permission_classes = [AllowAny]
 
     def patch(self, request, project_pk):
         """

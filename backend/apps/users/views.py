@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -233,7 +233,6 @@ def grid_preferences(request):
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([AllowAny])
 def user_tier_settings(request):
     """
     Get or update user tier level

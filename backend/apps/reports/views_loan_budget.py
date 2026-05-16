@@ -5,7 +5,6 @@ View for serving Loan Budget PDF report.
 import logging
 
 from django.http import HttpResponse
-from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from .generators.loan_budget import LoanBudgetPDFReport
@@ -21,7 +20,6 @@ class LoanBudgetPDFView(APIView):
     and Equity to Close tables for a single loan.
     """
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id: int, loan_id: int):
         try:

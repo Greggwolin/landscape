@@ -5,7 +5,7 @@ import json
 from django.db import connection
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 
@@ -68,7 +68,6 @@ demographics_service = DemographicsService()
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def get_demographics(request):
     """
     GET /api/v1/location-intelligence/demographics/
@@ -152,7 +151,6 @@ def get_demographics(request):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def get_project_demographics(request, project_id):
     """
     GET /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -204,7 +202,6 @@ def get_project_demographics(request, project_id):
     tags=["Location Intelligence"]
 )
 @api_view(["POST"])
-@permission_classes([AllowAny])
 def cache_project_demographics(request, project_id):
     """
     POST /api/v1/location-intelligence/demographics/project/{project_id}/
@@ -297,7 +294,6 @@ def delete_project_demographics(request, project_id):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def get_state_coverage(request):
     """
     GET /api/v1/location-intelligence/demographics/state-coverage/
@@ -338,7 +334,6 @@ def get_state_coverage(request):
     tags=["Location Intelligence"]
 )
 @api_view(["POST"])
-@permission_classes([AllowAny])
 def trigger_state_load(request):
     """
     POST /api/v1/location-intelligence/demographics/load-state/
@@ -395,7 +390,6 @@ def trigger_state_load(request):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def get_block_groups(request):
     """
     GET /api/v1/location-intelligence/block-groups/
@@ -490,7 +484,6 @@ def get_block_groups(request):
     tags=["Location Intelligence"]
 )
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def get_stats(request):
     """
     GET /api/v1/location-intelligence/stats/

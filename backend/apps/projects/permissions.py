@@ -64,6 +64,29 @@ class CanAccessProject(permissions.BasePermission):
         return request.user and request.user.is_authenticated
 
 
+def is_admin_user(user) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    return bool(user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin')
+
+
+def filter_qs_by_owner_or_staff(qs, request, owner_path: str = 'created_by'):
+    """
+    Scope a queryset to the requesting user's owned rows, with a staff/admin override.
+
+    owner_path examples:
+      - 'created_by'                          (Case 3a: model has a direct created_by FK)
+      - 'project__created_by'                 (Case 3b: transitive via project FK)
+      - 'session__project__created_by'        (deeper joins as needed)
+    """
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return qs.none()
+    if is_admin_user(user):
+        return qs
+    return qs.filter(**{owner_path: user})
+
+
 class APIKeyPermission(permissions.BasePermission):
     """Custom permission for API key authentication."""
     

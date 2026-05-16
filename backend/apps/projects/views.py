@@ -7,7 +7,7 @@ Provides REST API endpoints for CRUD operations on projects.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, F, DecimalField, Count, Subquery, IntegerField, OuterRef
 from django.db.models.functions import Coalesce
 from django.db import connection
@@ -626,7 +626,6 @@ class AnalysisTypeConfigViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     queryset = AnalysisTypeConfig.objects.all()
-    permission_classes = [AllowAny]  # Read-only config data
     lookup_field = 'analysis_type'
 
     def get_serializer_class(self):
@@ -723,7 +722,6 @@ class AnalysisDraftViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = AnalysisDraftSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
     lookup_field = 'draft_id'
 
     def get_queryset(self):

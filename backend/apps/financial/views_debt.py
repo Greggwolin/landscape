@@ -9,12 +9,12 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.calculations.loan_sizing_service import LoanSizingService
 from apps.projects.models import Project
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models_debt import Loan, LoanContainer, LoanFinanceStructure, DebtDrawSchedule
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,6 @@ class LoanViewSet(viewsets.ModelViewSet):
     """CRUD for loans scoped to a project."""
 
     queryset = Loan.objects.all()
-    permission_classes = [AllowAny]
     lookup_field = 'loan_id'
     lookup_url_kwarg = 'loan_id'
 
@@ -56,7 +55,8 @@ class LoanViewSet(viewsets.ModelViewSet):
         if loan_type:
             qs = qs.filter(loan_type=loan_type)
 
-        return qs.order_by('seniority', 'loan_name')
+        qs = qs.order_by('seniority', 'loan_name')
+        return filter_qs_by_owner_or_staff(qs, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         project_id = self.kwargs.get('project_id')
@@ -217,7 +217,6 @@ class LoanContainerViewSet(
     """CRUD for loan-to-division assignments."""
 
     queryset = LoanContainer.objects.all()
-    permission_classes = [AllowAny]
     serializer_class = LoanContainerSerializer
     lookup_field = 'loan_container_id'
     lookup_url_kwarg = 'loan_container_id'
@@ -246,7 +245,6 @@ class LoanFinanceStructureViewSet(
     """CRUD for loan-to-finance-structure assignments."""
 
     queryset = LoanFinanceStructure.objects.all()
-    permission_classes = [AllowAny]
     serializer_class = LoanFinanceStructureSerializer
     lookup_field = 'loan_fs_id'
     lookup_url_kwarg = 'loan_fs_id'
@@ -269,7 +267,6 @@ class LoanFinanceStructureViewSet(
 class LoanBudgetSummaryView(APIView):
     """Read-only budget breakdown for a single loan."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id: int, loan_id: int):
         project = get_object_or_404(Project, project_id=project_id)
@@ -281,7 +278,6 @@ class LoanBudgetSummaryView(APIView):
 class InterestReserveCalculationView(APIView):
     """Calculate recommended interest reserve for a loan."""
 
-    permission_classes = [AllowAny]
 
     def post(self, request, project_id: int, loan_id: int):
         project = get_object_or_404(Project, project_id=project_id)

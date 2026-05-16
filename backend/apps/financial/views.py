@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from django.db.models import Sum, Count, Q
 from django.db import connection
 from decimal import Decimal
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models import BudgetItem, ActualItem
 from .mixins import ScenarioFilterMixin
 from .models_finance_structure import (
@@ -60,6 +61,9 @@ class BudgetItemViewSet(viewsets.ModelViewSet):
         'parent_budget_item'
     ).prefetch_related('child_items')
     serializer_class = BudgetItemSerializer
+
+    def get_queryset(self):
+        return filter_qs_by_owner_or_staff(self.queryset, self.request, 'project__created_by')
 
     def get_serializer_class(self):
         """Use BudgetItemCreateSerializer for POST requests."""
@@ -337,6 +341,9 @@ class ActualItemViewSet(viewsets.ModelViewSet):
     )
     serializer_class = ActualItemSerializer
 
+    def get_queryset(self):
+        return filter_qs_by_owner_or_staff(self.queryset, self.request, 'project__created_by')
+
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
         """Get all actual items for a project."""
@@ -474,6 +481,11 @@ class FinanceStructureViewSet(ScenarioFilterMixin, viewsets.ModelViewSet):
         'cost_allocations__container'
     )
     serializer_class = FinanceStructureSerializer
+
+    def get_queryset(self):
+        # super() runs ScenarioFilterMixin (project_id, scenario_id query filters); ownership wraps the result.
+        qs = super().get_queryset()
+        return filter_qs_by_owner_or_staff(qs, self.request, 'project__created_by')
 
     def get_serializer_class(self):
         """Use FinanceStructureCreateSerializer for POST requests."""
@@ -745,6 +757,9 @@ class SaleSettlementViewSet(viewsets.ModelViewSet):
     ).prefetch_related('participation_payments')
     serializer_class = SaleSettlementSerializer
 
+    def get_queryset(self):
+        return filter_qs_by_owner_or_staff(self.queryset, self.request, 'project__created_by')
+
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
         """Get all sale settlements for a project."""
@@ -880,6 +895,9 @@ class ParticipationPaymentViewSet(viewsets.ModelViewSet):
 
     queryset = ParticipationPayment.objects.select_related('settlement', 'project')
     serializer_class = ParticipationPaymentSerializer
+
+    def get_queryset(self):
+        return filter_qs_by_owner_or_staff(self.queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_settlement/(?P<settlement_id>[0-9]+)')
     def by_settlement(self, request, settlement_id=None):

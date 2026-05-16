@@ -20,7 +20,6 @@ from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from apps.knowledge.services.knowledge_library_service import (
@@ -33,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def knowledge_library_facets(request):
     """
     GET /api/knowledge-library/facets/
@@ -62,7 +60,6 @@ def knowledge_library_facets(request):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def knowledge_library_search(request):
     """
     POST /api/knowledge-library/search/
@@ -102,7 +99,6 @@ def _is_downloadable_url(uri: str) -> bool:
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def knowledge_library_batch_download(request):
     """
     POST /api/knowledge-library/batch-download/
@@ -323,7 +319,6 @@ def _unique_filename(name: str, used: set[str]) -> str:
 # =====================================================
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 @parser_classes([MultiPartParser, FormParser])
 def knowledge_library_upload(request):
     """
@@ -436,7 +431,6 @@ def knowledge_library_upload(request):
 # =====================================================
 
 @api_view(['PATCH'])
-@permission_classes([AllowAny])
 def knowledge_library_update_classification(request, doc_id: int):
     """
     PATCH /api/knowledge/library/documents/{doc_id}/classification/
@@ -485,7 +479,6 @@ def knowledge_library_update_classification(request, doc_id: int):
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def knowledge_library_geo_tags(request, doc_id: int):
     """
     GET  /api/knowledge/library/documents/{doc_id}/geo-tags/
@@ -551,7 +544,6 @@ def knowledge_library_geo_tags(request, doc_id: int):
 
 
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
 def knowledge_library_delete_geo_tag(request, doc_id: int, geo_tag_id: int):
     """
     DELETE /api/knowledge/library/documents/{doc_id}/geo-tags/{geo_tag_id}/
@@ -576,7 +568,6 @@ def knowledge_library_delete_geo_tag(request, doc_id: int, geo_tag_id: int):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def knowledge_library_classification_options(request):
     """
     GET /api/knowledge/library/classification-options/
