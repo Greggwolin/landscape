@@ -8,6 +8,7 @@ import {
  SelectTrigger,
  SelectValue
 } from '@/components/ui/select';
+import { getAuthHeaders, redirectToLoginExpired } from '@/lib/authHeaders';
 
 type ProjectOption = {
  project_id: number;
@@ -50,7 +51,11 @@ export default function ProjectSelector({
  const fetchProjects = async () => {
  setIsLoading(true);
  try {
- const response = await fetch('/api/projects');
+ const response = await fetch('/api/projects', { headers: getAuthHeaders() });
+ if (response.status === 401) {
+ redirectToLoginExpired();
+ throw new Error('Unauthenticated');
+ }
  if (!response.ok) throw new Error('Failed to load projects');
  const data = await parseJsonSafely<any[]>(response, 'projects');
  setProjects(
