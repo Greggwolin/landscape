@@ -2462,10 +2462,19 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   background: var(--w-panel-bg);
   color: var(--w-text-primary);
   overflow-y: auto;
+  /* Padding + centering moved to .user-dashboard-content so the WrapperHeader
+     bar can sit flush at the top, spanning the full center-column width. */
+}
+
+.user-dashboard-content {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 64px 24px 48px;
 }
 

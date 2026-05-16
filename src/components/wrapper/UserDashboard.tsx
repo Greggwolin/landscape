@@ -180,6 +180,7 @@ export function UserDashboard() {
         title={displayName || 'Home'}
         subtitle={headerDateTime}
       />
+      <div className="user-dashboard-content">
       <header className="user-dashboard-header">
         <h1 className="user-dashboard-greeting">
           {displayName ? `Welcome back, ${displayName.split(' ')[0]}.` : 'Welcome back.'}
@@ -261,6 +262,7 @@ export function UserDashboard() {
           homeProjectLabel={displayName || undefined}
           homeProjectId={homeProjectId}
         />
+      </div>
       </div>
     </section>
   );
