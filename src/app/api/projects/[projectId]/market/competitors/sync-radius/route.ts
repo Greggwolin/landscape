@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ projectId: string }> };
 
 /**
@@ -78,6 +79,10 @@ type CompetitorResult = {
  *   - update_existing: boolean (default: false) - whether to update existing Zonda-sourced competitors
  */
 export async function POST(req: NextRequest, context: Params) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(req, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await context.params;
     if (!projectId) {

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * GET /api/budget/category-templates
  *
@@ -13,6 +14,10 @@ import { sql } from '@/lib/db';
  * - project_type_code: Filter by project type
  */
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const project_type_code = searchParams.get('project_type_code');
@@ -96,6 +101,10 @@ export async function GET(request: NextRequest) {
  * }
  */
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const {

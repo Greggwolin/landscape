@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 // API for Land Use Code Mapping between legacy parcel data and structured land use system
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
@@ -137,7 +142,11 @@ async function getSuggestedMappings(projectId: string | null) {
 }
 
 // POST endpoint to create mappings
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { legacy_code, target_landuse_id, create_new, new_landuse_data } = await request.json();
 

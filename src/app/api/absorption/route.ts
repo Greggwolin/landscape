@@ -7,6 +7,7 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 const sql = neon(process.env.DATABASE_URL!);
 
 /**
@@ -14,6 +15,10 @@ const sql = neon(process.env.DATABASE_URL!);
  * List absorption schedules for a project
  */
 export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
@@ -99,6 +104,10 @@ export async function GET(request: NextRequest) {
  * Create a new absorption schedule
  */
 export async function POST(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const body = await request.json();
     const {

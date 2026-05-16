@@ -8,10 +8,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ factId: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { factId } = await params;
     const updates = await request.json();
@@ -174,6 +179,10 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ factId: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { factId } = await params;
 

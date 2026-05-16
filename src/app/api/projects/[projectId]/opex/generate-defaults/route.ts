@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { generateOpExDefaults } from '@/lib/opex/defaults';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ projectId: string }> };
 
 // POST /api/projects/{projectId}/opex/generate-defaults
@@ -9,6 +10,10 @@ export async function POST(
   request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await context.params;
     const projectIdNum = parseInt(projectId);

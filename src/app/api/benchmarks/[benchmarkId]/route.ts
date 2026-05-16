@@ -9,10 +9,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import type { BenchmarkDetailResponse } from '@/types/benchmarks';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ benchmarkId: string }> };
 
 // GET /api/benchmarks/[benchmarkId]
 export async function GET(request: NextRequest, context: Params) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { benchmarkId } = await context.params;
 
@@ -126,6 +131,10 @@ export async function GET(request: NextRequest, context: Params) {
 
 // PATCH /api/benchmarks/[benchmarkId] - Partial update for inline editing
 export async function PATCH(request: NextRequest, context: Params) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { benchmarkId } = await context.params;
     const body = await request.json();
@@ -204,6 +213,10 @@ export async function PATCH(request: NextRequest, context: Params) {
 
 // PUT /api/benchmarks/[benchmarkId] - Full replacement (legacy)
 export async function PUT(request: NextRequest, context: Params) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { benchmarkId } = await context.params;
     const body = await request.json();
@@ -280,6 +293,10 @@ export async function PUT(request: NextRequest, context: Params) {
 
 // DELETE /api/benchmarks/[benchmarkId]
 export async function DELETE(request: NextRequest, context: Params) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { benchmarkId } = await context.params;
 

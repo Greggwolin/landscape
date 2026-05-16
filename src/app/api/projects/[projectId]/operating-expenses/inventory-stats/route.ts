@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 export const runtime = 'nodejs';
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -16,9 +17,13 @@ interface InventoryStats {
 type Params = { params: Promise<{ projectId: string }> };
 
 export async function GET(
-  _request: Request,
+  _request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(_request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const projectId = parseInt((await context.params).projectId);
 

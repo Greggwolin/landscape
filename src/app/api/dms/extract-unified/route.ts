@@ -22,9 +22,14 @@ import {
   type SchemaProfile
 } from '@/lib/ai/unified-extractor';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 export const maxDuration = 300; // 5 minutes for large PDFs
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;

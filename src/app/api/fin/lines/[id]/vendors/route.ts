@@ -1,7 +1,12 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { sql } from '../../../../../../lib/db'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(_req);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const rows = await sql`
@@ -21,6 +26,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
@@ -52,6 +61,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)

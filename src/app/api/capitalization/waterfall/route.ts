@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * GET /api/capitalization/waterfall
  * List all waterfall tiers for a project
@@ -13,6 +14,10 @@ import { sql } from '@/lib/db';
  * Note: Waterfall tiers are linked via equity_structure_id
  */
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
@@ -113,6 +118,10 @@ export async function GET(request: NextRequest) {
  * Validates that lp_split_pct + gp_split_pct = 100
  */
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const {

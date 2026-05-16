@@ -3,6 +3,7 @@ import { searchDocuments } from '@/lib/dms/meili';
 import { sql } from '@/lib/dms/db';
 import { SearchRequestZ } from './schema';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 /**
  * Database fallback search using mv_doc_search materialized view
  */
@@ -275,7 +276,11 @@ async function searchDeletedDocuments(params: any) {
 /**
  * GET /api/dms/search (legacy URL params)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -356,6 +361,10 @@ export async function GET(request: Request) {
  * Full-text search with faceting (supports both Meilisearch and database fallback)
  */
 export async function POST(req: NextRequest) {
+  const __qProjectId = new URL(req.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(req, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const body = await req.json();
 

@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 interface ContentChunk {
   embedding_id: number;
   content_text: string;
@@ -23,6 +24,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string; docId: string }> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId, docId } = await params;
     const { searchParams } = new URL(request.url);

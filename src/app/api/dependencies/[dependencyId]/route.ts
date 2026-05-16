@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { recalculateProjectTimeline } from '@/lib/timeline-engine/cpm-calculator';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 async function resetTimingIfNoDependencies(
   type: 'budget' | 'milestone',
   itemId: number,
@@ -44,6 +45,10 @@ export async function DELETE(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { dependencyId: depId } = await context.params;
     const dependencyId = Number(depId);

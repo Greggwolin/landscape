@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ projectId: string }> };
 
 /**
@@ -18,9 +19,13 @@ type Params = { params: Promise<{ projectId: string }> };
  *   }
  */
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const projectId = parseInt((await context.params).projectId);
 

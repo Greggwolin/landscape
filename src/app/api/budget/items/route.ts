@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 export const dynamic = 'force-dynamic';
 
 /**
@@ -36,7 +37,11 @@ export const dynamic = 'force-dynamic';
  * Returns:
  * - item: BudgetGridItem - The newly created budget item with all calculated fields
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
 

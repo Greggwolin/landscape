@@ -4,7 +4,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const searchParams = request.nextUrl.searchParams
     const projectId = searchParams.get('project_id')

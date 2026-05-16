@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { recalculateProjectTimeline } from '@/lib/timeline-engine/cpm-calculator';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const VALID_TRANSITIONS: Record<string, string[]> = {
   not_started: ['in_progress', 'cancelled'],
   in_progress: ['completed', 'cancelled'],
@@ -15,6 +16,10 @@ export async function PATCH(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { milestoneId: msId } = await context.params;
     const milestoneId = Number(msId);

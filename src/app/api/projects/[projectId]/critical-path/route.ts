@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 function durationDays(start: string | null, finish: string | null): number {
   if (!start || !finish) return 0;
   const startDate = new Date(start);
@@ -18,6 +19,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId: projId } = await context.params;
     const projectId = Number(projId);

@@ -1,14 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { FactType } from '@/types'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 type SearchRow = {
   fact_id: number
   fact_type: FactType
   tags: string[]
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   const { searchParams } = new URL(request.url)
   const tagsParam = searchParams.get('tags')
   const factTypeParam = searchParams.get('factType') as FactType | null

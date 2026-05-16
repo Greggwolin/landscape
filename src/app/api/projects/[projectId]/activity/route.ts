@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type ActivityChannel = 'landscaper' | 'property' | 'market' | 'budget' | 'underwriter' | 'docs';
 
 interface ActivityItem {
@@ -30,6 +31,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await params;
     const { searchParams } = new URL(request.url);

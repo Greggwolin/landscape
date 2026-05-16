@@ -17,6 +17,7 @@ import {
   type AnalysisPurpose,
 } from '@/types/project-taxonomy';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 export interface ProjectProfile {
   project_id: number;
   project_name: string;
@@ -60,6 +61,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await params;
 
@@ -132,6 +137,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await params;
     const body = await request.json().catch(() => ({}));

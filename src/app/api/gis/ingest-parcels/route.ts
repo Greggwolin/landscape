@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '../../../../lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 interface TaxParcelFeature {
   parcelId: string;  // Changed from apn to parcelId for Pinal County
   geom: GeoJSON.Geometry;
@@ -22,6 +23,10 @@ interface TaxParcelIngestionRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const body: TaxParcelIngestionRequest = await request.json();
     const { project_id, features, source = 'user_selection' } = body;
@@ -117,6 +122,10 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint to retrieve project boundary and tax parcel data
 export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');

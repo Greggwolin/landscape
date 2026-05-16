@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * PATCH /api/capitalization/equity/[tranche_id]
  * Update an existing equity partner/tranche
@@ -15,6 +16,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ tranche_id: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { tranche_id } = await params;
     const trancheId = parseInt(tranche_id);
@@ -288,6 +293,10 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ tranche_id: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { tranche_id } = await params;
     const trancheId = parseInt(tranche_id);

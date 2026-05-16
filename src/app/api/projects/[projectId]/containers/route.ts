@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { ContainerNode } from '@/types'
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = {
   projectId: string
 }
@@ -77,6 +78,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params
   const id = Number(projectId)
 
@@ -270,6 +275,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params
   const id = Number(projectId)
 

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '../../../../lib/db'
 import type { Assumptionrule } from '../../../../types/database'
 import {
@@ -8,6 +8,7 @@ import {
   formatValidationErrors
 } from '../../../../lib/validation/growth-rates'
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 // Growth rate assumption types
 interface GrowthRateStep {
   step: number;
@@ -109,7 +110,11 @@ const DEFAULT_ASSUMPTIONS: GrowthRateAssumption[] = [
   }
 ];
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url)
     const projectId = searchParams.get('project_id')
@@ -185,7 +190,11 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const body = await request.json()
     const { id, projectId, globalRate, steps, impact } = body ?? {}
@@ -296,7 +305,11 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const body = await request.json()
     const { projectId, category, name, globalRate, steps, impact } = body ?? {}
@@ -373,7 +386,11 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

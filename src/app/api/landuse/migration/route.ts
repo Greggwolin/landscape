@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Pool } from 'pg'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 })
@@ -83,6 +84,10 @@ const DEFAULT_MAPPINGS: { [key: string]: TaxonomyMapping } = {
 }
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { dryRun = false, projectId } = await request.json()
 
@@ -301,6 +306,10 @@ async function updateParcelTaxonomy(parcelId: number, taxonomyIds: TaxonomyIds, 
 }
 
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')

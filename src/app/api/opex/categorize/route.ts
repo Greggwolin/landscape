@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 interface CategorizeRequest {
   opex_id: number;
   new_category: string;
@@ -27,6 +28,10 @@ const VALID_CATEGORIES = [
 ];
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body: CategorizeRequest = await request.json();
     const { opex_id, new_category, label } = body;
@@ -123,7 +128,11 @@ export async function POST(request: NextRequest) {
  * GET /api/opex/categorize
  * Returns all learned category mappings
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const mappings = await sql`
       SELECT
@@ -159,6 +168,10 @@ export async function GET() {
  * Deletes a learned mapping
  */
 export async function DELETE(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { searchParams } = new URL(request.url);
     const mappingId = searchParams.get('mapping_id');

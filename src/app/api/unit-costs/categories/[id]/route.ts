@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processCategoryUpdate } from '../update-handler';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const DJANGO_API_URL = process.env.DJANGO_API_URL;
 const DJANGO_FINANCIAL_BASE = DJANGO_API_URL
   ? `${DJANGO_API_URL.replace(/\/$/, '')}/api/financial`
@@ -13,6 +14,10 @@ export async function PUT(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { id } = await context.params;
   return processCategoryUpdate(request, id);
 }
@@ -22,6 +27,10 @@ export async function DELETE(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { id } = await context.params;
   const categoryId = parseInt(id);
   if (isNaN(categoryId)) {
@@ -114,6 +123,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { id } = await context.params;
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');

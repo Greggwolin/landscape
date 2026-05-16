@@ -3,6 +3,7 @@ import { sql } from '@/lib/dms/db';
 import { MoveDocumentZ } from '@/app/api/dms/folders/schema';
 import { z } from 'zod';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * POST /api/dms/docs/:id/move
  * Move document to a folder and optionally apply inheritance
@@ -11,6 +12,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params;
     const docId = parseInt(id);
@@ -150,6 +155,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params;
     const docId = parseInt(id);

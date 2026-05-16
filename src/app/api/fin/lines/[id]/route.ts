@@ -2,7 +2,12 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { sql } from '../../../../../lib/db'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(_req);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const body = await _req.json().catch(() => ({}))
@@ -40,6 +45,10 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(_req);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     await sql`DELETE FROM landscape.core_fin_fact_budget WHERE fact_id = ${id}::bigint`

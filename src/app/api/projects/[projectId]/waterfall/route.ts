@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ projectId: string }> };
 
 export async function GET(
   _request: NextRequest,
   { params }: Params
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(_request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await params;
     const id = Number(projectId);

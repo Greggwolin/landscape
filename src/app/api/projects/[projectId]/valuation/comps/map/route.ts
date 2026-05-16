@@ -4,17 +4,22 @@
  * Returns GeoJSON data for subject property and comparable sales
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
 export async function GET(
-  _request: Request,
+  _request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(_request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params;
 
   try {

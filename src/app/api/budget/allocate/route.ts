@@ -10,6 +10,7 @@ import { sql } from '@/lib/db';
 import { derivePeriodRangeFromDates } from '@/lib/financial-engine/period-utils';
 import { fetchCurveProfileSummary } from '@/lib/financial-engine/curve-profiles';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 interface BudgetRow {
   fact_id: number;
   project_id: number | null;
@@ -29,6 +30,10 @@ interface BudgetRow {
 }
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const {
