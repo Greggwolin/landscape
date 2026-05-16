@@ -199,6 +199,9 @@ interface WrapperUIContextValue {
   /** Whether the artifacts right panel is expanded (true) or collapsed to strip (false). */
   artifactsOpen: boolean;
   toggleArtifacts: () => void;
+  /** Direct setter — used by surfaces that want to default the panel to closed
+   *  on mount (e.g. /w/dashboard). */
+  setArtifactsOpen: (v: boolean) => void;
   /**
    * Active view inside the project's right panel — toggles between the
    * artifacts workspace and the per-project document management surface.
@@ -323,7 +326,7 @@ export function WrapperUIProvider({ children }: { children: React.ReactNode }) {
     <WrapperUIContext.Provider value={{
       chatOpen, toggleChat, openChat, closeChat,
       rightPanelNarrow, setRightPanelNarrow,
-      artifactsOpen, toggleArtifacts,
+      artifactsOpen, toggleArtifacts, setArtifactsOpen,
       projectRightPanelView, setProjectRightPanelView,
       activeMapArtifact, setActiveMapArtifact,
       activeLocationBrief, setActiveLocationBrief,

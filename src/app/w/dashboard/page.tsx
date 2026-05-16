@@ -99,7 +99,14 @@ async function homeHasContent(projectId: number): Promise<boolean> {
 }
 
 export default function WrapperDashboardPage() {
-  const { setRightPanelNarrow } = useWrapperUI();
+  const { setRightPanelNarrow, setArtifactsOpen } = useWrapperUI();
+
+  // Home dashboard: artifacts panel starts CLOSED (collapsed to strip).
+  // Users opt in by clicking the hamburger. This keeps the home page clean
+  // for users who don't want the rail open by default.
+  useEffect(() => {
+    setArtifactsOpen(false);
+  }, [setArtifactsOpen]);
   const [homeProjectId, setHomeProjectId] = useState<number | null>(null);
   const [shouldMount, setShouldMount] = useState<boolean>(false);
 

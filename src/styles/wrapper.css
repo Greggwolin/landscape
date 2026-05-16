@@ -1096,30 +1096,39 @@
   flex: 1 1 auto;
 }
 
-/* Collapsed strip — mirrors left sidebar collapsed behavior */
+/* Collapsed strip — mirrors left sidebar collapsed behavior.
+   Strip itself uses the panel background; only the hamburger "cap" at the
+   top carries the dark header-band shade (#0A0A0B) so it matches the
+   WrapperHeader bar height across the rest of the page. */
 .artifacts-collapsed {
   width: 48px;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 0;
   border-left: 1px solid var(--w-border);
   background: var(--w-panel-bg, #1a1e28);
   flex-shrink: 0;
 }
 
 .artifacts-expand-btn {
-  background: none;
+  background: #0A0A0B;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid #323a49;   /* match WrapperHeader bottom border */
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  padding: 6px;
-  border-radius: 4px;
-  font-size: 12px;
+  width: 100%;
+  height: 42px;
+  border-radius: 0;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.artifacts-expand-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .artifacts-expand-btn:hover {
