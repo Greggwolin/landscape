@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
+import { getAuthHeaders, redirectToLoginExpired } from '@/lib/authHeaders';
 import {
   getPropertyTypeLabel,
   getPropertyTypeBadgeStyle,
@@ -60,8 +61,12 @@ export default function WrapperProjectsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch('/api/projects')
+    fetch('/api/projects', { headers: getAuthHeaders() })
       .then((r) => {
+        if (r.status === 401) {
+          redirectToLoginExpired();
+          throw new Error('Unauthenticated');
+        }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })

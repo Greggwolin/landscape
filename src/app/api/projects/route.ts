@@ -1,8 +1,9 @@
 // /app/api/projects/route.ts
 //
-// This route proxies to Django for authenticated project listing,
-// falling back to direct DB query for unauthenticated requests.
-// Django implements role-based filtering (alpha_testers see only their projects).
+// Proxies authenticated project-list requests to Django, which applies
+// role-based filtering (alpha_testers see only their own projects, admins see all).
+// Unauthenticated requests return 401 — the previous unauth fallback issued an
+// unfiltered SELECT against tbl_project and leaked every tester's project metadata.
 //
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
@@ -47,9 +48,6 @@ type RawProjectRow = {
   created_by_username?: string | null
 }
 
-type FallbackProjectRow = Omit<RawProjectRow, 'project_type_code' | 'is_active'>
-
-type PostgresError = Error & { code?: string }
 type AnalysisTypeConfigRow = {
   analysis_type: string
   analysis_perspective: string
@@ -80,37 +78,6 @@ const PROPERTY_TYPE_FALLBACKS: Array<[RegExp, string]> = [
   [/mixed/i, 'MXU'],
   [/master\s+planned/i, 'LAND'],
 ]
-
-const CARNEY_PROJECT_ID = 8
-const CARNEY_FALLBACK_PROJECT: RawProjectRow = {
-  project_id: CARNEY_PROJECT_ID,
-  project_name: 'Carney Power Center',
-  acres_gross: 200,
-  acreage: 200,
-  location_lat: null,
-  location_lon: null,
-  latitude: null,
-  longitude: null,
-  start_date: '2025-01-01',
-  jurisdiction_city: 'Phoenix',
-  jurisdiction_county: 'Maricopa County',
-  jurisdiction_state: 'AZ',
-  location_description: 'Phoenix, AZ',
-  location: 'Phoenix, AZ',
-  project_type_code: 'COMMERCIAL',
-  project_type: 'Retail Power Center',
-  is_active: true,
-  analysis_type: null,
-  analysis_perspective: 'INVESTMENT',
-  analysis_purpose: 'UNDERWRITING',
-  value_add_enabled: false,
-  property_subtype: null,
-  property_class: null,
-  analysis_mode: 'napkin',
-  total_residential_units: null,
-  total_commercial_sqft: null,
-  updated_at: new Date().toISOString()
-}
 
 function normalizeProjectTypeCode(projectTypeCode: string | null, projectType: string | null): string | null {
   if (projectTypeCode && projectTypeCode.trim().length > 0) {
@@ -220,192 +187,48 @@ function attachTileConfigToProjects(
   })
 }
 
-async function queryProjects(includeInactive: boolean, includeHome: boolean = false): Promise<RawProjectRow[]> {
-  try {
-    return await sql`
-      SELECT
-        project_id,
-        project_name,
-        acres_gross,
-        acres_gross AS acreage,
-        location_lat,
-        location_lon,
-        location_lat AS latitude,
-        location_lon AS longitude,
-        start_date,
-        jurisdiction_city,
-        jurisdiction_county,
-        jurisdiction_state,
-        location_description,
-        location_description AS location,
-        project_type_code,
-        project_type,
-        is_active,
-        analysis_type,
-        analysis_perspective,
-        analysis_purpose,
-        value_add_enabled,
-        property_subtype,
-        property_class,
-        COALESCE(analysis_mode, 'napkin') AS analysis_mode,
-        -- Phase 5 fields (nullable in legacy DB)
-        COALESCE(total_units, target_units)::numeric AS total_residential_units,
-        NULL::numeric AS total_commercial_sqft,
-        gross_sf,
-        primary_count,
-        primary_count_type,
-        primary_area,
-        primary_area_type,
-        updated_at
-      FROM landscape.tbl_project
-      WHERE 1 = 1
-        ${includeInactive ? sql`` : sql`AND COALESCE(is_active, true)`}
-        ${includeHome ? sql`` : sql`AND COALESCE(project_kind, 'real_estate') = 'real_estate'`}
-      ORDER BY updated_at DESC NULLS LAST, project_name
-    `
-  } catch (error: unknown) {
-    const pgError = error as PostgresError
-    if (pgError?.code !== '42703') throw error
-
-    // Schema-mismatch fallback (column missing on older databases). Same
-    // project_kind filter applied — defaults to 'real_estate' if the column
-    // doesn't exist yet, so behavior matches the primary query above.
-    const fallbackRows = await sql`
-      SELECT
-        project_id,
-        project_name,
-        acres_gross,
-        acres_gross AS acreage,
-        location_lat,
-        location_lon,
-        location_lat AS latitude,
-        location_lon AS longitude,
-        start_date,
-        jurisdiction_city,
-        jurisdiction_county,
-        jurisdiction_state,
-        project_type,
-        location_description,
-        location_description AS location,
-        analysis_type,
-        analysis_perspective,
-        analysis_purpose,
-        value_add_enabled,
-        NULL::numeric AS total_residential_units,
-        NULL::numeric AS total_commercial_sqft,
-        NULL::numeric AS gross_sf,
-        NULL::int AS primary_count,
-        NULL::text AS primary_count_type,
-        NULL::numeric AS primary_area,
-        NULL::text AS primary_area_type,
-        updated_at
-      FROM landscape.tbl_project
-      WHERE 1 = 1
-        ${includeHome ? sql`` : sql`AND COALESCE(project_kind, 'real_estate') = 'real_estate'`}
-      ORDER BY updated_at DESC NULLS LAST, project_name
-    `
-
-    return fallbackRows.map((row) => ({
-      ...row,
-      project_type_code: null,
-      is_active: true,
-      analysis_type: row.analysis_type ?? null,
-      analysis_perspective: row.analysis_perspective ?? null,
-      analysis_purpose: row.analysis_purpose ?? null,
-      value_add_enabled: row.value_add_enabled ?? false,
-      property_subtype: null,
-      property_class: null,
-      analysis_mode: 'napkin'
-    }))
-  }
-}
-
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const propertyTypeFilter = searchParams.get('property_type')
-  const includeInactiveParam = searchParams.get('include_inactive')
-  const includeInactive = includeInactiveParam === null || includeInactiveParam === 'true'
   // LF-USERDASH-0514 Phase 2: opt-in to home projects in the list. Defaults
   // false — real-estate-only matches Django's ProjectViewSet default.
   const includeHome = searchParams.get('include_home') === 'true'
-  const analysisTypeConfigs = await queryAnalysisTypeConfigs()
-
-  // Check for Authorization header - if present, proxy to Django for user-scoped filtering
-  const authHeader = request.headers.get('Authorization')
-
-  if (authHeader) {
-    // Proxy to Django backend for authenticated, role-based filtering
-    const djangoUrl = new URL(`${DJANGO_API_BASE}/api/projects/`)
-    if (includeHome) djangoUrl.searchParams.set('include_home', 'true')
-    try {
-      console.log('Proxying to Django with auth...')
-      const djangoResponse = await fetch(djangoUrl.toString(), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authHeader,
-        },
-      })
-
-      if (!djangoResponse.ok) {
-        console.error('Django returned error:', djangoResponse.status)
-        // Fall through to direct DB query on Django error
-      } else {
-        const djangoData = await djangoResponse.json()
-
-        // Django returns { results: [...] } or just [...]
-        const projects = Array.isArray(djangoData) ? djangoData : (djangoData.results || [])
-
-        // Normalize and filter
-        const normalized = projects.map((project: RawProjectRow) =>
-          applyPrimaryMeasureFallbacks({
-            ...deriveDimensionsFromAnalysisType(project.analysis_type),
-            ...project,
-            project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
-            is_active: project.is_active ?? true,
-            analysis_mode: project.analysis_mode ?? 'napkin',
-            analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
-            analysis_purpose: project.analysis_purpose ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_purpose,
-            value_add_enabled: project.value_add_enabled ?? deriveDimensionsFromAnalysisType(project.analysis_type).value_add_enabled,
-          })
-        )
-        const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
-
-        const filtered = propertyTypeFilter
-          ? withTileConfig.filter((project: RawProjectRow) => project.project_type_code === propertyTypeFilter.toUpperCase())
-          : withTileConfig
-
-        console.log(`Django returned ${filtered.length} projects for authenticated user`)
-        return NextResponse.json(filtered)
-      }
-    } catch (djangoError) {
-      console.error('Django proxy error:', djangoError)
-      // Fall through to direct DB query
-    }
-  }
-
-  // Unauthenticated fallback: direct DB query (returns all projects)
-  let rows: RawProjectRow[]
 
   try {
-    console.log('Querying landscape.tbl_project directly (no auth)...')
-    rows = await queryProjects(includeInactive, includeHome)
+    const djangoUrl = new URL(`${DJANGO_API_BASE}/api/projects/`)
+    if (includeHome) djangoUrl.searchParams.set('include_home', 'true')
+    const djangoResponse = await fetch(djangoUrl.toString(), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+    })
 
-    const hasCarney = rows.some(
-      (project) =>
-        project.project_id === CARNEY_PROJECT_ID ||
-        project.project_name?.toLowerCase().includes('carney')
-    )
-
-    if (!hasCarney && includeInactive) {
-      console.log('Carney project missing; injecting fallback entry')
-      rows = [...rows, CARNEY_FALLBACK_PROJECT]
+    if (djangoResponse.status === 401) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const normalized = rows.map((project) =>
+    if (!djangoResponse.ok) {
+      const message = `Django returned ${djangoResponse.status}`
+      console.error('Django proxy non-OK:', message)
+      return NextResponse.json({ error: 'Failed to fetch projects', details: message }, { status: djangoResponse.status })
+    }
+
+    const djangoData = await djangoResponse.json()
+    const projects = Array.isArray(djangoData) ? djangoData : (djangoData.results || [])
+
+    const analysisTypeConfigs = await queryAnalysisTypeConfigs()
+
+    const normalized = projects.map((project: RawProjectRow) =>
       applyPrimaryMeasureFallbacks({
         ...deriveDimensionsFromAnalysisType(project.analysis_type),
         ...project,
-        project_type_code: normalizeProjectTypeCode(project.project_type_code, project.project_type),
+        project_type_code: normalizeProjectTypeCode(project.project_type_code ?? null, project.project_type ?? null),
         is_active: project.is_active ?? true,
         analysis_mode: project.analysis_mode ?? 'napkin',
         analysis_perspective: project.analysis_perspective ?? deriveDimensionsFromAnalysisType(project.analysis_type).analysis_perspective,
@@ -416,21 +239,14 @@ export async function GET(request: NextRequest) {
     const withTileConfig = attachTileConfigToProjects(normalized, analysisTypeConfigs)
 
     const filtered = propertyTypeFilter
-      ? withTileConfig.filter((project) => project.project_type_code === propertyTypeFilter.toUpperCase())
+      ? withTileConfig.filter((project: RawProjectRow) => project.project_type_code === propertyTypeFilter.toUpperCase())
       : withTileConfig
 
-    console.log('Found projects:', filtered.length)
     return NextResponse.json(filtered)
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error('Database error details:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to fetch projects',
-        details: message,
-      },
-      { status: 500 }
-    )
+  } catch (djangoError) {
+    const message = djangoError instanceof Error ? djangoError.message : String(djangoError)
+    console.error('Django proxy error:', djangoError)
+    return NextResponse.json({ error: 'Failed to fetch projects', details: message }, { status: 502 })
   }
 }
 

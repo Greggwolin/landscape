@@ -17,6 +17,7 @@ import HelpLandscaperPanel from '@/components/help/HelpLandscaperPanel';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLandscapeCommand } from '@/lib/landscape-command-bus';
+import { redirectToLoginExpired } from '@/lib/authHeaders';
 import '@/styles/wrapper.css';
 
 const DEFAULT_SIDEBAR_WIDTH = 260;
@@ -473,8 +474,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
-    fetch('/api/projects')
-      .then((r) => (r.ok ? r.json() : []))
+    fetch('/api/projects', { headers: getAuthHeaders() })
+      .then((r) => {
+        if (r.status === 401) {
+          redirectToLoginExpired();
+          return [];
+        }
+        return r.ok ? r.json() : [];
+      })
       .then((data) => {
         const rows = Array.isArray(data) ? data : data?.results || data?.projects || [];
         const sorted = rows

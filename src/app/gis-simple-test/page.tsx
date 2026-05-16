@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { getAuthHeaders, redirectToLoginExpired } from '@/lib/authHeaders'
 
 export default function GISSimpleTestPage() {
   const [testResults, setTestResults] = useState<string[]>([])
@@ -19,7 +20,12 @@ export default function GISSimpleTestPage() {
     try {
       // Test 1: Projects API
       addResult("📋 Testing Projects API...")
-      const projectsRes = await fetch('/api/projects')
+      const projectsRes = await fetch('/api/projects', { headers: getAuthHeaders() })
+      if (projectsRes.status === 401) {
+        addResult("❌ Projects API: 401 — redirecting to login")
+        redirectToLoginExpired()
+        return
+      }
       if (projectsRes.ok) {
         const projects = await projectsRes.json()
         addResult(`✅ Projects API: Found ${projects.length} projects`)
