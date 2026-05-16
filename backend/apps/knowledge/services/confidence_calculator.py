@@ -171,17 +171,17 @@ def _calculate_unit_completeness(project_id: int) -> Tuple[int, str]:
         except Exception:
             pass
 
-        # Check container-based units
+        # Check division-based units (tier 3)
         try:
             cursor.execute("""
                 SELECT COUNT(*)
-                FROM landscape.tbl_container
-                WHERE project_id = %s AND container_level = 3 AND is_active = true
+                FROM landscape.tbl_division
+                WHERE project_id = %s AND tier = 3 AND is_active = true
             """, [project_id])
 
             row = cursor.fetchone()
             if row and row[0] > 0:
-                return 30, f"{row[0]} container-based units (limited data)"
+                return 30, f"{row[0]} division-based units (limited data)"
         except Exception:
             pass
 

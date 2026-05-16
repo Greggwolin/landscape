@@ -312,7 +312,7 @@ export type FinCurveProfileInsert = {
 
 // landscape.core_fin_fact_actual
 // Primary Key: fact_id
-// Foreign Keys: category_id -> landscape.core_fin_category.category_id, container_id -> landscape.tbl_container.container_id, uom_code -> landscape.core_fin_uom.uom_code
+// Foreign Keys: category_id -> landscape.core_fin_category.category_id, division_id -> landscape.tbl_division.division_id, uom_code -> landscape.core_fin_uom.uom_code
 export interface FinFactActual {
   /** Default: nextval('core_fin_fact_actual_fact_id_seq'::regclass) */
   factId: number;
@@ -326,7 +326,7 @@ export interface FinFactActual {
   sourceDoc: string | null;
   /** Default: now() */
   createdAt: string;
-  containerId: number | null;
+  divisionId: number | null;
   projectId: number | null;
 }
 
@@ -339,7 +339,7 @@ export type FinFactActualInsert = {
   amount?: number | null;
   txnDate: string;
   sourceDoc?: string | null;
-  containerId?: number | null;
+  divisionId?: number | null;
   projectId?: number | null;
 };
 

@@ -91,7 +91,7 @@ class BudgetItem(models.Model):
     container = models.ForeignKey(
         'containers.Container',
         on_delete=models.CASCADE,
-        db_column='container_id',
+        db_column='division_id',
         null=True,
         blank=True,
         related_name='budget_items',
@@ -838,7 +838,7 @@ class ActualItem(models.Model):
     container = models.ForeignKey(
         'containers.Container',
         on_delete=models.CASCADE,
-        db_column='container_id',
+        db_column='division_id',
         null=True,
         blank=True,
         related_name='actual_items'

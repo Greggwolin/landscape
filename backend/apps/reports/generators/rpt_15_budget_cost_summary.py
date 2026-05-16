@@ -86,12 +86,12 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
         # Budget by phase
         phase_budget = self.execute_query("""
             SELECT
-                COALESCE(c.container_label, 'Unassigned') AS phase_name,
+                COALESCE(d.display_name, d.division_code, 'Unassigned') AS phase_name,
                 COALESCE(SUM(b.amount), 0) AS budget_amount
             FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
-            WHERE b.project_id = %s AND b.container_id IS NOT NULL
-            GROUP BY COALESCE(c.container_label, 'Unassigned')
+            LEFT JOIN landscape.tbl_division d ON b.division_id = d.division_id
+            WHERE b.project_id = %s AND b.division_id IS NOT NULL
+            GROUP BY COALESCE(d.display_name, d.division_code, 'Unassigned')
             ORDER BY budget_amount DESC
         """, [self.project_id])
 
