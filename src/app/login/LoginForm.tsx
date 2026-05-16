@@ -5,10 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  createLandscaperProfile,
-  fetchLandscaperProfile,
-} from '@/services/landscaperProfile';
+import { createLandscaperProfile } from '@/services/landscaperProfile';
 
 export default function LoginForm() {
   const { login, isAuthenticated, isLoading } = useAuth();
@@ -110,21 +107,14 @@ export default function LoginForm() {
         persistAcceptedTos(loginUsernameKey, acceptedAt);
       }
 
-      const isAdmin = result.user?.role === 'admin';
-      if (isAdmin) {
-        setRedirecting(true);
-        router.push('/w/dashboard');
-        return;
-      }
-      const profile = await fetchLandscaperProfile();
-      const target = profile.survey_completed_at ? '/w/dashboard' : '/onboarding';
+      // Onboarding survey pulled 2026-05-15 — all authenticated users land
+      // on the home dashboard. TOS persistence above is retained.
       setRedirecting(true);
-      router.push(target);
+      router.push('/w/dashboard');
 
-      const resolvedAcceptedAt = profile.tos_accepted_at ?? acceptedAt;
-      if (resolvedAcceptedAt) {
+      if (acceptedAt) {
         const profileUsername = result.user?.username?.toLowerCase?.() || loginUsernameKey;
-        persistAcceptedTos(profileUsername, resolvedAcceptedAt);
+        persistAcceptedTos(profileUsername, acceptedAt);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -319,15 +309,14 @@ export default function LoginForm() {
           style={{ backgroundColor: 'var(--surface-card)', borderColor: 'var(--cui-border-color)' }}
         >
           <p className="text-sm uppercase tracking-[0.2em] mb-4" style={{ color: 'var(--cui-secondary-color)' }}>
-            Guidance
+            Alpha
           </p>
           <h1 className="text-2xl font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-            A better Landscaper onboarding
+            Welcome to Landscape
           </h1>
           <p className="text-base leading-relaxed" style={{ color: 'var(--cui-secondary-color)' }}>
-            We pair you with a calibrated Landscaper assistant, tailored to your role, tone, and tooling.
-            Your onboarding answers map directly to how the chat introduces itself, suggests documents, and
-            keeps confidential insights locked to your private workspace.
+            Sign in to reach your projects and the Landscaper assistant. Confidential work stays inside your
+            private workspace.
           </p>
         </div>
       </div>
