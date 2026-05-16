@@ -192,20 +192,71 @@ MUTABLE_FIELDS = {
         "submarket_vacancy_rate_pct", "competitive_set_vacancy_pct",
     ],
     # Rent Roll Tables
+    # Realigned 2026-05-16 (LSCMD-AUDIT-PASS-1B). Stale entries replaced with
+    # columns that actually exist on tbl_multifamily_unit_type today:
+    # - square_feet_min/_max collapsed to avg_square_feet
+    # - base_rent → market_rent / current_market_rent / current_rent_avg
+    # - is_affordable / affordability_ami_level dropped (feature not implemented)
     "tbl_multifamily_unit_type": [
         "unit_type_code", "unit_type_name", "bedrooms", "bathrooms",
-        "square_feet_min", "square_feet_max", "base_rent", "market_rent",
-        "unit_count", "is_affordable", "affordability_ami_level", "notes",
+        "avg_square_feet",
+        "market_rent", "current_market_rent", "current_rent_avg",
+        "concessions_avg", "value_source",
+        "unit_count", "total_units",
+        "other_features", "notes",
     ],
+    # Realigned 2026-05-16 (LSCMD-AUDIT-PASS-1B). Net-lease foundation
+    # migration 20260506_net_lease_extension_and_cleanup repurposed tbl_lease
+    # as the *commercial* lease table. Net-lease (NN/NNN), retail, industrial,
+    # and MF lease extensions hang off it via tbl_lease_nl_ext / tbl_lease_ret_ext
+    # / tbl_lease_ind_ext / tbl_lease_mf_ext. The production multifamily-
+    # residential lease pipeline lives on tbl_multifamily_lease (separate
+    # whitelist below). This whitelist now matches the commercial columns that
+    # actually exist on tbl_lease — same canonical list as the rent-roll
+    # batch-upsert writer in tool_executor.py (search "CRE lease provisions").
     "tbl_lease": [
+        # Tenant identity
         "tenant_name", "tenant_contact", "tenant_email", "tenant_phone",
-        "lease_start_date", "lease_end_date", "monthly_rent", "base_rent",
-        "rent_escalation_pct", "security_deposit", "lease_type", "lease_status",
-        "payment_frequency", "payment_day", "is_month_to_month", "notice_days",
-        "renewal_options", "renewal_rent_increase_pct", "cam_charges",
-        "utility_reimbursements", "parking_charges", "pet_deposit", "pet_rent",
-        "concessions_monthly", "concession_description", "move_in_date",
-        "move_out_date", "termination_reason", "notes",
+        "tenant_classification",
+        # Lease classification
+        "lease_status", "lease_type", "lease_type_code",
+        # Suite / location within property
+        "suite_number", "floor_number",
+        # Dates
+        "lease_execution_date", "lease_commencement_date", "rent_start_date",
+        "lease_expiration_date", "lease_term_months",
+        # Areas
+        "leased_sf", "usable_sf",
+        # Renewal options
+        "number_of_renewal_options", "renewal_option_term_months",
+        "renewal_notice_months", "renewal_probability_pct",
+        # Early termination
+        "early_termination_allowed", "termination_notice_months",
+        "termination_penalty_amount",
+        # Deposits
+        "security_deposit_amount", "security_deposit_months",
+        # Occupancy / rights
+        "affects_occupancy", "expansion_rights", "right_of_first_refusal",
+        # CRE lease provisions
+        "exclusive_use_clause", "co_tenancy_clause", "radius_restriction",
+        # Free-form
+        "notes", "lease_metadata",
+        # Termination metadata
+        "terminated_at", "termination_reason",
+    ],
+    # Added 2026-05-16 (LSCMD-AUDIT-PASS-1B). The production multifamily-
+    # residential lease pipeline writes here (per
+    # 20260506_net_lease_extension_and_cleanup migration comment). Previously
+    # no whitelist existed for this table, so mutation-service updates against
+    # it were ungated. Fields are the user-editable columns; identity (lease_id,
+    # unit_id) and audit (created_at, updated_at) excluded.
+    "tbl_multifamily_lease": [
+        "resident_name",
+        "lease_start_date", "lease_end_date", "lease_term_months",
+        "base_rent_monthly", "effective_rent_monthly",
+        "months_free_rent", "concession_amount",
+        "security_deposit", "pet_rent_monthly", "parking_rent_monthly",
+        "lease_status", "notice_date", "notice_to_vacate_days", "is_renewal",
     ],
     # Comparables Tables
     "tbl_sales_comparables": [
@@ -301,36 +352,17 @@ MUTABLE_FIELDS = {
         "template_name", "workspace_id", "project_id", "doc_type",
         "is_default", "doc_type_options", "description",
     ],
-    # Part 8: CRE Tables
-    "tbl_cre_tenant": [
-        "tenant_name", "tenant_legal_name", "dba_name", "industry", "naics_code",
-        "business_type", "credit_rating", "creditworthiness", "dun_bradstreet_number",
-        "annual_revenue", "years_in_business", "contact_name", "contact_title",
-        "email", "phone", "guarantor_name", "guarantor_type",
-    ],
-    "tbl_cre_space": [
-        "cre_property_id", "space_number", "floor_number", "usable_sf", "rentable_sf",
-        "space_type", "frontage_ft", "ceiling_height_ft", "number_of_offices",
-        "number_of_conference_rooms", "has_kitchenette", "has_private_restroom",
-        "space_status", "available_date",
-    ],
-    "tbl_cre_lease": [
-        "cre_property_id", "space_id", "tenant_id", "lease_number", "lease_type",
-        "lease_status", "lease_execution_date", "lease_commencement_date",
-        "rent_commencement_date", "lease_expiration_date", "lease_term_months",
-        "leased_sf", "number_of_options", "option_term_months", "option_notice_months",
-        "early_termination_allowed", "termination_notice_months", "termination_penalty_amount",
-        "security_deposit_amount", "security_deposit_months", "expansion_rights",
-        "right_of_first_refusal", "exclusive_use_clause", "co_tenancy_clause",
-        "radius_restriction", "notes",
-    ],
-    "tbl_cre_property": [
-        "project_id", "parcel_id", "property_name", "property_type", "property_subtype",
-        "total_building_sf", "rentable_sf", "usable_sf", "common_area_sf", "load_factor",
-        "year_built", "year_renovated", "number_of_floors", "number_of_units",
-        "parking_spaces", "parking_ratio", "property_status", "stabilization_date",
-        "stabilized_occupancy_pct", "acquisition_date", "acquisition_price", "current_assessed_value",
-    ],
+    # Removed 2026-05-16 (LSCMD-AUDIT-PASS-1B). The four tbl_cre_* whitelists
+    # (tbl_cre_tenant, tbl_cre_space, tbl_cre_lease, tbl_cre_property) pointed
+    # at tables that do not exist in the schema. Per migration
+    # 20260506_net_lease_extension_and_cleanup, the commercial-property feature
+    # was rebuilt on tbl_lease (commercial) + tbl_lease_nl_ext / _ret_ext /
+    # _ind_ext / _mf_ext extensions. The corresponding Landscaper tools
+    # (get_cre_tenants, update_cre_tenant, etc.) were de-registered earlier
+    # today on chore/cre-tools-deregister. The implementations in
+    # tool_executor.py remain in place for revival when commercial-property
+    # tooling is rebuilt against the live schema; this whitelist will need to
+    # be re-added at that point with the correct table targets.
     # Part 8: Market Intelligence Tables
     "market_competitive_projects": [
         "project_id", "master_plan_name", "comp_name", "builder_name", "comp_address",
@@ -428,6 +460,10 @@ PK_COLUMNS = {
     "tbl_multifamily_unit_type": "unit_type_id",
     "tbl_multifamily_unit": "unit_id",
     "tbl_lease": "lease_id",
+    # tbl_multifamily_lease primary key added 2026-05-16 (LSCMD-AUDIT-PASS-1B)
+    # in tandem with the new whitelist above. Same PK column name as
+    # commercial tbl_lease — they're parallel pipelines on different tables.
+    "tbl_multifamily_lease": "lease_id",
     # Comparables tables
     "tbl_sales_comparables": "comparable_id",
     "tbl_sales_comp_adjustments": "adjustment_id",
@@ -449,11 +485,10 @@ PK_COLUMNS = {
     "core_unit_cost_item": "item_id",
     "report_templates": "id",
     "dms_templates": "template_id",
-    # Part 8: CRE tables
-    "tbl_cre_tenant": "tenant_id",
-    "tbl_cre_space": "space_id",
-    "tbl_cre_lease": "lease_id",
-    "tbl_cre_property": "cre_property_id",
+    # Removed 2026-05-16 (LSCMD-AUDIT-PASS-1B). tbl_cre_* tables don't exist;
+    # commercial-property feature rebuilt on tbl_lease + extensions per
+    # migration 20260506_net_lease_extension_and_cleanup. See MUTABLE_FIELDS
+    # comment for the full context.
     # Part 8: Market Intelligence tables
     "market_competitive_projects": "id",
     "market_assumptions": "project_id",  # Composite key with lu_type_code
