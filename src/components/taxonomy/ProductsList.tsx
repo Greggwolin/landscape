@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/toast';
 import CIcon from '@coreui/icons-react';
 import { cilPencil, cilTrash } from '@coreui/icons';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Type {
   type_id: number;
   code: string;
@@ -45,7 +46,7 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
     const loadEfficiency = async () => {
       setEfficiencyLoading(true);
       try {
-        const response = await fetch('/api/planning-standards');
+        const response = await fetch('/api/planning-standards', { headers: getAuthHeaders() });
         if (response.ok) {
           const data = await response.json();
           const value = data?.standard?.default_planning_efficiency;
@@ -71,7 +72,7 @@ export default function ProductsList({ type, onClose }: ProductsListProps) {
   const loadProducts = async (typeId: number) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/taxonomy/products?type_id=${typeId}`);
+      const response = await fetch(`/api/taxonomy/products?type_id=${typeId}`, { headers: getAuthHeaders() });
       const data = await response.json();
       setProducts(data);
     } catch (error) {
@@ -134,9 +135,7 @@ const handleDelete = async (product: Product) => {
 
   try {
     const response = await fetch(
-      `/api/taxonomy/products/${product.product_id}?type_id=${type.type_id}`,
-      { method: 'DELETE' }
-    );
+      `/api/taxonomy/products/${product.product_id}?type_id=${type.type_id}`, { headers: getAuthHeaders(), method: 'DELETE' });
 
     if (!response.ok) {
       const error = await response.json();

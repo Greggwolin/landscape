@@ -1,9 +1,14 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { sql } from '@/lib/db'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 // PATCH /api/areas/[id]
 // Allows updating area name, label, and description
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
@@ -37,6 +42,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // DELETE /api/areas/[id]
 // Deletes an area by ID. Will fail if the area has phases or parcels associated with it.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
 

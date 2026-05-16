@@ -2,7 +2,6 @@
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import connection
 import logging
@@ -11,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def tag_list(request):
     """
     GET /api/dms/tags/?workspace_id=X  — List all tags for workspace with usage counts
@@ -83,7 +81,6 @@ def tag_list(request):
 
 
 @api_view(['PUT', 'DELETE'])
-@permission_classes([AllowAny])
 def tag_detail(request, tag_id):
     """
     PUT /api/dms/tags/{tag_id}/    — Rename tag globally
@@ -139,7 +136,6 @@ def tag_detail(request, tag_id):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def tag_suggest(request):
     """
     GET /api/dms/tags/suggest/?q=appr&workspace_id=X
@@ -212,7 +208,6 @@ def tag_suggest(request):
 
 
 @api_view(['POST', 'DELETE'])
-@permission_classes([AllowAny])
 def document_tags(request, doc_id, tag_id=None):
     """
     POST /api/dms/documents/{doc_id}/tags/          — Assign tag(s) to document
@@ -269,7 +264,6 @@ def document_tags(request, doc_id, tag_id=None):
 # =============================================================================
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def project_doc_types(request, project_id):
     """
     GET /api/dms/projects/{project_id}/doc-types/   — Returns merged list (template + custom)
@@ -348,7 +342,6 @@ def project_doc_types(request, project_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def reassign_project_doc_type(request, project_id, pk):
     """
     POST /api/dms/projects/{project_id}/doc-types/{pk}/reassign/
@@ -392,7 +385,6 @@ def reassign_project_doc_type(request, project_id, pk):
 
 
 @api_view(['DELETE', 'PUT'])
-@permission_classes([AllowAny])
 def project_doc_type_detail(request, project_id, pk):
     """
     DELETE /api/dms/projects/{project_id}/doc-types/{pk}/  — Remove custom doc type

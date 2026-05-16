@@ -19,6 +19,7 @@ import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove 
 import { CSS } from '@dnd-kit/utilities';
 import LocationIntelligenceCard from './LocationIntelligenceCard';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Project {
   project_id: number;
   project_name: string;
@@ -1329,7 +1330,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       });
 
       // Fetch rental comparables
-      const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`);
+      const compsResponse = await fetch(`/api/projects/${projectId}/rental-comparables`, { headers: getAuthHeaders() });
       if (compsResponse.ok) {
         const compsData = await compsResponse.json();
         if (compsData.success && compsData.data) {

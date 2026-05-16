@@ -37,6 +37,7 @@ async function generateSha256(file: File): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -180,18 +181,15 @@ export async function POST(req: NextRequest) {
     if (extractionResultsRaw) {
       try {
         const extractionFields = JSON.parse(extractionResultsRaw);
-        const persistResponse = await fetch(
-          `${DJANGO_API_URL}/api/dms/persist-extraction/`,
-          {
+        const persistResponse = await fetch(`${DJANGO_API_URL}/api/dms/persist-extraction/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
             body: JSON.stringify({
               doc_id: doc.doc_id,
               extracted_fields: extractionFields,
               extraction_method: 'project_creation',
             }),
-          }
-        );
+          });
         if (persistResponse.ok) {
           const persistResult = await persistResponse.json();
           console.log(`✅ Persisted ${persistResult.rows_written} extraction facts for doc_id=${doc.doc_id}`);
@@ -233,13 +231,10 @@ export async function POST(req: NextRequest) {
 
       try {
         // Step 1: Process document (text extraction, chunking, embeddings)
-        const processResponse = await fetch(
-          `${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`,
-          {
+        const processResponse = await fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+            headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
+          });
 
         if (!processResponse.ok) {
           const errorText = await processResponse.text();
@@ -251,18 +246,15 @@ export async function POST(req: NextRequest) {
           console.log(`✅ Document processed: ${processResult.embeddings_created || 0} embeddings`);
 
           // Step 2: Run batched extraction
-          const extractResponse = await fetch(
-            `${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/extract-batched/`,
-            {
+          const extractResponse = await fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/extract-batched/`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 project_id: projectId,
                 property_type: 'multifamily',
                 batches: ['core_property', 'financials', 'deal_market', 'opex', 'unit_types', 'comparables'],
               }),
-            }
-          );
+            });
 
           if (extractResponse.ok) {
             const extractResult = await extractResponse.json();
@@ -275,16 +267,13 @@ export async function POST(req: NextRequest) {
             if (extractResult.total_staged > 0) {
               console.log(`🔄 Auto-approving high-confidence extractions for project ${projectId}`);
               try {
-                const approveResponse = await fetch(
-                  `${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extractions/approve-high-confidence/`,
-                  {
+                const approveResponse = await fetch(`${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extractions/approve-high-confidence/`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       confidence_threshold: 0.85,
                     }),
-                  }
-                );
+                  });
 
                 if (approveResponse.ok) {
                   const approveResult = await approveResponse.json();

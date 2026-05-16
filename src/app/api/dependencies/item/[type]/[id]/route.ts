@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getTimelineItemSummary, TimelineItemType } from '@/lib/timeline-engine/item-service';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const ITEM_TYPES: TimelineItemType[] = ['budget', 'milestone'];
 
 type Params = { params: Promise<{ type: string; id: string }> };
@@ -10,6 +11,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { type: typeParam, id } = await context.params;
     const type = typeParam as TimelineItemType;

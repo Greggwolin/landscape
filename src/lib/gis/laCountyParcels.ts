@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const LA_COUNTY_PARCELS_QUERY_URL =
   'https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0/query';
 
@@ -210,7 +211,7 @@ const fetchBboxExternal = async (bbox: [number, number, number, number]): Promis
 const fetchChunkViaProxy = async (apns: string[]): Promise<FeatureCollection> => {
   const response = await fetch('/api/gis/la-parcels', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ apns }),
   });
 
@@ -225,7 +226,7 @@ const fetchChunkViaProxy = async (apns: string[]): Promise<FeatureCollection> =>
 const fetchBboxViaProxy = async (bbox: [number, number, number, number]): Promise<FeatureCollection> => {
   const response = await fetch('/api/gis/la-parcels', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ bbox }),
   });
 

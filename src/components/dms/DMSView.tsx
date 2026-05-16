@@ -18,6 +18,7 @@ import { useFileDrop } from '@/contexts/FileDropContext';
 import type { DMSDocument } from '@/types/dms';
 import { useToast } from '@/hooks/use-toast';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface DMSViewProps {
   projectId: number;
   projectName: string;
@@ -91,7 +92,7 @@ function DMSViewInner({
   } | null>(null);
 
   useEffect(() => {
-    fetch(`/api/projects/${projectId}/dms/doc-types`)
+    fetch(`/api/projects/${projectId}/dms/doc-types`, { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         if (data.template_id && data.template_name) {
@@ -103,7 +104,7 @@ function DMSViewInner({
 
   // Fetch all doc type suggestions from all templates for autocomplete
   useEffect(() => {
-    fetch(`/api/dms/templates/all-doc-types`)
+    fetch(`/api/dms/templates/all-doc-types`, { headers: getAuthHeaders() })
       .then(res => res.ok ? res.json() : { doc_types: [] })
       .then(data => {
         if (Array.isArray(data.doc_types)) {
@@ -186,7 +187,7 @@ function DMSViewInner({
           docTypeParams.append('project_type', projectType);
         }
 
-        const docTypesResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`);
+        const docTypesResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`, { headers: getAuthHeaders() });
         let docTypeOptions: string[] = [];
         if (docTypesResponse.ok) {
           const data = await parseJsonSafely<{ doc_type_options?: string[] }>(
@@ -203,7 +204,7 @@ function DMSViewInner({
       }
 
       // Fetch document counts
-      const countsResponse = await fetch(`/api/dms/filters/counts?project_id=${projectId}`);
+      const countsResponse = await fetch(`/api/dms/filters/counts?project_id=${projectId}`, { headers: getAuthHeaders() });
       if (!countsResponse.ok) {
         throw new Error('Failed to fetch filter counts');
       }
@@ -227,7 +228,7 @@ function DMSViewInner({
             workspace_id: defaultWorkspaceId.toString(),
             project_type: 'valuation'
           });
-          const valuationResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`);
+          const valuationResponse = await fetch(`/api/dms/templates/doc-types?${docTypeParams.toString()}`, { headers: getAuthHeaders() });
           if (valuationResponse.ok) {
             const valuationData = await parseJsonSafely<{ doc_type_options?: string[] }>(
               valuationResponse,
@@ -358,8 +359,7 @@ function DMSViewInner({
             .map(f => f.doc_type.toLowerCase())
         );
         const response = await fetch(
-          `/api/dms/search?project_id=${projectId}&limit=100`
-        );
+          `/api/dms/search?project_id=${projectId}&limit=100`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch documents');
         const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
         documents = (data.results || []).filter(
@@ -367,8 +367,7 @@ function DMSViewInner({
         );
       } else {
         const response = await fetch(
-          `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
-        );
+          `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch documents');
         const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
         documents = data.results || [];
@@ -432,8 +431,7 @@ function DMSViewInner({
   const refreshExpandedDocuments = async (docType: string) => {
     try {
       const response = await fetch(
-        `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`
-      );
+        `/api/dms/search?project_id=${projectId}&doc_type=${encodeURIComponent(docType)}&limit=20`, { headers: getAuthHeaders() });
       if (!response.ok) return;
       const data = await parseJsonSafely<{ results?: DMSDocument[] }>(response, 'dms/search');
       setAllFilters((prev) =>
@@ -453,8 +451,7 @@ function DMSViewInner({
     setIsLoadingTrash(true);
     try {
       const response = await fetch(
-        `/api/dms/search?project_id=${projectId}&include_deleted=true&deleted_only=true&limit=100`
-      );
+        `/api/dms/search?project_id=${projectId}&include_deleted=true&deleted_only=true&limit=100`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await parseJsonSafely<{ results?: DMSDocument[]; totalHits?: number }>(
           response,
@@ -552,13 +549,11 @@ function DMSViewInner({
       }
 
       const response = await fetch(
-        `/api/projects/${projectId}/dms/docs/${link.targetDocId}/link-version`,
-        {
+        `/api/projects/${projectId}/dms/docs/${link.targetDocId}/link-version`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ source_doc_id: link.sourceDocId }),
-        }
-      );
+        });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -579,9 +574,7 @@ function DMSViewInner({
     for (const doc of selectedDocuments) {
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`,
-          { method: 'DELETE' }
-        );
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`, { headers: getAuthHeaders(), method: 'DELETE' });
         if (!response.ok) {
           const data = await parseJsonSafely<{ error?: string }>(response, 'dms/delete');
           errors.push(`${doc.doc_name}: ${data.error || 'Delete failed'}`);
@@ -607,9 +600,7 @@ function DMSViewInner({
     for (const doc of selectedTrashedDocuments) {
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/restore`,
-          { method: 'POST' }
-        );
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/restore`, { headers: getAuthHeaders(), method: 'POST' });
         if (!response.ok) {
           const data = await parseJsonSafely<{ error?: string }>(response, 'dms/restore');
           errors.push(`${doc.doc_name}: ${data.error || 'Restore failed'}`);
@@ -636,9 +627,7 @@ function DMSViewInner({
     for (const doc of selectedTrashedDocuments) {
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/permanent-delete`,
-          { method: 'DELETE' }
-        );
+          `/api/projects/${projectId}/dms/docs/${doc.doc_id}/permanent-delete`, { headers: getAuthHeaders(), method: 'DELETE' });
         if (!response.ok) {
           const data = await parseJsonSafely<{ error?: string }>(response, 'dms/permanent-delete');
           errors.push(`${doc.doc_name}: ${data.error || 'Permanent delete failed'}`);
@@ -662,13 +651,11 @@ function DMSViewInner({
     if (!firstSelectedDoc) return;
 
     const response = await fetch(
-      `/api/projects/${projectId}/dms/docs/${firstSelectedDoc.doc_id}/rename`,
-      {
+      `/api/projects/${projectId}/dms/docs/${firstSelectedDoc.doc_id}/rename`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_name: newName }),
-      }
-    );
+      });
 
     if (!response.ok) {
       const data = await parseJsonSafely<{ error?: string }>(response, 'dms/rename');
@@ -686,7 +673,7 @@ function DMSViewInner({
 
     const response = await fetch(`/api/dms/documents/${firstSelectedDoc.doc_id}/profile`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile }),
     });
 
@@ -720,7 +707,7 @@ function DMSViewInner({
       try {
         const response = await fetch(`/api/dms/documents/${docId}/profile`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ profile: { doc_type: targetDocType } }),
         });
         if (!response.ok) {
@@ -964,7 +951,7 @@ function DMSViewInner({
     setIsSavingToTemplate(true);
     try {
       // Fetch current template to get existing doc_type_options, then append
-      const getRes = await fetch('/api/dms/templates');
+      const getRes = await fetch('/api/dms/templates', { headers: getAuthHeaders() });
       const getData = await getRes.json();
       const currentTemplate = (getData.templates || []).find(
         (t: { template_id: number }) => t.template_id === saveToTemplatePrompt.templateId
@@ -988,7 +975,7 @@ function DMSViewInner({
 
         await fetch(`/api/dms/templates/${saveToTemplatePrompt.templateId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ doc_type_options: updatedOptions }),
         });
       }

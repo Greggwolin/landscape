@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 interface RouteParams {
   params: Promise<{ projectId: string }>;
 }
@@ -28,6 +29,10 @@ interface InputUpdate {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params;
   const projectIdNum = parseInt(projectId, 10);
 

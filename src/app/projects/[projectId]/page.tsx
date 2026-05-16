@@ -20,6 +20,7 @@ import { useProjectContext, type ProjectSummary } from '@/app/components/Project
 import { useFolderNavigation } from '@/hooks/useFolderNavigation';
 import ProjectContentRouter from './ProjectContentRouter';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 function ProjectPageInner() {
   const params = useParams();
   const projectId = Number(params.projectId);
@@ -50,7 +51,7 @@ function ProjectPageInner() {
     fallbackAttempted.current = true;
     setFallbackLoading(true);
 
-    fetch(`/api/projects/${projectId}`)
+    fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
       .then(res => {
         if (!res.ok) return Promise.reject(res.status);
         return res.json();

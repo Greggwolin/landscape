@@ -19,6 +19,7 @@ import { LandscapeButton } from '@/components/ui/landscape';
 import EntityMediaDisplay from '@/components/shared/EntityMediaDisplay';
 import MediaPickerModal from '@/components/dms/modals/MediaPickerModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface SubjectPropertyInfo {
   city?: string | null;
   analysisStartDate?: string | null;
@@ -246,7 +247,7 @@ export function ComparablesGrid({ comparables, projectId, subjectProperty, onEdi
     let active = true;
     const loadOwnershipOptions = async () => {
       try {
-        const response = await fetch('/api/lookups/ownership-types');
+        const response = await fetch('/api/lookups/ownership-types', { headers: getAuthHeaders() });
         if (!response.ok) return;
         const data = await response.json();
         if (!active) return;

@@ -5,6 +5,7 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface UnitCostCategory {
   category_id: number;
   parent: number | null; // Note: API returns 'parent' not 'parent_id'
@@ -63,7 +64,7 @@ export function useUnitCostCategoriesForBudget(projectTypeCode?: string): UseUni
         params.set('project_type_code', projectTypeCode);
       }
 
-      const response = await fetch(`/api/unit-costs/categories?${params.toString()}`);
+      const response = await fetch(`/api/unit-costs/categories?${params.toString()}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to load unit cost categories');
       }

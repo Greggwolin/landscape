@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface MigrationStatus {
   total: number
   migrated: number
@@ -38,7 +39,7 @@ const TaxonomyMigration: React.FC = () => {
 
   const loadStatus = async () => {
     try {
-      const response = await fetch('/api/landuse/migration?action=status')
+      const response = await fetch('/api/landuse/migration?action=status', { headers: getAuthHeaders() })
       if (response.ok) {
         const data = await response.json()
         setStatus(data)
@@ -59,8 +60,7 @@ const TaxonomyMigration: React.FC = () => {
     try {
       const response = await fetch('/api/landuse/migration', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({ dryRun: true })
       })
@@ -91,8 +91,7 @@ const TaxonomyMigration: React.FC = () => {
     try {
       const response = await fetch('/api/landuse/migration', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({ dryRun: false })
       })

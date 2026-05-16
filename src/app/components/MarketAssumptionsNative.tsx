@@ -34,6 +34,7 @@ import { Save as SaveIcon, TrendingUp, Analytics, Timeline, KeyboardArrowDown, K
 import { useRouter } from 'next/navigation';
 import { processUOMOptions } from '../../lib/uom-utils';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Materio-inspired theme
 const materioTheme = createTheme({
  palette: {
@@ -252,13 +253,13 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
  setLoading(true)
  try {
  // Load active land use types
- const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`)
+ const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`, { headers: getAuthHeaders() })
  if (!typesResponse.ok) throw new Error('Failed to load land use types')
  const types = await typesResponse.json()
  setActiveLandUseTypes(types)
 
  // Load UOM options
- const uomResponse = await fetch('/api/fin/uoms')
+ const uomResponse = await fetch('/api/fin/uoms', { headers: getAuthHeaders() })
  if (uomResponse.ok) {
  const uoms = await uomResponse.json()
  const formattedUoms = uoms.map((uom: any) => ({ code: uom.uom_code, label: uom.name }))
@@ -267,7 +268,7 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
  }
 
  // Load existing pricing data
- const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`)
+ const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`, { headers: getAuthHeaders() })
  if (!pricingResponse.ok) throw new Error('Failed to load pricing data')
  const existingPricing = await pricingResponse.json()
 
@@ -298,7 +299,7 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
 
  // Check for custom growth rates configuration
  try {
- const growthRes = await fetch(`/api/assumptions/growth-rates?project_id=${projectId}`, { cache: 'no-store' })
+ const growthRes = await fetch(`/api/assumptions/growth-rates?project_id=${projectId}`, { headers: getAuthHeaders(), cache: 'no-store' })
  const growthData = await growthRes.json()
  // Check if any custom growth rates have been configured beyond defaults
  const hasCustomConfig = growthData?.assumptions?.some((assumption: any) =>
@@ -376,7 +377,7 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
  try {
  const response = await fetch('/api/market-pricing', {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({
  project_id: projectId,
  pricing_data: pricingData

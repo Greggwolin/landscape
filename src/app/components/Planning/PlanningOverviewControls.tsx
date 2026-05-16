@@ -5,6 +5,7 @@ import { mutate } from 'swr';
 import { CFormSwitch } from '@coreui/react';
 import { ExportButton } from '@/components/admin';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface GranularitySettings {
   level1Enabled: boolean;
   level1Label: string;
@@ -68,7 +69,7 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/project/granularity-settings?project_id=${projectId}`);
+      const response = await fetch(`/api/project/granularity-settings?project_id=${projectId}`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         const normalized: GranularitySettings = {
@@ -101,7 +102,7 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
     try {
       const response = await fetch(`/api/project/granularity-settings?project_id=${projectId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)
       });
 
@@ -167,7 +168,7 @@ export default function PlanningOverviewControls({ projectId, projectIdStr }: Pr
       try {
         const response = await fetch(`/api/project/granularity-settings?project_id=${projectId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedSettings)
         });
 

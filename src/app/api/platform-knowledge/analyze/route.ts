@@ -14,6 +14,7 @@ async function generateSha256(file: File): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const response = await fetch(`${DJANGO_API_URL}/api/knowledge/platform/analyze/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       body: JSON.stringify({
         storage_uri: storageUri,
         doc_name: file.name,

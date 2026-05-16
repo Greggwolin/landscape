@@ -7,7 +7,6 @@ Provides CRUD operations and custom endpoints for property valuation.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum, Avg, Count, Q
@@ -58,6 +57,7 @@ from .serializers_valuation import (
     ProjectPropertyAttributesSerializer,
 )
 from apps.projects.models import Project
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .views_income_approach import _get_income_approach_data
 
 
@@ -77,7 +77,6 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
     queryset = SalesComparable.objects.all()
     serializer_class = SalesComparableSerializer
     lookup_field = 'comparable_id'
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by project scope if provided and prefetch related details."""
@@ -95,7 +94,7 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
         if property_type:
             queryset = queryset.filter(property_type=property_type)
 
-        return queryset.select_related(
+        queryset = queryset.select_related(
             'project',
             'industrial_details',
             'hospitality_details',
@@ -114,6 +113,7 @@ class SalesComparableViewSet(viewsets.ModelViewSet):
             'contacts',
             'ai_suggestions',
         ).order_by('comp_number', '-sale_date')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def get_serializer_class(self):
         """Use project-scoped serializers for new endpoints; preserve legacy serializer for old routes."""
@@ -241,7 +241,6 @@ class SalesCompAdjustmentViewSet(viewsets.ModelViewSet):
 
     queryset = SalesCompAdjustment.objects.select_related('comparable').all()
     serializer_class = SalesCompAdjustmentSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by comparable scope if provided."""
@@ -270,7 +269,6 @@ class LkpSaleTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LkpSaleType.objects.all().order_by('sort_order', 'code')
     serializer_class = LkpSaleTypeSerializer
-    permission_classes = [AllowAny]
 
 
 class LkpPriceStatusViewSet(viewsets.ReadOnlyModelViewSet):
@@ -278,7 +276,6 @@ class LkpPriceStatusViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LkpPriceStatus.objects.all().order_by('-reliability_score', 'code')
     serializer_class = LkpPriceStatusSerializer
-    permission_classes = [AllowAny]
 
 
 class LkpBuyerSellerTypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -286,7 +283,6 @@ class LkpBuyerSellerTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LkpBuyerSellerType.objects.all().order_by('sort_order', 'code')
     serializer_class = LkpBuyerSellerTypeSerializer
-    permission_classes = [AllowAny]
 
 
 class LkpBuildingClassViewSet(viewsets.ReadOnlyModelViewSet):
@@ -294,7 +290,6 @@ class LkpBuildingClassViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = LkpBuildingClass.objects.all().order_by('code')
     serializer_class = LkpBuildingClassSerializer
-    permission_classes = [AllowAny]
 
 
 class AIAdjustmentSuggestionViewSet(viewsets.ModelViewSet):
@@ -311,7 +306,6 @@ class AIAdjustmentSuggestionViewSet(viewsets.ModelViewSet):
     """
     queryset = AIAdjustmentSuggestion.objects.all()
     serializer_class = AIAdjustmentSuggestionSerializer
-    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='by_comp/(?P<comp_id>[0-9]+)')
     def by_comp(self, request, comp_id=None):
@@ -367,15 +361,14 @@ class CostApproachViewSet(viewsets.ModelViewSet):
 
     queryset = CostApproach.objects.select_related('project').all()
     serializer_class = CostApproachSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project_id if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -406,15 +399,14 @@ class IncomeApproachViewSet(viewsets.ModelViewSet):
 
     queryset = IncomeApproach.objects.select_related('project').prefetch_related('cap_rate_comps').all()
     serializer_class = IncomeApproachSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project_id if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -461,15 +453,14 @@ class ValuationReconciliationViewSet(viewsets.ModelViewSet):
 
     queryset = ValuationReconciliation.objects.select_related('project').all()
     serializer_class = ValuationReconciliationSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project_id if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -492,7 +483,6 @@ class ValuationSummaryViewSet(viewsets.ViewSet):
     Combines all three approaches to value for a project.
     """
 
-    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -643,10 +633,9 @@ class HBUAnalysisViewSet(viewsets.ModelViewSet):
         'comparable_uses', 'zoning_documents', 'zoning_documents__document'
     ).all()
     serializer_class = HBUAnalysisSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
-        """Filter by project_id if provided."""
+        """Filter by project_id if provided. Always scoped to the requesting user."""
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         if project_id:
@@ -657,7 +646,8 @@ class HBUAnalysisViewSet(viewsets.ModelViewSet):
         if scenario_type:
             queryset = queryset.filter(scenario_type=scenario_type)
 
-        return queryset.order_by('productivity_rank', 'scenario_name')
+        queryset = queryset.order_by('productivity_rank', 'scenario_name')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def get_serializer_class(self):
         """Use summary serializer for list action."""
@@ -826,7 +816,6 @@ class HBUComparableUseViewSet(viewsets.ModelViewSet):
 
     queryset = HBUComparableUse.objects.select_related('hbu').all()
     serializer_class = HBUComparableUseSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by hbu_id if provided."""
@@ -903,7 +892,6 @@ class HBUZoningDocumentViewSet(viewsets.ModelViewSet):
 
     queryset = HBUZoningDocument.objects.select_related('hbu', 'document').all()
     serializer_class = HBUZoningDocumentSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by hbu_id if provided."""
@@ -955,7 +943,6 @@ class PropertyAttributeDefViewSet(viewsets.ModelViewSet):
 
     queryset = PropertyAttributeDef.objects.all()
     serializer_class = PropertyAttributeDefSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter by category, subcategory, and active status."""
@@ -1077,7 +1064,6 @@ class ProjectPropertyAttributesViewSet(viewsets.ViewSet):
     - PATCH /api/valuation/project-property-attributes/:project_id/improvement/ - Update improvement attributes only
     """
 
-    permission_classes = [AllowAny]
 
     def retrieve(self, request, pk=None):
         """Get property attributes for a project."""

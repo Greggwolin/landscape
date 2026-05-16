@@ -56,6 +56,7 @@ import {
   type DataSnapshot,
 } from '@/lib/location-analysis-snapshot';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -715,8 +716,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
       setError(null);
       try {
         const geoRes = await fetch(
-          `/api/market/geos?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`,
-        );
+          `/api/market/geos?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`, { headers: getAuthHeaders() });
         if (!geoRes.ok) {
           setError(
             geoRes.status === 404
@@ -732,8 +732,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
 
         const geoIds = geoJson.targets.map((t) => t.geo_id).join(',');
         const seriesRes = await fetch(
-          `/api/market/series?geo_ids=${encodeURIComponent(geoIds)}`,
-        );
+          `/api/market/series?geo_ids=${encodeURIComponent(geoIds)}`, { headers: getAuthHeaders() });
         if (seriesRes.ok) {
           const seriesJson = await seriesRes.json();
           if (!cancelled) setSeriesData(seriesJson.series || []);
@@ -810,7 +809,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
         const snapshot = await captureDataSnapshot(seriesData, project.project_id);
         const res = await fetch('/api/market/analysis/save', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId: project.project_id,
             tier,
@@ -878,7 +877,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
         };
         const res = await fetch('/api/market/analysis', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
@@ -927,8 +926,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
       for (const tier of ['t1', 't2', 't3'] as TierKey[]) {
         try {
           const res = await fetch(
-            `/api/market/analysis/load?projectId=${project.project_id}&tier=${tier}`,
-          );
+            `/api/market/analysis/load?projectId=${project.project_id}&tier=${tier}`, { headers: getAuthHeaders() });
           if (!res.ok) {
             console.warn(`[LocationAnalysis] Load ${tier} returned ${res.status}`);
             continue;
@@ -980,8 +978,7 @@ export default function LocationSubTab({ project }: LocationSubTabProps) {
           if (!analyses[tier]) continue;
           try {
             const res = await fetch(
-              `/api/market/analysis/load?projectId=${project.project_id}&tier=${tier}`,
-            );
+              `/api/market/analysis/load?projectId=${project.project_id}&tier=${tier}`, { headers: getAuthHeaders() });
             if (!res.ok) continue;
             const data = await res.json();
             if (data?.data_snapshot && !cancelled) {

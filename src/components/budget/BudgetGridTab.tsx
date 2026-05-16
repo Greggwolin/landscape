@@ -27,6 +27,7 @@ import { SemanticButton } from '@/components/ui/landscape';
 import { ColumnChooser, type BudgetColumnConfig } from './custom/ColumnChooser';
 import { getColumnsByMode } from './ColumnDefinitions';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   projectId: number;
   scopeFilter?: string; // Optional scope filter (e.g., "Planning & Engineering", "Development")
@@ -320,7 +321,7 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
   useEffect(() => {
     const fetchProjectMetadata = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}`);
+        const response = await fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() });
         if (!response.ok) return;
         const payload = await response.json();
         const code =

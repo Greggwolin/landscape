@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ projectId: string }> };
 
 // GET /api/projects/{projectId}/opex
@@ -8,6 +9,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await context.params;
     const projectIdNum = parseInt(projectId);
@@ -74,6 +79,10 @@ export async function POST(
   request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId } = await context.params;
     const projectIdNum = parseInt(projectId);

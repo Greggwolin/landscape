@@ -22,6 +22,7 @@ import { ChevronDown, ChevronRight, MapPin, Calendar, Building2, Plus, Pencil } 
 import { CompetitiveMarketCharts, type PropertyColorMap } from '@/components/property/CompetitiveMarketCharts';
 import { RentCompDetailModal } from './RentCompDetailModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Dynamic import to avoid SSR issues with MapLibre GL
 const LocationIntelligenceCard = dynamic(
   () => import('@/app/projects/[projectId]/components/tabs/LocationIntelligenceCard'),
@@ -121,8 +122,8 @@ export function RentCompsView({ projectId, projectName, latitude, longitude }: R
         setError(null);
 
         const [compsRes, floorPlansRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/rental-comparables`),
-          fetch(`/api/projects/${projectId}/floor-plans`).catch(() => null),
+          fetch(`/api/projects/${projectId}/rental-comparables`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/floor-plans`, { headers: getAuthHeaders() }).catch(() => null),
         ]);
 
         if (compsRes.ok) {

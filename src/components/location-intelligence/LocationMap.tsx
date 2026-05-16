@@ -15,6 +15,7 @@ import { RING_COLORS, POINT_CATEGORIES } from './constants';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const CENTER_SOURCE_ID = 'center-point';
@@ -367,10 +368,7 @@ export function LocationMap({
 
     const fetchBlockGroups = async () => {
       try {
-        const response = await fetch(
-          `${DJANGO_API_URL}/api/v1/location-intelligence/block-groups/?lat=${center[1]}&lon=${center[0]}&radius=5`,
-          { signal: controller.signal }
-        );
+        const response = await fetch(`${DJANGO_API_URL}/api/v1/location-intelligence/block-groups/?lat=${center[1]}&lon=${center[0]}&radius=5`, { headers: getAuthHeaders(), signal: controller.signal });
 
         if (!response.ok) {
           setBlockGroupFeatures({ type: 'FeatureCollection', features: [] });

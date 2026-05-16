@@ -8,7 +8,6 @@ from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -37,7 +36,6 @@ class CategoryTagLibraryViewSet(viewsets.ModelViewSet):
 
     queryset = CategoryTagLibrary.objects.all()
     serializer_class = CategoryTagLibrarySerializer
-    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def get_queryset(self):
         """Filter tags by context and active status."""
@@ -61,7 +59,6 @@ class UnitCostCategoryViewSet(viewsets.ModelViewSet):
 
     serializer_class = UnitCostCategorySerializer
     queryset = UnitCostCategory.objects.filter(is_active=True)
-    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def perform_update(self, serializer):
         """Custom update to handle activities many-to-many relationship."""
@@ -273,7 +270,6 @@ class UnitCostItemViewSet(viewsets.ModelViewSet):
     """
 
     queryset = UnitCostItem.objects.select_related('category', 'created_from_project')
-    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def get_queryset(self):
         qs = self.queryset
@@ -367,7 +363,6 @@ UnitCostTemplateViewSet = UnitCostItemViewSet
 class PlanningStandardView(APIView):
     """Retrieve and update the global planning defaults."""
 
-    permission_classes = [AllowAny]  # Allow unauthenticated access for admin UI
 
     def get(self, request):
         standard = PlanningStandard.objects.filter(is_active=True).order_by('standard_id').first()

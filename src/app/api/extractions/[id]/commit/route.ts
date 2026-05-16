@@ -4,12 +4,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(
   request: NextRequest,
   context: Params
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await context.params;
     const extractionId = parseInt(id);

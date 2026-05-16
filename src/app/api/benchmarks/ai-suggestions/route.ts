@@ -7,8 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import type { AISuggestionsResponse, SuggestionStatus, BenchmarkCategoryKey } from '@/types/benchmarks';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 // GET /api/benchmarks/ai-suggestions
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     // For now, return empty array - table may not exist yet
     const suggestions: any[] = [];

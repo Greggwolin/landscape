@@ -13,15 +13,10 @@ export async function GET(
   try {
     const { projectId } = params;
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/completeness/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/completeness/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       const data = await response.json();

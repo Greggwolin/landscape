@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, AlertTriangle, ArrowRight, Plus } from 'lucide-react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface UnmatchedCode {
  code: string;
  parcel_count: number;
@@ -113,7 +114,7 @@ const LandUseMatchWizard: React.FC<LandUseMatchWizardProps> = ({
  try {
  const response = await fetch('/api/landuse/mapping', {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({
  legacy_code: legacyCode,
  target_landuse_id: mapping.action === 'map' ? mapping.target : null,

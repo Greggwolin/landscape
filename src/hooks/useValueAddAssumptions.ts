@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export type RenoCostBasis = 'sf' | 'unit';
 
 export interface ValueAddState {
@@ -150,7 +151,7 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
     try {
       const response = await fetch(`/api/projects/${projectId}/value-add`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(serializeState(nextState))
       });
 
@@ -219,7 +220,7 @@ export function useValueAddAssumptions(projectId: number, stats: ValueAddStats) 
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/projects/${projectId}/value-add`);
+        const response = await fetch(`/api/projects/${projectId}/value-add`, { headers: getAuthHeaders() });
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           const errorMessage = (errorData as { error?: string })?.error || `Failed to load value-add assumptions (${response.status})`;

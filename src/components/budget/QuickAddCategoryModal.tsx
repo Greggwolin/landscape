@@ -29,6 +29,7 @@ import type {
   QuickAddCategoryResponse,
 } from '@/types/budget-categories';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface QuickAddCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -144,8 +145,7 @@ export function QuickAddCategoryModal({
 
       const response = await fetch('/api/financial/budget-categories/quick-add/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestData),
       });

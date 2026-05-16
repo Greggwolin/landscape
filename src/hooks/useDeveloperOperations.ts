@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -148,7 +149,7 @@ export function useDeveloperFees(projectId: number) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/developer-operations/fees?project_id=${projectId}`);
+      const response = await fetch(`/api/developer-operations/fees?project_id=${projectId}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch developer fees');
@@ -176,7 +177,7 @@ export function useDeveloperFees(projectId: number) {
     try {
       const response = await fetch('/api/developer-operations/fees', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -204,7 +205,7 @@ export function useDeveloperFees(projectId: number) {
     try {
       const response = await fetch(`/api/developer-operations/fees/${feeId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -230,8 +231,7 @@ export function useDeveloperFees(projectId: number) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/developer-operations/fees/${feeId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/developer-operations/fees/${feeId}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {
@@ -279,7 +279,7 @@ export function useManagementOverhead(projectId: number) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/developer-operations/overhead?project_id=${projectId}`);
+      const response = await fetch(`/api/developer-operations/overhead?project_id=${projectId}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch management overhead');
@@ -307,7 +307,7 @@ export function useManagementOverhead(projectId: number) {
     try {
       const response = await fetch('/api/developer-operations/overhead', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -335,7 +335,7 @@ export function useManagementOverhead(projectId: number) {
     try {
       const response = await fetch(`/api/developer-operations/overhead/${itemId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -361,8 +361,7 @@ export function useManagementOverhead(projectId: number) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/developer-operations/overhead/${itemId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/developer-operations/overhead/${itemId}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {

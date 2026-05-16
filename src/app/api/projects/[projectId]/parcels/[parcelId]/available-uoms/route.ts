@@ -10,18 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string; parcelId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId, parcelId } = await params;
 
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/parcels/${parcelId}/available-uoms/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/parcels/${parcelId}/available-uoms/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     const data = await response.json();
 

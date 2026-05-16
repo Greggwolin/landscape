@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '../../../../../lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 interface ProjectStructureRequest {
   structure_type: 'simple' | 'master_plan';
   metadata?: {
@@ -17,6 +18,10 @@ interface ProjectStructureParams {
 }
 
 export async function POST(request: NextRequest, { params }: ProjectStructureParams) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId: projectIdStr } = await params;
     const projectId = parseInt(projectIdStr);
@@ -95,6 +100,10 @@ export async function POST(request: NextRequest, { params }: ProjectStructurePar
 
 // GET endpoint to retrieve current structure choice
 export async function GET(request: NextRequest, { params }: ProjectStructureParams) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId: projectIdStr } = await params;
     const projectId = parseInt(projectIdStr);

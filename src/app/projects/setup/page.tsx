@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ProjectSetupWizard } from '@/app/components/ContainerManagement/ProjectSetupWizard'
 import type { ProjectSetupWizardProps } from '@/app/components/ContainerManagement/ProjectSetupWizard'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export default function ProjectSetupPage() {
   const router = useRouter()
 
@@ -11,7 +12,7 @@ export default function ProjectSetupPage() {
     try {
       const response = await fetch('/api/projects/setup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       })
 

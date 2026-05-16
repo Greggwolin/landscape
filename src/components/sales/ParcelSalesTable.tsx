@@ -43,6 +43,7 @@ import {
 import { useProjectConfig } from '@/hooks/useProjectConfig';
 import type { SaveAssumptionsPayload, CreateBenchmarkPayload } from '@/types/sales-absorption';
 import { SemanticButton } from '@/components/ui/landscape';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './ParcelSalesTable.css';
 
 interface Props {
@@ -341,7 +342,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         console.log('Updating existing benchmark:', improvementOffsetBenchmarkId, 'with value:', value);
         const response = await fetch(`/api/projects/${projectId}/benchmarks/${improvementOffsetBenchmarkId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             amount_per_uom: improvementOffset === '' ? null : value,
           }),
@@ -360,7 +361,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
         console.log('Creating new benchmark with value:', value);
         const response = await fetch(`/api/projects/${projectId}/benchmarks`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: 'SFD Improvement Offset',
             scope_level: 'project',
@@ -389,7 +390,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       console.log('Triggering SFD parcel recalculation...');
       const recalcResponse = await fetch(`/api/projects/${projectId}/recalculate-sfd`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       });
 
       if (recalcResponse.ok) {
@@ -436,13 +437,11 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       setActionError(null);
 
       const response = await fetch(
-        `/api/projects/${projectId}/parcels/${calculationModalParcel.parcel_id}/sale-assumptions`,
-        {
+        `/api/projects/${projectId}/parcels/${calculationModalParcel.parcel_id}/sale-assumptions`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        }
-      );
+        });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -468,7 +467,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
 
       const response = await fetch(`/api/projects/${projectId}/sale-benchmarks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -524,12 +523,10 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       // Trigger automatic recalculation for this parcel's use type
       try {
         const recalcResponse = await fetch(
-          `/api/projects/${projectId}/recalculate-sfd?type_code=${parcel.type_code}`,
-          {
+          `/api/projects/${projectId}/recalculate-sfd?type_code=${parcel.type_code}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          });
 
         if (recalcResponse.ok) {
           // Invalidate queries to refresh the table with new net proceeds

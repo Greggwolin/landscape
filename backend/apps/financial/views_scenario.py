@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction, connection
 
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models_scenario import Scenario, ScenarioComparison
 from .serializers_scenario import ScenarioSerializer, ScenarioComparisonSerializer
 
@@ -35,14 +36,14 @@ class ScenarioViewSet(viewsets.ModelViewSet):
     serializer_class = ScenarioSerializer
 
     def get_queryset(self):
-        """Filter scenarios by project if provided"""
+        """Filter scenarios by project if provided. Always scoped to the requesting user via project ownership."""
         queryset = super().get_queryset()
         project_id = self.request.query_params.get('project_id')
 
         if project_id:
             queryset = queryset.filter(project_id=project_id)
 
-        return queryset
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     @action(detail=True, methods=['post'])
     def activate(self, request, pk=None):
@@ -221,12 +222,14 @@ class ScenarioComparisonViewSet(viewsets.ModelViewSet):
     serializer_class = ScenarioComparisonSerializer
 
     def get_queryset(self):
-        """Filter comparisons by project if provided"""
+        """Filter comparisons by project if provided. Always scoped to the requesting user via project ownership."""
         queryset = super().get_queryset()
         project_id = self.request.query_params.get('project_id')
 
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+
+        queryset = filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
         return queryset
 

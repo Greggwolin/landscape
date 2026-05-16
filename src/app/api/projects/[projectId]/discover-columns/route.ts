@@ -13,6 +13,7 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ projectId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId } = await context.params;
 
   try {
@@ -20,14 +21,11 @@ export async function POST(
 
     console.log(`[discover-columns] projectId=${projectId}, document_id=${body.document_id}`);
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/knowledge/projects/${projectId}/discover-columns/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/knowledge/projects/${projectId}/discover-columns/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     const data = await response.json();
 

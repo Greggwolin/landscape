@@ -23,6 +23,7 @@ import type {
   JsonPatchOp,
   SourcePointersMap,
 } from '@/types/artifact';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -108,7 +109,7 @@ export function useArtifactList(filters: ArtifactListFilters = {}) {
       if (filters.limit != null) params.append('limit', String(filters.limit));
 
       const url = `${DJANGO_API_URL}/api/artifacts/${params.toString() ? '?' + params.toString() : ''}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Failed to fetch artifacts: ${res.status}`);
       return res.json();
     },
@@ -120,7 +121,7 @@ export function useArtifact(artifactId: number | null) {
     queryKey: ['artifacts', 'detail', artifactId],
     enabled: artifactId != null,
     queryFn: async () => {
-      const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/`);
+      const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Failed to fetch artifact ${artifactId}: ${res.status}`);
       return res.json();
     },
@@ -133,7 +134,7 @@ export function useArtifactPatch() {
     mutationFn: async ({ artifactId, patch }) => {
       const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error(`Failed to patch artifact ${artifactId}: ${res.status}`);
@@ -156,7 +157,7 @@ export function useArtifactVersions(artifactId: number | null, opts: { limit?: n
       if (opts.since) params.append('since', opts.since);
       if (opts.row_filter) params.append('row_filter', opts.row_filter);
       const qs = params.toString() ? '?' + params.toString() : '';
-      const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/versions/${qs}`);
+      const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/versions/${qs}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Failed to fetch versions for ${artifactId}: ${res.status}`);
       return res.json();
     },
@@ -169,7 +170,7 @@ export function useArtifactRestore() {
     mutationFn: async ({ artifactId, input }) => {
       const res = await fetch(`${DJANGO_API_URL}/api/artifacts/${artifactId}/restore/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
       if (!res.ok) throw new Error(`Failed to restore artifact ${artifactId}: ${res.status}`);

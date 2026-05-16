@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * PUT /api/budget/category-templates/update
  *
@@ -17,6 +18,10 @@ import { sql } from '@/lib/db';
  * }
  */
 export async function PUT(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const { project_id, template_name, project_type_code } = body;

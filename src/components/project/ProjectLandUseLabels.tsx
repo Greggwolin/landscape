@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useLandUseLabels } from '@/hooks/useLandUseLabels'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   projectId: number
 }
@@ -49,7 +50,7 @@ export default function ProjectLandUseLabels({ projectId }: Props) {
     try {
       const response = await fetch(`/api/projects/${projectId}/config`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           land_use_level1_label: labels.level1,
           land_use_level1_label_plural: labels.level1Plural,

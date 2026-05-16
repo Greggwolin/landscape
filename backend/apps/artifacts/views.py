@@ -37,7 +37,6 @@ source-of-truth refresh as a single user-edit step.
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .models import Artifact, ArtifactVersion
@@ -58,7 +57,6 @@ from .services import (
 class ArtifactViewSet(viewsets.ViewSet):
     """ViewSet for artifact list/retrieve/patch + version + restore actions."""
 
-    permission_classes = [AllowAny]
 
     def list(self, request):
         qs = Artifact.objects.all()

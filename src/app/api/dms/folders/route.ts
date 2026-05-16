@@ -3,11 +3,16 @@ import { sql } from '@/lib/dms/db';
 import { CreateFolderZ, UpdateFolderZ, FolderZ, FolderTreeNodeZ } from './schema';
 import { z } from 'zod';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * GET /api/dms/folders
  * Returns folder tree with optional filtering
  */
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const flat = searchParams.get('flat') === 'true'; // Return flat list instead of tree
@@ -104,6 +109,10 @@ export async function GET(request: NextRequest) {
  * Create new folder
  */
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const data = CreateFolderZ.parse(body);
@@ -185,6 +194,10 @@ export async function POST(request: NextRequest) {
  * Update existing folder
  */
 export async function PATCH(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const data = UpdateFolderZ.parse(body);
@@ -311,6 +324,10 @@ export async function PATCH(request: NextRequest) {
  * Soft delete folder (sets is_active = false)
  */
 export async function DELETE(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const folderId = searchParams.get('folder_id');

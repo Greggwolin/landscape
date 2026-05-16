@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '../../../../lib/db';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 interface GranularitySettings {
   level1Enabled: boolean;
   level1Label: string;
@@ -14,6 +15,10 @@ interface GranularitySettings {
 
 // GET - Load current granularity settings for a project
 export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
@@ -84,6 +89,10 @@ export async function GET(request: NextRequest) {
 
 // PUT - Save granularity settings for a project
 export async function PUT(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');

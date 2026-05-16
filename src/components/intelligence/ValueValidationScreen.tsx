@@ -19,6 +19,7 @@ import {
   CSpinner,
   CTooltip,
 } from '@coreui/react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -86,9 +87,7 @@ export default function ValueValidationScreen({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(
-          `${DJANGO_API_URL}/api/intake/${intakeUuid}/extracted_values/`
-        );
+        const res = await fetch(`${DJANGO_API_URL}/api/intake/${intakeUuid}/extracted_values/`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Failed to load extracted values');
         const data = await res.json();
         const vals: ExtractedValue[] = data.values || [];
@@ -153,14 +152,11 @@ export default function ValueValidationScreen({
         override_value: d.overrideValue || null,
       }));
 
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/intake/${intakeUuid}/commit_values/`,
-        {
+      const res = await fetch(`${DJANGO_API_URL}/api/intake/${intakeUuid}/commit_values/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ actions }),
-        }
-      );
+        });
 
       if (!res.ok) {
         const text = await res.text();

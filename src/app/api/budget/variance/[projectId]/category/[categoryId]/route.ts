@@ -14,17 +14,13 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId, categoryId } = await context.params;
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/financial/budget/variance/${projectId}/category/${categoryId}/`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/financial/budget/variance/${projectId}/category/${categoryId}/`, {
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       const errorText = await response.text();

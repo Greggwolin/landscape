@@ -15,6 +15,7 @@ import {
 } from '@coreui/react';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 // ── Display-bucket map: collapse Layer 2's three states into the same
 // three-bucket taxonomy the Cowork artifact uses, so the Open/In Progress/Closed

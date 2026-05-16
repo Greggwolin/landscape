@@ -41,6 +41,7 @@ import {
 } from 'recharts';
 import { CorrectionModal } from '@/components/documents/CorrectionModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // ===== TYPES =====
 
 interface ExtractionQueueItem {
@@ -207,7 +208,7 @@ function QueueTab({ onSelectExtraction }: { onSelectExtraction: (extraction: Ext
   const fetchExtractions = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/extractions/queue?status=${filter}&limit=50`);
+      const response = await fetch(`/api/extractions/queue?status=${filter}&limit=50`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
       setExtractions(data.queue || []);
@@ -230,8 +231,7 @@ function QueueTab({ onSelectExtraction }: { onSelectExtraction: (extraction: Ext
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch('/api/ai/analyze-document', {
-          method: 'POST',
+        const response = await fetch('/api/ai/analyze-document', { headers: getAuthHeaders(), method: 'POST',
           body: formData,
         });
 
@@ -267,7 +267,7 @@ function QueueTab({ onSelectExtraction }: { onSelectExtraction: (extraction: Ext
 
   const handleSelect = async (extractionId: number) => {
     try {
-      const response = await fetch(`/api/extractions/${extractionId}/review`);
+      const response = await fetch(`/api/extractions/${extractionId}/review`, { headers: getAuthHeaders() });
       const data = await response.json();
       const sections = transformDataToSections(data);
       onSelectExtraction({
@@ -437,7 +437,7 @@ function DetailTab({
 
   const fetchExtraction = async () => {
     try {
-      const response = await fetch(`/api/extractions/${extraction.extraction_id}/review`);
+      const response = await fetch(`/api/extractions/${extraction.extraction_id}/review`, { headers: getAuthHeaders() });
       const data = await response.json();
       const sections = transformDataToSections(data);
       onRefresh({
@@ -458,7 +458,7 @@ function DetailTab({
     try {
       const response = await fetch(`/api/extractions/${extraction.extraction_id}/correct`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           field_path: field.field_path,
           old_value: field.value,
@@ -486,7 +486,7 @@ function DetailTab({
     try {
       const response = await fetch(`/api/extractions/${extraction.extraction_id}/commit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           commit_notes: 'Reviewed and corrected via UI'
         })
@@ -690,7 +690,7 @@ function AnalyticsTab() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/corrections/analytics?days=${period}`);
+      const response = await fetch(`/api/corrections/analytics?days=${period}`, { headers: getAuthHeaders() });
       const data = await response.json();
       setAnalytics(data);
     } catch (error) {

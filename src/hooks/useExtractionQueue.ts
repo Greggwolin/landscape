@@ -68,14 +68,11 @@ export function useExtractionQueue(projectId: number | undefined) {
   const deleteAll = useCallback(async () => {
     if (!projectId) return false;
     try {
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`,
-        {
+      const res = await fetch(`${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delete_all' }),
-        }
-      );
+        });
       const result = await res.json();
       if (result.success) {
         mutate();
@@ -90,14 +87,11 @@ export function useExtractionQueue(projectId: number | undefined) {
   const deleteItems = useCallback(async (queueIds: number[]) => {
     if (!projectId || queueIds.length === 0) return false;
     try {
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`,
-        {
+      const res = await fetch(`${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delete', queue_ids: queueIds }),
-        }
-      );
+        });
       const result = await res.json();
       if (result.success) {
         mutate();
@@ -112,14 +106,11 @@ export function useExtractionQueue(projectId: number | undefined) {
   const retryItems = useCallback(async (queueIds: number[]) => {
     if (!projectId || queueIds.length === 0) return false;
     try {
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`,
-        {
+      const res = await fetch(`${DJANGO_API_URL}/api/knowledge/projects/${projectId}/extract-queue/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'retry', queue_ids: queueIds }),
-        }
-      );
+        });
       const result = await res.json();
       if (result.success) {
         mutate();

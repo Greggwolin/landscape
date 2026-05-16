@@ -17,6 +17,7 @@ import { DocumentChatModal, RenameModal, DeleteConfirmModal } from '../modals';
 import ProfileForm from '../profile/ProfileForm';
 import DocumentVersionHistory from './DocumentVersionHistory';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface DocumentPreviewPanelProps {
   projectId: number;
   document: DMSDocument;
@@ -93,13 +94,11 @@ export default function DocumentPreviewPanel({
 
   const handleRename = async (newName: string) => {
     const response = await fetch(
-      `/api/projects/${projectId}/dms/docs/${doc.doc_id}/rename`,
-      {
+      `/api/projects/${projectId}/dms/docs/${doc.doc_id}/rename`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ new_name: newName }),
-      }
-    );
+      });
 
     if (!response.ok) {
       const data = await response.json();
@@ -111,12 +110,10 @@ export default function DocumentPreviewPanel({
 
   const handleDelete = async () => {
     const response = await fetch(
-      `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`,
-      {
+      `/api/projects/${projectId}/dms/docs/${doc.doc_id}/delete`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      });
 
     if (!response.ok) {
       const data = await response.json();
@@ -156,7 +153,7 @@ export default function DocumentPreviewPanel({
   const handleSaveProfile = async (profile: Record<string, unknown>) => {
     const response = await fetch(`/api/dms/documents/${doc.doc_id}/profile`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ profile }),
     });
 
@@ -199,12 +196,9 @@ export default function DocumentPreviewPanel({
       }
 
       const response = await fetch(
-        `/api/projects/${projectId}/dms/docs/${doc.doc_id}/version`,
-        {
-          method: 'POST',
+        `/api/projects/${projectId}/dms/docs/${doc.doc_id}/version`, { headers: getAuthHeaders(), method: 'POST',
           body: formData,
-        }
-      );
+        });
 
       if (!response.ok) {
         const errorText = await response.text();

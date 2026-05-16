@@ -10,7 +10,6 @@ import logging
 from django.db import connection
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -29,7 +28,6 @@ class ScenarioLogListCreateView(APIView):
     GET  /api/landscaper/projects/<project_id>/scenarios/
     POST /api/landscaper/projects/<project_id>/scenarios/
     """
-    permission_classes = [AllowAny]  # Called from Next.js backend
 
     def get(self, request, project_id):
         """List saved/committed scenarios for a project."""
@@ -131,7 +129,6 @@ class ScenarioLogDetailView(APIView):
     PATCH  /api/landscaper/projects/<project_id>/scenarios/<scenario_log_id>/
     DELETE /api/landscaper/projects/<project_id>/scenarios/<scenario_log_id>/
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id, scenario_log_id):
         """Get full scenario detail including overrides."""

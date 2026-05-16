@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { CompletenessCategory } from '@/components/dashboard/CompletenessModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ProjectCompleteness {
   project_id: number;
   project_name: string;
@@ -31,7 +32,7 @@ export function useAllProjectsCompleteness() {
   return useQuery<AllCompletenessResponse>({
     queryKey: ['projects-completeness'],
     queryFn: async () => {
-      const response = await fetch('/api/projects/completeness');
+      const response = await fetch('/api/projects/completeness', { headers: getAuthHeaders() });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch completeness');
@@ -51,7 +52,7 @@ export function useProjectCompleteness(projectId?: string | number) {
   return useQuery<SingleCompletenessResponse>({
     queryKey: ['project-completeness', id],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${id}/completeness`);
+      const response = await fetch(`/api/projects/${id}/completeness`, { headers: getAuthHeaders() });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch completeness');

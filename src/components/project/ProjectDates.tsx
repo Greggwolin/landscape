@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { CCard, CCardBody, CCardHeader, CButton, CSpinner } from '@coreui/react'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   projectId: number
 }
@@ -21,7 +22,7 @@ export default function ProjectDates({ projectId }: Props) {
   useEffect(() => {
     async function fetchProject() {
       try {
-        const response = await fetch(`/api/projects/${projectId}`)
+        const response = await fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
         if (!response.ok) throw new Error('Failed to fetch project')
         const data = await response.json()
 
@@ -53,7 +54,7 @@ export default function ProjectDates({ projectId }: Props) {
     try {
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(dates)
       })
 

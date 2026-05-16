@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import GISMap from '../MapLibre/GISMap'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface PlanNavigationProps {
  projectId: number
  onParcelUpdate?: (parcelId: number, updates: Record<string, unknown>) => void
@@ -71,7 +72,7 @@ const PlanNavigation: React.FC<PlanNavigationProps> = ({
  params.append('min_confidence', minConfidence.toString())
  }
 
- const response = await fetch(`/api/gis/plan-parcels?${params}`)
+ const response = await fetch(`/api/gis/plan-parcels?${params}`, { headers: getAuthHeaders() })
 
  if (!response.ok) {
  throw new Error('Failed to load plan parcels')
@@ -116,7 +117,7 @@ const PlanNavigation: React.FC<PlanNavigationProps> = ({
  try {
  const response = await fetch('/api/gis/plan-parcels', {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({
  parcel_id: parcelId,
  confidence: newConfidence

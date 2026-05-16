@@ -8,6 +8,7 @@ import CollapsibleSection from './CollapsibleSection'
 import { ExportButton } from '@/components/admin'
 import styles from './PlanningContent.module.css'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Parcel {
   parcel_id: number;
   area_no: number;
@@ -334,7 +335,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   // Legacy cascading loaders kept for EditableParcelRow compatibility
   const loadAddParcelTypes = async (familyId: string) => {
     try {
-      const res = await fetch(`/api/landuse/types/${familyId}`)
+      const res = await fetch(`/api/landuse/types/${familyId}`, { headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
         const normalized = Array.isArray(data) ? data.map((t: Record<string, unknown>) => ({
@@ -351,7 +352,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   const loadAddParcelProducts = async (typeId: string) => {
     if (sharedLotProducts.has(typeId)) return
     try {
-      const res = await fetch(`/api/landuse/lot-products/${typeId}`)
+      const res = await fetch(`/api/landuse/lot-products/${typeId}`, { headers: getAuthHeaders() })
       if (res.ok) {
         const data = await res.json()
         const products = Array.isArray(data) ? data : []
@@ -414,7 +415,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     try {
       const res = await fetch('/api/areas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectId, area_name: 'Default' })
       })
       if (!res.ok) throw new Error(await res.text())
@@ -436,7 +437,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     try {
       const res = await fetch('/api/areas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectId, area_name: areaName || undefined })
       })
       if (!res.ok) throw new Error(await res.text())
@@ -457,7 +458,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     try {
       const res = await fetch('/api/phases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectId, area_no: areaNo })
       })
       if (!res.ok) throw new Error(await res.text())
@@ -503,7 +504,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
           try {
             const res = await fetch('/api/areas', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ project_id: projectId, area_name: newAreaName })
             })
             if (!res.ok) throw new Error(await res.text())
@@ -557,7 +558,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
       // Create the parcel
       const res = await fetch('/api/parcels', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           area_id: resolvedAreaId,
@@ -611,7 +612,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
   useEffect(() => {
     if (projectId && !sharedFamiliesLoading && sharedFamilies.length === 0) {
       setSharedFamiliesLoading(true)
-      fetch('/api/landuse/families')
+      fetch('/api/landuse/families', { headers: getAuthHeaders() })
         .then(res => res.ok ? res.json() : [])
         .then(data => {
           const normalized = (Array.isArray(data) ? data : [])
@@ -715,7 +716,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     try {
       const response = await fetch('/api/phases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_id: projectId, area_no: areaNo })
       })
 
@@ -756,7 +757,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
 
       const response = await fetch('/api/parcels', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           area_id: phase.area_id,
@@ -794,8 +795,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     if (!confirm('Are you sure you want to delete this parcel?')) return
 
     try {
-      const response = await fetch(`/api/parcels/${parcelId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/parcels/${parcelId}`, { headers: getAuthHeaders(), method: 'DELETE'
       })
 
       if (!response.ok) {
@@ -823,8 +823,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     if (!confirm('Are you sure you want to delete this phase? All parcels in this phase must be deleted first.')) return
 
     try {
-      const response = await fetch(`/api/phases/${phaseId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/phases/${phaseId}`, { headers: getAuthHeaders(), method: 'DELETE'
       })
 
       if (!response.ok) {
@@ -856,7 +855,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
     try {
       const response = await fetch('/api/areas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           area_name: areaName || undefined
@@ -894,7 +893,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
 
       const response = await fetch(`/api/areas/${phase.area_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           label: newTitle
         })
@@ -933,8 +932,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
         return
       }
 
-      const response = await fetch(`/api/areas/${areaId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/areas/${areaId}`, { headers: getAuthHeaders(), method: 'DELETE'
       })
 
       if (!response.ok) {
@@ -1041,7 +1039,7 @@ const PlanningContent: React.FC<Props> = ({ projectId = null, projectIdStr }) =>
                         const area = areaOptions.find(a => a.area_no === areaNo)
                         if (!area) return
                         try {
-                          const res = await fetch(`/api/areas?area_id=${area.area_id}`, { method: 'DELETE' })
+                          const res = await fetch(`/api/areas?area_id=${area.area_id}`, { headers: getAuthHeaders(), method: 'DELETE' })
                           if (!res.ok) {
                             const data = await res.json().catch(() => ({}))
                             throw new Error(data.error || 'Delete failed')
@@ -1533,7 +1531,7 @@ const EditableParcelRow: React.FC<{
 
   const loadTypesForFamily = async (familyId: string, preselectedTypeId?: string) => {
     try {
-      const response = await fetch(`/api/landuse/types/${familyId}`)
+      const response = await fetch(`/api/landuse/types/${familyId}`, { headers: getAuthHeaders() })
       if (response.ok) {
         const typesData = await response.json()
         const normalizedTypes = normalizeTypes(typesData)
@@ -1562,7 +1560,7 @@ const EditableParcelRow: React.FC<{
       console.log('Loading products for type_id (which is actually subtype_id):', typeId)
 
       // Use the lot-products API endpoint with the type_id (which is the subtype_id)
-      const response = await fetch(`/api/landuse/lot-products/${typeId}`)
+      const response = await fetch(`/api/landuse/lot-products/${typeId}`, { headers: getAuthHeaders() })
       if (response.ok) {
         const lotProductsData = await response.json()
         console.log('Raw lot products response:', lotProductsData)
@@ -1623,7 +1621,7 @@ const EditableParcelRow: React.FC<{
               setSelectedFamily(matchedFamily.family_id)
 
               // Load types for this family
-              const typesRes = await fetch(`/api/landuse/types/${matchedFamily.family_id}`)
+              const typesRes = await fetch(`/api/landuse/types/${matchedFamily.family_id}`, { headers: getAuthHeaders() })
               if (typesRes.ok) {
                 const typesData = await typesRes.json()
                 const normalizedTypes = normalizeTypes(typesData)
@@ -1724,7 +1722,7 @@ const EditableParcelRow: React.FC<{
           if (areaName === null) return
           const areaRes = await fetch('/api/areas', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ project_id: projectId, area_name: areaName || undefined })
           })
           if (!areaRes.ok) { alert(`Failed to create ${level1Label}`); return }
@@ -1733,7 +1731,7 @@ const EditableParcelRow: React.FC<{
           // Also need a phase in the new area
           const phaseRes = await fetch('/api/phases', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ project_id: projectId, area_no: newArea.area_no })
           })
           if (!phaseRes.ok) { alert(`Failed to create ${level2Label} in new ${level1Label}`); return }
@@ -1747,7 +1745,7 @@ const EditableParcelRow: React.FC<{
             if (!area) { alert(`${level1Label} not found`); return }
             const phaseRes = await fetch('/api/phases', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ project_id: projectId, area_no: area.area_no })
             })
             if (!phaseRes.ok) { alert(`Failed to create ${level2Label}`); return }
@@ -1825,7 +1823,7 @@ const EditableParcelRow: React.FC<{
 
       const res = await fetch(`/api/parcels/${parcel.parcel_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
       if (!res.ok) throw new Error(await res.text())
@@ -2201,7 +2199,7 @@ const PhaseRow: React.FC<{
   const save = async () => {
     setSaving(true)
     try {
-      await fetch(`/api/phases/${phase.phase_id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description }) })
+      await fetch(`/api/phases/${phase.phase_id}`, { method: 'PATCH', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ description }) })
       // Broadcast to other views (wizard) to refresh if needed
       try { window.dispatchEvent(new CustomEvent('dataChanged', { detail: { entity: 'phase', id: phase.phase_id } })) } catch {}
       setExpanded(false)

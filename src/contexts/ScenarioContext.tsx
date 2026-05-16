@@ -13,6 +13,7 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface Scenario {
   scenario_id: number;
   project: number;
@@ -80,8 +81,7 @@ export function ScenarioProvider({
     try {
       const response = await fetch(`/api/financial/scenarios/${scenarioId}/activate/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
       });
 
@@ -107,7 +107,7 @@ export function ScenarioProvider({
     try {
       const response = await fetch('/api/financial/scenarios/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project: projectId,
           scenario_name: name,
@@ -132,7 +132,7 @@ export function ScenarioProvider({
     try {
       const response = await fetch(`/api/financial/scenarios/${scenarioId}/clone/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scenario_name: newName,
           scenario_type: 'custom'
@@ -154,8 +154,7 @@ export function ScenarioProvider({
 
   const deleteScenario = async (scenarioId: number) => {
     try {
-      const response = await fetch(`/api/financial/scenarios/${scenarioId}/`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/financial/scenarios/${scenarioId}/`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {

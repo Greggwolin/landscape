@@ -22,6 +22,7 @@ import { IndicatedValueSummary } from './IndicatedValueSummary';
 import { useFlyout } from '../../studio/components/FlyoutContext';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Default and constraints for narrative panel width
 const NARRATIVE_DEFAULT_WIDTH = 576;
 const NARRATIVE_MIN_WIDTH = 320;
@@ -106,7 +107,7 @@ export function SalesComparisonPanel({
     let active = true;
     const loadSubjectDetails = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/details`);
+        const response = await fetch(`/api/projects/${projectId}/details`, { headers: getAuthHeaders() });
         if (response.ok) {
           const details = (await response.json()) as ProjectDetails;
           if (!active) return;

@@ -177,7 +177,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     if (lastFetchedId.current === projectId) return;
     lastFetchedId.current = projectId;
 
-    fetch(`/api/projects/${projectId}`)
+    fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {

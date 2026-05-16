@@ -10,6 +10,7 @@ import { basket4Config } from '@/config/assumptions/basket4-financing';
 import { basket5Config } from '@/config/assumptions/basket5-equity';
 import { AssumptionBasket } from '@/app/components/assumptions/AssumptionBasket';
 import { getFieldsForTier } from '@/config/assumptions';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import '@/app/styles/assumptions.css';
 
 export default function AssumptionsPage() {
@@ -42,7 +43,7 @@ export default function AssumptionsPage() {
     try {
       const response = await fetch(`/api/projects/${projectId}/assumptions/acquisition`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(acquisitionData)
       });
 
@@ -60,7 +61,7 @@ export default function AssumptionsPage() {
     try {
       await fetch(`/api/projects/${projectId}/assumptions/revenue`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(revenueData)
       });
     } catch (error) {
@@ -72,7 +73,7 @@ export default function AssumptionsPage() {
     try {
       await fetch(`/api/projects/${projectId}/assumptions/expenses`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(expenseData)
       });
     } catch (error) {
@@ -84,7 +85,7 @@ export default function AssumptionsPage() {
     try {
       await fetch(`/api/projects/${projectId}/assumptions/equity`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(equityData)
       });
     } catch (error) {
@@ -105,11 +106,11 @@ export default function AssumptionsPage() {
       setIsLoading(true);
       try {
         const [acqRes, revRes, expRes, finRes, eqRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/assumptions/acquisition`),
-          fetch(`/api/projects/${projectId}/assumptions/revenue`),
-          fetch(`/api/projects/${projectId}/assumptions/expenses`),
-          fetch(`/api/projects/${projectId}/assumptions/financing`),
-          fetch(`/api/projects/${projectId}/assumptions/equity`)
+          fetch(`/api/projects/${projectId}/assumptions/acquisition`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/assumptions/revenue`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/assumptions/expenses`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/assumptions/financing`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/assumptions/equity`, { headers: getAuthHeaders() })
         ]);
 
         const [acq, rev, exp, fin, eq] = await Promise.all([

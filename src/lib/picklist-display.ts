@@ -1,3 +1,5 @@
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 /**
  * Picklist Display Format Helper
  * Controls how picklist values are displayed in different UI contexts
@@ -22,7 +24,7 @@ export async function initDisplayConfigCache(): Promise<void> {
   if (cacheInitialized) return;
 
   try {
-    const response = await fetch('/api/admin/picklist-display');
+    const response = await fetch('/api/admin/picklist-display', { headers: getAuthHeaders() });
     if (!response.ok) {
       console.warn('Failed to load display configs, using defaults');
       cacheInitialized = true;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface BudgetItem {
   fact_id: number;
   category_id: number;
@@ -47,7 +48,7 @@ export function useBudgetData({
         ...(entityId && { entityId })
       });
 
-      const response = await fetch(`/api/budget/gantt?${params}`);
+      const response = await fetch(`/api/budget/gantt?${params}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch budget data');

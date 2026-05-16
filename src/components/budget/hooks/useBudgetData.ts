@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BudgetItem } from '../ColumnDefinitions';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export function useBudgetData(projectId: number) {
   const [data, setData] = useState<BudgetItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,7 +145,7 @@ export function useBudgetData(projectId: number) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/budget/gantt?projectId=${projectId}`);
+      const response = await fetch(`/api/budget/gantt?projectId=${projectId}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -208,7 +209,7 @@ export function useBudgetData(projectId: number) {
 
       const response = await fetch(`/api/budget/gantt/items/${factId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -238,7 +239,7 @@ export function useBudgetData(projectId: number) {
     async (payload: Record<string, unknown>) => {
       const response = await fetch('/api/budget/gantt/items', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -254,8 +255,7 @@ export function useBudgetData(projectId: number) {
 
   const deleteItem = useCallback(
     async (factId: number) => {
-      const response = await fetch(`/api/budget/gantt/items/${factId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/budget/gantt/items/${factId}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {

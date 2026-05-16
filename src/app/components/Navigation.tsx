@@ -24,6 +24,7 @@ import {
   cilDescription
 } from '@coreui/icons';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Icon map for dynamic icon lookup
 const ICON_MAP: Record<string, any> = {
   cilChartPie,
@@ -136,8 +137,7 @@ const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveView }) =>
     setAnalysisLoading(true);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/property`, {
-        cache: 'no-store'
+      const response = await fetch(`/api/projects/${projectId}/property`, { headers: getAuthHeaders(), cache: 'no-store'
       });
       const data = await response.json();
 

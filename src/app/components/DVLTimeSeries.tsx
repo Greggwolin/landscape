@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { formatNumber, parseNumber } from '../lib/number'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type DVLTimeSeriesData = {
   dvlPerYear: number | null
   dvlPerQuarter: number | null
@@ -26,7 +27,7 @@ const DVLTimeSeries: React.FC<Props> = ({
     if (projectId) {
       const loadData = async () => {
         try {
-          const res = await fetch(`/api/assumptions?project_id=${projectId}`, { cache: 'no-store' })
+          const res = await fetch(`/api/assumptions?project_id=${projectId}`, { headers: getAuthHeaders(), cache: 'no-store' })
           const result = await res.json()
           if (result) {
             const dvlData = {

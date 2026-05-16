@@ -11,7 +11,6 @@ Session: QK-28
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from django.db import connection
 from django.db.models import Q
@@ -28,7 +27,6 @@ class DcfAnalysisView(APIView):
     Creates default record if none exists, using DcfAnalysis.get_or_create_for_project().
     property_type is automatically determined from project.project_type_code.
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id):
         """
@@ -71,7 +69,6 @@ class GrowthRateSetsView(APIView):
 
     Returns global sets + project-specific sets filtered by card_type.
     """
-    permission_classes = [AllowAny]
 
     def get(self, request):
         """
@@ -156,7 +153,6 @@ class GrowthRateSetDetailView(APIView):
 
     Returns the set info plus the rate steps for display/preview.
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, set_id):
         """

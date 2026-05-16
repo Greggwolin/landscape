@@ -37,6 +37,7 @@ import {
   type AnalysisPurpose,
 } from '@/types/project-taxonomy';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 /* ── Nav tile button (memoized) ── */
 interface NavTileProps {
   folder: FolderTab;
@@ -176,7 +177,7 @@ export function ActiveProjectBar({
 
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 

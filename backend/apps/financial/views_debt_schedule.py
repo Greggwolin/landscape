@@ -2,7 +2,6 @@
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 
@@ -14,7 +13,6 @@ from apps.calculations.engines.debt_service_engine import DebtServiceEngine
 class DebtScheduleView(APIView):
     """Generate debt schedule for a specific loan."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id: int, loan_id: int):
         loan = get_object_or_404(Loan, loan_id=loan_id, project_id=project_id)

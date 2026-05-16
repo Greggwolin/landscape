@@ -7,7 +7,6 @@ Phase 3 collaborative narrative endpoints.
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -27,7 +26,6 @@ from .services.landscaper import LandscaperService
 class ProjectNarrativeView(APIView):
     """Get or create the latest narrative for a project/approach."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id, approach_type):
         version = NarrativeVersion.objects.filter(
@@ -67,7 +65,6 @@ class ProjectNarrativeView(APIView):
 class ProjectNarrativeVersionsView(APIView):
     """List all versions for a project/approach."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id, approach_type):
         versions = NarrativeVersion.objects.filter(
@@ -85,7 +82,6 @@ class ProjectNarrativeVersionsView(APIView):
 class ProjectNarrativeVersionDetailView(APIView):
     """Get a specific version by version_number."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id, approach_type, version_number):
         version = NarrativeVersion.objects.filter(
@@ -104,7 +100,6 @@ class ProjectNarrativeVersionDetailView(APIView):
 class ProjectNarrativeStatusView(APIView):
     """Update a specific version's status."""
 
-    permission_classes = [AllowAny]
 
     def put(self, request, project_id, approach_type, version_number):
         version = NarrativeVersion.objects.filter(
@@ -131,7 +126,6 @@ class ProjectNarrativeStatusView(APIView):
 class SendForReviewView(APIView):
     """Save and send narrative for Landscaper review."""
 
-    permission_classes = [AllowAny]
 
     def post(self, request, project_id, approach_type):
         serializer = SendForReviewSerializer(data=request.data)
@@ -183,7 +177,6 @@ class SendForReviewView(APIView):
 class ReviewStatusView(APIView):
     """Check if Landscaper response is ready."""
 
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id, approach_type):
         version = NarrativeVersion.objects.filter(
@@ -205,7 +198,6 @@ class ReviewStatusView(APIView):
 class ApplyChangesView(APIView):
     """Accept Landscaper edits and create a new draft version."""
 
-    permission_classes = [AllowAny]
 
     def post(self, request, project_id, approach_type):
         serializer = ApplyChangesSerializer(data=request.data)
@@ -262,7 +254,6 @@ class ApplyChangesView(APIView):
 class FollowUpView(APIView):
     """Send a follow-up question in review."""
 
-    permission_classes = [AllowAny]
 
     def post(self, request, project_id, approach_type):
         serializer = FollowUpSerializer(data=request.data)

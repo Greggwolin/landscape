@@ -23,6 +23,7 @@ import type {
   AbsorptionVelocity
 } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Category definitions - Cost Factors only (no stage links)
 const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
@@ -77,11 +78,11 @@ export default function GlobalBenchmarksPage() {
 
     try {
       const [benchmarkRes, saleBenchmarksRes, suggestionsRes, absorptionRes, unitCostTemplatesRes] = await Promise.all([
-        fetch('/api/benchmarks'),
-        fetch('/api/sale-benchmarks/global'),
-        fetch('/api/benchmarks/ai-suggestions'),
-        fetch('/api/benchmarks/absorption-velocity'),
-        fetch('/api/unit-costs/templates'),
+        fetch('/api/benchmarks', { headers: getAuthHeaders() }),
+        fetch('/api/sale-benchmarks/global', { headers: getAuthHeaders() }),
+        fetch('/api/benchmarks/ai-suggestions', { headers: getAuthHeaders() }),
+        fetch('/api/benchmarks/absorption-velocity', { headers: getAuthHeaders() }),
+        fetch('/api/unit-costs/templates', { headers: getAuthHeaders() }),
       ]);
 
       if (!benchmarkRes.ok) {
@@ -432,7 +433,7 @@ export default function GlobalBenchmarksPage() {
 async function fetchGrowthRates(): Promise<{ sets: GrowthRateSet[] }> {
   try {
     console.log('Fetching growth rates from /api/benchmarks/growth-rates');
-    const response = await fetch('/api/benchmarks/growth-rates');
+    const response = await fetch('/api/benchmarks/growth-rates', { headers: getAuthHeaders() });
     if (!response.ok) {
       const body = await response.text();
       console.warn('Failed to load growth rates:', { status: response.status, body });

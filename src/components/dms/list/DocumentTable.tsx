@@ -7,6 +7,7 @@ import Link from 'next/link';
 import type { DMSDocument } from '@/types/dms';
 import DocumentAccordion from './DocumentAccordion';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ChatMessage {
  role: 'user' | 'assistant';
  content: string;
@@ -93,8 +94,7 @@ export default function DocumentTable({
  // Best-effort auth header injection; request may still succeed in dev modes.
  }
 
- const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
- method: 'POST',
+ const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, { headers: getAuthHeaders(), method: 'POST',
  headers,
  body: JSON.stringify({
  message,

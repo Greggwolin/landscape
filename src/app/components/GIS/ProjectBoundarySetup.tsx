@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import GISMap from '../MapLibre/GISMap'
 import { reverseGeocode, type ReverseGeocodingResult } from '../../../lib/geocoding'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ProjectBoundarySetupProps {
  projectId: number
  onBoundaryConfirmed: (boundaryData: BoundaryData) => void
@@ -182,7 +183,7 @@ export default function ProjectBoundarySetup({
  // Store boundary selection in database
  const response = await fetch('/api/gis/project-boundary', {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({
  projectId,
  selectedParcels: boundaryData.selectedParcels,

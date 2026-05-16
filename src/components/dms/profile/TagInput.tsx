@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TagSuggestion {
   tag_name: string;
   usage_count: number;
@@ -90,7 +91,7 @@ export default function TagInput({
         if (projectId) params.append('project_id', projectId.toString());
         if (workspaceId) params.append('workspace_id', workspaceId.toString());
 
-        const response = await fetch(`/api/dms/tags/suggest?${params.toString()}`);
+        const response = await fetch(`/api/dms/tags/suggest?${params.toString()}`, { headers: getAuthHeaders() });
 
         if (!response.ok) throw new Error('Failed to fetch suggestions');
 

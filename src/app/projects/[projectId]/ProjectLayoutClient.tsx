@@ -42,6 +42,7 @@ import ProjectKnowledgeModal from '@/components/intake/ProjectKnowledgeModal';
 import PlatformKnowledgeModal from '@/components/intake/PlatformKnowledgeModal';
 import { formatFolderLabel } from '@/lib/utils/folderTabConfig';
 import { isIncomeProperty } from '@/components/projects/tiles/tileConfig';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import '@/styles/folder-tabs.css';
 import '@/styles/resizable-panel.css';
 
@@ -81,7 +82,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
     if (projectFromCache || isLoading || fallbackAttempted.current) return;
     fallbackAttempted.current = true;
 
-    fetch(`/api/projects/${projectId}`)
+    fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
       .then(res => {
         if (!res.ok) return Promise.reject(res.status);
         return res.json();
@@ -533,7 +534,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
                 });
               } catch { /* best-effort */ }
               if (session.docId) {
-                fetch(`/api/dms/documents/${session.docId}/delete`, { method: 'DELETE' }).catch(() => {});
+                fetch(`/api/dms/documents/${session.docId}/delete`, { headers: getAuthHeaders(), method: 'DELETE' }).catch(() => {});
               }
               queryClient.invalidateQueries({ queryKey: ['intake-sessions', projectId] });
               queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
@@ -593,8 +594,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
 
               // 2. Delete backing file from UploadThing cloud storage (fire-and-forget OK)
               if (workbenchState.docId) {
-                fetch(`/api/dms/documents/${workbenchState.docId}/delete`, {
-                  method: 'DELETE',
+                fetch(`/api/dms/documents/${workbenchState.docId}/delete`, { headers: getAuthHeaders(), method: 'DELETE',
                 }).catch((err) => console.warn('[Workbench] UT delete failed:', err));
               }
 
@@ -725,7 +725,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
                       });
                     } catch { /* best-effort */ }
                     if (workbenchState.docId) {
-                      fetch(`/api/dms/documents/${workbenchState.docId}/delete`, { method: 'DELETE' }).catch(() => {});
+                      fetch(`/api/dms/documents/${workbenchState.docId}/delete`, { headers: getAuthHeaders(), method: 'DELETE' }).catch(() => {});
                     }
                     queryClient.invalidateQueries({ queryKey: ['extraction-staging', projectId] });
                   }

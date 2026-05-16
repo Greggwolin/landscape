@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Types
 interface BudgetItem {
   fact_id: number;
@@ -97,8 +98,7 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
         if (scopeFilter) params.set('scope', scopeFilter);
 
         const response = await fetch(
-          `/api/budget/items/${projectId}?${params.toString()}`
-        );
+          `/api/budget/items/${projectId}?${params.toString()}`, { headers: getAuthHeaders() });
         const data = await response.json();
 
         if (!data.success) {
@@ -241,8 +241,7 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
         });
       } else {
         // Existing item, call API
-        const response = await fetch(`/api/budget/item/${itemToDelete}`, {
-          method: 'DELETE'
+        const response = await fetch(`/api/budget/item/${itemToDelete}`, { headers: getAuthHeaders(), method: 'DELETE'
         });
         const data = await response.json();
 
@@ -270,7 +269,7 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
         // Create new item via POST
         const response = await fetch('/api/budget/items', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             budgetId: 4, // Forecast budget
             projectId,
@@ -302,7 +301,7 @@ export default function BudgetGridDark({ projectId }: BudgetGridDarkProps) {
         // Update existing item via PUT
         const response = await fetch(`/api/budget/item/${item.fact_id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(edits)
         });
         const data = await response.json();

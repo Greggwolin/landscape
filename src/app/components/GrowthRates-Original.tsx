@@ -26,6 +26,7 @@ import type {
   // UpdateGrowthRateRequest
 } from '../../types/growth-rates';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Materio-inspired theme
 const materioTheme = createTheme({
   palette: {
@@ -155,7 +156,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
       const response = await fetch('/api/assumptions/growth-rates', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
       });
 

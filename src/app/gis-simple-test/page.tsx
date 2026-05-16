@@ -38,7 +38,7 @@ export default function GISSimpleTestPage() {
 
       // Test 2: Structure Choice API (GET)
       addResult("🏗️  Testing Structure Choice API...")
-      const structureRes = await fetch('/api/projects/7/choose-structure')
+      const structureRes = await fetch('/api/projects/7/choose-structure', { headers: getAuthHeaders() })
       if (structureRes.ok) {
         const structure = await structureRes.json()
         addResult(`✅ Structure API: ${structure.structure_type || 'Not set'} (${structure.current_stats.total_parcels} parcels)`)
@@ -48,7 +48,7 @@ export default function GISSimpleTestPage() {
 
       // Test 3: AI Ingestion History
       addResult("📄 Testing AI Ingestion History...")
-      const historyRes = await fetch('/api/ai/ingest-property-package?project_id=7')
+      const historyRes = await fetch('/api/ai/ingest-property-package?project_id=7', { headers: getAuthHeaders() })
       if (historyRes.ok) {
         const history = await historyRes.json()
         addResult(`✅ Ingestion History: ${history.ingestion_history?.length || 0} records`)
@@ -82,7 +82,7 @@ export default function GISSimpleTestPage() {
 
       const ingestionRes = await fetch('/api/ai/ingest-property-package', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(testPackage)
       })
 

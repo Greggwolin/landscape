@@ -6,7 +6,6 @@ from django.db import connection
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -40,7 +39,6 @@ class BenchmarkMarketTimingViewSet(viewsets.ModelViewSet):
 
     queryset = BenchmarkMarketTiming.objects.all()
     serializer_class = BenchmarkMarketTimingSerializer
-    permission_classes = [AllowAny]
 
 
 class BenchmarkAbsorptionVelocityViewSet(viewsets.ModelViewSet):
@@ -48,14 +46,12 @@ class BenchmarkAbsorptionVelocityViewSet(viewsets.ModelViewSet):
 
     queryset = BenchmarkAbsorptionVelocity.objects.all()
     serializer_class = BenchmarkAbsorptionVelocitySerializer
-    permission_classes = [AllowAny]
 
 
 class ProjectTimingAssumptionsViewSet(viewsets.ModelViewSet):
     """CRUD for project-level timing overrides."""
 
     serializer_class = ProjectTimingAssumptionSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_id") or self.request.query_params.get("project_id")
@@ -77,7 +73,6 @@ class ProjectAbsorptionAssumptionsViewSet(viewsets.ModelViewSet):
     """CRUD for project-level absorption overrides."""
 
     serializer_class = ProjectAbsorptionAssumptionSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_id") or self.request.query_params.get("project_id")
@@ -99,7 +94,6 @@ class ParcelSaleEventViewSet(viewsets.ModelViewSet):
     """CRUD for parcel sale events."""
 
     serializer_class = ParcelSaleEventSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_id") or self.request.query_params.get("project_id")
@@ -281,7 +275,6 @@ class ClosingEventViewSet(viewsets.ModelViewSet):
     """CRUD for takedown/closing events."""
 
     serializer_class = ClosingEventSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         sale_event_id = self.kwargs.get("sale_event_id") or self.request.query_params.get("sale_event_id")
@@ -305,7 +298,6 @@ class ParcelAbsorptionProfileViewSet(viewsets.ModelViewSet):
     """CRUD for parcel absorption profiles."""
 
     serializer_class = ParcelAbsorptionProfileSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_id") or self.request.query_params.get("project_id")
@@ -326,7 +318,6 @@ class ParcelAbsorptionProfileViewSet(viewsets.ModelViewSet):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def annual_inventory_gauge(request: Request, project_id: int):
     """
     Return annual inventory gauge data for a project.
@@ -367,7 +358,6 @@ def annual_inventory_gauge(request: Request, project_id: int):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def parcel_product_types(request: Request, project_id: int):
     """
     Return unique combinations of type_code and product_code from parcels for a project.
@@ -434,7 +424,6 @@ def parcel_product_types(request: Request, project_id: int):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
 def parcels_with_sales(request: Request, project_id: int):
     """
     Return parcels with joined sale event data and inflated land use pricing.
@@ -609,7 +598,6 @@ class ProjectPricingAssumptionViewSet(viewsets.ModelViewSet):
     """CRUD for project-level pricing assumptions."""
 
     serializer_class = ProjectPricingAssumptionSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_id") or self.request.query_params.get("project_id")
@@ -636,7 +624,6 @@ class ProjectPricingAssumptionViewSet(viewsets.ModelViewSet):
 # ============================================================================
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
 def create_sale_phase(request: Request, project_id: int):
     """
     Create a new sale phase for the project.
@@ -707,7 +694,6 @@ def create_sale_phase(request: Request, project_id: int):
 
 
 @api_view(["PATCH"])
-@permission_classes([AllowAny])
 def assign_parcel_to_phase(request: Request, project_id: int):
     """
     Assign one or more parcels to a sale phase.
@@ -768,7 +754,6 @@ def assign_parcel_to_phase(request: Request, project_id: int):
 
 
 @api_view(["PATCH"])
-@permission_classes([AllowAny])
 def save_parcel_overrides(request: Request, project_id: int):
     """
     Save custom sale detail overrides for a parcel.
@@ -877,7 +862,6 @@ def save_parcel_overrides(request: Request, project_id: int):
 
 
 @api_view(["PATCH"])
-@permission_classes([AllowAny])
 def update_parcel_sale_date(request: Request, project_id: int):
     """
     Update the custom sale date for a parcel (clears phase assignment).
@@ -938,7 +922,6 @@ def update_parcel_sale_date(request: Request, project_id: int):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def get_available_uoms(request: Request, project_id: int, parcel_id: int) -> Response:
     """
     Get available UOMs for a specific parcel based on its data.
@@ -998,7 +981,6 @@ def get_available_uoms(request: Request, project_id: int, parcel_id: int) -> Res
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def get_all_uoms(request: Request) -> Response:
     """
     Get all UOM formulas from the registry.
@@ -1033,7 +1015,6 @@ def get_all_uoms(request: Request) -> Response:
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
     """
     Recalculate net sale proceeds for parcels in the project.
@@ -1485,7 +1466,6 @@ def recalculate_sfd_parcels(request: Request, project_id: int) -> Response:
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def sale_benchmarks(request: Request, project_id: int) -> Response:
     """
     GET: Fetch all benchmarks for a project (includes global defaults)
@@ -1588,7 +1568,6 @@ def sale_benchmarks(request: Request, project_id: int) -> Response:
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
 def global_sale_benchmarks(request: Request) -> Response:
     """
     GET: Fetch all global sale benchmarks
@@ -1667,7 +1646,6 @@ def global_sale_benchmarks(request: Request) -> Response:
 
 
 @api_view(['PUT', 'PATCH', 'DELETE'])
-@permission_classes([AllowAny])
 def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
     """
     PUT/PATCH: Update a sale benchmark
@@ -1750,7 +1728,6 @@ def update_sale_benchmark(request: Request, benchmark_id: int) -> Response:
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def parcel_sale_benchmarks(request: Request, project_id: int, parcel_id: int) -> Response:
     """Get benchmarks applicable to a specific parcel"""
     from .services import SaleCalculationService
@@ -1798,7 +1775,6 @@ def parcel_sale_benchmarks(request: Request, project_id: int, parcel_id: int) ->
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) -> Response:
     """Preview sale calculation without saving"""
     from .services import SaleCalculationService
@@ -1981,7 +1957,6 @@ def calculate_sale_preview(request: Request, project_id: int, parcel_id: int) ->
 
 
 @api_view(['GET', 'PUT'])
-@permission_classes([AllowAny])
 def parcel_sale_assumptions(request: Request, project_id: int, parcel_id: int) -> Response:
     """
     GET: Fetch saved assumptions for a parcel

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LandUseLabels } from '@/types/containers'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const DEFAULT_LABELS: LandUseLabels = {
   level1Label: 'Family',
   level1LabelPlural: 'Families',
@@ -27,7 +28,7 @@ export function useLandUseLabels(projectId: number): UseLandUseLabelsResult {
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/projects/${projectId}/config`)
+      const response = await fetch(`/api/projects/${projectId}/config`, { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error('Failed to fetch project config')
       }

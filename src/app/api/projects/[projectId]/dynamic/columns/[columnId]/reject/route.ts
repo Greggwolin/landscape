@@ -12,16 +12,14 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ projectId: string; columnId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId, columnId } = await context.params;
 
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/dynamic/columns/${columnId}/reject/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/dynamic/columns/${columnId}/reject/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
+      });
 
     if (response.status === 204) {
       return new NextResponse(null, { status: 204 });

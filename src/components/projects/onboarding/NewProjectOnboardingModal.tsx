@@ -1,5 +1,6 @@
 'use client';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, ExternalLink } from 'lucide-react';
@@ -112,20 +113,9 @@ export default function NewProjectOnboardingModal({
     try {
       // If we have a project ID, use the real Landscaper endpoint
       if (projectId) {
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        try {
-          const tokens = localStorage.getItem('auth_tokens');
-          const accessToken = tokens ? JSON.parse(tokens).access : null;
-          if (accessToken) {
-            headers.Authorization = `Bearer ${accessToken}`;
-          }
-        } catch {
-          // Best-effort auth header injection; request may still succeed in dev modes.
-        }
-
         const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, {
           method: 'POST',
-          headers,
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: content,
             activeTab: 'documents',  // Onboarding focuses on document upload/extraction
@@ -294,21 +284,9 @@ export default function NewProjectOnboardingModal({
       if (fields.has('total_units')) payload.total_units = Number(fields.get('total_units')?.value);
       if (fields.has('rentable_sf')) payload.gross_sf = Number(fields.get('rentable_sf')?.value);
 
-      // Read JWT from localStorage so the API route can tag created_by_id
-      const storedTokens = typeof window !== 'undefined'
-        ? localStorage.getItem('auth_tokens')
-        : null;
-      const accessToken = storedTokens ? JSON.parse(storedTokens).access : null;
-      const fetchHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (accessToken) {
-        fetchHeaders['Authorization'] = `Bearer ${accessToken}`;
-      }
-
       const response = await fetch('/api/projects/minimal', {
         method: 'POST',
-        headers: fetchHeaders,
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 

@@ -21,7 +21,6 @@ import re
 from decimal import Decimal
 from django.db import connection
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 logger = logging.getLogger(__name__)
@@ -148,7 +147,6 @@ def _derive_parent_category(expense_type, label):
 # =============================================================================
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def operations_data(request, project_id):
     """
     Unified P&L view — migrated from Next.js legacy route.
@@ -1010,7 +1008,6 @@ def operations_data(request, project_id):
 # =============================================================================
 
 @api_view(['PUT'])
-@permission_classes([AllowAny])
 def operations_inputs(request, project_id):
     """
     Batch upsert operations line-item inputs.
@@ -1146,7 +1143,6 @@ def _upsert_management_fee(cursor, project_id, update):
 # =============================================================================
 
 @api_view(['PUT'])
-@permission_classes([AllowAny])
 def operations_settings(request, project_id):
     """
     Update operations settings.

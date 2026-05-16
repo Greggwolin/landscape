@@ -55,6 +55,7 @@ import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
 import { useMarketCompetitors } from '@/hooks/useMarketData';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './map-tab.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,8 +374,7 @@ export function MapTab({ project }: MapTabProps) {
 
     const loadProjectDetails = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/details`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/projects/${projectId}/details`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (!response.ok) return;
         const payload = await response.json();
@@ -631,8 +631,7 @@ export function MapTab({ project }: MapTabProps) {
 
     const loadRentComps = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/rental-comparables`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/projects/${projectId}/rental-comparables`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (!response.ok) {
           const payload = await response.text();
@@ -968,9 +967,7 @@ export function MapTab({ project }: MapTabProps) {
       setPlanError(null);
       try {
         const response = await fetch(
-          `/api/gis/plan-parcels?project_id=${projectId}&include_geometry=true&format=geojson`,
-          { signal: controller.signal }
-        );
+          `/api/gis/plan-parcels?project_id=${projectId}&include_geometry=true&format=geojson`, { headers: getAuthHeaders(), signal: controller.signal });
         if (!response.ok) {
           const payload = await response.text();
           throw new Error(`${response.status}: ${payload}`);
@@ -997,8 +994,7 @@ export function MapTab({ project }: MapTabProps) {
       setBoundaryLoading(true);
       setBoundaryError(null);
       try {
-        const response = await fetch(`/api/gis/ingest-parcels?project_id=${projectId}`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/gis/ingest-parcels?project_id=${projectId}`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (response.status === 404) {
           // No boundary data for this project — not an error, just no data yet
@@ -1045,8 +1041,7 @@ export function MapTab({ project }: MapTabProps) {
       setTaxLoading(true);
       setTaxError(null);
       try {
-        const response = await fetch(`/api/gis/tax-parcels?bbox=${bboxParam}`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/gis/tax-parcels?bbox=${bboxParam}`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (!response.ok) {
           const payload = await response.text();
@@ -1477,8 +1472,7 @@ export function MapTab({ project }: MapTabProps) {
 
     const resolveMapCenter = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/map`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/projects/${projectId}/map`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`Map center lookup failed (${response.status})`);

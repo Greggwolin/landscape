@@ -33,6 +33,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ factId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { factId } = await params;
     const body = await request.json();
@@ -43,9 +44,7 @@ export async function PUT(
     try {
       const djangoResponse = await fetch(`${DJANGO_API_URL}/api/budget-items/${factId}/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body), // Pass all fields through
       });
 

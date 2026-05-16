@@ -4,7 +4,6 @@ Dynamic Columns API Views
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import transaction
 from decimal import Decimal
@@ -33,9 +32,9 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = DynamicColumnDefinitionSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_queryset(self):
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
         project_id = self.kwargs.get('project_id')
         queryset = DynamicColumnDefinition.objects.filter(
             project_id=project_id,
@@ -55,7 +54,8 @@ class DynamicColumnViewSet(viewsets.ModelViewSet):
         if proposed is not None:
             queryset = queryset.filter(is_proposed=proposed.lower() == 'true')
 
-        return queryset.order_by('display_order', 'created_at')
+        queryset = queryset.order_by('display_order', 'created_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         project_id = self.kwargs.get('project_id')
@@ -170,7 +170,6 @@ class DynamicColumnValueViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = DynamicColumnValueSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_queryset(self):
         project_id = self.kwargs.get('project_id')

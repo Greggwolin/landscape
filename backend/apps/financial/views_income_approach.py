@@ -22,7 +22,6 @@ Session: QK-11 (original), QK-16 (refactor), QK-30 (3-basis consolidation)
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.db import connection
 from django.shortcuts import get_object_or_404
 from decimal import Decimal, ROUND_HALF_UP
@@ -518,7 +517,6 @@ def _get_income_approach_data(project_id: int) -> dict:
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def income_approach_data(request, project_id: int):
     """
     GET /api/valuation/income-approach-data/{project_id}/
@@ -535,7 +533,6 @@ def income_approach_data(request, project_id: int):
 
 
 @api_view(['PUT', 'PATCH'])
-@permission_classes([AllowAny])
 def update_income_approach_assumptions(request, project_id: int):
     """
     PUT/PATCH /api/valuation/income-approach-data/{project_id}/update/
@@ -567,7 +564,6 @@ def update_income_approach_assumptions(request, project_id: int):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def income_approach_dcf(request, project_id: int):
     """
     GET /api/valuation/income-approach-data/{project_id}/dcf/
@@ -594,7 +590,6 @@ def income_approach_dcf(request, project_id: int):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def income_approach_dcf_monthly(request, project_id: int):
     """
     GET /api/valuation/income-approach-data/{project_id}/dcf/monthly/
@@ -624,7 +619,6 @@ def income_approach_dcf_monthly(request, project_id: int):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def income_approach_unit_rent_schedule(request, project_id: int):
     """
     GET /api/valuation/income-approach-data/{project_id}/unit-rent-schedule/

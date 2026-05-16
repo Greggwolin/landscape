@@ -5,7 +5,6 @@ from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 
 logger = logging.getLogger(__name__)
 
@@ -346,7 +345,6 @@ class AlphaHelpView(APIView):
     The knowledge chunks table contains developer docs that leaked through
     even aggressive regex filtering.  Static content is authoritative.
     """
-    permission_classes = [AllowAny]
 
     def get(self, request):
         page_context = request.query_params.get("page_context", "home")

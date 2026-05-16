@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ProjectStructureChoiceProps {
   projectId: number
   onStructureSelected: (structureType: 'simple' | 'master_plan') => void
@@ -126,8 +127,7 @@ const ProjectStructureChoice: React.FC<ProjectStructureChoiceProps> = ({
     try {
       const response = await fetch(`/api/projects/${projectId}/choose-structure`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           structure_type: selectedType,

@@ -18,6 +18,7 @@ import {
   isDocumentProcessed
 } from '@/lib/ai/extraction-persistence';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 // Allow up to 300 seconds for AI analysis of large documents (up to 50MB)
 export const maxDuration = 300;
 
@@ -58,6 +59,10 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_PAGES = 100; // Safety limit for very large documents
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;

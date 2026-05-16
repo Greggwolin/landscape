@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 export const dynamic = 'force-dynamic'
 
 const parseId = (input: string | null): number | null => {
@@ -52,7 +53,11 @@ async function resolveContainerFromLegacy(peLevel: string, peId: string) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const __qProjectId = new URL(request.url).searchParams.get('project_id');
+  const __auth = await requireProjectAccess(request, __qProjectId);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { searchParams } = new URL(request.url)
 

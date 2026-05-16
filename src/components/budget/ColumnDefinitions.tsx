@@ -11,6 +11,7 @@ import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 import { UOMSelect } from '@/components/common/UOMSelect';
 import { SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Re-export BudgetItem for backward compatibility
 export type { BudgetItem };
 
@@ -126,7 +127,7 @@ export function getColumnsByMode(
           try {
             await fetch(`/api/unit-costs/templates/${template.template_id}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 usage_count: (template.usage_count ?? 0) + 1,
                 last_used_date: new Date().toISOString().split('T')[0],

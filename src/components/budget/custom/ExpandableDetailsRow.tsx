@@ -15,6 +15,7 @@ import { FieldRenderer } from '../fields/FieldRenderer';
 import TimingEscalationTile from '../tiles/TimingEscalationTile';
 import CostControlsTile from '../tiles/CostControlsTile';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ExpandableDetailsRowProps {
   item: BudgetItem;
   mode: BudgetMode;
@@ -46,7 +47,7 @@ function ExpandableDetailsRow({
   // Fetch project start date for timing calculations
   useEffect(() => {
     if (projectId) {
-      fetch(`/api/projects/${projectId}`)
+      fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
         .then(res => res.json())
         .then(data => {
           setProjectStartDate(data.project?.start_date || null);

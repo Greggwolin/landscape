@@ -9,6 +9,7 @@ import GrowthRateDetail from './GrowthRateDetail'
 import DVLTimeSeries from './DVLTimeSeries'
 import { processUOMOptions } from '../../lib/uom-utils'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type LookupResp = { [k: string]: { code: string; label: string; sort_order?: number }[] }
 
 type Props = { projectId?: number | null }
@@ -101,14 +102,14 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
     const loadData = async () => {
       try {
         // Load lookups
-        const lookupRes = await fetch('/api/lookups?key=uom,commission_basis,housing_demand_unit,contingency_name', { cache: 'no-store' })
+        const lookupRes = await fetch('/api/lookups?key=uom,commission_basis,housing_demand_unit,contingency_name', { headers: getAuthHeaders(), cache: 'no-store' })
         const lookupData = await lookupRes.json()
         setLookupLists(lookupData)
 
         // Check for custom growth rates configuration
         if (projectId) {
           try {
-            const growthRes = await fetch(`/api/assumptions/growth-rates?project_id=${projectId}`, { cache: 'no-store' })
+            const growthRes = await fetch(`/api/assumptions/growth-rates?project_id=${projectId}`, { headers: getAuthHeaders(), cache: 'no-store' })
             const growthData = await growthRes.json()
             // Check if any custom growth rates have been configured beyond defaults
             const hasCustomConfig = growthData?.assumptions?.some((assumption: any) =>
@@ -131,7 +132,7 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
     if (projectId) {
       ;(async () => {
         try {
-          const res = await fetch(`/api/assumptions?project_id=${projectId}`, { cache: 'no-store' })
+          const res = await fetch(`/api/assumptions?project_id=${projectId}`, { headers: getAuthHeaders(), cache: 'no-store' })
           const data = await res.json()
           if (data?.commission_basis || data?.demand_unit) {
             setMarketFactors(prev => prev.map(f => {
@@ -158,7 +159,7 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
       const defaultUom = landUsePricing?.[0]?.uom ?? null
       const res = await fetch('/api/assumptions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           commission_basis: commission,

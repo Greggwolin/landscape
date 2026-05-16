@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { ProjectConfig, ProjectSettings } from '@/types'
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 type Params = {
   projectId: string
 }
@@ -32,6 +33,10 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(_request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params
   const id = Number(projectId)
 
@@ -103,6 +108,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const { projectId: __projectIdParam } = await params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   const { projectId } = await params
   const id = Number(projectId)
 

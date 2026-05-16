@@ -17,6 +17,7 @@ import {
   CTooltip,
 } from '@coreui/react';
 import type { BudgetItem } from '@/types/budget';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './cost-controls-tile.css';
 
 interface Contact {
@@ -58,7 +59,7 @@ export default function CostControlsTile({
 
   // Load vendors on mount
   useEffect(() => {
-    fetch('/api/contacts?type=vendor')
+    fetch('/api/contacts?type=vendor', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         const contacts = Array.isArray(data) ? data : (data.contacts || []);
@@ -108,7 +109,7 @@ export default function CostControlsTile({
     }
 
     try {
-      const response = await fetch(`/api/contacts?type=vendor&search=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/contacts?type=vendor&search=${encodeURIComponent(query)}`, { headers: getAuthHeaders() });
       const data = await response.json();
       const contacts = Array.isArray(data) ? data : (data.contacts || []);
       setVendorSuggestions(contacts.slice(0, 10));

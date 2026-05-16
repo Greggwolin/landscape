@@ -10,6 +10,7 @@ import {
   TaxonomySelection
 } from '../types/landuse';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Hook for loading land use families
 export const useLandUseFamilies = () => {
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
@@ -20,7 +21,7 @@ export const useLandUseFamilies = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/landuse/choices?type=families');
+      const response = await fetch('/api/landuse/choices?type=families', { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to load families: ${response.statusText}`);
       }
@@ -88,7 +89,7 @@ export const useLandUseTypes = (familyId?: string | number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/landuse/choices?type=types&family_id=${fId}`);
+      const response = await fetch(`/api/landuse/choices?type=types&family_id=${fId}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to load types: ${response.statusText}`);
       }
@@ -123,7 +124,7 @@ export const useProductTypes = (typeId?: string | number) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/landuse/choices?type=products&type_id=${tId}`);
+      const response = await fetch(`/api/landuse/choices?type=products&type_id=${tId}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to load products: ${response.statusText}`);
       }

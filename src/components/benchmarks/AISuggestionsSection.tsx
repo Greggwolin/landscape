@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import type { AISuggestion } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   suggestions: AISuggestion[];
   onRefresh: () => void;
@@ -36,7 +37,7 @@ export default function AISuggestionsSection({ suggestions, onRefresh }: Props) 
         Array.from(selectedIds).map(id =>
           fetch(`/api/benchmarks/ai-suggestions/${id}/review`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'approved' })
           })
         )
@@ -125,13 +126,11 @@ function AISuggestionCard({ suggestion, isSelected, onToggleSelect, onRefresh }:
     setProcessing(true);
     try {
       const response = await fetch(
-        `/api/benchmarks/ai-suggestions/${suggestion.suggestion_id}/review`,
-        {
+        `/api/benchmarks/ai-suggestions/${suggestion.suggestion_id}/review`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, notes, variant_name: variantName })
-        }
-      );
+        });
 
       if (!response.ok) throw new Error('Failed to review suggestion');
 

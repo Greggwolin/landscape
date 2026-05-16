@@ -10,6 +10,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId } = params;
     const body = await request.json();
@@ -22,14 +23,11 @@ export async function POST(
       );
     }
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/knowledge/chat/${projectId}/search/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/knowledge/chat/${projectId}/search/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
-      }
-    );
+      });
 
     const data = await response.json();
 

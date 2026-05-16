@@ -6,6 +6,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface BudgetItemUpdate {
   fact_id?: number;
   qty?: number;
@@ -42,8 +43,7 @@ interface BudgetItemCreate {
 async function updateBudgetItem(factId: number, updates: BudgetItemUpdate): Promise<any> {
   const response = await fetch(`/api/budget/gantt/items/${factId}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
     },
     body: JSON.stringify(updates),
   });
@@ -58,8 +58,7 @@ async function updateBudgetItem(factId: number, updates: BudgetItemUpdate): Prom
 async function createBudgetItem(item: BudgetItemCreate): Promise<any> {
   const response = await fetch('/api/budget/gantt/items', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
     },
     body: JSON.stringify(item),
   });
@@ -72,8 +71,7 @@ async function createBudgetItem(item: BudgetItemCreate): Promise<any> {
 }
 
 async function deleteBudgetItem(factId: number): Promise<void> {
-  const response = await fetch(`/api/budget/gantt/items/${factId}`, {
-    method: 'DELETE',
+  const response = await fetch(`/api/budget/gantt/items/${factId}`, { headers: getAuthHeaders(), method: 'DELETE',
   });
 
   if (!response.ok) {

@@ -6,7 +6,6 @@ API views for narrative versioning, comments, and track changes.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
@@ -217,7 +216,6 @@ class ProjectNarrativeVersionsView(APIView):
 
 class ProjectLandComparablesView(APIView):
     """List and create land comparables scoped to a project."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get(self, request, project_id):
         queryset = LandComparable.objects.filter(project_id=project_id).order_by('comp_number', 'land_comparable_id')
@@ -241,7 +239,6 @@ class ProjectLandComparablesView(APIView):
 
 class LandComparableDetailView(APIView):
     """Retrieve, update, or delete a single land comparable."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_object(self, project_id, comp_id):
         return get_object_or_404(LandComparable, land_comparable_id=comp_id, project_id=project_id)
@@ -266,7 +263,6 @@ class LandComparableDetailView(APIView):
 
 class LandComparableAdjustmentsView(APIView):
     """List and create adjustments for a land comparable."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get(self, request, project_id, comp_id):
         comparable = get_object_or_404(LandComparable, land_comparable_id=comp_id, project_id=project_id)
@@ -286,7 +282,6 @@ class LandComparableAdjustmentsView(APIView):
 
 class LandComparableAdjustmentDetailView(APIView):
     """Retrieve, update, or delete a specific adjustment."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get_object(self, project_id, comp_id, adj_id):
         return get_object_or_404(
@@ -316,7 +311,6 @@ class LandComparableAdjustmentDetailView(APIView):
 
 class ContainerCostMetadataView(APIView):
     """Retrieve or upsert cost metadata for a container."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get(self, request, container_id):
         container = get_object_or_404(Container, pk=container_id)
@@ -339,7 +333,6 @@ class ContainerCostMetadataView(APIView):
 
 class ProjectDepreciationView(APIView):
     """Project-level depreciation data used by the Cost Approach."""
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated in production
 
     def get(self, request, project_id):
         depreciation = CostApproachDepreciation.objects.filter(project_id=project_id).first()

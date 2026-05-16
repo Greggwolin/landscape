@@ -93,23 +93,18 @@ export default function OverrideToggle({
     try {
       if (isOverridden && overrideId) {
         // Revert override
-        const res = await fetch(
-          `${DJANGO_API_URL}/api/landscaper/overrides/${overrideId}/revert/`,
-          {
+        const res = await fetch(`${DJANGO_API_URL}/api/landscaper/overrides/${overrideId}/revert/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          });
         if (res.ok) {
           onToggle?.(false);
         }
       } else {
         // Toggle override ON
-        const res = await fetch(
-          `${DJANGO_API_URL}/api/landscaper/projects/${projectId}/overrides/toggle/`,
-          {
+        const res = await fetch(`${DJANGO_API_URL}/api/landscaper/projects/${projectId}/overrides/toggle/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({
               field_key: fieldKey,
               override_value: String(currentValue ?? ''),
@@ -117,8 +112,7 @@ export default function OverrideToggle({
               division_id: divisionId,
               unit_id: unitId,
             }),
-          }
-        );
+          });
         if (res.ok) {
           onToggle?.(true);
         }

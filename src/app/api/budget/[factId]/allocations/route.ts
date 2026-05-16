@@ -12,6 +12,7 @@ import {
 } from '@/lib/financial-engine/period-utils';
 import { fetchCurveProfileSummary } from '@/lib/financial-engine/curve-profiles';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 type BudgetInfoRow = {
   factId: number;
   projectId: number | null;
@@ -55,6 +56,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ factId: string }> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { factId } = await params;
     const numericFactId = Number(factId);

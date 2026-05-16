@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilLayers } from '@coreui/icons';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface DocTypeFilter {
   doc_type: string;
   count: number;
@@ -82,8 +83,8 @@ export default function DocTypeFilters({
     try {
       if (!projectId) {
         const [response, platformResponse] = await Promise.all([
-          fetch('/api/dms/search?limit=0&offset=0'),
-          fetch('/api/platform-knowledge?limit=0&offset=0')
+          fetch('/api/dms/search?limit=0&offset=0', { headers: getAuthHeaders() }),
+          fetch('/api/platform-knowledge?limit=0&offset=0', { headers: getAuthHeaders() })
         ]);
         if (!response.ok) throw new Error('Failed to fetch global filters');
         const data = await parseJsonSafely<{ facets?: { doc_type?: Record<string, number | string> } }>(
@@ -107,10 +108,10 @@ export default function DocTypeFilters({
       }
 
       const [docTypesResponse, countsResponse] = await Promise.all([
-        fetch(`/api/dms/templates/doc-types?project_id=${projectId}&workspace_id=${workspaceId}`),
-        fetch(`/api/dms/filters/counts?project_id=${projectId}`)
+        fetch(`/api/dms/templates/doc-types?project_id=${projectId}&workspace_id=${workspaceId}`, { headers: getAuthHeaders() }),
+        fetch(`/api/dms/filters/counts?project_id=${projectId}`, { headers: getAuthHeaders() })
       ]);
-      const platformResponse = await fetch('/api/platform-knowledge?limit=0&offset=0');
+      const platformResponse = await fetch('/api/platform-knowledge?limit=0&offset=0', { headers: getAuthHeaders() });
 
       let docTypeOptions: string[] = [];
       if (docTypesResponse.ok) {

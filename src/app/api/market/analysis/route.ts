@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -340,6 +341,10 @@ Respond with JSON only — no markdown fences, no explanation outside the JSON.`
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body: AnalysisRequest = await request.json();
 

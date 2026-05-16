@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CCard, CCardBody, CFormSwitch } from '@coreui/react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 type CascadeMode = 'auto' | 'manual';
@@ -49,7 +50,7 @@ export function ArtifactBehaviorSettings({
     try {
       const res = await fetch(`/api/projects/${projectId}/details`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ artifact_cascade_mode: next }),
       });
       if (!res.ok) {

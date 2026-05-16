@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
 const sql = neon(process.env.DATABASE_URL!);
 
 type Params = { params: Promise<{ projectId: string; accountId: string }> };
@@ -16,6 +17,10 @@ export async function PUT(
   request: NextRequest,
   context: Params
 ) {
+  const { projectId: __projectIdParam } = await context.params;
+  const __auth = await requireProjectAccess(request, __projectIdParam);
+  if (__auth instanceof NextResponse) return __auth;
+
   try {
     const { projectId: projectIdParam, accountId: accountIdParam } = await context.params;
     const projectId = parseInt(projectIdParam);

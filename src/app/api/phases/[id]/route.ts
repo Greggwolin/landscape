@@ -1,10 +1,15 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { sql } from '@/lib/db'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 // PATCH /api/phases/[id]
 // Allows updating optional descriptive fields for a phase.
 // If columns don't exist (older DB), create them idempotently.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
     const body = await request.json().catch(() => ({}))
@@ -36,6 +41,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // DELETE /api/phases/[id]
 // Deletes a phase by ID. Will fail if the phase has parcels associated with it.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   try {
     const { id } = await params
 

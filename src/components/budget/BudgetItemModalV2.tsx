@@ -29,6 +29,7 @@ import './BudgetItemModal.css';
 import { UOMSelect } from '@/components/common/UOMSelect';
 import { SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface BudgetItemFormValues {
   fact_id?: number;
   project_id?: number;
@@ -246,7 +247,7 @@ export default function BudgetItemModalV2({
   useEffect(() => {
     if (open && projectId) {
       // Load containers - API returns tree structure, we need to flatten it
-      fetch(`/api/projects/${projectId}/containers`)
+      fetch(`/api/projects/${projectId}/containers`, { headers: getAuthHeaders() })
         .then(r => r.json())
         .then(data => {
           const tree = data.containers || [];
@@ -274,7 +275,7 @@ export default function BudgetItemModalV2({
         .catch(err => console.error('Error loading containers:', err));
 
       // Load project config for level labels
-      fetch(`/api/projects/${projectId}/config`)
+      fetch(`/api/projects/${projectId}/config`, { headers: getAuthHeaders() })
         .then(r => r.json())
         .then(data => {
           if (data.config) {
@@ -292,7 +293,7 @@ export default function BudgetItemModalV2({
   // Load cost library items when category changes (renamed from templates to items)
   useEffect(() => {
     if (categoryL1Id) {
-      fetch(`/api/unit-costs/items/?category_id=${categoryL1Id}`)
+      fetch(`/api/unit-costs/items/?category_id=${categoryL1Id}`, { headers: getAuthHeaders() })
         .then(r => r.json())
         .then(data => {
           // Django REST framework returns {count, next, previous, results}
@@ -430,7 +431,7 @@ export default function BudgetItemModalV2({
       if (addToTemplate && isCustomItem) {
         const response = await fetch('/api/unit-costs/items/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             category_id: categoryL1Id,
             item_name: itemDescription,

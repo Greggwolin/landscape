@@ -74,7 +74,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/confirm/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       });
       const data = await response.json();
       if (data.success) {
@@ -103,7 +103,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/reject/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       });
       const data = await response.json();
       if (data.success) {
@@ -118,7 +118,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/batch/${batchId}/confirm/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       });
       const data = await response.json();
       if (data.success) {

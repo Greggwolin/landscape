@@ -6,6 +6,7 @@ import TimelineChart from './TimelineChart';
 import { useBudgetData } from './hooks/useBudgetData';
 import { ColumnChooser, BudgetColumnConfig } from './ColumnChooser';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface BudgetGridWithTimelineProps {
   projectId: number;
   scope?: string;
@@ -58,7 +59,7 @@ export default function BudgetGridWithTimeline({
   useEffect(() => {
     async function fetchUom() {
       try {
-        const response = await fetch('/api/measures');
+        const response = await fetch('/api/measures', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch UOM');
         const measures = await response.json();
         setUomOptions(
@@ -80,7 +81,7 @@ export default function BudgetGridWithTimeline({
     try {
       const response = await fetch(`/api/budget/gantt/items/${factId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),
       });
 
@@ -99,8 +100,7 @@ export default function BudgetGridWithTimeline({
 
   const handleDelete = async (factId: number) => {
     try {
-      const response = await fetch(`/api/budget/gantt/items/${factId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/budget/gantt/items/${factId}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {

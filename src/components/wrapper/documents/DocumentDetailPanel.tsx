@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilX } from '@coreui/icons';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface DocumentDetailDoc {
   doc_id: string;
   doc_name?: string;
@@ -123,7 +124,7 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
 
     let cancelled = false;
     setLoadingDetail(true);
-    fetch(`/api/dms/docs/${doc.doc_id}`)
+    fetch(`/api/dms/docs/${doc.doc_id}`, { headers: getAuthHeaders() })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;

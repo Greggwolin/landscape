@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from django.db.models import Sum, Q
 from decimal import Decimal
 
+from apps.projects.permissions import filter_qs_by_owner_or_staff
 from .models_developer_ops import DeveloperFee, ManagementOverhead
 from .serializers_developer_ops import (
     DeveloperFeeSerializer,
@@ -33,12 +34,13 @@ class DeveloperFeeViewSet(viewsets.ModelViewSet):
     serializer_class = DeveloperFeeSerializer
 
     def get_queryset(self):
-        """Filter queryset by project_id if provided."""
+        """Filter queryset by project_id if provided. Always scoped to the requesting user."""
         queryset = DeveloperFee.objects.all()
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset.order_by('fee_type', 'created_at')
+        queryset = queryset.order_by('fee_type', 'created_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         """Set project_id from request data."""
@@ -140,12 +142,13 @@ class ManagementOverheadViewSet(viewsets.ModelViewSet):
     serializer_class = ManagementOverheadSerializer
 
     def get_queryset(self):
-        """Filter queryset by project_id if provided."""
+        """Filter queryset by project_id if provided. Always scoped to the requesting user."""
         queryset = ManagementOverhead.objects.all()
         project_id = self.request.query_params.get('project_id')
         if project_id:
             queryset = queryset.filter(project_id=project_id)
-        return queryset.order_by('item_name', 'created_at')
+        queryset = queryset.order_by('item_name', 'created_at')
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
 
     def perform_create(self, serializer):
         """Set project_id from request data."""

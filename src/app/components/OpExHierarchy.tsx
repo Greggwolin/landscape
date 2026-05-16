@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { InventoryStatsPanel } from '@/components/operations/InventoryStatsPanel';
 import { OpExModeSelector, OpExMode } from '@/components/operations/OpExModeSelector';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface OpexAccount {
   account_id: number;
   account_number: string;
@@ -91,7 +92,7 @@ export default function OpExHierarchy({ projectId: projectIdProp }: OpExHierarch
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/projects/${projectId}/operating-expenses/hierarchy`);
+      const response = await fetch(`/api/projects/${projectId}/operating-expenses/hierarchy`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to fetch hierarchy: ${response.statusText}`);
       }
@@ -119,7 +120,7 @@ export default function OpExHierarchy({ projectId: projectIdProp }: OpExHierarch
       setSaving(true);
       const response = await fetch(`/api/projects/${projectId}/operating-expenses/${accountId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 

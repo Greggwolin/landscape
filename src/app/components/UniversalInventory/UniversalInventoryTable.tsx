@@ -7,6 +7,7 @@ import type { ColDef, CellValueChangedEvent, GridReadyEvent } from 'ag-grid-comm
 import useSWR from 'swr'
 import { fetchJson } from '@/lib/fetchJson'
 import { Plus, Upload, Download, Settings } from 'lucide-react'
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Using AG Grid legacy theme to avoid v34 Theming API conflict
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -122,17 +123,17 @@ export default function UniversalInventoryTable({
     const loadLandUseOptions = async () => {
       try {
         // Load families
-        const familiesRes = await fetch('/api/land-use/families')
+        const familiesRes = await fetch('/api/land-use/families', { headers: getAuthHeaders() })
         const families = await familiesRes.json()
         setFamilyOptions(families)
 
         // Load all types (we'll filter them dynamically)
-        const typesRes = await fetch('/api/land-use/types')
+        const typesRes = await fetch('/api/land-use/types', { headers: getAuthHeaders() })
         const types = await typesRes.json()
         setTypeOptions(types)
 
         // Load all products (we'll filter them dynamically)
-        const productsRes = await fetch('/api/land-use/products')
+        const productsRes = await fetch('/api/land-use/products', { headers: getAuthHeaders() })
         const products = await productsRes.json()
         setProductOptions(products)
       } catch (error) {
@@ -291,7 +292,7 @@ export default function UniversalInventoryTable({
       // Auto-populate lot dimensions when product is selected
       if (field === 'product_id' && newValue) {
         try {
-          const productRes = await fetch(`/api/land-use/products/${newValue}`)
+          const productRes = await fetch(`/api/land-use/products/${newValue}`, { headers: getAuthHeaders() })
           const productDetails = await productRes.json()
 
           if (productDetails.lot_w_ft && productDetails.lot_d_ft) {
@@ -309,7 +310,7 @@ export default function UniversalInventoryTable({
 
             const response = await fetch(`/api/projects/${projectId}/inventory/${data.item_id}`, {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify(updates)
             })
 
@@ -358,7 +359,7 @@ export default function UniversalInventoryTable({
       // Send update to API
       const response = await fetch(`/api/projects/${projectId}/inventory/${data.item_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       })
 
@@ -387,7 +388,7 @@ export default function UniversalInventoryTable({
 
       const response = await fetch(`/api/projects/${projectId}/inventory`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           property_type: propertyType,
           item_code: newItemCode,

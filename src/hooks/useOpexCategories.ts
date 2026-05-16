@@ -1,5 +1,6 @@
 import useSWR from 'swr';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface OpexCategory {
   category_id: number;
   category_name: string;
@@ -173,7 +174,7 @@ export async function createOpexSubcategory(
 ): Promise<OpexCategory> {
   const response = await fetch('/api/admin/unit-cost-categories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       category_name: categoryName,
       parent_id: parentId,
@@ -207,7 +208,7 @@ export async function updateOpexRow(
 ): Promise<{ success: boolean; expense: Record<string, unknown> }> {
   const response = await fetch(`/api/projects/${projectId}/opex/${opexId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(updates)
   });
 

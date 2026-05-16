@@ -16,6 +16,7 @@ import { UnitMixAccordion, UnitMixRow } from './UnitMixAccordion';
 import { ExtractionFieldRow } from './ExtractionFieldRow';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface FieldMapping {
   extraction_id?: number;
   source_text: string;
@@ -324,7 +325,7 @@ export function ExtractionReviewModal({
       // Call API to save the extracted data
       const response = await fetch(`/api/projects/${projectId}/extractions/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           doc_id: docId,
           fields: fieldsToCommit,

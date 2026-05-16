@@ -24,6 +24,7 @@ import {
   type AnalysisPurpose,
 } from '@/types/project-taxonomy'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type NewProjectModalProps = {
   isOpen: boolean
   onClose: () => void
@@ -198,7 +199,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
     if (!isOpen) return
     let cancelled = false
     setLoadingTemplates(true)
-    fetch('/api/dms/templates')
+    fetch('/api/dms/templates', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         if (cancelled) return
@@ -912,8 +913,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         headers['Authorization'] = `Bearer ${accessToken}`
       }
 
-      const response = await fetch('/api/projects/minimal', {
-        method: 'POST',
+      const response = await fetch('/api/projects/minimal', { headers: getAuthHeaders(), method: 'POST',
         headers,
         body: JSON.stringify(payload)
       })
@@ -1595,7 +1595,7 @@ function DevCleanupButton() {
 
     setCleanupStatus('Deleting...')
     try {
-      const res = await fetch(`/api/dev/cleanup-project?project_id=${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/dev/cleanup-project?project_id=${id}`, { headers: getAuthHeaders(), method: 'DELETE' })
       const data = await res.json()
       if (res.ok) {
         setCleanupStatus(`Deleted project ${id} (${data.project_name})`)

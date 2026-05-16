@@ -6,10 +6,15 @@ import {
   TimelineItemType
 } from '@/lib/timeline-engine/item-service';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const ITEM_TYPES: TimelineItemType[] = ['budget', 'milestone'];
 const DEPENDENCY_TYPES = new Set(['FS', 'SS', 'FF', 'SF']);
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const {

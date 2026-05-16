@@ -10,7 +10,6 @@ Returns the cost to complete the renovation program at a given exit month.
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from rest_framework import status
 
 from .renovation_schedule_service import RenovationScheduleService
@@ -25,7 +24,6 @@ class RenovationScheduleView(APIView):
     - unit_schedule: per-unit renovation timeline
     - program_summary: high-level program metrics
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id: int):
         try:
@@ -57,7 +55,6 @@ class CostToCompleteView(APIView):
         'unit_detail': [...]
     }
     """
-    permission_classes = [AllowAny]
 
     def get(self, request, project_id: int):
         exit_month = request.query_params.get('exit_month')

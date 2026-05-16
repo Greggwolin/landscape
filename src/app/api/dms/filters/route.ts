@@ -3,11 +3,16 @@ import { sql } from '@/lib/dms/db';
 import { CreateSmartFilterZ, UpdateSmartFilterZ } from './schema';
 import { z } from 'zod';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 /**
  * GET /api/dms/filters
  * List all smart filters
  */
 export async function GET(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const includeInactive = searchParams.get('include_inactive') === 'true';
@@ -61,6 +66,10 @@ export async function GET(request: NextRequest) {
  * Create a new smart filter
  */
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const data = CreateSmartFilterZ.parse(body);
@@ -119,6 +128,10 @@ export async function POST(request: NextRequest) {
  * Update an existing smart filter
  */
 export async function PATCH(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const body = await request.json();
     const data = UpdateSmartFilterZ.parse(body);
@@ -201,6 +214,10 @@ export async function PATCH(request: NextRequest) {
  * Soft delete a smart filter
  */
 export async function DELETE(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const filterId = searchParams.get('filter_id');

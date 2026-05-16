@@ -5,6 +5,7 @@ import { formatNumber, parseNumber } from '../../lib/number'
 import { useRouter } from 'next/navigation'
 import type { UOMOption } from '../../lib/uom-utils'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type LandUseItem = {
   id?: number
   lu_type_code: string
@@ -48,7 +49,7 @@ const LandUsePricing: React.FC<Props> = ({
       setLoading(true)
       try {
         // Load active land use types for lookup
-        const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`)
+        const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`, { headers: getAuthHeaders() })
         if (!typesResponse.ok) throw new Error('Failed to load land use types')
         const types = await typesResponse.json()
         setActiveLandUseTypes(types)
@@ -60,7 +61,7 @@ const LandUsePricing: React.FC<Props> = ({
         }, {})
 
         // Load existing pricing data
-        const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`)
+        const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`, { headers: getAuthHeaders() })
         if (!pricingResponse.ok) throw new Error('Failed to load pricing data')
         const existingPricing = await pricingResponse.json()
 
@@ -99,7 +100,7 @@ const LandUsePricing: React.FC<Props> = ({
     try {
       const response = await fetch('/api/market-pricing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           pricing_data: pricingData

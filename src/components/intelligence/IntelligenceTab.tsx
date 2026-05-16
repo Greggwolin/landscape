@@ -27,6 +27,7 @@ import {
   CTableDataCell,
 } from '@coreui/react';
 import ValueValidationScreen from './ValueValidationScreen';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -77,7 +78,7 @@ async function triggerReExtract(intakeUuid: string): Promise<{ intakeUuid: strin
   try {
     const res = await fetch(`${DJANGO_API_URL}/api/intake/${intakeUuid}/re_extract/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       credentials: 'include',
     });
     if (res.ok) {
@@ -100,10 +101,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
     try {
       // Fetch intake sessions from the IntakeStartView list endpoint
       // The start endpoint also works as a session list when using GET on the project
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/intake/start/?project_id=${project.project_id}`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`${DJANGO_API_URL}/api/intake/start/?project_id=${project.project_id}`, { headers: getAuthHeaders(), credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions || []);
@@ -115,10 +113,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
 
   const fetchOverrides = useCallback(async () => {
     try {
-      const res = await fetch(
-        `${DJANGO_API_URL}/api/landscaper/projects/${project.project_id}/overrides/`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`${DJANGO_API_URL}/api/landscaper/projects/${project.project_id}/overrides/`, { headers: getAuthHeaders(), credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setOverrides({
@@ -226,10 +221,7 @@ export default function IntelligenceTab({ project }: IntelligenceTabProps) {
                       style={{ fontSize: '0.7rem' }}
                       onClick={async () => {
                         try {
-                          const res = await fetch(
-                            `${DJANGO_API_URL}/api/landscaper/overrides/${ov.overrideId}/revert/`,
-                            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-                          );
+                          const res = await fetch(`${DJANGO_API_URL}/api/landscaper/overrides/${ov.overrideId}/revert/`, { method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' } });
                           if (res.ok) {
                             fetchOverrides();
                           }

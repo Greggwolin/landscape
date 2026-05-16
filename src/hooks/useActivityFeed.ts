@@ -6,6 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface ActivityItem {
   id: string;
   type: 'status' | 'decision' | 'update' | 'alert';
@@ -49,7 +50,7 @@ export function useActivityFeed(projectId?: string | number) {
   return useQuery<ActivityFeedResponse>({
     queryKey: ['landscaper-activities', id],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${id}/landscaper/activities`);
+      const response = await fetch(`/api/projects/${id}/landscaper/activities`, { headers: getAuthHeaders() });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch activities');
@@ -76,12 +77,10 @@ export function useMarkActivityRead(projectId?: string | number) {
       }
 
       const response = await fetch(
-        `/api/projects/${id}/landscaper/activities/${activityId}/mark-read`,
-        {
+        `/api/projects/${id}/landscaper/activities/${activityId}/mark-read`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
 
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -136,12 +135,10 @@ export function useMarkAllRead(projectId?: string | number) {
       }
 
       const response = await fetch(
-        `/api/projects/${id}/landscaper/activities/mark-all-read`,
-        {
+        `/api/projects/${id}/landscaper/activities/mark-all-read`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
 
       const data = await response.json();
       if (!response.ok || !data.success) {

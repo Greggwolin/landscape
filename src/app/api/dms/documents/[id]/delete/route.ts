@@ -10,12 +10,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { UTApi } from 'uploadthing/server';
 import { sql } from '@/lib/db';
 
+import { requireAuth } from '@/lib/api/requireAuth';
 const utapi = new UTApi();
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const __auth = await requireAuth(_request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { id } = await params;
   const docId = parseInt(id, 10);
   if (isNaN(docId)) {

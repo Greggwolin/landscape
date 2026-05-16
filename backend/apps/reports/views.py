@@ -10,9 +10,8 @@ Provides:
 """
 
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, permission_classes as perm_classes
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.http import HttpResponse, JsonResponse
 from django.db.models import Count
 from decimal import Decimal
@@ -42,7 +41,6 @@ class ReportDefinitionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = ReportDefinition.objects.filter(is_active=True)
     serializer_class = ReportDefinitionSerializer
-    permission_classes = [AllowAny]
     lookup_field = 'report_code'
 
     def get_queryset(self):
@@ -93,7 +91,6 @@ class ReportDefinitionViewSet(viewsets.ReadOnlyModelViewSet):
 # =============================================================================
 
 @api_view(['GET'])
-@perm_classes([AllowAny])
 def report_preview(request, report_code, project_id):
     """
     Generate report data as JSON for HTML rendering in ReportViewer.
@@ -164,7 +161,6 @@ def report_preview(request, report_code, project_id):
 
 
 @api_view(['POST'])
-@perm_classes([AllowAny])
 def report_export(request, report_code, project_id):
     """
     Generate report as PDF or Excel blob for download.
@@ -221,7 +217,6 @@ def report_export(request, report_code, project_id):
 
 
 @api_view(['GET'])
-@perm_classes([AllowAny])
 def report_history(request, project_id):
     """Get report generation history for a project."""
     limit = int(request.query_params.get('limit', 50))
@@ -250,7 +245,6 @@ class ReportViewSet(viewsets.ViewSet):
     - GET /api/reports/:project_id/cash-flow.pdf
     - GET /api/reports/:project_id/rent-roll.pdf
     """
-    permission_classes = [AllowAny]
 
     @action(detail=False, methods=['get'], url_path='calculate/income/(?P<project_id>[0-9]+)')
     def calculate_income(self, request, project_id=None):
@@ -436,7 +430,6 @@ class ReportTemplateViewSet(viewsets.ModelViewSet):
     """
     queryset = ReportTemplate.objects.all()
     serializer_class = ReportTemplateSerializer
-    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """Filter templates by active status if requested."""

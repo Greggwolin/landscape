@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Building2, Home, Store, Factory, Landmark, Grid3x3, ChevronRight, Check } from 'lucide-react'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Asset type configurations with predefined label sets
 export const ASSET_TYPE_CONFIGS = {
   land_development: {
@@ -123,7 +124,7 @@ export function ProjectSetupWizard({ onComplete, onCancel }: ProjectSetupWizardP
   useEffect(() => {
     let cancelled = false
     setLoadingTemplates(true)
-    fetch('/api/dms/templates')
+    fetch('/api/dms/templates', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(result => {
         if (cancelled) return

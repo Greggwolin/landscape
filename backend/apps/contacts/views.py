@@ -8,7 +8,6 @@ ContactRelationship, and ProjectContact operations.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.db.models import Q, Count
 from django.db import connection
 
@@ -46,7 +45,6 @@ class CabinetViewSet(viewsets.ModelViewSet):
     """
     queryset = Cabinet.objects.filter(is_active=True)
     serializer_class = CabinetSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated
 
     def get_queryset(self):
         """Filter to user's cabinets (when auth is implemented)."""
@@ -98,7 +96,6 @@ class ContactRoleViewSet(viewsets.ModelViewSet):
     - PATCH /api/contact-roles/:id/visibility/ - Toggle visibility
     """
     queryset = ContactRole.objects.all()
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -179,7 +176,6 @@ class ContactViewSet(viewsets.ModelViewSet):
     - GET /api/contacts/typeahead/ - Typeahead search
     """
     queryset = Contact.objects.filter(is_active=True)
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -402,19 +398,20 @@ class ProjectContactViewSet(viewsets.ModelViewSet):
     """
     queryset = ProjectContact.objects.all()
     serializer_class = ProjectContactSerializer
-    permission_classes = [AllowAny]  # TODO: Change to IsAuthenticated
 
     def get_queryset(self):
-        """Filter to specific project."""
+        """Filter to specific project. Always scoped to the requesting user."""
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
         project_pk = self.kwargs.get('project_pk')
-        if project_pk:
-            return ProjectContact.objects.filter(
-                project_id=project_pk,
-                contact__is_active=True
-            ).select_related('contact', 'role').order_by(
-                'role__display_order', 'contact__name'
-            )
-        return ProjectContact.objects.none()
+        if not project_pk:
+            return ProjectContact.objects.none()
+        qs = ProjectContact.objects.filter(
+            project_id=project_pk,
+            contact__is_active=True
+        ).select_related('contact', 'role').order_by(
+            'role__display_order', 'contact__name'
+        )
+        return filter_qs_by_owner_or_staff(qs, self.request, 'project__created_by')
 
     def create(self, request, *args, **kwargs):
         """Add a contact to the project."""

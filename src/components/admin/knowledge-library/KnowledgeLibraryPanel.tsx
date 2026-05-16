@@ -11,6 +11,7 @@ import UploadDropZone from './UploadDropZone';
 import DocResultCard, { type DocResult } from './DocResultCard';
 import DocClassificationBar from './DocClassificationBar';
 import './knowledge-library.css';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const MAX_AUTO_DOCS = 50;
@@ -66,9 +67,7 @@ export default function KnowledgeLibraryPanel() {
       currentFilters.doc_type.forEach((v) => params.append('doc_type', v));
       currentFilters.project_id.forEach((v) => params.append('project_id', v));
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/knowledge/library/facets/?${params.toString()}`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?${params.toString()}`, { headers: getAuthHeaders() });
 
       if (!response.ok) throw new Error('Failed to fetch facets');
 
@@ -123,9 +122,9 @@ export default function KnowledgeLibraryPanel() {
   const fetchSourceCounts = useCallback(async () => {
     try {
       const [allRes, userRes, platformRes] = await Promise.all([
-        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=all`),
-        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=user`),
-        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=platform`),
+        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=all`, { headers: getAuthHeaders() }),
+        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=user`, { headers: getAuthHeaders() }),
+        fetch(`${DJANGO_API_URL}/api/knowledge/library/facets/?source=platform`, { headers: getAuthHeaders() }),
       ]);
 
       const [allData, userData, platformData] = await Promise.all([
@@ -208,7 +207,7 @@ export default function KnowledgeLibraryPanel() {
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/knowledge/library/batch-download/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_ids: Array.from(selectedDocs) }),
       });
 

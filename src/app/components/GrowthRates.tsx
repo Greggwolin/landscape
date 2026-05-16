@@ -53,6 +53,7 @@ import type {
 import type { AlertColor } from '@mui/material/Alert';
 import { useRouter } from 'next/navigation';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Materio-inspired theme (keep your existing theme)
 const materioTheme = createTheme({
   palette: {
@@ -373,7 +374,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
       let response = await fetch('/api/assumptions/growth-rates', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(updatePayload)
       });
 
@@ -391,7 +392,7 @@ const GrowthRates: React.FC<Props> = ({ projectId = null }) => {
 
           response = await fetch('/api/assumptions/growth-rates', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(createPayload)
           });
         } else {
@@ -475,7 +476,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
     try {
       const response = await fetch('/api/market-pricing', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           pricing_data: pricingData
@@ -585,7 +586,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
     const fetchBaseline = async () => {
       setCpiBaseline(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const response = await fetch('/api/assumptions/cpi-baseline');
+        const response = await fetch('/api/assumptions/cpi-baseline', { headers: getAuthHeaders() });
         if (!response.ok) {
           throw new Error(`Failed to fetch CPI baseline: ${response.status} ${response.statusText}`);
         }
@@ -625,7 +626,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
 
       setLandPricingLoading(true);
       try {
-        const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`);
+        const typesResponse = await fetch(`/api/landuse/active-types?project_id=${projectId}`, { headers: getAuthHeaders() });
         if (!typesResponse.ok) throw new Error('Failed to load land use types');
         const typesData = await typesResponse.json();
         const normalizedTypes = (typesData || []).map((type: any) => ({
@@ -636,13 +637,13 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
         setActiveLandUseTypes(normalizedTypes);
 
         // Load UOM options
-        const uomResponse = await fetch('/api/fin/uoms');
+        const uomResponse = await fetch('/api/fin/uoms', { headers: getAuthHeaders() });
         if (uomResponse.ok) {
           const uoms = await uomResponse.json();
           setUomOptions(uoms.map((uom: any) => ({ code: uom.uom_code, name: uom.name })));
         }
 
-        const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`);
+        const pricingResponse = await fetch(`/api/market-pricing?project_id=${projectId}`, { headers: getAuthHeaders() });
         if (!pricingResponse.ok) throw new Error('Failed to load pricing data');
         const existingPricing = await pricingResponse.json();
 
@@ -1247,8 +1248,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
 
           const response = await fetch('/api/assumptions/growth-rates', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestData)
           });
@@ -1354,8 +1354,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
 
         const createResponse = await fetch('/api/assumptions/growth-rates', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
           },
           body: JSON.stringify(createRequestData)
         });
@@ -1422,8 +1421,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
         // For default assumptions, we might get a 404 since they don't exist in the database
         // For custom sets (ID > 3), we need to actually delete them from the database
         if (isCustomSet || (!isDefaultAssumption && assumptionId > 3)) {
-          const response = await fetch(`/api/assumptions/growth-rates?id=${assumptionId}`, {
-            method: 'DELETE',
+          const response = await fetch(`/api/assumptions/growth-rates?id=${assumptionId}`, { headers: getAuthHeaders(), method: 'DELETE',
           });
 
           console.log('Delete response status:', response.status);

@@ -14,20 +14,16 @@ export async function PATCH(
   request: NextRequest,
   context: Params
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { benchmarkId } = await context.params;
     const body = await request.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/sale-benchmarks/${benchmarkId}/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/sale-benchmarks/${benchmarkId}/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     if (!response.ok) {
       const errorText = await response.text();

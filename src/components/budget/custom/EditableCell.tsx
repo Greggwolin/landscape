@@ -6,6 +6,7 @@ import ColoredDotIndicator from './ColoredDotIndicator';
 import type { UnitCostTemplateSummary } from '@/types/benchmarks';
 import { SemanticBadge } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type SelectOption = { value: string; label: string };
 
 // Cell type for color coding per Landscape Grid Standard
@@ -283,8 +284,7 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
           params.set('project_type_code', meta.projectTypeCode);
         }
         params.set('limit', '10');
-        const response = await fetch(`/api/unit-costs/templates?${params.toString()}`, {
-          signal: controller.signal,
+        const response = await fetch(`/api/unit-costs/templates?${params.toString()}`, { headers: getAuthHeaders(), signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);

@@ -15,6 +15,7 @@ import {
   getVisibleCategoryLevels,
 } from '@/types/budget-categories';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface UseBudgetCategoriesOptions {
   projectId?: number;
   templateName?: string;
@@ -99,7 +100,7 @@ export function useBudgetCategories(
       if (templateName) params.append('template_name', templateName);
       if (projectTypeCode) params.append('project_type_code', projectTypeCode);
 
-      const response = await fetch(`/api/budget/categories?${params}`);
+      const response = await fetch(`/api/budget/categories?${params}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch categories');
@@ -132,7 +133,7 @@ export function useBudgetCategories(
       if (templateName) params.append('template_name', templateName);
       if (projectTypeCode) params.append('project_type_code', projectTypeCode);
 
-      const response = await fetch(`/api/budget/categories/tree?${params}`);
+      const response = await fetch(`/api/budget/categories/tree?${params}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch category tree');
@@ -268,7 +269,7 @@ export function useBudgetCategories(
     try {
       const response = await fetch('/api/budget/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -305,7 +306,7 @@ export function useBudgetCategories(
     try {
       const response = await fetch(`/api/budget/categories/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
@@ -337,8 +338,7 @@ export function useBudgetCategories(
     setError(null);
 
     try {
-      const response = await fetch(`/api/budget/categories/${id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/budget/categories/${id}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {
@@ -380,7 +380,7 @@ export function useBudgetCategories(
     try {
       const response = await fetch('/api/budget/category-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           template_name: templateName,

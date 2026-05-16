@@ -4,7 +4,6 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, parser_classes, permission_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
 from django.core.files.storage import default_storage
 from django.utils import timezone
 from django.db.models import Q, Max, Value
@@ -66,20 +65,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
     serializer_class = DocumentSerializer
     
     def get_queryset(self):
-        """Filter by project_id, doc_type, or status if provided."""
+        """Filter by project_id, doc_type, or status if provided. Always scoped to the requesting user."""
+        from apps.projects.permissions import filter_qs_by_owner_or_staff
         queryset = self.queryset
         project_id = self.request.query_params.get('project_id')
         doc_type = self.request.query_params.get('doc_type')
         status = self.request.query_params.get('status')
-        
+
         if project_id:
             queryset = queryset.filter(project_id=project_id)
         if doc_type:
             queryset = queryset.filter(doc_type=doc_type)
         if status:
             queryset = queryset.filter(status=status)
-        
-        return queryset
+
+        return filter_qs_by_owner_or_staff(queryset, self.request, 'project__created_by')
     
     @action(detail=False, methods=['get'], url_path='by_project/(?P<project_id>[0-9]+)')
     def by_project(self, request, project_id=None):
@@ -105,7 +105,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
-@permission_classes([AllowAny])
 def upload_document(request):
     """
     Handle document upload for AI extraction
@@ -261,7 +260,6 @@ def upload_document(request):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def get_staging_data(request, doc_id):
     """
     Retrieve extracted data for user review
@@ -714,7 +712,6 @@ def commit_staging_data_internal(
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def commit_staging_data(request, doc_id):
     """
     Commit reviewed data to database tables
@@ -959,7 +956,6 @@ def _build_extraction_summary(facts_count: int, embeddings_count: int) -> str:
     return f"{facts_count} facts • {embeddings_count} embeddings"
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def check_upload_collision(request, project_id):
     """
     Check if uploaded file matches existing document by name or content hash.
@@ -1064,7 +1060,6 @@ def check_upload_collision(request, project_id):
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
-@permission_classes([AllowAny])
 def upload_new_version(request, project_id, doc_id):
     """
     Upload a new version of an existing document.
@@ -1224,7 +1219,6 @@ def upload_new_version(request, project_id, doc_id):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
 def list_document_versions(request, project_id, doc_id):
     """
     List version chain for a document (root + all versions).
@@ -1273,7 +1267,6 @@ def list_document_versions(request, project_id, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def link_document_version(request, project_id, doc_id):
     """
     Link an existing document as a new version of a target document.
@@ -1350,7 +1343,6 @@ def link_document_version(request, project_id, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def restore_document_version(request, project_id, doc_id):
     """
     Restore a prior version by creating a new version from it.
@@ -1457,7 +1449,6 @@ def restore_document_version(request, project_id, doc_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
 def soft_delete_document(request, project_id, doc_id):
     """Soft delete a document - marks as deleted but preserves for audit."""
     try:
@@ -1493,7 +1484,6 @@ def soft_delete_document(request, project_id, doc_id):
 
 
 @api_view(['PATCH'])
-@permission_classes([AllowAny])
 def rename_document(request, project_id, doc_id):
     """Rename a document."""
     try:
@@ -1532,7 +1522,6 @@ def rename_document(request, project_id, doc_id):
 
 
 @api_view(['POST'])
-@permission_classes([AllowAny])
 def restore_document(request, project_id, doc_id):
     """Restore a soft-deleted document from trash."""
     try:
@@ -1570,7 +1559,6 @@ def restore_document(request, project_id, doc_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([AllowAny])
 def permanent_delete_document(request, project_id, doc_id):
     """
     Permanently delete a document. Only works on documents that are already in trash.

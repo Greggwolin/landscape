@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RentScheduleGrid } from '@/components/income-approach/RentScheduleGrid';
 import type { UnitRentScheduleData } from '@/hooks/useIncomeApproach';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -29,9 +30,7 @@ export function RentScheduleReport({ projectId }: RentScheduleReportProps) {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/unit-rent-schedule/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/unit-rent-schedule/`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch rent schedule: ${response.statusText}`);

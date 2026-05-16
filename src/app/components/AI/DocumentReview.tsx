@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface DocumentReviewSuggestion {
   field_name: string
   field_label: string
@@ -58,8 +59,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
 
       const response = await fetch('/api/ai/document-review', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({ project_id: projectId }),
       })
@@ -135,8 +135,7 @@ const DocumentReview: React.FC<DocumentReviewProps> = ({
 
       const response = await fetch('/api/ai/document-review', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           project_id: projectId,
@@ -363,8 +362,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
     try {
       const response = await fetch('/api/ai/document-review', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           project_id: 8, // For demo, hardcode Red Valley project

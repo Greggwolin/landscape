@@ -27,6 +27,7 @@ import type { PricingAssumption } from '@/types/sales-absorption';
 import { formatMoney } from '@/utils/formatters/number';
 import { Trash2, Plus, Save, X } from 'lucide-react';
 import { SemanticButton } from '@/components/ui/landscape';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './PricingTable.css';
 
 interface Props {
@@ -222,7 +223,7 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
 
       const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/bulk-update-field/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ field: 'growth_rate', value: newRate }),
       });
 
@@ -243,12 +244,10 @@ export default function PricingTable({ projectId, phaseFilters, mode = 'napkin' 
       const typeCodesParam = typesCodes.join(',');
 
       const recalcResponse = await fetch(
-        `/api/projects/${projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`,
-        {
+        `/api/projects/${projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
 
       if (recalcResponse.ok) {
         const recalcResult = await recalcResponse.json();

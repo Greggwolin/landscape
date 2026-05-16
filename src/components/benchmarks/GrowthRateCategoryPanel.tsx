@@ -22,6 +22,7 @@ import {
   type ColumnDef
 } from '@tanstack/react-table';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   category: BenchmarkCategory;
   sets: GrowthRateSet[];
@@ -960,7 +961,7 @@ async function saveGrowthRateSet(payload: PreparedPayload) {
     console.log('saveGrowthRateSet: Starting POST request', { payload });
     const response = await fetch('/api/benchmarks/growth-rates', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(payload)
     });
@@ -1004,7 +1005,7 @@ async function saveGrowthRateSet(payload: PreparedPayload) {
 async function updateGrowthRateSet(setId: number, payload: PreparedPayload) {
   const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify(payload)
   });
@@ -1026,8 +1027,7 @@ async function updateGrowthRateSet(setId: number, payload: PreparedPayload) {
 }
 
 async function deleteGrowthRateSet(setId: number) {
-  const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, {
-    method: 'DELETE',
+  const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, { headers: getAuthHeaders(), method: 'DELETE',
     credentials: 'include'
   });
 

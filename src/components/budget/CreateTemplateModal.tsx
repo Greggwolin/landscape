@@ -20,6 +20,7 @@ import {
 } from '@coreui/react';
 import { SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface CreateTemplateModalProps {
   open: boolean;
   onClose: () => void;
@@ -52,7 +53,7 @@ export default function CreateTemplateModal({
       // Create a minimal template with one L1 category
       const response = await fetch('/api/budget/categories', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: 'ROOT',
           name: 'Root Category',

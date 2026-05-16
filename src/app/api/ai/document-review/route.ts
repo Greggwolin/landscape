@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { DocumentAnalyzer } from '@/lib/document-analyzer'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 interface DocumentReviewSuggestion {
   field_name: string
   field_label: string
@@ -20,6 +21,10 @@ interface DocumentReviewResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { project_id } = await request.json()
 
@@ -173,6 +178,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { project_id, field_name, user_feedback, current_suggestion, user_proposed_value } = await request.json()
 
@@ -245,6 +254,10 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): scope query by __auth.userId
+
   try {
     const { project_id, field_updates, user_feedback } = await request.json()
 

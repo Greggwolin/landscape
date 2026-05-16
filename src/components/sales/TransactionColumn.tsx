@@ -9,6 +9,7 @@ import { formatMoney } from '@/utils/formatters/number';
 import './TransactionColumn.css';
 import { SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TransactionColumnProps {
   sale: SaleTransaction;
   projectId: number;
@@ -25,7 +26,7 @@ export default function TransactionColumn({ sale, projectId, onSaveNameOptimisti
     try {
       const response = await fetch('/api/sales/update-name', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
           saleDate: sale.saleDate,

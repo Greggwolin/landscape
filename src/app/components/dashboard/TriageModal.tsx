@@ -6,6 +6,7 @@ import { Loader2, FileText, Building, Database, Plus, Check, X } from 'lucide-re
 import { LandscapeButton } from '@/components/ui/landscape';
 import type { ProjectSummary } from '@/app/components/ProjectProvider';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TriageModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -61,8 +62,7 @@ export default function TriageModal({
         const formData = new FormData();
         formData.append('file', files[0]);
 
-        const response = await fetch('/api/landscaper/extract-for-project', {
-          method: 'POST',
+        const response = await fetch('/api/landscaper/extract-for-project', { headers: getAuthHeaders(), method: 'POST',
           body: formData
         });
 

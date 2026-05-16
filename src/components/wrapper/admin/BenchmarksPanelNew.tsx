@@ -6,6 +6,7 @@ import AddBenchmarkModal from '@/components/benchmarks/AddBenchmarkModal';
 import GrowthRateCategoryPanel from '@/components/benchmarks/GrowthRateCategoryPanel';
 import type { Benchmark, BenchmarkCategory, GrowthRateSet } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
   { key: 'transaction_cost', label: 'Transaction Costs', icon: 'Receipt', count: 0 },
@@ -27,9 +28,9 @@ export default function BenchmarksPanelNew() {
     setError(null);
     try {
       const [benchmarkRes, saleBenchmarksRes, growthRatesRes] = await Promise.all([
-        fetch('/api/benchmarks'),
-        fetch('/api/sale-benchmarks/global'),
-        fetch('/api/benchmarks/growth-rates'),
+        fetch('/api/benchmarks', { headers: getAuthHeaders() }),
+        fetch('/api/sale-benchmarks/global', { headers: getAuthHeaders() }),
+        fetch('/api/benchmarks/growth-rates', { headers: getAuthHeaders() }),
       ]);
       if (!benchmarkRes.ok) throw new Error('Failed to fetch benchmark registry');
 

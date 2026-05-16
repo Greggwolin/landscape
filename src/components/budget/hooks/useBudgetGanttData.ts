@@ -7,6 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface BudgetGanttTask {
   id: number | string;
   text: string;
@@ -60,7 +61,7 @@ async function fetchBudgetItems(params: BudgetGanttParams): Promise<any[]> {
     ...(params.entityId && { entityId: String(params.entityId) }),
   });
 
-  const response = await fetch(`/api/budget/gantt?${searchParams}`);
+  const response = await fetch(`/api/budget/gantt?${searchParams}`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error(`Failed to fetch budget items: ${response.statusText}`);
   }

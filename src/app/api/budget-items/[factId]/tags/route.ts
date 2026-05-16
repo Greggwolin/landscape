@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import type { BudgetTag, FactType } from '@/types'
 
+import { requireAuth } from '@/lib/api/requireAuth';
 type Params = {
   factId: string
 }
@@ -21,6 +22,10 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const __auth = await requireAuth(_request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { factId: factIdParam } = await params
   const factId = Number(factIdParam)
   if (!Number.isFinite(factId)) {
@@ -50,6 +55,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<Params> }
 ) {
+  const __auth = await requireAuth(request);
+  if (__auth instanceof NextResponse) return __auth;
+  // TODO(LSCMD-AUTH-ROLLOUT-Phase3.5): add ownership JOIN for child-resource ID
+
   const { factId: factIdParam } = await params
   const factId = Number(factIdParam)
   if (!Number.isFinite(factId)) {

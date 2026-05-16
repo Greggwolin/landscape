@@ -9,6 +9,7 @@
 
 import { Decimal } from 'decimal.js';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export type UOMCode = 'FF' | 'EA' | 'SF' | 'AC' | 'UN' | '$$$';
 
 export interface UOMFormula {
@@ -36,7 +37,7 @@ export interface ParcelData {
  * Get all UOM formulas from the registry
  */
 export async function getAllUOMs(): Promise<UOMFormula[]> {
-  const response = await fetch('/api/uoms/');
+  const response = await fetch('/api/uoms/', { headers: getAuthHeaders() });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch UOMs: ${response.statusText}`);
@@ -55,8 +56,7 @@ export async function getAvailableUOMsForParcel(
   parcelId: number
 ): Promise<AvailableUOM[]> {
   const response = await fetch(
-    `/api/projects/${projectId}/parcels/${parcelId}/available-uoms/`
-  );
+    `/api/projects/${projectId}/parcels/${parcelId}/available-uoms/`, { headers: getAuthHeaders() });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch available UOMs: ${response.statusText}`);

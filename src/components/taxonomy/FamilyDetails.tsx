@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/toast';
 import CIcon from '@coreui/icons-react';
 import { cilPencil, cilTrash } from '@coreui/icons';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Family {
   family_id: number;
   code: string;
@@ -48,7 +49,7 @@ export default function FamilyDetails({ family, selectedType, onSelectType, onRe
   const loadTypes = async (familyId: number) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/taxonomy/types?family_id=${familyId}`);
+      const response = await fetch(`/api/taxonomy/types?family_id=${familyId}`, { headers: getAuthHeaders() });
       const data = await response.json();
       // Sort by product count (descending), then alphabetically by name
       const sortedData = data.sort((a: Type, b: Type) => {
@@ -149,8 +150,7 @@ export default function FamilyDetails({ family, selectedType, onSelectType, onRe
     if (!confirm(`Are you sure you want to delete "${type.name}"?`)) return;
 
     try {
-      const response = await fetch(`/api/taxonomy/types/${type.type_id}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/taxonomy/types/${type.type_id}`, { headers: getAuthHeaders(), method: 'DELETE'
       });
 
       if (!response.ok) {
