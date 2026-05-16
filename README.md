@@ -127,7 +127,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 ### Backend
 - **Django 5.0.1** with Django REST Framework 3.14.0 ⭐ NEW (Oct 22, 2025)
 - **Neon PostgreSQL** (serverless)
-- **324 tables + 42 views** in `landscape` schema
+- **359 tables + 41 views** in `landscape` schema
 - **Direct `pg` 8.13.1** + `@neondatabase/serverless` connections
 - **Next.js App Router** API routes (legacy, being replaced)
 - **Django Admin Panel** with smart dropdown fields
@@ -183,7 +183,7 @@ landscape/
 ## 🗄 Database Architecture
 
 ### Schemas
-- **`landscape`** (ACTIVE) - 324 tables, 42 views - All application data
+- **`landscape`** (ACTIVE) - 359 tables, 41 views - All application data
 - **`land_v2`** (LEGACY) - 2 tables - Zoning glossary only (unused)
 
 ### Recent work
@@ -254,7 +254,7 @@ DATABASE_URL=postgres://... npm run schema:md
 **Database Info**:
 - Host: `ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech`
 - Database: `land_v2`
-- Active Schema: `landscape` (324 tables, 42 views)
+- Active Schema: `landscape` (359 tables, 41 views)
 - Legacy Schema: `land_v2` (2 tables - unused)
 
 **Connection Methods**:

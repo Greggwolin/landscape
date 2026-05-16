@@ -58,7 +58,7 @@ Landscape is an AI-powered real estate analytics platform targeting land develop
          │  Neon PostgreSQL      │
          │  Database: land_v2    │
          │  Schema: landscape    │
-         │  324 tables           │
+         │  359 tables / 41 views │
          └───────────────────────┘
                      │
          ┌───────────┴───────────┐
@@ -107,7 +107,7 @@ const projects = await sql`
 landscape/
 ├── src/                      # Next.js frontend
 │   ├── app/                  # App Router pages + API routes (legacy)
-│   │   ├── api/              # 313 route files (migrating to Django)
+│   │   ├── api/              # 417 route files (migrating to Django)
 │   │   └── projects/         # Project-scoped pages
 │   ├── components/           # React components
 │   │   ├── ui/               # Base primitives (shadcn-style)

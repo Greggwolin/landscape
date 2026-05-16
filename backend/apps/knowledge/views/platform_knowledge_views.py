@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from ..models import KnowledgeSource, PlatformKnowledge, PlatformKnowledgeChunk
 from ..services.platform_source_analysis import analyze_publisher_and_references
@@ -183,8 +185,13 @@ def _store_embedding(chunk_id: int, embedding: List[float]) -> None:
         )
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+# Auth-gated 2026-05-16 (LSCMD-AUDIT-CODEX-2 P1). Previously @csrf_exempt
+# function view with no auth — Codex audit follow-up flagged five platform-
+# knowledge endpoints as unauthenticated. Switched to @api_view +
+# IsAuthenticated to match the rest of the codebase's auth posture after
+# Phase 2 rollout.
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def analyze_platform_document(request):
     try:
         data = json.loads(request.body)
@@ -274,8 +281,8 @@ def analyze_platform_document(request):
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def ingest_platform_document(request):
     try:
         data = json.loads(request.body)
@@ -401,8 +408,8 @@ def ingest_platform_document(request):
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def chat_with_document(request, document_key: str):
     """
     Chat with a specific platform knowledge document.
@@ -506,8 +513,8 @@ Formatting instructions:
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["PATCH"])
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
 def update_platform_knowledge(request, document_key: str):
     """
     Update a platform knowledge document's metadata.
@@ -581,8 +588,8 @@ def update_platform_knowledge(request, document_key: str):
         return JsonResponse({'error': str(exc)}, status=500)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def query_platform_knowledge(request):
     """
     Query platform knowledge using semantic search (RAG).
