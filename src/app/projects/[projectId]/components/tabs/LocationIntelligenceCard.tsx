@@ -26,6 +26,7 @@ import type { LayerVisibility, RingDemographics, UserMapPoint } from '@/componen
 import '@/components/location-intelligence/location-map.css';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface LocationIntelligenceCardProps {
   projectId: number;
   projectName: string;
@@ -321,7 +322,7 @@ export default function LocationIntelligenceCard({
 
     const resolveProjectCenter = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/details`);
+        const response = await fetch(`/api/projects/${projectId}/details`, { headers: getAuthHeaders() });
         if (!response.ok) {
           throw new Error(`Failed to load project coordinates (${response.status})`);
         }

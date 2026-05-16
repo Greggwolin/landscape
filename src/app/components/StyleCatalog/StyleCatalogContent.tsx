@@ -11,6 +11,7 @@ import { CardHeadersSection } from './CardHeadersSection';
 import { PropertyTypeTokensSection } from './PropertyTypeTokensSection';
 import { buttonIntentRegistry, badgeIntentRegistry } from '@/config/semanticIntentRegistry';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const DEFAULT_PATH = 'docs/design-system/style-catalog.md';
 
 interface StyleCatalogContentProps {
@@ -334,7 +335,7 @@ const StyleCatalogContent: React.FC<StyleCatalogContentProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/markdown?path=${encodeURIComponent(filePath)}`);
+        const response = await fetch(`/api/markdown?path=${encodeURIComponent(filePath)}`, { headers: getAuthHeaders() });
         const data = (await response.json()) as { success: boolean; content?: string; error?: string };
         if (!response.ok || !data.success) {
           throw new Error(data.error || response.statusText);

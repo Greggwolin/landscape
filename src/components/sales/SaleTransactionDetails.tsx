@@ -6,6 +6,7 @@ import { groupParcelsBySaleDate } from '@/utils/sales/salesAggregation';
 import FilterSidebar from './FilterSidebar';
 import TransactionGrid from './TransactionGrid';
 import { SemanticButton } from '@/components/ui/landscape';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './SaleTransactionDetails.css';
 
 interface SaleTransactionDetailsProps {
@@ -28,7 +29,7 @@ export default function SaleTransactionDetails({
   useEffect(() => {
     const fetchSaleNames = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/sales/names`);
+        const response = await fetch(`/api/projects/${projectId}/sales/names`, { headers: getAuthHeaders() });
         if (response.ok) {
           const data = await response.json();
           setSaleNames(data.saleNames || {});

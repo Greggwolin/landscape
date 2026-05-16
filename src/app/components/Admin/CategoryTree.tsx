@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { SemanticButton } from '@/components/ui/landscape'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type Category = {
   category_id: number
   code: string
@@ -25,8 +26,8 @@ const CategoryTree: React.FC = () => {
 
   const reload = async () => {
     const [cats, u] = await Promise.all([
-      fetch('/api/fin/categories').then(r => r.json()),
-      fetch('/api/fin/uoms').then(r => r.json()),
+      fetch('/api/fin/categories', { headers: getAuthHeaders() }).then(r => r.json()),
+      fetch('/api/fin/uoms', { headers: getAuthHeaders() }).then(r => r.json()),
     ])
     setCategories(Array.isArray(cats) ? cats : [])
     setUoms(Array.isArray(u) ? u : [])
@@ -52,11 +53,11 @@ const CategoryTree: React.FC = () => {
     setSaving(true)
     try {
       if (!selectedId) {
-        const res = await fetch('/api/fin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+        const res = await fetch('/api/fin/categories', { method: 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         if (!res.ok) throw new Error(await res.text())
         setSelectedId((await res.json()).category_id)
       } else {
-        const res = await fetch(`/api/fin/categories/${selectedId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+        const res = await fetch(`/api/fin/categories/${selectedId}`, { method: 'PATCH', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
         if (!res.ok) throw new Error(await res.text())
       }
       await reload()
@@ -67,7 +68,7 @@ const CategoryTree: React.FC = () => {
     if (!selectedId) return
     setSaving(true)
     try {
-      await fetch(`/api/fin/categories/${selectedId}`, { method: 'DELETE' })
+      await fetch(`/api/fin/categories/${selectedId}`, { headers: getAuthHeaders(), method: 'DELETE' })
       setSelectedId(null)
       setForm({ code: '', kind: 'Use', class: '', event: '', is_active: true, uoms: [], tiers: [] })
       await reload()

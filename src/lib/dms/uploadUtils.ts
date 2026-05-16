@@ -1,3 +1,5 @@
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 /**
  * Shared upload utilities for DMS file operations.
  * Extracted from Dropzone.tsx and AccordionFilters.tsx to avoid duplication.
@@ -44,7 +46,7 @@ export async function checkCollision(
   try {
     const response = await fetch(`/api/projects/${projectId}/dms/check-collision`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename, content_hash: contentHash }),
     });
 

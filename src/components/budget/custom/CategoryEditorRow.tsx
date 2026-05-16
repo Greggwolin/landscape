@@ -9,6 +9,7 @@ import { SemanticButton } from '@/components/ui/landscape';
 import type { BudgetItem } from '../ColumnDefinitions';
 import type { BudgetMode } from '../ModeSelector';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface CategoryEditorRowProps {
   item: BudgetItem;
   projectId: number;
@@ -58,7 +59,7 @@ export default function CategoryEditorRow({
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/budget/categories?project_id=${projectId}`);
+      const response = await fetch(`/api/budget/categories?project_id=${projectId}`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         console.log('[CategoryEditorRow] Fetched categories:', data.categories);

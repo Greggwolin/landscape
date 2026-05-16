@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface InventoryStats {
   unsold_parcels: number;
   total_parcels: number;
@@ -23,7 +24,7 @@ export function InventoryStatsPanel({ projectId }: InventoryStatsPanelProps) {
     const loadStats = async () => {
       try {
         setError(null);
-        const response = await fetch(`/api/projects/${projectId}/operating-expenses/inventory-stats`);
+        const response = await fetch(`/api/projects/${projectId}/operating-expenses/inventory-stats`, { headers: getAuthHeaders() });
         if (!response.ok) {
           throw new Error('Failed to load inventory stats');
         }

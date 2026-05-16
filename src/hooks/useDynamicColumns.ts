@@ -8,6 +8,7 @@
 import useSWR from 'swr';
 import { useCallback } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export type DynamicColumnDataType = 'text' | 'number' | 'currency' | 'percent' | 'boolean' | 'date';
 export type DynamicColumnSource = 'user' | 'landscaper' | 'extraction';
 
@@ -92,13 +93,11 @@ export function useProposedColumns(projectId: number | undefined, tableName: str
       if (!projectId) return false;
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dynamic/columns/${columnId}/accept/`,
-          {
+          `/api/projects/${projectId}/dynamic/columns/${columnId}/accept/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(overrides || {}),
-          }
-        );
+          });
         if (response.ok) {
           mutate();
           return true;
@@ -116,9 +115,7 @@ export function useProposedColumns(projectId: number | undefined, tableName: str
       if (!projectId) return false;
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dynamic/columns/${columnId}/reject/`,
-          { method: 'POST' }
-        );
+          `/api/projects/${projectId}/dynamic/columns/${columnId}/reject/`, { headers: getAuthHeaders(), method: 'POST' });
         if (response.ok || response.status === 204) {
           mutate();
           return true;
@@ -139,7 +136,7 @@ export function useProposedColumns(projectId: number | undefined, tableName: str
           columnIds.map((id) =>
             fetch(`/api/projects/${projectId}/dynamic/columns/${id}/accept/`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({}),
             })
           )
@@ -158,8 +155,7 @@ export function useProposedColumns(projectId: number | undefined, tableName: str
     try {
       await Promise.all(
         data.map((col) =>
-          fetch(`/api/projects/${projectId}/dynamic/columns/${col.id}/reject/`, {
-            method: 'POST',
+          fetch(`/api/projects/${projectId}/dynamic/columns/${col.id}/reject/`, { headers: getAuthHeaders(), method: 'POST',
           })
         )
       );
@@ -191,13 +187,11 @@ export function useDynamicColumnValues(projectId: number | undefined) {
       if (!projectId) return false;
       try {
         const response = await fetch(
-          `/api/projects/${projectId}/dynamic/values/bulk_update/`,
-          {
+          `/api/projects/${projectId}/dynamic/values/bulk_update/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(updates),
-          }
-        );
+          });
         return response.ok;
       } catch {
         return false;

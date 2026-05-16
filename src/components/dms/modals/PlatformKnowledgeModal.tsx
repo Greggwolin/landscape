@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CModal, CModalBody, CModalFooter, CModalHeader, CModalTitle } from '@coreui/react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const DOMAIN_OPTIONS = [
   'Operating Expenses',
   'Valuation Methodology',
@@ -113,7 +114,7 @@ export default function PlatformKnowledgeModal({
       setIsLoadingSources(true);
       setSourcesError(null);
       try {
-        const response = await fetch('/api/platform-knowledge/sources');
+        const response = await fetch('/api/platform-knowledge/sources', { headers: getAuthHeaders() });
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data.error || 'Failed to load sources');
@@ -230,7 +231,7 @@ export default function PlatformKnowledgeModal({
     try {
       const response = await fetch('/api/platform-knowledge/sources', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source_name: sourceName,
           source_type: newSourceType,

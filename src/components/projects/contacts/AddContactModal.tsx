@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { ContactFormData, CONTACT_ROLES } from '@/types/contacts';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface AddContactModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -54,7 +55,7 @@ export default function AddContactModal({
     try {
       const response = await fetch(`/api/projects/${projectId}/contacts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
 

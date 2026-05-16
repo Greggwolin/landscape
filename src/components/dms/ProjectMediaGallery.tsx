@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 import { ALL_CLASSIFICATIONS, badgeColorToCssVar, type Classification } from '@/lib/dms/classifications';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ export default function ProjectMediaGallery({
  const { data: docsData = [] } = useQuery<DocListItem[]>({
  queryKey: ['project-docs-for-scan', projectId],
  queryFn: async () => {
- const res = await fetch(`/api/dms/docs?project_id=${projectId}&limit=200`);
+ const res = await fetch(`/api/dms/docs?project_id=${projectId}&limit=200`, { headers: getAuthHeaders() });
  if (!res.ok) throw new Error('Failed to load documents');
  const payload = await res.json();
  if (Array.isArray(payload?.docs)) return payload.docs;

@@ -15,6 +15,7 @@ import {
 } from '@/lib/measures';
 import UOMTable from './UOMTable';
 import DeleteUOMModal from './DeleteUOMModal';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './uom-manager.css';
 
 type SaveResult = { ok: boolean; error?: string };
@@ -42,7 +43,7 @@ const UnitOfMeasureManager: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/measures', { cache: 'no-store' });
+      const response = await fetch('/api/admin/measures', { headers: getAuthHeaders(), cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || 'Failed to fetch measures');
@@ -108,7 +109,7 @@ const UnitOfMeasureManager: React.FC = () => {
     try {
       const response = await fetch('/api/admin/measures', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(normalizedDraft),
       });
       const payload = await response.json();
@@ -166,7 +167,7 @@ const UnitOfMeasureManager: React.FC = () => {
     try {
       const response = await fetch(`/api/admin/measures/${encodeURIComponent(code)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           measure_name: normalizedDraft.measure_name,
           measure_category: normalizedDraft.measure_category,
@@ -213,8 +214,7 @@ const UnitOfMeasureManager: React.FC = () => {
     const code = pendingDelete.measure_code;
     setSavingCode(code);
     try {
-      const response = await fetch(`/api/admin/measures/${encodeURIComponent(code)}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/admin/measures/${encodeURIComponent(code)}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
       const payload = await response.json();
       if (!response.ok || !payload?.success) {
@@ -261,7 +261,7 @@ const UnitOfMeasureManager: React.FC = () => {
     try {
       await fetch('/api/admin/uom/reorder', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ uom_codes: orderedCodes }),
       });
       showToast('Order updated', 'success');

@@ -20,6 +20,7 @@ import {
   deleteSalesComparable,
 } from '@/lib/api/valuation';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface SalesComparisonApproachProps {
   projectId: number;
   comparables: SalesComparable[];
@@ -119,7 +120,7 @@ export function SalesComparisonApproach({
     let active = true;
     const loadSubjectDetails = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/details`);
+        const response = await fetch(`/api/projects/${projectId}/details`, { headers: getAuthHeaders() });
         if (response.ok) {
           const details = (await response.json()) as ProjectDetails;
           if (!active) return;

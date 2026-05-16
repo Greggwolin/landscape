@@ -9,6 +9,7 @@ import EquityPartnersTable, { type EquityPartner } from '@/components/capitaliza
 import WaterfallConfigForm from '@/components/capitalization/WaterfallConfigForm';
 import WaterfallResults, { WaterfallApiResponse } from '@/components/capitalization/WaterfallResults';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
 
 const parseWaterfallError = async (res: Response): Promise<string> => {
@@ -36,7 +37,7 @@ export default function EquityPage() {
   const { data: partners = [] } = useQuery<EquityPartner[]>({
     queryKey: ['equity-partners', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/equity/partners`);
+      const response = await fetch(`/api/projects/${projectId}/equity/partners`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch partners');
       const data = await response.json();
       return data.partners || [];
@@ -62,8 +63,7 @@ export default function EquityPage() {
       };
       const hurdleMethod = hurdleMethodMap[waterfallType];
 
-      const res = await fetch(`/api/projects/${projectId}/waterfall/calculate?hurdle_method=${hurdleMethod}&_t=${Date.now()}`, {
-        method: 'GET',
+      const res = await fetch(`/api/projects/${projectId}/waterfall/calculate?hurdle_method=${hurdleMethod}&_t=${Date.now()}`, { headers: getAuthHeaders(), method: 'GET',
         credentials: 'include',
         cache: 'no-store',
       });
@@ -93,8 +93,7 @@ export default function EquityPage() {
     let cancelled = false;
     async function loadLastResult() {
       try {
-        const res = await fetch(`/api/projects/${projectId}/waterfall/last-result?_t=${Date.now()}`, {
-          credentials: 'include',
+        const res = await fetch(`/api/projects/${projectId}/waterfall/last-result?_t=${Date.now()}`, { headers: getAuthHeaders(), credentials: 'include',
           cache: 'no-store',
         });
         if (!res.ok || cancelled) return;

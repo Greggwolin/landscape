@@ -5,6 +5,7 @@ import FamilyTree from '@/components/taxonomy/FamilyTree';
 import FamilyDetails from '@/components/taxonomy/FamilyDetails';
 import ProductsList from '@/components/taxonomy/ProductsList';
 import { ToastProvider } from '@/components/ui/toast';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import './taxonomy.css';
 
 interface Family {
@@ -38,7 +39,7 @@ export default function TaxonomyManagerPage() {
 
   const loadFamilies = async () => {
     try {
-      const response = await fetch('/api/taxonomy/families');
+      const response = await fetch('/api/taxonomy/families', { headers: getAuthHeaders() });
       const data = await response.json();
       setFamilies(data);
 
@@ -57,7 +58,7 @@ export default function TaxonomyManagerPage() {
 
   const loadFirstType = async (familyId: number) => {
     try {
-      const response = await fetch(`/api/taxonomy/types?family_id=${familyId}`);
+      const response = await fetch(`/api/taxonomy/types?family_id=${familyId}`, { headers: getAuthHeaders() });
       const types = await response.json();
       if (Array.isArray(types) && types.length > 0) {
         setSelectedType(types[0]);

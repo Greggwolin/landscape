@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CAlert, CCard, CCardBody } from '@coreui/react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type WaterfallType = 'IRR' | 'EM' | 'IRR_EM';
 
 interface WaterfallConfigFormProps {
@@ -181,8 +182,8 @@ export default function WaterfallConfigForm({
 
         // Load equity requirement and waterfall config in parallel
         const [equityRes, waterfallRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/cash-flow/summary`),
-          fetch(`/api/projects/${projectId}/waterfall`),
+          fetch(`/api/projects/${projectId}/cash-flow/summary`, { headers: getAuthHeaders() }),
+          fetch(`/api/projects/${projectId}/waterfall`, { headers: getAuthHeaders() }),
         ]);
 
         // Process equity requirement from cash flow summary (peakEquity)
@@ -340,10 +341,9 @@ export default function WaterfallConfigForm({
       const residGpPct = typeof residualGpPct === 'number' ? residualGpPct : 55;
 
       const response = await fetch(
-        `/api/projects/${projectId}/waterfall/napkin`,
-        {
+        `/api/projects/${projectId}/waterfall/napkin`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             lpCapital,
             gpCapital,
@@ -360,8 +360,7 @@ export default function WaterfallConfigForm({
             prefRateEm: typeof prefRateEm === 'number' ? prefRateEm : 1.0,
             hurdleEm: typeof hurdleEm === 'number' ? hurdleEm : 1.5,
           }),
-        }
-      );
+        });
 
       if (!response.ok) {
         const text = await response.text();

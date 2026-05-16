@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit, Plus, Building, Home, Map } from 'lucide-react';
 import { LandscapeButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ResSpec {
  res_spec_id: number;
  subtype_id: number;
@@ -94,9 +95,9 @@ const LandUseDetails: React.FC<LandUseDetailsProps> = ({ subtype, onClose }) => 
  try {
  setLoading(true);
   const [specsRes, productsRes, landusesRes] = await Promise.all([
- fetch(`/api/landuse/specs?subtype_id=${subtype.subtype_id}`),
- fetch(`/api/landuse/products?subtype_id=${subtype.subtype_id}`),
- fetch('/api/landuse/codes')
+ fetch(`/api/landuse/specs?subtype_id=${subtype.subtype_id}`, { headers: getAuthHeaders() }),
+ fetch(`/api/landuse/products?subtype_id=${subtype.subtype_id}`, { headers: getAuthHeaders() }),
+ fetch('/api/landuse/codes', { headers: getAuthHeaders() })
  ]);
 
  const specsData = await specsRes.json();

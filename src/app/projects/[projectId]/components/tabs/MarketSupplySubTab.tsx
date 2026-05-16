@@ -45,6 +45,7 @@ import {
 import type { LayerVisibility, UserMapPoint } from '@/components/location-intelligence';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -591,7 +592,7 @@ export default function MarketSupplySubTab({ project }: MarketSupplySubTabProps)
     const fetchComparables = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/projects/${project.project_id}/rental-comparables`);
+        const res = await fetch(`/api/projects/${project.project_id}/rental-comparables`, { headers: getAuthHeaders() });
         if (!res.ok) {
           setError('Rental comparable data not available');
           return;

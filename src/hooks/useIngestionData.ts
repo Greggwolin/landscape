@@ -6,6 +6,7 @@ import type {
   MilestoneItem,
 } from '@/components/ingestion/types';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface IngestionProject {
   id: number;
   name: string;
@@ -91,7 +92,7 @@ export function useIngestionData(projectId: number | null): UseIngestionDataRetu
     setError(null);
 
     try {
-      const response = await fetch(`/api/ingestion/${projectId}`);
+      const response = await fetch(`/api/ingestion/${projectId}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         const data = await response.json();

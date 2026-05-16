@@ -20,6 +20,7 @@ import Paper from '@mui/material/Paper'
 import CircularProgress from '@mui/material/CircularProgress'
 import Avatar from '@mui/material/Avatar'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface GrowthRateStep {
   step_id?: number
   step_number: number
@@ -76,7 +77,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
       setIsLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/projects/${projectId}/growth-rates/${cardType}`)
+      const response = await fetch(`/api/projects/${projectId}/growth-rates/${cardType}`, { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error(`Failed to load growth sets: ${response.statusText}`)
       }
@@ -100,7 +101,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
 
   const loadStepsForSet = async (setId: number) => {
     try {
-      const response = await fetch(`/api/growth-rate-sets/${setId}/steps`)
+      const response = await fetch(`/api/growth-rate-sets/${setId}/steps`, { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error(`Failed to load growth steps: ${response.statusText}`)
       }
@@ -145,7 +146,7 @@ const GrowthRatesManager: React.FC<GrowthRatesManagerProps> = ({
 
       const response = await fetch(`/api/growth-rate-sets/${activeSetId}/steps`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ steps: validSteps })
       })
 

@@ -5,6 +5,7 @@ import CIcon from '@coreui/icons-react';
 import { cilX } from '@coreui/icons';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Template {
   template_id: number;
   template_name: string;
@@ -42,7 +43,7 @@ export default function DmsAdminPanelNew() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/dms/templates?workspace_id=${workspaceId}`);
+      const r = await fetch(`/api/dms/templates?workspace_id=${workspaceId}`, { headers: getAuthHeaders() });
       const data = await r.json();
       setTemplates(data?.templates ?? []);
     } catch (e) {
@@ -73,13 +74,13 @@ export default function DmsAdminPanelNew() {
       if (editing) {
         await fetch(`/api/dms/templates/${editing.template_id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         });
       } else {
         await fetch('/api/dms/templates', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...form, workspace_id: workspaceId }),
         });
       }
@@ -97,7 +98,7 @@ export default function DmsAdminPanelNew() {
     if (!confirm('Delete this template?')) return;
     setLoading(true);
     try {
-      await fetch(`/api/dms/templates/${id}`, { method: 'DELETE' });
+      await fetch(`/api/dms/templates/${id}`, { headers: getAuthHeaders(), method: 'DELETE' });
       await load();
     } finally {
       setLoading(false);

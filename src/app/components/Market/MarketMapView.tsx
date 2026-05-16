@@ -11,6 +11,7 @@ import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
 import { registerRasterDim } from '@/lib/maps/rasterDim';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface MarketCompetitorProduct {
   lot_width_ft?: number | null;
   lot_dimensions?: string | null;
@@ -159,7 +160,7 @@ export default function MarketMapView({
   const { data: project } = useQuery({
     queryKey: ['project', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}`);
+      const response = await fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch project');
       return response.json();
     },

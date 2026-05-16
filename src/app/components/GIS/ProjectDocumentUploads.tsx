@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback } from 'react'
 import Dropzone from '@/components/dms/upload/Dropzone'
 import { DMSDocument } from '@/types/dms'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Enhanced Inline Field Control Component with AI reconciliation support
 interface InlineFieldControlProps {
  label: string
@@ -87,7 +88,7 @@ const InlineFieldControl: React.FC<InlineFieldControlProps> = ({
  try {
  const response = await fetch('/api/ai/validate-field', {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({
  fieldName,
  value: valueStr,
@@ -688,8 +689,7 @@ const ProjectDocumentUploads: React.FC<ProjectDocumentUploadsProps> = ({
 
  // Call the real AI analysis API
  console.log('Sending PDF to AI analysis API...')
- const response = await fetch('/api/ai/analyze-document', {
- method: 'POST',
+ const response = await fetch('/api/ai/analyze-document', { headers: getAuthHeaders(), method: 'POST',
  body: formData
  })
 

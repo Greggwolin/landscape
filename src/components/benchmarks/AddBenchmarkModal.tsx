@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { BenchmarkCategoryKey } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Props {
   category: BenchmarkCategoryKey;
   categoryLabel: string;
@@ -97,7 +98,7 @@ export default function AddBenchmarkModal({ category, categoryLabel, onClose, on
 
       const response = await fetch('/api/benchmarks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
 

@@ -7,6 +7,7 @@ import Navigation from '../components/Navigation';
 import { ProjectProvider } from '../components/ProjectProvider';
 import { multiFamPrototypeRegistry } from '@/lib/prototypes-multifam/registry';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const statusMap: Record<string, string> = {
   wip: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
   stable: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
@@ -47,7 +48,7 @@ function PrototypesMultiFamContent() {
   useEffect(() => {
     const loadNotes = async () => {
       try {
-        const response = await fetch('/api/prototypes/notes?type=multifam', { cache: 'no-store' });
+        const response = await fetch('/api/prototypes/notes?type=multifam', { headers: getAuthHeaders(), cache: 'no-store' });
         if (!response.ok) {
           throw new Error('Failed to load notes');
         }

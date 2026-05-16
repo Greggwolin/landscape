@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/components/ui/toast';
 import { useDebouncedCallback } from 'use-debounce';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface SensitivityAnalysisContentProps {
   projectId: number;
 }
@@ -91,7 +92,7 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
   const { data: baseAssumptions, isLoading: loadingBase } = useQuery({
     queryKey: ['sensitivity', 'base-assumptions', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/assumptions/base`);
+      const response = await fetch(`/api/projects/${projectId}/assumptions/base`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch base assumptions');
       const data = await response.json();
 
@@ -111,7 +112,7 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
   const { data: savedScenarios = [] } = useQuery<SavedScenario[]>({
     queryKey: ['sensitivity', 'scenarios', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/scenarios`);
+      const response = await fetch(`/api/projects/${projectId}/scenarios`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch scenarios');
       const data = await response.json();
       return data.scenarios || [];
@@ -134,7 +135,7 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
 
       const response = await fetch(`/api/projects/${projectId}/sensitivity/calculate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ adjustments }),
       });
 
@@ -191,7 +192,7 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
 
       const response = await fetch(`/api/projects/${projectId}/scenarios`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(scenarioData),
       });
 
@@ -249,8 +250,7 @@ export default function SensitivityAnalysisContent({ projectId }: SensitivityAna
   // Delete scenario
   const deleteScenarioMutation = useMutation({
     mutationFn: async (scenarioId: number) => {
-      const response = await fetch(`/api/projects/${projectId}/scenarios/${scenarioId}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/projects/${projectId}/scenarios/${scenarioId}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) throw new Error('Failed to delete scenario');

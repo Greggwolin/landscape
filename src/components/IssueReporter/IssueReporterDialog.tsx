@@ -5,6 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { usePathname } from 'next/navigation'
 import { IssueReporterDraft, IssueReporterIssueType } from './IssueReporterContext'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type IssueReporterDialogProps = {
   open: boolean
   draft: IssueReporterDraft | null
@@ -192,7 +193,7 @@ export function IssueReporterDialog({
     try {
       const response = await fetch('/api/dev-status/issues', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
 

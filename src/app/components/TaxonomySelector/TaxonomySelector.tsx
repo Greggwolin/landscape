@@ -7,6 +7,7 @@ import type {
   ProductChoice,
 } from '@/types/landuse'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // DensityChoice interface
 interface DensityChoice {
   density_id: number
@@ -53,7 +54,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
     const loadFamilies = async () => {
       setLoading(true)
       try {
-        const response = await fetch('/api/landuse/choices?type=families')
+        const response = await fetch('/api/landuse/choices?type=families', { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
           setFamilies(data)
@@ -77,7 +78,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
 
       setLoading(true)
       try {
-        const response = await fetch(`/api/landuse/choices?type=densities&family_id=${value.family.family_id}`)
+        const response = await fetch(`/api/landuse/choices?type=densities&family_id=${value.family.family_id}`, { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
           setDensities(data)
@@ -102,8 +103,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       setLoading(true)
       try {
         const response = await fetch(
-          `/api/landuse/choices?type=types&family_id=${value.family.family_id}&density_id=${value.density.density_id}`
-        )
+          `/api/landuse/choices?type=types&family_id=${value.family.family_id}&density_id=${value.density.density_id}`, { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
           setTypes(data)
@@ -128,8 +128,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
       setLoading(true)
       try {
         const response = await fetch(
-          `/api/landuse/choices?type=products&family_id=${value.family.family_id}&type_id=${value.type.type_id}`
-        )
+          `/api/landuse/choices?type=products&family_id=${value.family.family_id}&type_id=${value.type.type_id}`, { headers: getAuthHeaders() })
         if (response.ok) {
           const data = await response.json()
           setProducts(data)

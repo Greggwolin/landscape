@@ -17,6 +17,7 @@ import {
 } from '@coreui/react';
 import DocTypeCombobox from '@/components/dms/filters/DocTypeCombobox';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const DJANGO_API = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 interface DocType {
@@ -75,8 +76,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
       if (missing.length === 0) return;
       try {
         const res = await fetch(
-          `/api/landscaper/threads/for-docs/?doc_ids=${missing.join(',')}`
-        );
+          `/api/landscaper/threads/for-docs/?doc_ids=${missing.join(',')}`, { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         const mapping = (data?.mapping || {}) as Record<
@@ -118,7 +118,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
       try {
         const res = await fetch('/api/landscaper/threads/doc-chat/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             doc_id: parseInt(doc.doc_id, 10),
             project_id: project_id ?? null,
@@ -189,7 +189,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
 
   // ── Fetch template suggestions (once) ───────────────────────
   useEffect(() => {
-    fetch('/api/dms/templates/all-doc-types')
+    fetch('/api/dms/templates/all-doc-types', { headers: getAuthHeaders() })
       .then((r) => (r.ok ? r.json() : { doc_types: [] }))
       .then((data) => {
         if (Array.isArray(data.doc_types)) setTemplateSuggestions(data.doc_types);
@@ -200,7 +200,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
   // ── Fetch trash count on mount + after refreshKey changes ──
   useEffect(() => {
     if (!project_id) return;
-    fetch(`/api/dms/search?project_id=${project_id}&include_deleted=true&deleted_only=true&limit=1`)
+    fetch(`/api/dms/search?project_id=${project_id}&include_deleted=true&deleted_only=true&limit=1`, { headers: getAuthHeaders() })
       .then((r) => (r.ok ? r.json() : {}))
       .then((data) => setTrashCount(data?.totalHits ?? 0))
       .catch(() => {});
@@ -219,7 +219,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
       try {
         const [typesRes, countsRes] = await Promise.all([
           fetch(`${DJANGO_API}/api/dms/projects/${project_id}/doc-types/`, { signal: ac.signal }),
-          fetch(`/api/dms/filters/counts?project_id=${project_id}`, { signal: ac.signal }),
+          fetch(`/api/dms/filters/counts?project_id=${project_id}`, { headers: getAuthHeaders(), signal: ac.signal }),
         ]);
 
         let types: DocType[] = [];
@@ -269,8 +269,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     setLoadingTrash(true);
     try {
       const res = await fetch(
-        `/api/dms/search?project_id=${project_id}&include_deleted=true&deleted_only=true&limit=100`
-      );
+        `/api/dms/search?project_id=${project_id}&include_deleted=true&deleted_only=true&limit=100`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const docs: DMSDoc[] = data?.results ?? [];
@@ -349,8 +348,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     setLoadingType(docType);
     try {
       const res = await fetch(
-        `/api/dms/search?project_id=${project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`
-      );
+        `/api/dms/search?project_id=${project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const results: DMSDoc[] = data?.results ?? [];
@@ -380,8 +378,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     setLoadingType(docType);
     try {
       const res = await fetch(
-        `/api/dms/search?project_id=${project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`
-      );
+        `/api/dms/search?project_id=${project_id}&doc_type=${encodeURIComponent(docType)}&limit=20`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         const results: DMSDoc[] = data?.results ?? [];
@@ -425,9 +422,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     for (const doc of selectedDocs) {
       try {
         const res = await fetch(
-          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/delete`,
-          { method: 'DELETE' }
-        );
+          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/delete`, { headers: getAuthHeaders(), method: 'DELETE' });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           errors.push(`${doc.doc_name}: ${(data as { error?: string }).error || 'Delete failed'}`);
@@ -446,13 +441,11 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     async (newName: string) => {
       if (!firstSelectedDoc) return;
       const res = await fetch(
-        `/api/projects/${project_id}/dms/docs/${firstSelectedDoc.doc_id}/rename`,
-        {
+        `/api/projects/${project_id}/dms/docs/${firstSelectedDoc.doc_id}/rename`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ new_name: newName }),
-        }
-      );
+        });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { error?: string }).error || 'Failed to rename document');
@@ -470,9 +463,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     for (const doc of trashSelected) {
       try {
         const res = await fetch(
-          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/restore`,
-          { method: 'POST' }
-        );
+          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/restore`, { headers: getAuthHeaders(), method: 'POST' });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           errors.push(`${doc.doc_name}: ${(data as { error?: string }).error || 'Restore failed'}`);
@@ -506,7 +497,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
         try {
           const res = await fetch(`/api/dms/documents/${docId}/profile`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ profile: { doc_type: targetDocType } }),
           });
           if (!res.ok) {
@@ -534,9 +525,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     for (const doc of trashSelected) {
       try {
         const res = await fetch(
-          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/permanent-delete`,
-          { method: 'DELETE' }
-        );
+          `/api/projects/${project_id}/dms/docs/${doc.doc_id}/permanent-delete`, { headers: getAuthHeaders(), method: 'DELETE' });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           errors.push(`${doc.doc_name}: ${(data as { error?: string }).error || 'Delete failed'}`);

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Template {
   template_id: number;
   template_name: string;
@@ -45,8 +46,7 @@ export default function TemplatesAdminPage() {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/dms/templates?workspace_id=${workspaceId}`
-      );
+        `/api/dms/templates?workspace_id=${workspaceId}`, { headers: getAuthHeaders() });
       const { templates } = await response.json();
       setTemplates(templates);
     } catch (error) {
@@ -86,19 +86,17 @@ export default function TemplatesAdminPage() {
     try {
       if (editingTemplate) {
         const response = await fetch(
-          `/api/dms/templates/${editingTemplate.template_id}`,
-          {
+          `/api/dms/templates/${editingTemplate.template_id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
-          }
-        );
+          });
 
         if (!response.ok) throw new Error('Failed to update template');
       } else {
         const response = await fetch('/api/dms/templates', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
             workspace_id: workspaceId
@@ -123,8 +121,7 @@ export default function TemplatesAdminPage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/dms/templates/${templateId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/dms/templates/${templateId}`, { headers: getAuthHeaders(), method: 'DELETE'
       });
 
       if (!response.ok) throw new Error('Failed to delete template');

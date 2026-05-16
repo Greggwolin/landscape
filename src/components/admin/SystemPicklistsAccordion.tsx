@@ -9,6 +9,7 @@ import useSWR from 'swr';
 import { PicklistEditor, type PicklistValue } from './PicklistEditor';
 import { PicklistItemModal } from './PicklistItemModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type PicklistTypeConfig = {
   value: string;
   label: string;
@@ -137,7 +138,7 @@ export function SystemPicklistsAccordion() {
 
       await fetch('/api/picklists/property-subtypes', {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
@@ -164,13 +165,13 @@ export function SystemPicklistsAccordion() {
     if (typeConfig?.usesLuTable) {
       await fetch('/api/picklists/property-subtypes', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ subtype_id: item.picklist_id, is_active: !item.is_active })
       });
     } else {
       await fetch(`/api/admin/picklists/${apiType}/${item.picklist_id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !item.is_active })
       });
     }
@@ -185,7 +186,7 @@ export function SystemPicklistsAccordion() {
 
     await fetch('/api/admin/picklist-display', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ list_code: listCode, context, display_format: format })
     });
 

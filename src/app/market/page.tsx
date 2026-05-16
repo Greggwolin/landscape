@@ -11,6 +11,7 @@ import KPIStat from './components/KPIStat';
 import CoverageBadge from './components/CoverageBadge';
 import CombinedTile, { MultiGeoKPIData } from './components/CombinedTile';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type MarketSeriesResponse = {
   series: Array<
     MarketSeries & {
@@ -99,8 +100,7 @@ const MarketPage: React.FC = () => {
     const resolveGeos = async () => {
       try {
         const response = await fetch(
-          `/api/market/geos?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`
-        );
+          `/api/market/geos?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`, { headers: getAuthHeaders() });
 
         if (cancelled) return;
 
@@ -685,7 +685,7 @@ const RefreshButton: React.FC<{ projectId: number }> = ({ projectId }) => {
     try {
       const res = await fetch('/api/market/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           bundle: 'macro_v1',

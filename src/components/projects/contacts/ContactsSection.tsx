@@ -5,6 +5,7 @@ import { ContactGroup } from '@/types/contacts';
 import ContactRoleCard from './ContactRoleCard';
 import AddContactModal from './AddContactModal';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ContactsSectionProps {
   projectId: number;
 }
@@ -21,7 +22,7 @@ export default function ContactsSection({ projectId }: ContactsSectionProps) {
 
   const fetchContacts = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/contacts`);
+      const response = await fetch(`/api/projects/${projectId}/contacts`, { headers: getAuthHeaders() });
       const result = await response.json();
       if (result.success) {
         setContactGroups(result.data);

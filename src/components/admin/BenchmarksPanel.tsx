@@ -11,6 +11,7 @@ import type {
   GrowthRateSet
 } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Category definitions
 const CATEGORIES: BenchmarkCategory[] = [
   { key: 'growth_rate', label: 'Growth Rates', icon: 'TrendingUp', count: 0 },
@@ -41,9 +42,9 @@ export default function BenchmarksPanel() {
 
     try {
       const [benchmarkRes, saleBenchmarksRes, growthRatesRes] = await Promise.all([
-        fetch('/api/benchmarks'),
-        fetch('/api/sale-benchmarks/global'),
-        fetch('/api/benchmarks/growth-rates'),
+        fetch('/api/benchmarks', { headers: getAuthHeaders() }),
+        fetch('/api/sale-benchmarks/global', { headers: getAuthHeaders() }),
+        fetch('/api/benchmarks/growth-rates', { headers: getAuthHeaders() }),
       ]);
 
       if (!benchmarkRes.ok) {

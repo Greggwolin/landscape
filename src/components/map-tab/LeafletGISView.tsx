@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Feature, FeatureCollection, Geometry, GeoJsonObject } from 'geojson'
 import { geoJSON, LatLngBounds, LatLngTuple, Map as LeafletMap, Layer, tileLayer } from 'leaflet'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface LeafletGISViewProps {
   projectId: number
   projectName?: string
@@ -68,9 +69,7 @@ export function LeafletGISView({
 
       try {
         const response = await fetch(
-          `/api/gis/plan-parcels?project_id=${projectId}&include_geometry=true&format=geojson`,
-          { signal: controller.signal }
-        )
+          `/api/gis/plan-parcels?project_id=${projectId}&include_geometry=true&format=geojson`, { headers: getAuthHeaders(), signal: controller.signal })
 
         if (!response.ok) {
       const payload = await response.text()
@@ -106,8 +105,7 @@ export function LeafletGISView({
       setBoundaryError(null)
 
       try {
-        const response = await fetch(`/api/gis/ingest-parcels?project_id=${projectId}`, {
-          signal: controller.signal
+        const response = await fetch(`/api/gis/ingest-parcels?project_id=${projectId}`, { headers: getAuthHeaders(), signal: controller.signal
         })
 
         if (!response.ok) {
@@ -316,8 +314,7 @@ export function LeafletGISView({
       setTaxError(null)
 
       try {
-        const response = await fetch(`/api/gis/tax-parcels?bbox=${bboxParam}`, {
-          signal: controller.signal
+        const response = await fetch(`/api/gis/tax-parcels?bbox=${bboxParam}`, { headers: getAuthHeaders(), signal: controller.signal
         })
 
         if (!response.ok) {

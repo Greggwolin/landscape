@@ -7,6 +7,7 @@ import CIcon from '@coreui/icons-react';
 import { cilSend } from '@coreui/icons';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -50,8 +51,7 @@ export function AlphaLandscaperChat({ projectId, pageContext }: AlphaLandscaperC
         }
       }
 
-      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, {
-        method: 'POST',
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { headers: getAuthHeaders(), method: 'POST',
         headers,
         body: JSON.stringify({
           message: userMessage,

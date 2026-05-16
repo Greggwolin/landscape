@@ -15,6 +15,7 @@ import type {
   UpdateGrowthRateSet
 } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // =============================================================================
 // BENCHMARKS HOOK
 // =============================================================================
@@ -36,7 +37,7 @@ export function useBenchmarks(filters?: BenchmarkFilters) {
       if (filters?.is_active !== undefined) params.set('is_active', String(filters.is_active));
       if (filters?.include_stale) params.set('include_stale', 'true');
 
-      const response = await fetch(`/api/benchmarks?${params.toString()}`);
+      const response = await fetch(`/api/benchmarks?${params.toString()}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch benchmarks');
@@ -82,7 +83,7 @@ export function useAISuggestions(filters?: AISuggestionFilters) {
       if (filters?.category) params.set('category', filters.category);
       if (filters?.status) params.set('status', filters.status);
 
-      const response = await fetch(`/api/benchmarks/ai-suggestions?${params.toString()}`);
+      const response = await fetch(`/api/benchmarks/ai-suggestions?${params.toString()}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch AI suggestions');
@@ -111,13 +112,11 @@ export function useAISuggestions(filters?: AISuggestionFilters) {
 
     try {
       const response = await fetch(
-        `/api/benchmarks/ai-suggestions/${suggestionId}/review`,
-        {
+        `/api/benchmarks/ai-suggestions/${suggestionId}/review`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(review)
-        }
-      );
+        });
 
       if (!response.ok) {
         throw new Error('Failed to review suggestion');
@@ -161,7 +160,7 @@ export function useGrowthRates() {
     setError(null);
 
     try {
-      const response = await fetch('/api/benchmarks/growth-rates');
+      const response = await fetch('/api/benchmarks/growth-rates', { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch growth rate sets');
@@ -188,7 +187,7 @@ export function useGrowthRates() {
     try {
       const response = await fetch('/api/benchmarks/growth-rates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
 
@@ -219,7 +218,7 @@ export function useGrowthRates() {
     try {
       const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
 
@@ -248,8 +247,7 @@ export function useGrowthRates() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/benchmarks/growth-rates/${setId}`, { headers: getAuthHeaders(), method: 'DELETE'
       });
 
       if (!response.ok) {
@@ -308,7 +306,7 @@ export function useInflationAnalysis(
       if (marketGeography) params.set('market_geography', marketGeography);
       params.set('lookback_months', String(lookbackMonths));
 
-      const response = await fetch(`/api/benchmarks/inflation-analysis?${params.toString()}`);
+      const response = await fetch(`/api/benchmarks/inflation-analysis?${params.toString()}`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch inflation analysis');

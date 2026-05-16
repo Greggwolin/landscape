@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import TagInput from './TagInput';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ProfileFormProps {
   docId?: number;
   projectId: number;
@@ -81,7 +82,7 @@ export default function ProfileForm({
   useEffect(() => {
     const fetchDocTypeOptions = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/dms/doc-types`);
+        const response = await fetch(`/api/projects/${projectId}/dms/doc-types`, { headers: getAuthHeaders() });
 
         let options: string[];
         if (response.ok) {

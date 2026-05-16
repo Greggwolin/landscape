@@ -26,6 +26,7 @@ import {
   type CascadeNotificationPayload,
 } from '@/contexts/WrapperUIContext';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Project {
   project_id: number;
   project_name: string;
@@ -217,7 +218,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     try {
       const response = await fetch('/api/opex/categorize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           opex_id: opexId,
           new_category: newCategory,
@@ -247,7 +248,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     try {
       const response = await fetch('/api/opex/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: project.project_id,
           expense_category: expense.expense_category,
@@ -275,7 +276,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     try {
       const response = await fetch('/api/opex/bulk-delete', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: opexIds })
       });
 
@@ -369,7 +370,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
       fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: 'user_modified' })
       }).then(() => reload());
     } else if (currentSource === 'user_modified') {
@@ -380,7 +381,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
       if (window.confirm('Revert this value to the original extracted amount?')) {
         fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ source: 'ingestion', revert: true })
         }).then(() => reload());
       }
@@ -393,7 +394,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
     try {
       const response = await fetch(`/api/projects/${project.project_id}/opex/${opexId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category_id: categoryId,
           expense_category: categoryName

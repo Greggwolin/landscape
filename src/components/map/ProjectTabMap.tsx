@@ -12,6 +12,7 @@ import { useProjectMapData } from '@/lib/map/hooks';
 import useSWRMutation from 'swr/mutation';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface RentalComparable {
   comparable_id: number;
   property_name: string;
@@ -171,7 +172,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
       setSaveError(null);
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           location_lat: arg.lat,
           location_lon: arg.lng
@@ -206,7 +207,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
     try {
       const response = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           gis_metadata: {
             location_override: false,

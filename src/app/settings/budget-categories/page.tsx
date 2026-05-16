@@ -31,6 +31,7 @@ import { useBudgetCategories } from '@/hooks/useBudgetCategories';
 import CategoryTreeManager from '@/components/budget/CategoryTreeManager';
 import CategoryTemplateManager from '@/components/budget/CategoryTemplateManager';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export default function BudgetCategoriesPage() {
   const [activeTab, setActiveTab] = useState<'templates' | 'custom'>('templates');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -41,7 +42,7 @@ export default function BudgetCategoriesPage() {
   useEffect(() => {
     async function fetchProjects() {
       try {
-        const response = await fetch('/api/projects/minimal');
+        const response = await fetch('/api/projects/minimal', { headers: getAuthHeaders() });
         if (response.ok) {
           const data = await response.json();
           setProjects(data.projects || []);

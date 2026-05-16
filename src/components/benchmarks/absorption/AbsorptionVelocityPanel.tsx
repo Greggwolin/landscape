@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import type { AbsorptionVelocity, ProjectScale } from '@/types/benchmarks';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface AbsorptionVelocityPanelProps {
   onCountUpdate?: (count: number) => void;
   onSelect?: (velocity: AbsorptionVelocity) => void;
@@ -31,7 +32,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate, onSelect, selec
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/benchmarks/absorption-velocity', { cache: 'no-store' });
+      const response = await fetch('/api/benchmarks/absorption-velocity', { headers: getAuthHeaders(), cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to load absorption velocities');
       const data: AbsorptionVelocity[] = await response.json();
       setVelocities(data);
@@ -48,7 +49,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate, onSelect, selec
     try {
       const response = await fetch(`/api/benchmarks/absorption-velocity/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ velocity_annual: editValue }),
       });
 
@@ -68,8 +69,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate, onSelect, selec
     }
 
     try {
-      const response = await fetch(`/api/benchmarks/absorption-velocity/${id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/benchmarks/absorption-velocity/${id}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) throw new Error('Failed to delete absorption velocity');
@@ -111,7 +111,7 @@ export default function AbsorptionVelocityPanel({ onCountUpdate, onSelect, selec
     try {
       const response = await fetch('/api/benchmarks/absorption-velocity', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           velocity_annual: velocityValue,
           market_geography: newMarketGeography || undefined,

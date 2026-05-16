@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface SimpleTaxonomySelectorProps {
  value: {
  family_name?: string;
@@ -88,7 +89,7 @@ const SimpleTaxonomySelector: React.FC<SimpleTaxonomySelectorProps> = ({
 
  const loadFamilies = async () => {
  try {
- const response = await fetch('/api/landuse/families?active=true');
+ const response = await fetch('/api/landuse/families?active=true', { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setFamilies(data);
@@ -102,7 +103,7 @@ const SimpleTaxonomySelector: React.FC<SimpleTaxonomySelectorProps> = ({
  try {
  const family = families.find(f => f.family_name === familyName);
  if (family) {
- const response = await fetch(`/api/landuse/types/${family.family_id}`);
+ const response = await fetch(`/api/landuse/types/${family.family_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setTypes(data);
@@ -117,7 +118,7 @@ const SimpleTaxonomySelector: React.FC<SimpleTaxonomySelectorProps> = ({
  try {
  // For residential lot products, use the specific endpoint
  if (typeCode === 'SFD' || typeCode === 'SFA') {
- const response = await fetch('/api/landuse/res-lot-products');
+ const response = await fetch('/api/landuse/res-lot-products', { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  // Remove duplicates by product_code and ensure unique products
@@ -145,7 +146,7 @@ const SimpleTaxonomySelector: React.FC<SimpleTaxonomySelectorProps> = ({
  type = types.find(t => t.type_code.startsWith(typeCode));
  }
  if (type) {
- const response = await fetch(`/api/landuse/products/${type.type_id}`);
+ const response = await fetch(`/api/landuse/products/${type.type_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setProducts(data);

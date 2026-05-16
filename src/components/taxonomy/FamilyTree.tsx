@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useToast } from '@/components/ui/toast';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Family {
   family_id: number;
   code: string;
@@ -88,8 +89,7 @@ export default function FamilyTree({ families, selectedFamily, onSelectFamily, o
     if (!confirm(`Are you sure you want to delete "${family.name}"?`)) return;
 
     try {
-      const response = await fetch(`/api/taxonomy/families/${family.family_id}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/taxonomy/families/${family.family_id}`, { headers: getAuthHeaders(), method: 'DELETE'
       });
 
       if (!response.ok) {

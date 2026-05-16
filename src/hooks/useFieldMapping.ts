@@ -7,6 +7,7 @@
 
 import { useState, useCallback } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Types
 export type MappingConfidence = 'high' | 'medium' | 'low' | 'none';
 export type MappingAction = 'auto' | 'suggest' | 'needs_input' | 'skip';
@@ -94,7 +95,7 @@ export function useFieldMapping(projectId: number) {
     try {
       const response = await fetch(`/api/projects/${projectId}/discover-columns`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_id: documentId }),
       });
 
@@ -164,7 +165,7 @@ export function useFieldMapping(projectId: number) {
 
       const response = await fetch(`/api/projects/${projectId}/apply-mapping/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           document_id: documentId,
           mappings,

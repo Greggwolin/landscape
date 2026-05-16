@@ -21,6 +21,7 @@ import CategoryTreeManager from './CategoryTreeManager';
 import { useBudgetCategories } from '@/hooks/useBudgetCategories';
 import { SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TemplateEditorModalProps {
   open: boolean;
   templateName: string;
@@ -77,7 +78,7 @@ export default function TemplateEditorModal({
       // Step 1: Apply template to project (or verify it's already applied)
       const applyResponse = await fetch('/api/budget/category-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           template_name: templateName,
@@ -105,7 +106,7 @@ export default function TemplateEditorModal({
         // Update the global template with current project categories
         const updateResponse = await fetch('/api/budget/category-templates/update', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             project_id: projectId,
             template_name: templateName,
@@ -130,7 +131,7 @@ export default function TemplateEditorModal({
         // Save as a new global template
         const saveNewResponse = await fetch('/api/budget/category-templates/save-new', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({
             project_id: projectId,
             template_name: newTemplateName.trim(),

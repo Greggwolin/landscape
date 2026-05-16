@@ -39,6 +39,7 @@ import { format } from 'date-fns';
 import './timing-escalation-tile.css';
 import { useProjectInflationSettings } from '@/hooks/useInflationSettings';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TimingEscalationTileProps {
   item: BudgetItem;
   projectId: number;
@@ -63,7 +64,7 @@ export default function TimingEscalationTile({
 
   // Fetch growth rate benchmarks for escalation dropdown
   useEffect(() => {
-    fetch('/api/benchmarks/growth-rates?is_global=true')
+    fetch('/api/benchmarks/growth-rates?is_global=true', { headers: getAuthHeaders() })
       .then(res => res.json())
       .then(data => {
         setGrowthRateSets(data.sets || []);

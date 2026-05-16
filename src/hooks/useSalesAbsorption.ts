@@ -21,6 +21,7 @@ import type {
   UpdateClosingPayload,
 } from '@/types/sales-absorption';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 /**
  * Fetch annual inventory gauge data for a project
  */
@@ -28,7 +29,7 @@ export function useInventoryGauge(projectId: number | null) {
   return useQuery({
     queryKey: ['inventory-gauge', projectId],
     queryFn: async (): Promise<InventoryGaugeData> => {
-      const response = await fetch(`/api/projects/${projectId}/inventory-gauge/`);
+      const response = await fetch(`/api/projects/${projectId}/inventory-gauge/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch inventory gauge data');
       }
@@ -93,8 +94,7 @@ export function useCreateSalePhase(projectId: number | null) {
 
       const response = await fetch(`/api/projects/${projectId}/sale-phases/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -128,8 +128,7 @@ export function useAssignParcelToPhase(projectId: number | null) {
 
       const response = await fetch(`/api/projects/${projectId}/parcel-sale-phase/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -162,8 +161,7 @@ export function useSaveParcelOverrides(projectId: number | null) {
 
       const response = await fetch(`/api/projects/${projectId}/parcel-sales/overrides/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -196,8 +194,7 @@ export function useUpdateParcelSaleDate(projectId: number | null) {
 
       const response = await fetch(`/api/projects/${projectId}/parcel-sales/date/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
@@ -224,7 +221,7 @@ export function usePhaseStats(projectId: number | null) {
     queryKey: ['phase-stats', projectId],
     queryFn: async () => {
       // Use existing phases endpoint
-      const response = await fetch(`/api/phases?project_id=${projectId}`);
+      const response = await fetch(`/api/phases?project_id=${projectId}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch phase stats');
       }
@@ -242,7 +239,7 @@ export function usePricingAssumptions(projectId: number | null) {
   return useQuery({
     queryKey: ['pricing-assumptions', projectId],
     queryFn: async (): Promise<PricingAssumption[]> => {
-      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/`);
+      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch pricing assumptions');
       }
@@ -277,8 +274,7 @@ export function useSavePricingAssumptions() {
       // Use bulk endpoint for ALL saves - handles 1 or 20 rows in ONE SQL query
       const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/bulk/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json',
         },
         body: JSON.stringify({ assumptions }),
       });
@@ -309,12 +305,10 @@ export function useSavePricingAssumptions() {
         // Make ONE call with all type codes (comma-separated)
         const typeCodesParam = typesCodes.join(',');
         const response = await fetch(
-          `/api/projects/${variables.projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`,
-          {
+          `/api/projects/${variables.projectId}/recalculate-sfd/?type_codes=${typeCodesParam}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        );
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+          });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -346,8 +340,7 @@ export function useDeletePricingAssumption() {
 
   return useMutation({
     mutationFn: async ({ projectId, id }: { projectId: number; id: number }) => {
-      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/${id}/`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/projects/${projectId}/pricing-assumptions/${id}/`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok && response.status !== 204) {
@@ -409,7 +402,7 @@ export function useGrowthRateBenchmarks() {
   return useQuery({
     queryKey: ['growth-rate-benchmarks'],
     queryFn: async () => {
-      const response = await fetch('/api/benchmarks/growth-rates');
+      const response = await fetch('/api/benchmarks/growth-rates', { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch growth rate benchmarks');
       }
@@ -436,7 +429,7 @@ export function useCreateParcelSale(projectId: number) {
     mutationFn: async (payload: CreateParcelSalePayload) => {
       const response = await fetch(`/api/projects/${projectId}/parcel-sales/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -468,7 +461,7 @@ export function useUpdateParcelSale(projectId: number) {
     mutationFn: async ({ saleEventId, payload }: { saleEventId: number; payload: UpdateParcelSalePayload }) => {
       const response = await fetch(`/api/projects/${projectId}/parcel-sales/${saleEventId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -495,7 +488,7 @@ export function useUpdateClosing(projectId: number) {
     mutationFn: async ({ closingId, payload }: { closingId: number; payload: UpdateClosingPayload }) => {
       const response = await fetch(`/api/closings/${closingId}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -520,8 +513,7 @@ export function useDeleteParcelSale(projectId: number) {
 
   return useMutation({
     mutationFn: async (saleEventId: number) => {
-      const response = await fetch(`/api/projects/${projectId}/parcel-sales/${saleEventId}/`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/projects/${projectId}/parcel-sales/${saleEventId}/`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) {
@@ -546,7 +538,7 @@ export function useUpdateParcelSalePeriod(projectId: number) {
     mutationFn: async ({ parcelId, salePeriod }: { parcelId: number; salePeriod: number | null }) => {
       const response = await fetch(`/api/parcels/${parcelId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ sale_period: salePeriod }),
       });
 

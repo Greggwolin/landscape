@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { BudgetCategory } from '@/types/budget-categories';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 export interface StageOption {
   id: number;
   name: string;
@@ -29,7 +30,7 @@ export function useBudgetStageCategories(projectId: number): UseBudgetStageCateg
     queryKey: ['budget-stage-categories', projectId],
     queryFn: async () => {
       const url = new URLSearchParams({ project_id: projectId.toString() });
-      const response = await fetch(`/api/budget/categories?${url.toString()}`);
+      const response = await fetch(`/api/budget/categories?${url.toString()}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to load budget categories');
       }

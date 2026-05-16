@@ -13,6 +13,7 @@ import { ProjectProfileTile } from '@/components/project/ProjectProfileTile';
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh';
 import { ArtifactBehaviorSettings } from '@/components/wrapper/ArtifactBehaviorSettings';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Project {
   project_id: number;
   project_name: string;
@@ -122,7 +123,7 @@ export default function ProjectTab({
   const fetchProjectDetails = useCallback(async () => {
     try {
       setLoadingProject(true);
-      const response = await fetch(`/api/projects/${initialProject.project_id}/details`);
+      const response = await fetch(`/api/projects/${initialProject.project_id}/details`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         setProject(normalizeProject(data));
@@ -296,7 +297,7 @@ export default function ProjectTab({
     try {
       const response = await fetch(`/api/projects/${latestProject.project_id}/profile`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
@@ -364,7 +365,7 @@ export default function ProjectTab({
       const pendingChanges = { ...editedProject };
       const response = await fetch(`/api/projects/${project.project_id}/details`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(pendingChanges)
       });
 
@@ -386,7 +387,7 @@ export default function ProjectTab({
       const pendingChanges = { ...editedProject };
       const response = await fetch(`/api/projects/${project.project_id}/details`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(pendingChanges)
       });
 

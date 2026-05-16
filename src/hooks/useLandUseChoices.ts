@@ -10,6 +10,7 @@ import {
   LandUseChoicesParams
 } from '../types/landuse';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface UseLandUseChoicesReturn {
   families: FamilyChoice[];
   subtypes: SubtypeChoice[];
@@ -46,7 +47,7 @@ export function useLandUseChoices(): UseLandUseChoicesReturn {
       }
     });
 
-    const response = await fetch(`/api/landuse/choices?${searchParams}`);
+    const response = await fetch(`/api/landuse/choices?${searchParams}`, { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error(`Failed to fetch land use choices: ${response.statusText}`);
     }

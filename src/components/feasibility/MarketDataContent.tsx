@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { getValuationSummary } from '@/lib/api/valuation';
 import SfCompsTile from '@/components/analysis/SfCompsTile';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface MarketDataContentProps {
   projectId: number;
 }
@@ -103,7 +104,7 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
   const { data: housingPrices = [] } = useQuery({
     queryKey: ['market-data', 'housing-prices', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/market-data/housing-prices`);
+      const response = await fetch(`/api/projects/${projectId}/market-data/housing-prices`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch housing prices');
       const data = await response.json();
       return data.comparables || [];
@@ -114,7 +115,7 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
   const { data: absorptionRates = [] } = useQuery({
     queryKey: ['market-data', 'absorption-rates', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/market-data/absorption-rates`);
+      const response = await fetch(`/api/projects/${projectId}/market-data/absorption-rates`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch absorption rates');
       const data = await response.json();
       return data.comparables || [];
@@ -156,8 +157,7 @@ export default function MarketDataContent({ projectId }: MarketDataContentProps)
 
   const deleteMutation = useMutation({
     mutationFn: async ({ type, id }: { type: ComparableType; id: number }) => {
-      const response = await fetch(`/api/projects/${projectId}/market-data/${type}/${id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/projects/${projectId}/market-data/${type}/${id}`, { headers: getAuthHeaders(), method: 'DELETE',
       });
 
       if (!response.ok) throw new Error('Failed to delete comparable');

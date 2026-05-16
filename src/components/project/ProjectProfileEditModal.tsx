@@ -42,6 +42,7 @@ import {
 } from '@/types/project-taxonomy';
 import { resolveCanonicalPropertyTypeCode } from '@/config/propertyTypeTokens';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 const toInputDate = (value?: string | null) => {
   if (!value) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
@@ -263,7 +264,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
 
       const response = await fetch(`/api/projects/${projectId}/profile`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
@@ -286,7 +287,7 @@ export const ProjectProfileEditModal: React.FC<ProjectProfileEditModalProps> = (
       if (Object.keys(corePayload).length > 0) {
         const coreResponse = await fetch(`/api/projects/${projectId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify(corePayload)
         });
         if (!coreResponse.ok) {

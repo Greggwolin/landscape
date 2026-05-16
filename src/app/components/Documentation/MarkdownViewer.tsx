@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowLeft, ExternalLink, Download } from 'lucide-react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface MarkdownViewerProps {
   filePath: string;
   title: string;
@@ -21,7 +22,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ filePath, title, onClos
 
       try {
         // Use API route to read markdown files from file system
-        const response = await fetch(`/api/markdown?path=${encodeURIComponent(filePath)}`);
+        const response = await fetch(`/api/markdown?path=${encodeURIComponent(filePath)}`, { headers: getAuthHeaders() });
 
         if (!response.ok) {
           throw new Error(`Failed to load document: ${response.statusText}`);

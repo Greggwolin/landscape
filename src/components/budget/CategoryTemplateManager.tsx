@@ -22,6 +22,7 @@ import {
 import type { BudgetCategoryTemplate } from '@/types/budget-categories';
 import { PropertyTypeBadge, SemanticButton } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface CategoryTemplateManagerProps {
   selectedProjectId: number | null;
   onTemplateApplied?: () => void;
@@ -54,7 +55,7 @@ export default function CategoryTemplateManager({
     setError(null);
 
     try {
-      const response = await fetch('/api/budget/category-templates');
+      const response = await fetch('/api/budget/category-templates', { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch templates');
       }
@@ -75,8 +76,7 @@ export default function CategoryTemplateManager({
 
     try {
       const response = await fetch(
-        `/api/budget/categories/tree?template_name=${encodeURIComponent(template.template_name)}&project_type_code=${encodeURIComponent(template.project_type_code)}`
-      );
+        `/api/budget/categories/tree?template_name=${encodeURIComponent(template.template_name)}&project_type_code=${encodeURIComponent(template.project_type_code)}`, { headers: getAuthHeaders() });
 
       if (response.ok) {
         const data = await response.json();
@@ -98,7 +98,7 @@ export default function CategoryTemplateManager({
     try {
       const response = await fetch('/api/budget/category-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: selectedProjectId,
           template_name: selectedTemplate.template_name,

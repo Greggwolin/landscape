@@ -8,6 +8,7 @@ import { cilSend, cilCheckCircle } from '@coreui/icons';
 import { processLandscaperResponse } from '@/utils/formatLandscaperResponse';
 import { captureBrowserContext } from '@/lib/utils/browserContext';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -243,8 +244,7 @@ export function HelpFeedbackAgent({
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, {
-        method: 'POST',
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { headers: getAuthHeaders(), method: 'POST',
         headers,
         body: JSON.stringify({
           message: userMessage,

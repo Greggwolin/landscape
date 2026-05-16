@@ -9,6 +9,7 @@ import {
  DensityClassification
 } from '../../../types/landuse';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface TaxonomySelectorProps {
  value: TaxonomySelection;
  onChange: (taxonomy: TaxonomySelection) => void;
@@ -91,7 +92,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
  const loadFamilies = async () => {
  setLoadingFamilies(true);
  try {
- const response = await fetch('/api/landuse/families?active=true');
+ const response = await fetch('/api/landuse/families?active=true', { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setFamilies(data);
@@ -134,7 +135,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
  // Find family_id from the selected family
  const family = families.find(f => f.family_name === familyName);
  if (family) {
- const response = await fetch(`/api/landuse/types/${family.family_id}`);
+ const response = await fetch(`/api/landuse/types/${family.family_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setTypes(data);
@@ -153,7 +154,7 @@ const TaxonomySelector: React.FC<TaxonomySelectorProps> = ({
  // Find type_id from the selected type
  const type = types.find(t => t.type_code === typeCode);
  if (type) {
- const response = await fetch(`/api/landuse/products/${type.type_id}`);
+ const response = await fetch(`/api/landuse/products/${type.type_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setProducts(data);

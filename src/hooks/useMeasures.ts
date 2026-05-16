@@ -6,6 +6,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { formatUOMOption } from '@/lib/utils/uomFormat';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface Measure {
   code: string;
   label: string;
@@ -27,7 +28,7 @@ interface MeasureOption {
 async function fetchMeasures(systemOnly = true, context?: string): Promise<Measure[]> {
   // For budget/pricing contexts, use financial UOMs (core_fin_uom) to satisfy FKs.
   if (context) {
-    const res = await fetch('/api/fin/uoms');
+    const res = await fetch('/api/fin/uoms', { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch measures');
     const data = await res.json();
     return (data || []).map((row: any) => {
@@ -46,7 +47,7 @@ async function fetchMeasures(systemOnly = true, context?: string): Promise<Measu
 
   const params = new URLSearchParams();
   if (systemOnly) params.append('systemOnly', 'true');
-  const response = await fetch(`/api/measures?${params.toString()}`);
+  const response = await fetch(`/api/measures?${params.toString()}`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch measures');
   return response.json();
 }

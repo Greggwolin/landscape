@@ -7,6 +7,7 @@ import type { PlatformKnowledgeDocument } from '@/types/dms';
 import PlatformKnowledgeAccordion from './PlatformKnowledgeAccordion';
 import ColumnChooser, { type ColumnConfig } from './ColumnChooser';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ChatMessage {
  role: 'user' | 'assistant';
  content: string;
@@ -77,7 +78,7 @@ export default function PlatformKnowledgeTable({
  try {
  const response = await fetch(`/api/platform-knowledge/${docKey}/chat`, {
  method: 'POST',
- headers: { 'Content-Type': 'application/json' },
+ headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
  body: JSON.stringify({ message })
  });
 

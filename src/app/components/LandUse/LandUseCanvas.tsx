@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Settings } from 'lucide-react';
 import LandUseDetails from './LandUseDetails';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Type definitions matching the existing structure
 interface Family {
  family_id: number;
@@ -86,9 +87,9 @@ const LandUseCanvas: React.FC<LandUseCanvasProps> = ({
  // TODO: Re-enable once schema issues are resolved
  const jurisdictionParam = '';
   const [familiesRes, subtypesRes, landusesRes] = await Promise.all([
- fetch(`/api/landuse/choices?type=families${jurisdictionParam}`),
- fetch(`/api/landuse/choices?type=subtypes${jurisdictionParam}`),
- fetch(`/api/landuse/choices?type=codes${jurisdictionParam}`)
+ fetch(`/api/landuse/choices?type=families${jurisdictionParam}`, { headers: getAuthHeaders() }),
+ fetch(`/api/landuse/choices?type=subtypes${jurisdictionParam}`, { headers: getAuthHeaders() }),
+ fetch(`/api/landuse/choices?type=codes${jurisdictionParam}`, { headers: getAuthHeaders() })
  ]);
 
  const familiesData = await familiesRes.json();

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 // Types
 export interface MarketCompetitiveProject {
   id?: number;
@@ -70,7 +71,7 @@ export function useMarketCompetitors(projectId: number) {
   return useQuery<MarketCompetitiveProject[]>({
     queryKey: ['market-competitors', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/market/competitors/`);
+      const response = await fetch(`/api/projects/${projectId}/market/competitors/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch competitive projects');
       }
@@ -90,7 +91,7 @@ export function useCreateCompetitor() {
     mutationFn: async ({ projectId, data }: { projectId: number; data: MarketCompetitiveProject }) => {
       const response = await fetch(`/api/projects/${projectId}/market/competitors/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       if (!response.ok) {
@@ -114,7 +115,7 @@ export function useUpdateCompetitor() {
     mutationFn: async ({ projectId, id, data }: { projectId: number; id: number; data: Partial<MarketCompetitiveProject> }) => {
       const response = await fetch(`/api/projects/${projectId}/market/competitors/${id}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       if (!response.ok) {
@@ -136,8 +137,7 @@ export function useDeleteCompetitor() {
 
   return useMutation({
     mutationFn: async ({ projectId, id }: { projectId: number; id: number }) => {
-      const response = await fetch(`/api/projects/${projectId}/market/competitors/${id}/`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/projects/${projectId}/market/competitors/${id}/`, { headers: getAuthHeaders(), method: 'DELETE',
       });
       if (!response.ok) {
         throw new Error('Failed to delete competitive project');
@@ -156,7 +156,7 @@ export function useMarketMacroData(projectId: number) {
   return useQuery<MarketMacroData[]>({
     queryKey: ['market-macro', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/market/macro/`);
+      const response = await fetch(`/api/projects/${projectId}/market/macro/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch macro data');
       }

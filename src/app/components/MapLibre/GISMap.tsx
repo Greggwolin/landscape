@@ -8,6 +8,7 @@ import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol'
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps'
 import { registerRasterDim } from '@/lib/maps/rasterDim'
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface GISMapProps {
  projectId: number
  mode: 'parcel-select' | 'navigation'
@@ -753,7 +754,7 @@ const GISMap: React.FC<GISMapProps> = ({
 
  try {
  // Fetch plan parcels from API
- const response = await fetch(`/api/gis/plan-parcels?project_id=${projectId}&format=geojson&include_geometry=true`)
+ const response = await fetch(`/api/gis/plan-parcels?project_id=${projectId}&format=geojson&include_geometry=true`, { headers: getAuthHeaders() })
 
  if (!response.ok) {
  throw new Error('Failed to fetch plan parcels')

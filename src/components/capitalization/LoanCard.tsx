@@ -16,6 +16,7 @@ import LoanBudgetModal from '@/components/capitalization/LoanBudgetModal';
 import { useToast } from '@/components/ui/toast';
 import { useContainers } from '@/hooks/useContainers';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 type PeriodView = 'monthly' | 'quarterly' | 'annual';
 type NumericFormat = 'currency' | 'percent' | 'integer' | 'decimal';
 type GoverningConstraint = 'LTV' | 'LTC' | 'MANUAL';
@@ -515,7 +516,7 @@ export default function LoanCard({
     if (!existingLoan?.loan_id) return;
     setLoadingDetails(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/loans/${existingLoan.loan_id}/`);
+      const response = await fetch(`/api/projects/${projectId}/loans/${existingLoan.loan_id}/`, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to load loan details');
       const detail = (await response.json()) as Loan;
       setFormData(normalizeLoan(detail));

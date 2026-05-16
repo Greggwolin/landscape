@@ -1,3 +1,5 @@
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 /**
  * Location Analysis Data Snapshot
  *
@@ -48,7 +50,7 @@ export async function captureDataSnapshot(
   let documentLatestCreatedAt: string | null = null;
 
   try {
-    const res = await fetch(`/api/documents/count?project_id=${projectId}`);
+    const res = await fetch(`/api/documents/count?project_id=${projectId}`, { headers: getAuthHeaders() });
     if (res.ok) {
       const data = await res.json();
       documentCount = data.document_count || 0;

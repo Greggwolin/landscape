@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Check, AlertTriangle, Clock, Wrench, Bug, Palette, FileText, RefreshCw, Edit3, FileQuestion, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface StatusData {
  pages: {
  name: string;
@@ -502,8 +503,7 @@ const DevStatus: React.FC = () => {
  params.set('pagePath', pagePath);
  }
 
- const response = await fetch(`/api/dev-status/issues?${params.toString()}`, {
- cache: 'no-store',
+ const response = await fetch(`/api/dev-status/issues?${params.toString()}`, { headers: getAuthHeaders(), cache: 'no-store',
  signal,
  });
  const payload = await response.json().catch(() => null);

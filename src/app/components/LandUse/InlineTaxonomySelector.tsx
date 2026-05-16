@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface InlineTaxonomySelectorProps {
  value: {
  family_name?: string;
@@ -86,7 +87,7 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
 
  const loadFamilies = async () => {
  try {
- const response = await fetch('/api/landuse/families?active=true');
+ const response = await fetch('/api/landuse/families?active=true', { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setFamilies(data);
@@ -100,7 +101,7 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
  try {
  const family = families.find(f => f.family_name === familyName);
  if (family) {
- const response = await fetch(`/api/landuse/types/${family.family_id}`);
+ const response = await fetch(`/api/landuse/types/${family.family_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  setTypes(data);
@@ -121,7 +122,7 @@ const InlineTaxonomySelector: React.FC<InlineTaxonomySelectorProps> = ({
 
  if (type) {
  // Use the lot-products endpoint which handles all product types
- const response = await fetch(`/api/landuse/lot-products/${type.type_id}`);
+ const response = await fetch(`/api/landuse/lot-products/${type.type_id}`, { headers: getAuthHeaders() });
  if (response.ok) {
  const data = await response.json();
  // Map the response to Product format

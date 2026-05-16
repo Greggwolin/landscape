@@ -15,6 +15,7 @@ import { formatNumber, formatCurrency } from '@/utils/formatNumber';
 import { useAuth } from '@/contexts/AuthContext';
 import { SemanticBadge } from '@/components/ui/landscape';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface PhysicalDescriptionProps {
   projectId: number;
   compact?: boolean; // When true, uses tighter spacing and no outer card wrapper
@@ -521,7 +522,7 @@ export default function PhysicalDescription({ projectId, compact = false }: Phys
           data = await djangoResponse.json();
         } else {
           // Fallback to Next.js API
-          const nextResponse = await fetch(`/api/projects/${projectId}`);
+          const nextResponse = await fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() });
           if (!nextResponse.ok) {
             throw new Error(`Failed to fetch project: ${nextResponse.status}`);
           }

@@ -17,6 +17,7 @@ import { ImprovementsSection } from './ImprovementsSection';
 import { DepreciationSection } from './DepreciationSection';
 import { CostApproachSummary } from './CostApproachSummary';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface CostApproachTabProps {
   projectId: number;
 }
@@ -31,7 +32,7 @@ export function CostApproachTab({ projectId }: CostApproachTabProps) {
 
   const fetchContainers = useCallback(async (): Promise<ContainerNode[]> => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/containers?level=2`);
+      const response = await fetch(`/api/projects/${projectId}/containers?level=2`, { headers: getAuthHeaders() });
       if (!response.ok) {
         console.warn(`Container fetch returned ${response.status} – rendering with empty list`);
         return [];

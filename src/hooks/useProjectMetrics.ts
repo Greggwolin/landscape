@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import { getAuthHeaders } from '@/lib/authHeaders';
 interface ProjectMetrics {
   project: {
     project_id: number;
@@ -43,7 +44,7 @@ export function useProjectMetrics(projectId: number) {
   return useQuery<ProjectMetrics>({
     queryKey: ['project-metrics', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/metrics`);
+      const response = await fetch(`/api/projects/${projectId}/metrics`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch project metrics');
       }
@@ -67,7 +68,7 @@ export function useProjectGranularity(projectId: number) {
   return useQuery({
     queryKey: ['project-granularity', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/projects/${projectId}/granularity`);
+      const response = await fetch(`/api/projects/${projectId}/granularity`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch project granularity');
       }
@@ -92,7 +93,7 @@ export function useProjectMilestones(projectId: number) {
   return useQuery({
     queryKey: ['project-milestones', projectId],
     queryFn: async () => {
-      const response = await fetch(`/api/milestones?projectId=${projectId}`);
+      const response = await fetch(`/api/milestones?projectId=${projectId}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch project milestones');
       }
