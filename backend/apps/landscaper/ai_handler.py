@@ -2971,7 +2971,6 @@ Example: "Metrostudy Q4 2025 Phoenix MSA", "Builder interview — Taylor Morriso
   Example: Phase 1 with 50x120 SFD (80 lots) and Townhomes (40 units) = 2 tbl_parcel rows.
 - **units_total**: Holds the count of individual lots/units of that type.
 - **Legacy hierarchy**: Area → Phase → Parcel (tbl_area, tbl_phase, tbl_parcel tables).
-- **Land use budget**: Stored in tbl_container.attributes JSONB as interim storage.
 
 ## Lot Pricing Mutations (CRITICAL)
 

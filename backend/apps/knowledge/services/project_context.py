@@ -271,22 +271,20 @@ class ProjectContextService:
         return "\n".join(lines) if lines else None
 
     def get_container_hierarchy(self) -> Optional[str]:
-        """Get property structure (buildings, units, phases, parcels)."""
+        """Get property structure (buildings, units, phases, parcels) from tbl_division."""
         with connection.cursor() as cursor:
-            # Try tbl_container first (generic hierarchy) - may not exist
             try:
                 cursor.execute("""
                     SELECT
-                        container_id,
-                        parent_container_id,
-                        container_level,
-                        container_code,
-                        display_name,
-                        container_type
-                    FROM landscape.tbl_container
+                        division_id,
+                        parent_division_id,
+                        tier,
+                        division_code,
+                        display_name
+                    FROM landscape.tbl_division
                     WHERE project_id = %s
                       AND is_active = true
-                    ORDER BY container_level, sort_order, container_code
+                    ORDER BY tier, sort_order, division_code
                     LIMIT 100
                 """, [self.project_id])
 
@@ -294,33 +292,31 @@ class ProjectContextService:
 
                 if rows:
                     columns = [col[0] for col in cursor.description]
-                    containers = [dict(zip(columns, row)) for row in rows]
+                    divisions = [dict(zip(columns, row)) for row in rows]
 
-                    # Build hierarchy summary
-                    level_counts = {}
-                    for c in containers:
-                        level = c['container_level']
-                        level_counts[level] = level_counts.get(level, 0) + 1
+                    tier_counts = {}
+                    for d in divisions:
+                        tier = d['tier']
+                        tier_counts[tier] = tier_counts.get(tier, 0) + 1
 
                     lines = ["Hierarchy Summary:"]
-                    level_names = {1: 'Buildings/Areas', 2: 'Floors/Phases', 3: 'Units'}
-                    for level in sorted(level_counts.keys()):
-                        name = level_names.get(level, f'Level {level}')
-                        lines.append(f"  {name}: {level_counts[level]}")
+                    tier_names = {1: 'Buildings/Areas', 2: 'Floors/Phases', 3: 'Units'}
+                    for tier in sorted(tier_counts.keys()):
+                        name = tier_names.get(tier, f'Tier {tier}')
+                        lines.append(f"  {name}: {tier_counts[tier]}")
 
-                    # Show some details
                     lines.append("\nTop-Level Items:")
-                    top_level = [c for c in containers if c['container_level'] == 1][:10]
-                    for c in top_level:
-                        name = c['display_name'] or c['container_code']
+                    top_level = [d for d in divisions if d['tier'] == 1][:10]
+                    for d in top_level:
+                        name = d['display_name'] or d['division_code']
                         lines.append(f"  - {name}")
 
-                    if len([c for c in containers if c['container_level'] == 1]) > 10:
+                    if len([d for d in divisions if d['tier'] == 1]) > 10:
                         lines.append("  ... and more")
 
                     return "\n".join(lines)
             except Exception:
-                pass  # Table doesn't exist, try fallback
+                pass  # Fall through to legacy area/phase fallback
 
             # Fallback to area/phase structure
             try:
@@ -425,26 +421,26 @@ class ProjectContextService:
             except Exception:
                 pass  # Table may not exist
 
-            # Try container-based units (Level 3)
+            # Try division-based units (tier 3)
             try:
                 cursor.execute("""
                     SELECT
-                        c.display_name as unit_type,
-                        c.attributes->>'bedrooms' as bedrooms,
-                        c.attributes->>'bathrooms' as bathrooms,
-                        c.attributes->>'sq_ft' as sq_ft,
-                        c.attributes->>'rent' as rent,
+                        d.display_name as unit_type,
+                        d.attributes->>'bedrooms' as bedrooms,
+                        d.attributes->>'bathrooms' as bathrooms,
+                        d.attributes->>'sq_ft' as sq_ft,
+                        d.attributes->>'rent' as rent,
                         COUNT(*) as unit_count
-                    FROM landscape.tbl_container c
-                    WHERE c.project_id = %s
-                      AND c.container_level = 3
-                      AND c.is_active = true
-                    GROUP BY c.display_name,
-                             c.attributes->>'bedrooms',
-                             c.attributes->>'bathrooms',
-                             c.attributes->>'sq_ft',
-                             c.attributes->>'rent'
-                    ORDER BY c.attributes->>'bedrooms', c.attributes->>'sq_ft'
+                    FROM landscape.tbl_division d
+                    WHERE d.project_id = %s
+                      AND d.tier = 3
+                      AND d.is_active = true
+                    GROUP BY d.display_name,
+                             d.attributes->>'bedrooms',
+                             d.attributes->>'bathrooms',
+                             d.attributes->>'sq_ft',
+                             d.attributes->>'rent'
+                    ORDER BY d.attributes->>'bedrooms', d.attributes->>'sq_ft'
                 """, [self.project_id])
 
                 rows = cursor.fetchall()
@@ -452,7 +448,7 @@ class ProjectContextService:
                     columns = [col[0] for col in cursor.description]
                     units = [dict(zip(columns, row)) for row in rows]
 
-                    lines = ["Unit Mix (from containers):"]
+                    lines = ["Unit Mix (from divisions):"]
                     total_units = 0
 
                     for u in units:

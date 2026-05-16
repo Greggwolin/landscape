@@ -135,7 +135,7 @@ _ALLOWED_TARGET_TABLES = {
     'tbl_multifamily_unit', 'tbl_lease', 'tbl_operating_expenses',
     'tbl_loan', 'tbl_equity_structure', 'tbl_dcf_assumption',
     'tbl_sales_comparables', 'tbl_rental_comparable', 'tbl_rental_comp',
-    'tbl_parcel', 'tbl_phase', 'tbl_container',
+    'tbl_parcel', 'tbl_phase', 'tbl_division',
     'tbl_project_assumption', 'tbl_vacancy_assumption',
 }
 
