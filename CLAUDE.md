@@ -155,18 +155,27 @@ landscape/
 
 ### Universal Container System
 
-The container system replaces rigid property-type-specific hierarchies with a flexible tree structure:
+The container system (now backed by **`tbl_division`** — renamed from `tbl_container` in migration `025_rename_container_to_division.sql`, Nov 2025) replaces rigid property-type-specific hierarchies with a flexible tree structure. "Container" remains the conceptual term in product copy and UI labels; "division" is the schema-level name.
 
 ```
 Project
-└── Container (Level 1) - e.g., "Area" or "Building"
-    └── Container (Level 2) - e.g., "Phase" or "Floor"
-        └── Container (Level 3) - e.g., "Parcel" or "Unit"
+└── Division (Tier 1) - e.g., "Area" or "Building"
+    └── Division (Tier 2) - e.g., "Phase" or "Floor"
+        └── Division (Tier 3) - e.g., "Parcel" or "Unit"
 ```
 
 **Key tables:**
-- `tbl_container` - Hierarchical tree with `parent_id`
-- `tbl_project_config` - Configurable level labels per project
+- `tbl_division` — Hierarchical tree. PK `division_id`, self-FK `parent_division_id`, integer `tier`, `division_code`, `display_name`, `attributes` JSONB.
+- `tbl_project_config` — Per-project tier labels: `tier_0_label` … `tier_3_label` (also renamed from `level_N_label` in migration 025).
+- `core_fin_division_applicability` — Replaces `core_fin_container_applicability` (renamed in migration 025).
+
+**Known column-name drift (incomplete rename):** `core_fin_fact_actual.container_id` was NOT renamed and still points at `tbl_division.division_id`. `core_fin_fact_budget.division_id` was renamed correctly. Queries that JOIN both tables on the same hierarchy need to alias these differently. Treat the asymmetric column name as a code smell to flag, not a column to rename without a migration.
+
+**Live code references to the old `tbl_container` name (will fail at runtime — investigate before relying on):**
+- `backend/apps/knowledge/services/confidence_calculator.py:178`
+- `backend/apps/knowledge/services/project_context.py:276, 286, 438`
+- `backend/apps/knowledge/views/workbench_views.py:138` (allowlist string, may be inert)
+- `backend/apps/landscaper/ai_handler.py:2904` (in Landscaper system prompt — model will be misdirected)
 
 **Labels are configurable per project:**
 | Property Type | Level 1 | Level 2 | Level 3 |
@@ -316,7 +325,7 @@ npm run seed:unitcosts:benchmark
 
 | Prefix | Domain |
 |--------|--------|
-| `tbl_` | Core entities (project, container, parcel, phase) |
+| `tbl_` | Core entities (project, division, parcel, phase) |
 | `core_fin_fact_` | Financial facts (budget, actual) |
 | `tbl_budget_` | Budget categories, templates |
 | `tbl_lease_` | Lease management |
@@ -333,13 +342,14 @@ npm run seed:unitcosts:benchmark
 ```sql
 -- Core hierarchy
 tbl_project              -- Project master
-tbl_container            -- Universal hierarchy (preferred)
+tbl_division             -- Universal hierarchy (preferred). Renamed from tbl_container in migration 025.
+                         -- PK division_id, self-FK parent_division_id, integer tier, division_code.
 tbl_parcel               -- Legacy parcel inventory (still supported)
 tbl_phase                -- Legacy phase hierarchy (still supported)
 
--- Financial
-core_fin_fact_budget     -- Budget line items (with container_id)
-core_fin_fact_actual     -- Actual costs (with container_id)
+-- Financial (asymmetric column naming — see note in Universal Container System above)
+core_fin_fact_budget     -- Budget line items (FK column: division_id)
+core_fin_fact_actual     -- Actual costs (FK column: container_id, still pointing at tbl_division.division_id)
 
 -- Land use taxonomy
 lu_family                -- Level 1: Family (e.g., Residential)
@@ -1014,7 +1024,7 @@ DO ask clarifying questions when:
 **High-risk zones that break easily (non-exhaustive):**
 
 - `core_fin_fact_budget` / `core_fin_fact_actual` — Changes ripple into budget grid, variance analysis, cash flow, waterfall, and financial engine calcs
-- Container hierarchy (`tbl_container`) — Affects rollups, budget aggregation, sales absorption, and Landscaper context
+- Hierarchy (`tbl_division`, formerly `tbl_container` — see Universal Container System section for rename history and lingering column-name drift) — Affects rollups, budget aggregation, sales absorption, and Landscaper context
 - API response shapes — Frontend hooks (SWR/React Query) and Landscaper tools both consume these; shape changes break both
 - Type definitions (`src/types/`) — Changing types without updating all consumers causes silent TypeScript build failures or runtime undefined access
 - Financial engine inputs — IRR/NPV/DSCR/cash flow calculations depend on specific data shapes; upstream changes produce wrong numbers without errors
@@ -1031,7 +1041,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-04-30 — Alpha Readiness Assessment (15-step workflow audit, includes Artifacts system)*
+*Last audit: 2026-05-16 — Universal Container System section reconciled with schema (tbl_container → tbl_division rename, migration 025, Nov 2025); flagged incomplete column rename on core_fin_fact_actual.container_id and four live code references to the old table name.*
+*Prior audit: 2026-04-30 — Alpha Readiness Assessment (15-step workflow audit, includes Artifacts system)*
 *Landscaper tool count: **273 registered** (+`find_documents` + `summarize_document_library` from DMS restructure 2026-05-04; +`save_user_vocab` from chat DA Phase 1 ship; +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Append session entries to CLAUDE_SESSION_HISTORY.md, not here.*
