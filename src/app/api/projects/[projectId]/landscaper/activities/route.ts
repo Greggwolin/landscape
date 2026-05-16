@@ -18,19 +18,15 @@ interface RouteParams {
  * Fetch activity feed for a project
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId } = await params;
 
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/landscaper/activities/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/landscaper/activities/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         cache: 'no-store',
-      }
-    );
+      });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -57,21 +53,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * Create a new activity item
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId } = await params;
 
   try {
     const body = await request.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/landscaper/activities/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/landscaper/activities/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     if (!response.ok) {
       const errorText = await response.text();

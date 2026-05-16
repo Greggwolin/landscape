@@ -7,16 +7,12 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://127.0.0.1:8001';
  * Fetch all global sale benchmarks from tbl_sale_benchmarks
  */
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/sale-benchmarks/global/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/sale-benchmarks/global/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     const data = await response.json();
 

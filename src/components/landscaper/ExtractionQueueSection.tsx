@@ -60,7 +60,7 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
       // Create (or resume) an intake session so the Workbench has an intakeUuid
       const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           doc_id: item.doc_id,
@@ -81,7 +81,7 @@ export function ExtractionQueueSection({ projectId }: ExtractionQueueSectionProp
         // Fire-and-forget extraction trigger
         fetch(`${DJANGO_API_URL}/api/knowledge/documents/${item.doc_id}/extract-batched/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ project_id: projectId }),
         }).catch(err =>
           console.warn('[ExtractionQueue] Extraction trigger failed:', err)

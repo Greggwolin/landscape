@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { ChangelogModal } from './ChangelogModal';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -30,7 +31,7 @@ export function VersionBadge({ className = '' }: VersionBadgeProps) {
 
       let response = await fetch(`${DJANGO_API_URL}/api/changelog/current-version/`, { headers });
       if ((response.status === 401 || response.status === 403) && accessToken) {
-        response = await fetch(`${DJANGO_API_URL}/api/changelog/current-version/`);
+        response = await fetch(`${DJANGO_API_URL}/api/changelog/current-version/`, { headers: getAuthHeaders() });
       }
 
       if (response.ok) {

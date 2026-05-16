@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const body = await request.json();
     const payload = {
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const response = await fetch(`${DJANGO_API_URL}/api/alpha/feedback/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 

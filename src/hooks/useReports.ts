@@ -8,6 +8,7 @@ import type {
   ReportPreviewResponse,
   ReportHistoryEntry,
 } from '@/types/report-definitions';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 export interface ReportTemplate {
   id: number;
@@ -103,9 +104,7 @@ export function useCreateReportTemplate() {
     mutationFn: async (data: CreateReportTemplateData) => {
       const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json', },
         body: JSON.stringify(data),
       });
 
@@ -132,9 +131,7 @@ export function useUpdateReportTemplate() {
     mutationFn: async ({ id, ...data }: UpdateReportTemplateData) => {
       const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/${id}/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json', },
         body: JSON.stringify(data),
       });
 
@@ -159,7 +156,7 @@ export function useDeleteReportTemplate() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/${id}/`, {
+      const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/${id}/`, { headers: getAuthHeaders(),
         method: 'DELETE',
       });
 
@@ -183,7 +180,7 @@ export function useToggleReportTemplateActive() {
 
   return useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/${id}/toggle_active/`, {
+      const response = await fetch(`${DJANGO_API_URL}/api/reports/templates/${id}/toggle_active/`, { headers: getAuthHeaders(),
         method: 'PATCH',
       });
 
@@ -205,12 +202,9 @@ export function useToggleReportTemplateActive() {
 export function useGenerateReport() {
   return useMutation({
     mutationFn: async ({ templateId, projectId }: { templateId: number; projectId: string }) => {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/reports/generate/${templateId}/${projectId}/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/reports/generate/${templateId}/${projectId}/`, { headers: getAuthHeaders(),
           method: 'POST',
-        }
-      );
+        });
 
       if (!response.ok) {
         throw new Error('Failed to generate report');
@@ -333,14 +327,11 @@ export function useReportExport() {
       format: 'pdf' | 'excel';
       parameters?: Record<string, unknown>;
     }) => {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/reports/export/${reportCode}/${projectId}/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/reports/export/${reportCode}/${projectId}/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ format, parameters }),
-        }
-      );
+        });
       if (!response.ok) {
         // Try to extract error message from JSON response
         const contentType = response.headers.get('content-type') || '';

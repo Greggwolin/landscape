@@ -8,6 +8,7 @@ import {
   CModalBody,
   CSpinner,
 } from '@coreui/react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -49,7 +50,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
 
       let response = await fetch(`${DJANGO_API_URL}/api/changelog/`, { headers });
       if ((response.status === 401 || response.status === 403) && accessToken) {
-        response = await fetch(`${DJANGO_API_URL}/api/changelog/`);
+        response = await fetch(`${DJANGO_API_URL}/api/changelog/`, { headers: getAuthHeaders() });
       }
 
       if (!response.ok) {

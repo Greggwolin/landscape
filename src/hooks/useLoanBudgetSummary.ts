@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -92,9 +93,7 @@ export function useLoanBudgetSummary(projectId: number): UseLoanBudgetResult {
       setError(null);
 
       // 1. Fetch all loans for the project
-      const loansRes = await fetch(
-        `${DJANGO_API_URL}/api/projects/${projectId}/loans/`
-      );
+      const loansRes = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/`, { headers: getAuthHeaders() });
       if (!loansRes.ok) {
         throw new Error(`Failed to fetch loans: ${loansRes.statusText}`);
       }
@@ -107,9 +106,7 @@ export function useLoanBudgetSummary(projectId: number): UseLoanBudgetResult {
       const summaryEntries = await Promise.all(
         loansData.map(async (loan) => {
           try {
-            const res = await fetch(
-              `${DJANGO_API_URL}/api/projects/${projectId}/loans/${loan.loan_id}/budget-summary/`
-            );
+            const res = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/loans/${loan.loan_id}/budget-summary/`, { headers: getAuthHeaders() });
             if (!res.ok) return null;
             const summary: LoanBudgetSummary = await res.json();
             return [loan.loan_id, summary] as const;

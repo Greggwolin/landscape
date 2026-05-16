@@ -10,6 +10,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ benchmarkId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { benchmarkId } = await params;
     const body = await request.json();
@@ -18,9 +19,7 @@ export async function PATCH(
 
     const response = await fetch(`${DJANGO_API_URL}/api/sale-benchmarks/${benchmarkId}/`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
       body: JSON.stringify(body),
     });
 
@@ -63,11 +62,13 @@ export async function DELETE(
 ) {
   try {
     const { benchmarkId } = await params;
+    const authHeader = request.headers.get('Authorization');
 
     console.log('[DELETE sale-benchmark] ID:', benchmarkId);
 
     const response = await fetch(`${DJANGO_API_URL}/api/sale-benchmarks/${benchmarkId}/`, {
       method: 'DELETE',
+      headers: authHeader ? { Authorization: authHeader } : {},
     });
 
     if (!response.ok) {

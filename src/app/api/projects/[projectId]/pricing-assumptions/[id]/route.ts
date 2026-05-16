@@ -6,6 +6,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId, id } = await params;
     const body = await request.json();
@@ -15,9 +16,7 @@ export async function PUT(
 
     const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/${id}/`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
       body: JSON.stringify(body),
     });
 
@@ -49,9 +48,11 @@ export async function DELETE(
 ) {
   try {
     const { projectId, id } = await params;
+    const authHeader = request.headers.get('Authorization');
 
     const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/pricing-assumptions/${id}/`, {
       method: 'DELETE',
+      headers: authHeader ? { Authorization: authHeader } : {},
     });
 
     if (!response.ok && response.status !== 204) {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -44,8 +45,8 @@ export default function DocClassificationBar({
     void (async () => {
       try {
         const [optionsRes, tagsRes] = await Promise.all([
-          fetch(`${DJANGO_API_URL}/api/knowledge/library/classification-options/`),
-          fetch(`${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/geo-tags/`),
+          fetch(`${DJANGO_API_URL}/api/knowledge/library/classification-options/`, { headers: getAuthHeaders() }),
+          fetch(`${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/geo-tags/`, { headers: getAuthHeaders() }),
         ]);
         if (optionsRes.ok) {
           const data = await optionsRes.json();

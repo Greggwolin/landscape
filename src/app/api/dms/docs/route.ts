@@ -17,6 +17,7 @@ const DJANGO_API_URL =
  * Create a new document record with duplicate detection and tag tracking
  */
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
  try {
   try {
     const body = await req.json();
@@ -400,7 +401,7 @@ export async function POST(req: NextRequest) {
       // Fire-and-forget: runs in parallel with the response.
       fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.doc_id}/process/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       })
         .then(async (res) => {
           if (res.ok) {

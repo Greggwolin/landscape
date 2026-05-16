@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://127.0.0.1:8001';
 
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
@@ -14,14 +15,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/multifamily/turns/?project_id=${projectId}`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/multifamily/turns/?project_id=${projectId}`, {
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       throw new Error(`Django API returned ${response.status}`);

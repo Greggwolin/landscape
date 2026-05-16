@@ -4,12 +4,13 @@ const DJANGO_API_URL =
   process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const body = await req.json();
 
     const response = await fetch(`${DJANGO_API_URL}/api/knowledge/platform/query/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
 

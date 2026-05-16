@@ -44,7 +44,7 @@ export function useDeleteProject(): UseDeleteProjectReturn {
       try {
         const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
             transfer_documents_to_platform: transferDocuments,

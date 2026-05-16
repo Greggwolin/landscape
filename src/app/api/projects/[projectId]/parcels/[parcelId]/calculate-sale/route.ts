@@ -23,21 +23,17 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string; parcelId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId, parcelId } = await params;
 
   try {
     const body = await request.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/parcels/${parcelId}/calculate-sale/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/parcels/${parcelId}/calculate-sale/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     // Handle non-JSON responses (e.g., Django HTML error pages)
     const contentType = response.headers.get('content-type') || '';

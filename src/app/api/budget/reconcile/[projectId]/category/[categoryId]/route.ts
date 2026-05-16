@@ -14,20 +14,16 @@ export async function POST(
   request: NextRequest,
   context: Params
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId, categoryId } = await context.params;
     const body = await request.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/financial/budget/reconcile/${projectId}/category/${categoryId}/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/financial/budget/reconcile/${projectId}/category/${categoryId}/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -6,17 +6,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const { projectId } = await params;
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/inventory-gauge/`,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/inventory-gauge/`, {
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

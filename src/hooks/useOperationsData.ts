@@ -16,6 +16,7 @@ import {
   SectionData,
   SCENARIO_PRIORITY
 } from '@/components/operations/types';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -111,7 +112,7 @@ export function useOperationsData(
     setError(null);
 
     try {
-      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/`);
+      const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch operations data');
@@ -358,7 +359,7 @@ export function useOperationsData(
       // Send batch update
       const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/inputs/`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           updates: Array.from(groupedUpdates.values())
         })
@@ -410,7 +411,7 @@ export function useOperationsData(
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/operations/settings/`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ value_add_enabled: newValue })
       });
 

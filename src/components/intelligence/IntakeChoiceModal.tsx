@@ -22,6 +22,7 @@ import {
 } from '@coreui/react';
 import { useWorkbench } from '@/contexts/WorkbenchContext';
 import '@/styles/ingestion-workbench.css';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -60,7 +61,7 @@ export default function IntakeChoiceModal({
   // Fetch project doc types for the profile selector
   useEffect(() => {
     if (!visible || !projectId) return;
-    fetch(`${DJANGO_API_URL}/api/dms/projects/${projectId}/doc-types/`)
+    fetch(`${DJANGO_API_URL}/api/dms/projects/${projectId}/doc-types/`, { headers: getAuthHeaders() })
       .then((res) => (res.ok ? res.json() : { results: [] }))
       .then((data) => {
         const types = data.results || data.doc_types || [];
@@ -93,7 +94,7 @@ export default function IntakeChoiceModal({
         try {
           const res = await fetch(`${DJANGO_API_URL}/api/intake/start/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({
               project_id: projectId,
               doc_id: doc.docId,
@@ -116,7 +117,7 @@ export default function IntakeChoiceModal({
             // Fire-and-forget extraction trigger
             fetch(`${DJANGO_API_URL}/api/knowledge/documents/${doc.docId}/extract-batched/`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({ project_id: projectId }),
             }).catch(err =>
               console.warn('[IntakeChoice] Extraction trigger failed:', err)
@@ -136,7 +137,7 @@ export default function IntakeChoiceModal({
         docs.map((doc) =>
           fetch(`${DJANGO_API_URL}/api/intake/start/`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
             body: JSON.stringify({
               project_id: projectId,
               doc_id: doc.docId,

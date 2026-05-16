@@ -36,6 +36,7 @@ import {
   type MFDcfMonthlyApiResponse,
 } from './mfCashFlowTransform';
 import { useTheme } from '@/app/components/CoreUIThemeProvider';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -67,7 +68,7 @@ export function DCFView({
   // Fetch acquisition price summary for Time 0 column
   useEffect(() => {
     if (!projectId) return;
-    fetch(`${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`)
+    fetch(`${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`, { headers: getAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) setAcquisitionSummary(data);

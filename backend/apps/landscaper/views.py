@@ -1389,11 +1389,28 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         unassigned = self.request.query_params.get('unassigned', '').lower() == 'true'
 
         if all_user_threads:
-            # No project/unassigned filter — sidebar shows everything the user can see.
-            # NOTE: ChatThread has no created_by FK, so we can't strictly user-scope today;
-            # current behavior matches the rest of the codebase (single-tenant alpha).
-            # Tighten when per-user scoping lands at the model level.
-            pass
+            # Tightened 2026-05-16 (LSCMD-AUTH-ROLLOUT Phase 4.5).
+            # Previously this branch returned every thread across the system
+            # because ChatThread has no created_by FK. After Phase 2 added an
+            # ownership gate on retrieve via get_object(), the loose list +
+            # strict retrieve combination broke the sidebar — users saw thread
+            # previews they couldn't actually open, producing "Thread not
+            # found" errors on click.
+            #
+            # Scope threads transitively via project ownership: a thread is
+            # visible if its project is visible. Staff/admin see all
+            # (mirrors filter_qs_by_owner_or_staff in apps.projects.permissions).
+            # Unassigned threads (project_id IS NULL) shown to every
+            # authenticated user — single-tenant alpha convention; will
+            # tighten when ChatThread gets created_by.
+            from django.db.models import Q as _Q
+            user = self.request.user
+            if not (user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin'):
+                queryset = queryset.filter(
+                    _Q(project__created_by=user)
+                    | _Q(project__created_by__isnull=True)
+                    | _Q(project_id__isnull=True)
+                )
         elif unassigned:
             queryset = queryset.filter(project_id__isnull=True)
         else:

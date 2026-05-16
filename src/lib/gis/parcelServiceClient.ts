@@ -1,5 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import type { CountyCode } from './countyServices';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://127.0.0.1:8000';
 

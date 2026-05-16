@@ -4,13 +4,15 @@ const DJANGO_API_URL =
   process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ sourceId: string }> }
 ) {
   try {
     const { sourceId } = await params;
+    const authHeader = req.headers.get('Authorization');
     const response = await fetch(`${DJANGO_API_URL}/api/knowledge/sources/${sourceId}/`, {
       method: 'GET',
+      headers: authHeader ? { Authorization: authHeader } : {},
     });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
@@ -24,13 +26,14 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ sourceId: string }> }
 ) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const { sourceId } = await params;
     const body = await req.json();
 
     const response = await fetch(`${DJANGO_API_URL}/api/knowledge/sources/${sourceId}/`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 

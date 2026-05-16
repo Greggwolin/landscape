@@ -22,6 +22,7 @@ import {
   affectsAnyTable,
   type LandscaperMutationDetail,
 } from '@/lib/events/landscaper-events';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -70,9 +71,7 @@ export function useDcfAnalysis(projectId: number) {
   return useQuery({
     queryKey: ['dcf-analysis', projectId],
     queryFn: async (): Promise<DcfAnalysisResponse> => {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/dcf-analysis/${projectId}/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/dcf-analysis/${projectId}/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to fetch DCF analysis: ${response.statusText}`);
       }
@@ -94,16 +93,11 @@ export function useUpdateDcfAnalysis(projectId: number) {
     mutationFn: async (data: DcfAnalysisUpdatePayload): Promise<DcfAnalysis> => {
       console.log('[useDcfAnalysis] Updating DCF analysis:', { projectId, data });
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/dcf-analysis/${projectId}/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/dcf-analysis/${projectId}/`, {
           method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json', },
           body: JSON.stringify(data),
-        }
-      );
+        });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -156,9 +150,7 @@ export function useGrowthRateSets(cardType?: 'revenue' | 'cost', projectId?: num
       if (cardType) params.append('card_type', cardType);
       if (projectId) params.append('project_id', projectId.toString());
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/growth-rate-sets/?${params}`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/growth-rate-sets/?${params}`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to fetch growth rate sets: ${response.statusText}`);
       }
@@ -175,9 +167,7 @@ export function useGrowthRateSetDetail(setId: number | null) {
   return useQuery({
     queryKey: ['growth-rate-set', setId],
     queryFn: async (): Promise<GrowthRateSetWithSteps> => {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/growth-rate-sets/${setId}/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/growth-rate-sets/${setId}/`, { headers: getAuthHeaders() });
       if (!response.ok) {
         throw new Error(`Failed to fetch growth rate set: ${response.statusText}`);
       }

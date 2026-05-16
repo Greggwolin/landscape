@@ -10,9 +10,7 @@ export async function GET() {
   try {
     const response = await fetch(`${DJANGO_API_URL}/api/uoms/`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
     });
 
     const data = await response.json();

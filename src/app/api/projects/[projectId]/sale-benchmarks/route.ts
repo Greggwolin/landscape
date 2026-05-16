@@ -10,18 +10,14 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId } = await params;
 
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/sale-benchmarks/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/sale-benchmarks/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     const data = await response.json();
 
@@ -47,21 +43,17 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { projectId } = await params;
 
   try {
     const body = await request.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/${projectId}/sale-benchmarks/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/sale-benchmarks/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     const data = await response.json();
 

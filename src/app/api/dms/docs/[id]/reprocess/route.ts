@@ -11,18 +11,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authHeader = request.headers.get('Authorization');
   const { id: docId } = await params;
 
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/knowledge/documents/${docId}/reprocess/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/knowledge/documents/${docId}/reprocess/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       const errorText = await response.text();

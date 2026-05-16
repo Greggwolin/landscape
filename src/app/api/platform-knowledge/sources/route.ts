@@ -18,12 +18,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const body = await req.json();
 
     const response = await fetch(`${DJANGO_API_URL}/api/knowledge/sources/`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 

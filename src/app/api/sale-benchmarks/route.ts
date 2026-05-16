@@ -7,6 +7,7 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://127.0.0.1:8001';
  * Create a new sale benchmark in tbl_sale_benchmarks
  */
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('Authorization');
   try {
     const body = await request.json();
 
@@ -37,9 +38,7 @@ export async function POST(request: NextRequest) {
 
     const response = await fetch(`${DJANGO_API_URL}/api/sale-benchmarks/global/`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
       body: JSON.stringify(djangoPayload),
     });
 

@@ -186,7 +186,7 @@ export function DocumentIngestion({
       attempts++;
 
       try {
-        const response = await fetch(`${DJANGO_API_URL}/api/dms/staging/${docId}/`);
+        const response = await fetch(`${DJANGO_API_URL}/api/dms/staging/${docId}/`, { headers: getAuthHeaders() });
 
         if (response.ok) {
           const staging = await response.json();
@@ -306,7 +306,7 @@ export function DocumentIngestion({
 
       const response = await fetch(`${DJANGO_API_URL}/api/dms/staging/${docId}/commit/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: projectId,
           approved_assertions: approvedIds,

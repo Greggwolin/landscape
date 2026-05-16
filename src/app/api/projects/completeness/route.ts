@@ -8,15 +8,10 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
  */
 export async function GET(_request: NextRequest) {
   try {
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/projects/all-completeness/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/projects/all-completeness/`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },
+      });
 
     if (!response.ok) {
       const data = await response.json();

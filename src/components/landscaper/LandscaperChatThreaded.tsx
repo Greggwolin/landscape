@@ -441,13 +441,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
   // Mutation handlers for Level 2 autonomy
   const handleConfirmMutation = useCallback(async (mutationId: string) => {
     try {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/confirm/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/confirm/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
       const data = await response.json();
       if (data.success) {
         loadThreads();
@@ -472,13 +469,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   const handleRejectMutation = useCallback(async (mutationId: string) => {
     try {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/reject/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/${mutationId}/reject/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
       const data = await response.json();
       if (data.success) {
         loadThreads();
@@ -490,13 +484,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
 
   const handleConfirmBatch = useCallback(async (batchId: string) => {
     try {
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/landscaper/mutations/batch/${batchId}/confirm/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/landscaper/mutations/batch/${batchId}/confirm/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        });
       const data = await response.json();
       if (data.success) {
         loadThreads();

@@ -17,6 +17,7 @@ import type {
   DCFAnalysisData,
 } from '@/types/income-approach';
 import type { MFDcfMonthlyApiResponse } from '@/components/valuation/income-approach/mfCashFlowTransform';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 const DEBOUNCE_DELAY = 300; // ms
@@ -110,9 +111,7 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch income approach data: ${response.statusText}`);
@@ -146,16 +145,11 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     try {
       setIsSaving(true);
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/update/`,
-        {
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/update/`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json', },
           body: JSON.stringify(updates),
-        }
-      );
+        });
 
       if (!response.ok) {
         throw new Error(`Failed to save: ${response.statusText}`);
@@ -243,9 +237,7 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     try {
       setIsDCFLoading(true);
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch DCF data: ${response.statusText}`);
@@ -268,9 +260,7 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
     try {
       setIsMonthlyDCFLoading(true);
 
-      const response = await fetch(
-        `${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`
-      );
+      const response = await fetch(`${DJANGO_API_URL}/api/valuation/income-approach-data/${projectId}/dcf/monthly/`, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch monthly DCF data: ${response.statusText}`);

@@ -25,10 +25,12 @@ export async function GET(request: NextRequest) {
   const pageTitle = PAGE_TITLES[pageContext] || 'Help';
 
   try {
+    const authHeader = request.headers.get('Authorization');
     const response = await fetch(
       `${DJANGO_API_URL}/api/knowledge/platform/alpha-help/?page_context=${encodeURIComponent(
         pageContext
-      )}`
+      )}`,
+      authHeader ? { headers: { Authorization: authHeader } } : undefined
     );
 
     if (!response.ok) {

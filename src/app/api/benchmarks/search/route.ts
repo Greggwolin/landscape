@@ -4,6 +4,7 @@ const DJANGO_API_URL =
   process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q');
@@ -17,10 +18,7 @@ export async function GET(req: NextRequest) {
     const params = new URLSearchParams({ q: query, property_type: propertyType });
     if (year) params.append('year', year);
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/knowledge/benchmarks/search/?${params.toString()}`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-    );
+    const response = await fetch(`${DJANGO_API_URL}/api/knowledge/benchmarks/search/?${params.toString()}`, { method: 'GET', headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' } });
 
     const data = await response.json();
     if (!response.ok) {

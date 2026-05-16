@@ -7,18 +7,16 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ documentKey: string }> }
 ) {
+  const authHeader = req.headers.get('Authorization');
   try {
     const { documentKey } = await params;
     const body = await req.json();
 
-    const response = await fetch(
-      `${DJANGO_API_URL}/api/knowledge/platform/${documentKey}/`,
-      {
+    const response = await fetch(`${DJANGO_API_URL}/api/knowledge/platform/${documentKey}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }
-    );
+      });
 
     const data = await response.json();
     if (!response.ok) {
