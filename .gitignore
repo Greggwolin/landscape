@@ -197,5 +197,18 @@ CC_*.md
 # Playwright reports
 playwright-report/
 
-# Cowork GitHub PAT (local secret)
+# Cowork sandbox credential files — sensitive, never commit
+# Set up per project_cowork_direct_access_setup memory entry; mode 600 on disk
 .cowork-*
+
+# EDGAR extraction outputs — regenerable by re-running scripts/edgar/fetch_concept_data.py
+scripts/edgar/output/
+
+# Large reference materials (keep local only — too large for GitHub)
+reference/netlease/
+
+# Generator log output — local-only diagnostic noise (LSCMD-MERGE-0515-wq1)
+logs/
+
+# Health-report nightly snapshots — generated artifact (LSCMD-MERGE-0515-wq1)
+docs/UX/health-reports/

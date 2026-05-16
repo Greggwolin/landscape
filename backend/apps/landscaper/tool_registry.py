@@ -119,6 +119,9 @@ UNIVERSAL_TOOLS = [
     # Cross-project document library search (chat qm — Platform Knowledge page)
     "find_documents",
     "summarize_document_library",
+    # Master lease lookup (Increment 8 — net lease lineage + provenance)
+    "find_master_lease",
+    "get_master_lease_detail",
 ]
 
 # Land development only — areas, phases, parcels, lots, milestones, land use,
@@ -274,6 +277,10 @@ UNASSIGNED_SAFE_TOOLS = [
     # Cross-project document library search (chat qm — Platform Knowledge page)
     "find_documents",
     "summarize_document_library",
+    # Master lease lookup (Increment 8) — pre-project use to spot existing
+    # tenants/operators/master leases before creating a new project.
+    "find_master_lease",
+    "get_master_lease_detail",
 ]
 
 

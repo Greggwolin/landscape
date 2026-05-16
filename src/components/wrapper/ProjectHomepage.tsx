@@ -26,6 +26,14 @@ interface ProjectThread {
   updatedAt: string;
   messageCount: number;
   isActive: boolean;
+  /**
+   * AI-generated 1-2 sentence summary as a small HTML fragment.
+   * Allowed tags: <b>, <strong>, <i>, <em>, <br> — sanitized
+   * server-side by ThreadService._sanitize_summary_html. Populated
+   * when the thread crosses the message-count threshold (5/15/30/60)
+   * or when close_thread regenerates on material change.
+   */
+  summary?: string | null;
 }
 
 interface ProjectDetails {
@@ -655,24 +663,51 @@ export function ProjectHomepage({
                       >
                         {title}
                       </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: 'var(--w-text-secondary)',
-                          marginTop: 3,
-                          lineHeight: 1.45,
-                          overflow: 'hidden',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                        }}
-                      >
-                        {thread.messageCount === 0
-                          ? 'No messages yet.'
-                          : `${thread.messageCount} message${
-                              thread.messageCount === 1 ? '' : 's'
-                            } · last activity ${formatRelativeTime(thread.updatedAt)}`}
-                      </div>
+                      {thread.summary && thread.summary.trim() ? (
+                        /* FB-292 / PG32 — AI-generated summary fragment.
+                           Trusted: thread.summary is sanitized server-side
+                           to the b/strong/i/em/br allowlist with no
+                           attributes preserved. Mirrors the same pattern
+                           used in ThreadList.tsx. Threads under the regen
+                           threshold have no summary; we fall back to the
+                           message-count line below. */
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: 'var(--w-text-secondary)',
+                            marginTop: 3,
+                            lineHeight: 1.45,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                          title={thread.summary
+                            .replace(/<[^>]*>/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim()}
+                          dangerouslySetInnerHTML={{ __html: thread.summary }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: 'var(--w-text-secondary)',
+                            marginTop: 3,
+                            lineHeight: 1.45,
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                        >
+                          {thread.messageCount === 0
+                            ? 'No messages yet.'
+                            : `${thread.messageCount} message${
+                                thread.messageCount === 1 ? '' : 's'
+                              } · last activity ${formatRelativeTime(thread.updatedAt)}`}
+                        </div>
+                      )}
                     </div>
                     <div
                       style={{

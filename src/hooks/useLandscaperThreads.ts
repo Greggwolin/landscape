@@ -328,6 +328,11 @@ export function useLandscaperThreads({
   /**
    * Load ALL threads for the project (across all page contexts).
    * Used by ThreadList browser so users can see and switch to any thread.
+   *
+   * PG25 follow-up: includes closed threads so the in-panel drawer
+   * shows the full project history, not just the handful currently
+   * marked active. Closed threads render in italic via the existing
+   * isActive-aware styling in ThreadList.
    */
   const [allThreads, setAllThreads] = useState<ChatThread[]>([]);
   const loadAllThreads = useCallback(async () => {
@@ -339,7 +344,10 @@ export function useLandscaperThreads({
       } else {
         url.searchParams.set('unassigned', 'true');
       }
-      // Default to active-only. Same rationale as loadThreads — see finding #8.
+      // PG25: surface closed threads in the in-panel drawer. Backend
+      // default is active-only; pass include_closed=true so the drawer
+      // reflects the full project history.
+      url.searchParams.set('include_closed', 'true');
 
       const response = await fetchWithTimeout(url.toString(), {
         headers: getAuthHeaders(false),
