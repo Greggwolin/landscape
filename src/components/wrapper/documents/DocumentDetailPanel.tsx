@@ -5,6 +5,7 @@ import CIcon from '@coreui/icons-react';
 import { cilX } from '@coreui/icons';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
+import { FilePreviewer } from '@/components/preview/FilePreviewer';
 export interface DocumentDetailDoc {
   doc_id: string;
   doc_name?: string;
@@ -54,21 +55,6 @@ function externalOpenHint(mime?: string | null, name?: string): string {
   if (lower.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext))
     return 'Open Image';
   return 'Open';
-}
-
-function isPdfMime(mime?: string | null, name?: string): boolean {
-  const lower = (mime || '').toLowerCase();
-  const ext = (name || '').toLowerCase().split('.').pop() || '';
-  return lower.includes('pdf') || ext === 'pdf';
-}
-
-function isImageMime(mime?: string | null, name?: string): boolean {
-  const lower = (mime || '').toLowerCase();
-  const ext = (name || '').toLowerCase().split('.').pop() || '';
-  return (
-    lower.startsWith('image/') ||
-    ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)
-  );
 }
 
 function formatSize(bytes?: number | null): string {
@@ -140,8 +126,6 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
     };
   }, [doc.doc_id, doc.storage_uri, doc.mime_type]);
 
-  const canPreview =
-    !!storageUri && (isPdfMime(mimeType, name) || isImageMime(mimeType, name));
   const openLabel = externalOpenHint(mimeType, name);
 
   const handleOpenExternally = () => {
@@ -175,23 +159,19 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
         </div>
       </div>
       <div className="w-doc-detail-body">
-        {/* Preview pane — renderable types only (PDF + images). For Excel/Word
-            and others, we skip preview and lean on the Open button. */}
-        {canPreview && storageUri && (
+        {/* Preview pane — Phase 1 of LSCMD-DMSPREV-IMPL-0516-DV.
+            FilePreviewer dispatches by mime type: PDF → Adobe Embed,
+            xlsx → SheetJS table, images → <img>, everything else →
+            download fallback card. Sized to match the existing
+            .w-doc-detail-preview-frame height (320px). */}
+        {storageUri && (
           <div className="w-doc-detail-preview">
-            {isPdfMime(mimeType, name) ? (
-              <iframe
-                src={storageUri}
-                title={`Preview of ${name}`}
-                className="w-doc-detail-preview-frame"
-              />
-            ) : (
-              <img
-                src={storageUri}
-                alt={name}
-                className="w-doc-detail-preview-image"
-              />
-            )}
+            <FilePreviewer
+              fileUrl={storageUri}
+              mimeType={mimeType}
+              filename={name}
+              height={320}
+            />
           </div>
         )}
 
