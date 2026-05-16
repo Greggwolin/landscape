@@ -57,10 +57,44 @@ def render_report_as_artifact_tool(
             { success: True, action: 'show_artifact', artifact_id, title, ... }
         Or a structured error envelope on failure / unknown report code.
     """
+    # LF-USERDASH-0514 diagnostic: model has been calling this tool with
+    # what looks like empty input despite the schema enum. Log the raw
+    # arrivals so we can see whether (a) tool_input is genuinely {}, (b)
+    # the model is sending fields at the wrong nesting level (kwargs), or
+    # (c) the field is present under a different key name.
+    logger.info(
+        "[render_report] entry — tool_input=%r project_id=%r kwargs_keys=%r",
+        tool_input,
+        project_id,
+        list(kwargs.keys()),
+    )
+
     tool_input = tool_input or kwargs.get('tool_input', {})
+
+    # Defensive: if the model sent report_code at the top level (kwargs)
+    # instead of inside tool_input, recover it. Same for project_id.
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    if 'report_code' not in tool_input and 'report_code' in kwargs:
+        tool_input['report_code'] = kwargs['report_code']
+    if 'project_id' not in tool_input and 'project_id' in kwargs and project_id is None:
+        tool_input['project_id'] = kwargs['project_id']
+
     report_code = (tool_input.get('report_code') or '').strip()
 
+    logger.info(
+        "[render_report] resolved — report_code=%r tool_input_keys=%r",
+        report_code,
+        list(tool_input.keys()),
+    )
+
     if not report_code:
+        logger.warning(
+            "[render_report] missing report_code — returning 'required' error. "
+            "tool_input=%r kwargs=%r",
+            tool_input,
+            {k: v for k, v in kwargs.items() if k != 'tool_input'},
+        )
         return {
             'success': False,
             'error': "report_code is required (e.g. 'RPT_07' for Rent Roll).",

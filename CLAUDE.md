@@ -558,7 +558,7 @@ The application has two coexisting navigation surfaces. Active development is on
 
 **Primary (chat-first / unified UI) — `/w/` route layer.** This is the target experience and the active line of work on `feature/unified-ui`. Three-panel shell: left sidebar (project list + recent threads), center Landscaper chat, right context-aware artifacts/content panel. Routes include `/w/projects`, `/w/projects/[projectId]`, `/w/chat`, `/w/chat/[threadId]`, `/w/admin`, `/w/help`, `/w/tools`, `/w/landscaper-ai`. See the "Chat Canvas / Unified UI" section below for component-level detail.
 
-**Legacy (folder/tab) — `/projects/[id]` route.** The original ARGUS-style 8-folder layout with two-row tabs and `?folder={folder}&tab={tab}` URL state. `ProjectContentRouter.tsx` still maps folder/tab combos to legacy components, and `FolderTabs.tsx` and `useFolderNavigation.ts` are still wired. The `folderTabConfig.ts` config file no longer exists — only a stranded test (`folderTabConfig.test.ts`) references it. Post-login lands here today; cutover to `/w/` as the default destination is pending.
+**Legacy (folder/tab) — `/projects/[id]` route.** The original ARGUS-style 8-folder layout with two-row tabs and `?folder={folder}&tab={tab}` URL state. `ProjectContentRouter.tsx` still maps folder/tab combos to legacy components, and `FolderTabs.tsx` and `useFolderNavigation.ts` are still wired. The `folderTabConfig.ts` config file no longer exists — only a stranded test (`folderTabConfig.test.ts`) references it. Post-login now redirects to `/w/dashboard` (as of `270c72e6`, May 15 2026). Legacy routes (`/`, `/register`) also redirect to `/w/` counterparts via `next.config.ts`.
 
 **Implication for new work:** new product surfaces should be built into the `/w/` shell (with right-panel artifacts and Landscaper as the primary navigation), not as new folders/tabs in the legacy layout.
 
@@ -577,9 +577,9 @@ The application has two coexisting navigation surfaces. Active development is on
 
 ### Chat Canvas / Unified UI
 
-The chat-first navigation layer is the primary target experience. The legacy ARGUS-style 8-folder layout is retained but no longer the design target. Active development happens on `feature/unified-ui`; merge to main is pending. Until cutover, post-login still lands on the legacy `/dashboard` route.
+The chat-first navigation layer is the primary target experience. The legacy ARGUS-style 8-folder layout is retained but no longer the design target. Active development happens on `feature/unified-ui`; merge to main is pending. Post-login now lands on `/w/dashboard` (shipped May 15, `270c72e6`).
 
-**Route structure:** `/w/` prefix — `src/app/w/layout.tsx` (shell), `/w/projects/` (project list), `/w/projects/[projectId]/` (project view), `/w/chat/` (unassigned chat), `/w/chat/[threadId]/` (specific thread).
+**Route structure:** `/w/` prefix — `src/app/w/layout.tsx` (shell), `/w/dashboard/` (home — auth landing), `/w/projects/` (project list), `/w/projects/[projectId]/` (project view), `/w/chat/` (unassigned chat), `/w/chat/[threadId]/` (specific thread).
 
 **Layout components** (`src/components/wrapper/`):
 - `PageShell.tsx` — outer 3-panel frame (sidebar + center + right)
@@ -605,6 +605,12 @@ The chat-first navigation layer is the primary target experience. The legacy ARG
 - Draggable right panel width (320–900px, 420px default, left-edge handle) on `/w/chat` aside and `ProjectArtifactsPanel` (Apr 23)
 - `LocationBriefArtifact.tsx` — renders `generate_location_brief` output with tabular indicator tiles + condensed exec summary toggle; hardcoded light palette avoids dark-mode bleed (Apr 23)
 - `CreateProjectCTA.tsx` — contextual "Create Project" prompt shown when location brief resolves city/state/property type
+- `/w/dashboard` home page (`UserDashboard.tsx`) — auth landing with recent chats, project tiles, artifacts rail (May 14–15)
+- Intent classification + navigation tools (`navigation_tools.py`, 2 tools) — Landscaper classifies user intent and navigates the UI contextually (Phase 3, May 15)
+- Report-as-artifact server-side rendering (`report_artifact_tools.py` + `artifact_adapter.py`) — all 20+ report generators render directly as artifacts, bypassing LLM row composition entirely. Fixes max_tokens-mid-tool-use truncation class (May 15)
+- Cross-project read override in tool executor — Landscaper can now read data across projects when explicitly requested (May 15)
+- Legacy route redirects (`next.config.ts`) — `/`, `/register`, `/login` redirect to `/w/` counterparts (May 15)
+- Onboarding code removed — 1,861 lines deleted (OnboardingChat, OnboardingSurvey, DocumentUploadModal) (May 15)
 
 **Backend support** (migration `0003_unassigned_threads.sql`):
 - `landscaper_thread.project_id` now nullable — enables pre-project conversations
@@ -1031,7 +1037,7 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-04-30 — Alpha Readiness Assessment (15-step workflow audit, includes Artifacts system)*
+*Last audit: 2026-05-15 — Nightly sync (auth landing cutover to /w/dashboard, report-as-artifact, navigation tools, onboarding cleanup)*
 *Landscaper tool count: **273 registered** (+`find_documents` + `summarize_document_library` from DMS restructure 2026-05-04; +`save_user_vocab` from chat DA Phase 1 ship; +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Append session entries to CLAUDE_SESSION_HISTORY.md, not here.*
