@@ -1,3 +1,17 @@
+# Landscape Financial Engine — Implementation Status (HISTORICAL)
+
+> ⚠️ **HISTORICAL DOCUMENT — superseded.** This snapshot is frozen at **April 17, 2026** and was never updated as `main` moved forward. The "Production Ready" framing below does **not** reflect current state. The app is in **alpha**, not production, and known gaps remain (scanned-PDF OCR, schema-vs-code drift documented in `/landscape/CLAUDE.md`, cohort data-isolation work landed May 16, 2026).
+>
+> **For current status, use one of:**
+>
+> - `docs/09_session_notes/` — Nightly automated daily syncs (CANONICAL recent state)
+> - `/landscape/CLAUDE.md` § "Alpha Readiness Assessment" — Updated session-by-session
+> - `docs/daily-context/session-log.md` — User-invoked session log
+>
+> This file is preserved for historical reference only. Do not extend or update it.
+
+---
+
 # Landscape Financial Engine - Implementation Status
 **Last Updated:** 2026-04-17
 **Version:** 5.0

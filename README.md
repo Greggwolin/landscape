@@ -15,35 +15,35 @@ Landscape provides enterprise-grade financial modeling capabilities for:
 
 ### Key Features
 
-✅ **Standardized Project Types** - 7 official project type codes (Migration 013 - Nov 2025)
-✅ **Universal Container System** - Production-ready flexible hierarchy (Area/Phase/Parcel OR Property/Building/Unit)
-✅ **Comprehensive Data Layer** - 324 tables + 42 views in PostgreSQL
-✅ **Unit-Level Multifamily** - Lease tracking, turn analysis, occupancy reporting
-✅ **Lease Management** - Escalations, recoveries, percentage rent, rollover analysis
-✅ **Dependency Engine** - Automated timeline calculation with circular detection
-✅ **S-Curve Distribution** - 4 profiles for cost/revenue timing
-✅ **GIS Integration** - Boundary mapping, parcel selection, AI document extraction
-✅ **Market Intelligence** - Census ACS, BLS, FRED, FHFA data integration
-✅ **Budget Grid** - Spreadsheet-like interface with inline editing
-✅ **CI/CD Pipeline** - Neon branching + Vercel deployment automation
+- **Project type codes** — 7 standardized codes (LAND, MF, OFF, RET, IND, HTL, MXU)
+- **Universal hierarchy** — Flexible tree backed by `tbl_division` (Area/Phase/Parcel OR Property/Building/Unit). See `/landscape/CLAUDE.md` for the Nov 2025 rename history (`tbl_container` → `tbl_division`).
+- **Multifamily** — Unit inventory, lease tracking, turn analysis, occupancy reporting
+- **Lease management** — Escalations, recoveries, percentage rent, rollover analysis
+- **Timeline engine** — Dependency-based scheduling with circular detection
+- **S-Curve distribution** — 4 profiles for cost/revenue timing
+- **GIS** — Boundary mapping, parcel selection, AI document extraction (native PDFs only; scanned-PDF OCR pipeline is outstanding)
+- **Market intelligence** — Census ACS, BLS, FRED, FHFA integration
+- **Budget grid** — Spreadsheet-style interface with inline editing
+- **CI/CD** — Vercel deploys; Neon branching is set up but the per-PR preview database step is currently failing (see Testing section)
+
+> Alpha status, not "production-ready." For current state, see `docs/09_session_notes/` (nightly automated daily syncs) — that stream is the source of truth for what's actually shipped vs. WIP.
 
 ## 📚 Documentation
 
-**All documentation is now centralized in the [/docs/](docs/) directory.**
+All documentation lives under [/docs/](docs/).
 
 ### Quick Links
 
-- **[Complete Documentation Index](docs/README.md)** - Master navigation guide
-- **[CHANGELOG](archive/docs/CHANGELOG.md)** - Version history and recent changes
-- **[Migration 013 Report](archive/docs/MIGRATION_013_EXECUTION_REPORT.md)** - Project type code standardization (Nov 2025)
-- **[Django Backend Implementation](docs/DJANGO_BACKEND_IMPLEMENTATION.md)** - Django setup & admin panel
-- **[Developer Guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** - Setup and installation
-- **[Quick Start Guide](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** - Get running in 5 minutes
-- **[Financial Engine Status](docs/00_overview/IMPLEMENTATION_STATUS.md)** - Financial modeling status
-- **[Database Schema](docs/05-database/DATABASE_SCHEMA.md)** - Complete schema reference
-- **[API Reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** - API documentation
-- **[DevOps Guide](docs/06-devops/DEVOPS_GUIDE.md)** - Deployment and operations
-- **[Django Admin Guide](backend/ADMIN_ACCESS.md)** - Admin panel access
+- **[Documentation index](docs/README.md)** — Top-level navigation
+- **[Project instructions](docs/PROJECT_INSTRUCTIONS.md)** — Canonical rules shared across Claude systems (Cowork, Claude.ai, Claude Code)
+- **[Developer guide](docs/00-getting-started/DEVELOPER_GUIDE.md)** — Setup and installation
+- **[Quick start](docs/00-getting-started/QUICK_START_FINANCIAL_ENGINE.md)** — Get running fast
+- **[Daily syncs](docs/09_session_notes/)** — Nightly automated status notes (CANONICAL recent state)
+- **[Database schema](docs/05-database/DATABASE_SCHEMA.md)** — Schema reference
+- **[API reference](docs/03-api-reference/API_REFERENCE_PHASE2.md)** — API documentation
+- **[DevOps guide](docs/06-devops/DEVOPS_GUIDE.md)** — Deployment and operations
+- **[Django admin guide](backend/ADMIN_ACCESS.md)** — Admin panel access
+- **[CLAUDE.md](CLAUDE.md)** — Architecture facts, alpha readiness, high-risk zones (kept current session-by-session)
 
 ### Documentation Structure
 
@@ -114,12 +114,15 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 ## 📊 Technology Stack
 
 ### Frontend
-- **Next.js 15.5.0** with Turbopack
-- **React 19.1.0** + TypeScript 5.x
-- **Tailwind CSS 3.4.17** for styling
-- **Material-UI 7.3.1** (DataGrid, Charts, DatePickers)
-- **MapLibre GL 5.7.3** for GIS mapping
-- **Handsontable 16.0.0** for budget grids
+- **Next.js ^15.5.9** with Turbopack
+- **React 18.2.0** + TypeScript 5.x
+- **Tailwind CSS ^3.4.17** for styling
+- **CoreUI React ^5.9.1** as the primary design system
+- **Material-UI** (DataGrid only — being phased out of general UI)
+- **MapLibre GL** for GIS mapping
+- **AG-Grid Community** (rent roll) + **TanStack Table** (preferred for new grids)
+
+> Always defer to `package.json` for the authoritative dependency versions — the list above can drift.
 
 ### Backend
 - **Django 5.0.1** with Django REST Framework 3.14.0 ⭐ NEW (Oct 22, 2025)
@@ -175,7 +178,7 @@ landscape/
     └── market_ingest_py/              # Python market data CLI
 ```
 
-> **Note**: For a complete `/src/app` directory tree with all 35+ API routes, 15+ pages, and 25+ component categories, see [App-Development-Status.md](Documentation/App-Development-Status.md#application-file-structure)
+> For a current snapshot of routes, pages, and components, browse `src/app/` directly — the old `Documentation/App-Development-Status.md` reference was removed because the file no longer exists.
 
 ## 🗄 Database Architecture
 
@@ -183,18 +186,13 @@ landscape/
 - **`landscape`** (ACTIVE) - 324 tables, 42 views - All application data
 - **`land_v2`** (LEGACY) - 2 tables - Zoning glossary only (unused)
 
-### Recent Additions (Migration 008 - Oct 14, 2025)
+### Recent work
 
-**Multifamily Property Tracking**:
-- `tbl_multifamily_unit` - Unit inventory (8 sample units)
-- `tbl_multifamily_lease` - Lease agreements (4 sample leases)
-- `tbl_multifamily_turn` - Turn tracking (1 sample turn)
-- `tbl_multifamily_unit_type` - Unit type master data (3 types)
-- 5 reporting views for occupancy, expirations, turn metrics
+For per-day change details, see `docs/09_session_notes/`. The "Migration 008 multifamily" line that used to live here was from October 2025 and has been superseded many times over; the multifamily tables (`tbl_multifamily_unit`, `tbl_multifamily_lease`, `tbl_multifamily_turn`, `tbl_multifamily_unit_type`) are now part of the standard schema, not "recent."
 
-## 📡 API Endpoints
+## 📡 API Endpoints (selected)
 
-### Multifamily (NEW)
+### Multifamily
 - `GET/POST /api/multifamily/units` - Unit CRUD
 - `GET/POST /api/multifamily/leases` - Lease management
 - `GET/POST /api/multifamily/turns` - Turn tracking
@@ -211,33 +209,37 @@ landscape/
 - `POST /api/projects/[id]/timeline/calculate` - Timeline calculation
 - `GET /api/leases` - Lease management
 
-See [Documentation/App-Development-Status.md](Documentation/App-Development-Status.md) for complete API reference.
+See [`docs/03-api-reference/API_REFERENCE_PHASE2.md`](docs/03-api-reference/API_REFERENCE_PHASE2.md) for the documented API surface, or browse `backend/apps/*/urls.py` (Django) and `src/app/api/` (legacy Next.js routes) for the live endpoint list.
 
 ## 🧪 Testing
 
 ```bash
-# Run unit tests
+# Theme tokens + design-token contrast (default `npm test`)
 npm test
 
-# Run API tests
-npm run test:api
+# Playwright UI mode (interactive)
+npm run test:ui
 
-# Load test fixtures
-./scripts/load-fixtures.sh
+# Playwright headless
+npm run test:headless
 ```
 
-**Test Data Available**:
-- Project 7 (Peoria Lakes Phase 1) - MPC with dependencies
-- Project 8 (Carney Power Center) - Retail power center
-- Project 9 (Peoria Lakes) - Multifamily sample (8 units, 4 leases)
+> **Heads-up — `npm test` is not green on a stock checkout.** The default `test` script runs the Jest token suite (passes) followed by the Playwright contrast suite (`tests/e2e/contrast.e2e.spec.ts`). The Playwright suite requires the Chromium browser binary, which is not automatically installed. On a clean clone you'll need:
+>
+> ```bash
+> npx playwright install chromium
+> ```
+>
+> Until that runs (or the Playwright step is excluded from the default), `npm test` will fail at the contrast suite even though the underlying styling is fine. No `npm run test:api` script exists; ignore older docs that reference one.
 
-## 📚 Documentation
+### Reference projects in the database
 
-- **[App-Development-Status.md](Documentation/App-Development-Status.md)** - Comprehensive development reference (2,300+ lines)
-- **[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)** - Project status and roadmap
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Onboarding guide
-- **[DEVOPS_GUIDE.md](project-docs/DEVOPS_GUIDE.md)** - CI/CD and deployment
-- **[API_REFERENCE_PHASE2.md](project-docs/API_REFERENCE_PHASE2.md)** - API documentation
+- Project 7 — Peoria Lakes Phase 1 — Master-planned community with dependencies
+- Project 9 — Peoria Meadows — Land development demo (canonical test project)
+- Project 17 — Chadron Terrace — Multifamily demo
+- Project 8 — Carney Power Center — Retail power center
+
+Demo provisioning for new alpha testers is automated via the `clone_demo_projects` Django management command (clones Chadron Terrace + Peoria Meadows into each new alpha-tester account on first login).
 
 ## 🔧 Development
 
@@ -264,20 +266,22 @@ DATABASE_URL=postgres://... npm run schema:md
 
 ### Universal Container System
 
-- SQL migrations live under `db/migrations/` with paired `*.up.sql` and `*.down.sql` files.
-- Seed helpers and sample data for testing are in `docs/sql/universal_container_system.sql`.
-- Architectural notes, API endpoints, and data contracts are documented in `docs/universal-container-system.md`.
+The hierarchy is backed by `tbl_division` (renamed from `tbl_container` in migration 025, Nov 2025). Migrations live under `migrations/` and `backend/db/migrations/` with paired `*.up.sql` and `*.down.sql` files. For the full rename history, lingering column-name drift, and high-risk-zone notes, see `/landscape/CLAUDE.md` § "Universal Container System."
 
-## Market Assumptions Persistence
+## Playwright on macOS — optional workarounds
 
-- Create table (run in Neon): `docs/sql/market_assumptions.sql`
-- API:
-  - `GET /api/assumptions?project_id=7`
-  - `POST /api/assumptions` with `{ project_id, commission_basis, demand_unit, uom }`
+If Playwright Chromium fails to launch on macOS due to system sandboxing:
 
-# Optional (use at your own risk):
+```bash
+# Optional, use at your own risk:
 # 1) Remove quarantine flags (post-install)
 xattr -dr com.apple.quarantine ~/Library/Caches/ms-playwright
-# 2) Ad-hoc sign cached Chromium app bundles (deep) to stabilize helpers
-#   Note: this is not notarized; may still fail under strict sandbox.
-find "$HOME/Library/Caches/ms-playwright" -type d -name "*.app" -maxdepth 3 -exec codesign --force --deep --sign - {} \;
+# 2) Ad-hoc sign cached Chromium app bundles to stabilize helpers (not notarized)
+find "$HOME/Library/Caches/ms-playwright" -type d -name "*.app" -maxdepth 3 \
+  -exec codesign --force --deep --sign - {} \;
+```
+
+Helper scripts also live in `scripts/`:
+- `npm run pw:diag` — diagnose Playwright Chromium issues on Sonoma
+- `npm run pw:use-bundled` — switch to bundled Chromium
+- `npm run pw:use-system` — switch to system Chromium

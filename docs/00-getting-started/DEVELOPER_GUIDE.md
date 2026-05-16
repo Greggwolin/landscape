@@ -398,18 +398,20 @@ interface Lease {
 
 ## 🧪 Testing
 
+> **Heads-up — `npm test` / `pnpm test` is not green on a fresh clone.** The default `test` script runs the Jest token suite (passes) followed by the Playwright contrast suite, which needs a Chromium binary that isn't installed automatically. Run `npx playwright install chromium` once before relying on the default verification path. The "with coverage" / "watch mode" flags below apply to Jest only — they won't help the Playwright step.
+
 ### Run Unit Tests
 ```bash
-# All tests
+# All tests (theme tokens + contrast — see caveat above)
 pnpm test
 
-# Specific test file
+# Specific test file (Jest only)
 pnpm test lease-calculator
 
-# With coverage
+# With coverage (Jest only)
 pnpm test -- --coverage
 
-# Watch mode
+# Watch mode (Jest only)
 pnpm test -- --watch
 ```
 
