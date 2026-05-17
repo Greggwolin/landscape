@@ -1,13 +1,20 @@
 """
-Models for report templates, definitions, and history.
+Models for report templates, definitions, history, and user persistence.
 
 ReportDefinition: Catalog of what reports exist and which project types can see them.
 ReportTemplate: Stores custom report configurations that can be assigned to project tabs.
 ReportHistory: Tracks each report generation event.
+UserReportPersonalDefault: One row per (user, report) for the user's personal layout
+    overrides. Missing row means use canonical base. RP-CFRPT-2605 Phase 2.
+UserSavedReport: User-named "Save As" entries. Many per user. Soft-delete via
+    is_archived. RP-CFRPT-2605 Phase 2.
 """
 
-from django.db import models
+import uuid as uuid_lib
+
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
+from django.db import models
 
 
 class ReportDefinition(models.Model):
@@ -143,3 +150,162 @@ class ReportTemplate(models.Model):
 
     def __repr__(self):
         return f"<ReportTemplate: {self.template_name} - {len(self.sections)} sections>"
+
+
+# =============================================================================
+# RP-CFRPT-2605 Phase 2 — User persistence layer
+# =============================================================================
+
+
+SCOPE_CHOICES = [
+    ('global', 'Global'),
+    ('project', 'Project'),
+    ('entity', 'Entity'),
+    ('master_lease', 'Master Lease'),
+    ('cross_project', 'Cross Project'),
+]
+
+
+class UserReportPersonalDefault(models.Model):
+    """
+    A user's personal layout overrides for a canonical report. One row per
+    (user, report_code, scope_type, scope_id). Missing row means the canonical
+    base renders unchanged.
+
+    At launch every row has scope_type='global' and scope_id=NULL — personal
+    defaults travel across every project the user touches. Other scope values
+    are reserved for net-lease portfolio reports added later.
+
+    DELETE this row = "Reset to base".
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='report_personal_defaults',
+        db_column='user_id',
+    )
+    report_definition = models.ForeignKey(
+        'ReportDefinition',
+        on_delete=models.CASCADE,
+        related_name='personal_defaults',
+        db_column='report_code',
+        to_field='report_code',
+    )
+    scope_type = models.CharField(
+        max_length=20,
+        choices=SCOPE_CHOICES,
+        default='global',
+        help_text='Scope of this personal default. "global" travels across every project.',
+    )
+    scope_id = models.IntegerField(
+        null=True, blank=True,
+        help_text='NULL for global/cross_project; required for project/entity/master_lease scopes.',
+    )
+    modification_spec = models.JSONField(
+        default=dict,
+        help_text='Layout overrides per Phase 1 §4 (columns, sort, filters, presentation).',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_user_report_personal_default'
+        verbose_name = 'User Report Personal Default'
+        verbose_name_plural = 'User Report Personal Defaults'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('user', 'report_definition', 'scope_type', 'scope_id'),
+                name='uq_personal_default_scope',
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(scope_type__in=('global', 'cross_project'), scope_id__isnull=True)
+                    | models.Q(scope_type__in=('project', 'entity', 'master_lease'), scope_id__isnull=False)
+                ),
+                name='chk_personal_default_scope_id_required',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'report_definition'], name='ix_pers_def_user_report'),
+            models.Index(fields=['scope_type', 'scope_id'], name='ix_pers_def_scope'),
+        ]
+
+    def __str__(self):
+        return f"PersonalDefault user={self.user_id} report={self.report_definition_id} scope={self.scope_type}"
+
+
+class UserSavedReport(models.Model):
+    """
+    A user-named "Save As" report. Many rows per user, each carries a
+    user-supplied name. Unique-per-user, NOT global — user Alice's
+    "Compressed Rent Roll" doesn't collide with user Bob's.
+
+    Soft-delete via is_archived; library list filters archived out by default.
+
+    `uuid` is the stable external identifier exposed in URLs and chat
+    references. Numeric `id` stays internal.
+    """
+
+    uuid = models.UUIDField(
+        unique=True,
+        editable=False,
+        default=uuid_lib.uuid4,
+        help_text='Stable external identifier used in URLs and chat references.',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_reports',
+        db_column='user_id',
+    )
+    base_report = models.ForeignKey(
+        'ReportDefinition',
+        on_delete=models.CASCADE,
+        related_name='user_saved_versions',
+        db_column='base_report_code',
+        to_field='report_code',
+    )
+    name = models.CharField(
+        max_length=120,
+        help_text='User-supplied name. Unique per user.',
+    )
+    description = models.TextField(null=True, blank=True)
+    scope_type = models.CharField(
+        max_length=20,
+        choices=SCOPE_CHOICES,
+        default='global',
+    )
+    scope_id = models.IntegerField(null=True, blank=True)
+    modification_spec = models.JSONField(default=dict)
+    is_archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'landscape"."tbl_user_saved_report'
+        verbose_name = 'User Saved Report'
+        verbose_name_plural = 'User Saved Reports'
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=('user', 'name'),
+                name='uq_saved_report_user_name',
+            ),
+            models.CheckConstraint(
+                check=(
+                    models.Q(scope_type__in=('global', 'cross_project'), scope_id__isnull=True)
+                    | models.Q(scope_type__in=('project', 'entity', 'master_lease'), scope_id__isnull=False)
+                ),
+                name='chk_saved_report_scope_id_required',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'is_archived'], name='ix_saved_user_archived'),
+            models.Index(fields=['base_report'], name='ix_saved_base_report'),
+        ]
+
+    def __str__(self):
+        return f"SavedReport user={self.user_id} name={self.name!r} base={self.base_report_id}"
