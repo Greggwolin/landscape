@@ -30,7 +30,7 @@ else
   CONNECTION_STRING=$(neonctl connection-string \
     --project-id "$NEON_PROJECT_ID" \
     --branch "$BRANCH_NAME" \
-    --role neondb_owner \
+    --role-name neondb_owner \
     --database land_v2)
 fi
 

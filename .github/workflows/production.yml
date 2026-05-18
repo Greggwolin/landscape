@@ -92,6 +92,7 @@ jobs:
             --project-id "$NEON_PROJECT_ID" \
             --name "$SNAPSHOT_NAME" \
             --parent production \
+            --role-name neondb_owner \
             --output json)
 
           SNAPSHOT_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.id')

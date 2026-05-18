@@ -57,7 +57,8 @@ if [[ $RESTORE_POINT == br-* ]]; then
   neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$ROLLBACK_BRANCH" \
-    --parent "$RESTORE_POINT"
+    --parent "$RESTORE_POINT" \
+    --role-name neondb_owner
 
   echo "✅ Rollback branch created"
   echo ""
@@ -87,7 +88,8 @@ else
   neonctl branches create \
     --project-id "$NEON_PROJECT" \
     --name "$ROLLBACK_BRANCH" \
-    --parent production
+    --parent production \
+    --role-name neondb_owner
 
   echo "⚠️  Manual PITR required - Neon CLI doesn't support timestamp directly"
   echo "Use Neon Console to create branch at timestamp: $RESTORE_POINT"
