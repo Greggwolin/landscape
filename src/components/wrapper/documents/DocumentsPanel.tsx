@@ -218,7 +218,10 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
       setLoading(true);
       try {
         const [typesRes, countsRes] = await Promise.all([
-          fetch(`${DJANGO_API}/api/dms/projects/${project_id}/doc-types/`, { signal: ac.signal }),
+          fetch(`${DJANGO_API}/api/dms/projects/${project_id}/doc-types/`, {
+            headers: getAuthHeaders(),
+            signal: ac.signal,
+          }),
           fetch(`/api/dms/filters/counts?project_id=${project_id}`, { headers: getAuthHeaders(), signal: ac.signal }),
         ]);
 
@@ -310,7 +313,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
     try {
       const res = await fetch(`${DJANGO_API}/api/dms/projects/${project_id}/doc-types/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_type_name: trimmed }),
       });
       const data = await res.json();

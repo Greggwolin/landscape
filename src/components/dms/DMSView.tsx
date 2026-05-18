@@ -162,7 +162,9 @@ function DMSViewInner({
       let usedDjangoApi = false;
 
       try {
-        const djangoResponse = await fetch(`${DJANGO_API}/api/dms/projects/${projectId}/doc-types/`);
+        const djangoResponse = await fetch(`${DJANGO_API}/api/dms/projects/${projectId}/doc-types/`, {
+          headers: getAuthHeaders(),
+        });
         if (djangoResponse.ok) {
           const djangoData = await parseJsonSafely<{
             success?: boolean;
@@ -803,7 +805,7 @@ function DMSViewInner({
     try {
       const response = await fetch(`${DJANGO_API}/api/dms/projects/${projectId}/doc-types/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_type_name: trimmed }),
       });
 
@@ -882,7 +884,7 @@ function DMSViewInner({
     try {
       const response = await fetch(
         `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${customId}/`,
-        { method: 'DELETE' }
+        { method: 'DELETE', headers: getAuthHeaders() }
       );
 
       if (response.ok) {
@@ -907,7 +909,7 @@ function DMSViewInner({
         `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${reassignModal.customId}/reassign/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ target_doc_type: reassignModal.targetDocType }),
         }
       );
@@ -920,7 +922,7 @@ function DMSViewInner({
       // Now delete the empty filter
       const deleteResponse = await fetch(
         `${DJANGO_API}/api/dms/projects/${projectId}/doc-types/${reassignModal.customId}/`,
-        { method: 'DELETE' }
+        { method: 'DELETE', headers: getAuthHeaders() }
       );
 
       if (deleteResponse.ok) {

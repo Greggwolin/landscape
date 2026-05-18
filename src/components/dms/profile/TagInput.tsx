@@ -66,7 +66,9 @@ export default function TagInput({
             limit: '10',
           });
 
-          const response = await fetch(`${DJANGO_API}/api/dms/tags/suggest/?${params.toString()}`);
+          const response = await fetch(`${DJANGO_API}/api/dms/tags/suggest/?${params.toString()}`, {
+            headers: getAuthHeaders(),
+          });
           if (response.ok) {
             const data = await response.json();
             const filtered = (data.suggestions || []).filter(
