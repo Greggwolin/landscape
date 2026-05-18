@@ -39,11 +39,15 @@ def render_report_as_artifact_tool(
     **kwargs,
 ) -> Dict[str, Any]:
     """
-    Render any registered report (RPT_01 through RPT_20+) as an artifact.
+    Render any active report from tbl_report_definition as an artifact.
 
     Args:
         tool_input: {
-            report_code: str (required)  — e.g. 'RPT_07' for Rent Roll
+            report_code: str (required)  — must match an is_active=TRUE row
+                in landscape.tbl_report_definition. The rent-roll family is
+                split into 'RPT_07a' (Rent Roll — Standard) and 'RPT_07b'
+                (Rent Roll — Detail); bare 'RPT_07' is no longer in the
+                catalog. Call list_available_reports for the full active set.
             project_id: int (optional override; used for cross-project reads
                             from the home dashboard — must match a real
                             estate project the user has access to)
@@ -82,6 +86,26 @@ def render_report_as_artifact_tool(
 
     report_code = (tool_input.get('report_code') or '').strip()
 
+    # --- Canonicalize shorthand codes to their catalog entries -----------
+    # Historically the generator_router has aliased bare codes (e.g. RPT_07)
+    # onto split variants (RPT_07a / RPT_07b). Those variants are the rows
+    # that actually exist in tbl_report_definition, so the artifact's
+    # params_json.report_code MUST be one of the canonical entries — the
+    # Phase 2 library API + the Phase 3 toolbar both filter by report_code
+    # against that catalog. Map the shorthand to the canonical variant
+    # before the catalog check below so the model can keep using the
+    # convenient short form without breaking save / Update / Save As.
+    REPORT_CODE_ALIASES = {
+        'RPT_07': 'RPT_07b',  # bare rent-roll alias → Detail variant
+    }
+    if report_code in REPORT_CODE_ALIASES:
+        canonical_code = REPORT_CODE_ALIASES[report_code]
+        logger.info(
+            "[render_report] canonicalized shorthand %r -> %r",
+            report_code, canonical_code,
+        )
+        report_code = canonical_code
+
     logger.info(
         "[render_report] resolved — report_code=%r tool_input_keys=%r",
         report_code,
@@ -97,7 +121,48 @@ def render_report_as_artifact_tool(
         )
         return {
             'success': False,
-            'error': "report_code is required (e.g. 'RPT_07' for Rent Roll).",
+            'error': (
+                "report_code is required (e.g. 'RPT_07a' for Rent Roll — Standard). "
+                "Call list_available_reports for the active set."
+            ),
+        }
+
+    # --- Validate report_code against the canonical catalog ---------------
+    # tbl_report_definition is the source of truth for what's renderable.
+    # The generator_router has historical fallback behavior that aliases
+    # bare codes like 'RPT_07' onto a split variant, but Phase 2's library
+    # API and the artifact-header toolbar both filter by report_code
+    # against the catalog — so an artifact whose params_json.report_code
+    # isn't in the active set produces a ghost (no personal default match,
+    # no Save As). Fail fast with the active-set list so the model can
+    # recover with one of the canonical codes instead.
+    try:
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM landscape.tbl_report_definition "
+                "WHERE report_code = %s AND is_active = TRUE",
+                [report_code],
+            )
+            if cur.fetchone() is None:
+                cur.execute(
+                    "SELECT report_code FROM landscape.tbl_report_definition "
+                    "WHERE is_active = TRUE ORDER BY report_code"
+                )
+                active = [r[0] for r in cur.fetchall()]
+                return {
+                    'success': False,
+                    'error': (
+                        f"'{report_code}' is not in the active report catalog. "
+                        f"Active codes: {', '.join(active)}. "
+                        f"Call list_available_reports for descriptions."
+                    ),
+                }
+    except Exception as exc:
+        logger.exception("Report catalog lookup failed for %r", report_code)
+        return {
+            'success': False,
+            'error': f"Report catalog lookup failed: {exc}",
         }
 
     # Resolve project_id — tool_input override wins so cross-project reads

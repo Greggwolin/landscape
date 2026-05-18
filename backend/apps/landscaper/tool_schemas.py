@@ -4394,9 +4394,8 @@ LANDSCAPER_TOOLS = [
             "  RPT_04 — Equity Waterfall\n"
             "  RPT_05 — Assumptions Summary\n"
             "  RPT_06 — Project Summary\n"
-            "  RPT_07 — Rent Roll (Detail)\n"
             "  RPT_07a — Rent Roll (Standard)\n"
-            "  RPT_07b — Rent Roll (Detail) — same as RPT_07\n"
+            "  RPT_07b — Rent Roll (Detail)\n"
             "  RPT_08 — Unit Mix\n"
             "  RPT_09 — Operating Statement\n"
             "  RPT_10 — Direct Cap Valuation\n"
@@ -4421,16 +4420,17 @@ LANDSCAPER_TOOLS = [
                     "type": "string",
                     "enum": [
                         "RPT_01", "RPT_02", "RPT_03", "RPT_04", "RPT_05",
-                        "RPT_06", "RPT_07", "RPT_07a", "RPT_07b", "RPT_08",
+                        "RPT_06", "RPT_07a", "RPT_07b", "RPT_08",
                         "RPT_09", "RPT_10", "RPT_11", "RPT_12", "RPT_13",
                         "RPT_14", "RPT_15", "RPT_16", "RPT_17", "RPT_18",
                         "RPT_19", "RPT_20",
                     ],
                     "description": (
                         "Report code from the registry. See description for "
-                        "the code→name mapping. For 'rent roll' use RPT_07. "
-                        "For 'operating statement' or 'P&L' use RPT_09. For "
-                        "'cash flow' use RPT_12 (leveraged) or RPT_18 (annual)."
+                        "the code→name mapping. For 'rent roll' use RPT_07b "
+                        "(Detail) or RPT_07a (Standard). For 'operating "
+                        "statement' or 'P&L' use RPT_09. For 'cash flow' "
+                        "use RPT_12 (leveraged) or RPT_18 (annual)."
                     ),
                 },
                 "project_id": {

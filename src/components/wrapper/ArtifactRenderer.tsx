@@ -48,6 +48,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     onUnpin,
     onSaveAsNewVersion,
     onOpenModal,
+    headerExtras,
   } = props;
 
   // Track unknown block types so the header can flag schema warnings.
@@ -76,6 +77,7 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
         onSaveAsNewVersion={onSaveAsNewVersion}
         onRefreshAllStale={() => refreshAllStale(schema, sourcePointers, currentValues, onUpdate)}
         onOpenModal={onOpenModal}
+        headerExtras={headerExtras}
       />
 
       <div className={styles.body}>
@@ -136,6 +138,7 @@ interface ArtifactHeaderProps {
   onSaveAsNewVersion: (label?: string) => void;
   onRefreshAllStale: () => void;
   onOpenModal: (modalName: string) => void;
+  headerExtras?: React.ReactNode;
 }
 
 function ArtifactHeader({
@@ -149,6 +152,7 @@ function ArtifactHeader({
   onSaveAsNewVersion,
   onRefreshAllStale,
   onOpenModal,
+  headerExtras,
 }: ArtifactHeaderProps) {
   const [editMenuOpen, setEditMenuOpen] = useState(false);
   const [pinPromptOpen, setPinPromptOpen] = useState(false);
@@ -180,6 +184,11 @@ function ArtifactHeader({
       </div>
 
       <div className={styles.headerActions}>
+        {/* Subtype-specific extras (e.g. ReportToolbar for report artifacts).
+            Rendered ahead of the existing icon buttons so the renderer stays
+            generic — see RP-CFRPT-2605 Phase 3. */}
+        {headerExtras}
+
         {/* Edit (single modal or list dropdown) — icon-only to keep the
             title from getting truncated when the panel is narrow. */}
         {editTarget && !editIsList && (
