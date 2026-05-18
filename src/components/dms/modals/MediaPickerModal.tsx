@@ -13,6 +13,7 @@ import {
 } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 /** Classification filter tabs */
 const FILTER_TABS = [
@@ -79,7 +80,7 @@ export default function MediaPickerModal({
         entity_type: entityType,
         entity_id: String(entityId),
       });
-      const res = await fetch(`${djangoBaseUrl}/api/dms/media/available/?${params}`);
+      const res = await fetch(`${djangoBaseUrl}/api/dms/media/available/?${params}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Failed to fetch available media');
       return res.json() as Promise<{ project_id: number; total: number; items: AvailableMediaItem[] }>;
     },

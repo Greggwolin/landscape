@@ -7,6 +7,7 @@ import { CSpinner } from '@coreui/react';
 import { Heart, Tag, Trash2, X } from 'lucide-react';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
 import { ALL_CLASSIFICATIONS, badgeColorToCssVar, findByCode } from '@/lib/dms/classifications';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const djangoBaseUrl =
   process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -336,7 +337,8 @@ export function MediaPanel({ projectId }: MediaPanelProps) {
     queryKey: ['media-panel', 'available', projectId],
     queryFn: async () => {
       const res = await fetch(
-        `${djangoBaseUrl}/api/dms/media/available/?project_id=${projectId}`
+        `${djangoBaseUrl}/api/dms/media/available/?project_id=${projectId}`,
+        { headers: getAuthHeaders() }
       );
       if (!res.ok) {
         throw new Error(`Failed to load media (${res.status})`);
