@@ -13,6 +13,7 @@ import React, {
 } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -209,7 +210,7 @@ function HelpLandscaperProviderInner({ children }: { children: ReactNode }) {
 
       const response = await fetch(`${DJANGO_API_URL}/api/landscaper/help/chat/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text.trim(),
           conversation_id: conversationId,

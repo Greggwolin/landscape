@@ -231,11 +231,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filter projects based on user role.
+        Filter projects by ownership.
 
-        - admin role or is_staff: See all projects
-        - alpha_tester role: See only projects they created
-        - Default: See only own projects
+        Scoping rules:
+        - LIST action: always own projects only, even for staff/admin.
+          The project picker is "your" projects. Staff who own multiple
+          alpha testers' demo clones would otherwise see 15 Chadron
+          Terraces in the picker and click the wrong one. Filed
+          2026-05-16 after Gregg flagged: "click Chadron Terrace from my
+          account, lands on 1013 — should be 17."
+        - RETRIEVE and other detail/by-id actions: staff/admin can fetch
+          ANY project by ID (oversight, cross-account read).
+        - alpha_tester / default: own projects only on every action.
         """
         from apps.multifamily.models import MultifamilyUnit
 
@@ -268,15 +275,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not include_home:
             base_qs = base_qs.filter(project_kind='real_estate')
 
-        # Admin users see all projects (still filtered by kind unless include_home).
-        if getattr(user, 'role', None) == 'admin' or user.is_staff:
+        is_staff_user = (
+            user.is_staff
+            or getattr(user, 'is_superuser', False)
+            or getattr(user, 'role', None) == 'admin'
+        )
+
+        # Staff/admin override applies to DETAIL actions only (retrieve,
+        # update, partial_update, destroy, custom @action methods on a
+        # single row). The LIST action always scopes to own projects so
+        # the picker UI shows the user's own work.
+        if is_staff_user and self.action != 'list':
             return base_qs.all()
 
-        # Alpha testers see only their own projects
-        if getattr(user, 'role', None) == 'alpha_tester':
-            return base_qs.filter(created_by=user)
-
-        # Default: own projects only
         return base_qs.filter(created_by=user)
 
     def get_serializer_class(self):
