@@ -46,6 +46,7 @@ else
     --project-id "$NEON_PROJECT" \
     --name "$BRANCH_NAME" \
     --parent production \
+    --role-name neondb_owner \
     --output json)
 
   BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id // .branch.id // empty')
@@ -61,7 +62,7 @@ echo "🔗 Retrieving connection string..."
 CONNECTION_STRING=$(neonctl connection-string \
   --project-id "$NEON_PROJECT" \
   --branch "$BRANCH_NAME" \
-  --role neondb_owner \
+  --role-name neondb_owner \
   --database land_v2 \
   --pooled)
 

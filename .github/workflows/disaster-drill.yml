@@ -56,6 +56,7 @@ jobs:
             --project-id "$NEON_PROJECT_ID" \
             --name "$TEST_BRANCH" \
             --parent production \
+            --role-name neondb_owner \
             --output json)
 
           BRANCH_ID=$(echo "$BRANCH_RESPONSE" | jq -r '.id')
@@ -70,7 +71,7 @@ jobs:
           CONNECTION_STRING=$(neonctl connection-string \
             --project-id "$NEON_PROJECT_ID" \
             --branch "${{ steps.create-branch.outputs.branch_name }}" \
-            --role neondb_owner \
+            --role-name neondb_owner \
             --database land_v2 \
             --pooled)
 
@@ -151,6 +152,7 @@ EOF
             --project-id "$NEON_PROJECT_ID" \
             --name "$RESTORE_BRANCH" \
             --parent production \
+            --role-name neondb_owner \
             --output json)
 
           RESTORE_ID=$(echo "$RESTORE_RESPONSE" | jq -r '.id')
@@ -165,7 +167,7 @@ EOF
           RESTORE_CONNECTION=$(neonctl connection-string \
             --project-id "$NEON_PROJECT_ID" \
             --branch "${{ steps.restore.outputs.restore_name }}" \
-            --role neondb_owner \
+            --role-name neondb_owner \
             --database land_v2 \
             --pooled)
 
