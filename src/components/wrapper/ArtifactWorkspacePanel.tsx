@@ -17,6 +17,7 @@ import {
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
+import { DocumentPreviewModal } from '@/components/preview/DocumentPreviewModal';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -109,6 +110,18 @@ export function ArtifactWorkspacePanel({
   const router = useRouter();
   const { activeArtifactId, setActiveArtifactId, toggleArtifacts, setProjectRightPanelView } = useWrapperUI();
   const modalRegistry = useModalRegistrySafe();
+
+  // Doc preview state — opens the overlay previewer when a doc in the
+  // Project Documents list is clicked. Reserved for this surface; the
+  // standalone DMS uses DocumentDetailPanel's inline preview instead.
+  // LSCMD-DMSPREV-COMMIT-0516-DV Phase 1 wiring-gap fix.
+  const [previewDocId, setPreviewDocId] = useState<number | null>(null);
+  const [previewDocName, setPreviewDocName] = useState<string | null>(null);
+  // Mark router + setProjectRightPanelView as intentionally retained even
+  // though the doc-list click no longer uses them — the panel's other
+  // sections still rely on the WrapperUIContext setters.
+  void router;
+  void setProjectRightPanelView;
 
   // Pinned artifacts — always show (small list).
   // `includeUnassigned` allows callers to surface project-scoped AND
@@ -284,7 +297,10 @@ export function ArtifactWorkspacePanel({
                 <DocumentListRow
                   key={doc.doc_id}
                   doc={doc}
-                  onClick={() => setProjectRightPanelView('documents')}
+                  onClick={() => {
+                    setPreviewDocId(doc.doc_id);
+                    setPreviewDocName(doc.doc_name);
+                  }}
                 />
               ))
             )}
@@ -497,6 +513,19 @@ export function ArtifactWorkspacePanel({
         {restoreMutation.status}
       </div>
       <CollapseToggleHint onCollapseAll={toggleArtifacts} />
+
+      {/* Document preview overlay — opens via doc-row click in the
+          Project Documents section above. Portal-rendered to document.body
+          so it floats above the artifacts panel rather than being clipped
+          by its overflow constraints. */}
+      <DocumentPreviewModal
+        docId={previewDocId}
+        filename={previewDocName}
+        onClose={() => {
+          setPreviewDocId(null);
+          setPreviewDocName(null);
+        }}
+      />
     </div>
   );
 }
