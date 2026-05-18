@@ -28,7 +28,11 @@ const COLLAPSED_WIDTH = 48;
 
 const DEFAULT_RIGHT_PANEL_WIDTH = 420;
 const MIN_RIGHT_PANEL_WIDTH = 320;
-const MAX_RIGHT_PANEL_WIDTH = 900;
+// Bumped from 900 → 1600 to accommodate Claude.ai-style artifact takeover
+// (RP-CFRPT-2605 Phase 3 follow-up). The takeover effect targets ~55% of
+// viewport, which can exceed 900 on wide displays; the user's manual drag
+// must be allowed to keep up with the takeover width without snap-back.
+const MAX_RIGHT_PANEL_WIDTH = 1600;
 
 interface ProjectData {
   project_name: string;
@@ -72,6 +76,48 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
   const isRightResizing = useRef(false);
   const rightStartX = useRef(0);
   const rightStartWidth = useRef(0);
+
+  // Pre-takeover width snapshot. When an artifact opens (activeArtifactId
+  // becomes truthy), the right panel expands to a "takeover" width — the
+  // Claude.ai-style behavior Gregg asked for: artifact takes the full
+  // right portion, chat shrinks to the left half. When the artifact
+  // closes (X click → activeArtifactId nulled), the panel restores to
+  // whatever width the user had it at before.
+  const preTakeoverWidth = useRef<number | null>(null);
+  // Snap-back is a tri-state. We can't just key on `activeArtifactId !==
+  // null` because the user can manually drag the panel during takeover —
+  // we need to know whether the CURRENT width came from a takeover (so
+  // we restore on close) or a user drag (so we leave it alone).
+  const inTakeoverMode = useRef(false);
+
+  useEffect(() => {
+    const hasActiveArtifact = activeArtifactId != null;
+
+    if (hasActiveArtifact && !inTakeoverMode.current) {
+      // Entering takeover. Snapshot current width, expand the panel.
+      preTakeoverWidth.current = rightPanelWidth;
+      inTakeoverMode.current = true;
+
+      // Auto-open the rail if it was collapsed — opening an artifact
+      // implies the user wants to see it. toggleArtifacts is a no-op
+      // when already open.
+      if (!artifactsOpen) toggleArtifacts();
+
+      // Compute takeover width: aim for ~55% of viewport, never less
+      // than 800px, never more than viewport-380 (reserve room for chat).
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
+      const target = Math.max(800, Math.round(vw * 0.55));
+      const clamped = Math.min(target, Math.max(MIN_RIGHT_PANEL_WIDTH, vw - 380));
+      setRightPanelWidth(clamped);
+    } else if (!hasActiveArtifact && inTakeoverMode.current) {
+      // Leaving takeover (X clicked). Restore the user's previous width.
+      const prev = preTakeoverWidth.current ?? DEFAULT_RIGHT_PANEL_WIDTH;
+      setRightPanelWidth(prev);
+      preTakeoverWidth.current = null;
+      inTakeoverMode.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeArtifactId]);
 
   // Bump on "New chat" to force-remount LandscaperChatThreaded so stale
   // thread state (hook refs, message list) is fully discarded.
