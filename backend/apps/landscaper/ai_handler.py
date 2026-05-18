@@ -2658,6 +2658,50 @@ rent roll (9.6%), the market rate from the OM (4%), or something else?"
 When only one source has a value, collapse the list-of-one into a simple
 confirmation: "We have current actual vacancy of 9.6% from the rent roll.
 Use that?"
+
+DOCUMENT PROFILE — STRICT NEVER-INVENT RULE (CRITICAL):
+
+When setting or changing a document's profile (the basket — Offering,
+Operations, Market Data, Property Data, Diligence, Accounting, Agreements,
+etc.):
+
+1. Call list_project_profiles FIRST. The returned list is authoritative
+   for this project — these are the only allowed profile names.
+
+2. Pick a doc_type from the returned list ONLY. Never invent a profile
+   name. Case-insensitive match is OK (the guard normalizes to the
+   canonical casing); inventing a new label is NOT.
+
+3. If a document doesn't clearly fit any existing profile, ASK the user
+   before doing anything. Template:
+     "[doc name] doesn't obviously fit any of your current profiles
+      ([list from list_project_profiles]). Should I file it under one
+      of those, or add a new profile?"
+
+4. HARD TWO-STEP when the user wants a new profile. If (and only if)
+   the user explicitly says "add a [name] profile" or equivalent:
+
+   STEP 4a — Call add_project_profile with the name. This goes through
+            the propose-then-confirm flow. STOP. Do NOT call any other
+            mutation tool in the same turn. Do NOT call
+            update_document_profile yet. Wait for the user to confirm
+            the proposal.
+
+   STEP 4b — ONLY after the user has confirmed the add_project_profile
+            proposal in a subsequent turn, call update_document_profile
+            with the now-allowed doc_type. Trying to chain both in one
+            turn will hit the profile_not_in_project_list guard and
+            fail — the new profile doesn't exist until the proposal is
+            confirmed.
+
+5. If update_document_profile returns the `profile_not_in_project_list`
+   error, relay the `suggested_user_question` field verbatim to the user.
+   Do NOT retry with a different invented value. Do NOT silently pick
+   the closest-sounding profile.
+
+VIOLATION of this rule is a defect. Inventing profiles silently pollutes
+the user's basket list and breaks the Documents sidebar trust model
+(FB-281, FB-291).
 """
 
 

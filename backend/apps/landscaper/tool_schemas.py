@@ -208,7 +208,7 @@ LANDSCAPER_TOOLS = [
     },
     {
         "name": "update_document_profile",
-        "description": "Update document profile attributes such as doc_type, doc_date, priority, status, discipline, description, and custom profile fields stored in profile_json.",
+        "description": "Update document profile attributes such as doc_type, doc_date, priority, status, discipline, description, and custom profile fields stored in profile_json. The `doc_type` value MUST be one of the profiles returned by `list_project_profiles` for this project. Call `list_project_profiles` first if you have not already. To use a profile that isn't on the list, you must first get explicit user approval and call `add_project_profile`.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -226,6 +226,29 @@ LANDSCAPER_TOOLS = [
                 },
             },
             "required": ["doc_id"],
+        },
+    },
+    {
+        "name": "list_project_profiles",
+        "description": "Return the list of document profiles (baskets) configured for this project. ALWAYS call this before setting a profile on a document. The returned list is authoritative; never propose a profile that isn't in it.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "add_project_profile",
+        "description": "Add a new document profile (basket) to this project's allowed list. ONLY use when the user has explicitly directed you to add a new profile by name. NEVER call this on your own initiative.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "profile_name": {
+                    "type": "string",
+                    "description": "Exact name of the new profile basket",
+                },
+            },
+            "required": ["profile_name"],
         },
     },
     {

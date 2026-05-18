@@ -2371,6 +2371,33 @@ def handle_update_document_profile(
     if not doc_id:
         return {'success': False, 'error': 'doc_id is required'}
 
+    # Profile-invention guard (LSCMD-DOCPROF-FIX-0518-Zq, FB-281/FB-291).
+    # doc_type must be one of the profiles configured for this project.
+    # New profiles take an explicit-consent path via add_project_profile.
+    proposed_doc_type = tool_input.get('doc_type')
+    if proposed_doc_type is not None:
+        from apps.knowledge.services.document_classifier import get_active_profiles_for_project
+        valid = get_active_profiles_for_project(project_id)
+        valid_lower = {v.lower(): v for v in valid}
+        if proposed_doc_type.lower() not in valid_lower:
+            return {
+                'success': False,
+                'error': 'profile_not_in_project_list',
+                'message': (
+                    f"'{proposed_doc_type}' is not a profile configured for this project. "
+                    f"Valid profiles: {', '.join(valid)}. "
+                    f"To add a new profile, ask the user explicitly first, then call add_project_profile."
+                ),
+                'valid_profiles': valid,
+                'suggested_user_question': (
+                    f"'{proposed_doc_type}' isn't a profile basket on this project. "
+                    f"Should I file it under one of the existing profiles "
+                    f"({', '.join(valid)}), or do you want me to add '{proposed_doc_type}' "
+                    f"as a new profile?"
+                ),
+            }
+        tool_input['doc_type'] = valid_lower[proposed_doc_type.lower()]
+
     # Allowed top-level fields on core_doc
     DOC_PROFILE_FIELDS = [
         'doc_type', 'doc_date', 'contract_value', 'priority',
@@ -19424,6 +19451,7 @@ from .tools import artifact_tools  # noqa: E402, F401
 from .tools import vocab_tools  # noqa: E402, F401
 from .tools import platform_knowledge_tools  # noqa: E402, F401
 from .tools import project_profile_tools  # noqa: E402, F401
+from .tools import document_profile_tools  # noqa: E402, F401
 from .tools import msa_tools  # noqa: E402, F401
 from .tools import navigation_tools  # noqa: E402, F401
 from .tools import report_artifact_tools  # noqa: E402, F401

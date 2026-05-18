@@ -352,6 +352,13 @@ MUTABLE_FIELDS = {
         "template_name", "workspace_id", "project_id", "doc_type",
         "is_default", "doc_type_options", "description",
     ],
+    # Per-project document profile (basket) list. Added 2026-05-18 for the
+    # FB-281/FB-291 profile-invention guard: add_project_profile proposes
+    # an insert here only when the user has explicitly approved a new
+    # profile name (see ai_handler.py BASE_INSTRUCTIONS).
+    "dms_project_doc_types": [
+        "doc_type_name",
+    ],
     # Removed 2026-05-16 (LSCMD-AUDIT-PASS-1B). The four tbl_cre_* whitelists
     # (tbl_cre_tenant, tbl_cre_space, tbl_cre_lease, tbl_cre_property) pointed
     # at tables that do not exist in the schema. Per migration
@@ -485,6 +492,7 @@ PK_COLUMNS = {
     "core_unit_cost_item": "item_id",
     "report_templates": "id",
     "dms_templates": "template_id",
+    "dms_project_doc_types": "id",
     # Removed 2026-05-16 (LSCMD-AUDIT-PASS-1B). tbl_cre_* tables don't exist;
     # commercial-property feature rebuilt on tbl_lease + extensions per
     # migration 20260506_net_lease_extension_and_cleanup. See MUTABLE_FIELDS
