@@ -39,10 +39,20 @@ class RentRollDetailGenerator(PreviewBaseGenerator):
             ORDER BY u.unit_type, u.unit_number
         """, [self.project_id])
 
+        # Subtitle: property name · city, state (when available). The renderer
+        # carries this in a shaded strip directly under the artifact header.
+        city = project.get('city') or ''
+        state = project.get('state') or ''
+        location = f"{city}, {state}".strip(', ') if city or state else ''
+        property_name = project.get('project_name', '')
+        subtitle = property_name
+        if location:
+            subtitle = f"{property_name} · {location}" if property_name else location
+
         if not units:
             return {
                 'title': 'Rent Roll (Detail)',
-                'subtitle': project.get('project_name', ''),
+                'subtitle': subtitle,
                 'message': 'No units found. Add units in the Property tab.',
                 'sections': [],
             }
@@ -73,8 +83,8 @@ class RentRollDetailGenerator(PreviewBaseGenerator):
             {'key': 'square_feet', 'label': 'SF', 'align': 'right', 'format': 'number'},
             {'key': 'tenant_name', 'label': 'Tenant Name', 'align': 'left'},
             {'key': 'status', 'label': 'Status', 'align': 'left'},
-            {'key': 'lease_start', 'label': 'Lease Start', 'align': 'center', 'format': 'date'},
-            {'key': 'lease_end', 'label': 'Lease End', 'align': 'center', 'format': 'date'},
+            {'key': 'lease_start', 'label': 'Lease Start', 'align': 'right', 'format': 'date'},
+            {'key': 'lease_end', 'label': 'Lease End', 'align': 'right', 'format': 'date'},
             {'key': 'current_rent', 'label': 'Monthly Rent', 'align': 'right', 'format': 'currency'},
             {'key': 'rent_per_sf', 'label': 'Rent $/SF', 'align': 'right', 'format': 'number'},
             {'key': 'market_rent', 'label': 'Market Rent', 'align': 'right', 'format': 'currency'},

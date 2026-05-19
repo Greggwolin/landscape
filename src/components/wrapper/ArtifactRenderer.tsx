@@ -712,6 +712,28 @@ const _NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
   useGrouping: true,
 });
 
+// ISO date detection — matches YYYY-MM-DD with optional time portion. Used
+// by formatCellValue to render date strings as Mmm-YY (e.g. "2017-02-01"
+// → "Feb-17") with right-justified alignment in the table renderer.
+const _ISO_DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/;
+const _MONTH_ABBREV = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+export function isDateLikeString(value: unknown): boolean {
+  return typeof value === 'string' && _ISO_DATE_REGEX.test(value.trim());
+}
+
+function _formatIsoDateAsMmmYy(s: string): string | null {
+  const m = s.trim().match(_ISO_DATE_REGEX);
+  if (!m) return null;
+  const monthIdx = Number(m[2]) - 1;
+  if (monthIdx < 0 || monthIdx > 11) return null;
+  const yy = m[1].slice(2);
+  return `${_MONTH_ABBREV[monthIdx]}-${yy}`;
+}
+
 /** Coerce a cell value to its display string per the tabular formatting standard. */
 export function formatCellValue(value: string | number | null | undefined): string {
   if (value == null) return '—';
@@ -720,8 +742,11 @@ export function formatCellValue(value: string | number | null | undefined): stri
     if (value < 0) return `(${_NUMBER_FORMATTER.format(Math.abs(value))})`;
     return _NUMBER_FORMATTER.format(value);
   }
-  // String — try to detect numeric content
+  // String — first try ISO date (YYYY-MM-DD) → Mmm-YY. Done before numeric
+  // detection so a date string never gets misread as a number.
   const s = String(value).trim();
+  const dateFormatted = _formatIsoDateAsMmmYy(s);
+  if (dateFormatted) return dateFormatted;
   if (s === '' || s === '0' || s === '0.00') return '—';
   // Strip $, commas, surrounding parens for negative detection
   const isParenNeg = /^\(.+\)$/.test(s);
