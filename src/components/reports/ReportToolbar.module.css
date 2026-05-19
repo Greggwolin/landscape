@@ -1,0 +1,368 @@
+/*
+ * ReportToolbar styles — CoreUI tokens only.
+ * No hardcoded hex, no Tailwind dark: variants per project instructions §7.
+ * RP-CFRPT-2605 Phase 3.
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ─── Trigger button (lives in the artifact header) ──────────────────── */
+
+.triggerBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--cui-body-color);
+  cursor: pointer;
+}
+
+.triggerBtn:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.triggerBtn[aria-expanded='true'] {
+  background: var(--cui-secondary-bg);
+  border-color: var(--cui-primary);
+}
+
+/* Small dot indicator: shown when a personal default is currently active */
+.dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cui-primary);
+  pointer-events: none;
+}
+
+/* ─── Popover ────────────────────────────────────────────────────────── */
+
+.popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  width: 320px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cui-tertiary-bg);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  color: var(--cui-body-color);
+  overflow: hidden;
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cui-border-color);
+  background: var(--cui-secondary-bg);
+  flex-shrink: 0;
+}
+
+.popoverTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cui-body-color);
+}
+
+/* ─── Section ────────────────────────────────────────────────────────── */
+
+.section {
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.sectionHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  color: var(--cui-body-color);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+}
+
+.sectionHeader:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.sectionBody {
+  padding: 4px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 240px;
+}
+
+/* ─── Column list ────────────────────────────────────────────────────── */
+
+.columnList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.columnRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 2px;
+}
+
+.columnRow:hover {
+  background: var(--cui-secondary-bg);
+}
+
+.columnCheckLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.columnReorder {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* ─── Sort row ───────────────────────────────────────────────────────── */
+
+.sortRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  height: 26px;
+  font-size: 12px;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 3px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  height: 26px;
+  font-size: 12px;
+  background: var(--cui-body-bg);
+  color: var(--cui-body-color);
+  border: 1px solid var(--cui-border-color);
+  border-radius: 3px;
+}
+
+/* ─── Presentation grid ──────────────────────────────────────────────── */
+
+.presentationGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.presentationField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.presentationField > span {
+  color: var(--cui-secondary-color);
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────── */
+
+.footer {
+  padding: 8px 10px;
+  background: var(--cui-secondary-bg);
+  border-top: 1px solid var(--cui-border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.footerSpacer {
+  flex: 1;
+}
+
+.savedAsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.errorBanner {
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--cui-danger);
+  background: var(--cui-danger-bg-subtle);
+  border: 1px solid var(--cui-danger-border-subtle);
+  border-radius: 3px;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────── */
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 3px;
+  color: var(--cui-body-color);
+  cursor: pointer;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--cui-tertiary-bg);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.iconBtnTiny {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--cui-border-color);
+  border-radius: 2px;
+  color: var(--cui-body-color);
+  cursor: pointer;
+}
+
+.iconBtnTiny:hover:not(:disabled) {
+  background: var(--cui-tertiary-bg);
+}
+
+.iconBtnTiny:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btnPrimary,
+.btnSecondary,
+.btnGhost,
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  height: 26px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.btnPrimary {
+  background: var(--cui-primary);
+  color: var(--cui-primary-text-emphasis, white);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+  border-color: var(--cui-border-color);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--cui-secondary-bg);
+}
+
+.btnSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--cui-secondary-color);
+  border-color: transparent;
+}
+
+.btnGhost:hover:not(:disabled) {
+  color: var(--cui-body-color);
+  background: var(--cui-tertiary-bg);
+}
+
+.btnGhost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  background: transparent;
+  color: var(--cui-danger);
+  border-color: var(--cui-danger);
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: var(--cui-danger-bg-subtle);
+}
+
+.btnDanger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

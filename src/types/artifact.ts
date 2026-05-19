@@ -174,6 +174,13 @@ export interface ArtifactRendererProps {
   onSaveAsNewVersion: (label?: string) => void;
   /** Hook into the parent's modal-open infra. Phase 3 wires real opens. */
   onOpenModal: (modalName: string) => void;
+  /**
+   * Optional ReactNode rendered inline in the artifact header, ahead of
+   * the existing icon buttons. Used by the report subtype to mount its
+   * structured toolbar without the generic renderer needing to know about
+   * report-specific concerns (RP-CFRPT-2605 Phase 3).
+   */
+  headerExtras?: React.ReactNode;
 }
 
 /* ─── JSON Patch (RFC-6902) ────────────────────────────────────────────── */

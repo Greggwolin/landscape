@@ -17,6 +17,7 @@ import {
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
+import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -378,6 +379,66 @@ export function ArtifactWorkspacePanel({
                 .location_brief_config
             }
             onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'render_report_as_artifact' ? (
+          // RP-CFRPT-2605 Phase 3: report artifacts run through a wrapper
+          // that owns the toolbar's draft spec + applies it to the schema
+          // client-side, so column toggles preview live before Update.
+          <ReportArtifactView
+            artifact={active}
+            loading={
+              patchMutation.isPending
+              || restoreMutation.isPending
+              || updateStateMutation.isPending
+              || commitFieldEditMutation.isPending
+            }
+            onClose={() => setActiveArtifactId(null)}
+            onUpdate={(patch: JsonPatchOp[]) => {
+              if (!patch || patch.length === 0) return;
+              updateStateMutation.mutate({
+                artifactId: active.artifact_id,
+                input: { schema_diff: patch, edit_source: 'user_edit' },
+              });
+            }}
+            onCommitFieldEdit={async (pairPath, newValue) => {
+              const result = await commitFieldEditMutation.mutateAsync({
+                artifactId: active.artifact_id,
+                input: { pair_path: pairPath, new_value: newValue },
+              });
+              return {
+                success: Boolean(result?.success),
+                error: result?.error,
+                detail: result?.detail,
+                suggested_user_question: result?.suggested_user_question,
+              };
+            }}
+            onPin={(label: string) =>
+              patchMutation.mutate({
+                artifactId: active.artifact_id,
+                patch: { pinned_label: label },
+              })
+            }
+            onUnpin={() =>
+              patchMutation.mutate({
+                artifactId: active.artifact_id,
+                patch: { pinned_label: null },
+              })
+            }
+            onSaveAsNewVersion={(label) => {
+              if (label) {
+                patchMutation.mutate({
+                  artifactId: active.artifact_id,
+                  patch: { pinned_label: label },
+                });
+              }
+            }}
+            onOpenModal={(modalName: string) => {
+              if (modalRegistry) {
+                modalRegistry.openModal(modalName, {
+                  source_artifact_id: active.artifact_id,
+                });
+              }
+            }}
           />
         ) : (
           <ArtifactRenderer
