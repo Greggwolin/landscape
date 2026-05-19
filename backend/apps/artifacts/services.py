@@ -20,6 +20,11 @@ from .operating_statement_guard import (
     is_operating_statement_artifact,
     validate_operating_statement_artifact,
 )
+from .registered_report_guard import (
+    RegisteredReportGuardError,
+    is_registered_report_artifact,
+    validate_registered_report_artifact,
+)
 from .schema_validation import (
     SchemaValidationError,
     apply_json_patch,
@@ -174,6 +179,37 @@ def create_artifact_record(
             return {
                 'success': False,
                 'error': f'operating statement guard rejected: {exc}',
+                **exc.to_envelope_extras(),
+            }
+    elif tool_name == 'create_artifact' and is_registered_report_artifact(title, schema):
+        # Order-based short-circuit: op-statement guard runs first (it owns
+        # T-12 / P&L / proforma titles via subtype enforcement). The
+        # registered-report bypass guard fires only for the OTHER 21
+        # registered reports — rent roll, unit mix, cash flow, debt
+        # summary, parcel table, etc. On match, reject with a structured
+        # envelope carrying suggested_tool_call so the model's
+        # retry-on-error path re-fires through render_report_as_artifact.
+        #
+        # The tool_name == 'create_artifact' gate is critical: the bridge
+        # tool itself (render_report_as_artifact) calls this same
+        # create_artifact_record function to persist the artifact it builds
+        # — with a title like "Rent Roll" that matches the guard's keyword
+        # rules. Without the gate, the bridge would reject its own output
+        # and the model would loop. Only freeform `create_artifact` calls
+        # from the model are subject to this guard.
+        try:
+            validate_registered_report_artifact(
+                title=title,
+                schema=schema,
+                project_id=project_id,
+            )
+        except RegisteredReportGuardError as exc:
+            # Note: NO 'error' field here (and the action/next_tool_call
+            # fields lead the envelope) so the model doesn't pattern-match
+            # to schema-error retry behavior. See guard's
+            # to_envelope_extras for the action-first shape.
+            return {
+                'success': False,
                 **exc.to_envelope_extras(),
             }
 
