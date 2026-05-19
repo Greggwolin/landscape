@@ -1110,12 +1110,52 @@
 
 .w-rail-card.is-artifact-active,
 .w-rail-card.is-artifact-active * {
+  /* Text color tokens — dark-on-light. */
   --cui-body-color: #1a1a1a;
   --cui-body-color-rgb: 26, 26, 26;
+  --cui-emphasis-color: #0a0a0a;
+  --cui-secondary-color: #4b4b48;
+  --cui-tertiary-color: #6b6b68;
+
+  /* Background tokens — CoreUI variants used by ArtifactRenderer for
+     section headers, table strips, kv-grid surfaces. */
+  --cui-body-bg: #ffffff;
   --cui-secondary-bg: #f7f7f5;
   --cui-tertiary-bg: #efefee;
+
+  /* Tinted bg-subtle variants used for tags/badges (new/info/warning).
+     Keep the tint visible against the white surface. */
+  --cui-primary-bg-subtle: #eef4ff;
+  --cui-info-bg-subtle: #eef6fa;
+  --cui-warning-bg-subtle: #fdf4e3;
+  --cui-success-bg-subtle: #ecf6ed;
+  --cui-danger-bg-subtle: #fbeceb;
+
+  /* Border tokens. */
   --cui-border-color: #e5e5e2;
   --cui-border-color-translucent: rgba(0, 0, 0, 0.08);
+
+  /* Wolin (workspace) custom tokens used by ArtifactRenderer.module.css
+     and per-renderer surfaces. These are NOT CoreUI variables but the
+     renderer's .root element pulls --w-bg-sidebar directly, so an
+     override at this scope is required to flip the renderer surface
+     light. */
+  --w-bg-sidebar: #ffffff;
+  --w-panel-bg: #ffffff;
+  --w-card-bg: #ffffff;
+
+  /* Text + border Wolin tokens. In dark mode the project sets these to
+     near-white; against the light artifact surface that produces the
+     invisible-text bug Gregg reported. Force them dark-on-light for
+     anything inside the active artifact card. */
+  --w-text-primary: rgba(37, 43, 54, 0.95);
+  --w-text-secondary: rgba(37, 43, 54, 0.68);
+  --w-text-tertiary: rgba(37, 43, 54, 0.38);
+  --w-text-muted: rgba(37, 43, 54, 0.25);
+  --w-border: #dbdfe6;
+  --w-border-hover: #aab3c5;
+  --w-border-subtle: rgba(0, 0, 0, 0.06);
+  --w-border-subtle-dark: rgba(0, 0, 0, 0.06);
 }
 
 /* ─── Takeover mode (Claude.ai-style full-rail artifact) ───
