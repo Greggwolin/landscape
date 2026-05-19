@@ -649,3 +649,45 @@
   line-height: 1.55;
   color: var(--cui-body-color);
 }
+
+/* ─── Light-artifact polish (LSCMD-ARTIFACT-POLISH-0519) ───
+   These rules only fire when the renderer is mounted inside a
+   .is-artifact-active card (active artifact in the right rail). The
+   :global() escape is required because .is-artifact-active is defined
+   in src/styles/wrapper.css, not this module. */
+
+/* Column header: dark strip, white text. The user explicitly wants the
+   header BG to stay dark (matches the panel chrome above) — only the
+   text needs to flip to white so it's readable. */
+:global(.w-rail-card.is-artifact-active) .table thead th {
+  background: #1f2937;
+  color: #ffffff;
+  border-bottom: 0;
+}
+
+/* Subtitle row (property name · city, state). Shaded background to
+   distinguish it from body content. */
+:global(.w-rail-card.is-artifact-active) .headerSubtitle {
+  background: #f1f1ee;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e5e5e2;
+  font-size: 13px;
+  color: #4a4a48;
+}
+
+/* Section headers (Summary, Rent Roll Detail, etc.) — shaded background
+   so they read as a heading band. Preserves the existing left accent
+   bar by not touching border-left. */
+:global(.w-rail-card.is-artifact-active) .sectionHeader {
+  background: #f7f7f5;
+  padding: 6px 12px;
+  border-radius: 0;
+}
+
+/* Row dividers — faint line under each data row to separate units. */
+:global(.w-rail-card.is-artifact-active) .table tbody tr td {
+  border-bottom: 1px solid #f0f0ee;
+}
+:global(.w-rail-card.is-artifact-active) .table tbody tr:last-child td {
+  border-bottom: 0;
+}
