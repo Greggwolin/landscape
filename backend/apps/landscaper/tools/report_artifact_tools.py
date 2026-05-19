@@ -257,6 +257,13 @@ def render_report_as_artifact_tool(
     # the existing artifact in place instead of duplicating. Each project
     # gets one canonical slot per report type. LF-USERDASH-0514 follows the
     # same pattern get_project_profile uses (dedup_key='').
+    # Canonical report name from the generator (e.g. "Rent Roll" rather
+    # than the project-prefixed artifact title). The toolbar popover header
+    # reads params_json.report_name to display a clean human-readable name
+    # instead of the bare RPT_XX code. Falls back to the artifact title
+    # when the generator doesn't supply one.
+    report_name = getattr(generator, 'report_name', '') or fallback_title
+
     try:
         envelope = create_artifact_record(
             title=title,
@@ -268,6 +275,7 @@ def render_report_as_artifact_tool(
             params_json={
                 'report_code': report_code,
                 'project_id': pid,
+                'report_name': report_name,
             },
             dedup_key=report_code,
         )
