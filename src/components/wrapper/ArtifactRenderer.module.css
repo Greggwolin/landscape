@@ -656,6 +656,30 @@
    :global() escape is required because .is-artifact-active is defined
    in src/styles/wrapper.css, not this module. */
 
+/* Main artifact header — dark strip with white title. Matches the
+   column header treatment so the document title reads as a prominent
+   chrome band rather than blending into the body. */
+:global(.w-rail-card.is-artifact-active) .header {
+  background: #1f2937;
+  color: #ffffff;
+  border-bottom: 0;
+}
+
+:global(.w-rail-card.is-artifact-active) .header .headerTitleText,
+:global(.w-rail-card.is-artifact-active) .header .headerTitle {
+  color: #ffffff;
+}
+
+:global(.w-rail-card.is-artifact-active) .header .btn {
+  color: #ffffff;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+:global(.w-rail-card.is-artifact-active) .header .btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Column header: dark strip, white text. The user explicitly wants the
    header BG to stay dark (matches the panel chrome above) — only the
    text needs to flip to white so it's readable. */

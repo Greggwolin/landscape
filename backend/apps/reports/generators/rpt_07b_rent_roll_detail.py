@@ -86,7 +86,7 @@ class RentRollDetailGenerator(PreviewBaseGenerator):
             {'key': 'lease_start', 'label': 'Lease Start', 'align': 'right', 'format': 'date'},
             {'key': 'lease_end', 'label': 'Lease End', 'align': 'right', 'format': 'date'},
             {'key': 'current_rent', 'label': 'Monthly Rent', 'align': 'right', 'format': 'currency'},
-            {'key': 'rent_per_sf', 'label': 'Rent $/SF', 'align': 'right', 'format': 'number'},
+            {'key': 'rent_per_sf', 'label': 'Rent $/SF', 'align': 'right', 'format': 'currency2'},
             {'key': 'market_rent', 'label': 'Market Rent', 'align': 'right', 'format': 'currency'},
             {'key': 'loss_to_lease', 'label': 'Loss to Lease', 'align': 'right', 'format': 'currency'},
         ]

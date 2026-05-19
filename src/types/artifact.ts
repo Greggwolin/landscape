@@ -39,6 +39,13 @@ export interface TableColumn {
   key: string;
   label: string;
   align?: 'left' | 'right' | 'center';
+  /** Optional cell format hint emitted by report generators.
+   *    'currency'  → $1,234   (no decimals)
+   *    'currency2' → $1.23    (two decimals — rates, $/SF, ratios)
+   *    'number'    → 1,234    (plain integer)
+   *    'date'      → Mmm-YY   (ISO-string detection happens in formatCellValue)
+   */
+  format?: 'currency' | 'currency2' | 'number' | 'date';
 }
 
 export interface TableRow {

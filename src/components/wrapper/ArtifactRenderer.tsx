@@ -667,6 +667,7 @@ function TableBlockRenderer({
                         path={cellPath}
                         onUpdate={onUpdate}
                         formatNumeric={!isLabelCol}
+                        format={col.format}
                       />
                     </td>
                   );
@@ -712,6 +713,25 @@ const _NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
   useGrouping: true,
 });
 
+// Currency formatters — used by formatCellValue when the column metadata
+// supplies a `format` hint. Two variants:
+//   'currency'  → $1,234  (no decimals; rents, prices, totals)
+//   'currency2' → $1.23   (two decimals; $/SF, rates, ratios)
+// Both use the en-US negative convention: ($1,234) parens, matching the
+// rest of the tabular formatting standard.
+const _CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+  minimumFractionDigits: 0,
+});
+const _CURRENCY2_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+});
+
 // ISO date detection — matches YYYY-MM-DD with optional time portion. Used
 // by formatCellValue to render date strings as Mmm-YY (e.g. "2017-02-01"
 // → "Feb-17") with right-justified alignment in the table renderer.
@@ -734,14 +754,42 @@ function _formatIsoDateAsMmmYy(s: string): string | null {
   return `${_MONTH_ABBREV[monthIdx]}-${yy}`;
 }
 
-/** Coerce a cell value to its display string per the tabular formatting standard. */
-export function formatCellValue(value: string | number | null | undefined): string {
+/** Coerce a cell value to its display string per the tabular formatting standard.
+ *
+ * Optional `format` hint comes from the column metadata supplied by the
+ * report generator. When provided, currency variants prepend the $ symbol
+ * and use the correct decimal precision. Without a hint, falls back to
+ * the legacy plain-number formatting used by operating statements.
+ */
+export function formatCellValue(
+  value: string | number | null | undefined,
+  format?: 'currency' | 'currency2' | 'number' | 'date',
+): string {
   if (value == null) return '—';
+
+  // Pick the right Intl formatter for the requested format. The function
+  // returns the formatted string for a numeric input, or null when no
+  // explicit format was supplied (legacy path).
+  const _formatNumeric = (n: number): string | null => {
+    if (format === 'currency') {
+      if (n < 0) return `(${_CURRENCY_FORMATTER.format(Math.abs(n))})`;
+      return _CURRENCY_FORMATTER.format(n);
+    }
+    if (format === 'currency2') {
+      if (n < 0) return `(${_CURRENCY2_FORMATTER.format(Math.abs(n))})`;
+      return _CURRENCY2_FORMATTER.format(n);
+    }
+    return null;
+  };
+
   if (typeof value === 'number') {
     if (!Number.isFinite(value) || value === 0) return '—';
+    const formatted = _formatNumeric(value);
+    if (formatted !== null) return formatted;
     if (value < 0) return `(${_NUMBER_FORMATTER.format(Math.abs(value))})`;
     return _NUMBER_FORMATTER.format(value);
   }
+
   // String — first try ISO date (YYYY-MM-DD) → Mmm-YY. Done before numeric
   // detection so a date string never gets misread as a number.
   const s = String(value).trim();
@@ -754,6 +802,8 @@ export function formatCellValue(value: string | number | null | undefined): stri
   const n = Number(cleaned);
   if (Number.isFinite(n) && /^-?\d/.test(cleaned)) {
     if (n === 0) return '—';
+    const formatted = _formatNumeric(n);
+    if (formatted !== null) return formatted;
     if (n < 0 || isParenNeg) return `(${_NUMBER_FORMATTER.format(Math.abs(n))})`;
     return _NUMBER_FORMATTER.format(n);
   }
@@ -911,15 +961,19 @@ interface EditableCellProps {
   onUpdate: (patch: JsonPatchOp[]) => void;
   /** When true, value is rendered via formatCellValue (accounting style). */
   formatNumeric?: boolean;
+  /** Column-level format hint (currency, currency2, number, date) from
+   *  the schema column metadata. Passed through to formatCellValue so
+   *  currency cells include $ + correct decimal precision. */
+  format?: 'currency' | 'currency2' | 'number' | 'date';
 }
 
-function EditableCell({ value, editable, path, onUpdate, formatNumeric = true }: EditableCellProps) {
+function EditableCell({ value, editable, path, onUpdate, formatNumeric = true, format }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
 
   // Display path: format via tabular standard for non-editing state.
   const display = formatNumeric
-    ? formatCellValue(value)
+    ? formatCellValue(value, format)
     : (value == null ? '—' : value);
 
   if (!editable) {
