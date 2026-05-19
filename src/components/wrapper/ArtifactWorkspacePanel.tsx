@@ -359,8 +359,12 @@ export function ArtifactWorkspacePanel({
 
       {/* ── Active Artifact (always expanded, takes remaining space) ──
           .is-grow makes this card the one that fills remaining vertical
-          space; the others stack at content height. */}
-      <div className="w-rail-card is-grow">
+          space; the others stack at content height.
+          .is-artifact-active applies the Claude-style light palette to
+          the rendered artifact whenever one is selected — independent
+          of takeover mode. The empty state keeps the dark surface so it
+          blends with the surrounding rail chrome. */}
+      <div className={`w-rail-card is-grow${activeArtifactId != null ? ' is-artifact-active' : ''}`}>
         {activeArtifactId == null ? (
           <EmptyActiveState
             hasArtifacts={pinnedArtifacts.length + recentArtifacts.length > 0}
