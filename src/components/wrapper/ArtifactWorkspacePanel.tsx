@@ -81,6 +81,12 @@ interface ArtifactWorkspacePanelProps {
    *  the home rail. Defaults to the existing behavior (only true when
    *  projectId itself is null). LF-USERDASH-0514. */
   includeUnassigned?: boolean;
+  /** Claude-style full-rail takeover. When true the per-section accordions
+   *  (Documents / Pinned / Recent / Source Pointers) are suppressed and only
+   *  the Active Artifact card renders, spanning the full rail. The artifact
+   *  also gets a forced light palette via the `artifact-takeover` class on
+   *  the panel body. RP-CFRPT-2605 Phase 3 follow-up. */
+  takeoverMode?: boolean;
 }
 
 /**
@@ -106,6 +112,7 @@ export function ArtifactWorkspacePanel({
   projectId,
   documentsLabel = 'Project Documents',
   includeUnassigned,
+  takeoverMode = false,
 }: ArtifactWorkspacePanelProps) {
   const router = useRouter();
   const { activeArtifactId, setActiveArtifactId, toggleArtifacts, setProjectRightPanelView } = useWrapperUI();
@@ -258,7 +265,7 @@ export function ArtifactWorkspacePanel({
 
   return (
     <div
-      className="artifacts-panel-body"
+      className={`artifacts-panel-body${takeoverMode ? ' artifact-takeover' : ''}`}
       style={{ color: 'var(--cui-body-color)' }}
     >
       {/* ── Project Documents ── (project-scoped only; hidden on unassigned
@@ -266,8 +273,9 @@ export function ArtifactWorkspacePanel({
           files are the first thing visible — Pinned + Recent are derivative
           views over those files.
           On the home (user) project, callers pass documentsLabel="Documents"
-          since there's no project association to qualify. LF-USERDASH-0514. */}
-      {projectId != null && (
+          since there's no project association to qualify. LF-USERDASH-0514.
+          Suppressed in takeover mode — the active artifact owns the full rail. */}
+      {!takeoverMode && projectId != null && (
         <div className="w-rail-card">
           <CollapsibleSection
             title={documentsLabel}
@@ -293,57 +301,61 @@ export function ArtifactWorkspacePanel({
         </div>
       )}
 
-      {/* ── Pinned Artifacts ── */}
-      <div className="w-rail-card">
-        <CollapsibleSection
-          title="Pinned Artifacts"
-          icon={<Pin size={15} />}
-          count={pinnedArtifacts.length}
-          collapsed={pinnedCollapsed}
-          onToggle={() => setPinnedCollapsed((v) => !v)}
-        >
-          {pinnedArtifacts.length === 0 ? (
-            <EmptyRow text="No pinned artifacts." />
-          ) : (
-            pinnedArtifacts.map((a) => (
-              <ArtifactListRow
-                key={a.artifact_id}
-                artifact={a}
-                isActive={a.artifact_id === activeArtifactId}
-                onClick={() => setActiveArtifactId(a.artifact_id)}
-                onRename={handleRenameArtifact}
-                onDelete={handleDeleteArtifact}
-              />
-            ))
-          )}
-        </CollapsibleSection>
-      </div>
+      {/* ── Pinned Artifacts ── (suppressed in takeover mode). */}
+      {!takeoverMode && (
+        <div className="w-rail-card">
+          <CollapsibleSection
+            title="Pinned Artifacts"
+            icon={<Pin size={15} />}
+            count={pinnedArtifacts.length}
+            collapsed={pinnedCollapsed}
+            onToggle={() => setPinnedCollapsed((v) => !v)}
+          >
+            {pinnedArtifacts.length === 0 ? (
+              <EmptyRow text="No pinned artifacts." />
+            ) : (
+              pinnedArtifacts.map((a) => (
+                <ArtifactListRow
+                  key={a.artifact_id}
+                  artifact={a}
+                  isActive={a.artifact_id === activeArtifactId}
+                  onClick={() => setActiveArtifactId(a.artifact_id)}
+                  onRename={handleRenameArtifact}
+                  onDelete={handleDeleteArtifact}
+                />
+              ))
+            )}
+          </CollapsibleSection>
+        </div>
+      )}
 
-      {/* ── Recent Artifacts ── */}
-      <div className="w-rail-card">
-        <CollapsibleSection
-          title="Recent Artifacts"
-          icon={<Clock size={15} />}
-          count={recentArtifacts.length}
-          collapsed={recentCollapsed}
-          onToggle={() => setRecentCollapsed((v) => !v)}
-        >
-          {recentArtifacts.length === 0 ? (
-            <EmptyRow text="No recent artifacts." />
-          ) : (
-            recentArtifacts.map((a) => (
-              <ArtifactListRow
-                key={a.artifact_id}
-                artifact={a}
-                isActive={a.artifact_id === activeArtifactId}
-                onClick={() => setActiveArtifactId(a.artifact_id)}
-                onRename={handleRenameArtifact}
-                onDelete={handleDeleteArtifact}
-              />
-            ))
-          )}
-        </CollapsibleSection>
-      </div>
+      {/* ── Recent Artifacts ── (suppressed in takeover mode). */}
+      {!takeoverMode && (
+        <div className="w-rail-card">
+          <CollapsibleSection
+            title="Recent Artifacts"
+            icon={<Clock size={15} />}
+            count={recentArtifacts.length}
+            collapsed={recentCollapsed}
+            onToggle={() => setRecentCollapsed((v) => !v)}
+          >
+            {recentArtifacts.length === 0 ? (
+              <EmptyRow text="No recent artifacts." />
+            ) : (
+              recentArtifacts.map((a) => (
+                <ArtifactListRow
+                  key={a.artifact_id}
+                  artifact={a}
+                  isActive={a.artifact_id === activeArtifactId}
+                  onClick={() => setActiveArtifactId(a.artifact_id)}
+                  onRename={handleRenameArtifact}
+                  onDelete={handleDeleteArtifact}
+                />
+              ))
+            )}
+          </CollapsibleSection>
+        </div>
+      )}
 
       {/* ── Active Artifact (always expanded, takes remaining space) ──
           .is-grow makes this card the one that fills remaining vertical
@@ -535,23 +547,25 @@ export function ArtifactWorkspacePanel({
         )}
       </div>
 
-      {/* ── Source Pointers ── */}
-      <div className="w-rail-card">
-        <CollapsibleSection
-          title="Source Pointers"
-          icon={<Database size={15} />}
-          count={countSourcePointers(active?.source_pointers_json)}
-          collapsed={pointersCollapsed}
-          onToggle={() => setPointersCollapsed((v) => !v)}
-          compact
-        >
-          {!active ? (
-            <EmptyRow text="Select an artifact to see its source pointers." />
-          ) : (
-            renderSourcePointers(active.source_pointers_json)
-          )}
-        </CollapsibleSection>
-      </div>
+      {/* ── Source Pointers ── (suppressed in takeover mode). */}
+      {!takeoverMode && (
+        <div className="w-rail-card">
+          <CollapsibleSection
+            title="Source Pointers"
+            icon={<Database size={15} />}
+            count={countSourcePointers(active?.source_pointers_json)}
+            collapsed={pointersCollapsed}
+            onToggle={() => setPointersCollapsed((v) => !v)}
+            compact
+          >
+            {!active ? (
+              <EmptyRow text="Select an artifact to see its source pointers." />
+            ) : (
+              renderSourcePointers(active.source_pointers_json)
+            )}
+          </CollapsibleSection>
+        </div>
+      )}
 
       {/* Phase 3 hint — restore tool unused in this pass; surfaces in Phase 4 */}
       <div style={{ display: 'none' }} aria-hidden>

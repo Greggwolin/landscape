@@ -79,23 +79,41 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   // Pre-takeover width snapshot. When an artifact opens (activeArtifactId
   // becomes truthy), the right panel expands to a "takeover" width — the
-  // Claude.ai-style behavior Gregg asked for: artifact takes the full
-  // right portion, chat shrinks to the left half. When the artifact
-  // closes (X click → activeArtifactId nulled), the panel restores to
-  // whatever width the user had it at before.
+  // Claude.ai-style behavior Gregg asked for: chat and artifact each take
+  // half of the remaining viewport (after the left sidebar). When the
+  // artifact closes (X click → activeArtifactId nulled), the panel
+  // restores to whatever width the user had it at before.
   const preTakeoverWidth = useRef<number | null>(null);
+  // Pre-takeover sidebar state snapshot. The takeover also collapses the
+  // left nav so chat and artifact get equal real estate. On close we
+  // restore the sidebar to whatever the user had it at before.
+  const preTakeoverSidebarCollapsed = useRef<boolean | null>(null);
+  const preTakeoverSidebarWidth = useRef<number | null>(null);
   // Snap-back is a tri-state. We can't just key on `activeArtifactId !==
   // null` because the user can manually drag the panel during takeover —
   // we need to know whether the CURRENT width came from a takeover (so
   // we restore on close) or a user drag (so we leave it alone).
   const inTakeoverMode = useRef(false);
 
+  // Compute the 50/50 takeover width. (viewport − sidebar width) / 2,
+  // clamped to MIN/MAX_RIGHT_PANEL_WIDTH. Exposed as a function so it can
+  // be re-run when the user manually expands the sidebar during takeover
+  // (handleResizeStart calls this to compress the artifact panel).
+  const computeTakeoverWidth = useCallback((sidebarPx: number) => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
+    const available = Math.max(vw - sidebarPx, MIN_RIGHT_PANEL_WIDTH * 2);
+    const half = Math.round(available / 2);
+    return Math.min(Math.max(half, MIN_RIGHT_PANEL_WIDTH), MAX_RIGHT_PANEL_WIDTH);
+  }, []);
+
   useEffect(() => {
     const hasActiveArtifact = activeArtifactId != null;
 
     if (hasActiveArtifact && !inTakeoverMode.current) {
-      // Entering takeover. Snapshot current width, expand the panel.
+      // Entering takeover. Snapshot current panel + sidebar state.
       preTakeoverWidth.current = rightPanelWidth;
+      preTakeoverSidebarCollapsed.current = collapsed;
+      preTakeoverSidebarWidth.current = sidebarWidth;
       inTakeoverMode.current = true;
 
       // Auto-open the rail if it was collapsed — opening an artifact
@@ -103,17 +121,27 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       // when already open.
       if (!artifactsOpen) toggleArtifacts();
 
-      // Compute takeover width: aim for ~55% of viewport, never less
-      // than 800px, never more than viewport-380 (reserve room for chat).
-      const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
-      const target = Math.max(800, Math.round(vw * 0.55));
-      const clamped = Math.min(target, Math.max(MIN_RIGHT_PANEL_WIDTH, vw - 380));
-      setRightPanelWidth(clamped);
+      // Auto-collapse the left sidebar so chat and artifact get the
+      // remaining viewport split 50/50 (Claude-style takeover). The
+      // user can manually expand the sidebar during takeover; that
+      // re-runs the width calc via handleResizeStart and compresses
+      // the artifact panel to make room.
+      setCollapsed(true);
+      setSidebarWidth(COLLAPSED_WIDTH);
+
+      setRightPanelWidth(computeTakeoverWidth(COLLAPSED_WIDTH));
     } else if (!hasActiveArtifact && inTakeoverMode.current) {
-      // Leaving takeover (X clicked). Restore the user's previous width.
+      // Leaving takeover (X clicked). Restore the user's previous panel
+      // width AND sidebar state.
       const prev = preTakeoverWidth.current ?? DEFAULT_RIGHT_PANEL_WIDTH;
       setRightPanelWidth(prev);
+      if (preTakeoverSidebarCollapsed.current === false) {
+        setCollapsed(false);
+        setSidebarWidth(preTakeoverSidebarWidth.current ?? DEFAULT_SIDEBAR_WIDTH);
+      }
       preTakeoverWidth.current = null;
+      preTakeoverSidebarCollapsed.current = null;
+      preTakeoverSidebarWidth.current = null;
       inTakeoverMode.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -282,10 +310,17 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
 
   const handleToggleCollapse = useCallback(() => {
     setCollapsed((v) => {
+      const next = !v;
+      const nextSidebar = v ? DEFAULT_SIDEBAR_WIDTH : COLLAPSED_WIDTH;
       if (v) setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
-      return !v;
+      // During takeover, recompute the artifact panel width so chat and
+      // artifact stay 50/50 of the remaining viewport.
+      if (inTakeoverMode.current) {
+        setRightPanelWidth(computeTakeoverWidth(nextSidebar));
+      }
+      return next;
     });
-  }, []);
+  }, [computeTakeoverWidth]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -299,12 +334,23 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
         const delta = ev.clientX - startX.current;
         const newWidth = startWidth.current + delta;
 
+        let nextSidebar: number;
         if (newWidth < COLLAPSE_THRESHOLD) {
           setCollapsed(true);
           setSidebarWidth(COLLAPSED_WIDTH);
+          nextSidebar = COLLAPSED_WIDTH;
         } else {
           setCollapsed(false);
-          setSidebarWidth(Math.min(Math.max(newWidth, MIN_SIDEBAR_WIDTH), MAX_SIDEBAR_WIDTH));
+          nextSidebar = Math.min(Math.max(newWidth, MIN_SIDEBAR_WIDTH), MAX_SIDEBAR_WIDTH);
+          setSidebarWidth(nextSidebar);
+        }
+
+        // During takeover, expanding the left sidebar compresses the
+        // artifact panel so chat keeps roughly its half and the artifact
+        // gives up the room. (viewport − sidebar) / 2 keeps the 50/50
+        // split honest as the sidebar grows.
+        if (inTakeoverMode.current) {
+          setRightPanelWidth(computeTakeoverWidth(nextSidebar));
         }
       };
 
@@ -317,7 +363,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       document.addEventListener('pointermove', handleMove);
       document.addEventListener('pointerup', handleUp);
     },
-    [sidebarWidth]
+    [sidebarWidth, computeTakeoverWidth]
   );
 
   const handleRightResizeStart = useCallback(
@@ -649,7 +695,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
                   active* slots so chat-card "Open" clicks consistently
                   route to the unified workspace panel. */}
               {activeArtifactId != null ? (
-                <ArtifactWorkspacePanel projectId={null} includeUnassigned />
+                <ArtifactWorkspacePanel projectId={null} includeUnassigned takeoverMode />
               ) : activeLocationBrief ? (
                 <LocationBriefArtifact
                   config={activeLocationBrief}

@@ -1096,6 +1096,41 @@
   flex: 1 1 auto;
 }
 
+/* ─── Takeover mode (Claude.ai-style full-rail artifact) ───
+   When an artifact takes over the rail, the per-section accordions
+   (Documents / Pinned / Recent / Source Pointers) are suppressed in
+   ArtifactWorkspacePanel — only the Active card renders. The body
+   gets the .artifact-takeover class which forces a light palette
+   so the artifact reads like a Claude.ai document instead of dark
+   chat chrome. RP-CFRPT-2605 Phase 3 follow-up. */
+.artifacts-panel-body.artifact-takeover {
+  background: #ffffff;
+  color: #1a1a1a;
+  padding: 0;
+  gap: 0;
+}
+
+.artifacts-panel-body.artifact-takeover .w-rail-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Force CoreUI body-color tokens to read as dark-on-light inside the
+   takeover surface so child renderers (ArtifactRenderer, ReportArtifactView,
+   LocationBriefArtifact) inherit the light palette without needing per-
+   component overrides. Scoped: only applies inside .artifact-takeover. */
+.artifacts-panel-body.artifact-takeover,
+.artifacts-panel-body.artifact-takeover * {
+  --cui-body-color: #1a1a1a;
+  --cui-body-color-rgb: 26, 26, 26;
+  --cui-secondary-bg: #f7f7f5;
+  --cui-tertiary-bg: #efefee;
+  --cui-border-color: #e5e5e2;
+  --cui-border-color-translucent: rgba(0, 0, 0, 0.08);
+}
+
 /* Collapsed strip — mirrors left sidebar collapsed behavior */
 .artifacts-collapsed {
   width: 48px;
