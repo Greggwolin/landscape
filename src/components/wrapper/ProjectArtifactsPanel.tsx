@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
 import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
@@ -12,6 +12,12 @@ import { ProjectDocumentsBody } from './ProjectDocumentsBody';
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
 const MAX_ARTIFACTS_WIDTH = 1600;
+
+// Left sidebar collapses to this width during artifact takeover. Mirrors
+// COLLAPSED_WIDTH in src/app/w/layout.tsx — when activeArtifactId becomes
+// truthy, layout.tsx auto-collapses the sidebar to 48px, so we use that
+// same number to compute the 50/50 split for chat + artifact.
+const SIDEBAR_COLLAPSED_WIDTH = 48;
 
 interface ProjectArtifactsPanelProps {
   projectId: number;
@@ -42,6 +48,31 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
+
+  // Takeover mode — when activeArtifactId becomes truthy, expand the panel
+  // to share the remaining viewport with the chat (50/50 after the
+  // collapsed sidebar). On close (X clicked → activeArtifactId nulled),
+  // restore the pre-takeover width. layout.tsx handles the sidebar
+  // collapse + restore in parallel. RP-CFRPT-2605 Phase 3 follow-up.
+  const preTakeoverWidth = useRef<number | null>(null);
+  const inTakeoverMode = useRef(false);
+  const takeoverMode = activeArtifactId != null;
+
+  useEffect(() => {
+    if (takeoverMode && !inTakeoverMode.current) {
+      preTakeoverWidth.current = panelWidth;
+      inTakeoverMode.current = true;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1600;
+      const available = Math.max(vw - SIDEBAR_COLLAPSED_WIDTH, MIN_ARTIFACTS_WIDTH * 2);
+      const half = Math.round(available / 2);
+      setPanelWidth(Math.min(Math.max(half, MIN_ARTIFACTS_WIDTH), MAX_ARTIFACTS_WIDTH));
+    } else if (!takeoverMode && inTakeoverMode.current) {
+      setPanelWidth(preTakeoverWidth.current ?? DEFAULT_ARTIFACTS_WIDTH);
+      preTakeoverWidth.current = null;
+      inTakeoverMode.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [takeoverMode]);
 
   const handleResizeStart = useCallback(
     (e: React.PointerEvent) => {
@@ -168,7 +199,7 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
           <ProjectDocumentsBody />
         </div>
       ) : activeArtifactId != null ? (
-        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} />
+        <ArtifactWorkspacePanel projectId={projectId} documentsLabel={documentsLabel} includeUnassigned={includeUnassigned} takeoverMode />
       ) : activeLocationBrief ? (
         <LocationBriefArtifact
           config={activeLocationBrief}

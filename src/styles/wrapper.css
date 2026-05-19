@@ -1096,6 +1096,28 @@
   flex: 1 1 auto;
 }
 
+/* ─── Active artifact always renders in light mode ───
+   Whenever an artifact is selected (regardless of takeover state), the
+   active-artifact card carries .is-artifact-active and gets the Claude-
+   style light palette. Surrounding accordions (Documents / Pinned /
+   Recent / Source Pointers) stay dark in non-takeover mode so the rail
+   chrome remains consistent with the rest of the workspace.
+   RP-CFRPT-2605 Phase 3 follow-up. */
+.w-rail-card.is-artifact-active {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.w-rail-card.is-artifact-active,
+.w-rail-card.is-artifact-active * {
+  --cui-body-color: #1a1a1a;
+  --cui-body-color-rgb: 26, 26, 26;
+  --cui-secondary-bg: #f7f7f5;
+  --cui-tertiary-bg: #efefee;
+  --cui-border-color: #e5e5e2;
+  --cui-border-color-translucent: rgba(0, 0, 0, 0.08);
+}
+
 /* ─── Takeover mode (Claude.ai-style full-rail artifact) ───
    When an artifact takes over the rail, the per-section accordions
    (Documents / Pinned / Recent / Source Pointers) are suppressed in
