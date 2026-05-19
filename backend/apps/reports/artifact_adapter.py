@@ -24,6 +24,8 @@ SQL the same way PDF/Excel exports are.
 
 from __future__ import annotations
 
+import datetime
+from decimal import Decimal
 from typing import Any
 
 
@@ -32,6 +34,32 @@ from typing import Any
 def _id(prefix: str, counter: dict[str, int]) -> str:
     counter[prefix] = counter.get(prefix, 0) + 1
     return f"{prefix}_{counter[prefix]}"
+
+
+def _json_safe(value: Any) -> Any:
+    """Coerce a single cell value into a JSON-serializable form.
+
+    Per-report preview generators return raw Python types from SQL:
+    `datetime.date` / `datetime.datetime` from DATE columns,
+    `Decimal` from NUMERIC columns, etc. The artifact body is stored
+    as PostgreSQL jsonb and psycopg2's encoder doesn't handle these
+    by default, so the bridge fails at INSERT time. Normalize here
+    rather than relying on a model-level JSON encoder so we keep the
+    coercion scoped to the report-artifact path.
+    """
+    if value is None or isinstance(value, (str, bool, int, float)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, datetime.datetime):
+        return value.isoformat()
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    return str(value)
 
 
 def _kpi_section_to_block(section: dict, counter: dict[str, int]) -> dict | None:
@@ -86,15 +114,26 @@ def _table_section_to_block(section: dict, counter: dict[str, int]) -> dict | No
     if not columns:
         return None
 
-    rows = list(section.get('rows') or [])
+    # Wrap each preview row into the canonical artifact row shape
+    # `{id, cells: {<col_key>: <value>, ...}}`. The validator requires
+    # both fields (apps/artifacts/schema_validation.py) and the renderer
+    # reads `row.cells[col.key]` (ArtifactRenderer.tsx). Per-report
+    # generators emit flat rows keyed by domain fields
+    # (unit_number, comp_id, etc.); we lift those into `cells` and add
+    # a sequential, unique-within-block `id`.
+    rows: list[dict] = []
+    for i, raw in enumerate(section.get('rows') or []):
+        if not isinstance(raw, dict):
+            continue
+        rows.append({'id': f'row_{i}', 'cells': _json_safe(raw)})
 
     # Append totals row if present, labeled "Total" in the leading column.
     totals = section.get('totals')
     if isinstance(totals, dict) and totals:
         first_key = columns[0]['key']
-        totals_row = dict(totals)
-        totals_row[first_key] = 'Total'
-        rows.append(totals_row)
+        totals_cells = _json_safe(totals)
+        totals_cells[first_key] = 'Total'
+        rows.append({'id': 'row_total', 'cells': totals_cells})
 
     return {
         'id': _id('table', counter),
