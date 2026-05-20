@@ -672,12 +672,13 @@
 
 :global(.w-rail-card.is-artifact-active) .header .btn {
   color: #ffffff;
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 :global(.w-rail-card.is-artifact-active) .header .btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Column header: dark strip, white text. The user explicitly wants the

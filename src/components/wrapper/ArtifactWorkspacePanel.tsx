@@ -760,18 +760,22 @@ function ArtifactListRow({ artifact, isActive, onClick, onRename, onDelete }: Ar
           }}
           title={artifact.title}
         >
-          {artifact.pinned_label && (
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--cui-warning)',
-                marginRight: 4,
-              }}
-            >
-              [{artifact.pinned_label}]
-            </span>
+          {artifact.pinned_label ? (
+            <>
+              <span>{artifact.pinned_label}</span>
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontWeight: 400,
+                  color: 'var(--cui-secondary-color)',
+                }}
+              >
+                · {displayTitle}
+              </span>
+            </>
+          ) : (
+            displayTitle
           )}
-          {displayTitle}
         </div>
         <div
           style={{

@@ -103,14 +103,26 @@ def _table_section_to_block(section: dict, counter: dict[str, int]) -> dict | No
     if not preview_cols:
         return None
 
-    columns = [
-        {
+    # Preserve align + format hints from the preview columns — without them
+    # the renderer can't right-justify rent columns or apply currency / date
+    # formatting to cells. Stripping these in the adapter is what caused
+    # rent rolls to render as bare numbers without $ signs.
+    # (LSCMD-ADAPTER-FORMAT-PRESERVE-0520)
+    columns: list[dict] = []
+    for c in preview_cols:
+        if not (isinstance(c, dict) and c.get('key')):
+            continue
+        col: dict = {
             'key': str(c.get('key', '')),
             'label': str(c.get('label', '')),
         }
-        for c in preview_cols
-        if isinstance(c, dict) and c.get('key')
-    ]
+        align = c.get('align')
+        if align in ('left', 'right', 'center'):
+            col['align'] = align
+        fmt = c.get('format')
+        if fmt in ('currency', 'currency2', 'number', 'date'):
+            col['format'] = fmt
+        columns.append(col)
     if not columns:
         return None
 
