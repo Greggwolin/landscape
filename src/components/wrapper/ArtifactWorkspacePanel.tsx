@@ -428,12 +428,26 @@ export function ArtifactWorkspacePanel({
                 suggested_user_question: result?.suggested_user_question,
               };
             }}
-            onPin={(label: string) =>
+            onPin={(label: string, modificationSpec?: unknown) => {
+              // Report artifacts include the current toolbar draft spec
+              // (visible columns, sort) so reopening restores the same
+              // view. The backend ArtifactPatchSerializer accepts
+              // params_json — we merge into the existing object so the
+              // generator's report_code / report_name / project_id
+              // stamps are preserved. (LSCMD-PIN-SAVES-VIEW-0519)
+              const patch: Record<string, unknown> = { pinned_label: label };
+              if (modificationSpec) {
+                const existingParams = (active.params_json ?? {}) as Record<string, unknown>;
+                patch.params_json = {
+                  ...existingParams,
+                  modification_spec: modificationSpec,
+                };
+              }
               patchMutation.mutate({
                 artifactId: active.artifact_id,
-                patch: { pinned_label: label },
-              })
-            }
+                patch,
+              });
+            }}
             onUnpin={() =>
               patchMutation.mutate({
                 artifactId: active.artifact_id,

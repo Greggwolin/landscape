@@ -61,17 +61,24 @@ class ArtifactDetailSerializer(serializers.ModelSerializer):
 
 
 class ArtifactPatchSerializer(serializers.ModelSerializer):
-    """PATCH-only fields for the panel: pin/unpin, archive."""
+    """PATCH-only fields for the panel: pin/unpin, archive, view state.
+
+    ``params_json`` is intentionally PATCH-allowed so the pin path can
+    snapshot the user's current view state (visible columns, sort, etc.)
+    alongside the pinned_label write — the next open then restores the
+    same view. (LSCMD-PIN-SAVES-VIEW-0519)
+    """
 
     pinned_label = serializers.CharField(
         max_length=100, required=False, allow_null=True, allow_blank=False
     )
     is_archived = serializers.BooleanField(required=False)
     title = serializers.CharField(max_length=255, required=False)
+    params_json = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = Artifact
-        fields = ['pinned_label', 'is_archived', 'title']
+        fields = ['pinned_label', 'is_archived', 'title', 'params_json']
 
 
 class ArtifactVersionSerializer(serializers.ModelSerializer):
