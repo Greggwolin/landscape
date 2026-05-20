@@ -48,7 +48,13 @@ export interface ReportArtifactViewProps {
    */
   onPin: (label: string, modificationSpec?: ModificationSpec) => void;
   onUnpin: ArtifactRendererProps['onUnpin'];
-  onSaveAsNewVersion: ArtifactRendererProps['onSaveAsNewVersion'];
+  /**
+   * Save-version path mirrors onPin — also carries the current draft
+   * modification_spec so the user's view state persists whether they
+   * click the pin icon or the save (floppy) icon.
+   * (LSCMD-PIN-SAVES-VIEW-0519)
+   */
+  onSaveAsNewVersion: (label: string | undefined, modificationSpec?: ModificationSpec) => void;
   onOpenModal: ArtifactRendererProps['onOpenModal'];
 }
 
@@ -106,6 +112,12 @@ export function ReportArtifactView(props: ReportArtifactViewProps) {
       availableColumns={availableColumns}
       appliedSpec={appliedSpec}
       onDraftChange={setDraftSpec}
+      // Toolbar's Update button also patches the current artifact's
+      // params_json (in addition to the personal-default write) so the
+      // user's view sticks on THIS artifact, not just on future fresh
+      // renders of the report. Reuses the save-version patch path —
+      // no label, just the spec. (LSCMD-UPDATE-SAVES-VIEW-0519)
+      onArtifactPersist={(spec) => props.onSaveAsNewVersion(undefined, spec)}
     />
   ) : null;
 
@@ -117,6 +129,13 @@ export function ReportArtifactView(props: ReportArtifactViewProps) {
   // it in the same patch. (LSCMD-PIN-SAVES-VIEW-0519)
   const handlePin = (label: string) => {
     props.onPin(label, draftSpec);
+  };
+
+  // Save-version (floppy icon) gets the same treatment as pin — both are
+  // user-initiated "persist this view" actions, so both should snapshot
+  // the current draft spec into params_json.
+  const handleSaveAsNewVersion = (label: string | undefined) => {
+    props.onSaveAsNewVersion(label, draftSpec);
   };
 
   return (
@@ -137,7 +156,7 @@ export function ReportArtifactView(props: ReportArtifactViewProps) {
       onCommitFieldEdit={props.onCommitFieldEdit}
       onPin={handlePin}
       onUnpin={props.onUnpin}
-      onSaveAsNewVersion={props.onSaveAsNewVersion}
+      onSaveAsNewVersion={handleSaveAsNewVersion}
       onOpenModal={props.onOpenModal}
     />
   );

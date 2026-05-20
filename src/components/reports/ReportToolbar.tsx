@@ -76,6 +76,15 @@ export interface ReportToolbarProps {
    * Parent typically refetches its preview here.
    */
   onPersisted?: () => void;
+  /**
+   * Optional callback fired after the user clicks Update — receives the
+   * current draft spec so the parent can also patch the SPECIFIC artifact
+   * the toolbar is wired to (params_json.modification_spec). The personal-
+   * default write is unchanged; this is an additional write so the
+   * artifact's saved view doesn't drift from the user's intent.
+   * (LSCMD-UPDATE-SAVES-VIEW-0519)
+   */
+  onArtifactPersist?: (spec: ModificationSpec) => void;
 }
 
 /** Deep-clone a spec to a fresh object (JSON-safe shape). */
@@ -100,6 +109,7 @@ export function ReportToolbar({
   appliedSpec,
   onDraftChange,
   onPersisted,
+  onArtifactPersist,
 }: ReportToolbarProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ModificationSpec>(cloneSpec(appliedSpec));
@@ -211,6 +221,13 @@ export function ReportToolbar({
         reportCode,
         modificationSpec: draft,
       });
+      // Personal default write succeeded — also patch the current
+      // artifact's params_json so reopening THIS artifact (vs running a
+      // fresh render of the report) restores the same view. Without
+      // this, Update silently dropped the user's view state on the
+      // artifact they were actively viewing.
+      // (LSCMD-UPDATE-SAVES-VIEW-0519)
+      onArtifactPersist?.(draft);
       onPersisted?.();
     } catch (err) {
       setErrorMsg((err as Error).message);
