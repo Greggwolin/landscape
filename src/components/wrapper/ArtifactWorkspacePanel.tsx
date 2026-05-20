@@ -454,13 +454,26 @@ export function ArtifactWorkspacePanel({
                 patch: { pinned_label: null },
               })
             }
-            onSaveAsNewVersion={(label) => {
-              if (label) {
-                patchMutation.mutate({
-                  artifactId: active.artifact_id,
-                  patch: { pinned_label: label },
-                });
+            onSaveAsNewVersion={(label, modificationSpec?: unknown) => {
+              // Save-version mirrors pin: persist current view state into
+              // params_json so reopening restores the same columns / sort
+              // / order. Same merge semantics — preserve report_code /
+              // report_name / project_id stamps from the generator.
+              // (LSCMD-PIN-SAVES-VIEW-0519)
+              const patch: Record<string, unknown> = {};
+              if (label) patch.pinned_label = label;
+              if (modificationSpec) {
+                const existingParams = (active.params_json ?? {}) as Record<string, unknown>;
+                patch.params_json = {
+                  ...existingParams,
+                  modification_spec: modificationSpec,
+                };
               }
+              if (Object.keys(patch).length === 0) return;
+              patchMutation.mutate({
+                artifactId: active.artifact_id,
+                patch,
+              });
             }}
             onOpenModal={(modalName: string) => {
               if (modalRegistry) {
