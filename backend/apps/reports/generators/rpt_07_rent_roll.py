@@ -59,7 +59,7 @@ class RentRollPreviewGenerator(PreviewBaseGenerator):
             {'key': 'unit_number', 'label': 'Unit', 'align': 'left'},
             {'key': 'unit_type', 'label': 'Type', 'align': 'left'},
             {'key': 'square_feet', 'label': 'SF', 'align': 'right', 'format': 'number'},
-            {'key': 'status', 'label': 'Status', 'align': 'left'},
+            {'key': 'status', 'label': 'Status', 'align': 'center'},
             {'key': 'current_rent', 'label': 'Current Rent', 'align': 'right', 'format': 'currency'},
             {'key': 'market_rent', 'label': 'Market Rent', 'align': 'right', 'format': 'currency'},
             {'key': 'variance', 'label': 'Variance', 'align': 'right', 'format': 'currency'},

@@ -544,7 +544,7 @@ function TableBlockRenderer({
                   className={alignClass(col.align)}
                   // size: undefined per CLAUDE.md tabular formatting rules
                 >
-                  {col.label}
+                  {_renderTwoLineHeader(col.label)}
                 </th>
               ))}
             </tr>
@@ -967,9 +967,40 @@ interface EditableCellProps {
   format?: 'currency' | 'currency2' | 'number' | 'date';
 }
 
+// Status-pill detection — when a cell's value matches one of these
+// canonical lease-status strings, the renderer wraps the display in a
+// status-badge span so the active-artifact CSS can paint it as a pill.
+// Matched against the trimmed, lower-cased value so 'Occupied' /
+// 'occupied' / 'OCCUPIED' all collapse to the same class.
+// (LSCMD-RENT-ROLL-AZURE-STYLE-0520)
+const _STATUS_BADGE_CLASS: Record<string, string> = {
+  occupied: 'statusBadgeOccupied',
+  vacant: 'statusBadgeVacant',
+  notice: 'statusBadgeNotice',
+  'notice (move out)': 'statusBadgeNotice',
+  'notice to vacate': 'statusBadgeNotice',
+  pending: 'statusBadgePending',
+};
+
+function _statusBadgeClass(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const probe = value.trim().toLowerCase();
+  return _STATUS_BADGE_CLASS[probe] ?? null;
+}
+
 function EditableCell({ value, editable, path, onUpdate, formatNumeric = true, format }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
+
+  // Status-pill carve-out: bypass numeric formatting and wrap the value
+  // in a badge span. Status cells are never editable so we can short-
+  // circuit before the editable branches below.
+  const badgeClass = _statusBadgeClass(value);
+  if (badgeClass) {
+    return (
+      <span className={`statusBadge ${badgeClass}`}>{String(value).trim()}</span>
+    );
+  }
 
   // Display path: format via tabular standard for non-editing state.
   const display = formatNumeric
@@ -1478,6 +1509,48 @@ function alignClass(align?: 'left' | 'right' | 'center'): string {
   if (align === 'right') return styles.alignRight;
   if (align === 'center') return styles.alignCenter;
   return styles.alignLeft;
+}
+
+/**
+ * Render a column header label across two lines when it contains
+ * multiple words — keeps the column width driven by the data, not by
+ * a wide header. Single-token labels render as-is. Two-word labels
+ * split on the space. Three-or-more-word labels split at the midpoint
+ * so both lines are roughly balanced.
+ *
+ * Examples:
+ *   'Unit'          → 'Unit'
+ *   'Unit Type'     → 'Unit' / 'Type'
+ *   'Lease Start'   → 'Lease' / 'Start'
+ *   'Loss to Lease' → 'Loss to' / 'Lease'
+ *   'Rent $/SF'     → 'Rent' / '$/SF'
+ *   'Beds/Bath'     → 'Beds/Bath'  (no space — single token)
+ *
+ * (LSCMD-RENT-ROLL-AZURE-STYLE-0520)
+ */
+function _renderTwoLineHeader(label: string): React.ReactNode {
+  const trimmed = (label ?? '').trim();
+  const words = trimmed.split(/\s+/);
+  if (words.length < 2) return trimmed;
+  if (words.length === 2) {
+    return (
+      <>
+        {words[0]}
+        <br />
+        {words[1]}
+      </>
+    );
+  }
+  const half = Math.ceil(words.length / 2);
+  const first = words.slice(0, half).join(' ');
+  const second = words.slice(half).join(' ');
+  return (
+    <>
+      {first}
+      <br />
+      {second}
+    </>
+  );
 }
 
 function escapeJsonPointer(token: string): string {

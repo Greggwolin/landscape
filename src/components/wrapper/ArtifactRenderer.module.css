@@ -681,13 +681,56 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Column header: dark strip, white text. The user explicitly wants the
-   header BG to stay dark (matches the panel chrome above) — only the
-   text needs to flip to white so it's readable. */
+/* Column header — light strip, uppercase muted text. Matches the Azure
+   mockup Gregg referenced: clean light header band that sits between
+   the white card body and the data rows, no shouty contrast.
+   (LSCMD-RENT-ROLL-AZURE-STYLE-0520) */
 :global(.w-rail-card.is-artifact-active) .table thead th {
-  background: #1f2937;
-  color: #ffffff;
-  border-bottom: 0;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 16px;
+}
+
+/* Body cells — slightly bumped padding, normal body color, tabular
+   numerals so currency columns line up. */
+:global(.w-rail-card.is-artifact-active) .table tbody td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status pill — generic. Renderer detects status-y text (Occupied /
+   Vacant / Notice / Pending) and wraps the cell content in
+   <span class="statusBadge statusBadge<Type>">. */
+:global(.w-rail-card.is-artifact-active) .table :global(.statusBadge) {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+:global(.w-rail-card.is-artifact-active) .table :global(.statusBadgeOccupied) {
+  background: #d1fae5;
+  color: #047857;
+}
+:global(.w-rail-card.is-artifact-active) .table :global(.statusBadgeVacant) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+:global(.w-rail-card.is-artifact-active) .table :global(.statusBadgeNotice) {
+  background: #fef3c7;
+  color: #b45309;
+}
+:global(.w-rail-card.is-artifact-active) .table :global(.statusBadgePending) {
+  background: #e0e7ff;
+  color: #4338ca;
 }
 
 /* Subtitle row (property name · city, state). Shaded background to
