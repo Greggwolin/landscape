@@ -28,7 +28,7 @@ import {
   ChevronUp,
   RotateCcw,
   Save,
-  Sliders,
+  SlidersHorizontal,
   X,
 } from 'lucide-react';
 
@@ -286,7 +286,7 @@ export function ReportToolbar({
         aria-label="Customize report layout"
         aria-expanded={open}
       >
-        <Sliders size={12} />
+        <SlidersHorizontal size={14} />
         {hasPersonalDefault && <span className={styles.dot} aria-hidden />}
       </button>
 

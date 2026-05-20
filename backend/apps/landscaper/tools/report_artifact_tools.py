@@ -264,6 +264,34 @@ def render_report_as_artifact_tool(
     # when the generator doesn't supply one.
     report_name = getattr(generator, 'report_name', '') or fallback_title
 
+    # Optional modification_spec — when Landscaper passes one (e.g. for a
+    # natural-language "show me the rent roll but leave off market rent
+    # and loss to lease" request), stamp it into params_json so the
+    # renderer applies it on display. The chat-side ReportArtifactView
+    # owns the apply-spec-to-schema path (mirrors what the server does
+    # in apply_spec for the canonical render path). Spec shape mirrors
+    # ModificationSpec in src/hooks/useReportLibrary:
+    #   { columns: { visible: [...], order: [...], rename: {...} },
+    #     sort: [{ key, direction }], ... }
+    # (LSCMD-BRIDGE-ACCEPTS-SPEC-0520)
+    modification_spec = tool_input.get('modification_spec')
+    if modification_spec is not None and not isinstance(modification_spec, dict):
+        return {
+            'success': False,
+            'error': (
+                'modification_spec must be a JSON object when provided; '
+                f'got {type(modification_spec).__name__}.'
+            ),
+        }
+
+    params_payload: Dict[str, Any] = {
+        'report_code': report_code,
+        'project_id': pid,
+        'report_name': report_name,
+    }
+    if isinstance(modification_spec, dict) and modification_spec:
+        params_payload['modification_spec'] = modification_spec
+
     try:
         envelope = create_artifact_record(
             title=title,
@@ -272,11 +300,7 @@ def render_report_as_artifact_tool(
             thread_id=thread_id,
             user_id=user_id,
             tool_name='render_report_as_artifact',
-            params_json={
-                'report_code': report_code,
-                'project_id': pid,
-                'report_name': report_name,
-            },
+            params_json=params_payload,
             dedup_key=report_code,
         )
     except Exception as exc:

@@ -4443,6 +4443,34 @@ LANDSCAPER_TOOLS = [
                         "executor injects the current project's id)."
                     ),
                 },
+                "modification_spec": {
+                    "type": "object",
+                    "description": (
+                        "Optional view customization to apply to this render. "
+                        "Use when the user's natural-language request includes "
+                        "column visibility, sort, or ordering — e.g. 'show me "
+                        "the rent roll without the market rent or loss-to-lease "
+                        "columns' (set columns.visible to the keys you want "
+                        "kept), or 'sort by SF descending' (set sort). The "
+                        "server stamps this into the artifact's params_json so "
+                        "the right-panel renderer applies it; the user can "
+                        "still adjust further via the toolbar afterward.\n\n"
+                        "Shape:\n"
+                        "  {\n"
+                        "    columns: {\n"
+                        "      visible?: [<col_key>, ...],   // keep only these\n"
+                        "      order?:   [<col_key>, ...],   // reorder\n"
+                        "      rename?:  { <col_key>: <label> }\n"
+                        "    },\n"
+                        "    sort?: [{ key: <col_key>, direction: 'asc'|'desc' }]\n"
+                        "  }\n\n"
+                        "Column keys are the same keys the report's columns use "
+                        "(unit_number, market_rent, loss_to_lease, current_rent, "
+                        "rent_per_sf, etc. — see the report's table schema). "
+                        "Omit this argument entirely when the user just wants "
+                        "the default view."
+                    ),
+                },
             },
             "required": ["report_code"],
         },
