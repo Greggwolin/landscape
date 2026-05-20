@@ -82,7 +82,7 @@ class RentRollDetailGenerator(PreviewBaseGenerator):
             {'key': 'bed_bath', 'label': 'Beds/Bath', 'align': 'left'},
             {'key': 'square_feet', 'label': 'SF', 'align': 'right', 'format': 'number'},
             {'key': 'tenant_name', 'label': 'Tenant Name', 'align': 'left'},
-            {'key': 'status', 'label': 'Status', 'align': 'left'},
+            {'key': 'status', 'label': 'Status', 'align': 'center'},
             {'key': 'lease_start', 'label': 'Lease Start', 'align': 'right', 'format': 'date'},
             {'key': 'lease_end', 'label': 'Lease End', 'align': 'right', 'format': 'date'},
             {'key': 'current_rent', 'label': 'Monthly Rent', 'align': 'right', 'format': 'currency'},
