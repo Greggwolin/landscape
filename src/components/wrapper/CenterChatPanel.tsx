@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import CIcon from '@coreui/icons-react';
@@ -91,6 +92,7 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const qc = useQueryClient();
 
   // On /w/chat routes, chat IS the content — always visible regardless of chatOpen toggle.
   const isChatRoute = /^\/w\/chat(\/|$)/.test(pathname);
@@ -188,10 +190,14 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         typeof result.artifact_id === 'number'
       ) {
         setActiveArtifactId(result.artifact_id);
+        // Invalidate the Recent Artifacts rail so the new artifact appears
+        // without a hard refresh. Mirrors the pattern used in useArtifact.ts
+        // mutations (useArtifactPatch / useArtifactUpdateState).
+        qc.invalidateQueries({ queryKey: ['artifacts', 'list'] });
         if (!artifactsOpen) toggleArtifacts();
       }
     },
-    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext],
+    [setActiveMapArtifact, setActiveLocationBrief, mergeActiveExcelAudit, setActiveArtifactId, artifactsOpen, toggleArtifacts, setActiveContentContext, qc],
   );
 
   // threadId selected/created from the homepage (null = homepage mode)

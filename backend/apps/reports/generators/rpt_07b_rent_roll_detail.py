@@ -137,7 +137,7 @@ class RentRollDetailGenerator(PreviewBaseGenerator):
 
         return {
             'title': 'Rent Roll (Detail)',
-            'subtitle': project.get('project_name', ''),
+            'subtitle': subtitle,
             'sections': sections,
             '_occupancy': occupancy,
             '_occupied': occupied,
