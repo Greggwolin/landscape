@@ -38,7 +38,15 @@ export interface ReportArtifactViewProps {
   onClose: () => void;
   onUpdate: ArtifactRendererProps['onUpdate'];
   onCommitFieldEdit: ArtifactRendererProps['onCommitFieldEdit'];
-  onPin: ArtifactRendererProps['onPin'];
+  /**
+   * Pin a report artifact. The second arg is the current draft
+   * modification_spec (visible columns, sort, etc.) — when present the
+   * parent should persist it into params_json so reopening restores the
+   * same view. ReportArtifactView always passes its draftSpec, so callers
+   * can rely on this arg being defined for report artifacts.
+   * (LSCMD-PIN-SAVES-VIEW-0519)
+   */
+  onPin: (label: string, modificationSpec?: ModificationSpec) => void;
   onUnpin: ArtifactRendererProps['onUnpin'];
   onSaveAsNewVersion: ArtifactRendererProps['onSaveAsNewVersion'];
   onOpenModal: ArtifactRendererProps['onOpenModal'];
@@ -101,6 +109,16 @@ export function ReportArtifactView(props: ReportArtifactViewProps) {
     />
   ) : null;
 
+  // Wrap onPin so the user's CURRENT draft spec (visible columns, sort,
+  // etc.) gets persisted alongside the pin write. Without this, pinning
+  // saves only the label and the user's column toggles are lost when
+  // they reopen the artifact. ArtifactRenderer's pin button calls
+  // onPin(label) — we tack on draftSpec here so the parent can include
+  // it in the same patch. (LSCMD-PIN-SAVES-VIEW-0519)
+  const handlePin = (label: string) => {
+    props.onPin(label, draftSpec);
+  };
+
   return (
     <ArtifactRenderer
       artifactId={artifact.artifact_id}
@@ -117,7 +135,7 @@ export function ReportArtifactView(props: ReportArtifactViewProps) {
       onClose={props.onClose}
       onUpdate={props.onUpdate}
       onCommitFieldEdit={props.onCommitFieldEdit}
-      onPin={props.onPin}
+      onPin={handlePin}
       onUnpin={props.onUnpin}
       onSaveAsNewVersion={props.onSaveAsNewVersion}
       onOpenModal={props.onOpenModal}
