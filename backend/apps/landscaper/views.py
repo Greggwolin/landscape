@@ -1389,27 +1389,27 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         unassigned = self.request.query_params.get('unassigned', '').lower() == 'true'
 
         if all_user_threads:
-            # Tightened 2026-05-16 (LSCMD-AUTH-ROLLOUT Phase 4.5).
-            # Previously this branch returned every thread across the system
-            # because ChatThread has no created_by FK. After Phase 2 added an
-            # ownership gate on retrieve via get_object(), the loose list +
-            # strict retrieve combination broke the sidebar — users saw thread
-            # previews they couldn't actually open, producing "Thread not
-            # found" errors on click.
+            # Tightened 2026-05-19 (LSCMD-THREAD-VISIBILITY-FIX-0519).
+            # Previously unassigned threads (project_id IS NULL) were visible
+            # to every authenticated user — the column carried no ownership
+            # signal. With created_by now populated at thread-creation time,
+            # we scope unassigned threads to the calling user. Legacy rows
+            # with NULL created_by remain visible to their original owner
+            # (none — there is no original owner column), so they stay
+            # globally visible until the data is backfilled or archived.
             #
-            # Scope threads transitively via project ownership: a thread is
-            # visible if its project is visible. Staff/admin see all
-            # (mirrors filter_qs_by_owner_or_staff in apps.projects.permissions).
-            # Unassigned threads (project_id IS NULL) shown to every
-            # authenticated user — single-tenant alpha convention; will
-            # tighten when ChatThread gets created_by.
+            # Project-scoped threads still ride the transitive project-
+            # ownership rule (a thread is visible if its project is visible).
+            # Staff/admin see all (mirrors filter_qs_by_owner_or_staff in
+            # apps.projects.permissions).
             from django.db.models import Q as _Q
             user = self.request.user
             if not (user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin'):
                 queryset = queryset.filter(
                     _Q(project__created_by=user)
                     | _Q(project__created_by__isnull=True)
-                    | _Q(project_id__isnull=True)
+                    | _Q(project_id__isnull=True, created_by=user)
+                    | _Q(project_id__isnull=True, created_by__isnull=True)
                 )
         elif unassigned:
             queryset = queryset.filter(project_id__isnull=True)
@@ -1531,7 +1531,8 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
             thread = ThreadService.get_or_create_active_thread(
                 project_id=resolved_project_id,
                 page_context=page_context,
-                subtab_context=request.data.get('subtab_context')
+                subtab_context=request.data.get('subtab_context'),
+                user_id=getattr(request.user, 'id', None),
             )
 
             return Response({
@@ -1675,9 +1676,17 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         Universal Archive Pattern (Phase 1a): default excludes archived threads.
         Pass ``?archived=true`` for archived only, or ``?include_archived=true``
         for both.
+
+        Scoped to the calling user (LSCMD-THREAD-VISIBILITY-FIX-0519):
+        previously this endpoint returned every thread system-wide with no
+        ownership filter, leaking project/thread metadata across accounts.
+        Now mirrors the all_user_threads list filter — a thread is visible
+        if its project is owned by the user OR has no project owner, OR if
+        the thread itself is unassigned and owned by the user. Staff/admin
+        see all.
         """
         from .models import ChatThread
-        from django.db.models import Count
+        from django.db.models import Count, Q as _Q
 
         limit = int(request.query_params.get('limit', 50))
         include_closed = request.query_params.get('include_closed', 'false').lower() == 'true'
@@ -1687,6 +1696,15 @@ class ChatThreadViewSet(viewsets.ModelViewSet):
         queryset = ChatThread.objects.select_related('project').annotate(
             msg_count=Count('messages')
         ).order_by('-updated_at')
+
+        user = request.user
+        if not (user.is_staff or user.is_superuser or getattr(user, 'role', None) == 'admin'):
+            queryset = queryset.filter(
+                _Q(project__created_by=user)
+                | _Q(project__created_by__isnull=True)
+                | _Q(project_id__isnull=True, created_by=user)
+                | _Q(project_id__isnull=True, created_by__isnull=True)
+            )
 
         if not include_closed:
             queryset = queryset.filter(is_active=True)

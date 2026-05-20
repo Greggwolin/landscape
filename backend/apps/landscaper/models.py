@@ -117,6 +117,20 @@ class ChatThread(models.Model):
         blank=True,
         help_text='User who archived the thread (NULL when is_archived = FALSE).',
     )
+    # Ownership — set at creation time from request.user. Used by the
+    # sidebar/recent endpoints to scope unassigned threads to their owner
+    # so users do not see other accounts' unassigned conversations.
+    # Nullable for backfill compatibility with pre-existing rows that have
+    # no owner attribution. (LSCMD-THREAD-VISIBILITY-FIX-0519)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column='created_by',
+        related_name='chat_threads_created',
+        help_text='User who created the thread. NULL for pre-fix legacy rows.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     closed_at = models.DateTimeField(

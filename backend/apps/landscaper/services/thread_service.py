@@ -44,7 +44,8 @@ class ThreadService:
     def get_or_create_active_thread(
         project_id: Optional[int],
         page_context: Optional[str] = None,
-        subtab_context: Optional[str] = None
+        subtab_context: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> ChatThread:
         """
         Get the active thread for a project/page context, or create one if none exists.
@@ -54,12 +55,23 @@ class ThreadService:
         segmented by page_context, so the page_context filter is only applied
         when project_id is set.
 
+        ``user_id`` (required for new unassigned-thread creation post-2026-05-19)
+        stamps ownership on newly created rows. When a matching active thread
+        already exists, the lookup honors ``user_id`` for unassigned threads so
+        users don't reuse another account's unassigned thread.
+
         Uses SELECT ... FOR UPDATE to prevent race conditions where concurrent
         requests both see "no active thread" and both create new ones.
         """
         lookup = {'is_active': True}
         if project_id is None:
             lookup['project_id__isnull'] = True
+            # Scope unassigned thread reuse to the calling user — prevents
+            # one user latching onto another user's unassigned active thread.
+            # When user_id is missing (legacy callers), fall through with no
+            # owner filter, matching pre-fix behavior.
+            if user_id is not None:
+                lookup['created_by_id'] = user_id
         else:
             lookup['project_id'] = project_id
             if page_context:
@@ -78,7 +90,8 @@ class ThreadService:
             project_id=project_id,
             page_context=page_context,
             subtab_context=subtab_context,
-            is_active=True
+            is_active=True,
+            created_by_id=user_id,
         )
         owner = f"project {project_id}" if project_id is not None else 'unassigned'
         logger.info(f"Created new thread {thread.id} for {owner}, page {page_context or '-'}")
@@ -222,7 +235,8 @@ class ThreadService:
     def start_new_thread(
         project_id: Optional[int],
         page_context: Optional[str] = None,
-        subtab_context: Optional[str] = None
+        subtab_context: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> ChatThread:
         """
         Start a new thread, closing any existing active thread for the same context.
@@ -230,10 +244,16 @@ class ThreadService:
         When project_id is None (unassigned thread), the previous active
         unassigned thread is closed but NOT archived to ActivityItem —
         ActivityItem.project is non-nullable.
+
+        ``user_id`` stamps ownership on the new thread row and scopes the
+        "close existing active" lookup so we don't accidentally close a
+        different user's active unassigned thread. (LSCMD-THREAD-VISIBILITY-FIX-0519)
         """
         existing_lookup = {'is_active': True}
         if project_id is None:
             existing_lookup['project_id__isnull'] = True
+            if user_id is not None:
+                existing_lookup['created_by_id'] = user_id
         else:
             existing_lookup['project_id'] = project_id
             if page_context:
@@ -275,7 +295,8 @@ class ThreadService:
             project_id=project_id,
             page_context=page_context,
             subtab_context=subtab_context,
-            is_active=True
+            is_active=True,
+            created_by_id=user_id,
         )
         owner = f"project {project_id}" if project_id is not None else 'unassigned'
         logger.info(f"Started new thread {new_thread.id} for {owner}, page {page_context or '-'}")
