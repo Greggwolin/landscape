@@ -636,6 +636,30 @@
 }
 
 /*
+ * Subtitle variant — used by report adapters for the property-header
+ * line at the top of the artifact body. Title segment renders large
+ * and bold; meta segment (city/state, "As of" date) renders muted on
+ * a second line. Matches the Azure mockup header treatment.
+ * (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
+ */
+.textSubtitle {
+  margin: 4px 0 12px;
+}
+.textSubtitleTitle {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  line-height: 1.2;
+}
+.textSubtitleMeta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+/*
  * Callout: keeps its colored-stripe identity but with a heavier left
  * bar and a touch more vertical padding so it reads like a pull-quote
  * inside a polished document.
@@ -743,13 +767,50 @@
   color: #4a4a48;
 }
 
-/* Section headers (Summary, Rent Roll Detail, etc.) — shaded background
-   so they read as a heading band. Preserves the existing left accent
-   bar by not touching border-left. */
+/* KPI grid stat boxes — match the Azure mockup's horizontal stat row.
+   Uppercase muted label on top, bold big value below. Applies inside
+   the active-artifact card.
+   (LSCMD-REPORT-SUBTITLE-VARIANT-0520) */
+:global(.w-rail-card.is-artifact-active) .kvGrid {
+  gap: 16px 24px;
+}
+:global(.w-rail-card.is-artifact-active) .kvPair {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+:global(.w-rail-card.is-artifact-active) .kvLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+:global(.w-rail-card.is-artifact-active) .kvValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: left;
+}
+
+/* Section headers (Summary, Rent Roll Detail, etc.) — quieter, smaller,
+   uppercase muted treatment so they read as section dividers rather
+   than competing titles. Drops the blue left accent bar and the heavy
+   bottom border that made them feel like primary headings. Matches the
+   way the Azure mockup elides any "Summary" label entirely; we keep
+   the text but lighten it visually.
+   (LSCMD-REPORT-SUBTITLE-VARIANT-0520) */
 :global(.w-rail-card.is-artifact-active) .sectionHeader {
-  background: #f7f7f5;
-  padding: 6px 12px;
-  border-radius: 0;
+  background: transparent;
+  border-left: none;
+  border-bottom: none;
+  padding: 16px 0 4px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
 }
 
 /* Row dividers — faint line under each data row to separate units. */

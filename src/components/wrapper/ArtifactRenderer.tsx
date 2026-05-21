@@ -1266,6 +1266,23 @@ function KeyValuePairRenderer({ pair, driftState, path, onUpdate, onCommitFieldE
 
 function TextBlockRenderer({ block }: { block: TextBlock }) {
   const variant = block.variant || 'body';
+
+  // Subtitle variant: report adapters emit this for the property-header
+  // line. Render the first " · " segment as a large bold title and any
+  // remaining segments as a muted location/metadata row beneath. Matches
+  // the Azure mockup header pattern. (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
+  if (variant === 'subtitle') {
+    const parts = block.content.split(' · ').map((s) => s.trim()).filter(Boolean);
+    const title = parts[0] ?? block.content;
+    const rest = parts.slice(1).join(' · ');
+    return (
+      <div className={styles.textSubtitle}>
+        <div className={styles.textSubtitleTitle}>{title}</div>
+        {rest && <div className={styles.textSubtitleMeta}>{rest}</div>}
+      </div>
+    );
+  }
+
   const className =
     variant === 'caption' ? styles.textCaption :
     variant === 'callout' ? styles.textCallout :
