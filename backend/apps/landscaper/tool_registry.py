@@ -31,6 +31,8 @@ UNIVERSAL_TOOLS = [
     "get_document_assertions", "ingest_document", "get_document_media_summary",
     "get_extraction_results", "update_extraction_result",
     "get_extraction_corrections", "log_extraction_correction",
+    # Document profiles (FB-281/FB-291 guard — list authoritative, add is explicit-consent)
+    "list_project_profiles", "add_project_profile",
     # Knowledge / RAG
     "get_knowledge_entities", "get_knowledge_facts", "get_knowledge_insights",
     "acknowledge_insight", "query_platform_knowledge", "search_irem_benchmarks",
@@ -281,6 +283,8 @@ UNASSIGNED_SAFE_TOOLS = [
     # tenants/operators/master leases before creating a new project.
     "find_master_lease",
     "get_master_lease_detail",
+    # Document-profile read (read-only — falls back to default template if no project).
+    "list_project_profiles",
 ]
 
 

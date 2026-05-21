@@ -558,6 +558,33 @@ def get_valid_doc_types_for_project(project_id: int) -> List[str]:
         return ['Property Data', 'Diligence', 'Agreements', 'Correspondence', 'Other']
 
 
+def get_active_profiles_for_project(project_id: int) -> List[str]:
+    """
+    Return the live per-project document-profile (basket) list.
+
+    Reads landscape.dms_project_doc_types (the table the Documents sidebar
+    consumes and that add_project_profile writes to). Falls back to the
+    template-based list from get_valid_doc_types_for_project() only when
+    the live list is empty.
+
+    Why a separate helper: get_valid_doc_types_for_project() reads the SEED
+    template (landscape.dms_templates.doc_type_options) and is_template
+    drift-prone — user-added profiles in dms_project_doc_types are invisible
+    to it. The Landscaper profile-invention guard (FB-281/FB-291) needs the
+    authoritative live list, not the seed.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT doc_type_name FROM landscape.dms_project_doc_types
+            WHERE project_id = %s
+            ORDER BY display_order, doc_type_name
+        """, [project_id])
+        rows = [r[0] for r in cursor.fetchall()]
+        if rows:
+            return rows
+    return get_valid_doc_types_for_project(project_id)
+
+
 def map_to_valid_doc_type(internal_type: str, valid_types: List[str]) -> str:
     """
     Map an internal classification type to a valid template doc_type.
