@@ -78,10 +78,17 @@ def _kpi_section_to_block(section: dict, counter: dict[str, int]) -> dict | None
     ]
     if not pairs:
         return None
-    # 3-column grid by default — matches the Azure mockup's horizontal
-    # stat strip. 1 or 2 KPIs collapse naturally; 6 KPIs render as two
-    # rows of three. (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
-    cols = 1 if len(pairs) == 1 else (2 if len(pairs) == 2 else 3)
+    # Single-row stat strip when there are 6 or fewer KPIs — matches the
+    # Azure mockup's horizontal stat row treatment. 7+ KPIs wrap into two
+    # rows of <=4. Columns are minmax(0, 1fr) in the renderer so they
+    # shrink gracefully when the artifact panel is narrow.
+    # (LSCMD-REPORT-AZURE-STRIP-0521)
+    n = len(pairs)
+    if n <= 6:
+        cols = n
+    else:
+        # Wrap: aim for 4 per row, ceil division
+        cols = 4
     return {
         'id': _id('kpi', counter),
         'type': 'key_value_grid',

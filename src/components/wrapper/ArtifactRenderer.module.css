@@ -708,10 +708,19 @@
 /* Column header — light strip, uppercase muted text. Matches the Azure
    mockup Gregg referenced: clean light header band that sits between
    the white card body and the data rows, no shouty contrast.
-   (LSCMD-RENT-ROLL-AZURE-STYLE-0520) */
+   !important is required to override the global `thead { background-color
+   ... !important }` rule in src/app/globals.css that paints headers
+   across the rest of the app. We don't want to remove that global rule
+   (the rest of the app depends on it) but we do need the active-artifact
+   surface to break out of it. (LSCMD-RENT-ROLL-AZURE-STYLE-0520) */
+:global(.w-rail-card.is-artifact-active) .table thead,
+:global(.w-rail-card.is-artifact-active) .table thead tr,
 :global(.w-rail-card.is-artifact-active) .table thead th {
-  background: #f1f5f9;
-  color: #64748b;
+  background: #f1f5f9 !important;
+  background-color: #f1f5f9 !important;
+}
+:global(.w-rail-card.is-artifact-active) .table thead th {
+  color: #64748b !important;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;

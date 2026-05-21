@@ -36,6 +36,25 @@
   border-color: var(--cui-primary);
 }
 
+/* When the toolbar lives inside the active-artifact card (dark header
+   strip), the default body-color icon reads as dark-on-dark and is
+   nearly invisible. Override to white text + translucent white border
+   to match the other icon buttons in the dark header band.
+   (LSCMD-REPORT-AZURE-STRIP-0521) */
+:global(.w-rail-card.is-artifact-active) .triggerBtn {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+:global(.w-rail-card.is-artifact-active) .triggerBtn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+:global(.w-rail-card.is-artifact-active) .triggerBtn[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 /* Small dot indicator: shown when a personal default is currently active */
 .dot {
   position: absolute;
