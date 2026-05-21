@@ -39,6 +39,14 @@ export interface TableColumn {
   key: string;
   label: string;
   align?: 'left' | 'right' | 'center';
+  /**
+   * Optional header-cell alignment override (separate from body cell
+   * `align`). When unset, the thead cell uses `align`. Set when the
+   * user requests a different alignment for the header strip than for
+   * the data — e.g. "center all column headers" but keep numerics
+   * right-aligned in the body. (LSCMD-SPEC-EXTEND-0521)
+   */
+  header_align?: 'left' | 'right' | 'center';
   /** Optional cell format hint emitted by report generators.
    *    'currency'  → $1,234   (no decimals)
    *    'currency2' → $1.23    (two decimals — rates, $/SF, ratios)

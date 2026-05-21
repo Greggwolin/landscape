@@ -128,6 +128,14 @@ def validate_spec(spec: Any) -> Dict:
             visible = _require_list(cols['visible'], 'columns.visible')
             for i, k in enumerate(visible):
                 _require_str(k, f'columns.visible[{i}]')
+        # columns.hidden — denylist counterpart to columns.visible. Applied
+        # after visible filter; the union of "not in visible" and "in hidden"
+        # are dropped. Lets the user say "hide loss to lease and market rent"
+        # without enumerating every column to keep. (LSCMD-SPEC-EXTEND-0521)
+        if 'hidden' in cols:
+            hidden = _require_list(cols['hidden'], 'columns.hidden')
+            for i, k in enumerate(hidden):
+                _require_str(k, f'columns.hidden[{i}]')
         if 'order' in cols:
             order = _require_list(cols['order'], 'columns.order')
             for i, k in enumerate(order):
@@ -137,6 +145,28 @@ def validate_spec(spec: Any) -> Dict:
             for k, v in rename.items():
                 _require_str(k, f'columns.rename key')
                 _require_str(v, f'columns.rename[{k}]')
+        # columns.align — per-column alignment override (data cells).
+        # Maps column key → 'left' | 'right' | 'center'. Overrides the
+        # generator's default alignment. (LSCMD-SPEC-EXTEND-0521)
+        if 'align' in cols:
+            align = _require_dict(cols['align'], 'columns.align')
+            for k, v in align.items():
+                _require_str(k, 'columns.align key')
+                _require_str(v, f'columns.align[{k}]')
+                if v not in ('left', 'right', 'center'):
+                    raise SpecValidationError(
+                        f"columns.align[{k}] must be one of left|right|center"
+                    )
+        # columns.header_align — alignment applied to ALL column headers
+        # (thead cells), independent of body cell alignment. Use when the
+        # user asks for "center all column headers" without touching data.
+        # (LSCMD-SPEC-EXTEND-0521)
+        if 'header_align' in cols:
+            ha = _require_str(cols['header_align'], 'columns.header_align')
+            if ha not in ('left', 'right', 'center'):
+                raise SpecValidationError(
+                    "columns.header_align must be one of left|right|center"
+                )
 
     # grouping
     if 'grouping' in spec:
@@ -279,20 +309,32 @@ def _apply_sort(rows: List[Dict], sort: List[Dict]) -> List[Dict]:
 
 
 def _apply_column_filters_to_table_block(block: Dict, spec: Dict) -> Dict:
-    """Apply visible/order/rename to a table block in-place (on a copy)."""
+    """Apply visible/hidden/order/rename/align/header_align to a table block
+    in-place (on a copy).
+    """
     cols_cfg = spec.get('columns') or {}
     visible = cols_cfg.get('visible')
+    hidden = cols_cfg.get('hidden')
     order = cols_cfg.get('order')
     rename = cols_cfg.get('rename') or {}
+    align = cols_cfg.get('align') or {}
+    header_align = cols_cfg.get('header_align')
 
     columns = block.get('columns') or []
     if not columns:
         return block
 
-    # Filter to visible set if specified
+    # Filter to visible set if specified (allowlist)
     if visible:
         visible_set = set(visible)
         columns = [c for c in columns if c.get('key') in visible_set]
+
+    # Remove hidden columns (denylist) — applied after the visible filter
+    # so callers can use just hidden to drop a couple columns without
+    # enumerating the entire keep-list. (LSCMD-SPEC-EXTEND-0521)
+    if hidden:
+        hidden_set = set(hidden)
+        columns = [c for c in columns if c.get('key') not in hidden_set]
 
     # Reorder if specified (unknown keys keep their relative position at end)
     if order:
@@ -304,6 +346,22 @@ def _apply_column_filters_to_table_block(block: Dict, spec: Dict) -> Dict:
         for c in columns:
             if c.get('key') in rename:
                 c['label'] = rename[c['key']]
+
+    # Per-column alignment override — replaces the column's body-cell
+    # alignment for keys listed in align. (LSCMD-SPEC-EXTEND-0521)
+    if align:
+        for c in columns:
+            k = c.get('key')
+            if k in align:
+                c['align'] = align[k]
+
+    # All-headers alignment override — sets header_align on every column
+    # so the renderer's thead cells pick it up. Separate from body
+    # alignment (header can be centered while data stays right-aligned
+    # for numerics, for example). (LSCMD-SPEC-EXTEND-0521)
+    if header_align:
+        for c in columns:
+            c['header_align'] = header_align
 
     block['columns'] = columns
     return block
@@ -373,8 +431,14 @@ def summarize_spec(spec: Optional[Dict]) -> str:
     cols = spec.get('columns') or {}
     if cols.get('visible'):
         parts.append(f"shows {len(cols['visible'])} columns")
+    if cols.get('hidden'):
+        parts.append(f"hides {len(cols['hidden'])} columns")
     if cols.get('rename'):
         parts.append(f"renames {len(cols['rename'])} columns")
+    if cols.get('align'):
+        parts.append(f"realigns {len(cols['align'])} columns")
+    if cols.get('header_align'):
+        parts.append(f"{cols['header_align']}-aligned headers")
     if spec.get('sort'):
         keys = ', '.join(s['key'] for s in spec['sort'])
         parts.append(f"sorted by {keys}")

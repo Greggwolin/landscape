@@ -222,18 +222,34 @@ function walkBlocks(blocks: unknown[], spec: ModificationSpec): void {
 
 function applySpecToTableBlock(
   block: {
-    columns?: Array<{ key: string; label: string }>;
+    columns?: Array<{
+      key: string;
+      label: string;
+      align?: 'left' | 'right' | 'center';
+      header_align?: 'left' | 'right' | 'center';
+    }>;
     rows?: Array<Record<string, unknown>>;
   },
   spec: ModificationSpec,
 ): void {
   let columns = block.columns ?? [];
 
-  // Column visibility: drop columns the user hid.
+  // Column visibility (allowlist): keep only listed columns.
   const visible = spec.columns?.visible;
   if (visible && visible.length > 0) {
     const visibleSet = new Set(visible);
     columns = columns.filter((c) => visibleSet.has(c.key));
+  }
+
+  // Column hidden (denylist): drop just the listed columns. Applied AFTER
+  // visible so users can use just `hidden` to remove a couple columns
+  // without enumerating the entire keep-list. The bridge tool's STRICT
+  // RULES guide LS to prefer this over `visible` for hide requests.
+  // (LSCMD-SPEC-EXTEND-0521)
+  const hidden = spec.columns?.hidden;
+  if (hidden && hidden.length > 0) {
+    const hiddenSet = new Set(hidden);
+    columns = columns.filter((c) => !hiddenSet.has(c.key));
   }
 
   // Column order: reorder per the user's drag/up/down picks; unknown keys
@@ -254,6 +270,24 @@ function applySpecToTableBlock(
     columns = columns.map((c) =>
       rename[c.key] ? { ...c, label: rename[c.key] } : c,
     );
+  }
+
+  // Per-column body-cell alignment override — replaces col.align for keys
+  // listed in `align`. (LSCMD-SPEC-EXTEND-0521)
+  const align = spec.columns?.align;
+  if (align) {
+    columns = columns.map((c) =>
+      align[c.key] ? { ...c, align: align[c.key] } : c,
+    );
+  }
+
+  // All-headers alignment override — stamps header_align on every column
+  // so the renderer's thead cells pick it up. Independent of body
+  // alignment so numerics stay right-justified in data rows even when
+  // the header strip is centered. (LSCMD-SPEC-EXTEND-0521)
+  const headerAlign = spec.columns?.header_align;
+  if (headerAlign) {
+    columns = columns.map((c) => ({ ...c, header_align: headerAlign }));
   }
 
   block.columns = columns;
