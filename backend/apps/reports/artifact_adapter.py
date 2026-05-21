@@ -78,11 +78,15 @@ def _kpi_section_to_block(section: dict, counter: dict[str, int]) -> dict | None
     ]
     if not pairs:
         return None
+    # 3-column grid by default — matches the Azure mockup's horizontal
+    # stat strip. 1 or 2 KPIs collapse naturally; 6 KPIs render as two
+    # rows of three. (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
+    cols = 1 if len(pairs) == 1 else (2 if len(pairs) == 2 else 3)
     return {
         'id': _id('kpi', counter),
         'type': 'key_value_grid',
         'pairs': pairs,
-        'columns': 2,
+        'columns': cols,
     }
 
 
@@ -209,9 +213,15 @@ def preview_to_artifact_schema(preview: dict) -> dict:
 
     subtitle = (preview.get('subtitle') or '').strip()
     if subtitle:
+        # 'subtitle' variant tells the renderer to treat this as the
+        # property-header line — splits on ' · ', renders the first
+        # segment as a big bold title and the remainder as a muted
+        # subtitle row. Matches the Azure mockup header treatment.
+        # (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
         blocks.append({
             'id': _id('subtitle', counter),
             'type': 'text',
+            'variant': 'subtitle',
             'content': subtitle,
         })
 

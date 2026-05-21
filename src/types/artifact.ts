@@ -88,7 +88,17 @@ export interface TextBlock {
   id: string;
   /** Plain text or restricted markdown (only **bold** and *italic* are interpreted). */
   content: string;
-  variant?: 'body' | 'caption' | 'callout';
+  /**
+   * Text block visual variant.
+   *   'body'     — default paragraph
+   *   'caption'  — small muted text (e.g. footnotes)
+   *   'callout'  — boxed/highlighted block (warnings, info banners)
+   *   'subtitle' — used by report adapters for the property-name header
+   *                line. Renderer splits on " · " and styles the first
+   *                part as a large bold title, remaining parts as muted
+   *                subtitle text. (LSCMD-REPORT-SUBTITLE-VARIANT-0520)
+   */
+  variant?: 'body' | 'caption' | 'callout' | 'subtitle';
 }
 
 export type Block = SectionBlock | TableBlock | KeyValueGridBlock | TextBlock;
