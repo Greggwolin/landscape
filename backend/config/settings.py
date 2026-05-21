@@ -344,3 +344,8 @@ DEMO_PROJECT_IDS = {
 # Discord webhook URL for capturing alpha tester feedback from Landscaper chat
 # Messages containing #FB will be forwarded to this webhook with context
 LANDSCAPER_FEEDBACK_WEBHOOK_URL = config('LANDSCAPER_FEEDBACK_WEBHOOK_URL', default=None)
+
+# Shared secret for the morning-refresh scheduled-task skill that hits
+# /api/feedback/dashboard-data/. Empty/missing value blocks all access
+# (the HasFeedbackDashboardToken permission class returns False).
+FEEDBACK_DASHBOARD_TOKEN = config('FEEDBACK_DASHBOARD_TOKEN', default='')
