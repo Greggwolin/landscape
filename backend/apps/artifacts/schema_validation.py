@@ -14,7 +14,7 @@ from typing import Any
 
 
 _VALID_BLOCK_TYPES = {'section', 'table', 'key_value_grid', 'text'}
-_VALID_TEXT_VARIANTS = {'body', 'caption', 'callout', None}
+_VALID_TEXT_VARIANTS = {'body', 'caption', 'callout', 'subtitle', None}
 _VALID_ALIGNMENTS = {'left', 'right', 'center', None}
 
 
@@ -156,7 +156,7 @@ def _validate_text(block: dict, path: str) -> None:
     variant = block.get('variant')
     if variant is not None and variant not in _VALID_TEXT_VARIANTS:
         raise SchemaValidationError(
-            f'{path}.variant must be one of body|caption|callout'
+            f'{path}.variant must be one of body|caption|callout|subtitle'
         )
 
 
