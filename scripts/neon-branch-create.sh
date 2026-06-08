@@ -63,8 +63,16 @@ CONNECTION_STRING=$(neonctl connection-string \
   --project-id "$NEON_PROJECT" \
   --branch "$BRANCH_NAME" \
   --role-name neondb_owner \
-  --database land_v2 \
-  --pooled)
+  --database land_v2)
+
+# Fail loud on empty: the pooled endpoint does not serve land_v2 in this
+# project, so --pooled (now removed) returned an empty string that silently
+# propagated to every downstream DB step. Catch it here at the real cause.
+if [ -z "$CONNECTION_STRING" ]; then
+  echo "❌ neonctl returned an empty connection string for branch '$BRANCH_NAME' / database land_v2."
+  echo "   (Check the --database name and whether --pooled is being used; pooled does not serve land_v2 in this project.)"
+  exit 1
+fi
 
 # Output for GitHub Actions
 echo "PREVIEW_DATABASE_URL=$CONNECTION_STRING" >> "$GITHUB_OUTPUT"
