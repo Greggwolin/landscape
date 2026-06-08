@@ -104,7 +104,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Resolve DATABASE_URL
         uses: ./.github/actions/resolve-neon-db-url
@@ -195,7 +195,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Resolve DATABASE_URL
         uses: ./.github/actions/resolve-neon-db-url
