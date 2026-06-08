@@ -141,81 +141,9 @@ jobs:
           files: ./coverage/lcov.info
           flags: unittests
 
-  # ==========================================================================
-  # JOB 4: Deploy to Vercel Preview
-  # ==========================================================================
-  deploy-preview:
-    name: Deploy to Vercel
-    runs-on: ubuntu-latest
-    needs: [create-database, migrate-database, build-and-test]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Resolve DATABASE_URL
-        uses: ./.github/actions/resolve-neon-db-url
-        with:
-          branch-name: ${{ needs.create-database.outputs.branch_name }}
-          neon-api-key: ${{ secrets.NEON_API_KEY }}
-          neon-project-id: ${{ secrets.NEON_PROJECT_ID }}
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        id: vercel-deploy
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--env DATABASE_URL=${{ env.DATABASE_URL }}'
-
-      - name: Comment PR with preview URL
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🚀 **Preview Environment Ready!**
-
-              - **Preview URL**: ${{ steps.vercel-deploy.outputs.preview-url }}
-              - **Database Branch**: \`${{ needs.create-database.outputs.branch_name }}\`
-              - **Branch ID**: \`${{ needs.create-database.outputs.branch_id }}\`
-
-              The preview environment is connected to an ephemeral Neon database branch.
-              All changes are isolated from production.`
-            })
-
-  # ==========================================================================
-  # JOB 5: API Contract Tests
-  # ==========================================================================
-  api-tests:
-    name: API Contract Tests
-    runs-on: ubuntu-latest
-    needs: [create-database, migrate-database, deploy-preview]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: Resolve DATABASE_URL
-        uses: ./.github/actions/resolve-neon-db-url
-        with:
-          branch-name: ${{ needs.create-database.outputs.branch_name }}
-          neon-api-key: ${{ secrets.NEON_API_KEY }}
-          neon-project-id: ${{ secrets.NEON_PROJECT_ID }}
-
-      - name: Run API tests
-        run: npm run test:api
-        env:
-          APP_ORIGIN: ${{ needs.deploy-preview.outputs.preview-url }}
+  # NOTE: the former "Deploy to Vercel" (amondnet/vercel-action) and
+  # "API Contract Tests" jobs were removed — the deploy job had no VERCEL_TOKEN
+  # secret (it never ran; Vercel's native GitHub integration handles preview
+  # deploys and is green) and api-tests had no test:api script and depended on
+  # that dead deploy. Re-add a real deploy/API gate only with a configured
+  # VERCEL_TOKEN + a real test:api. Tracked alongside #43/#39.
