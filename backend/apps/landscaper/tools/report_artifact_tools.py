@@ -207,6 +207,38 @@ def render_report_as_artifact_tool(
             ),
         }
 
+    # --- Optional scope (chat-driven custom reports) ----------------------
+    # e.g. "monthly cash flow for Year 2 of Phase 1". Landscaper parses the
+    # natural-language scope into structured params; the proforma report base
+    # (RPT_12/17/18/19) applies them. Generators that don't support scope simply
+    # ignore the attribute. Shape:
+    #   {phases:[...], year_start:int, year_end:int,
+    #    granularity:'month'|'quarter'|'year'}
+    scope = tool_input.get('scope')
+    if scope is not None:
+        if not isinstance(scope, dict):
+            return {
+                'success': False,
+                'error': (
+                    'scope must be a JSON object when provided, e.g. '
+                    '{"phases": ["1"], "year_start": 2, "year_end": 2, '
+                    '"granularity": "month"}.'
+                ),
+            }
+        for k in ('year_start', 'year_end'):
+            if scope.get(k) is not None:
+                try:
+                    scope[k] = int(scope[k])
+                except (TypeError, ValueError):
+                    return {'success': False, 'error': f'scope.{k} must be an integer.'}
+        if scope.get('granularity') and scope['granularity'] not in ('month', 'quarter', 'year'):
+            return {
+                'success': False,
+                'error': "scope.granularity must be 'month', 'quarter', or 'year'.",
+            }
+        # Set on the generator; the proforma base reads it, others ignore it.
+        setattr(generator, 'scope', scope)
+
     # --- Run the preview generator ----------------------------------------
     try:
         preview = generator.generate_preview()
@@ -291,6 +323,8 @@ def render_report_as_artifact_tool(
     }
     if isinstance(modification_spec, dict) and modification_spec:
         params_payload['modification_spec'] = modification_spec
+    if isinstance(scope, dict) and scope:
+        params_payload['scope'] = scope
 
     try:
         envelope = create_artifact_record(
