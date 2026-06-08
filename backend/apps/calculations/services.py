@@ -101,11 +101,10 @@ class CalculationService:
         """Fetch LAND project cash flows from LandDevCashFlowService."""
         from datetime import datetime
         from collections import defaultdict
-        from apps.financial.services.land_dev_cashflow_service import LandDevCashFlowService
+        from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
 
         try:
-            service = LandDevCashFlowService(project_id)
-            cf_data = service.calculate(include_financing=True)
+            cf_data = fetch_cashflow_schedule(project_id, include_financing=True)
 
             summary = cf_data.get('summary', {})
             periods = cf_data.get('periods', [])
@@ -216,11 +215,10 @@ class CalculationService:
         """Fetch non-LAND project cash flows from IncomePropertyCashFlowService."""
         from datetime import datetime
         from collections import defaultdict
-        from apps.financial.services.income_property_cashflow_service import IncomePropertyCashFlowService
+        from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
 
         try:
-            service = IncomePropertyCashFlowService(project_id)
-            cf_data = service.calculate(include_financing=True)
+            cf_data = fetch_cashflow_schedule(project_id, include_financing=True)
 
             periods = cf_data.get('periods', [])
             sections = cf_data.get('sections', [])

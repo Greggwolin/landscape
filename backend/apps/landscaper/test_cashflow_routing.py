@@ -16,6 +16,7 @@ from unittest import mock
 from django.test import SimpleTestCase
 
 from apps.landscaper import tool_executor
+from apps.financial.services import cashflow_routing
 
 
 SCHEDULE_FIXTURE = {
@@ -51,7 +52,7 @@ class FetchCashflowScheduleRoutingTests(SimpleTestCase):
         mock_connection.cursor.return_value = cursor_ctx
 
         with mock.patch.object(
-            tool_executor, 'connection', mock_connection
+            cashflow_routing, 'connection', mock_connection
         ), mock.patch(
             'apps.financial.services.land_dev_cashflow_service.LandDevCashFlowService'
         ) as mock_landdev, mock.patch(
@@ -72,7 +73,7 @@ class FetchCashflowScheduleRoutingTests(SimpleTestCase):
         mock_connection.cursor.return_value = cursor_ctx
 
         with mock.patch.object(
-            tool_executor, 'connection', mock_connection
+            cashflow_routing, 'connection', mock_connection
         ), mock.patch(
             'apps.financial.services.land_dev_cashflow_service.LandDevCashFlowService'
         ) as mock_landdev, mock.patch(
@@ -93,13 +94,13 @@ class FetchCashflowScheduleRoutingTests(SimpleTestCase):
         mock_connection.cursor.return_value = cursor_ctx
 
         with mock.patch.object(
-            tool_executor, 'connection', mock_connection
+            cashflow_routing, 'connection', mock_connection
         ), mock.patch(
             'apps.financial.services.land_dev_cashflow_service.LandDevCashFlowService'
         ) as mock_landdev, mock.patch(
             'apps.financial.services.income_property_cashflow_service.IncomePropertyCashFlowService'
         ) as mock_income, self.assertLogs(
-            tool_executor.logger, level='WARNING'
+            cashflow_routing.logger, level='WARNING'
         ) as log_capture:
             result = tool_executor._fetch_cashflow_schedule(999)
 
@@ -124,13 +125,13 @@ class FetchCashflowScheduleRoutingTests(SimpleTestCase):
         mock_connection.cursor.return_value = cursor_ctx
 
         with mock.patch.object(
-            tool_executor, 'connection', mock_connection
+            cashflow_routing, 'connection', mock_connection
         ), mock.patch(
             'apps.financial.services.land_dev_cashflow_service.LandDevCashFlowService'
         ) as mock_landdev, mock.patch(
             'apps.financial.services.income_property_cashflow_service.IncomePropertyCashFlowService'
         ) as mock_income, self.assertLogs(
-            tool_executor.logger, level='WARNING'
+            cashflow_routing.logger, level='WARNING'
         ):
             result = tool_executor._fetch_cashflow_schedule(99999)
 
