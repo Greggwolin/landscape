@@ -290,27 +290,10 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
       }
     });
 
-    // Generate schema-specific exports
-    tsCode += `// Schema-specific type collections\n`;
-    tsCode += `export namespace LandscapeSchema {\n`;
-    Object.keys(tablesBySchema)
-      .filter(key => key.startsWith('landscape.'))
-      .forEach(key => {
-        const tableName = key.split('.')[1];
-        const interfaceName = generateInterfaceName(tableName);
-        tsCode += `  export type ${toPascalCase(tableName)} = ${interfaceName};\n`;
-      });
-    tsCode += `}\n\n`;
-
-    tsCode += `export namespace LandV2Schema {\n`;
-    Object.keys(tablesBySchema)
-      .filter(key => key.startsWith('land_v2.'))
-      .forEach(key => {
-        const tableName = key.split('.')[1];
-        const interfaceName = generateInterfaceName(tableName);
-        tsCode += `  export type ${toPascalCase(tableName)} = ${interfaceName};\n`;
-      });
-    tsCode += `}\n\n`;
+    // NOTE: the LandscapeSchema / LandV2Schema re-export namespaces were removed.
+    // They emitted `export type X = X` aliases whose RHS resolved to the alias
+    // itself inside the namespace — self-referential (TS2456, ~87 errors) — and
+    // nothing consumed them. Consumers import the top-level interfaces directly.
 
     // Generate table name constants
     tsCode += `// Table name constants\n`;
