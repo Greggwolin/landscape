@@ -921,10 +921,10 @@ class DebtSummaryGenerator(PreviewBaseGenerator):
             SELECT COALESCE(SUM(COALESCE(amount, 0)), 0) AS total
             FROM landscape.core_fin_fact_budget
             WHERE project_id = %s
-              AND container_id IN (
-                SELECT container_id FROM landscape.tbl_container
+              AND division_id IN (
+                SELECT division_id FROM landscape.tbl_division
                 WHERE project_id = %s
-                  AND container_name ILIKE '%phase 1%'
+                  AND display_name ILIKE '%%phase 1%%'
                 LIMIT 1
               )
             LIMIT 1

@@ -11,23 +11,43 @@ class CashFlowByPhaseGenerator(PreviewBaseGenerator):
         project = self.get_project()
         sections = []
 
+        # Land-dev cash flow model: budget lines are development costs (outflows);
+        # inflows are parcel-sale net proceeds. There is no flow_direction flag on
+        # the budget — direction is structural (costs vs. sales), mirroring
+        # land_dev_cashflow_service. Costs roll up to a phase via the division's
+        # attributes->phase_id link; revenue rolls up via the parcel's phase_id.
         phase_cf = self.execute_query("""
+            WITH costs AS (
+                SELECT ph.phase_name AS phase_name,
+                       COALESCE(SUM(b.amount), 0) AS outflows,
+                       COUNT(DISTINCT b.fact_id) AS line_items
+                FROM landscape.core_fin_fact_budget b
+                LEFT JOIN landscape.tbl_division d ON b.division_id = d.division_id
+                LEFT JOIN landscape.tbl_phase ph
+                       ON (d.attributes->>'phase_id')::int = ph.phase_id
+                WHERE b.project_id = %s
+                GROUP BY ph.phase_name
+            ),
+            rev AS (
+                SELECT ph.phase_name AS phase_name,
+                       COALESCE(SUM(psa.net_sale_proceeds), 0) AS inflows
+                FROM landscape.tbl_parcel p
+                JOIN landscape.tbl_parcel_sale_assumptions psa
+                       ON p.parcel_id = psa.parcel_id
+                LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+                WHERE p.project_id = %s
+                GROUP BY ph.phase_name
+            )
             SELECT
-                COALESCE(c.container_label, 'Unassigned') AS phase_name,
-                COALESCE(SUM(CASE WHEN b.flow_direction = 'inflow' THEN b.amount ELSE 0 END), 0) AS inflows,
-                COALESCE(SUM(CASE WHEN b.flow_direction = 'outflow' THEN b.amount ELSE 0 END), 0) AS outflows,
-                COALESCE(SUM(
-                    CASE WHEN b.flow_direction = 'inflow' THEN b.amount
-                         WHEN b.flow_direction = 'outflow' THEN -b.amount
-                         ELSE 0 END
-                ), 0) AS net_cf,
-                COUNT(DISTINCT b.id) AS line_items
-            FROM landscape.core_fin_fact_budget b
-            LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
-            WHERE b.project_id = %s
-            GROUP BY COALESCE(c.container_label, 'Unassigned')
+                COALESCE(costs.phase_name, rev.phase_name, 'Unassigned') AS phase_name,
+                COALESCE(rev.inflows, 0) AS inflows,
+                COALESCE(costs.outflows, 0) AS outflows,
+                COALESCE(rev.inflows, 0) - COALESCE(costs.outflows, 0) AS net_cf,
+                COALESCE(costs.line_items, 0) AS line_items
+            FROM costs
+            FULL OUTER JOIN rev ON costs.phase_name = rev.phase_name
             ORDER BY net_cf DESC
-        """, [self.project_id])
+        """, [self.project_id, self.project_id])
 
         if not phase_cf:
             return {

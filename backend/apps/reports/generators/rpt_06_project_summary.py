@@ -52,8 +52,8 @@ class ProjectSummaryGenerator(PreviewBaseGenerator):
 
         # Container count (areas)
         area_count = self.execute_scalar("""
-            SELECT COUNT(*) FROM landscape.tbl_container
-            WHERE project_id = %s AND depth = 1
+            SELECT COUNT(*) FROM landscape.tbl_division
+            WHERE project_id = %s AND tier = 1
         """, [self.project_id]) or 0
 
         # Total acreage

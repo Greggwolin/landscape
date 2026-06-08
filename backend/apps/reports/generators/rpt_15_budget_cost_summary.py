@@ -134,14 +134,14 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
         # Query phase data with budget categories
         phase_data_rows = self.execute_query("""
             SELECT
-                COALESCE(ph.phase_name, c.container_label, 'Unphased') AS phase_name,
+                COALESCE(ph.phase_name, d.display_name, 'Unphased') AS phase_name,
                 COALESCE(ph.gross_acres, 0) AS gross_ac,
                 COALESCE(ph.revenue_generating_acres, ph.gross_acres, 0) AS revgen_ac,
                 COALESCE(ph.start_month, 0) AS start_mo,
                 COALESCE(ph.months_to_complete, 0) AS mo_to_complete,
                 COALESCE(ph.start_month + ph.months_to_complete, 0) AS thru_mo
             FROM landscape.tbl_phase ph
-            LEFT JOIN landscape.tbl_container c ON ph.phase_id = c.source_id
+            LEFT JOIN landscape.tbl_division d ON (d.attributes->>'phase_id')::int = ph.phase_id AND d.tier = 2
             WHERE ph.project_id = %s
             ORDER BY ph.phase_name
         """, [self.project_id])
@@ -169,8 +169,8 @@ class BudgetCostSummaryGenerator(PreviewBaseGenerator):
                     COALESCE(pcat.category_name, 'Other') AS category_name,
                     COALESCE(SUM(b.amount), 0) AS amount
                 FROM landscape.core_fin_fact_budget b
-                LEFT JOIN landscape.tbl_container c ON b.container_id = c.container_id
-                LEFT JOIN landscape.tbl_phase ph ON c.source_id = ph.phase_id
+                LEFT JOIN landscape.tbl_division d ON b.division_id = d.division_id
+                LEFT JOIN landscape.tbl_phase ph ON (d.attributes->>'phase_id')::int = ph.phase_id
                 LEFT JOIN landscape.core_unit_cost_category cat ON b.category_id = cat.category_id
                 LEFT JOIN landscape.core_unit_cost_category pcat ON cat.parent_id = pcat.category_id
                 WHERE b.project_id = %s

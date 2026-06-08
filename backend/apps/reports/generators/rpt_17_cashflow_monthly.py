@@ -121,10 +121,10 @@ class CashFlowMonthlyGenerator(PreviewBaseGenerator):
 
         # Fetch phase-level cost data
         phases = self.execute_query("""
-            SELECT DISTINCT c.name AS phase_name
-            FROM landscape.tbl_container c
-            WHERE c.project_id = %s AND c.level = 2
-            ORDER BY c.name
+            SELECT DISTINCT d.display_name AS phase_name
+            FROM landscape.tbl_division d
+            WHERE d.project_id = %s AND d.tier = 2
+            ORDER BY d.display_name
         """, [self.project_id])
 
         # If no data, return minimal PDF
@@ -274,7 +274,7 @@ class CashFlowMonthlyGenerator(PreviewBaseGenerator):
         land_acq_row.insert(1, p(fmt_currency_k(land_acq_total), styles, right=True))
         data_rows.append(land_acq_row)
 
-        # Phase-level costs (one row per phase from tbl_container)
+        # Phase-level costs (one row per phase from tbl_division, tier 2)
         total_phase_costs = 0
         phase_month_totals = [0] * 12
         for phase in phases:
