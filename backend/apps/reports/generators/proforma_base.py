@@ -19,6 +19,7 @@ labels, sections, and granularity are driven entirely by the envelope.
 """
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -29,6 +30,38 @@ from .preview_base import PreviewBaseGenerator
 # buildup but excluded from the leveraged-cash-flow total (see
 # leveraged_cashflow_summary). Used here only to know they are non-additive.
 _COMPONENT_SECTION_IDS = frozenset({'revenue-gross', 'revenue-deductions', 'income-opex'})
+
+# A bare hierarchy/phase code like "1.1" or "2" — used to detect line
+# descriptions that are just a phase/parcel code (cryptic on their own) and to
+# normalise phase header labels.
+_PHASE_CODE_RE = re.compile(r'^\d+(?:\.\d+)*$')
+
+
+def _phase_pretty(label: str) -> str:
+    """Normalise a phase label: bare codes ('1.1') become 'Phase 1.1';
+    already-qualified labels ('Phase 2.1', 'Unphased') pass through."""
+    s = str(label).strip()
+    return f'Phase {s}' if _PHASE_CODE_RE.match(s) else s
+
+
+def _line_display_label(li: Dict[str, Any], *, with_phase: bool) -> str:
+    """Human label for a line item.
+
+    Most lines use ``description``. Revenue lines whose description is a bare
+    phase code ('1.1') are cryptic, so they are relabelled with the revenue
+    descriptor (subcategory) and, when not already shown under a phase header,
+    the phase: e.g. 'Parcel Sales — Phase 1.1'.
+    """
+    desc = li.get('description') or li.get('lineId') or '—'
+    container = li.get('containerLabel')
+    subcat = li.get('subcategory')
+    s = str(desc).strip()
+    is_bare_code = bool(_PHASE_CODE_RE.match(s)) or (container and s == str(container).strip())
+    if is_bare_code:
+        descriptor = subcat or 'Revenue'
+        phase = container or desc
+        return f'{descriptor} — {_phase_pretty(phase)}' if with_phase else descriptor
+    return desc
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +147,22 @@ def build_proforma_model(
     if not periods or not sections:
         return {'buckets': buckets, 'rows': rows, 'notes': notes, 'empty': True}
 
+    def _agg(lis, with_phase):
+        """Aggregate line items sharing a display label (sum their periods),
+        first-seen order preserved. Collapses one cost category split across
+        phases into a single row; relabels cryptic phase-code revenue lines."""
+        out: "OrderedDict[str, Dict[str, float]]" = OrderedDict()
+        for li in lis:
+            label = _line_display_label(li, with_phase=with_phase)
+            vals = _bucket(li.get('periods'), seq_to_bucket, order)
+            if label in out:
+                acc = out[label]
+                for k in order:
+                    acc[k] += vals[k]
+            else:
+                out[label] = vals
+        return out
+
     for sec in sections:
         sid = sec.get('sectionId', '')
         sname = sec.get('sectionName') or sid or 'Section'
@@ -132,18 +181,20 @@ def build_proforma_model(
             for li in lineitems:
                 groups.setdefault(li.get('containerLabel') or 'Unphased', []).append(li)
             for phase_label, lis in groups.items():
-                addrow(phase_label, 'phase', indent=1)
+                pretty = _phase_pretty(phase_label)
+                addrow(pretty, 'phase', indent=1)
                 phase_acc = {k: 0.0 for k in order}
-                for li in lis:
-                    vals = _bucket(li.get('periods'), seq_to_bucket, order)
-                    addrow(li.get('description') or li.get('lineId') or '—', 'line', vals, indent=2)
+                # Phase is shown in the header, so line labels omit it.
+                for label, vals in _agg(lis, with_phase=False).items():
+                    addrow(label, 'line', vals, indent=2)
                     for k in order:
                         phase_acc[k] += vals[k]
-                addrow(f'Total {phase_label}', 'subtotal', phase_acc, indent=1)
+                addrow(f'Total {pretty}', 'subtotal', phase_acc, indent=1)
         else:
-            for li in lineitems:
-                vals = _bucket(li.get('periods'), seq_to_bucket, order)
-                addrow(li.get('description') or li.get('lineId') or '—', 'line', vals, indent=1)
+            # No phase grouping: collapse same-category lines split across
+            # phases; keep phase qualifier on relabelled revenue lines.
+            for label, vals in _agg(lineitems, with_phase=True).items():
+                addrow(label, 'line', vals, indent=1)
         addrow(f'Total {sname.title()}', 'subtotal', sub_vals)
 
     # Closing block: reversion (income), Leveraged Cash Flow, Cumulative.
