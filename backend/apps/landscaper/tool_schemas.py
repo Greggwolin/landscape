@@ -4494,6 +4494,30 @@ LANDSCAPER_TOOLS = [
                         "the default view."
                     ),
                 },
+                "scope": {
+                    "type": "object",
+                    "description": (
+                        "Optional SCOPE for the cash-flow proforma reports "
+                        "(RPT_12 / RPT_17 / RPT_18 / RPT_19). Use it to honor a "
+                        "natural-language request that narrows the report to a "
+                        "phase, a span of project years, or a different time "
+                        "granularity — e.g. 'monthly cash flow for Year 2 of "
+                        "Phase 1' → {phases:['1'], year_start:2, year_end:2, "
+                        "granularity:'month'}.\n\n"
+                        "Shape (all fields optional):\n"
+                        "  {\n"
+                        "    phases?: [<phase code>, ...],   // e.g. ['1'] or ['1.1','1.2']; matches the project's phase labels\n"
+                        "    year_start?: <int>,             // 1-based project year (Year 1 = first 12 months)\n"
+                        "    year_end?:   <int>,             // inclusive; omit for a single year (= year_start)\n"
+                        "    granularity?: 'month'|'quarter'|'year'\n"
+                        "  }\n\n"
+                        "Only applies to the four cash-flow reports; ignored by "
+                        "others. Omit entirely for the full, unscoped report. If "
+                        "the user names a phase or year that doesn't exist, the "
+                        "report returns a 'no lines match scope' message — relay "
+                        "that and ask the user to clarify rather than guessing."
+                    ),
+                },
             },
             "required": ["report_code"],
         },

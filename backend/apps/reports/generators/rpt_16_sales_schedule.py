@@ -18,18 +18,25 @@ class SalesScheduleGenerator(PreviewBaseGenerator):
         sections = []
 
         # Sales absorption data
+        # Sales schedule = parcel sales by phase and sale year. The old source
+        # (tbl_sale_absorption + tbl_container) does not exist in the schema, so
+        # this always returned empty; rebuilt on the live model (tbl_parcel +
+        # tbl_parcel_sale_assumptions), mirroring RPT_19's revenue source.
         sales = self.execute_query("""
             SELECT
-                COALESCE(ph.phase_name, c.container_label, 'Unknown') AS phase_name,
-                COALESCE(s.period_year, 0) AS period_year,
-                COALESCE(s.units_sold, 0) AS units_sold,
-                COALESCE(s.revenue, 0) AS revenue,
-                COALESCE(s.avg_price_per_unit, 0) AS avg_price
-            FROM landscape.tbl_sale_absorption s
-            LEFT JOIN landscape.tbl_phase ph ON s.phase_id = ph.phase_id
-            LEFT JOIN landscape.tbl_container c ON s.container_id = c.container_id
-            WHERE s.project_id = %s
-            ORDER BY s.period_year, phase_name
+                COALESCE(ph.phase_name, 'Unphased') AS phase_name,
+                EXTRACT(YEAR FROM psa.sale_date)::int AS period_year,
+                COALESCE(SUM(p.units_total), 0) AS units_sold,
+                COALESCE(SUM(psa.net_sale_proceeds), 0) AS revenue,
+                CASE WHEN COALESCE(SUM(p.units_total), 0) > 0
+                     THEN COALESCE(SUM(psa.net_sale_proceeds), 0) / SUM(p.units_total)
+                     ELSE 0 END AS avg_price
+            FROM landscape.tbl_parcel p
+            JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
+            LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+            WHERE p.project_id = %s
+            GROUP BY COALESCE(ph.phase_name, 'Unphased'), EXTRACT(YEAR FROM psa.sale_date)
+            ORDER BY period_year, phase_name
         """, [self.project_id])
 
         if not sales:

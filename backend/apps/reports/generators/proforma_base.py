@@ -44,6 +44,22 @@ def _phase_pretty(label: str) -> str:
     return f'Phase {s}' if _PHASE_CODE_RE.match(s) else s
 
 
+def _phase_code(label: Any) -> str:
+    """Bare hierarchy code from a phase label: 'Phase 1.1' -> '1.1', '1.1' -> '1.1'."""
+    return re.sub(r'^[Pp]hase\s+', '', str(label).strip())
+
+
+def _phase_matches(line_label: Any, requested: List[Any]) -> bool:
+    """Hierarchical match: a request for '1' matches '1', '1.1', '1.2' (the
+    whole area); a request for '1.1' matches only '1.1'."""
+    lc = _phase_code(line_label)
+    for rc in requested:
+        rc = _phase_code(rc)
+        if lc == rc or lc.startswith(rc + '.'):
+            return True
+    return False
+
+
 def _line_display_label(li: Dict[str, Any], *, with_phase: bool) -> str:
     """Human label for a line item.
 
@@ -103,6 +119,114 @@ def _bucket(plist, seq_to_bucket, order) -> Dict[str, float]:
         if k is not None:
             out[k] += float(pd.get('amount') or 0)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Scope (period-window + phase filter) — for chat-driven custom reports
+#   e.g. "monthly cash flow for Year 2 of Phase 1"
+# ---------------------------------------------------------------------------
+
+def _trim_periods_list(plist, keep_seqs):
+    """Keep only per-period entries whose periodSequence is in keep_seqs."""
+    if not plist:
+        return plist
+    return [pd for pd in plist if pd.get('periodSequence') in keep_seqs]
+
+
+def _recompute_subtotals(lineitems):
+    """Rebuild a section's per-period subtotals by summing its (already
+    filtered/trimmed) line items. Needed after a phase filter changes which
+    lines belong to the section — otherwise the original project-level
+    subtotals survive and the scoped totals (which the netting reads from the
+    subtotals) would not tie to the displayed lines."""
+    agg: "OrderedDict[Any, float]" = OrderedDict()
+    for li in lineitems:
+        for pd in li.get('periods') or []:
+            seq = pd.get('periodSequence')
+            if seq is None:
+                continue
+            agg[seq] = agg.get(seq, 0.0) + float(pd.get('amount') or 0)
+    return [{'periodSequence': seq, 'amount': amt} for seq, amt in agg.items()]
+
+
+def scope_envelope(
+    envelope: Dict[str, Any],
+    *,
+    phases: Optional[List[Any]] = None,
+    year_start: Optional[int] = None,
+    year_end: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Return a filtered COPY of the unified envelope for a scoped report.
+
+    Applied BEFORE build_proforma_model so the netting (leveraged_cashflow_summary)
+    runs on the scoped data and stays consistent.
+
+    - ``phases``: phase labels to keep, matched against each line's
+      ``containerLabel`` (normalised via _phase_pretty). Project-level lines that
+      carry no containerLabel (e.g. financing) are KEPT — a phase view still
+      shows the deal-level financing that funds it.
+      [MODELING — Gregg 2026-06-08: phase views DO include financing. The
+      INTERIM behaviour here keeps all untagged (deal-level) financing lines.
+      The fuller model is an OPEN design item: loans can be attributed to
+      specific phases (tbl_loan_container), and A&D / development financing
+      behaves differently from PERMANENT financing (tbl_loan.loan_type) on
+      income assets — so a phase view should ultimately show that phase's
+      attributed loans plus an allocation policy for truly project-level debt.
+      Not yet modeled; do not treat this interim as final.]
+    - ``year_start`` / ``year_end``: inclusive 1-based project years (Year 1 = the
+      first 12 monthly periods). Trims periods + each line's per-period values +
+      section subtotals to that window.
+
+    Reversion: when a year window is applied that does NOT reach the project's
+    final period, the exit/reversion block is dropped so a mid-deal window
+    doesn't show a sale that happens outside it. A window that includes the
+    final period keeps it.
+    """
+    periods = envelope.get('periods') or []
+    env = dict(envelope)
+
+    keep_seqs = None
+    if year_start or year_end:
+        ys = max(1, int(year_start or 1))
+        ye = int(year_end or year_start or ys)
+        lo, hi = (ys - 1) * 12, ye * 12   # month offsets [lo, hi)
+        kept, keep_seqs = [], set()
+        for i, p in enumerate(periods):
+            if lo <= i < hi:
+                kept.append(p)
+                keep_seqs.add(p.get('periodSequence'))
+        env['periods'] = kept
+        # Drop exit/reversion unless the window reaches the project's final period.
+        if periods and hi < len(periods):
+            env.pop('exitAnalysis', None)
+            env.pop('reversion', None)
+
+    new_sections = []
+    for sec in (envelope.get('sections') or []):
+        lis = sec.get('lineItems') or []
+        if phases:
+            lis = [
+                li for li in lis
+                if li.get('containerLabel') is None
+                or _phase_matches(li.get('containerLabel'), phases)
+            ]
+        if keep_seqs is not None:
+            lis = [{**li, 'periods': _trim_periods_list(li.get('periods'), keep_seqs)} for li in lis]
+
+        if phases:
+            # The phase filter changed which lines belong to the section, so the
+            # per-period subtotals must be rebuilt from the kept lines —
+            # otherwise the project-level subtotals (which the netting reads)
+            # survive and the scoped Leveraged Cash Flow would not tie to the
+            # displayed phase lines.
+            subtotals = _recompute_subtotals(lis)
+        elif keep_seqs is not None:
+            subtotals = _trim_periods_list(sec.get('subtotals'), keep_seqs)
+        else:
+            subtotals = sec.get('subtotals')
+        new_sections.append({**sec, 'lineItems': lis, 'subtotals': subtotals})
+    env['sections'] = new_sections
+    return env
 
 
 # ---------------------------------------------------------------------------
@@ -380,9 +504,29 @@ class ProformaReportBase(PreviewBaseGenerator):
     detail = 'line'                # line | subtotal
     group_by_phase = False
 
+    # Optional per-request scope for chat-driven custom reports. Set on the
+    # instance by render_report_as_artifact before generate_preview(). Shape:
+    #   {'phases': [...], 'year_start': int, 'year_end': int, 'granularity': str}
+    # None → full unscoped report (the standing behaviour).
+    scope: Optional[Dict[str, Any]] = None
+
     def _fetch_envelope(self) -> Dict[str, Any]:
         from apps.financial.services.cashflow_routing import fetch_cashflow_schedule
         return fetch_cashflow_schedule(self.project_id, include_financing=True)
+
+    def _apply_scope(self, env: Dict[str, Any], default_granularity: str) -> Tuple[Dict[str, Any], str]:
+        """Apply self.scope (if any) to the envelope; return (env, granularity)."""
+        gran = default_granularity
+        sc = self.scope
+        if sc:
+            env = scope_envelope(
+                env,
+                phases=sc.get('phases'),
+                year_start=sc.get('year_start'),
+                year_end=sc.get('year_end'),
+            )
+            gran = sc.get('granularity') or gran
+        return env, gran
 
     def _kpi_cards(self, envelope, summary) -> List[Dict]:
         cards = [
@@ -425,17 +569,25 @@ class ProformaReportBase(PreviewBaseGenerator):
             result['message'] = f'Cash flow could not be generated: {err}'
             return result
 
+        env, gran = self._apply_scope(env, self.preview_granularity)
+
         summary = leveraged_cashflow_summary(env)
         if not summary['rows']:
-            result['message'] = (
-                'No cash flow schedule available for this project. Income '
-                'properties require DCF assumptions; land projects require '
-                'budget and absorption data.'
-            )
+            if self.scope:
+                result['message'] = (
+                    'No cash flow lines match the requested scope (check the '
+                    'phase and the year range against this project).'
+                )
+            else:
+                result['message'] = (
+                    'No cash flow schedule available for this project. Income '
+                    'properties require DCF assumptions; land projects require '
+                    'budget and absorption data.'
+                )
             return result
 
         model = build_proforma_model(
-            env, granularity=self.preview_granularity,
+            env, granularity=gran,
             detail=self.detail, group_by_phase=self.group_by_phase,
         )
         sections = [self.make_kpi_section('Summary', self._kpi_cards(env, summary))]
@@ -448,8 +600,9 @@ class ProformaReportBase(PreviewBaseGenerator):
     def generate_pdf(self) -> bytes:
         project = self.get_project()
         env = self._fetch_envelope()
+        env, gran = self._apply_scope(env, self.pdf_granularity)
         model = build_proforma_model(
-            env, granularity=self.pdf_granularity,
+            env, granularity=gran,
             detail=self.detail, group_by_phase=self.group_by_phase,
         )
         subtitle = f"{project.get('project_name', '')} | {self.get_today_str()} | {self.report_code}"
