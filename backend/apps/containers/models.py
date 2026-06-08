@@ -4,9 +4,6 @@ Container models for hierarchical project organization.
 The Container model maps to landscape.tbl_division (renamed from tbl_container in
 migration 025); the Python field names are retained and remapped to the new
 columns via db_column, so no serializer/view consumers need to change.
-
-ContainerType has NO backing table anymore (tbl_container_type was dropped with
-no replacement) — it is dead; see its note.
 """
 
 from django.db import models
@@ -154,28 +151,3 @@ class Container(models.Model):
         )
 
         return direct_acres + child_acres
-
-
-class ContainerType(models.Model):
-    """
-    Lookup table for container types.
-
-    DEAD MODEL: landscape.tbl_container_type was dropped in the container→division
-    rename with NO replacement table, so this model is non-functional
-    (managed=False, no backing table). Left in place only to avoid breaking
-    imports; remove it and its admin registration in a follow-up. Do not build on it.
-    """
-
-    container_type_id = models.AutoField(primary_key=True)
-    type_code = models.CharField(max_length=50, unique=True)
-    type_name = models.CharField(max_length=100)
-    description = models.TextField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        managed = False
-        db_table = 'tbl_container_type'
-        ordering = ['type_name']
-
-    def __str__(self):
-        return self.type_name

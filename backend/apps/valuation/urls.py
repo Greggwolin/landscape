@@ -17,7 +17,6 @@ from .views import (
     LandComparableDetailView,
     LandComparableAdjustmentsView,
     LandComparableAdjustmentDetailView,
-    ContainerCostMetadataView,
     ProjectDepreciationView,
 )
 
@@ -63,11 +62,6 @@ urlpatterns += [
         'projects/<int:project_id>/valuation/land-comps/<int:comp_id>/adjustments/<int:adj_id>/',
         LandComparableAdjustmentDetailView.as_view(),
         name='land-comparable-adjustment-detail'
-    ),
-    path(
-        'containers/<int:container_id>/cost-metadata/',
-        ContainerCostMetadataView.as_view(),
-        name='container-cost-metadata'
     ),
     path(
         'projects/<int:project_id>/valuation/depreciation/',
