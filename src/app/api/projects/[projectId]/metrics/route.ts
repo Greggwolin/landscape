@@ -79,7 +79,7 @@ export async function GET(
         COUNT(*) FILTER (WHERE tier = 1) as areas,
         COUNT(*) FILTER (WHERE tier = 2) as phases,
         COUNT(*) FILTER (WHERE tier = 3) as parcels
-      FROM landscape.tbl_container
+      FROM landscape.tbl_division
       WHERE project_id = ${projectId}
     `;
 

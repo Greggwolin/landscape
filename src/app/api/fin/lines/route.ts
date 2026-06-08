@@ -32,7 +32,7 @@ async function resolveContainerFromLegacy(peLevel: string, peId: string) {
     level === 1 ? 'area_id' : level === 2 ? 'phase_id' : 'parcel_id'
   const [row] = await sql`
     SELECT division_id, project_id
-    FROM landscape.tbl_container
+    FROM landscape.tbl_division
     WHERE tier = ${level}
       AND attributes->>${column} = ${peId}
     LIMIT 1
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     if (divisionId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${divisionId}
+        SELECT project_id FROM landscape.tbl_division WHERE division_id = ${divisionId}
       `
       if (row?.project_id != null) {
         projectId = Number(row.project_id)
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
 
     if (resolvedContainerId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${resolvedContainerId}
+        SELECT project_id FROM landscape.tbl_division WHERE division_id = ${resolvedContainerId}
       `
       if (row?.project_id != null) {
         projectId = Number(row.project_id)

@@ -39,7 +39,7 @@ async function resolveContainerFromLegacy(peLevel: string, peId: string) {
 
   const [row] = await sql`
     SELECT division_id, project_id
-    FROM landscape.tbl_container
+    FROM landscape.tbl_division
     WHERE tier = ${tier}
       AND attributes->>${column} = ${peId}
     LIMIT 1
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     if (!projectId && divisionId) {
       const [row] = await sql`
         SELECT project_id
-        FROM landscape.tbl_container
+        FROM landscape.tbl_division
         WHERE division_id = ${divisionId}
       `
       if (row?.project_id != null) {
@@ -110,13 +110,13 @@ export async function GET(request: NextRequest) {
         rollup = (await sql`
           WITH RECURSIVE container_tree AS (
             SELECT division_id, tier, project_id, parent_division_id
-            FROM landscape.tbl_container
+            FROM landscape.tbl_division
             WHERE division_id = ${divisionId}
 
             UNION ALL
 
             SELECT c.division_id, c.tier, c.project_id, c.parent_division_id
-            FROM landscape.tbl_container c
+            FROM landscape.tbl_division c
             INNER JOIN container_tree ct ON c.parent_division_id = ct.division_id
           )
           SELECT
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
             MAX(b.amount) AS max_amount,
             COUNT(DISTINCT b.division_id) AS container_count
           FROM landscape.core_fin_fact_budget b
-          LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+          LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
           WHERE b.division_id IN (SELECT division_id FROM container_tree)
             ${maxLevel ? sql`AND c.tier <= ${maxLevel}` : sql``}
           GROUP BY c.tier
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
             MAX(b.amount) AS max_amount,
             COUNT(DISTINCT b.division_id) AS container_count
           FROM landscape.core_fin_fact_budget b
-          LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+          LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
           WHERE b.project_id = ${projectId}
             ${maxLevel ? sql`AND (c.tier IS NULL OR c.tier <= ${maxLevel})` : sql``}
           GROUP BY c.tier
@@ -169,15 +169,15 @@ export async function GET(request: NextRequest) {
         rollup = (await sql`
           WITH RECURSIVE container_tree AS (
             SELECT division_id, tier, project_id, parent_division_id,
-                   container_code, display_name, sort_order
-            FROM landscape.tbl_container
+                   division_code AS container_code, display_name, sort_order
+            FROM landscape.tbl_division
             WHERE division_id = ${divisionId}
 
             UNION ALL
 
             SELECT c.division_id, c.tier, c.project_id, c.parent_division_id,
-                   c.container_code, c.display_name, c.sort_order
-            FROM landscape.tbl_container c
+                   c.division_code AS container_code, c.display_name, c.sort_order
+            FROM landscape.tbl_division c
             INNER JOIN container_tree ct ON c.parent_division_id = ct.division_id
           )
           SELECT
@@ -202,18 +202,18 @@ export async function GET(request: NextRequest) {
           SELECT
             c.division_id,
             c.tier,
-            c.container_code,
+            c.division_code AS container_code,
             c.display_name AS container_name,
             c.parent_division_id,
             c.sort_order,
             COUNT(b.fact_id)::INT AS item_count,
             SUM(b.amount) AS total_amount,
             AVG(b.amount) AS avg_amount
-          FROM landscape.tbl_container c
+          FROM landscape.tbl_division c
           LEFT JOIN landscape.core_fin_fact_budget b ON b.division_id = c.division_id
           WHERE c.project_id = ${projectId}
             ${maxLevel ? sql`AND c.tier <= ${maxLevel}` : sql``}
-          GROUP BY c.division_id, c.tier, c.container_code,
+          GROUP BY c.division_id, c.tier, c.division_code,
                    c.display_name, c.parent_division_id, c.sort_order
           ORDER BY c.tier, c.sort_order
         `) as any[]
@@ -223,13 +223,13 @@ export async function GET(request: NextRequest) {
         rollup = (await sql`
           WITH RECURSIVE container_tree AS (
             SELECT division_id
-            FROM landscape.tbl_container
+            FROM landscape.tbl_division
             WHERE division_id = ${divisionId}
 
             UNION ALL
 
             SELECT c.division_id
-            FROM landscape.tbl_container c
+            FROM landscape.tbl_division c
             INNER JOIN container_tree ct ON c.parent_division_id = ct.division_id
           )
           SELECT
@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
             AVG(b.amount) AS avg_amount
           FROM landscape.core_fin_fact_budget b
           INNER JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
-          LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+          LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
           WHERE b.project_id = ${projectId}
           GROUP BY cat.category_id, cat.code, cat.detail, cat.scope
           ORDER BY cat.scope, cat.code

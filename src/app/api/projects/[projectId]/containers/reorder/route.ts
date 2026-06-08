@@ -57,7 +57,7 @@ export async function PATCH(
     const divisionIds = updates.map((u) => u.division_id)
     const existingContainers = await sql`
       SELECT division_id, project_id, parent_division_id
-      FROM landscape.tbl_container
+      FROM landscape.tbl_division
       WHERE division_id = ANY(${divisionIds})
     `
 
@@ -122,7 +122,7 @@ export async function PATCH(
     await sql.begin(async (txn: any) => {
       for (const update of updates) {
         await txn`
-          UPDATE landscape.tbl_container
+          UPDATE landscape.tbl_division
           SET sort_order = ${update.sort_order}, updated_at = CURRENT_TIMESTAMP
           WHERE division_id = ${update.division_id}
         `
@@ -132,7 +132,7 @@ export async function PATCH(
     // Return updated containers
     const updated = await sql`
       SELECT division_id, sort_order
-      FROM landscape.tbl_container
+      FROM landscape.tbl_division
       WHERE division_id = ANY(${divisionIds})
       ORDER BY sort_order NULLS LAST
     `

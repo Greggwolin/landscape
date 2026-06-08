@@ -92,7 +92,7 @@ export async function GET(
         COUNT(DISTINCT p.parcel_id) as parcels_count,
         COUNT(DISTINCT p.type_code) as product_types_count,
         COUNT(*) FILTER (WHERE p.type_code IS NOT NULL) as parcels_with_types
-      FROM landscape.tbl_container c
+      FROM landscape.tbl_division c
       LEFT JOIN landscape.tbl_parcel p ON p.project_id = c.project_id
       WHERE c.project_id = ${projectId}
     `;
