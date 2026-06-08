@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 from apps.projects.models import Project
-from apps.containers.models import Container, ContainerType
+from apps.containers.models import Container
 from apps.financial.models import BudgetItem, ActualItem, FinancialCategory, FinancialAccountCode, FinancialAccountGroup
 from apps.calculations.converters import (
     convert_project_to_property_data,
@@ -62,13 +62,8 @@ def full_project():
 @pytest.fixture
 def project_with_financials(full_project):
     """Create project with containers and budget items."""
-    ctype = ContainerType.objects.create(
-        type_code="PHASE",
-        type_name="Phase"
-    )
     container = Container.objects.create(
         project=full_project,
-        container_type=ctype,
         container_name="Phase 1",
         display_order=1
     )

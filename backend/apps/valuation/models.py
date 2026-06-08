@@ -199,43 +199,6 @@ class LandCompAdjustment(models.Model):
         return f"{self.get_adjustment_type_display()} adjustment for comp {self.land_comparable_id}"
 
 
-class ContainerCostMetadata(models.Model):
-    """
-    Marshall & Swift / appraisal metadata linked to each building container.
-
-    NOTE: This model is currently disabled (managed=False) because tbl_container
-    doesn't exist yet. When the container system is fully implemented, update this
-    model to use a proper ForeignKey to Container.
-    """
-
-    cost_metadata_id = models.AutoField(primary_key=True)
-    # Using IntegerField until tbl_container exists
-    container_id = models.IntegerField(unique=True)
-    cost_source = models.CharField(max_length=100, null=True, blank=True)
-    source_section = models.CharField(max_length=50, null=True, blank=True)
-    source_page = models.CharField(max_length=50, null=True, blank=True)
-    cost_date = models.DateField(null=True, blank=True)
-    construction_class = models.CharField(max_length=10, null=True, blank=True)
-    quality = models.CharField(max_length=50, null=True, blank=True)
-    num_stories = models.IntegerField(default=1)
-    base_cost_per_sf = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    height_per_story_factor = models.DecimalField(max_digits=6, decimal_places=4, default=1.0)
-    perimeter_factor = models.DecimalField(max_digits=6, decimal_places=4, default=1.0)
-    current_cost_multiplier = models.DecimalField(max_digits=6, decimal_places=4, default=1.0)
-    local_area_multiplier = models.DecimalField(max_digits=6, decimal_places=4, default=1.0)
-    indirect_cost_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    entrepreneurial_profit_pct = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        managed = False  # Disabled until tbl_container exists
-        db_table = 'tbl_container_cost_metadata'
-
-    def __str__(self):
-        return f"M&S metadata for container {self.container_id}"
-
-
 class CostApproachDepreciation(models.Model):
     """Project-level depreciation entries used by the Cost Approach summary."""
 

@@ -12,11 +12,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Prefetch
 from apps.projects.permissions import filter_qs_by_owner_or_staff
-from .models import Container, ContainerType
+from .models import Container
 from .serializers import (
     ContainerSerializer,
     ContainerCreateSerializer,
-    ContainerTypeSerializer,
 )
 
 
@@ -246,16 +245,3 @@ class ContainerViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-
-class ContainerTypeViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Read-only ViewSet for ContainerType lookup table.
-
-    Endpoints:
-    - GET /api/container-types/ - List all container types
-    - GET /api/container-types/:id/ - Retrieve container type
-    """
-
-    queryset = ContainerType.objects.filter(is_active=True)
-    serializer_class = ContainerTypeSerializer

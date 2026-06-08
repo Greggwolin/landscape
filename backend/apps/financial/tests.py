@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
 from apps.projects.models import Project
-from apps.containers.models import Container, ContainerType
+from apps.containers.models import Container
 from apps.financial.models import (
     BudgetItem, ActualItem, FinancialCategory,
     FinancialAccountCode, FinancialAccountGroup
@@ -45,13 +45,8 @@ def test_project():
 
 @pytest.fixture
 def container(test_project):
-    ctype = ContainerType.objects.create(
-        type_code="PHASE",
-        type_name="Phase"
-    )
     return Container.objects.create(
         project=test_project,
-        container_type=ctype,
         container_name="Phase 1",
         display_order=1
     )

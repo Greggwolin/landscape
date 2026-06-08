@@ -14,7 +14,6 @@ from .models import (
     NarrativeChange,
     LandComparable,
     LandCompAdjustment,
-    ContainerCostMetadata,
     CostApproachDepreciation,
 )
 
@@ -298,34 +297,6 @@ class LandCompAdjustmentSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['adjustment_id', 'created_at']
-
-
-class ContainerCostMetadataSerializer(serializers.ModelSerializer):
-    """Serializer for container-level cost metadata."""
-
-    class Meta:
-        model = ContainerCostMetadata
-        fields = [
-            'cost_metadata_id',
-            'container',
-            'cost_source',
-            'source_section',
-            'source_page',
-            'cost_date',
-            'construction_class',
-            'quality',
-            'num_stories',
-            'base_cost_per_sf',
-            'height_per_story_factor',
-            'perimeter_factor',
-            'current_cost_multiplier',
-            'local_area_multiplier',
-            'indirect_cost_pct',
-            'entrepreneurial_profit_pct',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['cost_metadata_id', 'created_at', 'updated_at']
 
 
 class CostApproachDepreciationSerializer(serializers.ModelSerializer):

@@ -5,7 +5,7 @@ Provides recursive serialization for hierarchical container trees.
 """
 
 from rest_framework import serializers
-from .models import Container, ContainerType
+from .models import Container
 
 
 class RecursiveField(serializers.Serializer):
@@ -215,17 +215,3 @@ class ContainerCreateSerializer(serializers.ModelSerializer):
         )
 
         return container
-
-
-class ContainerTypeSerializer(serializers.ModelSerializer):
-    """Serializer for ContainerType lookup table."""
-
-    class Meta:
-        model = ContainerType
-        fields = [
-            'container_type_id',
-            'type_code',
-            'type_name',
-            'description',
-            'is_active',
-        ]

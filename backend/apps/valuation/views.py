@@ -20,7 +20,6 @@ from .models import (
     NarrativeChange,
     LandComparable,
     LandCompAdjustment,
-    ContainerCostMetadata,
     CostApproachDepreciation,
 )
 from .serializers import (
@@ -32,7 +31,6 @@ from .serializers import (
     AcceptChangesSerializer,
     LandComparableSerializer,
     LandCompAdjustmentSerializer,
-    ContainerCostMetadataSerializer,
     CostApproachDepreciationSerializer,
 )
 
@@ -307,28 +305,6 @@ class LandComparableAdjustmentDetailView(APIView):
         adjustment = self.get_object(project_id, comp_id, adj_id)
         adjustment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ContainerCostMetadataView(APIView):
-    """Retrieve or upsert cost metadata for a container."""
-
-    def get(self, request, container_id):
-        container = get_object_or_404(Container, pk=container_id)
-        metadata = ContainerCostMetadata.objects.filter(container=container).first()
-        if not metadata:
-            return Response({'detail': 'No metadata found'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = ContainerCostMetadataSerializer(metadata)
-        return Response(serializer.data)
-
-    def put(self, request, container_id):
-        container = get_object_or_404(Container, pk=container_id)
-        metadata = ContainerCostMetadata.objects.filter(container=container).first()
-        data = request.data.copy()
-        data['container'] = container_id
-        serializer = ContainerCostMetadataSerializer(metadata, data=data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
 
 
 class ProjectDepreciationView(APIView):
