@@ -1,0 +1,52 @@
+name: Resolve Neon DATABASE_URL
+description: >
+  Re-derive the Neon connection string for a PR's database branch inside the
+  current job and export it as DATABASE_URL. GitHub scrubs secret-bearing
+  values passed across job outputs, so the connection string cannot be handed
+  from the create-database job to downstream jobs — each consumer must derive it
+  itself from the NEON_API_KEY secret and the non-secret branch name.
+
+inputs:
+  branch-name:
+    description: Neon branch name (non-secret) from the create-database job.
+    required: true
+  neon-api-key:
+    description: Neon API key (secret); used by neonctl for auth.
+    required: true
+  neon-project-id:
+    description: Neon project id.
+    required: true
+  database:
+    description: Database name to connect to.
+    required: false
+    default: land_v2
+  role-name:
+    description: Role name for the connection string.
+    required: false
+    default: neondb_owner
+
+runs:
+  using: composite
+  steps:
+    - name: Install Neon CLI
+      shell: bash
+      run: npm install -g neonctl
+
+    - name: Re-derive DATABASE_URL
+      shell: bash
+      env:
+        NEON_API_KEY: ${{ inputs.neon-api-key }}
+      run: |
+        DB_URL="$(neonctl connection-string \
+          --project-id "${{ inputs.neon-project-id }}" \
+          --branch "${{ inputs.branch-name }}" \
+          --role-name "${{ inputs.role-name }}" \
+          --database "${{ inputs.database }}")"
+        if [ -z "$DB_URL" ]; then
+          echo "::error::Empty Neon connection string for branch '${{ inputs.branch-name }}' (database '${{ inputs.database }}'). Check NEON_API_KEY / project id / neonctl flags."
+          exit 1
+        fi
+        # Mask the credential in logs and expose to subsequent steps in this job.
+        echo "::add-mask::$DB_URL"
+        echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
+        echo "Resolved DATABASE_URL for branch '${{ inputs.branch-name }}' (non-empty)."
