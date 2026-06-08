@@ -8,6 +8,7 @@
     "start": "next start --port 3000",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "typecheck": "tsc --noEmit",
     "test": "npm run test:tokens && npm run test:contrast",
     "test:tokens": "jest tests/themeTokens.spec.ts",
     "test:contrast": "playwright test --config=playwright.config.ts tests/e2e/contrast.e2e.spec.ts",
