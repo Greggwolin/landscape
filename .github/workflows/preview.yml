@@ -122,6 +122,12 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # next build evaluates route modules during page-data collection;
+          # src/lib/auth.ts throws at import if JWT_SIGNING_KEY is unset. The
+          # build only needs the var present (it's a runtime signing key, not
+          # used at build time), so a placeholder is sufficient here.
+          JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY || 'ci-build-time-placeholder' }}
 
       - name: Run unit tests
         # Jest unit tests only. The Playwright contrast e2e (test:contrast / the
