@@ -11,18 +11,21 @@ import { readFileSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Import the Neon client
-import { neon } from '@neondatabase/serverless';
+// Direct Postgres driver. The @neondatabase/serverless HTTP driver cannot
+// resolve the land_v2 database over its endpoint ("database land_v2 does not
+// exist"), while the standard Postgres protocol reaches it fine — so this
+// script uses pg and runs anywhere with a normal DATABASE_URL.
+import pg from 'pg';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load environment variables
+// Load DATABASE_URL from .env.local (quoted OR unquoted) or the environment.
 const envPath = join(__dirname, '..', '.env.local');
 let DATABASE_URL;
 try {
   const envContent = readFileSync(envPath, 'utf8');
-  const match = envContent.match(/DATABASE_URL="([^"]+)"/);
+  const match = envContent.match(/^\s*DATABASE_URL\s*=\s*["']?([^"'\n]+)["']?/m);
   DATABASE_URL = match ? match[1] : process.env.DATABASE_URL;
 } catch (error) {
   DATABASE_URL = process.env.DATABASE_URL;
@@ -33,7 +36,22 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const sql = neon(DATABASE_URL);
+const client = new pg.Client({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+await client.connect();
+
+// Tagged-template shim matching the previous `sql` interface: `await sql`...``
+// returns the rows array. Supports ${param} interpolation via positional args.
+const sql = async (strings, ...values) => {
+  const text = strings.reduce(
+    (acc, s, i) => acc + s + (i < values.length ? `$${i + 1}` : ''),
+    '',
+  );
+  const result = await client.query(text, values);
+  return result.rows;
+};
 
 // PostgreSQL to TypeScript type mapping
 const TYPE_MAPPING = {
@@ -272,27 +290,10 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
       }
     });
 
-    // Generate schema-specific exports
-    tsCode += `// Schema-specific type collections\n`;
-    tsCode += `export namespace LandscapeSchema {\n`;
-    Object.keys(tablesBySchema)
-      .filter(key => key.startsWith('landscape.'))
-      .forEach(key => {
-        const tableName = key.split('.')[1];
-        const interfaceName = generateInterfaceName(tableName);
-        tsCode += `  export type ${toPascalCase(tableName)} = ${interfaceName};\n`;
-      });
-    tsCode += `}\n\n`;
-
-    tsCode += `export namespace LandV2Schema {\n`;
-    Object.keys(tablesBySchema)
-      .filter(key => key.startsWith('land_v2.'))
-      .forEach(key => {
-        const tableName = key.split('.')[1];
-        const interfaceName = generateInterfaceName(tableName);
-        tsCode += `  export type ${toPascalCase(tableName)} = ${interfaceName};\n`;
-      });
-    tsCode += `}\n\n`;
+    // NOTE: the LandscapeSchema / LandV2Schema re-export namespaces were removed.
+    // They emitted `export type X = X` aliases whose RHS resolved to the alias
+    // itself inside the namespace — self-referential (TS2456, ~87 errors) — and
+    // nothing consumed them. Consumers import the top-level interfaces directly.
 
     // Generate table name constants
     tsCode += `// Table name constants\n`;
@@ -326,6 +327,8 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
   } catch (error) {
     console.error('❌ Type generation failed:', error.message);
     throw error;
+  } finally {
+    await client.end();
   }
 }
 
