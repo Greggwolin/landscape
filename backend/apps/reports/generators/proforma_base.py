@@ -205,12 +205,78 @@ def proforma_preview_sections(model: Dict[str, Any], heading: str = 'Proforma Ca
 # PDF
 # ---------------------------------------------------------------------------
 
+# Minimum readable width (points) for a period column; drives how many period
+# columns fit per page before horizontal pagination kicks in.
+_MIN_COL_PT = 38
+# Item / Total fixed widths (points) per orientation.
+_PORTRAIT_ITEM_PT, _PORTRAIT_TOTAL_PT = 120, 48
+_LANDSCAPE_ITEM_PT, _LANDSCAPE_TOTAL_PT = 150, 55
+# Orientation thresholds: portrait only when the schedule is both narrow and
+# short; anything wide (many period columns, e.g. monthly) or dense (many line
+# items) goes landscape.
+_PORTRAIT_MAX_COLS = 8
+_PORTRAIT_MAX_ROWS = 26
+
+
+def _decide_orientation(n_cols: int, n_rows: int) -> str:
+    if n_cols <= _PORTRAIT_MAX_COLS and n_rows <= _PORTRAIT_MAX_ROWS:
+        return 'portrait'
+    return 'landscape'
+
+
+def _build_chunk_table(model, chunk, page_w, item_w, total_w, styles):
+    """Build one table covering the Item + Total columns plus a slice of the
+    period columns. Item/Total are repeated in every chunk so they appear on
+    every page when period columns paginate horizontally."""
+    from .pdf_base import scale_cw, make_table, p, hp, fmt_currency_k
+
+    header = [hp('Item', styles), hp('Total', styles, right=True)]
+    header += [hp(lab, styles, right=True) for _k, lab in chunk]
+    data = [header]
+    row_styles: List[str] = []
+
+    for r in model['rows']:
+        kind = r['kind']
+        bold = kind in ('section', 'phase', 'subtotal', 'grandtotal', 'cumulative')
+        label = ('  ' * r.get('indent', 0)) + r['label']
+        if kind == 'section':
+            data.append([p(label, styles, bold=True)] + [p('', styles) for _ in range(len(chunk) + 1)])
+            row_styles.append('header')
+            continue
+        cells = [p(label, styles, bold=bold), p(fmt_currency_k(r['total']), styles, bold=bold, right=True)]
+        for key, _lab in chunk:
+            cells.append(p(fmt_currency_k(r['values'].get(key, 0)), styles, bold=bold, right=True))
+        data.append(cells)
+        if kind == 'grandtotal':
+            row_styles.append('total')
+        elif kind in ('subtotal', 'phase'):
+            row_styles.append('subtotal')
+        elif kind == 'line':
+            row_styles.append('indent')
+        else:
+            row_styles.append('')
+
+    col_pt = (page_w - item_w - total_w) / max(len(chunk), 1)
+    weights = [item_w, total_w] + [col_pt] * len(chunk)
+    col_widths = scale_cw(weights, page_w)
+    # has_header repeatRows=1 → the column-header row repeats when rows paginate
+    # vertically across pages.
+    return make_table(data, col_widths, row_styles=row_styles, has_header=True)
+
+
 def render_proforma_pdf(model: Dict[str, Any], title: str, subtitle: str) -> bytes:
+    """Render the model to PDF with content-driven orientation + pagination.
+
+    Orientation is chosen from the schedule's shape (wide/dense → landscape,
+    small → portrait). Period columns that exceed the page width paginate
+    horizontally into successive tables, each repeating the Item + Total
+    columns; rows that exceed page height paginate vertically with the
+    column-header row repeated.
+    """
     from .pdf_base import (
-        scale_cw, make_styles, make_table, add_header, build_pdf,
-        p, hp, fmt_currency_k, LANDSCAPE_WIDTH,
+        make_styles, add_header, build_pdf, PORTRAIT_WIDTH, LANDSCAPE_WIDTH,
     )
-    from reportlab.platypus import Paragraph
+    from reportlab.platypus import Paragraph, Spacer
 
     elements: List[Any] = []
     add_header(elements, title, subtitle)
@@ -223,42 +289,28 @@ def render_proforma_pdf(model: Dict[str, Any], title: str, subtitle: str) -> byt
             'No cash flow schedule available for this project.',
             make_styles(10)['left'],
         ))
-        return build_pdf(elements, orientation='landscape')
+        return build_pdf(elements, orientation='portrait')
 
-    header = [hp('Item', styles), hp('Total', styles, right=True)]
-    header += [hp(lab, styles, right=True) for _k, lab in buckets]
-    data = [header]
-    row_styles: List[str] = []
+    orientation = _decide_orientation(len(buckets), len(model['rows']))
+    if orientation == 'portrait':
+        page_w, item_w, total_w = PORTRAIT_WIDTH, _PORTRAIT_ITEM_PT, _PORTRAIT_TOTAL_PT
+    else:
+        page_w, item_w, total_w = LANDSCAPE_WIDTH, _LANDSCAPE_ITEM_PT, _LANDSCAPE_TOTAL_PT
 
-    for r in model['rows']:
-        kind = r['kind']
-        bold = kind in ('section', 'phase', 'subtotal', 'grandtotal', 'cumulative')
-        label = ('  ' * r.get('indent', 0)) + r['label']
-        if kind == 'section':
-            cells = [p(label, styles, bold=True)] + [p('', styles) for _ in range(len(buckets) + 1)]
-            row_styles.append('header')
-            data.append(cells)
-            continue
-        cells = [p(label, styles, bold=bold), p(fmt_currency_k(r['total']), styles, bold=bold, right=True)]
-        for key, _lab in buckets:
-            cells.append(p(fmt_currency_k(r['values'].get(key, 0)), styles, bold=bold, right=True))
-        data.append(cells)
-        if kind == 'grandtotal':
-            row_styles.append('total')
-        elif kind in ('subtotal', 'phase'):
-            row_styles.append('subtotal')
-        elif kind == 'line':
-            row_styles.append('indent')
-        else:
-            row_styles.append('')
+    cap = max(1, int((page_w - item_w - total_w) // _MIN_COL_PT))
+    chunks = [buckets[i:i + cap] for i in range(0, len(buckets), cap)]
 
-    # Raw proportional weights; scale_cw normalizes them to the page width.
-    n = len(buckets)
-    weights = [2.2, 0.85] + [0.8] * n
-    col_widths = scale_cw(weights, LANDSCAPE_WIDTH)
+    for ci, chunk in enumerate(chunks):
+        if ci > 0:
+            elements.append(Spacer(1, 10))
+            elements.append(Paragraph(
+                f"<i>Periods continued: {chunk[0][1]} – {chunk[-1][1]}</i>",
+                styles['left'],
+            ))
+            elements.append(Spacer(1, 4))
+        elements.append(_build_chunk_table(model, chunk, page_w, item_w, total_w, styles))
 
-    elements.append(make_table(data, col_widths, row_styles=row_styles, has_header=True))
-    return build_pdf(elements, orientation='landscape')
+    return build_pdf(elements, orientation=orientation)
 
 
 # ---------------------------------------------------------------------------
