@@ -34,7 +34,7 @@ export async function PATCH(
 
     // Check container exists
     const existingCheck = await sql`
-      SELECT * FROM landscape.tbl_container
+      SELECT * FROM landscape.tbl_division
       WHERE division_id = ${id}
     `
 
@@ -57,9 +57,9 @@ export async function PATCH(
     if (container_code && container_code !== existing.container_code) {
       const duplicateCheck = await sql`
         SELECT COUNT(*)::int as count
-        FROM landscape.tbl_container
+        FROM landscape.tbl_division
         WHERE project_id = ${existing.project_id}
-          AND container_code = ${container_code}
+          AND division_code = ${container_code}
           AND division_id != ${id}
       `
 
@@ -118,16 +118,16 @@ export async function PATCH(
     // Execute update with conditional field updates using COALESCE
     // This allows partial updates - only provided fields are changed
     const updated = await sql`
-      UPDATE landscape.tbl_container
+      UPDATE landscape.tbl_division
       SET
-        container_code = COALESCE(${container_code ?? null}, container_code),
+        division_code = COALESCE(${container_code ?? null}, division_code),
         display_name = COALESCE(${display_name ?? null}, display_name),
         sort_order = COALESCE(${sort_order ?? null}, sort_order),
         attributes = COALESCE(${attributes ? JSON.stringify(attributes) : null}::jsonb, attributes),
         is_active = COALESCE(${is_active ?? null}, is_active),
         updated_at = CURRENT_TIMESTAMP
       WHERE division_id = ${id}
-      RETURNING *
+      RETURNING *, division_code AS container_code
     `
 
     if (updated.length === 0) {
@@ -242,7 +242,7 @@ export async function DELETE(
 
     // Safe to delete - use soft delete (set is_active = false)
     const deleted = await sql`
-      UPDATE landscape.tbl_container
+      UPDATE landscape.tbl_division
       SET is_active = false, updated_at = CURRENT_TIMESTAMP
       WHERE division_id = ${id}
       RETURNING *

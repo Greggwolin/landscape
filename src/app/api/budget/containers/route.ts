@@ -62,7 +62,7 @@ async function resolveContainerFromLegacy(peLevel: string, peId: string) {
 
   const [row] = await sql`
     SELECT division_id, project_id
-    FROM landscape.tbl_container
+    FROM landscape.tbl_division
     WHERE tier = ${tier}
       AND attributes->>${column} = ${peId}
     LIMIT 1
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     if (!projectId && divisionId) {
       const [row] = await sql`
         SELECT project_id, tier
-        FROM landscape.tbl_container
+        FROM landscape.tbl_division
         WHERE division_id = ${divisionId}
       `
       if (row?.project_id != null) {
@@ -149,14 +149,14 @@ export async function GET(request: NextRequest) {
     if (divisionId && includeChildren) {
       items = (await sql`
         WITH RECURSIVE container_tree AS (
-          SELECT division_id, tier, project_id, parent_division_id, container_code, display_name, sort_order
-          FROM landscape.tbl_container
+          SELECT division_id, tier, project_id, parent_division_id, division_code AS container_code, display_name, sort_order
+          FROM landscape.tbl_division
           WHERE division_id = ${divisionId}
 
           UNION ALL
 
-          SELECT c.division_id, c.tier, c.project_id, c.parent_division_id, c.container_code, c.display_name, c.sort_order
-          FROM landscape.tbl_container c
+          SELECT c.division_id, c.tier, c.project_id, c.parent_division_id, c.division_code AS container_code, c.display_name, c.sort_order
+          FROM landscape.tbl_division c
           INNER JOIN container_tree ct ON c.parent_division_id = ct.division_id
         )
         SELECT
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
           b.confidence_level,
           b.is_committed,
           c.tier,
-          c.container_code,
+          c.division_code AS container_code,
           c.display_name AS container_name,
           c.parent_division_id,
           c.project_id AS project_ref,
@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+        LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
         WHERE b.division_id = ${divisionId}
         ORDER BY cat.scope, cat.code
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
           b.confidence_level,
           b.is_committed,
           c.tier,
-          c.container_code,
+          c.division_code AS container_code,
           c.display_name AS container_name,
           c.parent_division_id,
           c.project_id AS project_ref,
@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+        LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
         WHERE b.project_id = ${projectId}
           ${tier === 0
@@ -263,7 +263,7 @@ export async function GET(request: NextRequest) {
           b.confidence_level,
           b.is_committed,
           c.tier,
-          c.container_code,
+          c.division_code AS container_code,
           c.display_name AS container_name,
           c.parent_division_id,
           c.project_id AS project_ref,
@@ -272,7 +272,7 @@ export async function GET(request: NextRequest) {
           cat.detail AS category_name,
           cat.scope AS category_scope
         FROM landscape.core_fin_fact_budget b
-        LEFT JOIN landscape.tbl_container c ON b.division_id = c.division_id
+        LEFT JOIN landscape.tbl_division c ON b.division_id = c.division_id
         LEFT JOIN landscape.core_fin_category cat ON b.category_id = cat.category_id
         WHERE b.project_id = ${projectId}
         ORDER BY

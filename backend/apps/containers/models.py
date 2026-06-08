@@ -1,7 +1,12 @@
 """
 Container models for hierarchical project organization.
 
-Maps to landscape.tbl_container table.
+The Container model maps to landscape.tbl_division (renamed from tbl_container in
+migration 025); the Python field names are retained and remapped to the new
+columns via db_column, so no serializer/view consumers need to change.
+
+ContainerType has NO backing table anymore (tbl_container_type was dropped with
+no replacement) — it is dead; see its note.
 """
 
 from django.db import models
@@ -22,7 +27,11 @@ class Container(models.Model):
     - Aggregated data from all descendants
     """
 
-    container_id = models.AutoField(primary_key=True)
+    # Python field names are kept as-is (container_id, container_level,
+    # container_code, parent_container) so existing serializers/views don't
+    # change; each is remapped via db_column to the renamed tbl_division
+    # columns (migration 025: tbl_container -> tbl_division).
+    container_id = models.AutoField(primary_key=True, db_column='division_id')
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.CASCADE,
@@ -32,12 +41,13 @@ class Container(models.Model):
     parent_container = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
-        db_column='parent_container_id',
+        db_column='parent_division_id',
         null=True,
         blank=True,
         related_name='children'
     )
     container_level = models.SmallIntegerField(
+        db_column='tier',
         choices=[
             (1, 'Level 1 - Division'),
             (2, 'Level 2 - Subdivision'),
@@ -47,6 +57,7 @@ class Container(models.Model):
     )
     container_code = models.CharField(
         max_length=50,
+        db_column='division_code',
         help_text='Unique code within project (e.g., RES-FS-A)'
     )
     display_name = models.CharField(
@@ -89,7 +100,7 @@ class Container(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'tbl_container'
+        db_table = 'tbl_division'
         ordering = ['container_level', 'sort_order', 'container_id']
         constraints = [
             models.UniqueConstraint(
@@ -149,7 +160,10 @@ class ContainerType(models.Model):
     """
     Lookup table for container types.
 
-    Maps to landscape.tbl_container_type table.
+    DEAD MODEL: landscape.tbl_container_type was dropped in the container→division
+    rename with NO replacement table, so this model is non-functional
+    (managed=False, no backing table). Left in place only to avoid breaking
+    imports; remove it and its admin registration in a follow-up. Do not build on it.
     """
 
     container_type_id = models.AutoField(primary_key=True)

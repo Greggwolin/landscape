@@ -368,9 +368,9 @@ export async function POST(
     // Check for duplicate container_code
     const existingCode = await sql`
       SELECT COUNT(*)::int as count
-      FROM landscape.tbl_container
+      FROM landscape.tbl_division
       WHERE project_id = ${id}
-        AND container_code = ${finalCode}
+        AND division_code = ${finalCode}
     `
 
     if (existingCode[0].count > 0) {
@@ -394,7 +394,7 @@ export async function POST(
     if (parent_division_id != null) {
       const parentCheck = await sql`
         SELECT project_id, tier, division_id
-        FROM landscape.tbl_container
+        FROM landscape.tbl_division
         WHERE division_id = ${parent_division_id}
       `
 
@@ -452,11 +452,11 @@ export async function POST(
 
     // Insert container
     const inserted = await sql`
-      INSERT INTO landscape.tbl_container (
+      INSERT INTO landscape.tbl_division (
         project_id,
         parent_division_id,
         tier,
-        container_code,
+        division_code,
         display_name,
         sort_order,
         attributes,
@@ -471,7 +471,7 @@ export async function POST(
         ${attributes ? JSON.stringify(attributes) : '{}'},
         true
       )
-      RETURNING *
+      RETURNING *, division_code AS container_code
     `
 
     const created = inserted[0]

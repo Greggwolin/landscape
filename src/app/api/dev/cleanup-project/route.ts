@@ -214,7 +214,7 @@ export async function DELETE(request: NextRequest) {
     // ============================================================
     await deleteByProjectId('tbl_parcel')
     await deleteByProjectId('tbl_phase')
-    await deleteByProjectId('tbl_container')
+    await deleteByProjectId('tbl_division')
     await deleteByProjectId('landscaper_chat_embedding')
     await deleteByProjectId('knowledge_sessions')
     await deleteByProjectId('mutation_audit_log')

@@ -156,7 +156,7 @@ export async function POST(
         if (result[0].division_id) {
           const tier = await sql`
             SELECT tier
-            FROM landscape.tbl_container
+            FROM landscape.tbl_division
             WHERE division_id = ${result[0].division_id}
           `
           if (tier.length > 0) {
@@ -181,7 +181,7 @@ export async function POST(
       SELECT
         tier,
         COUNT(DISTINCT division_id) as count
-      FROM landscape.tbl_container
+      FROM landscape.tbl_division
       WHERE project_id = ${id}
         AND is_active = true
         AND tier > 1

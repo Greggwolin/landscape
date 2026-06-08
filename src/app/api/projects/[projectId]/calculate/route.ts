@@ -51,13 +51,13 @@ export async function POST(
         SELECT
           c.division_id,
           c.tier,
-          c.container_code,
+          c.division_code AS container_code,
           c.display_name,
           SUM(b.amount)::text AS total_amount
         FROM landscape.core_fin_fact_budget b
-        JOIN landscape.tbl_container c ON c.division_id = b.division_id
+        JOIN landscape.tbl_division c ON c.division_id = b.division_id
         WHERE c.project_id = ${id}
-        GROUP BY c.division_id, c.tier, c.container_code, c.display_name
+        GROUP BY c.division_id, c.tier, c.division_code, c.display_name
         ORDER BY c.tier, c.sort_order NULLS LAST, c.division_id
       `,
       sql`

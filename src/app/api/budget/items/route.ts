@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           ? []
           : await sql`
               SELECT division_id, project_id
-              FROM landscape.tbl_container
+              FROM landscape.tbl_division
               WHERE tier = ${
                 peLevel === 'area' ? 1 : peLevel === 'phase' ? 2 : 3
               }
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     if (resolvedContainerId != null && projectId == null) {
       const [row] = await sql`
-        SELECT project_id FROM landscape.tbl_container WHERE division_id = ${resolvedContainerId}
+        SELECT project_id FROM landscape.tbl_division WHERE division_id = ${resolvedContainerId}
       `;
       if (row?.project_id != null) {
         projectId = Number(row.project_id);
