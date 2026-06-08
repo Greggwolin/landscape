@@ -99,6 +99,12 @@ class SalesScheduleGenerator(PreviewBaseGenerator):
         add_header(elements, "Project Land Sales Schedule", subtitle)
 
         # Fetch per-parcel sales data
+        # Per-parcel sales. Parcel attributes (units, frontage, acres) come from
+        # tbl_parcel; sale timing + proceeds come from tbl_parcel_sale_assumptions
+        # (the live source — tbl_parcel.saledate/saleprice are not populated, and
+        # the old front_footage/sale_year/sale_month/dev_cost_per_lot columns do
+        # not exist). Per-parcel subdivision cost has no parcel-level column
+        # (dev cost lives in the budget), so it is reported as 0 here.
         parcels = self.execute_query("""
             SELECT
                 COALESCE(ph.phase_name, 'Unphased') AS phase_name,
@@ -106,14 +112,15 @@ class SalesScheduleGenerator(PreviewBaseGenerator):
                 COALESCE(p.landuse_type, 'UNK') AS use_code,
                 COALESCE(p.lot_product, '') AS product,
                 COALESCE(p.units_total, 0) AS units,
-                COALESCE(p.front_footage, 0) AS ff,
+                COALESCE(p.lots_frontfeet, 0) AS ff,
                 COALESCE(p.acres_gross, 0) AS acres,
-                COALESCE(p.sale_year, 0) AS sale_yr,
-                COALESCE(p.sale_month, 0) AS sale_mo,
-                COALESCE(p.saleprice * p.units_total, 0) AS sfd_revenue,
-                COALESCE(p.dev_cost_per_lot * p.units_total, 0) AS subd_cost
+                COALESCE(EXTRACT(YEAR FROM psa.sale_date)::int, 0) AS sale_yr,
+                COALESCE(EXTRACT(MONTH FROM psa.sale_date)::int, 0) AS sale_mo,
+                COALESCE(psa.net_sale_proceeds, 0) AS sfd_revenue,
+                0 AS subd_cost
             FROM landscape.tbl_parcel p
             LEFT JOIN landscape.tbl_phase ph ON p.phase_id = ph.phase_id
+            LEFT JOIN landscape.tbl_parcel_sale_assumptions psa ON p.parcel_id = psa.parcel_id
             WHERE p.project_id = %s
             ORDER BY ph.phase_name, p.parcel_name
         """, [self.project_id])
@@ -240,7 +247,7 @@ class SalesScheduleGenerator(PreviewBaseGenerator):
         elements.append(Spacer(1, 0.15 * inch))
 
         # Footer text
-        footer_style = make_styles(7.5, italic=True)['left']
+        footer_style = make_styles(7.5)['left']
         footer_text = f"Showing {parcel_count} of {parcel_count} parcels | Total Net Proceeds (all parcels): {fmt_currency(total_net_proceeds)} | Total SFD Lots: {total_units}"
         elements.append(Paragraph(footer_text, footer_style))
 
