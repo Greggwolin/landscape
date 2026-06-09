@@ -491,9 +491,9 @@ function GrowthRateForm({
         steps: [
           {
             from_period: 1,
-            periods: 'E',
+            periods: 'E' as const,
             rate: parsedFlat,
-            thru_period: 'E'
+            thru_period: 'E' as const
           }
         ],
         is_global: isGlobal,
