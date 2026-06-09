@@ -56,14 +56,14 @@ export default function FiltersAccordion({
   // Prefer containers with data, but fall back to showing everything so users can still select areas/phases
   const validAreas = React.useMemo(() => {
     const filtered = areas.filter(area =>
-      area.acres > 0 || area.units > 0 || area.phaseCount > 0 || area.parcelCount > 0 || area.totalCost > 0
+      area.acres > 0 || area.units > 0 || (area.phaseCount ?? 0) > 0 || (area.parcelCount ?? 0) > 0 || area.totalCost > 0
     )
     return filtered.length > 0 ? filtered : areas
   }, [areas])
 
   const validPhases = React.useMemo(() => {
     const filtered = phases.filter(phase =>
-      phase.acres > 0 || phase.units > 0 || phase.parcelCount > 0 || phase.totalCost > 0
+      phase.acres > 0 || phase.units > 0 || (phase.parcelCount ?? 0) > 0 || phase.totalCost > 0
     )
     return filtered.length > 0 ? filtered : phases
   }, [phases])

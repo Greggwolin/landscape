@@ -38,7 +38,8 @@ const profileSchema = z.object({
   }, z.number().optional()),
 });
 
-type ProfileFormData = z.infer<typeof profileSchema>;
+type ProfileFormInput = z.input<typeof profileSchema>;
+type ProfileFormData = z.output<typeof profileSchema>;
 
 export default function ProfileForm({
   docId,
@@ -62,15 +63,15 @@ export default function ProfileForm({
     setValue,
     watch,
     formState: { errors, isValid, isDirty }
-  } = useForm<ProfileFormData>({
+  } = useForm<ProfileFormInput, unknown, ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      doc_type: initialProfile.doc_type || docType || '',
-      description: initialProfile.description || '',
-      tags: initialProfile.tags || [],
-      doc_date: initialProfile.doc_date || '',
-      parties: initialProfile.parties || '',
-      dollar_amount: initialProfile.dollar_amount || undefined,
+      doc_type: (initialProfile.doc_type as string) || docType || '',
+      description: (initialProfile.description as string) || '',
+      tags: (initialProfile.tags as string[]) || [],
+      doc_date: (initialProfile.doc_date as string) || '',
+      parties: (initialProfile.parties as string) || '',
+      dollar_amount: (initialProfile.dollar_amount as number) || undefined,
     },
     mode: 'onChange'
   });
@@ -258,7 +259,7 @@ export default function ProfileForm({
               Tags
             </label>
             <TagInput
-              value={currentTags}
+              value={currentTags ?? []}
               onChange={(tags) => setValue('tags', tags, { shouldDirty: true })}
               projectId={projectId}
               workspaceId={workspaceId}

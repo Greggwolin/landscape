@@ -110,7 +110,8 @@ export default function ReportTemplateCard({ template, onEdit }: ReportTemplateC
         {/* Action Buttons */}
         <div className="d-flex gap-2 mt-3">
           <LandscapeButton
-            variant="outline-primary"
+            color="primary"
+            variant="outline"
             size="sm"
             onClick={() => onEdit(template)}
             style={{ flex: 1 }}
@@ -118,7 +119,8 @@ export default function ReportTemplateCard({ template, onEdit }: ReportTemplateC
             Edit
           </LandscapeButton>
           <LandscapeButton
-            variant={template.is_active ? 'outline-secondary' : 'outline-success'}
+            color={template.is_active ? 'secondary' : 'success'}
+            variant="outline"
             size="sm"
             onClick={handleToggleActive}
             disabled={toggleActive.isPending}
@@ -126,7 +128,8 @@ export default function ReportTemplateCard({ template, onEdit }: ReportTemplateC
             {template.is_active ? 'Deactivate' : 'Activate'}
           </LandscapeButton>
           <LandscapeButton
-            variant="outline-danger"
+            color="danger"
+            variant="outline"
             size="sm"
             onClick={handleDelete}
             disabled={deleteTemplate.isPending}

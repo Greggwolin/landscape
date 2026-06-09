@@ -35,7 +35,7 @@ interface Assumption {
 
 interface ImpactMetrics {
   landValue: number;
-  irr: number;
+  irr: number | null;
   npv: number;
   calculating: boolean;
 }

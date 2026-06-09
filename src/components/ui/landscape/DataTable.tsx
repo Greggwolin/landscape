@@ -21,7 +21,7 @@ import {
   CTableDataCell,
   CSpinner,
 } from '@coreui/react';
-import type { CTableProps } from '@coreui/react';
+import type { CTableProps } from '@coreui/react/dist/esm/components/table/CTable';
 
 export interface DataTableColumn<T> {
   /**
@@ -55,7 +55,7 @@ export interface DataTableColumn<T> {
   sortable?: boolean;
 }
 
-export interface DataTableProps<T> extends Omit<CTableProps, 'children'> {
+export interface DataTableProps<T> extends Omit<CTableProps, 'children' | 'columns'> {
   /**
    * Array of data to display
    */

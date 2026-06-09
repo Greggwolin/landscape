@@ -308,7 +308,7 @@ function DroppableParentRow({
 
   return (
     <tr
-      ref={drop}
+      ref={(node) => { drop(node); }}
       className={rowClass}
       style={{
         backgroundColor: isOver && canDrop

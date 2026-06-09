@@ -11,6 +11,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { CButton, CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CSpinner } from '@coreui/react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 

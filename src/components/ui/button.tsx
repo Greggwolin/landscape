@@ -6,7 +6,8 @@ import { CButton } from '@coreui/react';
 type Variant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 type Size = 'default' | 'sm' | 'lg' | 'icon';
 
-export interface ButtonProps extends React.ComponentPropsWithoutRef<typeof CButton> {
+export interface ButtonProps
+  extends Omit<React.ComponentPropsWithoutRef<typeof CButton>, 'variant' | 'size'> {
   variant?: Variant;
   size?: Size;
 }
@@ -28,10 +29,12 @@ const classForSize: Record<Size, string | undefined> = {
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'default', size = 'default', className, ...props }, ref) => {
-    const coreColor = colorForVariant[variant] || 'primary';
-    const coreVariant = variant === 'outline' ? 'outline' : undefined;
-    const extraClass = [classForSize[size], className].filter(Boolean).join(' ');
+  ({ variant = 'default', size = 'default', className, ...props }: ButtonProps, ref) => {
+    const v: Variant = variant;
+    const s: Size = size;
+    const coreColor = colorForVariant[v] || 'primary';
+    const coreVariant = v === 'outline' ? 'outline' : undefined;
+    const extraClass = [classForSize[s], className].filter(Boolean).join(' ');
 
     return (
       <CButton

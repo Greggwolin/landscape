@@ -525,7 +525,7 @@ function KLAccordionPanel({ doc, chatHistory, isChatLoading, onSendMessage, onQu
       <DocClassificationBar
         docId={doc.doc_id}
         currentDocType={doc.doc_type}
-        currentPropertyType={(doc as Record<string, unknown>).property_type as string | null | undefined}
+        currentPropertyType={doc.property_type}
         onClassificationChange={onClassificationChange}
       />
 

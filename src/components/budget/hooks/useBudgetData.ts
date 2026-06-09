@@ -72,7 +72,7 @@ export function useBudgetData(projectId: number) {
           ? Number(raw.project_id)
           : raw.projectId !== undefined && raw.projectId !== null
             ? Number(raw.projectId)
-            : undefined,
+            : projectId,
       scope: raw.scope ?? null,
       qty: raw.qty !== undefined && raw.qty !== null ? Number(raw.qty) : null,
       rate: raw.rate !== undefined && raw.rate !== null ? Number(raw.rate) : null,
@@ -136,8 +136,12 @@ export function useBudgetData(projectId: number) {
         raw.phase_front_feet !== undefined && raw.phase_front_feet !== null
           ? Number(raw.phase_front_feet)
           : null,
-    };
-  }, []);
+      // TODO(#43): this loader populates a subset of the strict BudgetItem shape
+      // (the remaining ~44 fields are not returned by this endpoint). Cast keeps
+      // the existing runtime object; populating/typing the full shape is a data
+      // change, not a type-hygiene change.
+    } as BudgetItem;
+  }, [projectId]);
 
   const fetchData = useCallback(async () => {
     if (!projectId) return;

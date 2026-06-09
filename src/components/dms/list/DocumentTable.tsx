@@ -94,7 +94,7 @@ export default function DocumentTable({
  // Best-effort auth header injection; request may still succeed in dev modes.
  }
 
- const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, { headers: getAuthHeaders(), method: 'POST',
+ const response = await fetch(`/api/projects/${projectId}/landscaper/chat`, { method: 'POST',
  headers,
  body: JSON.stringify({
  message,

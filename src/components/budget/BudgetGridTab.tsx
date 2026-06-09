@@ -11,7 +11,7 @@ import {
   CModalHeader,
   CModalTitle,
 } from '@coreui/react';
-import type { BudgetMode } from '@/types/budget';
+import type { BudgetMode, TimingMethod } from '@/types/budget';
 import BudgetDataGrid from './BudgetDataGrid';
 import FiltersAccordion from './FiltersAccordion';
 import { useBudgetData } from './hooks/useBudgetData';
@@ -458,7 +458,10 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
         uom_code: values.uom_code,
         escalation_rate: values.escalation_rate ?? null,
         contingency_pct: values.contingency_pct ?? null,
-        timing_method: values.timing_method ?? null,
+        // TODO(#43): the modal's timing_method is a free-text input; BudgetItem
+        // types it as the strict TimingMethod union. Cast preserves the existing
+        // value flow — constraining the input is a separate behavior change.
+        timing_method: (values.timing_method ?? null) as TimingMethod | null,
         funding_id: values.funding_id ?? null,
         curve_id: values.curve_id ?? null,
         milestone_id: values.milestone_id ?? null,
@@ -478,7 +481,8 @@ export default function BudgetGridTab({ projectId, scopeFilter }: Props) {
         uom_code: values.uom_code,
         escalation_rate: values.escalation_rate ?? null,
         contingency_pct: values.contingency_pct ?? null,
-        timing_method: values.timing_method ?? null,
+        // TODO(#43): free-text timing_method cast to strict TimingMethod union.
+        timing_method: (values.timing_method ?? null) as TimingMethod | null,
         funding_id: values.funding_id ?? null,
         curve_id: values.curve_id ?? null,
         milestone_id: values.milestone_id ?? null,

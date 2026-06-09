@@ -10,6 +10,7 @@ export interface DocResult {
   project_id: number | null;
   project_name: string | null;
   doc_type: string;
+  property_type?: string | null;
   format: string;
   file_size_bytes: number | null;
   uploaded_at: string | null;

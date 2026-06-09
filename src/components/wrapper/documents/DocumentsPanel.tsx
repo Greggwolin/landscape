@@ -201,7 +201,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
   useEffect(() => {
     if (!project_id) return;
     fetch(`/api/dms/search?project_id=${project_id}&include_deleted=true&deleted_only=true&limit=1`, { headers: getAuthHeaders() })
-      .then((r) => (r.ok ? r.json() : {}))
+      .then((r) => (r.ok ? r.json() : {}) as Promise<{ totalHits?: number }>)
       .then((data) => setTrashCount(data?.totalHits ?? 0))
       .catch(() => {});
   }, [project_id, refreshKey]);
@@ -715,7 +715,7 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
                     onExpand={() => handleExpand(t.doc_type_name)}
                     docs={docsByType[t.doc_type_name]}
                     loading={loadingType === t.doc_type_name}
-                    selectedDocId={selectedDoc?.doc_id ?? null}
+                    selectedDocId={null}
                     onSelectDoc={setSelectedDoc}
                     selectedDocIds={selectedDocIds}
                     onToggleCheck={toggleDocSelection}

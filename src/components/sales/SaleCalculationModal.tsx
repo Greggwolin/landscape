@@ -172,7 +172,10 @@ export default function SaleCalculationModal({
       if (row.originalRate !== undefined && row.rate !== row.originalRate) {
         // Special handling for closing costs which has '_cost' in the field name
         const fieldPrefix = row.type === 'closing' ? 'closing_cost' : row.type;
-        const key = `${fieldPrefix}_pct` as keyof NonNullable<CalculateSalePayload['overrides']>;
+        const key = `${fieldPrefix}_pct` as Exclude<
+          keyof NonNullable<CalculateSalePayload['overrides']>,
+          'custom_transaction_costs'
+        >;
         overrides[key] = row.rate;
       }
     });

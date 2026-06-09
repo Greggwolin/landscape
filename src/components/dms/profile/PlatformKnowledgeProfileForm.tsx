@@ -60,7 +60,8 @@ const platformKnowledgeSchema = z.object({
  description: z.string().optional(),
 });
 
-type PlatformKnowledgeFormData = z.infer<typeof platformKnowledgeSchema>;
+type PlatformKnowledgeFormInput = z.input<typeof platformKnowledgeSchema>;
+type PlatformKnowledgeFormData = z.output<typeof platformKnowledgeSchema>;
 
 export default function PlatformKnowledgeProfileForm({
  document,
@@ -76,7 +77,7 @@ export default function PlatformKnowledgeProfileForm({
  setValue,
  watch,
  formState: { errors, isValid, isDirty },
- } = useForm<PlatformKnowledgeFormData>({
+ } = useForm<PlatformKnowledgeFormInput, unknown, PlatformKnowledgeFormData>({
  resolver: zodResolver(platformKnowledgeSchema),
  defaultValues: {
  title: document.title || '',

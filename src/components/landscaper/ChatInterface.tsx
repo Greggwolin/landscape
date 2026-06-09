@@ -47,8 +47,13 @@ function emitMutationEventsIfNeeded(
   projectId: number,
   metadata: ChatMessage['metadata']
 ): void {
+  // Backend sends snake_case keys (field_updates, tool_calls) that aren't part
+  // of the typed metadata shape (which uses camelCase fieldUpdates and the
+  // legacy tool_executions). Read them through a widened record view.
+  const backendMeta = (metadata ?? {}) as Record<string, unknown>;
+
   // Check both tool_executions (legacy) and field_updates (from backend)
-  const fieldUpdates = metadata?.field_updates as Array<{
+  const fieldUpdates = backendMeta.field_updates as Array<{
     tool?: string;
     type?: string;
     success?: boolean;
@@ -57,7 +62,7 @@ function emitMutationEventsIfNeeded(
     total?: number;
   }> | undefined;
 
-  const toolCalls = metadata?.tool_calls as Array<{
+  const toolCalls = backendMeta.tool_calls as Array<{
     tool: string;
     input: unknown;
   }> | undefined;

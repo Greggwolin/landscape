@@ -81,7 +81,7 @@ export function LocationMap({
       style: initialStyle,
       center: center,
       zoom: 12,
-      antialias: true,
+      canvasContextAttributes: { antialias: true },
     });
 
     const cleanupRasterDim = registerRasterDim(map.current, 0.1);

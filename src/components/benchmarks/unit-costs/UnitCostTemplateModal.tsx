@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { UnitCostTemplateSummary, UnitCostCategoryReference, DevelopmentStage } from '@/types/benchmarks';
+import type { UnitCostTemplateSummary, UnitCostCategoryReference, Activity as DevelopmentStage } from '@/types/benchmarks';
 
 const ALLOWED_UOMS = ['EA', 'LF', 'CY', 'SF', 'SY', 'LS', 'MO', 'DAY', '%'] as const;
 const DEFAULT_LOCATION = 'Maricopa, AZ';
@@ -87,11 +87,11 @@ export default function UnitCostTemplateModal({
       newErrors.category_id = 'Category is required';
     }
 
-    if (formData.typical_mid_value !== null && formData.typical_mid_value < 0) {
+    if (formData.typical_mid_value != null && formData.typical_mid_value < 0) {
       newErrors.typical_mid_value = 'Value must be zero or greater';
     }
 
-    if (formData.quantity !== null && formData.quantity < 0) {
+    if (formData.quantity != null && formData.quantity < 0) {
       newErrors.quantity = 'Quantity must be zero or greater';
     }
 
@@ -121,7 +121,7 @@ export default function UnitCostTemplateModal({
 
   const handleChange = (field: keyof UnitCostTemplateSummary, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
+    setErrors((prev) => ({ ...prev, [field]: '' }));
   };
 
   if (!isOpen) return null;

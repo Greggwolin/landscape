@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { ContactFormData, CONTACT_ROLES } from '@/types/contacts';
+import { LegacyContactFormData, CONTACT_ROLES } from '@/types/contacts';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 interface AddContactModalProps {
@@ -23,7 +23,7 @@ export default function AddContactModal({
   projectId,
   preselectedRole
 }: AddContactModalProps) {
-  const [formData, setFormData] = useState<ContactFormData>({
+  const [formData, setFormData] = useState<LegacyContactFormData>({
     contact_role: preselectedRole || 'property_contact',
     name: '',
     title: '',

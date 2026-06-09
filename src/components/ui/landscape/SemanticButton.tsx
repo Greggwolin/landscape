@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { CButton } from '@coreui/react';
-import type { CButtonProps } from '@coreui/react';
+import type { CButtonProps } from '@coreui/react/dist/esm/components/button/CButton';
 
 export type SemanticButtonIntent =
   | 'primary-action'

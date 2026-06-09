@@ -651,7 +651,7 @@ export default function WaterfallConfigForm({
                         type="text"
                         value={
                           typeof prefRateEm === 'number'
-                            ? formatWithSuffix(prefRateEm.toFixed(2), 'x')
+                            ? `${prefRateEm.toFixed(2)}x`
                             : ''
                         }
                         onChange={(e) => setPrefRateEm(parseNumber(e.target.value))}
@@ -683,7 +683,7 @@ export default function WaterfallConfigForm({
                         type="text"
                         value={
                           typeof hurdleEm === 'number'
-                            ? formatWithSuffix(hurdleEm.toFixed(2), 'x')
+                            ? `${hurdleEm.toFixed(2)}x`
                             : ''
                         }
                         onChange={(e) => setHurdleEm(parseNumber(e.target.value))}

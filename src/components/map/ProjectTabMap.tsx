@@ -101,7 +101,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   // Memoize markers and lines with deep comparison to prevent unnecessary updates
   // Use JSON.stringify to ensure memoization only changes when actual values change
   const markers = useMemo(() => {
-    const base: Array<{ id: string; coordinates: [number, number]; color: string; label: string; popup?: string }> = data?.center
+    const base: Array<{ id: string; coordinates: [number, number]; color: string; stroke?: string; label: string; popup?: string }> = data?.center
       ? [{ id: 'subject', coordinates: data.center, color: subjectMarkerColor, label: 'Subject Property' }]
       : [];
 
@@ -161,7 +161,7 @@ export default function ProjectTabMap({ projectId, styleUrl, tabId = 'project', 
   };
 
   const lines = useMemo(
-    () => (data?.context ? [{ id: 'context', data: data.context, color: contextLineColor, width: 0.8 }] : []),
+    () => (data?.context ? [{ id: 'context', data: data.context as GeoJSON.FeatureCollection, color: contextLineColor, width: 0.8 }] : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contextLineColor, data?.context ? JSON.stringify(data.context) : null]
   );

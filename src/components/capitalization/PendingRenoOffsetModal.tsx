@@ -199,7 +199,7 @@ export default function PendingRenoOffsetModal({
               >
                 UNIT STATUS AT EXIT (Month {data.exit_month})
               </div>
-              <CTable striped bordered hover size="sm">
+              <CTable striped bordered hover small>
                 <thead>
                   <tr>
                     <th>Status</th>
@@ -253,7 +253,7 @@ export default function PendingRenoOffsetModal({
               >
                 COST TO COMPLETE
               </div>
-              <CTable striped bordered hover size="sm">
+              <CTable striped bordered hover small>
                 <thead>
                   <tr>
                     <th>Category</th>
@@ -294,7 +294,7 @@ export default function PendingRenoOffsetModal({
                 UNIT-BY-UNIT DETAIL ({data.unit_detail.length} units)
               </div>
               <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <CTable striped bordered hover size="sm">
+                <CTable striped bordered hover small>
                   <thead style={{ position: 'sticky', top: 0, background: 'var(--cui-tertiary-bg)', zIndex: 1 }}>
                     <tr>
                       <th>Unit</th>

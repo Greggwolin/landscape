@@ -1,5 +1,5 @@
 // v2.0 · 2025-11-15 · Column sets by mode with expanded type support
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowData } from '@tanstack/react-table';
 import CIcon from '@coreui/icons-react';
 import { cilPlus, cilTrash, cilObjectGroup } from '@coreui/icons';
 import EditableCell from './custom/EditableCell';
@@ -19,6 +19,24 @@ export type BudgetColumnDef<TData> = ColumnDef<TData> & {
   headerClassName?: string;
   cellClassName?: string;
 };
+
+// Column meta carries cell-rendering hints consumed by EditableCell / the grid renderer.
+declare module '@tanstack/react-table' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: 'left' | 'right' | 'center';
+    kind?: 'numeric';
+    editable?: boolean;
+    inputType?: 'text' | 'number' | 'currency' | 'select' | 'category-select' | 'template-autocomplete';
+    options?: { value: string; label: string }[];
+    projectId?: number;
+    projectTypeCode?: string;
+    isGrouped?: boolean;
+    cellType?: 'input' | 'calculated' | 'dropdown' | 'disabled';
+    onCommit?: (value: unknown, row: BudgetItem, columnId?: string) => Promise<void> | void;
+    onAutocompleteSelect?: (template: UnitCostTemplateSummary, row: BudgetItem) => Promise<void> | void;
+  }
+}
 
 // Use standard formatters from UI_STANDARDS_v1.0.md
 const moneyFmt = (value?: number | null) => formatMoney(value);
@@ -125,7 +143,7 @@ export function getColumnsByMode(
           }
 
           try {
-            await fetch(`/api/unit-costs/templates/${template.template_id}`, {
+            await fetch(`/api/unit-costs/templates/${template.item_id}`, {
               method: 'PATCH',
               headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
               body: JSON.stringify({

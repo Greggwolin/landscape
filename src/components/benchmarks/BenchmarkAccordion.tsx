@@ -747,8 +747,15 @@ function BenchmarkListItem({
         // Only refresh parent for benchmarks that affect this panel
         // improvement_offset benchmarks don't need a full reload - the database trigger
         // will clear the cache and React Query will refetch when needed
-        const isImprovementOffset = benchmark.category === 'improvement_offset' ||
-                                   (isSaleBenchmark && benchmark.benchmark_type === 'improvement_offset');
+        // `improvement_offset` is a sale-benchmark runtime discriminator that is
+        // not part of the typed BenchmarkCategoryKey / Benchmark shape; read it
+        // through a widened view to preserve the existing runtime check.
+        const benchmarkMeta = benchmark as unknown as {
+          category?: string;
+          benchmark_type?: string;
+        };
+        const isImprovementOffset = benchmarkMeta.category === 'improvement_offset' ||
+                                   (isSaleBenchmark && benchmarkMeta.benchmark_type === 'improvement_offset');
         if (!isImprovementOffset) {
           console.log('[BenchmarkAccordion] Calling onRefresh to reload data');
           onRefresh?.();

@@ -149,12 +149,13 @@ export default function NewProjectFieldTable({
                   </div>
                 </td>
                 <td className="py-2 px-3 text-center">
-                  <SourceIcon
-                    className={`h-3.5 w-3.5 mx-auto ${
-                      isDark ? 'text-slate-500' : 'text-slate-400'
-                    }`}
-                    title={SOURCE_LABELS[field.source]}
-                  />
+                  <span title={SOURCE_LABELS[field.source]}>
+                    <SourceIcon
+                      className={`h-3.5 w-3.5 mx-auto ${
+                        isDark ? 'text-slate-500' : 'text-slate-400'
+                      }`}
+                    />
+                  </span>
                 </td>
               </tr>
             );

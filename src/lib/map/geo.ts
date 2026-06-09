@@ -35,6 +35,7 @@ export interface ProjectMapData {
 
 export interface CompFeatureProps extends SiteFeatureProps {
   compId: string; // internal comp key
+  compNumber?: number; // 1-based display index for the comp marker/label
   type: 'sale' | 'listing' | 'rental';
   price?: number | null;
   price_per_unit?: number | null;

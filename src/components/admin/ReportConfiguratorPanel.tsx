@@ -52,7 +52,7 @@ export default function ReportConfiguratorPanel() {
           </p>
         </div>
         <LandscapeButton
-          variant="primary"
+          color="primary"
           onClick={handleCreateNew}
           disabled={isLoading}
         >
@@ -83,7 +83,7 @@ export default function ReportConfiguratorPanel() {
         ) : (
           <div className="text-center py-5">
             <p className="text-muted">No report templates configured yet.</p>
-            <LandscapeButton variant="outline-primary" onClick={handleCreateNew}>
+            <LandscapeButton color="primary" variant="outline" onClick={handleCreateNew}>
               Create Your First Template
             </LandscapeButton>
           </div>

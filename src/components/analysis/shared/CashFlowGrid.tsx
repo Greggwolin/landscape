@@ -44,6 +44,7 @@ export interface CashFlowRow {
   total?: number; // Row total (sum across all periods)
   hideTotal?: boolean; // Don't show total column for this row
   bottomBorder?: boolean; // Show underline below this row (accounting style)
+  isInformational?: boolean; // Sub-item shown for context only (e.g. value-add components)
 }
 
 export interface CashFlowSection {

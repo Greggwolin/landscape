@@ -66,6 +66,10 @@ export const StagingModal: React.FC<StagingModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<StagingData | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  // TODO(#43): edit flow is incomplete — setEditingItem is wired to the row
+  // Edit button but the value is not yet consumed. State added so the existing
+  // handler type-checks without changing behavior.
+  const [, setEditingItem] = useState<string | null>(null);
   const [corrections, setCorrections] = useState<Array<{
     assertion_id: number;
     field_path: string;
@@ -234,8 +238,8 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                 sx={{ mb: 1 }}
               >
                 <Typography variant="body2">
-                  <strong>{item.message}</strong>
-                  {item.suggestion && ` - ${item.suggestion}`}
+                  <strong>{String(item.message ?? '')}</strong>
+                  {item.suggestion ? ` - ${String(item.suggestion)}` : ''}
                 </Typography>
               </Alert>
             ))}
@@ -272,9 +276,9 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                     return (
                     <TableRow key={idx}>
                       <TableCell>
-                        {utData.bedroom_count}BR / {utData.bathroom_count}BA
+                        {String(utData.bedroom_count ?? '')}BR / {String(utData.bathroom_count ?? '')}BA
                       </TableCell>
-                      <TableCell align="right">{utData.unit_count}</TableCell>
+                      <TableCell align="right">{String(utData.unit_count ?? '')}</TableCell>
                       <TableCell align="right">
                         {utData.typical_sqft ? String(utData.typical_sqft).toLocaleString() : '-'}
                       </TableCell>
@@ -283,10 +287,10 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                       </TableCell>
                       <TableCell align="center">
                         <Chip
-                          icon={getConfidenceIcon(ut.confidence)}
-                          label={`${(ut.confidence * 100).toFixed(0)}%`}
+                          icon={getConfidenceIcon(ut.confidence ?? 0)}
+                          label={`${((ut.confidence ?? 0) * 100).toFixed(0)}%`}
                           size="small"
-                          color={getConfidenceColor(ut.confidence)}
+                          color={getConfidenceColor(ut.confidence ?? 0)}
                         />
                       </TableCell>
                     </TableRow>
@@ -315,14 +319,14 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                     const unitData = unit.data as unknown as Record<string, unknown>;
                     return (
                     <TableRow key={idx}>
-                      <TableCell>{unitData.unit_number}</TableCell>
+                      <TableCell>{String(unitData.unit_number ?? '')}</TableCell>
                       <TableCell>
                         {unitData.bedroom_count && unitData.bathroom_count
-                          ? `${unitData.bedroom_count}/${unitData.bathroom_count}`
+                          ? `${String(unitData.bedroom_count)}/${String(unitData.bathroom_count)}`
                           : unitData.is_commercial ? 'Commercial' : '-'}
                       </TableCell>
                       <TableCell align="right">
-                        {unitData.square_feet || '-'}
+                        {String(unitData.square_feet ?? '') || '-'}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -333,10 +337,10 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                       </TableCell>
                       <TableCell align="center">
                         <Chip
-                          icon={getConfidenceIcon(unit.confidence)}
-                          label={`${(unit.confidence * 100).toFixed(0)}%`}
+                          icon={getConfidenceIcon(unit.confidence ?? 0)}
+                          label={`${((unit.confidence ?? 0) * 100).toFixed(0)}%`}
                           size="small"
-                          color={getConfidenceColor(unit.confidence)}
+                          color={getConfidenceColor(unit.confidence ?? 0)}
                         />
                       </TableCell>
                     </TableRow>
@@ -367,8 +371,8 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                     const leaseData = lease.data as unknown as Record<string, unknown>;
                     return (
                     <TableRow key={idx}>
-                      <TableCell>{leaseData.unit_number}</TableCell>
-                      <TableCell>{leaseData.tenant_name || '-'}</TableCell>
+                      <TableCell>{String(leaseData.unit_number ?? '')}</TableCell>
+                      <TableCell>{String(leaseData.tenant_name ?? '') || '-'}</TableCell>
                       <TableCell align="right">
                         {leaseData.monthly_rent
                           ? `$${String(leaseData.monthly_rent).toLocaleString()}`
@@ -380,16 +384,16 @@ export const StagingModal: React.FC<StagingModalProps> = ({
                           : 'MTM'}
                       </TableCell>
                       <TableCell>
-                        {leaseData.is_section_8 && (
+                        {Boolean(leaseData.is_section_8) && (
                           <Chip label="Sec 8" size="small" color="info" />
                         )}
                       </TableCell>
                       <TableCell align="center">
                         <Chip
-                          icon={getConfidenceIcon(lease.confidence)}
-                          label={`${(lease.confidence * 100).toFixed(0)}%`}
+                          icon={getConfidenceIcon(lease.confidence ?? 0)}
+                          label={`${((lease.confidence ?? 0) * 100).toFixed(0)}%`}
                           size="small"
-                          color={getConfidenceColor(lease.confidence)}
+                          color={getConfidenceColor(lease.confidence ?? 0)}
                         />
                       </TableCell>
                       <TableCell align="center">

@@ -32,6 +32,7 @@ import type {
   SalePhaseBenchmarks,
   ParcelSalesDataset,
   CreateSalePhasePayload,
+  CreateParcelSalePayload,
 } from '@/types/sales-absorption';
 import CreateSalePhaseModal from './CreateSalePhaseModal';
 import SaleCalculationModal from './SaleCalculationModal';
@@ -365,7 +366,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
           body: JSON.stringify({
             name: 'SFD Improvement Offset',
             scope_level: 'project',
-            project_id: parseInt(projectId),
+            project_id: projectId,
             benchmark_type: 'improvement_offset',
             amount_per_uom: improvementOffset === '' ? null : value,
             uom_code: 'FF',
@@ -505,7 +506,7 @@ export default function ParcelSalesTable({ projectId, phaseFilters, mode = 'napk
       setActionError(null);
       setSavingParcelId(parcel.parcel_id);
 
-      const payload = {
+      const payload: CreateParcelSalePayload = {
         parcel_id: parcel.parcel_id,
         sale_type: 'single_closing',
         closings: [

@@ -393,7 +393,7 @@ function TanStackEditableCell({ getValue, row, column }: TanStackProps) {
             )}
             {suggestions.map((template) => (
               <button
-                key={template.template_id}
+                key={template.item_id}
                 type="button"
                 className="dropdown-item text-light bg-transparent"
                 style={{ whiteSpace: 'normal' }}

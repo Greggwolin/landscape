@@ -50,6 +50,8 @@ export interface BudgetItemFormValues {
    escalation_rate?: number | null;
    contingency_pct?: number | null;
    timing_method?: string | null;
+   scope?: string | null;
+   activity?: string | null;
    start_date?: string | null;
    end_date?: string | null;
    funding_id?: number | null;
@@ -157,7 +159,7 @@ export default function BudgetItemModalV2({
   const level4Options = useMemo(() => getChildren(categoryL3Id ?? null), [getChildren, categoryL3Id]);
   const showStandardFields = activeBudgetMode === 'standard' || activeBudgetMode === 'detail';
   const showDetailFields = activeBudgetMode === 'detail';
-  const accordionActiveItems = showStandardFields ? ['standard'] : undefined;
+  const accordionActiveItems = showStandardFields ? 'standard' : undefined;
   const totalDisplay = useMemo(() => {
     if (!Number.isFinite(total)) return '$0';
     return new Intl.NumberFormat('en-US', {
@@ -601,7 +603,7 @@ export default function BudgetItemModalV2({
               />
               <datalist id="items-list">
                 {templates.map((template) => (
-                  <option key={template.template_id} value={template.item_name} />
+                  <option key={template.item_id} value={template.item_name} />
                 ))}
               </datalist>
               {templates.length > 0 && (

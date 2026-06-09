@@ -117,7 +117,7 @@ function AISuggestionCard({ suggestion, isSelected, onToggleSelect, onRefresh }:
     let variantName: string | undefined;
 
     if (action === 'variant') {
-      variantName = prompt('Enter variant name:', suggestion.suggested_name + ' (Variant)');
+      variantName = prompt('Enter variant name:', suggestion.suggested_name + ' (Variant)') ?? undefined;
       if (!variantName) return;
     } else if (action === 'rejected') {
       notes = prompt('Reason for rejection (optional):') || undefined;

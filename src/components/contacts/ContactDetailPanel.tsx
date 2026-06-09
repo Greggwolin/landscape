@@ -57,7 +57,7 @@ interface ContactDetailPanelProps {
   onEdit?: (contact: ContactDetail) => void;
 }
 
-const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
+const CONTACT_TYPE_ICONS: Record<ContactType, string[]> = {
   Person: cilUser,
   Company: cilBuilding,
   Entity: cilInstitution,
@@ -75,7 +75,10 @@ const CONTACT_TYPE_COLORS: Record<ContactType, string> = {
   Other: 'dark',
 };
 
-const ROLE_CATEGORY_COLORS: Record<RoleCategory, string> = {
+// TODO(#43): keys here predate the current RoleCategory union
+// (Principal|Financing|Advisor|Contact|Other); typed as Record<string,string>
+// to preserve the existing runtime lookup behavior without changing values.
+const ROLE_CATEGORY_COLORS: Record<string, string> = {
   Client: 'primary',
   'Transaction Party': 'success',
   'Internal Team': 'info',
@@ -279,12 +282,12 @@ export default function ContactDetailPanel({
                           </div>
                         </CListGroupItem>
                       )}
-                      {contact.job_title && (
+                      {contact.title && (
                         <CListGroupItem className="d-flex align-items-center px-0">
                           <CIcon icon={cilBriefcase} className="text-muted me-2" />
                           <div>
                             <small className="text-muted d-block">Title</small>
-                            {contact.job_title}
+                            {contact.title}
                           </div>
                         </CListGroupItem>
                       )}

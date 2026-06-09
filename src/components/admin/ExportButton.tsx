@@ -83,7 +83,8 @@ export default function ExportButton({ tabName, projectId, size }: ExportButtonP
       <>
         <CDropdown variant="btn-group">
         <LandscapeButton
-          variant="outline-primary"
+          color="primary"
+          variant="outline"
           onClick={() => handleExport(template)}
           disabled={isGenerating || isLoading}
           size={size}
