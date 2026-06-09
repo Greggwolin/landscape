@@ -2,20 +2,24 @@
 
 import { useState } from 'react';
 import { Mail, Phone, Building2, User, StickyNote, Edit2, Trash2 } from 'lucide-react';
-import { ProjectContact, ProjectContactFormData } from '@/types/contacts';
+import { LegacyProjectContact } from '@/types/contacts';
 
 interface ContactCardProps {
-  contact: ProjectContact;
+  contact: LegacyProjectContact;
   projectId: number;
   onUpdated: () => void;
   onDeleted: () => void;
 }
 
-interface EditFormData extends ProjectContactFormData {
-  contact_name?: string;
-  company_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
+// Editable subset matching what the contacts API (legacy tbl_contacts) accepts on
+// PATCH: name / company / email / phone_direct / notes. (Role is shown via the
+// contact's `title`; name is display-only here.)
+interface EditFormData {
+  name: string;
+  company: string;
+  email: string;
+  phone_direct: string;
+  notes: string;
 }
 
 const contactFieldClass =
@@ -28,22 +32,22 @@ export default function ContactCard({
   onDeleted
 }: ContactCardProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState<EditFormData>({
-    contact_id: contact.contact_id,
-    role_id: contact.role_id,
-    is_primary: contact.is_primary,
-    is_billing_contact: contact.is_billing_contact,
-    notes: contact.notes,
-    contact_name: contact.contact_name,
-    company_name: contact.company_name,
-    contact_email: contact.contact_email,
-    contact_phone: contact.contact_phone,
+  const buildForm = (): EditFormData => ({
+    name: contact.name ?? '',
+    company: contact.company ?? '',
+    email: contact.email ?? '',
+    phone_direct: contact.phone_direct ?? contact.phone_mobile ?? '',
+    notes: contact.notes ?? '',
   });
+  const [formData, setFormData] = useState<EditFormData>(buildForm);
   const [saving, setSaving] = useState(false);
+
+  const phone = contact.phone_direct || contact.phone_mobile;
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Body uses the legacy field names the PATCH route expects.
       const response = await fetch(
         `/api/projects/${projectId}/contacts/${contact.contact_id}`,
         {
@@ -82,17 +86,7 @@ export default function ContactCard({
   };
 
   const handleCancel = () => {
-    setFormData({
-      contact_id: contact.contact_id,
-      role_id: contact.role_id,
-      is_primary: contact.is_primary,
-      is_billing_contact: contact.is_billing_contact,
-      notes: contact.notes,
-      contact_name: contact.contact_name,
-      company_name: contact.company_name,
-      contact_email: contact.contact_email,
-      contact_phone: contact.contact_phone,
-    });
+    setFormData(buildForm());
     setIsEditing(false);
   };
 
@@ -103,15 +97,15 @@ export default function ContactCard({
           <input
             type="text"
             placeholder="Name"
-            value={formData.contact_name || ''}
-            onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className={contactFieldClass}
             disabled
           />
           <input
             type="text"
-            placeholder="Role"
-            value={contact.role_label || ''}
+            placeholder="Title"
+            value={contact.title || ''}
             className={contactFieldClass}
             disabled
           />
@@ -119,27 +113,27 @@ export default function ContactCard({
         <input
           type="text"
           placeholder="Company"
-          value={formData.company_name || ''}
-          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+          value={formData.company}
+          onChange={(e) => setFormData({ ...formData, company: e.target.value })}
           className={contactFieldClass}
         />
         <input
           type="email"
           placeholder="Email"
-          value={formData.contact_email || ''}
-          onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           className={contactFieldClass}
         />
         <input
           type="text"
           placeholder="Phone"
-          value={formData.contact_phone || ''}
-          onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+          value={formData.phone_direct}
+          onChange={(e) => setFormData({ ...formData, phone_direct: e.target.value })}
           className={contactFieldClass}
         />
         <textarea
           placeholder="Notes"
-          value={formData.notes || ''}
+          value={formData.notes}
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           rows={2}
           className={contactFieldClass}
@@ -165,14 +159,14 @@ export default function ContactCard({
 
   return (
     <div className="contacts-card p-4 space-y-2">
-      {/* Name and Role */}
+      {/* Name and Title */}
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 contacts-card-icon" />
-            <span className="font-medium contacts-card-name">{contact.contact_name}</span>
-            {contact.role_label && (
-              <span className="text-sm contacts-card-title">- {contact.role_label}</span>
+            <span className="font-medium contacts-card-name">{contact.name}</span>
+            {contact.title && (
+              <span className="text-sm contacts-card-title">- {contact.title}</span>
             )}
           </div>
         </div>
@@ -195,31 +189,31 @@ export default function ContactCard({
       </div>
 
       {/* Company */}
-      {contact.company_name && (
+      {contact.company && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Building2 className="w-4 h-4 contacts-card-icon" />
-          <span>{contact.company_name}</span>
+          <span>{contact.company}</span>
         </div>
       )}
 
       {/* Email */}
-      {contact.contact_email && (
+      {contact.email && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Mail className="w-4 h-4 contacts-card-icon" />
           <a
-            href={`mailto:${contact.contact_email}`}
+            href={`mailto:${contact.email}`}
             className="contacts-card-link hover:underline"
           >
-            {contact.contact_email}
+            {contact.email}
           </a>
         </div>
       )}
 
       {/* Phone */}
-      {contact.contact_phone && (
+      {phone && (
         <div className="flex items-center gap-2 text-sm contacts-card-meta">
           <Phone className="w-4 h-4 contacts-card-icon" />
-          <span>{contact.contact_phone}</span>
+          <span>{phone}</span>
         </div>
       )}
 
