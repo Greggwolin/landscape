@@ -3,7 +3,8 @@ import useSWR from 'swr'
 import type { ProjectConfig, ProjectSettings, ContainerNode } from '@/types'
 import { fetchJson } from '@/lib/fetchJson'
 
-const fetcher = (url: string) => fetchJson(url)
+interface ProjectConfigResponse { config?: ProjectConfig | null; settings?: ProjectSettings | null; planningEfficiency?: number | null }
+interface ProjectContainersResponse { containers?: ContainerNode[] }
 
 export interface ProjectConfigResult {
   config: ProjectConfig | null
@@ -36,8 +37,8 @@ const toNumber = (value: unknown) => {
 
 export function useProjectConfig(projectId?: number | null): ProjectConfigResult {
   const shouldFetch = typeof projectId === 'number' && Number.isFinite(projectId)
-  const { data: configResponse, error: configError } = useSWR(shouldFetch ? `/api/projects/${projectId}/config` : null, fetcher)
-  const { data: containersResponse, error: containerError } = useSWR(shouldFetch ? `/api/projects/${projectId}/containers` : null, fetcher)
+  const { data: configResponse, error: configError } = useSWR(shouldFetch ? `/api/projects/${projectId}/config` : null, (url: string) => fetchJson<ProjectConfigResponse>(url))
+  const { data: containersResponse, error: containerError } = useSWR(shouldFetch ? `/api/projects/${projectId}/containers` : null, (url: string) => fetchJson<ProjectContainersResponse>(url))
 
   const config: ProjectConfig | null = configResponse?.config ?? null
   const settings: ProjectSettings | null = configResponse?.settings ?? null
@@ -46,9 +47,9 @@ export function useProjectConfig(projectId?: number | null): ProjectConfigResult
     [containersResponse]
   )
 
-  const level1Label = config?.level1_label ?? 'Area'
-  const level2Label = config?.level2_label ?? 'Phase'
-  const level3Label = config?.level3_label ?? 'Parcel'
+  const level1Label = config?.tier_1_label ?? 'Area'
+  const level2Label = config?.tier_2_label ?? 'Phase'
+  const level3Label = config?.tier_3_label ?? 'Parcel'
   const pluralize = (label: string) => (label.endsWith('s') ? label : `${label}s`)
   const labels = {
     level1Label,

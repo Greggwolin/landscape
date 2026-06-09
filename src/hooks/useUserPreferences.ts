@@ -57,7 +57,7 @@ export function usePreference<T = any>(
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const isMountedRef = useRef(false);
 
   // Load initial value from database
@@ -266,12 +266,12 @@ export function useBudgetGroupingPersistence(projectId: number) {
   });
 
   const setIsGrouped = useCallback((isGrouped: boolean) => {
-    setGroupingState((prev: any) => ({ ...prev, isGrouped }));
-  }, [setGroupingState]);
+    setGroupingState({ ...groupingState, isGrouped });
+  }, [setGroupingState, groupingState]);
 
   const setExpandedCategories = useCallback((expandedCategories: string[]) => {
-    setGroupingState((prev: any) => ({ ...prev, expandedCategories }));
-  }, [setGroupingState]);
+    setGroupingState({ ...groupingState, expandedCategories });
+  }, [setGroupingState, groupingState]);
 
   return {
     isGrouped: groupingState.isGrouped,

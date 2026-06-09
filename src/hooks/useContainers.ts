@@ -90,7 +90,7 @@ function extractLevelStats(
       stats.push({
         division_id: node.division_id,
         name: node.display_name,
-        code: node.container_code,
+        code: node.division_code,
         level: node.tier,
         parent_id: node.parent_division_id,
         acres,

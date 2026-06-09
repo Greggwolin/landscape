@@ -73,8 +73,6 @@ export interface AnalysisTypeLandscaperContext {
   }
 }
 
-const fetcher = (url: string) => fetchJson(url)
-
 const normalizeLookup = (
   lookup: AnalysisType | AnalysisTypeConfigLookup | null | undefined
 ): AnalysisTypeConfigLookup => {
@@ -124,7 +122,7 @@ export function useAnalysisTypeConfig(
         .map((project) => project.tile_config)
         .find(
           (config): config is AnalysisTypeConfig =>
-            Boolean(config)
+            config != null
             && config.analysis_perspective === analysisPerspective
             && config.analysis_purpose === analysisPurpose
         )
@@ -157,7 +155,7 @@ export function useAnalysisTypeConfig(
 export function useAnalysisTypeConfigs() {
   const { data, error, isLoading, mutate } = useSWR<AnalysisTypeConfigList[]>(
     `${DJANGO_API_URL}/api/config/analysis-types/`,
-    fetcher,
+    (url: string) => fetchJson<AnalysisTypeConfigList[]>(url),
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
@@ -187,7 +185,7 @@ export function useVisibleTiles(analysisType: AnalysisType | null | undefined) {
 
   const { data, error, isLoading } = useSWR<AnalysisTypeTiles>(
     shouldFetch ? `${DJANGO_API_URL}/api/config/analysis-types/${analysisType}/tiles/` : null,
-    fetcher,
+    (url: string) => fetchJson<AnalysisTypeTiles>(url),
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
@@ -217,7 +215,7 @@ export function useLandscaperContext(analysisType: AnalysisType | null | undefin
 
   const { data, error, isLoading } = useSWR<AnalysisTypeLandscaperContext>(
     shouldFetch ? `${DJANGO_API_URL}/api/config/analysis-types/${analysisType}/landscaper_context/` : null,
-    fetcher,
+    (url: string) => fetchJson<AnalysisTypeLandscaperContext>(url),
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
