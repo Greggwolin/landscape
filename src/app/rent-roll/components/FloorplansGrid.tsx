@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community'
-import type { ColDef, CellValueChangedEvent } from 'ag-grid-community'
+import type { ColDef, CellValueChangedEvent, CellStyle } from 'ag-grid-community'
 import useSWR from 'swr'
 import { fetchUnitTypes, unitTypesAPI } from '@/lib/api/multifamily'
 import { useLandscaperRefresh } from '@/hooks/useLandscaperRefresh'
@@ -23,9 +23,9 @@ interface UnitType {
   avg_square_feet: number
   current_market_rent: number
   total_units: number
-  notes?: string
-  other_features?: string
-  floorplan_doc_id?: number
+  notes?: string | null
+  other_features?: string | null
+  floorplan_doc_id?: number | null
 }
 
 interface UnitTypeResponse {
@@ -117,7 +117,7 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
       width: 180,
       pinned: 'left',
       editable: true,
-      cellStyle: { fontWeight: '500' }
+      cellStyle: { fontWeight: '500' } as CellStyle
     },
     {
       headerName: 'Bed',
@@ -180,7 +180,7 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
       width: 100,
       type: 'numericColumn',
       editable: true,
-      cellStyle: { fontWeight: '500' },
+      cellStyle: { fontWeight: '500' } as CellStyle,
       valueFormatter: (params) => params.value ? formatCurrency(params.value) : '$0',
       wrapHeaderText: true,
       autoHeaderHeight: true
@@ -191,13 +191,13 @@ const FloorplansGrid: React.FC<FloorplansGridProps> = ({ projectId }) => {
       width: 80,
       type: 'numericColumn',
       editable: true,
-      cellStyle: { fontWeight: '500' },
+      cellStyle: { fontWeight: '500' } as CellStyle,
       wrapHeaderText: true,
       autoHeaderHeight: true
     },
     {
       headerName: 'Actions',
-      field: 'actions',
+      colId: 'actions',
       width: 90,
       pinned: 'right',
       cellRenderer: (params: any) => {

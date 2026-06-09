@@ -75,10 +75,7 @@ const CONTACT_TYPE_COLORS: Record<ContactType, string> = {
   Other: 'dark',
 };
 
-// TODO(#43): keys here predate the current RoleCategory union
-// (Principal|Financing|Advisor|Contact|Other); typed as Record<string,string>
-// to preserve the existing runtime lookup behavior without changing values.
-const ROLE_CATEGORY_COLORS: Record<string, string> = {
+const ROLE_CATEGORY_COLORS: Record<RoleCategory, string> = {
   Client: 'primary',
   'Transaction Party': 'success',
   'Internal Team': 'info',

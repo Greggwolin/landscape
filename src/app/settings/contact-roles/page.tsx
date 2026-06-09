@@ -69,6 +69,7 @@ const initialFormData: ContactRoleFormData = {
   role_code: '',
   role_label: '',
   role_category: 'Other',
+  typical_contact_types: [],
   description: '',
   display_order: 100,
 };
@@ -120,6 +121,7 @@ export default function ContactRolesPage() {
         role_code: role.role_code,
         role_label: role.role_label,
         role_category: role.role_category,
+        typical_contact_types: role.typical_contact_types ?? [],
         description: role.description || '',
         display_order: role.display_order,
       });

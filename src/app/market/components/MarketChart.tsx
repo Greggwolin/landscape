@@ -57,7 +57,7 @@ const MarketChart: React.FC<MarketChartProps> = ({
 
   const chartData = useMemo(() => {
     if (!seriesWithData.length) return [];
-    const merged = new Map<string, Record<string, number | null>>();
+    const merged = new Map<string, Record<string, string | number | null>>();
 
     seriesWithData.forEach((serie) => {
       serie.data.forEach((point) => {
@@ -69,12 +69,12 @@ const MarketChart: React.FC<MarketChartProps> = ({
       });
     });
 
-  return Array.from(merged.values()).sort((a, b) => (a.date as string).localeCompare(b.date as string));
+  return Array.from(merged.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }, [seriesWithData]);
 
-  const resolveTooltipValue = (value: unknown) => {
+  const resolveTooltipValue = (value: unknown): string => {
     if (typeof value !== 'number') {
-      return value ?? 'n/a';
+      return value != null ? String(value) : 'n/a';
     }
     return tooltipValueFormatter
       ? tooltipValueFormatter(value)

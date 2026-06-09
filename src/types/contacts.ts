@@ -15,7 +15,7 @@
 
 export type ContactType = 'Person' | 'Company' | 'Entity' | 'Fund' | 'Government' | 'Other';
 
-export type RoleCategory = 'Principal' | 'Financing' | 'Advisor' | 'Contact' | 'Other';
+export type RoleCategory = 'Client' | 'Transaction Party' | 'Internal Team' | 'Vendor' | 'Other';
 
 export type RelationshipType =
   | 'Employee'
@@ -38,10 +38,10 @@ export const CONTACT_TYPES: { value: ContactType; label: string }[] = [
 ];
 
 export const ROLE_CATEGORIES: { value: RoleCategory; label: string }[] = [
-  { value: 'Principal', label: 'Principal' },
-  { value: 'Financing', label: 'Financing' },
-  { value: 'Advisor', label: 'Advisor' },
-  { value: 'Contact', label: 'Contact' },
+  { value: 'Client', label: 'Client' },
+  { value: 'Transaction Party', label: 'Transaction Party' },
+  { value: 'Internal Team', label: 'Internal Team' },
+  { value: 'Vendor', label: 'Vendor' },
   { value: 'Other', label: 'Other' },
 ];
 

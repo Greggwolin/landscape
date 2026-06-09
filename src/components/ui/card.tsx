@@ -3,8 +3,16 @@
 import React from 'react';
 import { CCard, CCardBody, CCardFooter, CCardHeader, CCardTitle } from '@coreui/react';
 
-export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <CCard className={className}>{children}</CCard>;
+export function Card({
+  children,
+  className,
+  onClick,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
+}) {
+  return <CCard className={className} onClick={onClick}>{children}</CCard>;
 }
 
 export function CardHeader({ children, className }: { children: React.ReactNode; className?: string }) {

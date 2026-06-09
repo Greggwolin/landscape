@@ -47,10 +47,12 @@ export function TabsTrigger({
   value,
   className,
   children,
+  disabled,
 }: {
   value: string;
   className?: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   const ctx = useContext(TabsContext);
   const active = ctx?.value === value;
@@ -60,6 +62,7 @@ export function TabsTrigger({
       variant={active ? undefined : 'outline'}
       className={className}
       onClick={() => ctx?.setValue(value)}
+      disabled={disabled}
       type="button"
     >
       {children}

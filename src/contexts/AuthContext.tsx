@@ -53,12 +53,17 @@ export interface LoginData {
   password: string;
 }
 
+export interface AuthResult {
+  user: User;
+  tokens: AuthTokens;
+}
+
 interface AuthContextType {
   user: User | null;
   tokens: AuthTokens | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (data: LoginData) => Promise<void>;
+  login: (data: LoginData) => Promise<AuthResult>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => Promise<void>;
