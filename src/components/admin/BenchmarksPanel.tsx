@@ -220,8 +220,10 @@ export default function BenchmarksPanel() {
       {/* Add Benchmark Modal */}
       {showAddModal && addingToCategory && (
         <AddBenchmarkModal
-          category={addingToCategory}
+          category={addingToCategory.key}
+          categoryLabel={addingToCategory.label}
           onClose={handleModalClose}
+          onSuccess={handleModalClose}
         />
       )}
     </div>

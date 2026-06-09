@@ -34,7 +34,7 @@ interface ContactTypeaheadProps {
   size?: 'sm' | 'lg';
 }
 
-const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
+const CONTACT_TYPE_ICONS: Record<ContactType, string[]> = {
   Person: cilUser,
   Company: cilBuilding,
   Entity: cilInstitution,

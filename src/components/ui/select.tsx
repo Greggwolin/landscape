@@ -6,7 +6,7 @@ import { CFormSelect } from '@coreui/react';
 const ITEM_TAG = 'ui-select-item';
 const VALUE_TAG = 'ui-select-value';
 
-type SelectItemDef = { value: string; label: React.ReactNode };
+type SelectItemDef = { value: string; label: React.ReactNode; disabled?: boolean };
 
 function walkChildren(node: React.ReactNode, items: SelectItemDef[], meta: { placeholder?: string }) {
   React.Children.forEach(node, (child) => {
@@ -14,7 +14,11 @@ function walkChildren(node: React.ReactNode, items: SelectItemDef[], meta: { pla
     const typeTag = (child.type as any)?._compatTag;
     const childElement = child as React.ReactElement<Record<string, unknown>>;
     if (typeTag === ITEM_TAG) {
-      items.push({ value: childElement.props.value, label: childElement.props.children });
+      items.push({
+        value: String(childElement.props.value ?? ''),
+        label: childElement.props.children as React.ReactNode,
+        disabled: childElement.props.disabled as boolean | undefined,
+      });
       return;
     }
     if (typeTag === VALUE_TAG) {
@@ -22,7 +26,7 @@ function walkChildren(node: React.ReactNode, items: SelectItemDef[], meta: { pla
       return;
     }
     if (childElement.props?.children) {
-      walkChildren(childElement.props.children, items, meta);
+      walkChildren(childElement.props.children as React.ReactNode, items, meta);
     }
   });
 }
@@ -50,7 +54,7 @@ export function Select({
     >
       {meta.placeholder ? <option value="">{meta.placeholder}</option> : null}
       {items.map((item) => (
-        <option key={item.value} value={item.value}>
+        <option key={item.value} value={item.value} disabled={item.disabled}>
           {item.label}
         </option>
       ))}
@@ -58,7 +62,7 @@ export function Select({
   );
 }
 
-export function SelectTrigger({ children }: { id?: string; children?: React.ReactNode }) {
+export function SelectTrigger({ children }: { id?: string; className?: string; children?: React.ReactNode }) {
   return <>{children}</>;
 }
 
@@ -67,11 +71,11 @@ export function SelectValue({ placeholder }: { placeholder?: string }) {
 }
 (SelectValue as any)._compatTag = VALUE_TAG;
 
-export function SelectContent({ children }: { children: React.ReactNode }) {
+export function SelectContent({ children }: { className?: string; children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function SelectItem({ value, children }: { value: string; children: React.ReactNode }) {
+export function SelectItem({ value, children }: { value: string; disabled?: boolean; children: React.ReactNode }) {
   return <span data-value={value}>{children}</span>;
 }
 (SelectItem as any)._compatTag = ITEM_TAG;

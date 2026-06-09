@@ -9,6 +9,7 @@ import { ChatMessageBubble } from './ChatMessageBubble';
 import { LandscaperProgress } from './LandscaperProgress';
 import { emitMutationComplete } from '@/lib/events/landscaper-events';
 import { useLandscaperThinking } from '@/contexts/LandscaperThinkingContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
@@ -60,7 +61,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
   const promptCopy = "Ask Landscaper anything about this project or drop a document and we'll get the model updated.";
   const tabContextHint = getTabContextHint(activeTab);
 
-  const { messages, sendMessage, isLoading, loadThreadMessages, error } = useLandscaperThreads({
+  const { messages, sendMessage, isLoading, loadThreadMessages, activeThread, error } = useLandscaperThreads({
     projectId: projectId.toString(),
     pageContext: activeTab,
   });
@@ -79,7 +80,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       const data = await response.json();
       if (data.success) {
         // Refresh chat history to reflect updated state
-        loadThreadMessages?.();
+        if (activeThread) loadThreadMessages?.(activeThread.threadId);
 
         // Emit mutation event so page components refresh without reload
         const pid = data.project_id || projectId;
@@ -97,7 +98,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     } catch (error) {
       console.error('Error confirming mutation:', error);
     }
-  }, [loadThreadMessages, projectId]);
+  }, [loadThreadMessages, activeThread, projectId]);
 
   const handleRejectMutation = useCallback(async (mutationId: string) => {
     try {
@@ -107,12 +108,12 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       });
       const data = await response.json();
       if (data.success) {
-        loadThreadMessages?.();
+        if (activeThread) loadThreadMessages?.(activeThread.threadId);
       }
     } catch (error) {
       console.error('Error rejecting mutation:', error);
     }
-  }, [loadThreadMessages]);
+  }, [loadThreadMessages, activeThread]);
 
   const handleConfirmBatch = useCallback(async (batchId: string) => {
     try {
@@ -122,7 +123,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
       });
       const data = await response.json();
       if (data.success) {
-        loadThreadMessages?.();
+        if (activeThread) loadThreadMessages?.(activeThread.threadId);
 
         // Collect all affected tables from batch results and emit single event
         const affectedTables = new Set<string>();
@@ -148,7 +149,7 @@ export function LandscaperChat({ projectId, activeTab = 'home', isIngesting, ing
     } catch (error) {
       console.error('Error confirming batch:', error);
     }
-  }, [loadThreadMessages, projectId]);
+  }, [loadThreadMessages, activeThread, projectId]);
 
   // Auto-scroll only after user interaction
   useEffect(() => {

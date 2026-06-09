@@ -51,7 +51,7 @@ export function AlphaLandscaperChat({ projectId, pageContext }: AlphaLandscaperC
         }
       }
 
-      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { headers: getAuthHeaders(), method: 'POST',
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { method: 'POST',
         headers,
         body: JSON.stringify({
           message: userMessage,

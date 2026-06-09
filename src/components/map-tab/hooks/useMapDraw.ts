@@ -167,7 +167,7 @@ function calculateMeasurements(
   if (feature.geometry.type === 'LineString') {
     const coords = (feature.geometry as GeoJSON.LineString).coordinates;
     if (Array.isArray(coords) && coords.length >= 2) {
-      const length = turf.length(feature as turf.Feature<turf.LineString>, {
+      const length = turf.length(feature as GeoJSON.Feature<GeoJSON.LineString>, {
         units: 'feet',
       });
       measurements.length_ft = Math.round(length);
@@ -178,12 +178,12 @@ function calculateMeasurements(
   if (feature.geometry.type === 'Polygon') {
     const ring = (feature.geometry as GeoJSON.Polygon).coordinates?.[0];
     if (Array.isArray(ring) && ring.length >= 4) {
-      const area = turf.area(feature as turf.Feature<turf.Polygon>); // square meters
+      const area = turf.area(feature as GeoJSON.Feature<GeoJSON.Polygon>); // square meters
       measurements.area_sqft = Math.round(area * 10.7639); // sqm to sqft
       measurements.area_acres = measurements.area_sqft / 43560;
 
       const perimeter = turf.length(
-        turf.polygonToLine(feature as turf.Feature<turf.Polygon>),
+        turf.polygonToLine(feature as GeoJSON.Feature<GeoJSON.Polygon>),
         { units: 'feet' }
       );
       measurements.perimeter_ft = Math.round(perimeter);

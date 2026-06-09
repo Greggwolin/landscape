@@ -12,7 +12,7 @@
 
 import React, { forwardRef } from 'react';
 import { CButton, CSpinner } from '@coreui/react';
-import type { CButtonProps } from '@coreui/react';
+import type { CButtonProps } from '@coreui/react/dist/esm/components/button/CButton';
 
 export interface LandscapeButtonProps extends Omit<CButtonProps, 'disabled'> {
   /**
@@ -74,7 +74,7 @@ export const LandscapeButton = forwardRef<HTMLButtonElement, LandscapeButtonProp
         {loading ? (
           <>
             <CSpinner
-              component="span"
+              as="span"
               size="sm"
               aria-hidden="true"
               className="me-2"

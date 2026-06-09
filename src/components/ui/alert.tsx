@@ -3,17 +3,27 @@
 import React from 'react';
 import { CAlert } from '@coreui/react';
 
+type AlertVariant = 'default' | 'destructive';
+
+const VARIANT_COLOR: Record<AlertVariant, string> = {
+  default: 'info',
+  destructive: 'danger',
+};
+
 export function Alert({
   children,
   className,
-  color = 'warning',
+  color,
+  variant,
 }: {
   children: React.ReactNode;
   className?: string;
   color?: string;
+  variant?: AlertVariant;
 }) {
+  const resolvedColor = color ?? (variant ? VARIANT_COLOR[variant] : 'warning');
   return (
-    <CAlert color={color} className={className}>
+    <CAlert color={resolvedColor} className={className}>
       {children}
     </CAlert>
   );

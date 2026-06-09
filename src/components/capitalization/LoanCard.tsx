@@ -41,7 +41,13 @@ interface LoanCardProps {
   defaultExpanded?: boolean;
 }
 
-const defaultLoan: Partial<Loan> = {
+// The editable form models the "unset" state as null for numeric/date fields,
+// which the canonical Loan type declares as required non-null. DraftLoan is the
+// in-form shape: every field optional and nullable. This keeps the runtime null
+// semantics the inputs rely on without mutating the canonical Loan type.
+type DraftLoan = { [K in keyof Loan]?: Loan[K] | null };
+
+const defaultLoan: DraftLoan = {
   loan_name: '',
   lender_name: '',
   facility_structure: 'TERM',
@@ -74,7 +80,7 @@ const defaultLoan: Partial<Loan> = {
   notes: '',
 };
 
-const normalizeLoan = (loan?: Loan | null): Partial<Loan> => {
+const normalizeLoan = (loan?: Loan | null): DraftLoan => {
   if (!loan) return { ...defaultLoan };
 
   return {
@@ -200,12 +206,12 @@ const formatTerm = (months: number | null | undefined): string => {
   return `${months}mo Term`;
 };
 
-const getFacilityStructure = (loan: Partial<Loan>): string => {
+const getFacilityStructure = (loan: DraftLoan): string => {
   return loan.facility_structure || loan.structure_type || 'TERM';
 };
 
 const calculateLoanSizingPreview = (
-  loanData: Partial<Loan>,
+  loanData: DraftLoan,
   askingPrice: number
 ): LoanSizingPreview => {
   const ltvPct = coerceNumeric(loanData.loan_to_value_pct);
@@ -387,7 +393,7 @@ export default function LoanCard({
   const [isEditing, setIsEditing] = useState(defaultExpanded || false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleView, setScheduleView] = useState<PeriodView>('annual');
-  const [formData, setFormData] = useState<Partial<Loan>>(normalizeLoan(loan));
+  const [formData, setFormData] = useState<DraftLoan>(normalizeLoan(loan));
   const [containerIds, setContainerIds] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -480,7 +486,7 @@ export default function LoanCard({
     'closing_costs_other',
   ]);
 
-  const buildLoanPayload = (sourceData: Partial<Loan>): Record<string, unknown> => {
+  const buildLoanPayload = (sourceData: DraftLoan): Record<string, unknown> => {
     const filtered: Record<string, unknown> = {};
     editableLoanFields.forEach((field) => {
       let value = sourceData[field];
@@ -531,7 +537,7 @@ export default function LoanCard({
   };
 
   const persistLoan = async (
-    sourceData: Partial<Loan>,
+    sourceData: DraftLoan,
     successMessage: string,
     closeEditorOnSuccess = true
   ) => {
@@ -617,7 +623,7 @@ export default function LoanCard({
 
   const handleApplyReserve = async () => {
     if (!reserveRecommendation) return;
-    const nextData: Partial<Loan> = {
+    const nextData: DraftLoan = {
       ...formData,
       interest_reserve_amount: reserveRecommendation.recommended_reserve,
     };

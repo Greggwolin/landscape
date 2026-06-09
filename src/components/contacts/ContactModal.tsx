@@ -60,10 +60,10 @@ const initialFormData: ContactFormData = {
   contact_type: 'Person',
   display_name: '',
   company_name: '',
-  job_title: '',
+  title: '',
   email: '',
   phone: '',
-  mobile_phone: '',
+  phone_mobile: '',
   address_line1: '',
   address_line2: '',
   city: '',
@@ -96,10 +96,10 @@ export default function ContactModal({
         contact_type: contact.contact_type,
         display_name: contact.display_name || '',
         company_name: contact.company_name || '',
-        job_title: '',
+        title: '',
         email: contact.email || '',
         phone: contact.phone || '',
-        mobile_phone: '',
+        phone_mobile: '',
         address_line1: '',
         address_line2: '',
         city: contact.city || '',
@@ -316,11 +316,11 @@ export default function ContactModal({
                 </CCol>
 
                 <CCol md={6}>
-                  <CFormLabel htmlFor="job_title">Job Title</CFormLabel>
+                  <CFormLabel htmlFor="title">Job Title</CFormLabel>
                   <CFormInput
-                    id="job_title"
-                    name="job_title"
-                    value={formData.job_title}
+                    id="title"
+                    name="title"
+                    value={formData.title}
                     onChange={handleChange}
                     placeholder="Position or role"
                   />
@@ -365,16 +365,16 @@ export default function ContactModal({
                 </CCol>
 
                 <CCol md={6}>
-                  <CFormLabel htmlFor="mobile_phone">Mobile</CFormLabel>
+                  <CFormLabel htmlFor="phone_mobile">Mobile</CFormLabel>
                   <CInputGroup>
                     <CInputGroupText>
                       <CIcon icon={cilPhone} />
                     </CInputGroupText>
                     <CFormInput
-                      id="mobile_phone"
-                      name="mobile_phone"
+                      id="phone_mobile"
+                      name="phone_mobile"
                       type="tel"
-                      value={formData.mobile_phone}
+                      value={formData.phone_mobile}
                       onChange={handleChange}
                       placeholder="(555) 987-6543"
                     />

@@ -294,10 +294,10 @@ export default function ReportTemplateEditorModal({
         </CModalBody>
 
         <CModalFooter>
-          <LandscapeButton variant="secondary" onClick={handleCloseWithConfirmation} disabled={isSaving}>
+          <LandscapeButton color="secondary" onClick={handleCloseWithConfirmation} disabled={isSaving}>
             Cancel
           </LandscapeButton>
-          <LandscapeButton variant="primary" type="submit" disabled={isSaving}>
+          <LandscapeButton color="primary" type="submit" disabled={isSaving}>
             {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
           </LandscapeButton>
         </CModalFooter>

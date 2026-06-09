@@ -475,7 +475,6 @@ export function ExtractionMappingAdmin() {
                     <CFormSwitch
                       checked={mapping.is_active}
                       onChange={() => handleToggleActive(mapping)}
-                      size="sm"
                     />
                   </CTableDataCell>
                   <CTableDataCell>

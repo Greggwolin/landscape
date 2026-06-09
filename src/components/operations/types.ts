@@ -30,6 +30,7 @@ export interface AsIsInputs {
   count?: number | null;
   rate?: number | null;
   market_rate?: number | null; // Market rent (for comparison with current)
+  sf?: number | null; // Square footage per unit (used for total-SF rollups)
   per_sf?: number | null;
   market_per_sf?: number | null; // Market $/SF
   total: number;

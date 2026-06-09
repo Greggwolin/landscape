@@ -151,7 +151,7 @@ export default function BenchmarksPanelNew() {
       </div>
 
       {showAddModal && addingToCategory && (
-        <AddBenchmarkModal category={addingToCategory} onClose={handleModalClose} />
+        <AddBenchmarkModal category={addingToCategory.key} categoryLabel={addingToCategory.label} onClose={handleModalClose} onSuccess={handleModalClose} />
       )}
     </div>
   );

@@ -245,7 +245,7 @@ function SelectableExpenseRow({
         ) : (
           <span className="ops-label-inline">
             {isDraggable && (
-              <span ref={isDraggable && !isEditingName ? drag : undefined} className="ops-drag-handle" title="Drag to categorize" style={{ cursor: 'grab' }}>
+              <span ref={(node) => { if (isDraggable && !isEditingName) drag(node); }} className="ops-drag-handle" title="Drag to categorize" style={{ cursor: 'grab' }}>
                 ⋮⋮
               </span>
             )}
@@ -409,7 +409,7 @@ function DroppableParentRow({
   if (isUnclassifiedSection) rowClass += ' unclassified-section';
 
   return (
-    <div ref={drop} className={rowClass}>
+    <div ref={(node) => { drop(node); }} className={rowClass}>
       <div className="ops-cell">
         {isUnclassifiedSection && (
           <span className="unclassified-badge">
@@ -495,7 +495,7 @@ function InlineAddRow({
   const [customName, setCustomName] = useState<string>('');
   const [unitAmount, setUnitAmount] = useState<number | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 
   useEffect(() => {
     // Focus the select/input when mounted
@@ -533,7 +533,7 @@ function InlineAddRow({
           <span className="ops-loading-text">Loading...</span>
         ) : hasSubcategories && !showCustomInput ? (
           <select
-            ref={inputRef as React.RefObject<HTMLSelectElement>}
+            ref={(node) => { inputRef.current = node; }}
             className="ops-add-select"
             value={selectedCategory}
             onChange={(e) => {
@@ -556,7 +556,7 @@ function InlineAddRow({
           </select>
         ) : (
           <input
-            ref={inputRef}
+            ref={(node) => { inputRef.current = node; }}
             type="text"
             className="ops-add-input"
             placeholder="Enter expense name..."

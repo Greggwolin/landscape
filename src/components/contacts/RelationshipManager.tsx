@@ -44,7 +44,7 @@ import type {
   ContactType,
 } from '@/types/contacts';
 import ContactTypeahead from './ContactTypeahead';
-import type { ContactTypeaheadItem } from '@/types/contacts';
+import type { ContactTypeaheadItem, RelationshipType } from '@/types/contacts';
 
 interface RelationshipManagerProps {
   contactId: number;
@@ -52,7 +52,7 @@ interface RelationshipManagerProps {
   onUpdate?: () => void;
 }
 
-const CONTACT_TYPE_ICONS: Record<ContactType, (string | string[])[]> = {
+const CONTACT_TYPE_ICONS: Record<ContactType, string[]> = {
   Person: cilUser,
   Company: cilBuilding,
   Entity: cilInstitution,
@@ -122,7 +122,11 @@ export default function RelationshipManager({
     try {
       await createContactRelationship(contactId, {
         related_to_id: selectedContact.contact_id,
-        relationship_type: relationshipType,
+        // TODO(#43): local RELATIONSHIP_TYPES options (lowercase 'employee',
+        // 'owner', etc.) diverge from the canonical RelationshipType union
+        // ('Employee', 'Principal', ...). Cast preserves the exact value sent to
+        // the API today; reconciling the two vocabularies is a behavior change.
+        relationship_type: relationshipType as RelationshipType,
         role_title: roleTitle || undefined,
       });
 

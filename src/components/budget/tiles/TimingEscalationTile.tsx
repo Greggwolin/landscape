@@ -294,7 +294,7 @@ export default function TimingEscalationTile({
                     const benchmark = growthRateSets.find(s => s.set_id === parseInt(e.target.value));
                     setSelectedBenchmarkId(parseInt(e.target.value));
                     setEscalationSource('benchmark');
-                    const rate = benchmark?.steps?.[0]?.annual_rate || 0;
+                    const rate = benchmark?.steps?.[0]?.rate || 0;
                     onFieldChange('escalation_rate', rate);
                   } else {
                     setSelectedBenchmarkId(null);
@@ -418,8 +418,8 @@ export default function TimingEscalationTile({
                 <CFormRange
                   value={item.curve_steepness || 25}
                   onChange={(e) => onFieldChange('curve_steepness', parseInt(e.target.value))}
-                  min="0"
-                  max="100"
+                  min={0}
+                  max={100}
                   className="flex-grow-1"
                 />
                 <span className="small text-muted" style={{ fontSize: '0.75rem' }}>Aggressive</span>

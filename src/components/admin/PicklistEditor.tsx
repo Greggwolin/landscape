@@ -71,7 +71,7 @@ export function PicklistEditor({ values, hasParent, parentOptions, onEdit, onTog
   };
 
   return (
-    <CTable hover responsive size="sm" className="mb-0">
+    <CTable hover responsive small className="mb-0">
       <CTableHead>
         <CTableRow>
           <CTableHeaderCell style={{ width: '110px' }}>Code</CTableHeaderCell>

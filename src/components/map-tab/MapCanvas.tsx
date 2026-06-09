@@ -457,7 +457,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       style,
       center,
       zoom,
-      antialias: true,
+      canvasContextAttributes: { antialias: true },
     });
 
     rasterDimCleanupRef.current = registerRasterDim(map.current, 0.1);

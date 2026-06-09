@@ -198,6 +198,7 @@ export interface ContactFormData {
 export interface ContactTypeaheadItem {
   contact_id: number;
   name: string;
+  display_name?: string;
   company_name?: string;
   contact_type: ContactType;
   label: string; // Formatted display label

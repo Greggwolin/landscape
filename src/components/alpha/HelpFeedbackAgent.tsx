@@ -244,7 +244,7 @@ export function HelpFeedbackAgent({
         headers.Authorization = `Bearer ${accessToken}`;
       }
 
-      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { headers: getAuthHeaders(), method: 'POST',
+      const response = await fetch(`/api/projects/${projectId}/landscaper/chat/`, { method: 'POST',
         headers,
         body: JSON.stringify({
           message: userMessage,

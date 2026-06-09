@@ -58,7 +58,7 @@ export function AlphaAssistantFlyout({
       {/* Accordion Content */}
       <div className="alpha-flyout-accordion-wrapper">
         <CAccordion
-          activeItemKey={activeAccordion}
+          activeItemKey={activeAccordion ?? undefined}
           className="alpha-assistant-accordion"
         >
           {/* Accordion 1: Help / Feedback Agent */}

@@ -20,7 +20,18 @@ import {
   CButtonGroup,
 } from '@coreui/react';
 import { useBudgetCategories } from '@/hooks/useBudgetCategories';
-import type { BudgetCategory, BudgetCategoryTreeNode } from '@/types/budget-categories';
+import type { BudgetCategory, BudgetCategoryTreeNode, CategoryLevel } from '@/types/budget-categories';
+
+interface CategoryFormData {
+  code: string;
+  name: string;
+  description: string;
+  level: CategoryLevel;
+  parent_id: number | null;
+  sort_order: number;
+  icon: string;
+  color: string;
+}
 import { SemanticButton } from '@/components/ui/landscape';
 
 interface CategoryTreeManagerProps {
@@ -44,12 +55,12 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingCategory, setEditingCategory] = useState<BudgetCategory | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CategoryFormData>({
     code: '',
     name: '',
     description: '',
     level: 1,
-    parent_id: null as number | null,
+    parent_id: null,
     sort_order: 0,
     icon: '',
     color: '',
@@ -71,7 +82,7 @@ export default function CategoryTreeManager({ projectId }: CategoryTreeManagerPr
       code: '',
       name: '',
       description: '',
-      level: parentCategory ? parentCategory.level + 1 : 1,
+      level: (parentCategory ? parentCategory.level + 1 : 1) as CategoryLevel,
       parent_id: parentCategory ? parentCategory.category_id : null,
       sort_order: 0,
       icon: '',

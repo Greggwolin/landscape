@@ -43,14 +43,14 @@ export function ValueAddAccordion({
               <div className="ops-value-add-input">
                 <span className="ops-value-add-suffix">$/SF</span>
                 <InputCell
-                  value={state.renoCostPerSf}
+                  value={state.renoCost}
                   variant="as-is"
                   format="currency"
                   disabled={isLoading}
-                  onChange={(val) => onUpdate('renoCostPerSf', val ?? 0)}
+                  onChange={(val) => onUpdate('renoCost', val ?? 0)}
                 />
               </div>
-              {errors.renoCostPerSf && <div className="ops-value-add-error">{errors.renoCostPerSf}</div>}
+              {errors.renoCost && <div className="ops-value-add-error">{errors.renoCost}</div>}
             </div>
 
             <div className="ops-value-add-field">
@@ -108,14 +108,14 @@ export function ValueAddAccordion({
               <div className="ops-value-add-input">
                 <span className="ops-value-add-suffix">Units/Mo</span>
                 <InputCell
-                  value={state.renoPacePerMonth}
+                  value={state.renoStartsPerMonth}
                   variant="as-is"
                   format="number"
                   disabled={isLoading}
-                  onChange={(val) => onUpdate('renoPacePerMonth', val ?? 0)}
+                  onChange={(val) => onUpdate('renoStartsPerMonth', val ?? 0)}
                 />
               </div>
-              {errors.renoPacePerMonth && <div className="ops-value-add-error">{errors.renoPacePerMonth}</div>}
+              {errors.renoStartsPerMonth && <div className="ops-value-add-error">{errors.renoStartsPerMonth}</div>}
             </div>
 
             <div className="ops-value-add-field">
@@ -169,14 +169,14 @@ export function ValueAddAccordion({
               <div className="ops-value-add-input">
                 <span className="ops-value-add-suffix">Months</span>
                 <InputCell
-                  value={state.reletLagMonths}
+                  value={state.reletMonths}
                   variant="as-is"
                   format="number"
                   disabled={isLoading}
-                  onChange={(val) => onUpdate('reletLagMonths', val ?? 0)}
+                  onChange={(val) => onUpdate('reletMonths', val ?? 0)}
                 />
               </div>
-              {errors.reletLagMonths && <div className="ops-value-add-error">{errors.reletLagMonths}</div>}
+              {errors.reletMonths && <div className="ops-value-add-error">{errors.reletMonths}</div>}
             </div>
           </div>
         </div>

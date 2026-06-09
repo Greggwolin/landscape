@@ -6,6 +6,7 @@ import CIcon from '@coreui/icons-react';
 import { cilTrash, cilReload, cilChevronBottom, cilChevronTop, cilWarning } from '@coreui/icons';
 import { useExtractionQueue, type ExtractQueueItem } from '@/hooks/useExtractionQueue';
 import { useWorkbench } from '@/contexts/WorkbenchContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 

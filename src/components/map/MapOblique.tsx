@@ -17,6 +17,7 @@ import React, {
   useContext,
 } from 'react';
 import maplibregl from 'maplibre-gl';
+import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { registerGoogleProtocol } from '@/lib/maps/registerGoogleProtocol';
 import { getGoogleBasemapStyle } from '@/lib/maps/googleBasemaps';
@@ -93,7 +94,7 @@ export const useMapOblique = () => useContext(MapObliqueContext);
 
 const hasLayerUsingSource = (map: maplibregl.Map, sourceId: string) => {
  const layers = map.getStyle()?.layers ?? [];
- return layers.some((layer) => (layer as maplibregl.AnyLayer).source === sourceId);
+ return layers.some((layer) => 'source' in layer && layer.source === sourceId);
 };
 
 export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
@@ -175,7 +176,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  zoom,
  pitch,
  bearing,
- antialias: true,
+ canvasContextAttributes: { antialias: true },
  scrollZoom: true,
  });
 
@@ -290,7 +291,7 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  paint: {
  'fill-extrusion-color': color,
  'fill-extrusion-opacity': 0.88,
- 'fill-extrusion-height': e.heightExpr ?? expr,
+ 'fill-extrusion-height': (e.heightExpr ?? expr) as ExpressionSpecification,
  'fill-extrusion-base': 0
  }
  });

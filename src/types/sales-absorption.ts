@@ -301,8 +301,8 @@ export interface PricingAssumption {
   lu_type_code: string;
   product_code?: string;
   price_per_unit: number;
-  unit_of_measure: string; // FF, SF, AC, EA
-  growth_rate: number; // Decimal (e.g., 0.035 for 3.5%)
+  unit_of_measure: string | null; // FF, SF, AC, EA — null in unsaved draft rows (must be selected)
+  growth_rate: number | null; // Decimal (e.g., 0.035 for 3.5%) — null in unsaved draft rows
   created_at?: string;
   updated_at?: string;
   inflated_value?: number; // Calculated by backend

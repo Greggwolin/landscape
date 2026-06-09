@@ -1,6 +1,6 @@
 import React from 'react';
 import { CBadge } from '@coreui/react';
-import type { CBadgeProps } from '@coreui/react';
+import type { CBadgeProps } from '@coreui/react/dist/esm/components/badge/CBadge';
 import { getPropertyTypeLabel, getPropertyTypeBadgeStyle, type BadgeVariant } from '@/config/propertyTypeTokens';
 
 export interface PropertyTypeBadgeProps extends Omit<CBadgeProps, 'color'> {
