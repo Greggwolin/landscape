@@ -22,6 +22,7 @@ export interface UnitType {
   unit_type_id: number;
   project_id: number;
   unit_type_code: string;
+  unit_type_name?: string | null;
   bedrooms: number;
   bathrooms: number;
   avg_square_feet: number;
@@ -66,6 +67,13 @@ export interface Unit {
     lease_end_date: string;
     base_rent_monthly: number;
   } | null;
+  // Optional top-level lease/charge fields some API responses flatten onto the unit row.
+  lease_start_date?: string | null;
+  lease_end_date?: string | null;
+  parking_rent?: number | null;
+  pet_rent?: number | null;
+  past_due_amount?: number | null;
+  deposit_amount?: number | null;
   created_at?: string;
   updated_at?: string;
 }

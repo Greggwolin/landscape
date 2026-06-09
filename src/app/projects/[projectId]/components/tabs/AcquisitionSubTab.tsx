@@ -28,7 +28,7 @@ interface AcquisitionSubTabProps {
 export default function AcquisitionSubTab({ project }: AcquisitionSubTabProps) {
   return (
     <div className="space-y-4">
-      <AcquisitionLedgerGrid projectId={project.project_id} showAllFields />
+      <AcquisitionLedgerGrid projectId={project.project_id} />
     </div>
   );
 }

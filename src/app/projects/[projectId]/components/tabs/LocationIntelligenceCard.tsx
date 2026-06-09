@@ -240,7 +240,7 @@ export default function LocationIntelligenceCard({
         markerIndex += 1;
 
         const color = comparableColors[propertyName] || getComparableColor(propertyName);
-        return {
+        const point: UserMapPoint = {
           id: `comp-property-${propertyName}`,
           label: propertyName,
           category: 'competitor',
@@ -249,6 +249,7 @@ export default function LocationIntelligenceCard({
           markerLabel: String(markerIndex),
           popupHtml: getGroupedPopupHtml(comps, color),
         };
+        return point;
       })
       .filter((point): point is UserMapPoint => point !== null);
   }, [comparableColors, rentalComparables]);

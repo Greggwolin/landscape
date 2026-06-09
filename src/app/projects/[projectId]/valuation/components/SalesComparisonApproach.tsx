@@ -84,12 +84,21 @@ export function SalesComparisonApproach({
   const gridRef = useRef<HTMLDivElement>(null);
   const { activeProject } = useProjectContext();
   const subjectLocation = useMemo(
-    () => buildSubjectLocationFromProject(activeProject),
+    () => buildSubjectLocationFromProject(activeProject ?? undefined),
     [activeProject]
+  );
+  // Modal expects fully-resolved coordinates (or null); ComparableLocation
+  // carries optional coords, so normalize here.
+  const subjectLocationForModal = useMemo(
+    () =>
+      subjectLocation?.latitude != null && subjectLocation?.longitude != null
+        ? { latitude: subjectLocation.latitude, longitude: subjectLocation.longitude }
+        : null,
+    [subjectLocation]
   );
   const subjectInfo = useMemo(() => ({
     name: activeProject?.project_name ?? 'Subject',
-    address: activeProject?.street_address ?? '',
+    address: activeProject?.location_description ?? activeProject?.location ?? '',
     city: subjectProperty?.city ?? activeProject?.jurisdiction_city ?? '',
     state: activeProject?.jurisdiction_state ?? '',
     lat: subjectLocation?.latitude,
@@ -210,7 +219,7 @@ export function SalesComparisonApproach({
           : displayComparables.length + 1
         }
         allComparables={displayComparables}
-        subjectLocation={subjectLocation}
+        subjectLocation={subjectLocationForModal}
         subjectProperty={subjectInfo}
       />
 

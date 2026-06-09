@@ -88,6 +88,11 @@ export interface SalesCompAdjustment {
   user_notes: string | null;
   last_modified_by: string | null;
   created_at: string;
+  // AI/Landscaper adjustment context (backend SalesCompAdjustment model)
+  subject_value?: string | null;
+  comp_value?: string | null;
+  landscaper_analysis?: string | null;
+  confidence_score?: number | null;
 }
 
 export interface SalesCompContact {

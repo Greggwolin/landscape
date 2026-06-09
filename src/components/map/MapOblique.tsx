@@ -70,6 +70,7 @@ export interface MapObliqueRef {
  getPitch: () => number;
  getZoom: () => number; // Returns current map zoom level
  fitBounds: (bounds: [[number, number], [number, number]], options?: { padding?: number; pitch?: number; bearing?: number }) => void;
+ resize: () => void;
 }
 
 const buildHeightExpr = (featureColor?: string) => {
@@ -139,7 +140,8 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  essential: true
  });
  }
- }
+ },
+ resize: () => mapRef.current?.resize()
  }),
  [center, zoom, pitch, bearing]
  );

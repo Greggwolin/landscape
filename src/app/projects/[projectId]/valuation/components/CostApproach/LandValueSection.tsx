@@ -27,7 +27,7 @@ interface LandValueSectionProps {
 export function LandValueSection({ comparables, loading, onRefresh, projectId }: LandValueSectionProps) {
   const { activeProject } = useProjectContext();
   const subjectLocation = useMemo(
-    () => buildSubjectLocationFromProject(activeProject),
+    () => buildSubjectLocationFromProject(activeProject ?? undefined),
     [activeProject]
   );
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -68,13 +68,23 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
   }, []);
 
   const subjectMapProperty = useMemo(() => {
-    if (!subjectLocation) return undefined;
+    if (subjectLocation?.latitude == null || subjectLocation?.longitude == null) return undefined;
     return {
       latitude: subjectLocation.latitude,
       longitude: subjectLocation.longitude,
       name: activeProject?.project_name ?? 'Subject',
     };
   }, [subjectLocation, activeProject]);
+
+  // Modal expects fully-resolved coordinates (or null); ComparableLocation
+  // carries optional coords, so normalize here.
+  const subjectLocationForModal = useMemo(
+    () =>
+      subjectLocation?.latitude != null && subjectLocation?.longitude != null
+        ? { latitude: subjectLocation.latitude, longitude: subjectLocation.longitude }
+        : null,
+    [subjectLocation]
+  );
 
   return (
     <div
@@ -201,10 +211,10 @@ export function LandValueSection({ comparables, loading, onRefresh, projectId }:
           : comparables.length + 1
         }
         allComparables={comparables}
-        subjectLocation={subjectLocation}
+        subjectLocation={subjectLocationForModal}
         subjectProperty={{
           name: activeProject?.project_name ?? 'Subject',
-          address: activeProject?.street_address ?? '',
+          address: activeProject?.location_description ?? activeProject?.location ?? '',
           city: activeProject?.jurisdiction_city ?? '',
           state: activeProject?.jurisdiction_state ?? '',
           lat: subjectLocation?.latitude,

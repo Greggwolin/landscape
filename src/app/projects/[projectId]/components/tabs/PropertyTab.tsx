@@ -912,8 +912,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
     fetch(`${backendUrl}/api/users/grid-preferences/?project_id=${projectId}&grid_id=rent_roll`, {
       headers: { Authorization: `Bearer ${tokens.access}` },
     })
-      .then(r => r.ok ? r.json() : {})
-      .then(data => {
+      .then(r => (r.ok ? r.json() : {}) as Promise<{ column_order?: string[]; column_visibility?: Record<string, boolean> }> | {})
+      .then((data: { column_order?: string[]; column_visibility?: Record<string, boolean> }) => {
         if (data.column_order && Array.isArray(data.column_order) && data.column_order.length > 0) {
           setSavedColumnOrder(data.column_order);
         }
@@ -2772,8 +2772,8 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
               </div>
 
               {/* Column categories — include 'dynamic' only when dynamic columns exist */}
-              {(['unit', 'floorplan', 'tenant', 'lease', 'financial'] as const)
-                .concat(columns.some(c => c.category === 'dynamic') ? ['dynamic' as const] : [])
+              {(['unit', 'floorplan', 'tenant', 'lease', 'financial'] as ColumnConfig['category'][])
+                .concat(columns.some(c => c.category === 'dynamic') ? ['dynamic'] : [])
                 .map(category => {
                   const categoryCols = columns.filter(col => col.category === category);
                   if (categoryCols.length === 0) return null;
