@@ -40,12 +40,9 @@ export default function CapitalizationTab({
     currentSubTab === 'debt' ? <DebtPage key={refreshKey} /> : <EquityPage key={refreshKey} />;
 
   return (
-    <CapitalizationLayout
-      subNavOverrides={{
-        activeSubTab: currentSubTab,
-        ...(setFolderTab ? { onSubTabChange: handleSubTabChange } : {}),
-      }}
-    >
+    // Next route layouts only accept { children }; CapitalizationLayout ignored
+    // subNavOverrides, so passing it was a no-op (removed for the #43 typecheck gate).
+    <CapitalizationLayout>
       {renderContent}
     </CapitalizationLayout>
   );
