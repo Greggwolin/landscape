@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+// @ts-expect-error TODO(#43): OperatingExpensesTab prototype was archived into the tsconfig-excluded src/app/_archive/ tree (and depends on the removed Progressive Complexity "mode"). Restore-vs-remove the MF OpEx surface is a product decision.
 import { OperatingExpensesTab } from '@/app/prototypes/multifam/rent-roll-inputs/components/OperatingExpensesTab';
 
 interface Project {
