@@ -97,8 +97,8 @@ const PlanNavigation: React.FC<PlanNavigationProps> = ({
  loadPlanParcels()
  }, [confidenceFilter])
 
- const handleParcelClick = (parcel: PlanParcel) => {
- setSelectedParcel(parcel)
+ const handleParcelClick = (parcel: Record<string, unknown>) => {
+ setSelectedParcel(parcel as unknown as PlanParcel)
  }
 
  const getConfidenceLabel = (confidence: number) => {

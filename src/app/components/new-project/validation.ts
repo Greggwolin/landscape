@@ -15,7 +15,7 @@ const siteAreaUnitEnum = z.enum(['AC', 'SF', 'SM'])
 const scaleMethodEnum = z.enum(['units', 'density', 'later'])
 
 const optionalString = (message?: string) =>
-  z.string({ required_error: message }).max(255).optional().or(z.literal(''))
+  z.string({ error: message }).max(255).optional().or(z.literal(''))
 
 export const newProjectSchema = z.object({
   // Asset classification (two orthogonal dimensions)

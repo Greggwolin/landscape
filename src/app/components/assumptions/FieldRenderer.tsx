@@ -56,7 +56,7 @@ export function FieldRenderer({
     : field.required === currentMode;
 
   // Format number with thousand separators
-  const formatNumber = (num: number | null | undefined): string => {
+  const formatNumber = (num: number | string | null | undefined): string => {
     if (num === null || num === undefined || num === '') return '';
     const numValue = typeof num === 'string' ? parseFloat(num) : num;
     if (isNaN(numValue)) return '';

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { formatNumber, parseNumber } from '../../lib/number'
 import { useRouter } from 'next/navigation'
-import type { UOMOption } from '../../lib/uom-utils'
+import type { UOMOption } from '../../../lib/uom-utils'
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 type LandUseItem = {

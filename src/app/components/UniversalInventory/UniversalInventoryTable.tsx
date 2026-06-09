@@ -528,11 +528,11 @@ export default function UniversalInventoryTable({
             flex: 1,
             minWidth: 100,
             wrapHeaderText: true,
-            autoHeaderHeight: true
+            autoHeaderHeight: true,
+            enableCellChangeFlash: true
           }}
           onCellValueChanged={onCellValueChanged}
           animateRows={true}
-          enableCellChangeFlash={true}
           rowSelection="multiple"
           suppressRowClickSelection={true}
         />

@@ -2,9 +2,9 @@
 
 import React from 'react'
 import { formatNumber, parseNumber } from '../../lib/number'
-import type { ProcessedUOMOptions } from '../../lib/uom-utils'
+import type { ProcessedUOMOptions } from '../../../lib/uom-utils'
 
-type CostItem = {
+export type CostItem = {
   id: number
   name: string
   amount: number | ''
@@ -13,7 +13,7 @@ type CostItem = {
   enabled: boolean
 }
 
-type ProjectCostsState = {
+export type ProjectCostsState = {
   planningEngineering: CostItem[]
   development: CostItem[]
   ownership: CostItem[]

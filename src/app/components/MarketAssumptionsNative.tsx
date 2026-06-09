@@ -24,6 +24,7 @@ import {
  Chip,
  CircularProgress,
  Paper,
+ type PaperProps,
  Collapse,
  Tabs,
  Tab,
@@ -71,7 +72,7 @@ const materioTheme = createTheme({
 });
 
 // Enhanced styled components for financial tables
-const CompactTable = styled(TableContainer)(({ theme }) => ({
+const CompactTable = styled(TableContainer)<{ component?: React.ElementType; variant?: PaperProps['variant'] }>(({ theme }) => ({
  border: `1px solid ${theme.palette.divider}`,
  borderRadius: theme.shape.borderRadius,
  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -481,19 +482,19 @@ const MarketAssumptionsNative: React.FC<Props> = ({ projectId = 7 }) => {
  setEditingSteps(prev => ({ ...prev, [key]: value }))
  }
 
- const getCalculatedFromPeriod = (cardId: string, stepIndex: number) => {
+ const getCalculatedFromPeriod = (cardId: string, stepIndex: number): number | '-' => {
  if (stepIndex === 0) return 1
  const prevThru = getCalculatedThruPeriod(cardId, stepIndex - 1)
  return prevThru !== '-' && !isNaN(prevThru) ? prevThru + 1 : '-'
  }
 
- const getCalculatedThruPeriod = (cardId: string, stepIndex: number) => {
+ const getCalculatedThruPeriod = (cardId: string, stepIndex: number): number | '-' => {
  const fromPeriod = getCalculatedFromPeriod(cardId, stepIndex)
  const periodsValue = getStepValue(cardId, stepIndex, 'periods', '')
 
  if (periodsValue === 'E' || periodsValue === 'e') return 180
  const periods = parseInt(periodsValue)
- if (!isNaN(periods) && !isNaN(fromPeriod)) {
+ if (!isNaN(periods) && fromPeriod !== '-' && !isNaN(fromPeriod)) {
  return fromPeriod + periods - 1
  }
  return '-'

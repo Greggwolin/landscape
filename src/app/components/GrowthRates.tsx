@@ -21,6 +21,7 @@ import {
   TableHead,
   TableRow,
   Paper,
+  type PaperProps,
   Chip,
   Avatar,
   Stack,
@@ -48,6 +49,7 @@ import {
 import { BarChart } from '@mui/x-charts/BarChart';
 import type {
   GrowthRateAssumption,
+  GrowthRateStep,
   GrowthRatesResponse
 } from '../../types/growth-rates';
 import type { AlertColor } from '@mui/material/Alert';
@@ -98,7 +100,7 @@ const materioTheme = createTheme({
 });
 
 // Enhanced styled components for financial tables
-const CompactTable = styled(TableContainer)(({ theme }) => ({
+const CompactTable = styled(TableContainer)<{ component?: React.ElementType; variant?: PaperProps['variant'] }>(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -545,11 +547,14 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
 
   const familyDistribution = useMemo(() => {
     return Object.entries(familyTotals)
-      .map(([family, totals]: [string, { acres: number; units: number }]) => ({
-        family,
-        acres: Number(totals.acres ?? 0),
-        units: Number(totals.units ?? 0)
-      }))
+      .map(([family, totals]) => {
+        const t = totals as { acres: number; units: number };
+        return {
+          family,
+          acres: Number(t.acres ?? 0),
+          units: Number(t.units ?? 0)
+        };
+      })
       .sort((a, b) => b.acres - a.acres);
   }, [familyTotals]);
 
@@ -935,7 +940,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
   };
 
   // Helper function to calculate From Period
-  const getCalculatedFromPeriod = (assumptionId: number, stepIndex: number) => {
+  const getCalculatedFromPeriod = (assumptionId: number, stepIndex: number): number | '-' => {
     const assumption = assumptions.find(a => a.id === assumptionId);
     if (!assumption) return '-';
 
@@ -961,7 +966,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
   };
 
   // Helper function to calculate Thru Period
-  const getCalculatedThruPeriod = (assumptionId: number, stepIndex: number) => {
+  const getCalculatedThruPeriod = (assumptionId: number, stepIndex: number): number | '-' => {
     const assumption = assumptions.find(a => a.id === assumptionId);
     if (!assumption) return '-';
 
@@ -977,7 +982,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
     }
 
     const periods = parseInt(periodsValue);
-    if (!isNaN(periods) && !isNaN(fromPeriod)) {
+    if (!isNaN(periods) && fromPeriod !== '-' && !isNaN(fromPeriod)) {
       return fromPeriod + periods - 1;
     }
 
@@ -1175,7 +1180,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
       }
 
       // Build updated steps from current editing state
-      const updatedSteps = [];
+      const updatedSteps: GrowthRateStep[] = [];
       const visibleCount = getVisibleRowCount(assumptionId);
 
       // Ensure we have at least one step
@@ -1209,7 +1214,7 @@ const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string
         const finalFromPeriod = typeof fromPeriod === 'number' && fromPeriod > 0 ? fromPeriod : (originalStep?.period || (stepIndex === 0 ? 1 : 1));
         const finalThruPeriod = typeof thruPeriod === 'number' && thruPeriod > 0 ? thruPeriod : (originalStep?.thru || (stepIndex === 0 ? 12 : 12));
 
-        const step = {
+        const step: GrowthRateStep = {
           step: stepIndex + 1,
           period: finalFromPeriod,
           rate: formattedRate,

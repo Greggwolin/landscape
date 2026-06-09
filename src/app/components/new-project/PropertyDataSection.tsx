@@ -102,6 +102,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false, extracted
   } = form
 
   const analysisType = watch('analysis_type')
+  const propertyCategory = watch('property_category')
 
   const renderIncomePropertyFields = () => (
     <div className="flex gap-3 items-end">
@@ -217,7 +218,7 @@ const PropertyDataSection = ({ form, isDark = false, hasError = false, extracted
 
   return (
     <div>
-      {analysisType === 'Income Property'
+      {propertyCategory === 'Income Property'
         ? renderIncomePropertyFields()
         : renderLandDevelopmentFields()}
     </div>

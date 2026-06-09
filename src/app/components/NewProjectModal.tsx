@@ -4,7 +4,7 @@ console.log("=== MODAL VERSION 2025-01-14 ===")
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, type FieldErrors, type Path } from 'react-hook-form'
+import { useForm, type FieldErrors, type Path, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useProjectContext } from './ProjectProvider'
 import LocationSection from './new-project/LocationSection'
@@ -148,7 +148,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   })
 
   const form = useForm<NewProjectFormData>({
-    resolver: zodResolver(newProjectSchema),
+    resolver: zodResolver(newProjectSchema) as Resolver<NewProjectFormData>,
     mode: 'onChange',
     defaultValues: emptyFormDefaults
   })
@@ -251,7 +251,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
   const locationSectionRef = useRef<HTMLDivElement>(null)
   const propertyDataSectionRef = useRef<HTMLDivElement>(null)
 
-  const sectionRefs: Record<SectionKey, React.RefObject<HTMLDivElement>> = {
+  const sectionRefs: Record<SectionKey, React.RefObject<HTMLDivElement | null>> = {
     asset: assetSectionRef,
     configure: assetSectionRef,
     location: locationSectionRef,
@@ -913,7 +913,8 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
         headers['Authorization'] = `Bearer ${accessToken}`
       }
 
-      const response = await fetch('/api/projects/minimal', { headers: getAuthHeaders(), method: 'POST',
+      const response = await fetch('/api/projects/minimal', {
+        method: 'POST',
         headers,
         body: JSON.stringify(payload)
       })
@@ -1197,7 +1198,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                         onFocus={() => setSubtypeFocused(true)}
                         onBlur={() => setSubtypeFocused(false)}
                         onChange={(event) => {
-                          const value = event.target.value
+                          const value = event.target.value as NewProjectFormData['property_subtype']
                           setValue('property_subtype', value, { shouldDirty: true, shouldValidate: true })
                           setValue('project_type_code', value, { shouldDirty: true })
                         }}
@@ -1257,7 +1258,7 @@ const NewProjectModal = ({ isOpen, onClose, initialFiles }: NewProjectModalProps
                           onFocus={() => setClassFocused(true)}
                           onBlur={() => setClassFocused(false)}
                           onChange={(event) => {
-                            const value = event.target.value
+                            const value = event.target.value as NewProjectFormData['property_class']
                             setValue('property_class', value, { shouldDirty: true, shouldValidate: true })
                           }}
                           className="form-select pe-5"
