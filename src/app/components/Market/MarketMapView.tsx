@@ -112,7 +112,7 @@ export default function MarketMapView({
         layers: [
           { id: 'esri', type: 'raster', source: 'esri' }
         ]
-      }
+      } as maplibregl.StyleSpecification
     }
   }), []);
 
@@ -179,7 +179,7 @@ export default function MarketMapView({
     try {
       registerGoogleProtocol();
       // Initialize map centered on project
-      const selectedStyle = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
+      const selectedStyle = mapStyles[mapStyleId as keyof typeof mapStyles]?.style ?? mapStyles.light.style;
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: selectedStyle,
@@ -226,7 +226,7 @@ export default function MarketMapView({
 
   useEffect(() => {
     if (!map.current) return;
-    const style = mapStyles[mapStyleId]?.style ?? mapStyles.light.style;
+    const style = mapStyles[mapStyleId as keyof typeof mapStyles]?.style ?? mapStyles.light.style;
     map.current.setStyle(style as maplibregl.StyleSpecification | string);
   }, [mapStyleId, mapStyles]);
 

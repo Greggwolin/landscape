@@ -494,9 +494,9 @@ const GISMap: React.FC<GISMapProps> = ({
  console.log('✅ Setting selection filters for parcels:', selectedArray)
 
  // Use APN-based filter for unique identification
- const filter = selectedArray.length === 1
+ const filter = (selectedArray.length === 1
  ? ['==', 'parcelid', selectedArray[0]]
- : ['in', 'parcelid', ...selectedArray]
+ : ['in', 'parcelid', ...selectedArray]) as maplibregl.FilterSpecification
 
  console.log('🎯 APN FILTER:', filter)
  map.current?.setFilter('tax-parcels-selected-fill', filter)
@@ -512,7 +512,7 @@ const GISMap: React.FC<GISMapProps> = ({
  const selectedDetails: PinalParcel[] = []
 
  if (sourceData && 'features' in sourceData) {
- const features = sourceData.features as unknown as Array<{ properties?: Record<string, unknown> }>
+ const features = sourceData.features as unknown as Array<{ properties?: Record<string, unknown>; geometry?: GeoJSON.Geometry }>
  Array.from(newSelected).forEach(selectedParcelId => {
  console.log('🔍 LOOKING FOR APN:', selectedParcelId)
 
@@ -521,11 +521,11 @@ const GISMap: React.FC<GISMapProps> = ({
  )
  console.log('🎯 FOUND FEATURE FOR LOOKUP:', selectedFeature?.properties)
  if (selectedFeature?.properties) {
- const parcelDetail = {
- PARCELID: selectedFeature.properties.parcelid, // Use actual APN
- OWNERNME1: selectedFeature.properties.ownernme1,
- SITEADDRESS: selectedFeature.properties.siteaddres, // Corrected field name
- GROSSAC: selectedFeature.properties.grossac,
+ const parcelDetail: PinalParcel = {
+ PARCELID: String(selectedFeature.properties.parcelid ?? ''), // Use actual APN
+ OWNERNME1: selectedFeature.properties.ownernme1 as string | undefined,
+ SITEADDRESS: selectedFeature.properties.siteaddres as string | undefined, // Corrected field name
+ GROSSAC: selectedFeature.properties.grossac as number | undefined,
  geometry: selectedFeature.geometry
  }
  console.log('📦 ADDING PARCEL DETAIL:', parcelDetail)
@@ -680,7 +680,7 @@ const GISMap: React.FC<GISMapProps> = ({
  const filteredData = {
  type: 'FeatureCollection',
  features: visibleFeatures
- }
+ } as GeoJSON.FeatureCollection
 
  // Debug: Show sample grossac values and their types
  const sampleGrossacs = visibleFeatures.slice(0, 5).map(f => ({

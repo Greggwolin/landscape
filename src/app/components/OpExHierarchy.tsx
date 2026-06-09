@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactElement } from 'react';
 import { useParams } from 'next/navigation';
 import { InventoryStatsPanel } from '@/components/operations/InventoryStatsPanel';
 import { OpExModeSelector, OpExMode } from '@/components/operations/OpExModeSelector';
@@ -449,7 +449,7 @@ export default function OpExHierarchy({ projectId: projectIdProp }: OpExHierarch
     );
   };
 
-  const renderAccount = (account: OpexAccount, depth = 0): JSX.Element => {
+  const renderAccount = (account: OpexAccount, depth = 0): ReactElement => {
     const indentPx = depth * 20;
     const isEditable = !account.is_calculated;
     const displayTotal = Number(account.calculated_total ?? 0);

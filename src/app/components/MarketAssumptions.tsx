@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { SemanticButton } from '@/components/ui/landscape';
 import MarketFactors from './MarketFactors'
-import ProjectCosts from './ProjectCosts'
+import ProjectCosts, { type ProjectCostsState, type CostItem } from './ProjectCosts'
 import LandUsePricing from './LandUsePricing'
 import GrowthRateDetail from './GrowthRateDetail'
 import DVLTimeSeries from './DVLTimeSeries'
@@ -30,32 +30,32 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
     { id: 2, name: 'Direct Project Costs', value: 3.0, detail: true }
   ])
 
-  const [projectCosts, setProjectCosts] = useState({
+  const [projectCosts, setProjectCosts] = useState<ProjectCostsState>({
     planningEngineering: [
       { id: 1, name: 'Entitlement Cost', amount: 250, unit: '$/FF', dvl: 'DVL', enabled: true },
       { id: 2, name: 'Engineering Cost', amount: 1750, unit: 'Lot', dvl: 'DVL', enabled: true },
-      ...Array.from({length: 8}, (_, i) => ({ id: i + 3, name: '', amount: '', unit: '$/FF', dvl: 'DVL', enabled: false }))
+      ...Array.from({length: 8}, (_, i): CostItem => ({ id: i + 3, name: '', amount: '', unit: '$/FF', dvl: 'DVL', enabled: false }))
     ],
     development: [
       { id: 1, name: 'Project Costs (Offsite)', amount: 100, unit: '$/FF', dvl: 'DVL', enabled: true },
       { id: 2, name: 'Project Costs (Onsite)', amount: 200, unit: '$/FF', dvl: 'DVL', enabled: true },
       { id: 3, name: 'Subdivision Development Cost', amount: 1300, unit: '$/FF', dvl: 'DVL', enabled: true },
       { id: 4, name: 'Other 1', amount: '', unit: '$/FF', dvl: 'DVL', enabled: false },
-      ...Array.from({length: 6}, (_, i) => ({ id: i + 5, name: '', amount: '', unit: '$/FF', dvl: 'DVL', enabled: false }))
+      ...Array.from({length: 6}, (_, i): CostItem => ({ id: i + 5, name: '', amount: '', unit: '$/FF', dvl: 'DVL', enabled: false }))
     ],
     ownership: [
       { id: 1, name: 'Management Fees', amount: 300000, unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: true },
       { id: 2, name: 'General & Administrative', amount: 50000, unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: true },
       { id: 3, name: 'Legal & Accounting', amount: 10000, unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: true },
       { id: 4, name: 'Other', amount: '', unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: false },
-      ...Array.from({length: 6}, (_, i) => ({ id: i + 5, name: '', amount: '', unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: false }))
+      ...Array.from({length: 6}, (_, i): CostItem => ({ id: i + 5, name: '', amount: '', unit: 'Ann/Qtr/Mo', dvl: 'DVL', enabled: false }))
     ],
     carryCosts: [
       { id: 1, name: 'Property Tax', amount: 50, unit: '$/Acre', dvl: 'DVL', enabled: true },
       { id: 2, name: 'Insurance', amount: 20, unit: '$/Acre', dvl: 'DVL', enabled: true },
       { id: 3, name: 'Other 1', amount: '', unit: '$/Acre', dvl: 'DVL', enabled: false },
       { id: 4, name: 'Other 2', amount: '', unit: '$/Acre', dvl: 'DVL', enabled: false },
-      ...Array.from({length: 6}, (_, i) => ({ id: i + 5, name: '', amount: '', unit: '$/Acre', dvl: 'DVL', enabled: false }))
+      ...Array.from({length: 6}, (_, i): CostItem => ({ id: i + 5, name: '', amount: '', unit: '$/Acre', dvl: 'DVL', enabled: false }))
     ]
   })
 
@@ -91,10 +91,10 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
     (lookupLists['uom'] ?? []).map(o => ({ code: o.code, label: o.label }))
   )
 
-  const updateProjectCost = (section: string, id: number, field: string, value: any) => {
+  const updateProjectCost = (section: keyof ProjectCostsState, id: number, field: string, value: any) => {
     setProjectCosts(prev => ({
       ...prev,
-      [section]: prev[section].map((item: any) => item.id === id ? { ...item, [field]: value } : item)
+      [section]: prev[section].map((item) => item.id === id ? { ...item, [field]: value } : item)
     }))
   }
 
@@ -235,8 +235,6 @@ const MarketAssumptions: React.FC<Props> = ({ projectId = null }) => {
 
       {/* Land Use Pricing */}
       <LandUsePricing
-        landUsePricing={landUsePricing}
-        setLandUsePricing={setLandUsePricing}
         uomOptions={processedUOMOptions.regular}
         inflationOptions={inflationOptions}
         onOpenGrowthDetail={(rid) => { setSelectedGrowthRate(rid); setShowGrowthDetail(true); }}
