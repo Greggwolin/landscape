@@ -171,11 +171,13 @@ Project
 
 **Column-name drift — RESOLVED 2026-05-16:** `core_fin_fact_actual.container_id` was renamed to `division_id` in migration `20260516_rename_fact_actual_container_id_to_division_id.up.sql`. Both fact tables now use `division_id` consistently. The Django model `db_column` strings on `BudgetItem.container` and `ActualItem.container` were also corrected in the same change (BudgetItem's had been silently misaligned with the DB since migration 025).
 
-**Lingering `tbl_container` references (post-cleanup 2026-05-16):** The Nov-2025 rename left ~60 additional callsites in code that wasn't exercised at the time. The six most user-facing references were fixed on 2026-05-16; the remaining drift is filed for follow-up:
-- **`backend/apps/containers/models.py:92`** — `Container.Meta.db_table = 'tbl_container'`. The Container Django ORM model has been broken at runtime since Nov 2025 (`relation "tbl_container" does not exist`). The DRF financial serializers call `Container.objects.get(...)` and would throw — the Next.js side appears to have routed around this via raw-SQL routes. **Renaming the model's `db_table` requires aligning all `container_level`, `container_code`, `parent_container_id` field references in the model and downstream consumers — non-trivial.**
-- **6 report generators** still query `tbl_container` directly: `rpt_02_debt_summary.py:925`, `rpt_06_project_summary.py:55`, `rpt_15_budget_cost_summary.py:144, 172`, `rpt_16_sales_schedule.py:30`, `rpt_17_cashflow_monthly.py:125, 277`, `rpt_19_cashflow_by_phase.py:26`.
-- **15+ Next.js API routes** under `src/app/api/budget/`, `src/app/api/containers/`, `src/app/api/projects/[id]/containers/`. Several already use `b.division_id = c.division_id` as the JOIN key but still name the old table.
-- `src/types/database.ts` — auto-generated; regenerate with `npm run generate:types`.
+**Lingering `tbl_container` references — RESOLVED 2026-06-08:** The Nov-2025 rename left ~60 additional callsites. The six most user-facing were fixed 2026-05-16; the rest were completed on 2026-06-08:
+- ~~**`backend/apps/containers/models.py`**~~ — ✅ RESOLVED (#42). `Container.Meta.db_table` now points to `tbl_division`. Python field names preserved (`container_id`, `container_level`, etc.) with `db_column` remaps to the real columns (`division_id`, `tier`, `division_code`, `parent_division_id`). API contract unchanged.
+- ~~**6 report generators**~~ — ✅ RESOLVED (#32, #40, #41). All repointed from `tbl_container` to `tbl_division`.
+- ~~**15+ Next.js API routes**~~ — ✅ RESOLVED (#42). 12 legacy routes migrated to new column names with `SELECT ... AS` aliases preserving API output.
+- ~~**Dead models**~~ — ✅ RESOLVED (#46). `ContainerType` and `ContainerCostMetadata` models + API surface deleted (-244 lines).
+- ~~`src/types/database.ts`~~ — ✅ RESOLVED (#47). Regenerated with circular-namespace bug fix.
+- **Remaining:** `management_overhead.container_id` is the real DB column name (not renamed to `division_id`). Left intentionally — it's a different table with its own migration history.
 
 **Labels are configurable per project:**
 | Property Type | Level 1 | Level 2 | Level 3 |
@@ -557,7 +559,7 @@ Django uses DRF serializers with consistent envelope:
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
 - ~~Operations GET endpoint~~ — RESOLVED (Apr 1). P&L GET migrated to Django (`views_operations.py`, +958 lines). Legacy Next.js route retained as dead code pending production confirm
-- Reports system complete: 20 generators with real SQL + PDF/Excel export; data_readiness flags updated
+- Reports system complete: 20 generators with real SQL + PDF/Excel export; data_readiness flags updated. Cash-flow reports (RPT_12/17/18/19) share `proforma_base.py` unified renderer (Jun 2026)
 - pgvector column commented out in Knowledge embeddings model
 - Scanned PDF / OCR pipeline not yet implemented (OCRmyPDF identified as preferred solution)
 - Code-side cross-property entity guard (post-alpha) — `e27123e` added the BASE_INSTRUCTIONS rule blocking Landscaper from fabricating data across mismatched property names (finding #10), but the entity creation path still permits a `canonical_name` that conflates two property names (e.g. "BROWNSTONE APARTMENTS (CHADRON TERRACE)"). Add a server-side guard in the entity write path so the prompt rule is backed by code enforcement
@@ -1047,7 +1049,7 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-05-16 — Resolved the incomplete container → division rename: migration 20260516 renamed core_fin_fact_actual.container_id → division_id; six user-facing tbl_container references fixed; broader drift (Container ORM model, 6 report generators, 15+ Next.js API routes) filed for follow-up in the Universal Container System section.*
+*Last audit: 2026-06-08 — Container→division cleanup COMPLETED: ORM model remapped (#42), 6 report generators repointed (#32/#40/#41), 12 Next.js API routes column-migrated (#42), dead ContainerType/ContainerCostMetadata models removed (#46), database.ts regenerated (#47). Cash-flow report consolidation: unified proforma_base.py renderer shared by RPT_12/17/18/19 (#34/#36). CI pipeline green (#39/#44). Only remaining container drift: management_overhead.container_id (intentional).*
 *Prior audit: 2026-05-15 — Nightly sync (auth landing cutover to /w/dashboard, report-as-artifact, navigation tools, onboarding cleanup)*
 *Landscaper tool count: **275 registered** (+`find_documents` + `summarize_document_library` from DMS restructure 2026-05-04; +`save_user_vocab` from chat DA Phase 1 ship; +`list_project_profiles` + `add_project_profile` 2026-05-18 (FB-281/FB-291 profile-invention guard); +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
