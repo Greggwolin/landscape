@@ -87,7 +87,7 @@ export async function GET(_req: NextRequest, context: Params) {
     let products: ProductRow[] = [];
 
     if (competitorIds.length > 0) {
-      products = await sql`
+      products = (await sql`
         SELECT
           id,
           competitive_project_id,
@@ -117,7 +117,7 @@ export async function GET(_req: NextRequest, context: Params) {
         FROM landscape.market_competitive_project_products
         WHERE competitive_project_id = ANY(${competitorIds}::integer[])
         ORDER BY lot_width_ft
-      `;
+      ` as ProductRow[]);
     }
 
     // Group products by competitive_project_id

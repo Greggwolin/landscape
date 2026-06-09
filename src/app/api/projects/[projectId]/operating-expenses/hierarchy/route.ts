@@ -94,7 +94,7 @@ export async function GET(
 
     // Query core_unit_cost_category for Operations activity categories
     // This replaces the old tbl_opex_accounts query after migration 042
-    const accounts = await sql`
+    const accounts = (await sql`
       SELECT
         c.category_id as account_id,
         c.account_number,
@@ -128,7 +128,7 @@ export async function GET(
           OR ${projectType} = ANY(c.property_types)
         )
       ORDER BY c.sort_order
-    `;
+    `) as OpexAccount[];
 
     // Transform flat list into nested hierarchy
     const accountMap = new Map<number, NestedAccount>();

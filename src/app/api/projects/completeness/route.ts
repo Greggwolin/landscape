@@ -6,8 +6,9 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
  * GET /api/projects/completeness
  * Get completeness scores for all active projects.
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('Authorization');
     const response = await fetch(`${DJANGO_API_URL}/api/projects/all-completeness/`, {
         method: 'GET',
         headers: { ...(authHeader ? { Authorization: authHeader } : {}), 'Content-Type': 'application/json', },

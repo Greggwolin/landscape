@@ -11,7 +11,15 @@ type ConfigRow = ProjectConfig
 
 type SettingsRow = ProjectSettings
 
-const DEFAULT_CONFIG: ProjectConfig = {
+// Shape mirrors the aliased GET response (tier_N_label is selected AS levelN_label),
+// not the ProjectConfig DB type — so the fallback uses the response-facing keys.
+const DEFAULT_CONFIG: {
+  project_id: number
+  asset_type: string
+  level1_label: string
+  level2_label: string
+  level3_label: string
+} = {
   project_id: 0,
   asset_type: 'land_development',
   level1_label: 'Area',
@@ -177,7 +185,7 @@ export async function PATCH(
       RETURNING *
     `
 
-    const result = await sql.unsafe(updateQuery, values)
+    const result = await sql.query(updateQuery, values)
 
     if (result.length === 0) {
       return NextResponse.json(

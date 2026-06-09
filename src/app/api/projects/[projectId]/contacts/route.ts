@@ -96,7 +96,7 @@ export async function POST(
     const projectId = parseInt(projectIdParam);
     const body = await request.json();
 
-    const { rows } = await sql`
+    const rows = await sql`
       INSERT INTO landscape.tbl_contacts (
         project_id, contact_role, contact_name, title, company,
         email, phone_direct, phone_mobile, notes, sort_order

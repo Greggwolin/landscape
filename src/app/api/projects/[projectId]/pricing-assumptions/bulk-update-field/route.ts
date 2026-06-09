@@ -35,7 +35,7 @@ export async function POST(
     console.log(`[bulk-update-field] Updating ${field} = ${value} for all pricing assumptions in project ${projectId}`);
 
     // Use parameterized query for safety
-    let result;
+    let result: Record<string, any>[] | undefined;
     if (field === 'growth_rate') {
       result = await sql`
         UPDATE landscape.land_use_pricing

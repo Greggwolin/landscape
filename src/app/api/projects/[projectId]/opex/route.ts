@@ -103,7 +103,7 @@ export async function POST(
       WHERE project_id = ${projectIdNum}
       LIMIT 1
     `;
-    const discriminator = statementDiscriminator || activeResult.rows[0]?.active_opex_discriminator || 'default';
+    const discriminator = statementDiscriminator || activeResult[0]?.active_opex_discriminator || 'default';
 
     // Upsert operating expenses
     for (const expense of expenses) {

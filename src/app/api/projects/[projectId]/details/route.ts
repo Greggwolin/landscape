@@ -45,7 +45,7 @@ export async function GET(
     }
 
     const row = rows[0];
-    const response = {
+    const response: Record<string, any> = {
       ...row,
       cap_rate_current: row.income_selected_cap_rate ?? null,
       cap_rate_proforma: row.income_terminal_cap_rate ?? null,
@@ -109,14 +109,14 @@ export async function PATCH(
 
     const result = await sql.query(query, [projectId, ...values]);
 
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(result.rows[0]);
+    return NextResponse.json(result[0]);
 
   } catch (error) {
     console.error('Error updating project details:', error);

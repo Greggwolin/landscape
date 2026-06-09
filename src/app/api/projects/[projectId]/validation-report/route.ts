@@ -295,7 +295,7 @@ export async function GET(
       WHERE p.project_id = ${projectId}
         AND p.type_code IN ('SFD', 'SFA')
         AND p.units_total > 0
-    `;
+    ` as ParcelSubdivisionCostRow[];
 
     // 3b. Fetch Other Land parcels (MF, BTR, etc. - non-SFD)
     const otherLandParcels = await sql`

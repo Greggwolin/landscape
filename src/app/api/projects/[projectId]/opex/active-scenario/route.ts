@@ -29,8 +29,8 @@ export async function GET(
 
   return NextResponse.json({
     project_id: projectIdNum,
-    active_statement_discriminator: activeResult.rows[0]?.active_opex_discriminator || 'default',
-    available_statement_discriminators: availableResult.rows.map((r: any) => r.statement_discriminator).filter(Boolean)
+    active_statement_discriminator: activeResult[0]?.active_opex_discriminator || 'default',
+    available_statement_discriminators: availableResult.map((r) => r.statement_discriminator).filter(Boolean)
   });
 }
 
@@ -56,7 +56,7 @@ export async function PUT(
     FROM landscape.tbl_operating_expenses
     WHERE project_id = ${projectIdNum}
   `;
-  const available = availableResult.rows.map((r: any) => r.statement_discriminator).filter(Boolean);
+  const available = availableResult.map((r) => r.statement_discriminator).filter(Boolean);
   if (!available.includes(requested)) {
     return NextResponse.json(
       { error: `No OpEx rows found for discriminator ${requested}` },
