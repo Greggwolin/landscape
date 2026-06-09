@@ -9,12 +9,9 @@ const nextConfig = {
       bodySizeLimit: '32mb',
     },
   },
-  // Note: Most async params have been fixed. Remaining errors are pre-existing TypeScript issues
-  // like 'error' is of type 'unknown', Activity type mismatches, etc.
-  // TODO: Clean up remaining TypeScript strict mode issues in a separate PR
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // TypeScript build errors are now ENFORCED (the ~1,040-error backlog was burned
+  // down in #43). `next build` fails on type errors; CI also runs `npm run typecheck`.
+  // The only two known-deferred items carry tracked `TODO(#43)` suppressions.
   eslint: {
     // Allow production builds to complete even with linting errors
     // These are pre-existing issues that need a dedicated cleanup PR

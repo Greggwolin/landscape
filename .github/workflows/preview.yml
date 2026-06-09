@@ -115,10 +115,11 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        # `npm run typecheck` (tsc --noEmit) is intentionally NOT gated here yet:
-        # ~1,040 pre-existing app TS errors (next.config sets
-        # typescript.ignoreBuildErrors). The script exists for local use; the CI
-        # gate is re-enabled after the backlog is burned down. Tracked in #43.
+
+      - name: Typecheck
+        # Re-enabled after the #43 backlog burndown (was ~1,040 pre-existing errors).
+        # tsc --noEmit must pass; two known-deferred items carry tracked TODO(#43) suppressions.
+        run: npm run typecheck
 
       - name: Build
         run: npm run build

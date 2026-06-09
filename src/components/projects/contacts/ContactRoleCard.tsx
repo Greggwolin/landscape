@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { ContactGroup } from '@/types/contacts';
 import ContactCard from './ContactCard';
@@ -81,7 +81,8 @@ export default function ContactRoleCard({
             group.contacts.map(contact => (
               <ContactCard
                 key={contact.contact_id}
-                contact={contact}
+                // TODO(#43): group.contacts is LegacyProjectContact[]; ContactCard wants the canonical ProjectContact (project_contact_id, etc.). Cast preserves current runtime behavior; proper bridge pending a product decision on the canonical contact shape.
+                contact={contact as unknown as ComponentProps<typeof ContactCard>['contact']}
                 projectId={projectId}
                 onUpdated={onContactUpdated}
                 onDeleted={onContactDeleted}
