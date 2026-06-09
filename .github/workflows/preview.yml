@@ -142,6 +142,55 @@ jobs:
           files: ./coverage/lcov.info
           flags: unittests
 
+  # ==========================================================================
+  # JOB 4: Backend Tests (Django / pytest)
+  # ==========================================================================
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: landscape
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Hermetic: the backend test DB is built from current model state against
+      # this throwaway Postgres service (see backend/conftest.py — it creates the
+      # `landscape` schema and the unmanaged tables). No Neon branch or production
+      # data is involved, so this job needs neither NEON_* secrets nor the
+      # create-database/migrate jobs.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/landscape
+      SECRET_KEY: ci-test-secret-key-not-used-in-prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run backend test suite
+        working-directory: backend
+        # Quarantined-but-tracked tests are skipped (see TODO(LSCMD-CLEANUP-BACKENDTESTS-0609));
+        # the rest must stay green. This gates the backend suite going forward,
+        # mirroring the #43 typecheck gate.
+        run: pytest
+
   # NOTE: the former "Deploy to Vercel" (amondnet/vercel-action) and
   # "API Contract Tests" jobs were removed — the deploy job had no VERCEL_TOKEN
   # secret (it never ran; Vercel's native GitHub integration handles preview
