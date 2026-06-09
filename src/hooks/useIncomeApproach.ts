@@ -200,8 +200,11 @@ export function useIncomeApproach(projectId: number): UseIncomeApproachReturn {
         };
       });
 
-      // Queue update for server
-      pendingUpdates.current[field] = value;
+      // Queue update for server.
+      // `field` is a union over keys whose value types differ, so a direct
+      // computed assignment collapses the target type. Write through a
+      // record view keyed by the same field to keep the assignment sound.
+      (pendingUpdates.current as Record<keyof IncomeApproachAssumptions, number | string>)[field] = value;
       debouncedSave();
     },
     [data, debouncedSave]

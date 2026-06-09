@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import {
   FamilyChoice,
-  SubtypeChoice,
+  TypeChoice,
   ProductChoice,
   LandUseCodeChoice,
   LandUseChoicesParams
@@ -13,7 +13,7 @@ import {
 import { getAuthHeaders } from '@/lib/authHeaders';
 interface UseLandUseChoicesReturn {
   families: FamilyChoice[];
-  subtypes: SubtypeChoice[];
+  subtypes: TypeChoice[];
   products: ProductChoice[];
   codes: LandUseCodeChoice[];
   loading: boolean;
@@ -21,19 +21,19 @@ interface UseLandUseChoicesReturn {
 
   // Methods
   loadFamilies: () => Promise<FamilyChoice[]>;
-  loadSubtypes: (familyId: number) => Promise<SubtypeChoice[]>;
+  loadSubtypes: (familyId: number) => Promise<TypeChoice[]>;
   loadProducts: () => Promise<ProductChoice[]>;
-  loadCodes: (subtypeId?: number) => Promise<LandUseCodeChoice[]>;
+  loadCodes: (typeId?: number) => Promise<LandUseCodeChoice[]>;
 
   // Convenience methods
   getFamilyName: (familyId: number) => string | undefined;
-  getSubtypeName: (subtypeId: number) => string | undefined;
+  getSubtypeName: (typeId: number) => string | undefined;
   getProductName: (productId: number) => string | undefined;
 }
 
 export function useLandUseChoices(): UseLandUseChoicesReturn {
   const [families, setFamilies] = useState<FamilyChoice[]>([]);
-  const [subtypes, setSubtypes] = useState<SubtypeChoice[]>([]);
+  const [subtypes, setSubtypes] = useState<TypeChoice[]>([]);
   const [products, setProducts] = useState<ProductChoice[]>([]);
   const [codes, setCodes] = useState<LandUseCodeChoice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,11 +71,11 @@ export function useLandUseChoices(): UseLandUseChoicesReturn {
     }
   };
 
-  const loadSubtypes = async (familyId: number): Promise<SubtypeChoice[]> => {
+  const loadSubtypes = async (familyId: number): Promise<TypeChoice[]> => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchChoices({ type: 'subtypes', family_id: familyId.toString() });
+      const data = await fetchChoices({ type: 'types', family_id: familyId.toString() });
       setSubtypes(data);
       return data;
     } catch (err) {
@@ -88,13 +88,13 @@ export function useLandUseChoices(): UseLandUseChoicesReturn {
     }
   };
 
-  const loadProducts = async (subtypeId?: number): Promise<ProductChoice[]> => {
+  const loadProducts = async (typeId?: number): Promise<ProductChoice[]> => {
     try {
       setLoading(true);
       setError(null);
       const params: LandUseChoicesParams = { type: 'products' };
-      if (subtypeId) {
-        params.subtype_id = subtypeId.toString();
+      if (typeId) {
+        params.type_id = typeId.toString();
       }
       const data = await fetchChoices(params);
       setProducts(data);
@@ -109,13 +109,13 @@ export function useLandUseChoices(): UseLandUseChoicesReturn {
     }
   };
 
-  const loadCodes = async (subtypeId?: number): Promise<LandUseCodeChoice[]> => {
+  const loadCodes = async (typeId?: number): Promise<LandUseCodeChoice[]> => {
     try {
       setLoading(true);
       setError(null);
       const params: LandUseChoicesParams = { type: 'codes' };
-      if (subtypeId) {
-        params.subtype_id = subtypeId.toString();
+      if (typeId) {
+        params.type_id = typeId.toString();
       }
       const data = await fetchChoices(params);
       setCodes(data);
@@ -135,8 +135,8 @@ export function useLandUseChoices(): UseLandUseChoicesReturn {
     return families.find(f => f.family_id === familyId)?.family_name;
   };
 
-  const getSubtypeName = (subtypeId: number): string | undefined => {
-    return subtypes.find(s => s.subtype_id === subtypeId)?.subtype_name;
+  const getSubtypeName = (typeId: number): string | undefined => {
+    return subtypes.find(s => s.type_id === typeId)?.type_name;
   };
 
   const getProductName = (productId: number): string | undefined => {

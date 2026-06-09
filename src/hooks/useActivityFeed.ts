@@ -70,7 +70,7 @@ export function useMarkActivityRead(projectId?: string | number) {
   const queryClient = useQueryClient();
   const id = projectId?.toString() || '';
 
-  return useMutation<MarkReadResponse, Error, string>({
+  return useMutation<MarkReadResponse, Error, string, { previousData: ActivityFeedResponse | undefined }>({
     mutationFn: async (activityId: string) => {
       if (!id) {
         throw new Error('Project ID is required');
@@ -128,7 +128,7 @@ export function useMarkAllRead(projectId?: string | number) {
   const queryClient = useQueryClient();
   const id = projectId?.toString() || '';
 
-  return useMutation<MarkAllReadResponse, Error, void>({
+  return useMutation<MarkAllReadResponse, Error, void, { previousData: ActivityFeedResponse | undefined }>({
     mutationFn: async () => {
       if (!id) {
         throw new Error('Project ID is required');
