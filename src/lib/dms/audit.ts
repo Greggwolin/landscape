@@ -99,7 +99,7 @@ export async function logProfileChange(
     `📝 Audit log created for document ${docId}: ${changedFields.length} fields changed`
   );
 
-  return result[0];
+  return result[0] as ProfileAudit;
 }
 
 /**
@@ -109,13 +109,13 @@ export async function getDocumentAuditHistory(
   docId: number,
   limit: number = 50
 ): Promise<ProfileAudit[]> {
-  return await sql`
+  return (await sql`
     SELECT *
     FROM landscape.dms_profile_audit
     WHERE doc_id = ${docId}
     ORDER BY created_at DESC
     LIMIT ${limit}
-  `;
+  `) as ProfileAudit[];
 }
 
 /**
@@ -132,23 +132,24 @@ export async function getRecentAuditActivity(
     }
   >
 > {
+  type AuditWithDoc = ProfileAudit & { doc_name: string; doc_type: string };
   if (projectId) {
-    return await sql`
+    return (await sql`
       SELECT a.*, d.doc_name, d.doc_type
       FROM landscape.dms_profile_audit a
       JOIN landscape.core_doc d ON a.doc_id = d.doc_id
       WHERE d.project_id = ${projectId}
       ORDER BY a.created_at DESC
       LIMIT ${limit}
-    `;
+    `) as AuditWithDoc[];
   } else {
-    return await sql`
+    return (await sql`
       SELECT a.*, d.doc_name, d.doc_type
       FROM landscape.dms_profile_audit a
       JOIN landscape.core_doc d ON a.doc_id = d.doc_id
       ORDER BY a.created_at DESC
       LIMIT ${limit}
-    `;
+    `) as AuditWithDoc[];
   }
 }
 

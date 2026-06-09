@@ -3,6 +3,7 @@
  */
 
 import { createUploadthing, type FileRouter } from "uploadthing/next";
+import type { FileRouterInputConfig } from "@uploadthing/shared";
 import { UploadThingError } from "uploadthing/server";
 import { dmsDb } from "./db";
 import crypto from "crypto";
@@ -13,6 +14,9 @@ const f = createUploadthing();
 export const dmsUploader = {
   // Document uploader - handles PDFs, Office docs, images
   documentUploader: f({
+    // NOTE: the macro-enabled Excel MIME (.xlsm) below is a valid upload target at
+    // runtime but is missing from @uploadthing/mime-types' MimeType union, so the
+    // object literal is asserted to FileRouterInputConfig to keep the entry.
     "application/pdf": { maxFileSize: "32MB" },
     "application/msword": { maxFileSize: "16MB" },
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { maxFileSize: "16MB" },
@@ -30,7 +34,7 @@ export const dmsUploader = {
     "text/csv": { maxFileSize: "8MB" },
     "application/zip": { maxFileSize: "64MB" },
     "application/octet-stream": { maxFileSize: "32MB" },
-  })
+  } as FileRouterInputConfig)
     .middleware(async ({ req }) => {
       // Extract metadata from request headers or query params.
       // Accepts EITHER project-scoped OR thread-scoped uploads:

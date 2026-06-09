@@ -32,7 +32,7 @@ export async function findDmsTemplate(
       WHERE project_id = ${projectId}
       ORDER BY is_default DESC, updated_at DESC
       LIMIT 1
-    `;
+    ` as TemplateMatch[];
     if (projectTemplate[0]) return projectTemplate[0];
   }
 
@@ -43,7 +43,7 @@ export async function findDmsTemplate(
       WHERE LOWER(template_name) = ${normalizedProjectType}
       ORDER BY is_default DESC, updated_at DESC
       LIMIT 1
-    `;
+    ` as TemplateMatch[];
     if (typeTemplate[0]) return typeTemplate[0];
   }
 
@@ -54,7 +54,7 @@ export async function findDmsTemplate(
       WHERE workspace_id = ${workspaceId}
       ORDER BY is_default DESC, updated_at DESC
       LIMIT 1
-    `;
+    ` as TemplateMatch[];
     if (workspaceTemplate[0]) return workspaceTemplate[0];
   }
 
@@ -64,7 +64,7 @@ export async function findDmsTemplate(
     WHERE is_default = true
     ORDER BY updated_at DESC
     LIMIT 1
-  `;
+  ` as TemplateMatch[];
   return defaultTemplate[0] ?? null;
 }
 

@@ -4,10 +4,26 @@ import { sql } from '@/lib/dms/db';
 import { SearchRequestZ } from './schema';
 
 import { requireAuth, requireProjectAccess } from '@/lib/api/requireAuth';
+
+/**
+ * Unified shape returned by all search backends (Meilisearch, DB fallback, and
+ * the deleted-docs query). Fields that only some backends populate are optional
+ * so the union of return values is assignable to a single type and `.source`
+ * can be set after the fact on the Meili result.
+ */
+interface SearchResult {
+  hits: any[];
+  totalHits: number;
+  facetDistribution?: Record<string, any>;
+  processingTimeMs?: number;
+  query?: string;
+  source?: string;
+}
+
 /**
  * Database fallback search using mv_doc_search materialized view
  */
-async function databaseSearch(params: any) {
+async function databaseSearch(params: any): Promise<SearchResult> {
   try {
     const { query, filters, facets: requestedFacets, limit, offset } = params;
 
@@ -214,7 +230,7 @@ async function databaseSearch(params: any) {
 /**
  * Search for deleted (trashed) documents directly from core_doc
  */
-async function searchDeletedDocuments(params: any) {
+async function searchDeletedDocuments(params: any): Promise<SearchResult> {
   try {
     const { filters, limit, offset } = params;
 
@@ -260,7 +276,7 @@ async function searchDeletedDocuments(params: any) {
       FROM landscape.core_doc
       ${whereClause}
     `;
-    const totalHits = countResult[0]?.count || 0;
+    const totalHits = Number(countResult[0]?.count ?? 0);
 
     return {
       hits: docs,
@@ -299,7 +315,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`🔍 GET search: q="${query}", project=${projectId}, limit=${limit}, deletedOnly=${deletedOnly}`);
 
-    let results;
+    let results: SearchResult;
 
     if (deletedOnly) {
       // Search only deleted documents
@@ -374,7 +390,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`🔍 POST search: query="${query}", filters=${JSON.stringify(filters)}, limit=${limit}, offset=${offset}`);
 
-    let results;
+    let results: SearchResult;
 
     if (useDatabaseFallback) {
       // Use database fallback

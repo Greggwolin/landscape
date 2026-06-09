@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         RETURNING *
       `;
 
-      createdAttributes.push(result[0]);
+      createdAttributes.push(result[0] as DMSAttribute);
     }
 
     return NextResponse.json({

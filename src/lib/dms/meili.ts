@@ -48,6 +48,7 @@ export interface SearchableDocument {
   project_name?: string;
   workspace_name?: string;
   phase_name?: string;
+  phase_no?: string;
   parcel_name?: string;
   searchable_text: string;
 

@@ -47,7 +47,7 @@ export const SystemZ = z.object({
 /**
  * Profile fields (custom attributes - JSONB)
  */
-export const ProfileZ = z.record(z.any()).optional();
+export const ProfileZ = z.record(z.string(), z.any()).optional();
 
 /**
  * AI ingestion metadata (optional)

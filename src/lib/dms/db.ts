@@ -106,11 +106,11 @@ export const dmsDb = {
    */
   async getDefaultWorkspace(): Promise<DMSWorkspace | null> {
     const result = await sql`
-      SELECT * FROM landscape.dms_workspaces 
-      WHERE is_default = true 
+      SELECT * FROM landscape.dms_workspaces
+      WHERE is_default = true
       LIMIT 1
     `;
-    return result[0] || null;
+    return (result[0] as DMSWorkspace | undefined) || null;
   },
 
   /**
@@ -118,23 +118,23 @@ export const dmsDb = {
    */
   async getWorkspaceByCode(code: string): Promise<DMSWorkspace | null> {
     const result = await sql`
-      SELECT * FROM landscape.dms_workspaces 
+      SELECT * FROM landscape.dms_workspaces
       WHERE workspace_code = ${code}
     `;
-    return result[0] || null;
+    return (result[0] as DMSWorkspace | undefined) || null;
   },
 
   /**
    * Get attributes for template
    */
   async getTemplateAttributes(templateId: number): Promise<(DMSAttribute & { is_required: boolean; display_order: number })[]> {
-    return await sql`
+    return (await sql`
       SELECT a.*, ta.is_required, ta.display_order
       FROM landscape.dms_attributes a
       JOIN landscape.dms_template_attributes ta ON a.attr_id = ta.attr_id
       WHERE ta.template_id = ${templateId}
       ORDER BY ta.display_order, a.attr_name
-    `;
+    `) as (DMSAttribute & { is_required: boolean; display_order: number })[];
   },
 
   /**
@@ -152,7 +152,7 @@ export const dmsDb = {
         CASE WHEN doc_type IS NOT NULL THEN 1 ELSE 2 END
       LIMIT 1
     `;
-    return result[0] || null;
+    return (result[0] as DMSTemplate | undefined) || null;
   },
 
   /**
@@ -174,7 +174,7 @@ export const dmsDb = {
       )
       RETURNING *
     `;
-    return result[0];
+    return result[0] as CoreDoc;
   },
 
   /**
@@ -244,7 +244,7 @@ export const dmsDb = {
       `;
     }
 
-    return updatedDoc[0];
+    return updatedDoc[0] as CoreDoc;
   },
 
   /**

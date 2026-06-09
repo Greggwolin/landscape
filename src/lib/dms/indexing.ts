@@ -3,11 +3,18 @@
  */
 
 import { sql } from './db';
-import { indexDocuments } from './meili';
-import { DMSDocument, SearchableDocument } from '../../types/dms';
+import { indexDocuments, SearchableDocument } from './meili';
+import { DMSDocument } from '../../types/dms';
+
+// Database row shape returned by the indexing queries below: a core_doc row
+// plus joined/derived columns (phase_no, extracted_text, etc.).
+type IndexableRow = DMSDocument & {
+  phase_no?: string | null;
+  extracted_text?: string | null;
+};
 
 // Convert database document to searchable format
-export function documentToSearchable(dbDoc: DMSDocument): SearchableDocument {
+export function documentToSearchable(dbDoc: IndexableRow): SearchableDocument {
   return {
     doc_id: dbDoc.doc_id,
     project_id: dbDoc.project_id,
@@ -33,21 +40,22 @@ export function documentToSearchable(dbDoc: DMSDocument): SearchableDocument {
     phase_no: dbDoc.phase_no,
     searchable_text: buildSearchableText(dbDoc),
     extracted_text: dbDoc.extracted_text || '' // From OCR/extraction
-  };
+  } as unknown as SearchableDocument;
 }
 
 // Build searchable text from document fields
-function buildSearchableText(dbDoc: DMSDocument): string {
+function buildSearchableText(dbDoc: IndexableRow): string {
+  const profile = (dbDoc.profile_json ?? {}) as Record<string, any>;
   const parts = [
     dbDoc.doc_name,
     dbDoc.doc_type,
     dbDoc.discipline,
-    dbDoc.profile_json?.description,
-    dbDoc.profile_json?.tags?.join(' '),
+    profile.description,
+    Array.isArray(profile.tags) ? profile.tags.join(' ') : undefined,
     dbDoc.project_name,
     dbDoc.workspace_name
   ].filter(Boolean);
-  
+
   return parts.join(' ').toLowerCase();
 }
 
@@ -69,7 +77,7 @@ export async function indexSingleDocument(docId: number) {
       LEFT JOIN landscape.dms_extract_queue eq ON d.doc_id = eq.doc_id AND eq.status = 'completed'
       WHERE d.doc_id = ${docId}
         AND d.status != 'archived'
-    `;
+    ` as IndexableRow[];
 
     if (docs.length === 0) {
       console.log(`Document ${docId} not found or archived`);
@@ -108,7 +116,7 @@ export async function indexAllDocuments() {
       LEFT JOIN landscape.dms_extract_queue eq ON d.doc_id = eq.doc_id AND eq.status = 'completed'
       WHERE d.status != 'archived'
       ORDER BY d.created_at DESC
-    `;
+    ` as IndexableRow[];
 
     if (docs.length === 0) {
       console.log('No documents found to index');
@@ -162,7 +170,7 @@ export async function indexProjectDocuments(projectId: number) {
       WHERE d.project_id = ${projectId}
         AND d.status != 'archived'
       ORDER BY d.created_at DESC
-    `;
+    ` as IndexableRow[];
 
     const searchableDocs = docs.map(documentToSearchable);
     

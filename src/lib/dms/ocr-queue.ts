@@ -50,7 +50,7 @@ export async function enqueueForExtraction(
   `;
 
   console.log(`📝 Enqueued document ${docId} for ${extractType} extraction`);
-  return result[0];
+  return result[0] as QueueJob;
 }
 
 /**
@@ -66,7 +66,7 @@ export async function getNextQueueJob(): Promise<QueueJob | null> {
     FOR UPDATE SKIP LOCKED
   `;
 
-  return result[0] || null;
+  return (result[0] as QueueJob | undefined) || null;
 }
 
 /**
