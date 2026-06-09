@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, Edit2, Pin, RotateCw, Save, X, AlertTriangle, Plus } from 'lucide-react';
 import type {
   ArtifactRendererProps,
   Block,
@@ -64,10 +64,16 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
     [schema, sourcePointers, currentValues, removedRowPaths],
   );
 
+  // Plain-text / TSV serialization of the artifact for the copy button
+  // (FB-295). Tables become tab-separated rows so they paste cleanly into
+  // Excel/Sheets; kv-grids and text become readable lines.
+  const copyText = useMemo(() => serializeArtifact(title, schema.blocks), [title, schema.blocks]);
+
   return (
     <div className={styles.root}>
       <ArtifactHeader
         title={title}
+        copyText={copyText}
         pinnedLabel={pinnedLabel}
         editTarget={editTarget}
         driftSummary={driftSummary}
@@ -125,10 +131,68 @@ export function ArtifactRenderer(props: ArtifactRendererProps) {
   );
 }
 
+/* ─── Artifact text serialization (copy button — FB-295) ─────────────── */
+
+/**
+ * Flatten an artifact's block document into copy-friendly text. Tables are
+ * emitted as tab-separated values (header row + data rows) so they paste
+ * into spreadsheets cleanly; key-value grids become `label<TAB>value` lines;
+ * text blocks and section titles pass through as plain lines.
+ */
+function serializeArtifact(title: string, blocks: Block[]): string {
+  const lines: string[] = [];
+  if (title) {
+    lines.push(title);
+    lines.push('');
+  }
+
+  const walk = (bs: Block[]): void => {
+    for (const b of bs) {
+      switch (b.type) {
+        case 'section':
+          if (b.title) lines.push(b.title);
+          walk(b.children);
+          lines.push('');
+          break;
+        case 'table':
+          if (b.title) lines.push(b.title);
+          lines.push(b.columns.map((c) => c.label).join('\t'));
+          for (const row of b.rows) {
+            lines.push(
+              b.columns
+                .map((c) => {
+                  const v = row.cells[c.key];
+                  return v === null || v === undefined ? '' : String(v);
+                })
+                .join('\t'),
+            );
+          }
+          lines.push('');
+          break;
+        case 'key_value_grid':
+          if (b.title) lines.push(b.title);
+          for (const p of b.pairs) {
+            lines.push(`${p.label}\t${p.value ?? ''}`);
+          }
+          lines.push('');
+          break;
+        case 'text':
+          lines.push(b.content);
+          lines.push('');
+          break;
+      }
+    }
+  };
+
+  walk(blocks);
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /* ─── Header ──────────────────────────────────────────────────────────── */
 
 interface ArtifactHeaderProps {
   title: string;
+  copyText: string;
   pinnedLabel?: string | null;
   editTarget?: EditTarget;
   driftSummary: { stale: number; removed: number };
@@ -143,6 +207,7 @@ interface ArtifactHeaderProps {
 
 function ArtifactHeader({
   title,
+  copyText,
   pinnedLabel,
   editTarget,
   driftSummary,
@@ -156,6 +221,17 @@ function ArtifactHeader({
 }: ArtifactHeaderProps) {
   const [editMenuOpen, setEditMenuOpen] = useState(false);
   const [pinPromptOpen, setPinPromptOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard API unavailable (e.g. insecure context) — no-op.
+    }
+  };
 
   const isPinned = Boolean(pinnedLabel);
   const editIsList = Array.isArray(editTarget);
@@ -264,6 +340,17 @@ function ArtifactHeader({
             }}
           />
         )}
+
+        {/* Copy artifact content — icon-only with tooltip (FB-295) */}
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnIcon}`}
+          onClick={handleCopy}
+          title={copied ? 'Copied' : 'Copy artifact content'}
+          aria-label="Copy artifact content"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+        </button>
 
         {/* Save as new version — icon-only with tooltip */}
         <button
