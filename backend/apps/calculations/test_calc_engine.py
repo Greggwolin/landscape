@@ -4,7 +4,6 @@ Tests for Calculations application.
 Integration tests for calculation engine and Django ORM conversion.
 """
 
-import pytest
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from decimal import Decimal
@@ -38,12 +37,6 @@ class ConverterTests(TestCase):
             created_by=self.user,
         )
 
-    @pytest.mark.skip(
-        reason="TODO(LSCMD-CLEANUP-BACKENDTESTS-0609): convert_project_to_property_data() "
-        "reads project.property_type_code, which no longer exists on the Project model "
-        "(now project_type_code). This is an app-code bug, not a test bug — flagged for a "
-        "code fix in a separate change; quarantined here per the no-business-logic policy."
-    )
     def test_convert_project_to_property_data(self):
         """Test project conversion."""
         data = convert_project_to_property_data(self.project)
@@ -166,11 +159,6 @@ class APIEndpointTests(TestCase):
                 is_active=True
             )
 
-    @pytest.mark.skip(
-        reason="TODO(LSCMD-CLEANUP-BACKENDTESTS-0609): POST /api/calculations/irr/ returns "
-        "500 (unhandled) rather than the expected 200/503 graceful path. App-side "
-        "error-handling/engine-availability issue — flagged for a code fix, quarantined here."
-    )
     def test_irr_endpoint(self):
         """Test IRR calculation endpoint."""
         from rest_framework.test import APIClient

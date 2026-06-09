@@ -11,6 +11,31 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import serializers
 from .services import CalculationService
+
+
+def _irr_from_series(cash_flows):
+    """IRR of a signed cash-flow series (period 0 first).
+
+    Returns None when no real IRR solution exists (NaN). Raises ImportError
+    when numpy-financial is unavailable so callers can degrade to 503.
+    """
+    import math
+    import numpy_financial as npf
+    irr = npf.irr(cash_flows)
+    if irr is None or (isinstance(irr, float) and math.isnan(irr)):
+        return None
+    irr = float(irr)
+    return None if math.isnan(irr) else irr
+
+
+def _npv_from_series(discount_rate, cash_flows):
+    """NPV of a signed cash-flow series at a period-0-anchored discount rate.
+
+    Raises ImportError when numpy-financial is unavailable so callers can
+    degrade to 503.
+    """
+    import numpy_financial as npf
+    return float(npf.npv(discount_rate, cash_flows))
 logger = logging.getLogger(__name__)
 
 
@@ -49,10 +74,8 @@ class CalculationViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            from financial_engine.core.metrics import InvestmentMetrics
-            metrics = InvestmentMetrics()
-            irr = metrics.calculate_irr(serializer.validated_data['cash_flows'])
-            
+            irr = _irr_from_series(serializer.validated_data['cash_flows'])
+
             return Response({
                 'irr': float(irr) if irr is not None else None,
                 'irr_percentage': float(irr * 100) if irr is not None else None,
@@ -78,13 +101,11 @@ class CalculationViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            from financial_engine.core.metrics import InvestmentMetrics
-            metrics = InvestmentMetrics()
-            npv = metrics.calculate_npv(
+            npv = _npv_from_series(
+                serializer.validated_data['discount_rate'],
                 serializer.validated_data['cash_flows'],
-                serializer.validated_data['discount_rate']
             )
-            
+
             return Response({
                 'npv': float(npv) if npv is not None else None,
                 'discount_rate': serializer.validated_data['discount_rate'],
@@ -135,14 +156,11 @@ class CalculationViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            from financial_engine.core.metrics import InvestmentMetrics
-            metrics = InvestmentMetrics()
-            
             cash_flows = serializer.validated_data['cash_flows']
             discount_rate = serializer.validated_data['discount_rate']
-            
-            irr = metrics.calculate_irr(cash_flows)
-            npv = metrics.calculate_npv(cash_flows, discount_rate)
+
+            irr = _irr_from_series(cash_flows)
+            npv = _npv_from_series(discount_rate, cash_flows)
             
             # Calculate equity multiple
             total_invested = abs(sum(cf for cf in cash_flows if cf < 0))
