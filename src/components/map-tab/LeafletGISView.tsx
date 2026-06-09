@@ -364,7 +364,12 @@ export function LeafletGISView({
     if (!boundsList.length) {
       return null
     }
-    const combined = boundsList[0].clone()
+    // Leaflet's LatLngBounds has no clone(); build a fresh copy from the first
+    // bounds' corners so we don't mutate the source bounds object.
+    const combined = new LatLngBounds(
+      boundsList[0].getSouthWest(),
+      boundsList[0].getNorthEast()
+    )
     for (let i = 1; i < boundsList.length; i += 1) {
       combined.extend(boundsList[i])
     }

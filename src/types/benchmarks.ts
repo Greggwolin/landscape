@@ -421,7 +421,7 @@ export interface GrowthRateStep {
   from_period: number;
   periods: number | 'E'; // 'E' for perpetuity
   rate: number; // Percentage (2.0 = 2%)
-  thru_period: number;
+  thru_period: number | 'E'; // 'E' for perpetuity (matches `periods`; API maps 'E' -> NULL on write)
   created_at?: string;
 }
 
@@ -439,7 +439,7 @@ export interface GrowthRateStepInput {
   from_period: number;
   rate: number;
   periods: number | 'E';
-  thru_period: number;
+  thru_period: number | 'E'; // 'E' for perpetuity (matches `periods`; API maps 'E' -> NULL on write)
 }
 
 export interface UpdateGrowthRateSet extends CreateGrowthRateSet {

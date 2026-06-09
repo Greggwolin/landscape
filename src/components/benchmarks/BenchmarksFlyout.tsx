@@ -155,8 +155,8 @@ function describePeriods(periods: number | 'E') {
   return `${periods} period${periods === 1 ? '' : 's'}`;
 }
 
-function formatThru(value: number | null | undefined) {
-  if (value === null || value === undefined) return '∞';
+function formatThru(value: number | 'E' | null | undefined) {
+  if (value === null || value === undefined || value === 'E') return '∞';
   return value;
 }
 

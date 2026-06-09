@@ -300,11 +300,15 @@ export const MapOblique = forwardRef<MapObliqueRef, MapObliqueProps>(
  // Add click handlers
  if (onFeatureClick) {
  const layerId = `${e.id}-fill`;
- map.off('click', layerId); // Remove old handlers
- map.on('click', layerId, (ev) => {
+ const handleLayerClick = (ev: maplibregl.MapLayerMouseEvent) => {
  const f = ev.features?.[0];
  onFeatureClick(String(f?.id ?? f?.properties?.id ?? ''));
- });
+ };
+ // off(type, layer, listener) is the valid maplibre overload; the previous
+ // 2-arg off(type, layer) form isn't typed. Removing then re-adding keeps the
+ // de-dupe intent (avoid stacking click handlers across effect re-runs).
+ map.off('click', layerId, handleLayerClick);
+ map.on('click', layerId, handleLayerClick);
  map.on('mouseenter', layerId, () => {
  if (map.getCanvas()) {
  map.getCanvas().style.cursor = 'pointer';
