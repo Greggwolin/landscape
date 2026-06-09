@@ -19,7 +19,6 @@ import { ComparablesGrid } from './ComparablesGrid';
 import { MapAccordion } from './MapAccordion';
 import { NarrativeCanvas } from './NarrativeCanvas';
 import { IndicatedValueSummary } from './IndicatedValueSummary';
-import { useFlyout } from '../../studio/components/FlyoutContext';
 import { useProjectContext } from '@/app/components/ProjectProvider';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
@@ -73,31 +72,19 @@ export function SalesComparisonPanel({
   const gridMinWidth = reviewFlyoutOpen ? GRID_MIN_WIDTH_WITH_REVIEW : GRID_MIN_WIDTH;
   const { activeProject } = useProjectContext();
 
-  // Try to use flyout context if available (only works in Studio)
-  let openFlyout: ((flyoutId: string) => void) | null = null;
-  try {
-    const flyoutContext = useFlyout();
-    openFlyout = (flyoutId: string) => flyoutContext.openFlyout(flyoutId);
-  } catch {
-    // Not in FlyoutProvider context (e.g., legacy valuation page)
-    openFlyout = null;
-  }
+  // The Studio flyout (input/editing) surface was removed; this panel is the
+  // output/preview surface and now always runs on the legacy valuation page,
+  // where no flyout context exists. The flyout-based edit handlers below are
+  // therefore no-ops (in production openFlyout was already null on this page).
+  const openFlyout: boolean = false;
 
   const handleEditClick = useCallback(() => {
-    if (openFlyout) {
-      openFlyout('sales-comparison');
-    }
-  }, [openFlyout]);
+    // No flyout surface available; editing happens via modal elsewhere.
+  }, []);
 
-  const handleEditComp = useCallback((comp: SalesComparable) => {
-    if (openFlyout) {
-      const compIndex = comparables.findIndex(item => item.comparable_id === comp.comparable_id);
-      openFlyout('sales-comparison', undefined, undefined, {
-        compId: comp.comparable_id,
-        compIndex: compIndex >= 0 ? compIndex + 1 : undefined,
-      });
-    }
-  }, [comparables, openFlyout]);
+  const handleEditComp = useCallback((_comp: SalesComparable) => {
+    // No flyout surface available; editing happens via modal elsewhere.
+  }, []);
 
   const handleCanvasToggle = useCallback(() => {
     setCanvasCollapsed(prev => !prev);
@@ -251,7 +238,6 @@ export function SalesComparisonPanel({
             projectId={projectId}
             mode={mode}
             subjectProperty={subjectProperty ?? undefined}
-            readOnly={true}
             onEdit={handleEditComp}
           />
         </div>

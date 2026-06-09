@@ -243,7 +243,6 @@ function ProjectContentRouter({
             return (
               <CapitalizationTab
                 project={project}
-                activeSubTab={currentTab}
                 setFolderTab={setFolderTab}
               />
             );

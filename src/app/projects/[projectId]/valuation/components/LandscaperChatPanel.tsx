@@ -88,8 +88,9 @@ How would you like to proceed with the analysis?`;
           response: `The adjustments for **${propertyName}** are based on comparing it to the subject property:
 
 ${comparable.adjustments?.map(adj => {
-  const pct = (Number(adj.adjustment_pct) * 100).toFixed(0);
-  return `**${adj.adjustment_type_display} (${pct > 0 ? '+' : ''}${pct}%):**
+  const pctValue = Number(adj.adjustment_pct) * 100;
+  const pct = pctValue.toFixed(0);
+  return `**${adj.adjustment_type_display} (${pctValue > 0 ? '+' : ''}${pct}%):**
 ${adj.justification || 'Standard market adjustment'}`;
 }).join('\n\n') || 'No adjustments were applied to this comparable.'}
 
@@ -126,7 +127,7 @@ The adjusted price/unit of $${Number(comparable.adjusted_price_per_unit).toLocal
 • Units: ${comparable.units}
 • Building SF: ${Number(comparable.building_sf).toLocaleString()}
 • Year Built: ${comparable.year_built}
-• Average Unit Size: ${Math.round(Number(comparable.building_sf) / comparable.units)} SF
+• Average Unit Size: ${comparable.units ? Math.round(Number(comparable.building_sf) / comparable.units) : 'N/A'} SF
 
 **Performance:**
 • Cap Rate: ${(Number(comparable.cap_rate) * 100).toFixed(2)}%

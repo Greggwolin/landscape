@@ -178,7 +178,7 @@ export default function RenovationSubTab({ project }: RenovationSubTabProps) {
           availableScenarios={['as_is', 'post_reno']}
           preferredScenario="as_is"
           valueAddEnabled={true}
-          rentPremiumPct={valueAddState.rentPremiumPct}
+          rentPremiumPct={valueAddState.rentPremiumPct ?? undefined}
           hasDetailedRentRoll={false}
           onUpdateRow={() => {}}
         />

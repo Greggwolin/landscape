@@ -163,8 +163,8 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
   const getValueAddErrors = useCallback((nextState: typeof valueAddState) => {
     const errors: Partial<Record<keyof typeof valueAddState, string>> = {};
-    if (nextState.renoCost <= 0) errors.renoCost = 'Must be greater than 0.';
-    if (nextState.relocationIncentive < 0) errors.relocationIncentive = 'Must be 0 or greater.';
+    if ((nextState.renoCost ?? 0) <= 0) errors.renoCost = 'Must be greater than 0.';
+    if ((nextState.relocationIncentive ?? 0) < 0) errors.relocationIncentive = 'Must be 0 or greater.';
     if (!nextState.renovateAll) {
       if (nextState.unitsToRenovate === null || nextState.unitsToRenovate <= 0) {
         errors.unitsToRenovate = 'Enter a positive unit count.';
@@ -172,13 +172,13 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         errors.unitsToRenovate = `Cannot exceed total units (${unitMixStats.totalUnits}).`;
       }
     }
-    if (nextState.renoStartsPerMonth <= 0) errors.renoStartsPerMonth = 'Must be greater than 0.';
-    if (nextState.renoStartMonth < 1) errors.renoStartMonth = 'Must be 1 or greater.';
-    if (nextState.monthsToComplete < 1) errors.monthsToComplete = 'Must be 1 or greater.';
-    if (nextState.rentPremiumPct < 0 || nextState.rentPremiumPct > 1) {
+    if ((nextState.renoStartsPerMonth ?? 0) <= 0) errors.renoStartsPerMonth = 'Must be greater than 0.';
+    if ((nextState.renoStartMonth ?? 0) < 1) errors.renoStartMonth = 'Must be 1 or greater.';
+    if ((nextState.monthsToComplete ?? 0) < 1) errors.monthsToComplete = 'Must be 1 or greater.';
+    if ((nextState.rentPremiumPct ?? 0) < 0 || (nextState.rentPremiumPct ?? 0) > 1) {
       errors.rentPremiumPct = 'Must be between 0 and 1.';
     }
-    if (nextState.reletMonths < 0) errors.reletMonths = 'Must be 0 or greater.';
+    if ((nextState.reletMonths ?? 0) < 0) errors.reletMonths = 'Must be 0 or greater.';
     return errors;
   }, [unitMixStats.totalUnits]);
 

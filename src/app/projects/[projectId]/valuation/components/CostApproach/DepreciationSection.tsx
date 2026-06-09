@@ -13,7 +13,17 @@ interface DepreciationSectionProps {
   onSaved?: () => Promise<void>;
 }
 
-const fields: (keyof CostApproachDepreciationForm)[] = [
+// Numeric depreciation components that contribute to the total. Typed as the
+// number-valued keys so index access yields `number | null | undefined`.
+type NumericDepreciationField =
+  | 'physical_curable'
+  | 'physical_incurable_short'
+  | 'physical_incurable_long'
+  | 'functional_curable'
+  | 'functional_incurable'
+  | 'external_obsolescence';
+
+const fields: NumericDepreciationField[] = [
   'physical_curable',
   'physical_incurable_short',
   'physical_incurable_long',
@@ -38,7 +48,7 @@ export function DepreciationSection({ projectId, record, onSaved }: Depreciation
         external_obsolescence: record.external_obsolescence,
         effective_age_years: record.effective_age_years,
         remaining_life_years: record.remaining_life_years,
-        depreciation_method: record.depreciation_method,
+        depreciation_method: record.depreciation_method ?? undefined,
         notes: record.notes,
       });
     }

@@ -62,7 +62,7 @@ export function ImprovementsSection({ containers, metadata, loading }: Improveme
                   <div className="text-right text-sm" style={{ color: 'var(--cui-secondary-color)' }}>
                     Attributes:
                     <div style={{ color: 'var(--cui-body-color)' }}>
-                      {(container.attributes as Record<string, unknown> | null)?.units_total ?? '—'} units
+                      {String((container.attributes as Record<string, unknown> | null)?.units_total ?? '—')} units
                     </div>
                   </div>
                 </div>

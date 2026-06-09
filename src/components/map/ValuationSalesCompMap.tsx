@@ -6,7 +6,7 @@
 
 'use client';
 
-import React, { useRef, useMemo, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useMemo, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import { MapOblique, MapObliqueRef } from './MapOblique';
 import { useCompsMapData } from '@/lib/map/hooks';
 import { ParcelOverlayLayer } from './ParcelOverlayLayer';
@@ -20,16 +20,32 @@ export interface ValuationSalesCompMapProps {
   compApns?: string[];
 }
 
-export default function ValuationSalesCompMap({
+// Imperative handle exposed to parents that need to drive the map (e.g. resize
+// after a collapsible container opens). Mirrors the underlying MapOblique ref.
+export type ValuationSalesCompMapRef = MapObliqueRef;
+
+const ValuationSalesCompMap = forwardRef<ValuationSalesCompMapRef, ValuationSalesCompMapProps>(function ValuationSalesCompMap({
   projectId,
   styleUrl,
   height = '520px',
   onToggleComp,
   subjectApn,
   compApns
-}: ValuationSalesCompMapProps) {
+}: ValuationSalesCompMapProps, ref) {
   const { data, error, isLoading } = useCompsMapData(projectId);
   const mapRef = useRef<MapObliqueRef>(null);
+
+  // Forward the underlying MapOblique imperative handle to parents.
+  useImperativeHandle(ref, () => ({
+    flyToSubject: (...args) => mapRef.current?.flyToSubject(...args),
+    setBearing: (b) => mapRef.current?.setBearing(b),
+    setPitch: (p) => mapRef.current?.setPitch(p),
+    getBearing: () => mapRef.current?.getBearing() ?? 0,
+    getPitch: () => mapRef.current?.getPitch() ?? 0,
+    getZoom: () => mapRef.current?.getZoom() ?? 13,
+    fitBounds: (bounds, options) => mapRef.current?.fitBounds(bounds, options),
+    resize: () => mapRef.current?.resize(),
+  }), []);
 
   // Basemap state
   type BasemapOption = 'google-roadmap' | 'google-satellite' | 'google-hybrid' | 'google-terrain';
@@ -336,4 +352,6 @@ export default function ValuationSalesCompMap({
       </div>
     </div>
   );
-}
+});
+
+export default ValuationSalesCompMap;
