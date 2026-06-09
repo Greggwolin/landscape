@@ -7,11 +7,12 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
  * Get completeness scores for a project across 6 categories.
  */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { projectId: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
+    const authHeader = request.headers.get('Authorization');
 
     const response = await fetch(`${DJANGO_API_URL}/api/projects/${projectId}/completeness/`, {
         method: 'GET',

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-const getAuthHeaders = (request: NextRequest) => {
+const getAuthHeaders = (request: NextRequest): Record<string, string> => {
   const authHeader = request.headers.get('Authorization');
   return authHeader ? { Authorization: authHeader } : {};
 };

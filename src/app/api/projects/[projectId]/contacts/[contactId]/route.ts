@@ -64,7 +64,7 @@ export async function PATCH(
       RETURNING contact_id, contact_name
     `;
 
-    const { rows } = await sql.query(query, values);
+    const rows = await sql.query(query, values);
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -98,12 +98,13 @@ export async function DELETE(
   try {
     const contactId = parseInt((await context.params).contactId);
 
-    const { rowCount } = await sql`
+    const deleted = await sql`
       DELETE FROM landscape.tbl_contacts
       WHERE contact_id = ${contactId}
+      RETURNING contact_id
     `;
 
-    if (rowCount === 0) {
+    if (deleted.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Contact not found' },
         { status: 404 }

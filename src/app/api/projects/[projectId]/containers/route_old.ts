@@ -20,8 +20,15 @@ type ContainerRow = {
   updated_at: string | null
 }
 
-function buildTree(rows: ContainerRow[]): ContainerNode[] {
-  const nodes = rows.map<ContainerNode>((row) => ({
+// Local node type mirrors the emitted shape (container_code, the SQL alias of
+// division_code), which doesn't match the renamed DivisionNode.division_code.
+type ContainerTreeNode = Omit<ContainerNode, 'division_code' | 'children'> & {
+  container_code: string
+  children: ContainerTreeNode[]
+}
+
+function buildTree(rows: ContainerRow[]): ContainerTreeNode[] {
+  const nodes = rows.map<ContainerTreeNode>((row) => ({
     division_id: row.division_id,
     project_id: row.project_id,
     parent_division_id: row.parent_division_id,
@@ -36,11 +43,11 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
     children: [],
   }))
 
-  const map = new Map<number, ContainerNode>()
+  const map = new Map<number, ContainerTreeNode>()
   nodes.forEach((node) => map.set(node.division_id, node))
 
-  const roots: ContainerNode[] = []
-  const childrenByParent = new Map<number, ContainerNode[]>()
+  const roots: ContainerTreeNode[] = []
+  const childrenByParent = new Map<number, ContainerTreeNode[]>()
 
   for (const node of nodes) {
     if (node.parent_division_id) {
@@ -103,7 +110,7 @@ export async function GET(
       ORDER BY tier, sort_order NULLS LAST, division_id
     `
 
-    const tree = buildTree(rows)
+    const tree = buildTree(rows as ContainerRow[])
     return NextResponse.json({ containers: tree })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)

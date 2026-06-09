@@ -79,7 +79,7 @@ const parseRate = (value: any): number | null => {
 };
 
 async function fetchAvailableSets(): Promise<InflationSelection[]> {
-  const rows = await sql`
+  const rows = (await sql`
     SELECT
       s.set_id,
       s.set_name,
@@ -93,10 +93,12 @@ async function fetchAvailableSets(): Promise<InflationSelection[]> {
     WHERE s.is_global = true
     GROUP BY s.set_id, s.set_name, s.is_global
     ORDER BY s.set_name ASC
-  `;
+  `) as Array<{ set_id: number; set_name: string; is_global: boolean; current_rate: unknown }>;
 
   return rows.map((row) => ({
-    ...row,
+    set_id: row.set_id,
+    set_name: row.set_name,
+    is_global: row.is_global,
     current_rate: parseRate(row.current_rate),
   }));
 }
@@ -146,7 +148,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     await ensureInflationColumns();
 
-    const upsertResult = await sql`
+    const upsertResult = (await sql`
       INSERT INTO landscape.tbl_project_settings (
         project_id,
         cost_inflation_set_id,
@@ -166,9 +168,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
         price_inflation_set_id = EXCLUDED.price_inflation_set_id,
         updated_at = NOW()
     RETURNING project_id, cost_inflation_set_id, price_inflation_set_id;
-    `;
+    `) as SettingsRow[];
 
-    const appliedSettings: SettingsRow | undefined = upsertResult[0] ?? {
+    const appliedSettings: SettingsRow = upsertResult[0] ?? {
       project_id: id,
       cost_inflation_set_id: costId,
       price_inflation_set_id: priceId,

@@ -118,16 +118,16 @@ export async function PATCH(
       )
     }
 
-    // Execute updates in transaction
-    await sql.begin(async (txn: any) => {
-      for (const update of updates) {
-        await txn`
+    // Execute updates in a single atomic transaction (Neon HTTP array form).
+    await sql.transaction(
+      updates.map(
+        (update) => sql`
           UPDATE landscape.tbl_division
           SET sort_order = ${update.sort_order}, updated_at = CURRENT_TIMESTAMP
           WHERE division_id = ${update.division_id}
         `
-      }
-    })
+      )
+    )
 
     // Return updated containers
     const updated = await sql`

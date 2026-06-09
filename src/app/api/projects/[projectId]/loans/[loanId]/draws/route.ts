@@ -7,7 +7,7 @@ const buildUrl = (baseUrl: string, searchParams: URLSearchParams) => {
   return query ? `${baseUrl}?${query}` : baseUrl;
 };
 
-const getAuthHeaders = (request: NextRequest) => {
+const getAuthHeaders = (request: NextRequest): Record<string, string> => {
   const authHeader = request.headers.get('Authorization');
   return authHeader ? { Authorization: authHeader } : {};
 };

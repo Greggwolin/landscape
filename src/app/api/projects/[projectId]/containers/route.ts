@@ -21,8 +21,16 @@ type ContainerRow = {
   updated_at: string | null
 }
 
-function buildTree(rows: ContainerRow[]): ContainerNode[] {
-  const nodes = rows.map<ContainerNode>((row) => ({
+// This route's tree nodes expose the legacy `container_code` API field (the SQL
+// aliases division_code AS container_code), so they don't match DivisionNode's
+// `division_code` shape. Use a local node type that mirrors what we actually emit.
+type ContainerTreeNode = Omit<ContainerNode, 'division_code' | 'children'> & {
+  container_code: string
+  children: ContainerTreeNode[]
+}
+
+function buildTree(rows: ContainerRow[]): ContainerTreeNode[] {
+  const nodes = rows.map<ContainerTreeNode>((row) => ({
     division_id: Number(row.division_id),
     project_id: Number(row.project_id),
     parent_division_id: row.parent_division_id ? Number(row.parent_division_id) : null,
@@ -37,11 +45,11 @@ function buildTree(rows: ContainerRow[]): ContainerNode[] {
     children: [],
   }))
 
-  const map = new Map<number, ContainerNode>()
+  const map = new Map<number, ContainerTreeNode>()
   nodes.forEach((node) => map.set(node.division_id, node))
 
-  const roots: ContainerNode[] = []
-  const childrenByParent = new Map<number, ContainerNode[]>()
+  const roots: ContainerTreeNode[] = []
+  const childrenByParent = new Map<number, ContainerTreeNode[]>()
 
   for (const node of nodes) {
     if (node.parent_division_id) {
@@ -192,10 +200,10 @@ export async function GET(
     }
 
     // Step 2: Build tree structure
-    const tree = buildTree(rows)
+    const tree = buildTree(rows as ContainerRow[])
 
     // Step 3: Recursively aggregate child data up to parents
-    function aggregateChildData(node: ContainerNode): void {
+    function aggregateChildData(node: ContainerTreeNode): void {
       if (node.children && node.children.length > 0) {
         // First, recursively process all children
         node.children.forEach(child => aggregateChildData(child))
