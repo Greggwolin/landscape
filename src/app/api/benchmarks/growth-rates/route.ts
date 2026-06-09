@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
         ORDER BY step_number ASC
       `;
       console.log(`GET /api/benchmarks/growth-rates - Steps for set ${set.set_id}:`, steps);
-      set.steps = steps;
+      set.steps = steps as unknown as GrowthRateSet['steps'];
 
       // Ensure current_rate is a number, not a string
       if (set.current_rate !== null && set.current_rate !== undefined) {

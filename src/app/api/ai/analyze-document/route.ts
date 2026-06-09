@@ -230,7 +230,11 @@ async function analyzeWithClaudePDF(
     extracted_data: extractionResult.mapped,
     field_mappings: fieldMappings,
     processing_notes: processingNotes,
-    extraction_metadata: persistenceResult,
+    extraction_metadata: {
+      queue_id: persistenceResult.queueId,
+      unmapped_count: persistenceResult.unmappedCount,
+      assertion_count: persistenceResult.assertionCount
+    },
     validation
   };
 }
@@ -295,7 +299,11 @@ async function analyzeWithTextExtraction(
     extracted_data: extractionResult.mapped,
     field_mappings: fieldMappings,
     processing_notes: processingNotes,
-    extraction_metadata: persistenceResult,
+    extraction_metadata: {
+      queue_id: persistenceResult.queueId,
+      unmapped_count: persistenceResult.unmappedCount,
+      assertion_count: persistenceResult.assertionCount
+    },
     validation
   };
 }

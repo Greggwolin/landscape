@@ -2534,82 +2534,14 @@ export type GisTaxParcelRefInsert = {
   updatedAt?: string | null;
 };
 
-// landscape.glossary_zoning
-// Primary Key: glossary_id
-export interface GlossaryZoning {
-  /** Default: gen_random_uuid() */
-  glossaryId: string;
-  jurisdictionCity: string;
-  jurisdictionCounty: string | null;
-  jurisdictionState: string;
-  jurisdictionDisplay: string;
-  districtCode: string | null;
-  districtName: string | null;
-  familyName: string;
-  localCodeRaw: string;
-  localCodeCanonical: string | null;
-  codeTokenKind: string /* code_token_kind enum */;
-  codeTokenConfidence: number;
-  mappedUse: string;
-  allowance: string;
-  purposeText: string | null;
-  intentText: string | null;
-  conditionsText: string | null;
-  developmentStandards: any | null;
-  useStandardRefs: any | null;
-  definitionsRefs: any | null;
-  narrativeSectionRef: string | null;
-  narrativeSrcUrl: string | null;
-  sourceDocUrl: string | null;
-  effectiveDate: string | null;
-  amendingOrdList: any | null;
-  /** Default: true */
-  isActive: boolean;
-  /** Default: now() */
-  createdAt: string;
-  /** Default: now() */
-  updatedAt: string;
-  suggestedFamily: string | null;
-  suggestedDensityCode: string | null;
-  suggestedTypeCode: string | null;
-  aiConfidence: number | null;
-  mappingStatus: string | null;
-}
-
-// Insert type for landscape.glossary_zoning (excludes auto-generated fields)
-export type GlossaryZoningInsert = {
-  glossaryId?: string;
-  jurisdictionCity: string;
-  jurisdictionCounty?: string | null;
-  jurisdictionState: string;
-  jurisdictionDisplay: string;
-  districtCode?: string | null;
-  districtName?: string | null;
-  familyName: string;
-  localCodeRaw: string;
-  localCodeCanonical?: string | null;
-  codeTokenKind: string /* code_token_kind enum */;
-  codeTokenConfidence: number;
-  mappedUse: string;
-  allowance: string;
-  purposeText?: string | null;
-  intentText?: string | null;
-  conditionsText?: string | null;
-  developmentStandards?: any | null;
-  useStandardRefs?: any | null;
-  definitionsRefs?: any | null;
-  narrativeSectionRef?: string | null;
-  narrativeSrcUrl?: string | null;
-  sourceDocUrl?: string | null;
-  effectiveDate?: string | null;
-  amendingOrdList?: any | null;
-  isActive?: boolean;
-  suggestedFamily?: string | null;
-  suggestedDensityCode?: string | null;
-  suggestedTypeCode?: string | null;
-  aiConfidence?: number | null;
-  mappingStatus?: string | null;
-};
+// SKIPPED duplicate interface name for landscape.glossary_zoning -> GlossaryZoning (already emitted from land_v2.glossary_zoning)
+// SKIPPED duplicate insert type for landscape.glossary_zoning -> GlossaryZoningInsert (already emitted from land_v2.glossary_zoning)
+// NOTE: the landscape.glossary_zoning table carries 5 extra columns not present on
+// land_v2.glossary_zoning (suggestedFamily, suggestedDensityCode, suggestedTypeCode,
+// aiConfidence, mappingStatus). No code in the repo references the GlossaryZoning type,
+// so dropping the wider declaration is type-safe today. If a consumer ever needs those
+// columns, the generator's first-wins dedup should be changed to prefer the superset
+// (or suffix the schema, e.g. GlossaryZoningLandscape) rather than reinstating a raw duplicate.
 
 // landscape.knowledge_embeddings
 // Primary Key: embedding_id
@@ -15042,26 +14974,12 @@ export interface AbsorptionWithDependencies {
   dependencySummary: string | null;
 }
 
-// landscape.vw_acreage_allocation
-export interface AcreageAllocation {
-  allocationId: number | null;
-  projectId: number | null;
-  projectName: string | null;
-  phaseId: number | null;
-  parcelId: number | null;
-  allocationTypeId: number | null;
-  allocationTypeCode: string | null;
-  allocationTypeName: string | null;
-  isDevelopable: boolean | null;
-  acres: number | null;
-  sourceDocId: number | null;
-  sourceDocument: string | null;
-  sourcePage: number | null;
-  confidenceScore: number | null;
-  notes: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
+// SKIPPED duplicate interface name for landscape.vw_acreage_allocation -> AcreageAllocation
+// (already emitted from landscape.tbl_acreage_allocation; the vw_ prefix strips to the same
+// name). The view typed several columns as nullable (allocationId, projectId, acres: number | null)
+// where the base table types them non-null (acres: number), which is what produced the TS2717
+// interface-merge nullability conflicts. No code references AcreageAllocation, so keeping the
+// base-table declaration is type-safe.
 
 // landscape.vw_budget_grid_items
 export interface BudgetGridItems {
@@ -15638,36 +15556,7 @@ export interface RevenueTimeline {
   pctComplete: number | null;
 }
 
-// landscape.vw_zoning_glossary_export
-export interface ZoningGlossaryExport {
-  glossaryId: string | null;
-  jurisdictionDisplay: string | null;
-  jurisdictionCity: string | null;
-  jurisdictionCounty: string | null;
-  jurisdictionState: string | null;
-  familyName: string | null;
-  districtCode: string | null;
-  districtName: string | null;
-  localCodeRaw: string | null;
-  localCodeCanonical: string | null;
-  codeTokenKind: string /* code_token_kind enum */ | null;
-  codeTokenConfidence: number | null;
-  mappedUse: string | null;
-  allowance: string | null;
-  purposeText: string | null;
-  intentText: string | null;
-  conditionsText: string | null;
-  developmentStandards: any | null;
-  useStandardRefs: any | null;
-  definitionsRefs: any | null;
-  narrativeSectionRef: string | null;
-  narrativeSrcUrl: string | null;
-  sourceDocUrl: string | null;
-  effectiveDate: string | null;
-  isActive: boolean | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
+// SKIPPED duplicate interface name for landscape.vw_zoning_glossary_export -> ZoningGlossaryExport (already emitted from land_v2.vw_zoning_glossary_export; shapes identical)
 
 // landscape.zonda_subdivisions
 // Primary Key: id
@@ -15817,7 +15706,7 @@ export const TABLE_NAMES = {
   GIS_PLAN_PARCEL: 'landscape.gis_plan_parcel' as const,
   GIS_PROJECT_BOUNDARY: 'landscape.gis_project_boundary' as const,
   GIS_TAX_PARCEL_REF: 'landscape.gis_tax_parcel_ref' as const,
-  GLOSSARY_ZONING: 'landscape.glossary_zoning' as const,
+  // SKIPPED duplicate key GLOSSARY_ZONING for landscape.glossary_zoning (already emitted from land_v2.glossary_zoning)
   KNOWLEDGE_EMBEDDINGS: 'landscape.knowledge_embeddings' as const,
   KNOWLEDGE_ENTITIES: 'landscape.knowledge_entities' as const,
   KNOWLEDGE_FACTS: 'landscape.knowledge_facts' as const,
@@ -16135,7 +16024,7 @@ export const TABLE_NAMES = {
   VW_PERMIT_MSA_MONTHLY: 'landscape.vw_permit_msa_monthly' as const,
   VW_PROJECT_ACQUISITION_SUMMARY: 'landscape.vw_project_acquisition_summary' as const,
   VW_REVENUE_TIMELINE: 'landscape.vw_revenue_timeline' as const,
-  VW_ZONING_GLOSSARY_EXPORT: 'landscape.vw_zoning_glossary_export' as const,
+  // SKIPPED duplicate key VW_ZONING_GLOSSARY_EXPORT for landscape.vw_zoning_glossary_export (already emitted from land_v2.vw_zoning_glossary_export)
   ZONDA_SUBDIVISIONS: 'landscape.zonda_subdivisions' as const,
 } as const;
 

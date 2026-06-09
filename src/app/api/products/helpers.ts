@@ -30,7 +30,7 @@ export async function fetchPlanningEfficiency(): Promise<number | null> {
   const result = await sql.query(
     `SELECT default_planning_efficiency FROM landscape.core_planning_standards WHERE is_active = true ORDER BY standard_id LIMIT 1`
   );
-  const value = result.rows?.[0]?.default_planning_efficiency;
+  const value = result?.[0]?.default_planning_efficiency;
   return value !== undefined && value !== null ? Number(value) : null;
 }
 
@@ -43,7 +43,7 @@ export const computeDensity = (product: ReturnType<typeof mapProductRow>, effici
 };
 
 export async function getProductByIdDirect(id: number) {
-  const result = await sql.query<ProductRow>(
+  const result = (await sql.query(
     `
       SELECT
         p.product_id,
@@ -62,8 +62,8 @@ export async function getProductByIdDirect(id: number) {
       LIMIT 1;
     `,
     [id]
-  );
+  )) as ProductRow[];
 
-  const row = result.rows?.[0];
+  const row = result?.[0];
   return row ? mapProductRow(row) : null;
 }

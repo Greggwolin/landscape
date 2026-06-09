@@ -22,21 +22,21 @@ export async function GET(request: NextRequest) {
     let rows: PropertySubtypeRow[];
 
     if (propertyType) {
-      rows = await sql`
+      rows = (await sql`
         SELECT *
         FROM landscape.lu_property_subtype
         WHERE property_type_code = ${propertyType.toUpperCase()}
           AND is_active = true
         ORDER BY sort_order, subtype_name;
-      `;
+      `) as PropertySubtypeRow[];
     } else {
       // Return all subtypes grouped by property type
-      rows = await sql`
+      rows = (await sql`
         SELECT *
         FROM landscape.lu_property_subtype
         WHERE is_active = true
         ORDER BY property_type_code, sort_order, subtype_name;
-      `;
+      `) as PropertySubtypeRow[];
     }
 
     return NextResponse.json({

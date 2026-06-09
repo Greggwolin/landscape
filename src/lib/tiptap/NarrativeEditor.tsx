@@ -13,11 +13,17 @@
  */
 
 import React, { useCallback, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+// @ts-expect-error @tiptap/react not installed yet
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
+// @ts-expect-error @tiptap/starter-kit not installed yet
 import StarterKit from '@tiptap/starter-kit';
+// @ts-expect-error @tiptap/extension-underline not installed yet
 import Underline from '@tiptap/extension-underline';
+// @ts-expect-error @tiptap/extension-text-style not installed yet
 import { TextStyle } from '@tiptap/extension-text-style';
+// @ts-expect-error @tiptap/extension-highlight not installed yet
 import Highlight from '@tiptap/extension-highlight';
+// @ts-expect-error @tiptap/extension-color not installed yet
 import { Color } from '@tiptap/extension-color';
 import { CButton, CBadge } from '@coreui/react';
 import CIcon from '@coreui/icons-react';

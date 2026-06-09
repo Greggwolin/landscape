@@ -164,7 +164,7 @@ async function loadWorkbook(): Promise<UnitCostTemplateSummary[]> {
 
     const categoryId = generateStableId(categoryName, 10_000);
     templates.push({
-      template_id: generateStableId(`${categoryName}-${itemName}-${index}`, 1_000_000),
+      item_id: generateStableId(`${categoryName}-${itemName}-${index}`, 1_000_000),
       category_id: categoryId,
       category_name: categoryName,
       item_name: itemName,

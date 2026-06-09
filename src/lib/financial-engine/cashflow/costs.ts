@@ -236,7 +236,7 @@ export async function fetchBudgetItems(
     `;
   }
 
-  return await query;
+  return (await query) as BudgetItemRow[];
 }
 
 /**
@@ -278,7 +278,7 @@ export async function fetchBudgetTiming(
     `;
   }
 
-  const rows = await query;
+  const rows = (await query) as BudgetTimingRow[];
 
   // Group by fact_id
   const timingMap = new Map<number, BudgetTimingRow[]>();
@@ -521,7 +521,7 @@ export async function fetchAcquisitionCosts(projectId: number): Promise<Acquisit
     ORDER BY event_date, acquisition_id
   `;
 
-  return await query;
+  return (await query) as AcquisitionRow[];
 }
 
 // ============================================================================

@@ -826,7 +826,9 @@ function extractProjectInformation(text: string) {
       email: string;
       phone: string;
       type: string; // 'engineer', 'lawyer', 'developer', 'consultant'
-    }>
+    }>,
+    // Structured Parcel Data table (populated by extractParcelTables when found)
+    parcelTableData: undefined as any,
   };
 
   // Look for project name patterns
@@ -1255,6 +1257,7 @@ function extractStructuredParcelTable(text: string): any | null {
   // Save full extracted text to file for debugging
   const debugPath = '/tmp/extracted_pdf_text.txt';
   try {
+    const fs = require('fs');
     fs.writeFileSync(debugPath, text);
     console.log(`📝 Saved full extracted text to: ${debugPath}`);
   } catch (err) {
@@ -2179,7 +2182,7 @@ async function analyzeDocumentContent(
         confidence: projectInfo.parcelNumbers.length > 0 ? 0.95 : 0.0
       },
       land_area: {
-        total_acres: projectInfo.totalAcres,
+        total_acres: projectInfo.totalAcres ?? undefined,
         individual_parcels: projectInfo.productTypes.map(product => ({
           parcel_id: product.name,
           acres: 0, // Would need additional parsing to extract acres per product type
@@ -2188,7 +2191,7 @@ async function analyzeDocumentContent(
         confidence: projectInfo.totalAcres ? 0.90 : 0.0
       },
       development_data: {
-        units_planned: projectInfo.totalUnits,
+        units_planned: projectInfo.totalUnits ?? undefined,
         land_uses: projectInfo.productTypes.map(p => p.name),
         phases: projectInfo.phases.map(p => p.name),
         confidence: projectInfo.totalUnits ? 0.90 : 0.0

@@ -1,6 +1,6 @@
 import 'server-only'
 import { neon } from '@neondatabase/serverless'
-import type { NeonQueryFunction } from '@neondatabase/serverless'
+import type { HTTPQueryOptions, NeonQueryFunction } from '@neondatabase/serverless'
 
 // Lazy-initialize a singleton Neon client for server-side usage.
 let _sql: NeonQueryFunction<false, false> | null = null
@@ -17,8 +17,11 @@ function getSql(): NeonQueryFunction<false, false> {
 export const sql: NeonQueryFunction<false, false> = Object.assign(
   (strings: TemplateStringsArray, ...values: unknown[]) => getSql()(strings, ...values),
   {
-    query: (queryWithPlaceholders: string, params?: unknown[], queryOpts?: unknown) =>
-      getSql().query(queryWithPlaceholders, params, queryOpts)
+    query: (
+      queryWithPlaceholders: string,
+      params?: unknown[],
+      queryOpts?: HTTPQueryOptions<false, false>
+    ) => getSql().query(queryWithPlaceholders, params, queryOpts)
   }
 ) as NeonQueryFunction<false, false>
 

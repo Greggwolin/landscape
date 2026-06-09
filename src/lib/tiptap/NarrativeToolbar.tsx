@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+// @ts-expect-error @tiptap/react not installed yet
 import { Editor } from '@tiptap/react';
 import {
   CButton,

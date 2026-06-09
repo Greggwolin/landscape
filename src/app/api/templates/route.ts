@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     let templates: Template[]
 
     if (propertyType) {
-      templates = await sql`
+      templates = (await sql`
         SELECT
           t.template_id,
           t.template_name,
@@ -107,9 +107,9 @@ export async function GET(request: NextRequest) {
           AND t.is_active = true
         GROUP BY t.template_id, t.template_name, t.property_type, t.template_category, t.description, t.is_active
         ORDER BY t.template_name
-      `
+      `) as Template[]
     } else {
-      templates = await sql`
+      templates = (await sql`
         SELECT
           t.template_id,
           t.template_name,
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         WHERE t.is_active = true
         GROUP BY t.template_id, t.template_name, t.property_type, t.template_category, t.description, t.is_active
         ORDER BY t.property_type, t.template_name
-      `
+      `) as Template[]
     }
 
     // If include_columns is requested, fetch columns for each template

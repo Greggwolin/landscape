@@ -13,7 +13,8 @@ type Params = { params: Promise<{ id: string }> };
  */
 export const GET = async (_request: Request, context: Params) => {
   try {
-    const leaseId = parseInt((await context.params).id, 10);
+    const { id } = await context.params;
+    const leaseId = parseInt(id, 10);
 
     if (isNaN(leaseId)) {
       return NextResponse.json(
@@ -25,9 +26,11 @@ export const GET = async (_request: Request, context: Params) => {
     // Try to get from database first
     let data = await getFullLeaseData(leaseId);
 
-    // If not found in database, use mock data (for prototype)
+    // If not found in database, use mock data (for prototype).
+    // The mock fixture's LeaseData shape differs from the financial-engine
+    // LeaseData; cast at this prototype-only fallback boundary.
     if (!data) {
-      data = getLeaseData(params.id);
+      data = getLeaseData(id) as unknown as typeof data;
     }
 
     if (!data) {

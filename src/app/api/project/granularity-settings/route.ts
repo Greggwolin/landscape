@@ -44,12 +44,12 @@ export async function GET(request: NextRequest) {
 
     let projectPlanning: { planning_efficiency: number | null } | undefined;
     try {
-      [projectPlanning] = await sql`
+      [projectPlanning] = (await sql`
         SELECT planning_efficiency
         FROM landscape.tbl_project
         WHERE project_id = ${projectId}::bigint
         LIMIT 1
-      `;
+      `) as { planning_efficiency: number | null }[];
     } catch (error) {
       console.warn('Could not read planning_efficiency column:', error);
       projectPlanning = undefined;

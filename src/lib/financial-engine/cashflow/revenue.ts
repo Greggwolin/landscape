@@ -184,7 +184,7 @@ export async function fetchProjectParcels(
     `;
   }
 
-  return await query;
+  return (await query) as ParcelRow[];
 }
 
 // ============================================================================
@@ -621,6 +621,7 @@ export async function generateAbsorptionSchedule(
       totalNetRevenue: 0,
       totalCommissions: 0,
       totalClosingCosts: 0,
+      totalSubdivisionCosts: 0,
     };
   }
 

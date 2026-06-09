@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      categories = await sql`
+      categories = (await sql`
         SELECT
           c.category_id,
           c.parent_id,
@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
         WHERE c.parent_id = ${parentIdNum}
           AND c.is_active = true
         ORDER BY c.sort_order, c.category_name
-      `;
+      `) as CategoryRow[];
     } else if (includeAll) {
       // Return all OpEx categories (account numbers starting with 5)
-      categories = await sql`
+      categories = (await sql`
         SELECT
           c.category_id,
           c.parent_id,
@@ -76,10 +76,10 @@ export async function GET(request: NextRequest) {
         WHERE c.account_number LIKE '5%'
           AND c.is_active = true
         ORDER BY c.account_number, c.sort_order, c.category_name
-      `;
+      `) as CategoryRow[];
     } else {
       // Return top-level OpEx categories with Operations lifecycle stage
-      categories = await sql`
+      categories = (await sql`
         SELECT DISTINCT
           c.category_id,
           c.parent_id,
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         WHERE c.is_active = true
           AND c.parent_id IS NULL
         ORDER BY c.sort_order, c.category_name
-      `;
+      `) as CategoryRow[];
     }
 
     return NextResponse.json({

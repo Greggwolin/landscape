@@ -325,9 +325,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const { property_id } = await context.params;
   return NextResponse.json({
     message: 'Use POST method to run sensitivity analysis',
-    endpoint: `/api/cre/properties/${params.property_id}/sensitivity`,
+    endpoint: `/api/cre/properties/${property_id}/sensitivity`,
     method: 'POST',
     parameters: {
       hold_period_years: 'number (optional, defaults to 10)',

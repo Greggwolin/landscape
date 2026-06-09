@@ -98,7 +98,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
 
   if (categoryId && projectTypeCode) {
     // Both filters
-    result = await sql`
+    result = (await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -110,10 +110,10 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
         AND t.category_id = ${Number(categoryId)}
         AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})
       ORDER BY t.item_name
-    `;
+    `) as TemplateRow[];
   } else if (categoryId) {
     // Only category filter
-    result = await sql`
+    result = (await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -124,10 +124,10 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
       WHERE t.is_active = true
         AND t.category_id = ${Number(categoryId)}
       ORDER BY t.item_name
-    `;
+    `) as TemplateRow[];
   } else if (projectTypeCode) {
     // Only project type filter
-    result = await sql`
+    result = (await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -138,10 +138,10 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
       WHERE t.is_active = true
         AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})
       ORDER BY t.item_name
-    `;
+    `) as TemplateRow[];
   } else {
     // No filters - return all active items
-    result = await sql`
+    result = (await sql`
       SELECT
         t.item_id as template_id, t.category_id, c.category_name, t.item_name,
         t.default_uom_code, t.typical_mid_value, t.quantity, t.market_geography,
@@ -151,7 +151,7 @@ async function queryTemplates(searchParams: URLSearchParams): Promise<TemplateRo
       JOIN landscape.core_unit_cost_category c ON c.category_id = t.category_id
       WHERE t.is_active = true
       ORDER BY t.item_name
-    `;
+    `) as TemplateRow[];
   }
 
   console.log(`Query returned ${result.length} rows`);

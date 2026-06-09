@@ -99,7 +99,7 @@ export async function GET(
       LIMIT 1
     `;
 
-    const budget = budgetRows[0];
+    const budget = budgetRows[0] as BudgetInfoRow | undefined;
     if (!budget) {
       return NextResponse.json(
         { error: 'Budget item not found' },

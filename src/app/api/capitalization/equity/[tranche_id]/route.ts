@@ -163,11 +163,14 @@ export async function PATCH(
     // Add updated_at
     updates.push('updated_at = NOW()');
 
-    // Execute update using sql.raw() for dynamic SQL
-    const result = await sql`
+    // Execute update with the dynamically-built SET clause. The SET fragment is
+    // composed from a fixed field allowlist with values already escaped/inlined
+    // above; only the WHERE id is parameterized.
+    const result = await sql.query(
+      `
       UPDATE landscape.tbl_equity
-      SET ${sql.raw(updates.join(', '))}
-      WHERE equity_id = ${trancheId}
+      SET ${updates.join(', ')}
+      WHERE equity_id = $1
       RETURNING
         equity_id,
         project_id,
@@ -203,7 +206,9 @@ export async function PATCH(
         has_lookback,
         lookback_at_sale,
         updated_at
-    `;
+    `,
+      [trancheId]
+    );
 
     if (result.length === 0) {
       return NextResponse.json(

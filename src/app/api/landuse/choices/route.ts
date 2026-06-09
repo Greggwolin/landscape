@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const type = searchParams.get('type'); // 'families', 'types', 'codes'
     const familyId = searchParams.get('family_id');
     const typeId = searchParams.get('type_id');
-    let result;
+    let result: Record<string, unknown>[] = [];
 
     const normalizeProducts = (data: unknown) => {
       if (!Array.isArray(data)) return [] as {

@@ -44,8 +44,8 @@ async function queryProducts(searchParams: URLSearchParams) {
     ORDER BY p.code;
   `;
 
-  const result = await sql.query<ProductRow>(query, values);
-  return result.rows ?? [];
+  const result = (await sql.query(query, values)) as ProductRow[];
+  return result ?? [];
 }
 
 export async function GET(request: NextRequest) {
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       isActive === undefined ? true : Boolean(isActive)
     ];
 
-    const result = await sql.query<ProductRow>(
+    const result = (await sql.query(
       `
         INSERT INTO landscape.res_lot_product (
           code,
@@ -186,9 +186,9 @@ export async function POST(request: NextRequest) {
           updated_at;
       `,
       values
-    );
+    )) as ProductRow[];
 
-    const row = result.rows?.[0];
+    const row = result?.[0];
     if (!row) {
       throw new Error('Insert failed');
     }

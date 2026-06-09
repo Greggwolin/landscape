@@ -175,39 +175,35 @@ async function insertUnmappedFields(
     WHERE doc_id = ${docId}
   `;
 
-  // Batch insert all unmapped fields
-  const values = unmapped.map((item) => {
-    const bboxArray = item.bbox
-      ? `ARRAY[${item.bbox.join(',')}]::decimal[]`
-      : 'NULL';
+  // Insert all unmapped fields (one row per item).
+  for (const item of unmapped) {
+    const bbox = item.bbox && item.bbox.length > 0 ? item.bbox : null;
 
-    return sql`(
-      ${docId},
-      ${projectId},
-      ${item.key},
-      ${String(item.value)},
-      ${item.target_table_candidates || []},
-      ${item.page || null},
-      ${sql.unsafe(bboxArray)},
-      'new',
-      NOW()
-    )`;
-  });
-
-  await sql`
-    INSERT INTO landscape.dms_unmapped (
-      doc_id,
-      project_id,
-      source_key,
-      raw_value,
-      candidate_targets,
-      page,
-      bbox,
-      status,
-      created_at
-    )
-    VALUES ${sql.unsafe(values.map((v, i) => `$${i + 1}`).join(','))}
-  `.queryWith(values);
+    await sql`
+      INSERT INTO landscape.dms_unmapped (
+        doc_id,
+        project_id,
+        source_key,
+        raw_value,
+        candidate_targets,
+        page,
+        bbox,
+        status,
+        created_at
+      )
+      VALUES (
+        ${docId},
+        ${projectId},
+        ${item.key},
+        ${String(item.value)},
+        ${item.target_table_candidates || []},
+        ${item.page || null},
+        ${bbox}::decimal[],
+        'new',
+        NOW()
+      )
+    `;
+  }
 
   return unmapped.length;
 }

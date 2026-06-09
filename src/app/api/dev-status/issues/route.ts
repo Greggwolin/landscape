@@ -15,7 +15,7 @@ const CreateIssueSchema = z.object({
   commitSha: z.string().optional(),
   reporterName: z.string().optional(),
   reporterEmail: z.string().email().optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 })
 
 const DefaultMetadataSchema = z.object({
@@ -89,7 +89,7 @@ const ensureDevIssueLogTable = (() => {
 })()
 
 function isPostgresError(error: unknown): error is PostgresError {
-  return error instanceof Error && 'code' in (error as Record<string, unknown>)
+  return error instanceof Error && 'code' in error
 }
 
 async function insertIssueRow(params: {

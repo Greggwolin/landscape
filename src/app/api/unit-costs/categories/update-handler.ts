@@ -144,7 +144,7 @@ function normalizeUpdatePayload(raw: any): { data?: UpdateCategoryPayload; error
 }
 
 async function fetchCategoryRow(categoryId: number): Promise<CategoryRow | null> {
-  const rows = await sql`
+  const rows = (await sql`
     SELECT
       c.category_id,
       c.parent_id as parent,
@@ -165,7 +165,7 @@ async function fetchCategoryRow(categoryId: number): Promise<CategoryRow | null>
       ON p.category_id = c.parent_id
     WHERE c.category_id = ${categoryId}
     GROUP BY c.category_id, c.parent_id, p.category_name, c.category_name, c.tags, c.sort_order, c.is_active
-  `;
+  `) as CategoryRow[];
 
   return rows[0] ?? null;
 }

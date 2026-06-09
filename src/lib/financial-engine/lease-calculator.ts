@@ -39,6 +39,11 @@ export interface Lease {
   has_percentage_rent: boolean;
   percentage_rent_rate?: number;
   percentage_rent_breakpoint?: number;
+
+  // Rollover / new-lease terms (set by the lease-rollover engine)
+  ti_allowance_psf?: number;
+  lc_allowance_psf?: number;
+  lease_status?: string;
 }
 
 /**

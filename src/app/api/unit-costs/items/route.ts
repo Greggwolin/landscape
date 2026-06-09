@@ -88,7 +88,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
 
   // Build query dynamically based on what params we have
   if (!categoryId) {
-    const result = await sql`
+    const result = (await sql`
       SELECT
         t.item_id as template_id,
         t.category_id,
@@ -112,7 +112,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
       WHERE t.is_active = true
       ORDER BY t.item_name
       LIMIT 100
-    `;
+    `) as TemplateRow[];
     console.log(`Query returned ${result.length} rows`);
     return result;
   }
@@ -120,7 +120,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
   const categoryIdVal = Number(categoryId);
 
   if (projectTypeCode) {
-    const result = await sql`
+    const result = (await sql`
       SELECT
         t.item_id as template_id,
         t.category_id,
@@ -145,12 +145,12 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
         AND t.category_id = ${categoryIdVal}
         AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})
       ORDER BY t.item_name
-    `;
+    `) as TemplateRow[];
     console.log(`Query returned ${result.length} rows`);
     return result;
   }
 
-  const result = await sql`
+  const result = (await sql`
     SELECT
       t.item_id as template_id,
       t.category_id,
@@ -174,7 +174,7 @@ async function queryItems(searchParams: URLSearchParams): Promise<TemplateRow[]>
     WHERE t.is_active = true
       AND t.category_id = ${categoryIdVal}
     ORDER BY t.item_name
-  `;
+  `) as TemplateRow[];
 
   console.log(`Query returned ${result.length} rows`);
   return result;

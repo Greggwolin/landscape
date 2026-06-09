@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       LIMIT 10
     `;
 
-    const contacts = await sql.unsafe(query, params);
+    const contacts = await sql.query(query, params);
 
     return NextResponse.json({
       contacts: contacts.map((contact: any) => ({

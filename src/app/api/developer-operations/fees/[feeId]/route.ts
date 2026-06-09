@@ -158,7 +158,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
 
-    const result = await sql.unsafe(
+    const result = await sql.query(
       `UPDATE landscape.developer_fees SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
       [...values, parseInt(feeId)]
     );

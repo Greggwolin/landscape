@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       if (includeGeometry && parcel.geom_json) {
         return {
           ...parcel,
-          geom: JSON.parse(parcel.geom_json),
+          geom: JSON.parse(parcel.geom_json as string),
           geom_json: undefined
         };
       }
@@ -148,9 +148,11 @@ export async function GET(request: NextRequest) {
     });
 
     // Group by hierarchy for easier navigation
-    const grouped = processedParcels.reduce((acc: Record<string, unknown>, parcel: Record<string, unknown>) => {
-      const areaKey = parcel.area_no || 'no_area';
-      const phaseKey = parcel.phase_no || 'no_phase';
+    type PhaseGroup = { phase_no: unknown; parcels: Record<string, unknown>[] };
+    type AreaGroup = { area_no: unknown; phases: Record<string, PhaseGroup> };
+    const grouped = processedParcels.reduce((acc: Record<string, AreaGroup>, parcel: Record<string, unknown>) => {
+      const areaKey = String(parcel.area_no ?? 'no_area');
+      const phaseKey = String(parcel.phase_no ?? 'no_phase');
 
       if (!acc[areaKey]) {
         acc[areaKey] = {
@@ -220,7 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build update query manually since sql.unsafe isn't available
-    let result;
+    let result: Record<string, unknown>[] | undefined;
     if (confidence !== undefined && notes !== undefined) {
       result = await sql`
         UPDATE landscape.gis_plan_parcel
@@ -244,7 +246,7 @@ export async function POST(request: NextRequest) {
       `;
     }
 
-    if (result.length === 0) {
+    if (!result || result.length === 0) {
       return NextResponse.json({
         error: 'Parcel not found'
       }, { status: 404 });

@@ -8,8 +8,8 @@ export async function GET(request: Request) {
     const subtypeId = searchParams.get('subtype_id');
     const familyId = searchParams.get('family_id');
 
-    let resSpecs = [];
-    let comSpecs = [];
+    let resSpecs: Record<string, unknown>[] = [];
+    let comSpecs: Record<string, unknown>[] = [];
 
     // Get residential specifications
     try {

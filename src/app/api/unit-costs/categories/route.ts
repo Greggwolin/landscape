@@ -86,7 +86,7 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
       ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
       : sql``;
 
-    result = await sql`
+    result = (await sql`
       SELECT
         c.category_id,
         c.parent_id as parent,
@@ -110,14 +110,14 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
       WHERE c.is_active = true
       GROUP BY c.category_id, c.parent_id, p.category_name, c.category_name, c.tags, c.sort_order, c.is_active
       ORDER BY c.sort_order, c.category_name
-    `;
+    `) as CategoryRow[];
   } else {
     // No filters - return all categories with their lifecycle stages
     const templateCountFilter = projectTypeCode
       ? sql`AND LOWER(t.project_type_code) = LOWER(${projectTypeCode})`
       : sql``;
 
-    result = await sql`
+    result = (await sql`
       SELECT
         c.category_id,
         c.parent_id as parent,
@@ -141,7 +141,7 @@ async function fetchCategoriesDirect(searchParams: URLSearchParams): Promise<Cat
       WHERE c.is_active = true
       GROUP BY c.category_id, c.parent_id, p.category_name, c.category_name, c.tags, c.sort_order, c.is_active
       ORDER BY c.sort_order, c.category_name
-    `;
+    `) as CategoryRow[];
   }
 
   return result;
@@ -289,9 +289,9 @@ function normalizeCreatePayload(raw: any): { data?: CreateCategoryPayload; error
     return { error: 'At least one lifecycle stage is required' };
   }
 
-  const tags = Array.isArray(raw.tags)
+  const tags: string[] = Array.isArray(raw.tags)
     ? Array.from(
-        new Set(
+        new Set<string>(
           raw.tags
             .map((tag: unknown) => (typeof tag === 'string' ? tag.trim() : ''))
             .filter((tag: string) => Boolean(tag))
@@ -478,7 +478,7 @@ async function createCategoryDirect(payload: CreateCategoryPayload) {
       );
     }
 
-    updateCategoryMapping([complete]);
+    updateCategoryMapping([complete as { category_id: number; category_name: string }]);
     return NextResponse.json(complete, { status: 201 });
   } catch (error) {
     console.error('Direct SQL error creating category:', error);

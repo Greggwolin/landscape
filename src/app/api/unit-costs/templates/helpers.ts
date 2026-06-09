@@ -39,7 +39,7 @@ export const templateSelectFields = `
   t.created_from_project_id,
   EXISTS (
     SELECT 1 FROM landscape.core_template_benchmark_link l
-    WHERE l.template_id = t.item_id as template_id
+    WHERE l.template_id = t.item_id
   ) AS has_benchmarks
 `;
 
@@ -175,8 +175,8 @@ export const insertTemplateDirect = async (body: Record<string, unknown>) => {
   `;
 
   try {
-    const result = await sql.query<TemplateRow>(query, values);
-    const row = result.rows?.[0];
+    const result = (await sql.query(query, values)) as TemplateRow[];
+    const row = result?.[0];
     if (!row) {
       throw new Error('Insert failed');
     }

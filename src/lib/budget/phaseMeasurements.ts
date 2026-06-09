@@ -46,7 +46,7 @@ export async function getPhaseMeasurements(
   `;
 
   const map = new Map<number, PhaseMeasurements>();
-  rows.forEach(row => map.set(row.division_id, row));
+  rows.forEach(row => map.set(row.division_id, row as PhaseMeasurements));
   return map;
 }
 

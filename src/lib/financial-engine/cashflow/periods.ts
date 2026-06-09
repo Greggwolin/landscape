@@ -67,7 +67,7 @@ export async function fetchProjectPeriods(
     `;
   }
 
-  const rows = await query;
+  const rows = (await query) as PeriodRow[];
 
   if (rows.length === 0) {
     throw new Error(

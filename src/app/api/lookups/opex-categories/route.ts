@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     if (parentId) {
       // Get children of specific parent by ID
       if (includeHasChildren) {
-        categories = await sql`
+        categories = (await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -62,15 +62,15 @@ export async function GET(request: Request) {
           WHERE c.parent_id = ${parseInt(parentId, 10)}
             AND c.is_active = true
           ORDER BY c.account_number
-        `;
+        `) as OpexCategory[];
       } else {
-        categories = await sql`
+        categories = (await sql`
           SELECT category_id, category_name, account_number, parent_id
           FROM landscape.core_unit_cost_category
           WHERE parent_id = ${parseInt(parentId, 10)}
             AND is_active = true
           ORDER BY account_number
-        `;
+        `) as OpexCategory[];
       }
     } else if (parentCategory) {
       // Get categories by parent_category string (for inline editor)
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
 
       if (parent.length > 0) {
         // Get all leaf categories under this parent (recursively)
-        categories = await sql`
+        categories = (await sql`
           WITH RECURSIVE category_tree AS (
             -- Direct children of the root
             SELECT
@@ -126,10 +126,10 @@ export async function GET(request: Request) {
             ) as has_children
           FROM category_tree ct
           ORDER BY ct.account_number
-        `;
+        `) as OpexCategory[];
       } else {
         // Fallback: get all categories starting with the prefix
-        categories = await sql`
+        categories = (await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -143,12 +143,12 @@ export async function GET(request: Request) {
           WHERE c.account_number LIKE ${accountPrefix + '%'}
             AND c.is_active = true
           ORDER BY c.account_number
-        `;
+        `) as OpexCategory[];
       }
     } else {
       // Get all Operations categories (4xxx range)
       if (includeHasChildren) {
-        categories = await sql`
+        categories = (await sql`
           SELECT
             c.category_id,
             c.category_name,
@@ -164,15 +164,15 @@ export async function GET(request: Request) {
           WHERE c.account_number LIKE '4%'
             AND c.is_active = true
           ORDER BY c.account_number
-        `;
+        `) as OpexCategory[];
       } else {
-        categories = await sql`
+        categories = (await sql`
           SELECT category_id, category_name, account_number, parent_id
           FROM landscape.core_unit_cost_category
           WHERE account_number LIKE '4%'
             AND is_active = true
           ORDER BY account_number
-        `;
+        `) as OpexCategory[];
       }
     }
 

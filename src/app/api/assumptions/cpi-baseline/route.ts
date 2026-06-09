@@ -13,7 +13,8 @@ export async function GET() {
     process.env.CPI_BASELINE_FALLBACK_RATE ??
     process.env.NEXT_PUBLIC_CPI_BASELINE_FALLBACK_RATE;
   const parsedEnvRate = fallbackRateEnv != null ? Number(fallbackRateEnv) : null;
-  const fallbackRate = Number.isFinite(parsedEnvRate) ? parsedEnvRate : 3;
+  const fallbackRate =
+    parsedEnvRate != null && Number.isFinite(parsedEnvRate) ? parsedEnvRate : 3;
   const fallback = {
     rate: fallbackRate,
     rateDecimal: fallbackRate / 100,

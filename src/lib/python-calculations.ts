@@ -224,7 +224,7 @@ export async function calculateInvestmentMetricsPython(
   };
   metrics: InvestmentMetricsResult;
 }> {
-  const args = buildArgs(request);
+  const args = buildArgs(request as unknown as Record<string, string | number | boolean | undefined>);
   type MetricsResponse = {
     success: boolean;
     property: {
@@ -288,7 +288,7 @@ export async function calculateCashFlowPython(
     avg_monthly_noi: number;
   };
 }> {
-  const args = buildArgs(request);
+  const args = buildArgs(request as unknown as Record<string, string | number | boolean | undefined>);
   type CashFlowResponse = {
     success: boolean;
     property: {
