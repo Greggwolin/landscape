@@ -95,7 +95,7 @@ export async function GET(
       doc.doc_type
     );
 
-    let attributes = [];
+    let attributes: Awaited<ReturnType<typeof dmsDb.getTemplateAttributes>> = [];
     if (template) {
       attributes = await dmsDb.getTemplateAttributes(template.template_id);
     }

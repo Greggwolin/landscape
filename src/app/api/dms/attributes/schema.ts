@@ -68,7 +68,7 @@ export const CreateAttributeZ = z.object({
   status: z.enum(['active', 'deprecated', 'hidden']).optional().default('active'),
 
   // Type-specific configs
-  validation_rules: z.record(z.any()).optional(), // JSONSchema rules
+  validation_rules: z.record(z.string(), z.any()).optional(), // JSONSchema rules
   enum_values: z.array(EnumOptionZ).optional(), // For enum type
   lookup_table: z.string().max(100).optional(), // Deprecated, use lookup_config
   lookup_config: LookupConfigZ.optional(), // For lookup type
@@ -104,7 +104,7 @@ export const AttributeZ = z.object({
   attr_description: z.string().nullable(),
   is_required: z.boolean(),
   is_searchable: z.boolean(),
-  validation_rules: z.record(z.any()),
+  validation_rules: z.record(z.string(), z.any()),
   enum_values: z.any().nullable(),
   lookup_table: z.string().nullable(),
   display_order: z.number().int(),

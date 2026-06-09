@@ -27,10 +27,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Helper to read doc_type_options from template result
-    const getDocTypes = (rows: Array<{ doc_type_options: string[] | null }>) =>
-      rows.length > 0 && rows[0].doc_type_options && rows[0].doc_type_options.length > 0
-        ? rows[0].doc_type_options
-        : null;
+    const getDocTypes = (rows: Record<string, any>[]): string[] | null => {
+      const options = rows[0]?.doc_type_options as string[] | null | undefined;
+      return options && options.length > 0 ? options : null;
+    };
 
     let docTypes: string[] | null = null;
 

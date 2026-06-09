@@ -58,7 +58,7 @@ export async function extractTextFromPDF(
 
     // Load PDF
     const loadingTask = pdfjsLib.getDocument({ data, useWorkerFetch: false, isEvalSupported: false });
-    const pdf: PDFDocumentProxy = await loadingTask.promise;
+    const pdf = await loadingTask.promise;
 
     const numPages = Math.min(pdf.numPages, maxPages);
     const textParts: string[] = [];
@@ -240,7 +240,10 @@ export async function batchExtractText(
   }
 
   const result = await query;
-  const docs = result.rows;
+  // NOTE: the `sql` tagged template (NeonQueryFunction<false,false>) returns the
+  // row array DIRECTLY — there is no `.rows` wrapper. Reading `result.rows` here
+  // was a latent bug (undefined at runtime → the loop below would throw).
+  const docs = result as Array<{ doc_id: number; storage_uri: string; mime_type: string }>;
 
   let succeeded = 0;
   let failed = 0;

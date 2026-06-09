@@ -88,7 +88,7 @@ export const EffectiveTemplateZ = z.object({
       condition_expr: z.string().nullable(),
       default_value: z.any().nullable(),
       display_order: z.number().int(),
-      validation_rules: z.record(z.any()),
+      validation_rules: z.record(z.string(), z.any()),
       enum_options: z.array(z.any()).nullable(),
       help_text: z.string().nullable(),
     })

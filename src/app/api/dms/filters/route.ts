@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Validation error',
-          details: error.errors
+          details: error.issues
         },
         { status: 400 }
       );
@@ -192,7 +192,7 @@ export async function PATCH(request: NextRequest) {
         {
           success: false,
           error: 'Validation error',
-          details: error.errors
+          details: error.issues
         },
         { status: 400 }
       );

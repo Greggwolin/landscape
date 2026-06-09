@@ -9,7 +9,7 @@ export const FolderZ = z.object({
   name: z.string().min(1).max(255),
   path: z.string(),
   sort_order: z.number().int().default(0),
-  default_profile: z.record(z.any()).default({}),
+  default_profile: z.record(z.string(), z.any()).default({}),
   is_active: z.boolean().default(true),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
@@ -37,7 +37,7 @@ export const FolderTreeNodeZ: z.ZodType<{
     name: z.string(),
     path: z.string(),
     sort_order: z.number().int(),
-    default_profile: z.record(z.any()),
+    default_profile: z.record(z.string(), z.any()),
     is_active: z.boolean(),
     children: z.array(FolderTreeNodeZ),
     doc_count: z.number().int().optional(),
@@ -53,7 +53,7 @@ export const CreateFolderZ = z.object({
   name: z.string().min(1).max(255),
   parent_id: z.number().int().positive().nullable().optional(),
   sort_order: z.number().int().default(0),
-  default_profile: z.record(z.any()).default({}),
+  default_profile: z.record(z.string(), z.any()).default({}),
 });
 
 export type CreateFolderRequest = z.infer<typeof CreateFolderZ>;
@@ -66,7 +66,7 @@ export const UpdateFolderZ = z.object({
   name: z.string().min(1).max(255).optional(),
   parent_id: z.number().int().positive().nullable().optional(),
   sort_order: z.number().int().optional(),
-  default_profile: z.record(z.any()).optional(),
+  default_profile: z.record(z.string(), z.any()).optional(),
   is_active: z.boolean().optional(),
 });
 

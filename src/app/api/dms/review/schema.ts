@@ -14,7 +14,7 @@ export const UpdateCoreDocOpZ = z.object({
     doc_date: z.string().optional(), // ISO date
     contract_value: z.number().optional(),
     priority: z.string().optional(),
-    profile_json_merge: z.record(z.any()).optional(), // Deep merge into existing
+    profile_json_merge: z.record(z.string(), z.any()).optional(), // Deep merge into existing
   }),
 });
 
@@ -131,13 +131,13 @@ export const ReviewContextZ = z.object({
     version_no: z.number().int(),
     project_id: z.number().int(),
     storage_uri: z.string(),
-    profile_json: z.record(z.any()),
+    profile_json: z.record(z.string(), z.any()),
     created_at: z.string(),
     updated_at: z.string(),
   }),
   ai_analysis: z.object({
-    mapped: z.record(z.any()).optional(),
-    unmapped: z.record(z.any()).optional(),
+    mapped: z.record(z.string(), z.any()).optional(),
+    unmapped: z.record(z.string(), z.any()).optional(),
     warnings: z.array(z.string()).optional(),
     assertions: z.array(z.any()).optional(),
     confidence: z.number().min(0).max(1).optional(),

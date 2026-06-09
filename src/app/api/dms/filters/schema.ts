@@ -16,7 +16,7 @@ export const FilterQueryZ = z.object({
   date_to: z.string().datetime().optional(),
   tags: z.array(z.string()).optional(),
   // Profile fields (custom attributes)
-  profile: z.record(z.any()).optional(),
+  profile: z.record(z.string(), z.any()).optional(),
 });
 
 export type FilterQuery = z.infer<typeof FilterQueryZ>;
