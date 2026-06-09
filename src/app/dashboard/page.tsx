@@ -201,7 +201,7 @@ function ProjectAccordion({
                 key={project.project_id}
                 role="button"
                 tabIndex={0}
-                ref={(node) => node && itemRefs.current.set(project.project_id, node)}
+                ref={(node) => { if (node) itemRefs.current.set(project.project_id, node); }}
                 onClick={() => onProjectClick(project)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onProjectClick(project); } }}
                 onMouseEnter={() => setHoveredId(project.project_id)}

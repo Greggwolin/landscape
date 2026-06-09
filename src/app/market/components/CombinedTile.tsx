@@ -116,7 +116,7 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
 
     // If using indexed mode, calculate base-100 index for each series
     if (useIndexed) {
-      const merged = new Map<string, Record<string, number | null>>();
+      const merged = new Map<string, Record<string, string | number | null>>();
 
       filteredSeries.forEach((serie) => {
         // Find the first non-null value as base
@@ -137,11 +137,11 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
         });
       });
 
-      return Array.from(merged.values()).sort((a, b) => (a.date as string).localeCompare(b.date as string));
+      return Array.from(merged.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
     }
 
     // Regular mode
-    const merged = new Map<string, Record<string, number | null>>();
+    const merged = new Map<string, Record<string, string | number | null>>();
     filteredSeries.forEach((serie) => {
       serie.data.forEach((point) => {
         const value = point.value != null ? Number(point.value) : null;
@@ -152,14 +152,14 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
       });
     });
 
-    return Array.from(merged.values()).sort((a, b) => (a.date as string).localeCompare(b.date as string));
+    return Array.from(merged.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [filteredSeries, useIndexed]);
 
   const chartWidth = '100%';
   const chartMargin = narrowChart ? { top: 10, right: 10, left: 0, bottom: 0 } : { top: 10, right: 30, left: 0, bottom: 0 };
-  const resolveTooltipValue = (value: unknown) => {
+  const resolveTooltipValue = (value: unknown): string => {
     if (typeof value !== 'number') {
-      return value ?? '-';
+      return value != null ? String(value) : '-';
     }
     return tooltipValueFormatter
       ? tooltipValueFormatter(value)
@@ -474,7 +474,7 @@ const CombinedTile: React.FC<CombinedTileProps> = ({
                   if (typeof value === 'number') {
                     return [value.toLocaleString(undefined, { maximumFractionDigits: 0 }), payload?.name];
                   }
-                  return [value, payload?.name];
+                  return [value != null ? String(value) : '—', payload?.name];
                 }}
                 labelFormatter={(label, payload) => {
                   const first = Array.isArray(payload) && payload.length ? payload[0] : null;

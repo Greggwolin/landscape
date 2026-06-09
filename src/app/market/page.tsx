@@ -224,7 +224,7 @@ const MarketPage: React.FC = () => {
     if (exactMatch) return exactMatch;
     const sorted = entries
       .filter((item) => item.data.length)
-      .sort((a, b) => (GEO_PRIORITY[a.geo_level] ?? Number.MAX_SAFE_INTEGER) - (GEO_PRIORITY[b.geo_level] ?? Number.MAX_SAFE_INTEGER));
+      .sort((a, b) => ((a.geo_level ? GEO_PRIORITY[a.geo_level] : undefined) ?? Number.MAX_SAFE_INTEGER) - ((b.geo_level ? GEO_PRIORITY[b.geo_level] : undefined) ?? Number.MAX_SAFE_INTEGER));
     if (sorted.length) return sorted[0];
     return entries[0];
   };
@@ -337,6 +337,7 @@ const MarketPage: React.FC = () => {
         geoLevel: geoLevelDisplay,
         geoName,
         value: value != null ? (formatter ? formatter(value) : formatNumber(value)) : 'NAV',
+        numericValue: value,
         yoy,
         changeLabel
       });
