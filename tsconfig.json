@@ -28,6 +28,7 @@
     "node_modules", "docs", "reference", "backup*", "playwright*.ts", "tests", "scripts",
     "outputs", "archive",
     "src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/__tests__",
+    "src/app/_archive",
     "src/themes/current",
     "src/app/components/layout",
     "src/app/components/theme",
