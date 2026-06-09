@@ -25,7 +25,7 @@ export async function GET() {
       const r = await sql`SELECT COUNT(*)::text AS count FROM landscape.tbl_parcel`;
       parcelCount = Number(r?.[0]?.count ?? 0);
     } catch (e) {
-      parcelCountError = e?.message || String(e);
+      parcelCountError = e instanceof Error ? e.message : String(e);
     }
 
     return new Response(
@@ -39,7 +39,7 @@ export async function GET() {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err?.message || 'diagnostics failed' }),
+      JSON.stringify({ error: err instanceof Error ? err.message : 'diagnostics failed' }),
       { status: 500, headers: { 'content-type': 'application/json' } }
     );
   }
