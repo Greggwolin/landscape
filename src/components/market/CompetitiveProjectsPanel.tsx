@@ -352,12 +352,12 @@ interface CompetitorRowProps {
   getSubdivisionName: (comp: MarketCompetitiveProject) => string;
 }
 
-// Normalize lot dimension/width keys regardless of snake_case vs camelCase
+// Lot dimension/width accessors (product fields are snake_case)
 const getLotDimensionsValue = (product: MarketCompetitiveProjectProduct | undefined | null) =>
-  product?.lot_dimensions ?? product?.lotDimensions ?? null;
+  product?.lot_dimensions ?? null;
 
 const getLotWidthValue = (product: MarketCompetitiveProjectProduct | undefined | null) =>
-  product?.lot_width_ft ?? product?.lotWidthFt ?? null;
+  product?.lot_width_ft ?? null;
 
 function CompetitorRow({
   comp,
@@ -470,7 +470,7 @@ function CompetitorRow({
           >
             {statusLabel}
           </SemanticBadge>
-          {comp.data_source === 'Zonda' && (
+          {comp.data_source === 'zonda' && (
             <SemanticBadge
               intent="category"
               value={comp.data_source}
@@ -539,9 +539,7 @@ function ProductsTable({
                 >
                   {JSON.stringify({
                     lot_dimensions: prod.lot_dimensions,
-                    lotDimensions: prod.lotDimensions,
-                    lot_width_ft: prod.lot_width_ft,
-                    lotWidthFt: prod.lotWidthFt
+                    lot_width_ft: prod.lot_width_ft
                   })}
                 </SemanticBadge>
               </td>

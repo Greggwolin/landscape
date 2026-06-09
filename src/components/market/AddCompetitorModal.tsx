@@ -46,7 +46,7 @@ export function AddCompetitorModal({ projectId, isOpen, onClose }: AddCompetitor
   });
 
   // Hooks
-  const zondaSearch = useZondaSearch(searchTerm);
+  const zondaSearch = useZondaSearch(projectId, searchTerm);
   const importZonda = useImportZondaProject();
   const createCompetitor = useCreateCompetitor();
 
