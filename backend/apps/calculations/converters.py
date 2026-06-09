@@ -25,13 +25,13 @@ def convert_project_to_property_data(project: Project) -> Dict:
     return {
         'property_id': project.project_id,
         'property_name': project.project_name,
-        'property_type': project.property_type_code or 'unknown',
+        'property_type': project.project_type_code or 'unknown',
         'acquisition_date': project.start_date,
         'analysis_start_date': project.analysis_start_date,
         'analysis_end_date': project.analysis_end_date,
         'discount_rate': float(project.discount_rate_pct or 0.10),
         'metadata': {
-            'development_type': project.development_type,
+            'development_type': project.project_type,
             'acres': float(project.acres_gross) if project.acres_gross else None,
             'location': {
                 'city': project.jurisdiction_city,

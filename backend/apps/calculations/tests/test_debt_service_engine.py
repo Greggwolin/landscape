@@ -13,15 +13,12 @@ from apps.calculations.engines.debt_service_engine import (
 )
 
 
-@pytest.mark.skip(
-    reason="TODO(LSCMD-CLEANUP-BACKENDTESTS-0609): DebtServiceEngine.calculate_revolver "
-    "output no longer matches the Star Valley Excel fixture's expected values "
-    "(e.g. commitment 268068 vs 251733, interest_reserve far off). Either the engine "
-    "math evolved or the fixture is stale — a domain/business-logic call, not a test-infra "
-    "fix. Quarantined and flagged; TestTermLoanCalculation below still runs."
-)
+# Expected values in star_valley_test_fixture.json were re-baselined to the
+# DebtServiceEngine's current output per LSCMD-CALCFIX-0609-pm (engine is the
+# source of truth, per Gregg's call). They now guard against regression in the
+# engine, not against the legacy Star Valley Excel model.
 class TestRevolverCalculation(TestCase):
-    """Validate against Lotbank Excel model - Star Valley project."""
+    """Validate against the DebtServiceEngine - Star Valley project (engine-baselined)."""
 
     def setUp(self):
         self.fixture = self._load_fixture()

@@ -45,12 +45,13 @@
     }
   },
   "expected_totals": {
-    "commitment": 25173350.51,
-    "interest_reserve": 3921350.67,
-    "origination_fee": 251733.51,
-    "total_interest": 3139829.42,
-    "total_releases": 24391829.26,
-    "peak_balance": 21432241.61,
+    "_note": "Re-baselined to DebtServiceEngine output per LSCMD-CALCFIX-0609-pm (engine is the source of truth; prior values were from the legacy Star Valley Excel model). These guard against regression, not against the spreadsheet. total_cost_draws left as-is (not asserted by any test).",
+    "commitment": 24905281.78,
+    "interest_reserve": 3477250.15,
+    "origination_fee": 249052.82,
+    "total_interest": 2781800.04,
+    "total_releases": 21428031.63,
+    "peak_balance": 20699096.55,
     "total_cost_draws": 20967766.33
   },
   "release_prices_per_lot": {
