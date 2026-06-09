@@ -8,11 +8,11 @@ const DJANGO_API_URL = process.env.DJANGO_API_URL || 'http://localhost:8000';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   const authHeader = request.headers.get('Authorization');
   try {
-    const { projectId } = params;
+    const { projectId } = await params;
     const body = await request.json();
     const query = body.query;
 

@@ -88,8 +88,8 @@ export const updatePropertySection = <K extends keyof PropertyData>(
     mockPropertyData = {
       ...mockPropertyData,
       [section]: {
-        ...current,
-        ...value
+        ...(current as unknown as object),
+        ...(value as unknown as object)
       } as PropertyData[K]
     };
     return;

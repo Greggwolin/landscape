@@ -95,7 +95,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      data: sortMeasures(rows),
+      data: sortMeasures(rows as UnitOfMeasure[]),
     });
   } catch (error) {
     console.error('Error fetching measures:', error);

@@ -59,7 +59,7 @@ const normalizeProductPayload = (body: Record<string, unknown>) => {
 async function updateProductDirect(id: number, body: Record<string, unknown>) {
   const payload = normalizeProductPayload(body);
 
-  const result = await sql.query<ProductRow>(
+  const result = (await sql.query(
     `
       UPDATE landscape.res_lot_product
       SET
@@ -92,9 +92,9 @@ async function updateProductDirect(id: number, body: Record<string, unknown>) {
       payload.is_active,
       id
     ]
-  );
+  )) as ProductRow[];
 
-  const row = result.rows?.[0];
+  const row = result?.[0];
   if (!row) throw new Error('Product not found');
   return (await getProductByIdDirect(id)) ?? mapProductRow(row);
 }
@@ -174,7 +174,7 @@ async function patchProductDirect(id: number, body: Record<string, unknown>) {
   }
 
   values.push(id);
-  const result = await sql.query<ProductRow>(
+  const result = (await sql.query(
     `
       UPDATE landscape.res_lot_product
       SET ${updates.join(', ')}, updated_at = NOW()
@@ -192,9 +192,9 @@ async function patchProductDirect(id: number, body: Record<string, unknown>) {
         updated_at;
     `,
     values
-  );
+  )) as ProductRow[];
 
-  const row = result.rows?.[0];
+  const row = result?.[0];
   if (!row) throw new Error('Product not found');
   return (await getProductByIdDirect(id)) ?? mapProductRow(row);
 }

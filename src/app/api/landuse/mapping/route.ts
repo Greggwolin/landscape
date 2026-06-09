@@ -99,7 +99,7 @@ async function analyzeLandUseMismatches(projectId: string | null) {
 
 async function getSuggestedMappings(projectId: string | null) {
   // Get jurisdiction-specific land use codes if project specified
-  let jurisdictionalCodes = [];
+  let jurisdictionalCodes: Record<string, unknown>[] = [];
   
   if (projectId) {
     try {

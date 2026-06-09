@@ -238,7 +238,7 @@ export async function PUT(request: NextRequest) {
       values
     );
 
-    const row = result.rows?.[0];
+    const row = result?.[0];
     return NextResponse.json({
       standard: row ? mapStandardRow(row) : { standard_id: standardId }
     });

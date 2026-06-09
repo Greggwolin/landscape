@@ -67,18 +67,19 @@ async function getCurveProfile(opts: {
   const isCustom = requestedCode === 'CUSTOM';
   const effectiveCode = isCustom ? DEFAULT_CURVE_CODE : requestedCode;
 
-  let rows: Array<{
+  type CurveRow = {
     curveId: number;
     curveName: string;
     curveCode: string;
     description: string | null;
     deciles: (string | number)[];
-  }> = [];
+  };
+  let rows: CurveRow[] = [];
 
   if (process.env.DATABASE_URL) {
     try {
       if (opts.curveId) {
-        rows = await sql`
+        rows = (await sql`
           SELECT
             curve_id AS "curveId",
             curve_name AS "curveName",
@@ -92,10 +93,10 @@ async function getCurveProfile(opts: {
           WHERE curve_id = ${opts.curveId}
             AND is_active = TRUE
           LIMIT 1
-        `;
+        `) as CurveRow[];
       } else {
         const codeToUse = effectiveCode ?? DEFAULT_CURVE_CODE;
-        rows = await sql`
+        rows = (await sql`
           SELECT
             curve_id AS "curveId",
             curve_name AS "curveName",
@@ -109,7 +110,7 @@ async function getCurveProfile(opts: {
           WHERE curve_code = ${codeToUse}
             AND is_active = TRUE
           LIMIT 1
-        `;
+        `) as CurveRow[];
       }
     } catch (queryError) {
       if (process.env.NODE_ENV !== 'test') {

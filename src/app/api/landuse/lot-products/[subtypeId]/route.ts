@@ -123,7 +123,7 @@ export async function GET(
           name: product.name,
           subtype_id: subtypeId
         }));
-      } else if (subtypeCode === 'HOT') {
+      } else if (typeCode === 'HOT') {
         // Hotel gets hotel types
         const hotelProducts = [
           { code: 'Budget Hotel', name: 'Budget Hotel' },

@@ -4,6 +4,7 @@ import type {
   GrowthRateStep,
   GrowthRateAssumption,
   GrowthRateValidationError,
+  GrowthRateImpact,
   CreateGrowthRateRequest,
   UpdateGrowthRateRequest
 } from '../../types/growth-rates';
@@ -125,7 +126,7 @@ export class GrowthRateValidator {
     return isValid;
   }
 
-  private validateImpact(impact: Record<string, unknown>): boolean {
+  private validateImpact(impact: GrowthRateImpact): boolean {
     let isValid = true;
 
     if (!impact) {

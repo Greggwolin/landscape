@@ -45,7 +45,7 @@ async function getTemplateById(id: number) {
     LIMIT 1;
   `;
 
-  const result = await sql.query<TemplateRow>(query, [id]);
+  const result = (await sql.query(query, [id])) as TemplateRow[];
   const row = result?.[0];
   return row ? mapTemplateRow(row) : null;
 }
@@ -92,7 +92,7 @@ async function updateTemplateDirect(id: number, body: Record<string, unknown>) {
     RETURNING template_id;
   `;
 
-  const updateResult = await sql.query<{ template_id: number }>(updateQuery, values);
+  const updateResult = (await sql.query(updateQuery, values)) as { template_id: number }[];
   if (!updateResult || updateResult.length === 0) {
     throw new Error('Template not found');
   }
@@ -106,7 +106,7 @@ async function updateTemplateDirect(id: number, body: Record<string, unknown>) {
     LIMIT 1;
   `;
 
-  const result = await sql.query<TemplateRow>(selectQuery, [id]);
+  const result = (await sql.query(selectQuery, [id])) as TemplateRow[];
   const row = result?.[0];
   if (!row) {
     throw new Error('Template not found after update');
@@ -198,7 +198,7 @@ async function patchTemplateDirect(id: number, body: Record<string, unknown>) {
     RETURNING template_id;
   `;
 
-  const updateResult = await sql.query<{ template_id: number }>(updateQuery, values);
+  const updateResult = (await sql.query(updateQuery, values)) as { template_id: number }[];
   if (!updateResult || updateResult.length === 0) {
     throw new Error('Template not found');
   }
@@ -212,7 +212,7 @@ async function patchTemplateDirect(id: number, body: Record<string, unknown>) {
     LIMIT 1;
   `;
 
-  const result = await sql.query<TemplateRow>(selectQuery, [id]);
+  const result = (await sql.query(selectQuery, [id])) as TemplateRow[];
   const row = result?.[0];
   if (!row) {
     throw new Error('Template not found after update');
@@ -228,7 +228,7 @@ async function softDeleteTemplate(id: number) {
     RETURNING template_id;
   `;
 
-  const updateResult = await sql.query<{ template_id: number }>(updateQuery, [id]);
+  const updateResult = (await sql.query(updateQuery, [id])) as { template_id: number }[];
   if (!updateResult || updateResult.length === 0) {
     throw new Error('Template not found');
   }
@@ -242,7 +242,7 @@ async function softDeleteTemplate(id: number) {
     LIMIT 1;
   `;
 
-  const result = await sql.query<TemplateRow>(selectQuery, [id]);
+  const result = (await sql.query(selectQuery, [id])) as TemplateRow[];
   const row = result?.[0];
   if (!row) {
     throw new Error('Template not found after soft delete');

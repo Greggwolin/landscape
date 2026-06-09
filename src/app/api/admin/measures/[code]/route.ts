@@ -95,7 +95,7 @@ export async function PUT(
       );
     }
 
-    const current = existingRows[0];
+    const current = existingRows[0] as UnitOfMeasure;
     const body = (await request.json()) as MeasurePayload;
     const { data, error } = normalizeUpdatePayload(body, current);
 

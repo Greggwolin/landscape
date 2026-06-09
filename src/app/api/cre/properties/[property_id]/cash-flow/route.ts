@@ -328,9 +328,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const { property_id } = await context.params;
   return NextResponse.json({
     message: 'Use POST method to calculate cash flow',
-    endpoint: `/api/cre/properties/${params.property_id}/cash-flow`,
+    endpoint: `/api/cre/properties/${property_id}/cash-flow`,
     method: 'POST',
     parameters: {
       start_date: 'ISO date string (optional, defaults to today)',

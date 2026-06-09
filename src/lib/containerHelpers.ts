@@ -6,12 +6,13 @@
  */
 
 import type { ContainerNode } from '@/types'
+import type { Tier } from '@/types/containers'
 
 export interface FlatContainer {
   division_id: number
   parent_division_id: number | null
-  tier: 1 | 2 | 3
-  container_code: string
+  tier: Tier
+  division_code: string
   display_name: string
   sort_order: number | null
   project_id: number
@@ -31,7 +32,7 @@ export function flattenContainers(containers: ContainerNode[]): FlatContainer[] 
         division_id: node.division_id,
         parent_division_id: node.parent_division_id ?? null,
         tier: node.tier,
-        container_code: node.container_code,
+        division_code: node.division_code,
         display_name: node.display_name,
         sort_order: node.sort_order,
         project_id: node.project_id,

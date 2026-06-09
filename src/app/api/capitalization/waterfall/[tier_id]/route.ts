@@ -70,12 +70,17 @@ export async function PATCH(
 
     updates.push('updated_at = NOW()');
 
-    const result = await sql`
+    // The SET fragment is composed from a fixed field allowlist with values
+    // already escaped/inlined above; only the WHERE id is parameterized.
+    const result = await sql.query(
+      `
       UPDATE landscape.tbl_waterfall_tier
-      SET ${sql.raw(updates.join(', '))}
-      WHERE tier_id = ${tierId}
+      SET ${updates.join(', ')}
+      WHERE tier_id = $1
       RETURNING *
-    `;
+    `,
+      [tierId]
+    );
 
     if (result.length === 0) {
       return NextResponse.json(

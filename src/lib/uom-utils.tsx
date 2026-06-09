@@ -43,7 +43,7 @@ export function processUOMOptions(uomOptions: UOMOption[]): ProcessedUOMOptions 
   // Create combined array with divider if there are time-based items
   const all: Array<UOMOption | { isDivider: true }> = [
     ...regular,
-    ...(timeBased.length > 0 ? [{ isDivider: true }, ...timeBased] : [])
+    ...(timeBased.length > 0 ? [{ isDivider: true as const }, ...timeBased] : [])
   ];
 
   return {

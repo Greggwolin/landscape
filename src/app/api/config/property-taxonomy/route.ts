@@ -12,9 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   PROPERTY_TAXONOMY,
-  getSubtypesForAnalysisType,
-  isAnalysisType,
-  type AnalysisType,
+  getSubtypesForPropertyCategory,
+  isPropertyCategory,
   type PropertyTaxonomy
 } from '@/types/project-taxonomy';
 
@@ -25,19 +24,19 @@ export async function GET(request: NextRequest) {
 
     // If analysis_type is specified, return filtered subtypes
     if (analysisType) {
-      // Validate analysis_type
-      if (!isAnalysisType(analysisType)) {
+      // Validate analysis_type (interpreted as a property category here)
+      if (!isPropertyCategory(analysisType)) {
         return NextResponse.json(
           {
             error: 'Invalid analysis_type',
-            valid_values: PROPERTY_TAXONOMY.analysis_types
+            valid_values: PROPERTY_TAXONOMY.property_categories
           },
           { status: 400 }
         );
       }
 
-      // Return subtypes for the specified analysis type
-      const subtypes = getSubtypesForAnalysisType(analysisType);
+      // Return subtypes for the specified property category
+      const subtypes = getSubtypesForPropertyCategory(analysisType);
 
       return NextResponse.json({
         analysis_type: analysisType,

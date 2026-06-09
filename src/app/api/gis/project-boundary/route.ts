@@ -61,8 +61,7 @@ export async function POST(request: NextRequest) {
       dissolvedBoundary = {
         type: 'MultiPolygon',
         coordinates: selectedParcels
-          .filter(p => p.geometry)
-          .map(p => p.geometry?.coordinates)
+          .map(p => (p.geometry && 'coordinates' in p.geometry ? p.geometry.coordinates : undefined))
           .filter(Boolean)
       }
     }

@@ -1,7 +1,12 @@
-import type { CashFlow } from './types';
-
 export interface DatedCashFlow {
   date: Date | string;
+  amount: number;
+}
+
+// Internal normalized flow: date is always a concrete Date after normalizeFlows.
+interface NormalizedFlow {
+  periodId: number;
+  date: Date;
   amount: number;
 }
 
@@ -107,7 +112,7 @@ export function calculateIRR(
   return (low + high) / 2;
 }
 
-function normalizeFlows(flows: DatedCashFlow[]): CashFlow[] {
+function normalizeFlows(flows: DatedCashFlow[]): NormalizedFlow[] {
   return flows
     .map((f) => ({
       amount: Number(f.amount),

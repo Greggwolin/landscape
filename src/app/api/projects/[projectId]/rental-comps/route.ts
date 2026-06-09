@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-type Params = { params: { projectId: string } };
+type Params = { params: Promise<{ projectId: string }> };
 
 export type RentalComp = {
   id: number;
@@ -28,7 +28,7 @@ export type RentalCompsResponse = {
 };
 
 export async function GET(req: NextRequest, context: Params) {
-  const { projectId: projectIdRaw } = context.params;
+  const { projectId: projectIdRaw } = await context.params;
   const projectId = Number.parseInt(projectIdRaw, 10);
 
   if (!Number.isInteger(projectId) || projectId <= 0) {

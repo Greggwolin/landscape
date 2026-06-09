@@ -55,14 +55,14 @@ export async function GET(request: NextRequest) {
 
     query += ' ORDER BY sort_order NULLS LAST, measure_category, measure_code';
 
-    const rows = await sql.query<{
+    const rows = (await sql.query(query, values)) as Array<{
       code: string;
       name: string;
       category: string | null;
       is_system: boolean | null;
       sort_order: number | null;
       usage_contexts: string[] | null;
-    }>(query, values);
+    }>;
 
     // Map to expected format
     const measures = rows.map((row) => ({

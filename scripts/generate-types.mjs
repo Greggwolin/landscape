@@ -235,13 +235,40 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 `;
 
+    // De-dup guard for interface / insert-type names.
+    //
+    // The schema scan covers TWO Postgres schemas ('landscape' and 'land_v2').
+    // generateInterfaceName() strips the table prefix (tbl_/core_/lu_/vw_) and the
+    // schema, so identically-named objects collide on the same TS identifier in two
+    // distinct ways:
+    //   1. Cross-schema: land_v2.glossary_zoning AND landscape.glossary_zoning both
+    //      normalize to `GlossaryZoning` / `GlossaryZoningInsert`.
+    //   2. Within-schema prefix strip: landscape.tbl_acreage_allocation AND
+    //      landscape.vw_acreage_allocation both normalize to `AcreageAllocation`.
+    // Emitting the second declaration produces TS2300 (duplicate `type`), TS2717
+    // (interface-merge nullability mismatch, e.g. acres `number` vs `number | null`),
+    // and TS1117 (duplicate TABLE_NAMES object keys). To keep the output compilable
+    // without a DB change, the FIRST declaration of any given name wins and later
+    // collisions are skipped. Iteration order is stable (the schema scan is
+    // ORDER BY table_schema, table_name), so for a cross-schema collision 'land_v2'
+    // (alphabetically before 'landscape') is emitted first and wins; for a
+    // within-schema prefix-strip collision the alphabetically-earlier table name
+    // wins (e.g. tbl_acreage_allocation before vw_acreage_allocation).
+    const emittedInterfaceNames = new Set();
+
     // Generate interfaces for each table
     Object.entries(tablesBySchema).forEach(([tableKey, tableCols]) => {
       const [schema, tableName] = tableKey.split('.');
       const interfaceName = generateInterfaceName(tableName);
       const pks = pkMap[tableKey] || [];
       const fks = fkMap[tableKey] || [];
-      
+
+      if (emittedInterfaceNames.has(interfaceName)) {
+        tsCode += `// SKIPPED duplicate interface name for ${schema}.${tableName} -> ${interfaceName} (already emitted)\n\n`;
+        return;
+      }
+      emittedInterfaceNames.add(interfaceName);
+
       tsCode += `// ${schema}.${tableName}\n`;
       if (pks.length > 0) {
         tsCode += `// Primary Key: ${pks.join(', ')}\n`;
@@ -296,11 +323,23 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
     // nothing consumed them. Consumers import the top-level interfaces directly.
 
     // Generate table name constants
+    //
+    // TABLE_NAMES keys are derived from the table name alone (uppercased), so the
+    // same cross-schema collision applies here: land_v2.glossary_zoning and
+    // landscape.glossary_zoning both want the key GLOSSARY_ZONING, which TS rejects
+    // as a duplicate object property (TS1117). First key wins; later collisions are
+    // skipped (same ORDER BY table_schema ordering, so 'land_v2' wins the key).
+    const emittedTableNameKeys = new Set();
     tsCode += `// Table name constants\n`;
     tsCode += `export const TABLE_NAMES = {\n`;
     Object.keys(tablesBySchema).forEach(key => {
       const [schema, tableName] = key.split('.');
       const constantName = tableName.toUpperCase();
+      if (emittedTableNameKeys.has(constantName)) {
+        tsCode += `  // SKIPPED duplicate key ${constantName} for ${schema}.${tableName} (already emitted)\n`;
+        return;
+      }
+      emittedTableNameKeys.add(constantName);
       tsCode += `  ${constantName}: '${schema}.${tableName}' as const,\n`;
     });
     tsCode += `} as const;\n\n`;

@@ -140,8 +140,8 @@ export const basket1Config: BasketConfig = {
       required: false,
       autoCalc: (values) => {
         if (values.acquisition_date && values.hold_period_years) {
-          const acqDate = new Date(values.acquisition_date);
-          acqDate.setFullYear(acqDate.getFullYear() + Math.floor(values.hold_period_years));
+          const acqDate = new Date(values.acquisition_date as string | number);
+          acqDate.setFullYear(acqDate.getFullYear() + Math.floor(Number(values.hold_period_years)));
           return acqDate.toISOString().split('T')[0];
         }
         return null;
@@ -235,7 +235,7 @@ export const basket1Config: BasketConfig = {
       format: { prefix: '$', decimals: 0, thousandsSeparator: true },
       autoCalc: (values) => {
         if (values.purchase_price && values.unit_count) {
-          return Math.round(values.purchase_price / values.unit_count);
+          return Math.round(Number(values.purchase_price) / Number(values.unit_count));
         }
         return null;
       },
@@ -255,7 +255,7 @@ export const basket1Config: BasketConfig = {
       format: { prefix: '$', decimals: 2 },
       autoCalc: (values) => {
         if (values.purchase_price && values.rentable_sf) {
-          return (values.purchase_price / values.rentable_sf).toFixed(2);
+          return (Number(values.purchase_price) / Number(values.rentable_sf)).toFixed(2);
         }
         return null;
       },
@@ -318,7 +318,7 @@ export const basket1Config: BasketConfig = {
       format: { prefix: '$', decimals: 0, thousandsSeparator: true },
       autoCalc: (values) => {
         if (values.purchase_price && values.improvement_pct) {
-          return Math.round(values.purchase_price * (values.improvement_pct / 100));
+          return Math.round(Number(values.purchase_price) * (Number(values.improvement_pct) / 100));
         }
         return null;
       },
@@ -351,8 +351,8 @@ export const basket1Config: BasketConfig = {
       group: 'tax_treatment',
       format: { suffix: '%', decimals: 1 },
       autoCalc: (values) => {
-        if (values.land_pct !== undefined) {
-          return (100 - values.land_pct).toFixed(1);
+        if (values.land_pct !== undefined && values.land_pct !== null) {
+          return (100 - Number(values.land_pct)).toFixed(1);
         }
         return null;
       },

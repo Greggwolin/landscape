@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
-import type { BenchmarkDetailResponse } from '@/types/benchmarks';
+import type { Benchmark, BenchmarkDetailResponse } from '@/types/benchmarks';
 
 import { requireAuth } from '@/lib/api/requireAuth';
 type Params = { params: Promise<{ benchmarkId: string }> };
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest, context: Params) {
       );
     }
 
-    const benchmark = registryResult[0];
+    const benchmark = registryResult[0] as unknown as Benchmark;
 
     // Fetch category-specific details
     let detail = null;

@@ -77,7 +77,7 @@ export async function createLease(data: LeaseCreate): Promise<Lease> {
       ${data.affects_occupancy ?? true}, ${data.expansion_rights ?? false}, ${data.right_of_first_refusal ?? false},
       ${data.exclusive_use_clause ?? null}, ${data.co_tenancy_clause ?? null}, ${data.radius_restriction ?? null},
       ${data.notes ?? null}, ${JSON.stringify(data.lease_metadata ?? {})},
-      ${data.created_by ?? null}, ${data.updated_by ?? null}
+      ${null}, ${null}
     )
     RETURNING *
   `;
@@ -117,7 +117,7 @@ export async function getLeasesByParcel(parcelId: number): Promise<Lease[]> {
 export async function updateLease(leaseId: number, data: LeaseUpdate): Promise<Lease | null> {
   // Build dynamic update query
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'lease_id') {
@@ -142,7 +142,7 @@ export async function updateLease(leaseId: number, data: LeaseUpdate): Promise<L
 
   values.push(leaseId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as Lease) : null;
 }
 
@@ -152,7 +152,10 @@ export async function deleteLease(leaseId: number): Promise<boolean> {
     WHERE lease_id = ${leaseId}
   `;
 
-  return result.count > 0;
+  // NOTE: with fullResults:false the tagged result is a plain row array with no
+  // `count`/`rowCount`. These DELETEs have no RETURNING, so `count` is undefined
+  // and this has always evaluated to false. Behavior preserved; see report (#43).
+  return ((result as unknown as { count?: number }).count ?? 0) > 0;
 }
 
 // =====================================================================
@@ -190,7 +193,7 @@ export async function getBaseRentByLease(leaseId: number): Promise<BaseRent[]> {
 
 export async function updateBaseRent(baseRentId: number, data: BaseRentUpdate): Promise<BaseRent | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'base_rent_id') {
@@ -215,7 +218,7 @@ export async function updateBaseRent(baseRentId: number, data: BaseRentUpdate): 
 
   values.push(baseRentId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as BaseRent) : null;
 }
 
@@ -225,7 +228,10 @@ export async function deleteBaseRent(baseRentId: number): Promise<boolean> {
     WHERE base_rent_id = ${baseRentId}
   `;
 
-  return result.count > 0;
+  // NOTE: with fullResults:false the tagged result is a plain row array with no
+  // `count`/`rowCount`. These DELETEs have no RETURNING, so `count` is undefined
+  // and this has always evaluated to false. Behavior preserved; see report (#43).
+  return ((result as unknown as { count?: number }).count ?? 0) > 0;
 }
 
 // =====================================================================
@@ -260,7 +266,7 @@ export async function getEscalationsByLease(leaseId: number): Promise<Escalation
 
 export async function updateEscalation(escalationId: number, data: EscalationUpdate): Promise<Escalation | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'escalation_id') {
@@ -289,7 +295,7 @@ export async function updateEscalation(escalationId: number, data: EscalationUpd
 
   values.push(escalationId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as Escalation) : null;
 }
 
@@ -299,7 +305,10 @@ export async function deleteEscalation(escalationId: number): Promise<boolean> {
     WHERE escalation_id = ${escalationId}
   `;
 
-  return result.count > 0;
+  // NOTE: with fullResults:false the tagged result is a plain row array with no
+  // `count`/`rowCount`. These DELETEs have no RETURNING, so `count` is undefined
+  // and this has always evaluated to false. Behavior preserved; see report (#43).
+  return ((result as unknown as { count?: number }).count ?? 0) > 0;
 }
 
 // =====================================================================
@@ -330,7 +339,7 @@ export async function getRecoveryByLease(leaseId: number): Promise<Recovery | nu
 
 export async function updateRecovery(recoveryId: number, data: RecoveryUpdate): Promise<Recovery | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'recovery_id') {
@@ -359,7 +368,7 @@ export async function updateRecovery(recoveryId: number, data: RecoveryUpdate): 
 
   values.push(recoveryId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as Recovery) : null;
 }
 
@@ -369,7 +378,10 @@ export async function deleteRecovery(recoveryId: number): Promise<boolean> {
     WHERE recovery_id = ${recoveryId}
   `;
 
-  return result.count > 0;
+  // NOTE: with fullResults:false the tagged result is a plain row array with no
+  // `count`/`rowCount`. These DELETEs have no RETURNING, so `count` is undefined
+  // and this has always evaluated to false. Behavior preserved; see report (#43).
+  return ((result as unknown as { count?: number }).count ?? 0) > 0;
 }
 
 // =====================================================================
@@ -428,7 +440,7 @@ export async function getAdditionalIncomeByLease(leaseId: number): Promise<Addit
 
 export async function updateAdditionalIncome(additionalIncomeId: number, data: AdditionalIncomeUpdate): Promise<AdditionalIncome | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'additional_income_id') {
@@ -457,7 +469,7 @@ export async function updateAdditionalIncome(additionalIncomeId: number, data: A
 
   values.push(additionalIncomeId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as AdditionalIncome) : null;
 }
 
@@ -489,7 +501,7 @@ export async function getTenantImprovementByLease(leaseId: number): Promise<Tena
 
 export async function updateTenantImprovement(tiId: number, data: TenantImprovementUpdate): Promise<TenantImprovement | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'tenant_improvement_id') {
@@ -514,7 +526,7 @@ export async function updateTenantImprovement(tiId: number, data: TenantImprovem
 
   values.push(tiId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as TenantImprovement) : null;
 }
 
@@ -546,7 +558,7 @@ export async function getLeasingCommissionByLease(leaseId: number): Promise<Leas
 
 export async function updateLeasingCommission(commissionId: number, data: LeasingCommissionUpdate): Promise<LeasingCommission | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'commission_id') {
@@ -575,7 +587,7 @@ export async function updateLeasingCommission(commissionId: number, data: Leasin
 
   values.push(commissionId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as LeasingCommission) : null;
 }
 
@@ -658,7 +670,7 @@ export async function getLotsByParcel(parcelId: number): Promise<Lot[]> {
 
 export async function updateLot(lotId: number, data: LotUpdate): Promise<Lot | null> {
   const updates: string[] = [];
-  const values: (string | number | boolean | null)[] = [];
+  const values: unknown[] = [];
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && key !== 'lot_id') {
@@ -682,7 +694,7 @@ export async function updateLot(lotId: number, data: LotUpdate): Promise<Lot | n
 
   values.push(lotId);
 
-  const result = await sql(query, values);
+  const result = await sql.query(query, values);
   return result[0] ? (result[0] as Lot) : null;
 }
 
@@ -692,5 +704,8 @@ export async function deleteLot(lotId: number): Promise<boolean> {
     WHERE lot_id = ${lotId}
   `;
 
-  return result.count > 0;
+  // NOTE: with fullResults:false the tagged result is a plain row array with no
+  // `count`/`rowCount`. These DELETEs have no RETURNING, so `count` is undefined
+  // and this has always evaluated to false. Behavior preserved; see report (#43).
+  return ((result as unknown as { count?: number }).count ?? 0) > 0;
 }

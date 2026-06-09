@@ -92,7 +92,7 @@ export async function fetchPeriodsBySequences(
     ORDER BY period_sequence
   `;
 
-  return rows.map(mapPeriodRow);
+  return (rows as PeriodRow[]).map(mapPeriodRow);
 }
 
 export async function fetchPeriodRangeMetadata(
@@ -118,5 +118,5 @@ export async function fetchPeriodRangeMetadata(
     ORDER BY period_sequence
   `;
 
-  return rows.map(mapPeriodRow);
+  return (rows as PeriodRow[]).map(mapPeriodRow);
 }

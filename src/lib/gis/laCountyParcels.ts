@@ -1,4 +1,4 @@
-import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
+import type { Feature, FeatureCollection, Geometry, GeometryCollection, Position } from 'geojson';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 const LA_COUNTY_PARCELS_QUERY_URL =
@@ -67,10 +67,15 @@ const transformGeometryToWgs84 = (geometry: Geometry): Geometry => {
     };
   }
 
+  if (!('coordinates' in geometry)) {
+    return geometry;
+  }
+
+  const geomWithCoords = geometry as Exclude<Geometry, GeometryCollection>;
   return {
-    ...geometry,
-    coordinates: transformCoordinates(geometry.coordinates) as Geometry['coordinates'],
-  };
+    ...geomWithCoords,
+    coordinates: transformCoordinates(geomWithCoords.coordinates),
+  } as Geometry;
 };
 
 const normalizeFeatures = (features: Feature[]): Feature[] => {

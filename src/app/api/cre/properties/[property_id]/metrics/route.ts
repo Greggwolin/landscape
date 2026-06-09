@@ -125,7 +125,7 @@ async function fetchPropertyData(propertyId: number): Promise<PropertyData | nul
         base_rent_psf_annual: parseFloat(r.base_rent_psf_annual || 0),
       })),
       escalation: escalationRows.length > 0 ? {
-        escalation_type: escalationRows[0].escalation_type as 'Fixed Percentage' | 'CPI' | 'None',
+        escalation_type: escalationRows[0].escalation_type as 'Fixed Percentage' | 'CPI' | 'Fixed Dollar' | 'Stepped',
         escalation_pct: parseFloat(escalationRows[0].escalation_pct || 0),
         escalation_frequency: escalationRows[0].escalation_frequency,
         cpi_floor_pct: parseFloat(escalationRows[0].cpi_floor_pct || 0),
@@ -369,9 +369,10 @@ export async function GET(
   request: NextRequest,
   context: Params
 ) {
+  const { property_id } = await context.params;
   return NextResponse.json({
     message: 'Use POST method to calculate investment metrics',
-    endpoint: `/api/cre/properties/${params.property_id}/metrics`,
+    endpoint: `/api/cre/properties/${property_id}/metrics`,
     method: 'POST',
     parameters: {
       hold_period_years: 'number (optional, defaults to 10)',

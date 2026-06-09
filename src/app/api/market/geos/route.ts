@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
           AND UPPER(usps_state) = UPPER(${stateCode})
         LIMIT 1
       `;
-      return rows[0] ?? null;
+      return (rows[0] as GeoRow) ?? null;
     };
 
     const findState = async (stateCode: string) => {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
           )
         LIMIT 1
       `;
-      return rows[0] ?? null;
+      return (rows[0] as GeoRow) ?? null;
     };
 
     if (geoId) {
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         WHERE geo_id = ${geoId}
         LIMIT 1
       `;
-      baseRow = rows[0] ?? null;
+      baseRow = (rows[0] as GeoRow) ?? null;
     } else if (city && state) {
       const normalizedState = normalizeState(state);
       baseRow = await findCity(city, normalizedState);
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     `;
 
     const byId = new Map<string, GeoRow>();
-    for (const row of related) {
+    for (const row of related as GeoRow[]) {
       byId.set(row.geo_id, row);
     }
 

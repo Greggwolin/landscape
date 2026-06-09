@@ -22,9 +22,9 @@ function buildForwardHeaders(request: NextRequest): Record<string, string> {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = params;
+  const { projectId } = await params;
   const searchParams = request.nextUrl.searchParams;
   const limit = searchParams.get('limit') || '100';
   const beforeId = searchParams.get('before_id') || '';
@@ -61,9 +61,9 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = params;
+  const { projectId } = await params;
 
   try {
     const body = await request.json();
@@ -101,9 +101,9 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const { projectId } = params;
+  const { projectId } = await params;
 
   try {
     const response = await fetch(

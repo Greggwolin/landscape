@@ -46,11 +46,11 @@ export async function PUT(request: NextRequest, context: Params) {
 
     const updated = await sql.query(query, [...values, picklistId, picklistType]);
 
-    if (!updated?.rows || updated.rows.length === 0) {
+    if (!updated || updated.length === 0) {
       return NextResponse.json({ error: 'Picklist value not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ value: updated.rows[0] });
+    return NextResponse.json({ value: updated[0] });
   } catch (err) {
     console.error('picklists item PUT error', err);
     const message = err instanceof Error ? err.message : String(err);
