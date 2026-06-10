@@ -252,6 +252,32 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "get_extraction_mappings",
+        "description": "Read-only view of the AI document-extraction mapping configuration (the rules managed on the Landscaper AI admin page): which labels are extracted from which document types, what database field each maps to, data types, transform rules, confidence levels, and auto-write behavior. Use ONLY when the user explicitly asks how extraction is configured, what fields/mappings exist for a document type, or why a value was/wasn't extracted to a field. Do NOT call this during normal document ingestion — the extraction pipeline applies these rules automatically. This tool cannot change configuration; mapping edits happen on the admin page.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "document_type": {
+                    "type": "string",
+                    "description": "Filter to one document type (e.g., 'Operations', 'Offering')",
+                },
+                "target_table": {
+                    "type": "string",
+                    "description": "Filter to mappings writing to one table (e.g., 'tbl_project')",
+                },
+                "search": {
+                    "type": "string",
+                    "description": "Substring match on source pattern, target field/table, or notes",
+                },
+                "include_inactive": {
+                    "type": "boolean",
+                    "description": "Include disabled mappings (default false)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "move_document_to_folder",
         "description": "Move a document into a DMS folder, or remove it from its current folder. Optionally applies folder inheritance rules (default profile attributes).",
         "input_schema": {

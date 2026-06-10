@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import CIcon from '@coreui/icons-react';
 import { cilX } from '@coreui/icons';
+import ProfileForm from '@/components/dms/profile/ProfileForm';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 export interface DocumentDetailDoc {
@@ -24,6 +25,12 @@ export interface DocumentDetailDoc {
 interface Props {
   doc: DocumentDetailDoc;
   onClose: () => void;
+  /** Project the doc belongs to — required for profile editing. */
+  projectId?: number;
+  /** FB-301: 'profile' opens straight into the profile editor (Profile badge). */
+  initialMode?: 'detail' | 'profile';
+  /** Called after a successful profile save so the doc list can refresh. */
+  onProfileSaved?: () => void;
 }
 
 /**
@@ -97,13 +104,26 @@ function formatDate(iso?: string | null, withTime = false): string {
   });
 }
 
-export function DocumentDetailPanel({ doc, onClose }: Props) {
+export function DocumentDetailPanel({
+  doc,
+  onClose,
+  projectId,
+  initialMode = 'detail',
+  onProfileSaved,
+}: Props) {
   const name = doc.doc_name || doc.original_filename || `Document ${doc.doc_id}`;
   const ver = doc.version_no ?? 1;
   const parties =
     (doc.profile_json?.parties as string | undefined) ||
     (doc.profile_json?.party as string | undefined) ||
     '';
+
+  // FB-301: profile-editing mode. Entered via the Profile badge on a doc row
+  // (initialMode='profile') or the Edit Profile action below.
+  const [showProfile, setShowProfile] = useState(initialMode === 'profile');
+  useEffect(() => {
+    setShowProfile(initialMode === 'profile');
+  }, [doc.doc_id, initialMode]);
 
   // Lazy-load the canonical doc record to grab storage_uri + mime_type.
   // The list rows only carry a partial DMSDoc shape, but /api/dms/docs/[id]
@@ -114,13 +134,15 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
     doc.storage_uri ?? null
   );
   const [mimeType, setMimeType] = useState<string | null>(doc.mime_type ?? null);
+  const [fetchedProfile, setFetchedProfile] = useState<Record<string, unknown> | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     // Reset on doc change
     setStorageUri(doc.storage_uri ?? null);
     setMimeType(doc.mime_type ?? null);
-    if (doc.storage_uri) return;
+    setFetchedProfile(null);
+    if (doc.storage_uri && doc.profile_json) return;
 
     let cancelled = false;
     setLoadingDetail(true);
@@ -130,6 +152,9 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
         if (cancelled || !data) return;
         if (typeof data.storage_uri === 'string') setStorageUri(data.storage_uri);
         if (typeof data.mime_type === 'string') setMimeType(data.mime_type);
+        if (data.profile_json && typeof data.profile_json === 'object') {
+          setFetchedProfile(data.profile_json as Record<string, unknown>);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -138,7 +163,21 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [doc.doc_id, doc.storage_uri, doc.mime_type]);
+  }, [doc.doc_id, doc.storage_uri, doc.mime_type, doc.profile_json]);
+
+  // FB-301: profile save — same endpoint the legacy DMS preview panel uses.
+  const handleSaveProfile = async (profile: Record<string, unknown>) => {
+    const response = await fetch(`/api/dms/documents/${doc.doc_id}/profile`, {
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to save profile');
+    }
+    setShowProfile(false);
+    onProfileSaved?.();
+  };
 
   const canPreview =
     !!storageUri && (isPdfMime(mimeType, name) || isImageMime(mimeType, name));
@@ -163,6 +202,40 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
     a.click();
     document.body.removeChild(a);
   };
+
+  // FB-301: profile-editing mode replaces the detail body until save/cancel.
+  if (showProfile && projectId != null) {
+    const profile = (doc.profile_json ?? fetchedProfile ?? {}) as Record<string, unknown>;
+    return (
+      <aside className="w-doc-detail">
+        <div className="w-doc-detail-header">
+          <span className="w-doc-detail-title">Document Profile</span>
+          <div className="w-doc-detail-actions">
+            <button className="w-doc-detail-close" onClick={onClose} aria-label="Close">
+              <CIcon icon={cilX} size="sm" />
+            </button>
+          </div>
+        </div>
+        <div className="w-doc-detail-body">
+          <ProfileForm
+            docId={parseInt(doc.doc_id, 10)}
+            projectId={projectId}
+            docType={doc.doc_type || undefined}
+            initialProfile={{
+              doc_type: (profile.doc_type as string) || doc.doc_type || '',
+              description: (profile.description as string) || '',
+              tags: (profile.tags as string[]) || [],
+              doc_date: (profile.doc_date as string) || doc.doc_date || '',
+              parties: (profile.parties as string) || '',
+              dollar_amount: profile.dollar_amount as number | undefined,
+            }}
+            onSave={handleSaveProfile}
+            onCancel={() => setShowProfile(false)}
+          />
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-doc-detail">
@@ -229,7 +302,14 @@ export function DocumentDetailPanel({ doc, onClose }: Props) {
             ↓ Download
           </button>
           <button className="w-doc-detail-action">⟳ Upload New Version</button>
-          <button className="w-doc-detail-action">⚙ Edit Profile</button>
+          <button
+            className="w-doc-detail-action"
+            onClick={() => setShowProfile(true)}
+            disabled={projectId == null}
+            title={projectId == null ? 'Project context not available' : ''}
+          >
+            ⚙ Edit Profile
+          </button>
           <button className="w-doc-detail-action">✏ Rename</button>
           <button className="w-doc-detail-action is-danger">🗑 Delete</button>
         </div>

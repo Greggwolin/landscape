@@ -33,6 +33,8 @@ UNIVERSAL_TOOLS = [
     "get_extraction_corrections", "log_extraction_correction",
     # Document profiles (FB-281/FB-291 guard — list authoritative, add is explicit-consent)
     "list_project_profiles", "add_project_profile",
+    # Extraction-mapping config visibility (FB-303 — read-only; edits stay on admin UI)
+    "get_extraction_mappings",
     # Knowledge / RAG
     "get_knowledge_entities", "get_knowledge_facts", "get_knowledge_insights",
     "acknowledge_insight", "query_platform_knowledge", "search_irem_benchmarks",
@@ -285,6 +287,8 @@ UNASSIGNED_SAFE_TOOLS = [
     "get_master_lease_detail",
     # Document-profile read (read-only — falls back to default template if no project).
     "list_project_profiles",
+    # Extraction-mapping config read (FB-303 — platform-level, no project dependency).
+    "get_extraction_mappings",
 ]
 
 

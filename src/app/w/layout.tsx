@@ -62,6 +62,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
     setActiveArtifactId,
     artifactsOpen,
     toggleArtifacts,
+    closeChat,
   } = useWrapperUI();
   const { logout, user } = useAuth();
 
@@ -302,10 +303,14 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           tools: 'tools',
           'platform-knowledge': 'platform-knowledge',
         };
+        // FB-302: Platform Knowledge is a full-width navigator — start with
+        // the center chat panel closed so the knowledge tree gets the room.
+        // The user can re-open chat via the header toggle.
+        if (page === 'platform-knowledge') closeChat();
         router.push(`/w/${routeMap[page] || page}`);
       }
     },
-    [router, projectId, lastProjectId, toggleHelp]
+    [router, projectId, lastProjectId, toggleHelp, closeChat]
   );
 
   const handleToggleCollapse = useCallback(() => {

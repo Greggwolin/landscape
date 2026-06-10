@@ -83,9 +83,11 @@ function ProjectDocumentsBodyInner({
           style={{ display: 'none' }}
           onChange={handleFilesSelected}
         />
+        {/* FB-287: solid button treatment — the ghost variant read as a bare
+            text link; the upload entry point should look like a button. */}
         <button
           type="button"
-          className="w-btn w-btn-ghost w-btn-sm"
+          className="w-btn w-btn-primary w-btn-sm"
           onClick={handleUploadClick}
         >
           + Upload New
