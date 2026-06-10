@@ -1839,6 +1839,34 @@
   margin-top: 1px;
 }
 
+/* FB-301: per-doc action badges (Preview / Profile) on doc rows */
+.w-doc-type-list-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.w-doc-list-badge {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 9px;
+  border: 1px solid var(--w-border);
+  background: transparent;
+  color: var(--w-text-secondary);
+  cursor: pointer;
+}
+
+.w-doc-list-badge:hover {
+  background: var(--w-bg-surface-hover);
+  color: var(--w-text-primary);
+  border-color: var(--w-border-hover);
+}
+
 .w-doc-type-name {
   flex: 1;
   color: var(--w-text-primary);

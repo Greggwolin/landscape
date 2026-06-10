@@ -54,6 +54,9 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
   const [docsByType, setDocsByType] = useState<Record<string, DMSDoc[]>>({});
   const [loadingType, setLoadingType] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DMSDoc | null>(null);
+  // FB-301: which mode the detail panel opens in — 'detail' (Preview badge /
+  // row click) or 'profile' (Profile badge → profile editor).
+  const [detailMode, setDetailMode] = useState<'detail' | 'profile'>('detail');
   const [collapsed, setCollapsed] = useState(false);
 
   // ── Selection state ────────────────────────────────────────
@@ -696,7 +699,14 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
                   docs={docsByType[t.doc_type_name]}
                   loading={loadingType === t.doc_type_name}
                   selectedDocId={selectedDoc?.doc_id ?? null}
-                  onSelectDoc={setSelectedDoc}
+                  onSelectDoc={(d) => {
+                    setDetailMode('detail');
+                    setSelectedDoc(d);
+                  }}
+                  onOpenProfile={(d) => {
+                    setDetailMode('profile');
+                    setSelectedDoc(d);
+                  }}
                   selectedDocIds={selectedDocIds}
                   onToggleCheck={toggleDocSelection}
                   onReclassify={handleDocumentReclassify}
@@ -716,7 +726,14 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
                     docs={docsByType[t.doc_type_name]}
                     loading={loadingType === t.doc_type_name}
                     selectedDocId={null}
-                    onSelectDoc={setSelectedDoc}
+                    onSelectDoc={(d) => {
+                      setDetailMode('detail');
+                      setSelectedDoc(d);
+                    }}
+                    onOpenProfile={(d) => {
+                      setDetailMode('profile');
+                      setSelectedDoc(d);
+                    }}
                     selectedDocIds={selectedDocIds}
                     onToggleCheck={toggleDocSelection}
                     onReclassify={handleDocumentReclassify}
@@ -736,7 +753,16 @@ export function DocumentsPanel({ refreshKey = 0, onChange }: DocumentsPanelProps
 
       {!collapsed && selectedDoc && (
         <div className="w-panel w-panel-detail">
-          <DocumentDetailPanel doc={selectedDoc} onClose={() => setSelectedDoc(null)} />
+          <DocumentDetailPanel
+            doc={selectedDoc}
+            onClose={() => setSelectedDoc(null)}
+            projectId={project_id ?? undefined}
+            initialMode={detailMode}
+            onProfileSaved={() => {
+              triggerRefresh();
+              onChange?.();
+            }}
+          />
         </div>
       )}
 
@@ -844,6 +870,7 @@ function DocTypeRowView({
   loading,
   selectedDocId,
   onSelectDoc,
+  onOpenProfile,
   selectedDocIds,
   onToggleCheck,
   onReclassify,
@@ -857,6 +884,8 @@ function DocTypeRowView({
   loading?: boolean;
   selectedDocId: string | null;
   onSelectDoc: (doc: DMSDoc) => void;
+  /** FB-301: open the detail panel straight into the profile editor. */
+  onOpenProfile?: (doc: DMSDoc) => void;
   selectedDocIds: Set<string>;
   onToggleCheck: (docId: string, e: React.MouseEvent) => void;
   onReclassify?: (docIds: string[], targetDocType: string) => void;
@@ -1036,6 +1065,31 @@ function DocTypeRowView({
                         {ver}
                         {date ? ` · ${date}` : ''}
                       </span>
+                    </span>
+                    {/* FB-301: per-doc action badges */}
+                    <span className="w-doc-type-list-badges">
+                      <button
+                        type="button"
+                        className="w-doc-list-badge"
+                        title="Preview this document"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectDoc(d);
+                        }}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        type="button"
+                        className="w-doc-list-badge"
+                        title="Edit this document's profile"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenProfile?.(d);
+                        }}
+                      >
+                        Profile
+                      </button>
                     </span>
                   </li>
                 );

@@ -160,9 +160,9 @@ export function MutationProposalCard({
       <div
         className="rounded-lg px-4 py-3 text-sm d-flex align-items-center gap-2"
         style={{
-          backgroundColor: 'var(--cui-success-bg-subtle, #d1e7dd)',
-          color: 'var(--cui-success, #198754)',
-          border: '1px solid var(--cui-success, #198754)',
+          backgroundColor: 'var(--cui-success-bg-subtle)',
+          color: 'var(--cui-success)',
+          border: '1px solid var(--cui-success)',
         }}
       >
         <CIcon icon={cilCheckCircle} size="sm" />
@@ -177,7 +177,7 @@ export function MutationProposalCard({
     <CCard
       className="border-warning"
       style={{
-        backgroundColor: 'var(--cui-warning-bg-subtle, #fff3cd)',
+        backgroundColor: 'var(--cui-warning-bg-subtle)',
         borderWidth: '2px',
       }}
     >
@@ -185,8 +185,8 @@ export function MutationProposalCard({
         className="d-flex align-items-center justify-content-between"
         style={{
           padding: '8px 12px',
-          backgroundColor: 'var(--cui-warning, #ffc107)',
-          color: 'var(--cui-dark, #212529)',
+          backgroundColor: 'var(--cui-warning)',
+          color: 'var(--cui-warning-text-emphasis)',
         }}
       >
         <div className="d-flex align-items-center gap-2">
@@ -235,11 +235,11 @@ export function MutationProposalCard({
                 className="rounded p-3"
                 style={{
                   backgroundColor: proposal.isHighRisk
-                    ? 'var(--cui-danger-bg-subtle, #f8d7da)'
-                    : 'var(--cui-body-bg, #fff)',
+                    ? 'var(--cui-danger-bg-subtle)'
+                    : 'var(--cui-body-bg)',
                   border: proposal.isHighRisk
-                    ? '1px solid var(--cui-danger, #dc3545)'
-                    : '1px solid var(--cui-border-color, #dee2e6)',
+                    ? '1px solid var(--cui-danger)'
+                    : '1px solid var(--cui-border-color)',
                 }}
               >
                 <div className="d-flex align-items-start justify-content-between gap-3">
@@ -328,7 +328,7 @@ export function MutationProposalCard({
           <div
             className="mt-3 pt-2 small text-muted text-center"
             style={{
-              borderTop: '1px solid var(--cui-border-color, #dee2e6)',
+              borderTop: '1px solid var(--cui-border-color)',
               fontSize: '0.75rem',
             }}
           >
