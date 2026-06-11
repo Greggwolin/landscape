@@ -178,6 +178,23 @@ async function captureView(page, view) {
   }
   await settle(page, view.extraSettleMs || 0);
 
+  // Wait out any visible "Loading..." placeholders (grids hydrate rows after
+  // networkidle — the 1806/1817 runs caught the budget grid mid-load). Bounded;
+  // warns rather than fails if something never resolves.
+  const deadline = Date.now() + 20_000;
+  let stillLoading = false;
+  do {
+    stillLoading = await page.evaluate(() => {
+      const re = /loading/i;
+      for (const el of document.querySelectorAll('td, span, div, p')) {
+        if (el.children.length === 0 && re.test(el.textContent || '') && el.offsetParent !== null) return true;
+      }
+      return false;
+    });
+    if (stillLoading) await page.waitForTimeout(1000);
+  } while (stillLoading && Date.now() < deadline);
+  if (stillLoading) log(`  WARN: visible "Loading" text remained after 20s — review this image`);
+
   // Viewport shot
   await page.screenshot({ path: path.join(OUT_DIR, `${view.name}.png`) });
 
@@ -221,6 +238,15 @@ async function captureView(page, view) {
     viewport: { width: 1440, height: 900 }, // spec: 1440–1600px, no ultrawide
     deviceScaleFactor: 2,                   // retina-quality output
   });
+
+  // Pre-dismiss the Help & Feedback flyout. HelpLandscaperContext auto-opens it
+  // on workspace pages unless sessionStorage has the dismissed flag — it covered
+  // a third of every legacy capture in the 1817 run. Init script runs before app
+  // code on every page load.
+  await context.addInitScript(() => {
+    try { sessionStorage.setItem('landscape_help_dismissed', 'true'); } catch {}
+  });
+
   const page = await context.newPage();
 
   const failures = [];
