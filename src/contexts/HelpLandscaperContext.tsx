@@ -86,6 +86,20 @@ function buildCurrentPage(
   // --- Pathname-based fallback ---
   const segments = pathname.split('/').filter(Boolean);
 
+  // Chat-first /w/ shell routes (FB-313: these previously fell through to
+  // undefined, so every Help submission from the new UI was tagged "general")
+  if (segments[0] === 'w') {
+    if (segments[1] === 'projects' && segments.length >= 3) {
+      const sub = segments[3];
+      if (sub) return sub;             // e.g. /w/projects/17/reports → "reports"
+      return 'home';                   // e.g. /w/projects/17         → "home"
+    }
+    if (segments[1] === 'chat') return 'chat';
+    if (segments[1] === 'dashboard') return 'home';
+    if (segments[1]) return segments[1]; // e.g. platform-knowledge, admin, help, tools
+    return 'home';
+  }
+
   if (segments[0] === 'projects' && segments.length >= 2) {
     const sub = segments[2];
     if (sub) return sub;               // e.g. /projects/17/documents → "documents"

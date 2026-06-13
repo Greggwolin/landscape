@@ -66,6 +66,34 @@ class HelpChatView(APIView):
             has_feedback = detect_feedback_tag(message)
             feedback_id = None
             if has_feedback:
+                # Empty-after-strip guard (FB-313): a message that is ONLY the
+                # #FB tag (no actual feedback text) must not create a blank
+                # tbl_feedback row. Ask the user for the content instead.
+                if not strip_feedback_tag(message):
+                    user_id = request.user.id if request.user.is_authenticated else None
+                    if conversation_id:
+                        conv_id = self._get_conversation_db_id(conversation_id)
+                        if not conv_id:
+                            conversation_id, conv_id = self._create_conversation(user_id)
+                    else:
+                        conversation_id, conv_id = self._create_conversation(user_id)
+                    ack_content = (
+                        "I see the #FB tag but no message with it — nothing was "
+                        "logged. Type your feedback and include #FB again and "
+                        "I'll capture it."
+                    )
+                    self._store_message(conv_id, 'user', message, current_page)
+                    self._store_message(conv_id, 'assistant', ack_content, current_page)
+                    self._touch_conversation(conv_id)
+                    return Response({
+                        'success': True,
+                        'content': ack_content,
+                        'conversation_id': str(conversation_id),
+                        'metadata': {
+                            'feedback_captured': False,
+                            'feedback_id': None,
+                        },
+                    }, status=status.HTTP_200_OK)
                 # Extract user info from request.data (sent by frontend)
                 user_id = request.data.get('user_id')
                 user_name = request.data.get('user_name')

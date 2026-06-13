@@ -82,6 +82,17 @@ def capture_feedback(
         v2 task.
     """
     feedback_text = strip_feedback_tag(user_message)
+
+    # Empty-after-strip guard (FB-313): never persist a blank feedback row.
+    # Callers should pre-check and prompt the user for content; this is the
+    # backstop for callers that don't.
+    if not feedback_text:
+        logger.warning(
+            "[FEEDBACK] capture_feedback called with empty-after-strip message "
+            "— skipping Discord post and tbl_feedback INSERT"
+        )
+        return None
+
     discord_ok = False
 
     # 1. Discord post (best-effort)
