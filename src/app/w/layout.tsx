@@ -622,6 +622,7 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
           onClick: () => router.push(`/w/projects/${p.id}`),
         }))}
         isHelpThinking={isHelpLoading}
+        isAdmin={user?.is_staff === true}
         onSearchClick={openSearch}
         currentTheme={theme === 'light' ? 'light' : 'dark'}
         onThemeToggle={toggleTheme}

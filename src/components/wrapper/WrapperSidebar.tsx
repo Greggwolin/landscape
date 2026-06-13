@@ -73,6 +73,12 @@ export interface WrapperSidebarProps {
 
   // Help flyout
   isHelpThinking?: boolean;
+
+  /** Staff/admin viewer. When true, the admin-only "Feedback" link (the
+   *  outstanding-feedback log) is shown. When false, that link is hidden and
+   *  the "Help" item is relabeled "Help / Feedback" — non-admins submit
+   *  feedback through the Help flyout (#FB), so Help is their feedback entry. */
+  isAdmin?: boolean;
 }
 
 // Simple inline SVG icon component
@@ -189,6 +195,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
   userPlan = 'Crescent Bay Holdings',
   userInitials = 'GW',
   isHelpThinking = false,
+  isAdmin = false,
   onArchiveThread,
   onRestoreThread,
   onDeleteThreadPermanently,
@@ -228,6 +235,15 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
     else router.push('/w/chat');
   };
 
+  // Role-aware nav: the "Feedback" link (outstanding-feedback log) is admin-only.
+  // Non-admins don't see it; instead their "Help" item is relabeled
+  // "Help / Feedback" because the Help flyout (#FB) is their feedback entry point.
+  const navItems = NAV_ITEMS
+    .filter((item) => item.id !== 'admin-feedback' || isAdmin)
+    .map((item) =>
+      item.id === 'help' && !isAdmin ? { ...item, label: 'Help / Feedback' } : item,
+    );
+
   return (
     <>
       <div
@@ -260,7 +276,7 @@ export const WrapperSidebar: React.FC<WrapperSidebarProps> = ({
 
         {/* Navigation */}
         <div className="sb-nav">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = activePage === item.id;
             return (
               <div
