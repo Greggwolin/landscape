@@ -299,9 +299,66 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set created_by to the authenticated user on project creation."""
         if self.request.user and self.request.user.is_authenticated:
-            serializer.save(created_by=self.request.user)
+            project = serializer.save(created_by=self.request.user)
         else:
-            serializer.save()
+            project = serializer.save()
+        self._geocode_on_save(project)
+
+    def perform_update(self, serializer):
+        """Persist project edits, then best-effort (re)geocode if needed (FB-317)."""
+        project = serializer.save()
+        self._geocode_on_save(project)
+
+    @staticmethod
+    def _geocode_on_save(project):
+        """Best-effort auto-geocode a project after save (FB-317).
+
+        Fills latitude/longitude from the project's stored address when they
+        are missing. Never raises and never blocks the save — a geocode
+        failure is logged and swallowed. No-op when coordinates already exist,
+        so edits to already-geocoded projects add no latency.
+        """
+        try:
+            if project is None:
+                return
+            if getattr(project, 'latitude', None) is not None and \
+                    getattr(project, 'longitude', None) is not None:
+                return
+            from apps.location_intelligence.services.geocode_provider import (
+                geocode_address, build_project_address,
+            )
+            address = build_project_address(
+                street_address=getattr(project, 'street_address', None),
+                project_address=getattr(project, 'project_address', None),
+                city=getattr(project, 'city', None),
+                state=getattr(project, 'state', None),
+                zip_code=getattr(project, 'zip_code', None),
+            )
+            if not address:
+                return
+            result = geocode_address(address)
+            if result.get('latitude') is None:
+                return
+            from django.db import connection
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE landscape.tbl_project
+                    SET latitude = %s, longitude = %s,
+                        geocoding_confidence = %s,
+                        geocoded_at = NOW(),
+                        geocoded_by_service = %s
+                    WHERE project_id = %s
+                    """,
+                    [result['latitude'], result['longitude'],
+                     result.get('confidence'), result.get('provider'),
+                     project.project_id],
+                )
+        except Exception:
+            logger.warning(
+                "FB-317 on-save geocode skipped for project %s",
+                getattr(project, 'project_id', '?'), exc_info=True,
+            )
 
     @action(detail=False, methods=['get'], url_path='home')
     def home(self, request):

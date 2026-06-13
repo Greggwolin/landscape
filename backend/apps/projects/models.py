@@ -289,6 +289,16 @@ class Project(models.Model):
         help_text='How dependent-artifact updates cascade after edits.',
     )
 
+    # Geocoding (FB-317) — populated by the geocode_provider service via the
+    # on-save hook, the geocode_address Landscaper tool, or the backfill
+    # command. DB columns added in migration 0010 (RunSQL; table is
+    # managed=False). Coordinates feed MapLibre project pins + map tools.
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+    geocoding_confidence = models.FloatField(blank=True, null=True)
+    geocoded_at = models.DateTimeField(blank=True, null=True)
+    geocoded_by_service = models.CharField(max_length=32, blank=True, null=True)
+
     # Metadata
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
