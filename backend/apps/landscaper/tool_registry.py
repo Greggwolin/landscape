@@ -97,6 +97,8 @@ UNIVERSAL_TOOLS = [
     "generate_map_artifact",
     # Location Brief artifact (universal, works pre-project)
     "generate_location_brief",
+    # Geocoding (FB-317) — universal, address → coordinates
+    "geocode_address",
     # P1 Analysis tools (Apr 2026)
     "list_projects_summary",
     "get_deal_summary",
@@ -269,6 +271,8 @@ UNASSIGNED_SAFE_TOOLS = [
     "list_projects_summary", "list_available_reports",
     # Universal location intelligence (FRED + Census, no project required)
     "generate_location_brief",
+    # Geocoding (FB-317) — works pre-project for ad-hoc address lookups
+    "geocode_address",
     # User vocabulary learning — pre-project vocab works the same as project-scoped
     "save_user_vocab",
     # Generative Artifacts (Finding #4, Phase 1) — pre-project artifacts

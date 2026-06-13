@@ -349,3 +349,16 @@ LANDSCAPER_FEEDBACK_WEBHOOK_URL = config('LANDSCAPER_FEEDBACK_WEBHOOK_URL', defa
 # /api/feedback/dashboard-data/. Empty/missing value blocks all access
 # (the HasFeedbackDashboardToken permission class returns False).
 FEEDBACK_DASHBOARD_TOKEN = config('FEEDBACK_DASHBOARD_TOKEN', default='')
+
+# ============================================================================
+# GEOCODING (FB-317)
+# ============================================================================
+# Active forward-geocoding provider. The pluggable layer in
+# apps.location_intelligence.services.geocode_provider keys its provider
+# registry on this value; swap to a paid provider (e.g. 'google') by
+# registering it there and flipping this flag — no consumer changes.
+GEOCODER_PROVIDER = config('GEOCODER_PROVIDER', default='nominatim')
+
+# Optional hard quality gate (0.0 = accept all matches). Consumers compare a
+# provider's normalized confidence (0.0–1.0) against this floor.
+GEOCODER_MIN_CONFIDENCE = config('GEOCODER_MIN_CONFIDENCE', default=0.0, cast=float)

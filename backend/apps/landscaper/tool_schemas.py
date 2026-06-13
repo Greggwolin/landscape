@@ -8,6 +8,37 @@ Estimated tokens: ~18,500
 
 LANDSCAPER_TOOLS = [
     {
+        "name": "geocode_address",
+        "description": (
+            "Resolve a street address (or the active project's stored address) "
+            "to latitude/longitude coordinates via the platform geocoder. Fires "
+            "ONLY when the user explicitly asks to geocode, map, locate, or find "
+            "coordinates for an address or a project — never speculatively. Pass "
+            "`address` for an ad-hoc lookup, or set `use_project_address` to "
+            "geocode the current project's stored address. Set `persist` (only "
+            "valid with use_project_address) to write the coordinates back to the "
+            "project."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "Free-text address to geocode. Omit when use_project_address is true.",
+                },
+                "use_project_address": {
+                    "type": "boolean",
+                    "description": "Geocode the active project's stored address instead of a passed string. Requires project context.",
+                },
+                "persist": {
+                    "type": "boolean",
+                    "description": "When true AND geocoding the project's own address, write coords back to tbl_project. Default false.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "update_project_field",
         "description": "Update a single project field value.",
         "input_schema": {
