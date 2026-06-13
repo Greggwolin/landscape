@@ -4739,7 +4739,14 @@ LANDSCAPER_TOOLS = [
                 "include_comps": {"type": "boolean", "description": "Include comparable properties as markers."},
                 "custom_markers": {
                     "type": "array",
-                    "description": "Additional markers.",
+                    "description": (
+                        "Additional markers (e.g., rental or expense comps not "
+                        "covered by include_comps). For an informative click "
+                        "popup, supply `address` and/or `details` (one line per "
+                        "fact such as rent, unit mix, distance), or pass a full "
+                        "`popup` HTML string. Without them the popup shows only "
+                        "the label."
+                    ),
                     "items": {
                         "type": "object",
                         "properties": {
@@ -4747,6 +4754,13 @@ LANDSCAPER_TOOLS = [
                             "lat": {"type": "number"},
                             "lng": {"type": "number"},
                             "color": {"type": "string"},
+                            "address": {"type": "string", "description": "Street address line for the popup."},
+                            "details": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Extra popup lines (e.g., '$1,850/mo', '2BR/2BA', '0.4 mi').",
+                            },
+                            "popup": {"type": "string", "description": "Optional full popup HTML; overrides address/details."},
                         },
                         "required": ["label", "lat", "lng"],
                     },
