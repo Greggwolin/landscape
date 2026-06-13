@@ -45,7 +45,7 @@ export interface TableColumn {
    *    'number'    → 1,234    (plain integer)
    *    'date'      → Mmm-YY   (ISO-string detection happens in formatCellValue)
    */
-  format?: 'currency' | 'currency2' | 'number' | 'date';
+  format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent';
 }
 
 export interface TableRow {
