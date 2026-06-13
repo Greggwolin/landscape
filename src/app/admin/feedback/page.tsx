@@ -2,11 +2,6 @@
 
 import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CModal,
-  CModalHeader,
-  CModalTitle,
-  CModalBody,
-  CModalFooter,
   CButton,
   CFormTextarea,
   CFormSelect,
@@ -15,16 +10,31 @@ import {
 } from '@coreui/react';
 import AdminNavBar from '@/app/components/AdminNavBar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { getAuthHeaders } from '@/lib/authHeaders';
 
-// ── Display-bucket map: collapse Layer 2's three states into the same
-// three-bucket taxonomy the Cowork artifact uses, so the Open/In Progress/Closed
-// count chips read the same way. submitted → open, under_review → in_progress,
-// addressed → closed. Pure display layer; the database column stays as-is.
-const STATUS_BUCKET_MAP: Record<string, 'open' | 'in_progress' | 'closed'> = {
-  submitted: 'open',
-  under_review: 'in_progress',
+// ── Canonical feedback lives in landscape.tbl_feedback (single source of truth,
+// shared with the daily brief + the list_feedback/close_feedback/start_feedback/
+// mark_feedback_addressed CLI + Cowork). The tester_feedback mirror was retired
+// in LSCMD-FBUNIFY-0613-qz. This page reads /api/feedback/ (canonical viewset)
+// and PATCHes status edits back through the same CLI semantics.
+
+type CanonicalStatus =
+  | 'open'
+  | 'in_progress'
+  | 'addressed'
+  | 'closed'
+  | 'wontfix'
+  | 'duplicate';
+
+// ── Display-bucket map (DECISION 3): collapse the six canonical states into the
+// three chips the Cowork artifact uses. open → Open; in_progress → In Progress;
+// addressed | closed | wontfix | duplicate → Closed.
+const STATUS_BUCKET_MAP: Record<CanonicalStatus, 'open' | 'in_progress' | 'closed'> = {
+  open: 'open',
+  in_progress: 'in_progress',
   addressed: 'closed',
+  closed: 'closed',
+  wontfix: 'closed',
+  duplicate: 'closed',
 };
 const BUCKET_LABEL: Record<'open' | 'in_progress' | 'closed', string> = {
   open: 'Open',
@@ -37,63 +47,59 @@ const BUCKET_ACCENT: Record<'open' | 'in_progress' | 'closed', { bg: string; bgA
   closed:      { bg: '#fafafa', bgActive: '#dcfce7', fg: '#475569', fgActive: '#166534', numColor: '#16a34a' },
 };
 
+// Per-status badge nomenclature (the full canonical vocabulary, not the 3 chips).
+const STATUS_LABELS: Record<CanonicalStatus, string> = {
+  open: 'Open',
+  in_progress: 'In Progress',
+  addressed: 'Addressed',
+  closed: 'Closed',
+  wontfix: "Won't Fix",
+  duplicate: 'Duplicate',
+};
+const STATUS_COLORS: Record<CanonicalStatus, string> = {
+  open: 'danger',
+  in_progress: 'warning',
+  addressed: 'success',
+  closed: 'secondary',
+  wontfix: 'secondary',
+  duplicate: 'secondary',
+};
+
+// Status values an admin may set from the queue. Duplicate is intentionally
+// omitted — it requires a duplicate_of target the inline form doesn't collect;
+// set duplicates via the close_feedback CLI.
+const EDITABLE_STATUSES: CanonicalStatus[] = ['open', 'in_progress', 'addressed', 'closed', 'wontfix'];
+
 interface FeedbackItem {
   id: number;
-  internal_id: string;
-  user: number;
-  username: string;
-  user_email?: string;
-  feedback_type: 'bug' | 'feature' | 'question' | 'general';
-  message: string;
-  page_url: string;
-  page_path: string;
-  project_id?: number;
-  project_name?: string;
-  category?: 'bug' | 'feature_request' | 'ux_confusion' | 'question';
-  affected_module?: string;
-  landscaper_summary?: string;
-  landscaper_raw_chat?: Array<{ role: string; content: string }>;
-  browser_context?: {
-    browser?: string;
-    os?: string;
-    screenSize?: string;
-    currentUrl?: string;
-    timestamp?: string;
-  };
-  report_count: number;
-  status: 'submitted' | 'under_review' | 'addressed';
-  admin_notes: string;
-  admin_response?: string;
-  admin_responded_at?: string;
+  fb_label: string; // "FB-N"
   created_at: string;
-  updated_at: string;
-  context_url?: string;
+  status: CanonicalStatus;
+  category: string | null;
+  source: string | null;
+  page_context: string | null;
+  project_id: number | null;
+  project_name: string | null;
+  message_text: string;
+  user_name: string | null;
+  user_email: string | null;
+  started_at: string | null;
+  addressed_at: string | null;
+  closed_at: string | null;
+  in_progress_branch: string | null;
+  in_progress_session_slug: string | null;
+  resolved_by_commit_sha: string | null;
+  resolved_by_commit_url: string | null;
+  resolution_notes: string | null;
+  working_summary: string | null;
+  active_chat_slug: string | null;
+  duplicate_of_id: number | null;
+  report_count: number; // surfaced as a constant 1
 }
 
-// Display nomenclature is Open / In Progress / Closed (matches the count chips
-// and the Cowork artifact). The DB column stays as submitted/under_review/addressed
-// — only the rendering changes. Keep these maps as the single source of truth so
-// every badge / select / sort key stays consistent.
-const STATUS_COLORS: Record<string, string> = {
-  submitted: 'danger',     // Open
-  under_review: 'warning', // In Progress
-  addressed: 'success',    // Closed
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  submitted: 'Open',
-  under_review: 'In Progress',
-  addressed: 'Closed',
-};
-
-// FB-id extraction: rows backfilled from tbl_feedback have an admin_notes prefix
-// like "[migrated FB-281 on 2026-05-06]" — parse it for display. Rows submitted
-// natively to tester_feedback won't have that marker; fall back to the local id.
-function fbIdLabel(item: FeedbackItem): string {
-  const m = (item.admin_notes || '').match(/^\[migrated FB-(\d+)/);
-  if (m) return `FB-${m[1]}`;
-  return `F-${item.id}`;
-}
+// Patch payload the admin queue sends. Status maps to the CLI write semantics
+// server-side; resolution_notes is the single free-text field tbl_feedback keeps.
+type FeedbackPatch = { status: CanonicalStatus; resolution_notes: string };
 
 const CATEGORY_COLORS: Record<string, string> = {
   bug: 'danger',
@@ -111,38 +117,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
-// ── Working-summary + Fix Prompt helpers (mirror the Cowork feedback_status_live artifact) ──
-// During the Layer 2 bridge backfill (LSCMD-FBLOG-0505-kp), the Cowork-side
-// `working_summary` content from tbl_feedback was stuffed into admin_notes
-// under a "--- Working summary ---" header. This helper extracts it for
-// display in the detail modal so the chat-tied lifecycle log is visible
-// here, not only in the legacy Cowork artifact.
-function parseWorkingSummary(adminNotes: string | undefined | null): string | null {
-  if (!adminNotes) return null;
-  const idx = adminNotes.indexOf('--- Working summary ---');
-  if (idx < 0) return null;
-  return adminNotes.substring(idx + '--- Working summary ---'.length).trim() || null;
-}
-
-// Build the same paste-ready triage prompt the Cowork artifact's "Fix Prompt"
-// button copies to clipboard. Includes a "Prior work on this item" section
-// when the row already has a working summary, so a fresh chat can pick up
-// where the prior one left off.
+// Build the paste-ready triage prompt the Cowork artifact's "Fix Prompt" button
+// copies to clipboard. Includes a "Prior work on this item" section when the row
+// already has a working_summary, so a fresh chat can pick up where it left off.
 function buildFixPrompt(item: FeedbackItem): string {
   const dateOnly = (item.created_at || '').slice(0, 10);
-  const where = item.affected_module || 'Unknown';
+  const where = item.page_context || 'Unknown';
   const statusLabel = STATUS_LABELS[item.status] || item.status;
-  const ws = parseWorkingSummary(item.admin_notes);
+  const ws = item.working_summary;
   const hasPriorWork = !!ws;
   const lines: string[] = [];
 
-  lines.push(`Triage feedback item FB-${item.id} from the Landscape app.`);
+  lines.push(`Triage feedback item ${item.fb_label} from the Landscape app.`);
   lines.push(``);
   lines.push(`Reported: ${dateOnly} on the ${where} surface`);
   lines.push(`Status: ${statusLabel}`);
   lines.push(``);
   lines.push(`User's wording:`);
-  lines.push(`"${(item.message || '').trim()}"`);
+  lines.push(`"${(item.message_text || '').trim()}"`);
   lines.push(``);
 
   if (hasPriorWork) {
@@ -167,317 +159,27 @@ function buildFixPrompt(item: FeedbackItem): string {
   return lines.join('\n');
 }
 
-interface FeedbackDetailModalProps {
-  item: FeedbackItem | null;
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (id: number, data: Partial<FeedbackItem>) => Promise<void>;
-}
-
-function FeedbackDetailModal({ item, isOpen, onClose, onSave }: FeedbackDetailModalProps) {
-  const [status, setStatus] = useState<string>('');
-  const [adminNotes, setAdminNotes] = useState('');
-  const [adminResponse, setAdminResponse] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [showRawChat, setShowRawChat] = useState(false);
-  const [showWorkingSummary, setShowWorkingSummary] = useState(false);
-  const [showFixPrompt, setShowFixPrompt] = useState(false);
-  const [fixPromptCopied, setFixPromptCopied] = useState(false);
-
-  useEffect(() => {
-    if (item) {
-      setStatus(item.status);
-      setAdminNotes(item.admin_notes || '');
-      setAdminResponse(item.admin_response || '');
-      // Reset disclosures + copied state on item change
-      setShowWorkingSummary(false);
-      setShowFixPrompt(false);
-      setFixPromptCopied(false);
-    }
-  }, [item]);
-
-  // Resolve working summary + fix prompt for the current item (memoised on every render is fine here — strings are small)
-  const workingSummary = item ? parseWorkingSummary(item.admin_notes) : null;
-  const fixPromptText = item ? buildFixPrompt(item) : '';
-
-  const handleCopyFixPrompt = async () => {
-    if (!item) return;
-    try {
-      await navigator.clipboard.writeText(fixPromptText);
-      setFixPromptCopied(true);
-      setShowFixPrompt(true);
-      setTimeout(() => setFixPromptCopied(false), 1500);
-    } catch {
-      // Clipboard blocked — show the text inline so the user can copy manually
-      setShowFixPrompt(true);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!item) return;
-    setSaving(true);
-    try {
-      await onSave(item.id, {
-        status: status as FeedbackItem['status'],
-        admin_notes: adminNotes,
-        admin_response: adminResponse,
-      });
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!item) return null;
-
-  return (
-    <CModal visible={isOpen} onClose={onClose} size="lg">
-      <CModalHeader>
-        <CModalTitle>Feedback Detail</CModalTitle>
-      </CModalHeader>
-      <CModalBody>
-        <div className="row mb-3">
-          <div className="col-md-6">
-            <strong>User:</strong> {item.username}
-            {item.user_email && <span className="text-muted ms-2">({item.user_email})</span>}
-          </div>
-          <div className="col-md-6">
-            <strong>Submitted:</strong> {new Date(item.created_at).toLocaleString()}
-          </div>
-        </div>
-
-        <div className="row mb-3">
-          <div className="col-md-6">
-            <strong>Module:</strong>{' '}
-            <CBadge color="dark">{item.affected_module || 'Unknown'}</CBadge>
-          </div>
-          <div className="col-md-6">
-            <strong>Category:</strong>{' '}
-            {item.category ? (
-              <CBadge color={CATEGORY_COLORS[item.category]}>
-                {CATEGORY_LABELS[item.category]}
-              </CBadge>
-            ) : (
-              <span className="text-muted">Not classified</span>
-            )}
-          </div>
-        </div>
-
-        {item.report_count > 1 && (
-          <div className="alert alert-info py-2 mb-3">
-            <strong>Reported by {item.report_count} users</strong>
-          </div>
-        )}
-
-        <div className="mb-3">
-          <strong>Summary:</strong>
-          <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>
-            {item.landscaper_summary || item.message}
-          </p>
-        </div>
-
-        {item.landscaper_summary && item.landscaper_summary !== item.message && (
-          <div className="mb-3">
-            <strong>Original Message:</strong>
-            <p className="mb-0 mt-1 text-muted" style={{ whiteSpace: 'pre-wrap' }}>
-              {item.message}
-            </p>
-          </div>
-        )}
-
-        {item.browser_context && Object.keys(item.browser_context).length > 0 && (
-          <div className="mb-3">
-            <strong>Browser Context:</strong>
-            <div className="mt-1 p-2 bg-light rounded small">
-              {item.browser_context.browser && <div>Browser: {item.browser_context.browser}</div>}
-              {item.browser_context.os && <div>OS: {item.browser_context.os}</div>}
-              {item.browser_context.screenSize && (
-                <div>Screen: {item.browser_context.screenSize}</div>
-              )}
-              {item.browser_context.currentUrl && (
-                <div className="text-truncate">URL: {item.browser_context.currentUrl}</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {item.landscaper_raw_chat && item.landscaper_raw_chat.length > 0 && (
-          <div className="mb-3">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setShowRawChat(!showRawChat)}
-            >
-              {showRawChat ? 'Hide' : 'Show'} Chat History ({item.landscaper_raw_chat.length}{' '}
-              messages)
-            </button>
-            {showRawChat && (
-              <div className="mt-2 p-2 bg-light rounded" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {item.landscaper_raw_chat.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`mb-2 p-2 rounded ${msg.role === 'user' ? 'bg-primary text-white ms-4' : 'bg-white'}`}
-                  >
-                    <small className="d-block mb-1 fw-bold">
-                      {msg.role === 'user' ? 'User' : 'Assistant'}
-                    </small>
-                    {msg.content}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mb-3">
-          <strong>Page:</strong>{' '}
-          <a
-            href={item.context_url || item.page_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-decoration-none"
-          >
-            {item.page_path}
-          </a>
-        </div>
-
-        {workingSummary && (
-          <div className="mb-3">
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => setShowWorkingSummary((v) => !v)}
-            >
-              {showWorkingSummary ? 'Hide' : 'Show'} Working Summary ({workingSummary.split('\n').length} lines)
-            </button>
-            {showWorkingSummary && (
-              <div
-                className="mt-2 p-3 rounded"
-                style={{
-                  backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
-                  border: '1px solid var(--cui-border-color, #e2e8f0)',
-                  fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-                  fontSize: '12.5px',
-                  lineHeight: 1.65,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  maxHeight: '320px',
-                  overflowY: 'auto',
-                  color: 'var(--cui-body-color)',
-                }}
-              >
-                {workingSummary}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mb-3">
-          <button
-            type="button"
-            className={`btn btn-sm ${fixPromptCopied ? 'btn-success' : 'btn-outline-primary'}`}
-            onClick={handleCopyFixPrompt}
-          >
-            {fixPromptCopied ? 'Copied to clipboard' : 'Fix Prompt'}
-          </button>
-          {showFixPrompt && (
-            <div
-              className="mt-2 p-3 rounded"
-              style={{
-                backgroundColor: 'var(--cui-tertiary-bg, #f8fafc)',
-                border: '1px solid var(--cui-border-color, #e2e8f0)',
-                fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
-                fontSize: '12px',
-                lineHeight: 1.6,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                maxHeight: '320px',
-                overflowY: 'auto',
-                color: 'var(--cui-body-color)',
-              }}
-            >
-              {fixPromptText}
-            </div>
-          )}
-        </div>
-
-        <hr />
-
-        <div className="mb-3">
-          <label className="form-label fw-bold">Status</label>
-          <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="submitted">Open</option>
-            <option value="under_review">In Progress</option>
-            <option value="addressed">Closed</option>
-          </CFormSelect>
-        </div>
-
-        <div className="mb-3">
-          <label className="form-label fw-bold">Internal Notes (private)</label>
-          <CFormTextarea
-            rows={3}
-            value={adminNotes}
-            onChange={(e) => setAdminNotes(e.target.value)}
-            placeholder="Internal notes visible only to admins..."
-          />
-        </div>
-
-        <div className="mb-3">
-          <label className="form-label fw-bold">Response to Tester (visible to user)</label>
-          <CFormTextarea
-            rows={3}
-            value={adminResponse}
-            onChange={(e) => setAdminResponse(e.target.value)}
-            placeholder="This response will be visible to the tester in their Feedback Log..."
-          />
-          {item.admin_responded_at && (
-            <small className="text-muted">
-              Last responded: {new Date(item.admin_responded_at).toLocaleString()}
-            </small>
-          )}
-        </div>
-      </CModalBody>
-      <CModalFooter>
-        <CButton color="secondary" onClick={onClose}>
-          Cancel
-        </CButton>
-        <CButton color="primary" onClick={handleSave} disabled={saving}>
-          {saving ? <CSpinner size="sm" className="me-2" /> : null}
-          Save Changes
-        </CButton>
-      </CModalFooter>
-    </CModal>
-  );
-}
-
-// ── Inline expansion panel: replaces the modal. Same content, rendered
-// directly below the row in a colspan'd cell. Per-row state lives here.
+// ── Inline expansion panel rendered below an expanded row.
 interface ExpandedRowPanelProps {
   item: FeedbackItem;
-  onSave: (id: number, data: Partial<FeedbackItem>) => Promise<void>;
+  onSave: (id: number, data: FeedbackPatch) => Promise<void>;
 }
 
 function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
-  const [status, setStatus] = useState<string>(item.status);
-  const [adminNotes, setAdminNotes] = useState(item.admin_notes || '');
-  const [adminResponse, setAdminResponse] = useState(item.admin_response || '');
+  const [status, setStatus] = useState<CanonicalStatus>(item.status);
+  const [resolutionNotes, setResolutionNotes] = useState(item.resolution_notes || '');
   const [saving, setSaving] = useState(false);
-  const [showRawChat, setShowRawChat] = useState(false);
   const [showWorkingSummary, setShowWorkingSummary] = useState(false);
   const [showFixPrompt, setShowFixPrompt] = useState(false);
   const [fixPromptCopied, setFixPromptCopied] = useState(false);
 
-  const workingSummary = parseWorkingSummary(item.admin_notes);
+  const workingSummary = item.working_summary;
   const fixPromptText = buildFixPrompt(item);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await onSave(item.id, {
-        status: status as FeedbackItem['status'],
-        admin_notes: adminNotes,
-        admin_response: adminResponse,
-      });
+      await onSave(item.id, { status, resolution_notes: resolutionNotes });
     } finally {
       setSaving(false);
     }
@@ -496,58 +198,52 @@ function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
 
   return (
     <div className="p-3" style={{ background: 'var(--cui-tertiary-bg)' }}>
-      <div className="mb-3">
-        <strong>Summary:</strong>
-        <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>
-          {item.landscaper_summary || item.message}
-        </p>
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <strong>User:</strong>{' '}
+          {item.user_name || <span className="text-muted">unknown</span>}
+          {item.user_email && <span className="text-muted ms-2">({item.user_email})</span>}
+        </div>
+        <div className="col-md-6">
+          <strong>Submitted:</strong> {new Date(item.created_at).toLocaleString()}
+        </div>
       </div>
 
-      {item.landscaper_summary && item.landscaper_summary !== item.message && (
-        <div className="mb-3">
-          <strong>Original Message:</strong>
-          <p className="mb-0 mt-1 text-muted" style={{ whiteSpace: 'pre-wrap' }}>{item.message}</p>
-        </div>
-      )}
+      <div className="mb-3">
+        <strong>Feedback:</strong>
+        <p className="mb-0 mt-1" style={{ whiteSpace: 'pre-wrap' }}>{item.message_text}</p>
+      </div>
 
-      {item.browser_context && Object.keys(item.browser_context).length > 0 && (
-        <div className="mb-3">
-          <strong>Browser Context:</strong>
-          <div className="mt-1 p-2 rounded small" style={{ background: 'var(--cui-card-bg)' }}>
-            {item.browser_context.browser && <div>Browser: {item.browser_context.browser}</div>}
-            {item.browser_context.os && <div>OS: {item.browser_context.os}</div>}
-            {item.browser_context.screenSize && <div>Screen: {item.browser_context.screenSize}</div>}
-            {item.browser_context.currentUrl && (
-              <div className="text-truncate">URL: {item.browser_context.currentUrl}</div>
-            )}
-          </div>
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <strong>Where:</strong>{' '}
+          <CBadge color="dark">{item.page_context || 'Unknown'}</CBadge>
         </div>
-      )}
+        <div className="col-md-6">
+          <strong>Project:</strong>{' '}
+          {item.project_name || <span className="text-muted">—</span>}
+        </div>
+      </div>
 
-      {item.landscaper_raw_chat && item.landscaper_raw_chat.length > 0 && (
-        <div className="mb-3">
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setShowRawChat(!showRawChat)}>
-            {showRawChat ? 'Hide' : 'Show'} Chat History ({item.landscaper_raw_chat.length} messages)
-          </button>
-          {showRawChat && (
-            <div className="mt-2 p-2 rounded" style={{ background: 'var(--cui-card-bg)', maxHeight: '200px', overflowY: 'auto' }}>
-              {item.landscaper_raw_chat.map((msg, idx) => (
-                <div key={idx} className={`mb-2 p-2 rounded ${msg.role === 'user' ? 'bg-primary text-white ms-4' : ''}`} style={msg.role !== 'user' ? { background: 'var(--cui-tertiary-bg)' } : undefined}>
-                  <small className="d-block mb-1 fw-bold">{msg.role === 'user' ? 'User' : 'Assistant'}</small>
-                  {msg.content}
-                </div>
-              ))}
+      {/* Lifecycle context — branch/session, resolving commit, active chat */}
+      {(item.in_progress_branch || item.in_progress_session_slug || item.resolved_by_commit_url || item.active_chat_slug || item.duplicate_of_id) && (
+        <div className="mb-3 p-2 rounded small" style={{ background: 'var(--cui-card-bg)' }}>
+          {item.in_progress_branch && <div>Branch: <code>{item.in_progress_branch}</code></div>}
+          {item.in_progress_session_slug && <div>Session: <code>{item.in_progress_session_slug}</code></div>}
+          {item.active_chat_slug && <div>Active chat: <code>{item.active_chat_slug}</code></div>}
+          {item.resolved_by_commit_url && (
+            <div>
+              Resolved by:{' '}
+              <a href={item.resolved_by_commit_url} target="_blank" rel="noopener noreferrer">
+                {item.resolved_by_commit_sha?.slice(0, 8) || 'commit'}
+              </a>
             </div>
           )}
+          {item.duplicate_of_id && <div>Duplicate of: FB-{item.duplicate_of_id}</div>}
+          {item.addressed_at && <div>Addressed: {new Date(item.addressed_at).toLocaleString()}</div>}
+          {item.closed_at && <div>Closed: {new Date(item.closed_at).toLocaleString()}</div>}
         </div>
       )}
-
-      <div className="mb-3">
-        <strong>Page:</strong>{' '}
-        <a href={item.context_url || item.page_url} target="_blank" rel="noopener noreferrer" className="text-decoration-none">
-          {item.page_path}
-        </a>
-      </div>
 
       {workingSummary && (
         <div className="mb-3">
@@ -595,24 +291,21 @@ function ExpandedRowPanel({ item, onSave }: ExpandedRowPanelProps) {
 
       <div className="mb-3">
         <label className="form-label fw-bold">Status</label>
-        <CFormSelect value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="submitted">Open</option>
-          <option value="under_review">In Progress</option>
-          <option value="addressed">Closed</option>
+        <CFormSelect value={status} onChange={(e) => setStatus(e.target.value as CanonicalStatus)}>
+          {EDITABLE_STATUSES.map((s) => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
         </CFormSelect>
       </div>
 
       <div className="mb-3">
-        <label className="form-label fw-bold">Internal Notes (private)</label>
-        <CFormTextarea rows={3} value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} />
-      </div>
-
-      <div className="mb-3">
-        <label className="form-label fw-bold">Response to Tester (visible to user)</label>
-        <CFormTextarea rows={3} value={adminResponse} onChange={(e) => setAdminResponse(e.target.value)} />
-        {item.admin_responded_at && (
-          <small className="text-muted">Last responded: {new Date(item.admin_responded_at).toLocaleString()}</small>
-        )}
+        <label className="form-label fw-bold">Resolution Notes</label>
+        <CFormTextarea
+          rows={3}
+          value={resolutionNotes}
+          onChange={(e) => setResolutionNotes(e.target.value)}
+          placeholder="Notes recorded with the status change (addressed / closed)…"
+        />
       </div>
 
       <div className="d-flex gap-2 justify-content-end">
@@ -631,13 +324,10 @@ function FeedbackAdminContent() {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Bucket-based status filter (Set lets multiple buckets be active at once;
-  // start with 'open' + 'in_progress' active, 'closed' off — same defaults as the Cowork artifact)
+  // Bucket-based status filter — start with open + in_progress active, closed off.
   const [statusBuckets, setStatusBuckets] = useState<Set<'open' | 'in_progress' | 'closed'>>(
     new Set(['open', 'in_progress'])
   );
-  // Category filter tiles — same Set-based multi-toggle as status. Empty set
-  // means "show all categories"; populated set means "only these."
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<SortKey>('date');
@@ -691,7 +381,7 @@ function FeedbackAdminContent() {
     void fetchFeedback();
   }, [fetchFeedback]);
 
-  const updateFeedback = async (id: number, data: Partial<FeedbackItem>) => {
+  const updateFeedback = async (id: number, data: FeedbackPatch) => {
     let accessToken: string | null = null;
     try {
       const tokens = localStorage.getItem('auth_tokens');
@@ -729,7 +419,7 @@ function FeedbackAdminContent() {
     await fetchFeedback();
   };
 
-  // Bucket counts for the count chips (computed off ALL feedback, not the filtered set)
+  // Bucket counts for the count chips (off ALL feedback, not the filtered set).
   const bucketCounts = useMemo(() => {
     const counts: Record<'open' | 'in_progress' | 'closed', number> = { open: 0, in_progress: 0, closed: 0 };
     for (const i of feedback) {
@@ -739,7 +429,8 @@ function FeedbackAdminContent() {
     return counts;
   }, [feedback]);
 
-  // Category counts for the filter tiles (computed off ALL feedback)
+  // Category counts for the filter tiles (off ALL feedback). Canonical rows are
+  // mostly uncategorized for now — the category column was just added.
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { bug: 0, feature_request: 0, ux_confusion: 0, question: 0, _uncategorized: 0 };
     for (const i of feedback) {
@@ -775,17 +466,9 @@ function FeedbackAdminContent() {
           bv = new Date(b.created_at).getTime();
           break;
         case 'fb':
-          // Sort by extracted FB-N when present, else by tester_feedback.id.
-          // Migrated rows sort numerically by the original FB id; native rows
-          // sort by their local id (no clean cross-comparison, just stable).
-          av = (() => {
-            const m = (a.admin_notes || '').match(/^\[migrated FB-(\d+)/);
-            return m ? parseInt(m[1], 10) : a.id;
-          })();
-          bv = (() => {
-            const m = (b.admin_notes || '').match(/^\[migrated FB-(\d+)/);
-            return m ? parseInt(m[1], 10) : b.id;
-          })();
+          // Canonical rows carry the real FB id directly.
+          av = a.id;
+          bv = b.id;
           break;
         case 'status':
           av = a.status;
@@ -796,8 +479,8 @@ function FeedbackAdminContent() {
           bv = (b.category || 'zzz').toLowerCase();
           break;
         case 'summary':
-          av = (a.landscaper_summary || a.message || '').toLowerCase();
-          bv = (b.landscaper_summary || b.message || '').toLowerCase();
+          av = (a.message_text || '').toLowerCase();
+          bv = (b.message_text || '').toLowerCase();
           break;
       }
       if (av < bv) return -1 * dir;
@@ -812,7 +495,6 @@ function FeedbackAdminContent() {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortBy(key);
-      // Default direction per column type — date desc, text asc
       setSortDir(key === 'date' ? 'desc' : 'asc');
     }
   };
@@ -892,8 +574,6 @@ function FeedbackAdminContent() {
     _uncategorized: 'Uncategorized',
   };
 
-  // Category filter tiles — same CoreUI badge as in the table (CATEGORY_COLORS),
-  // just larger so the count fits comfortably alongside the label.
   const renderCategoryTile = (cat: string) => {
     const active = categoryFilters.has(cat);
     const count = categoryCounts[cat] || 0;
@@ -942,7 +622,7 @@ function FeedbackAdminContent() {
           <span className="text-muted small">{sortedFeedback.length} of {feedback.length} items</span>
         </div>
 
-        {/* Status count chips on the left, category filter tiles on the right — single row */}
+        {/* Status count chips on the left, category filter tiles on the right */}
         <div className="d-flex flex-wrap gap-2 mb-3 align-items-center">
           {renderCountChip('open')}
           {renderCountChip('in_progress')}
@@ -1029,7 +709,7 @@ function FeedbackAdminContent() {
                           {new Date(item.created_at).toLocaleDateString()}
                         </td>
                         <td className="p-3" style={{ fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace', fontSize: '12.5px', color: 'var(--cui-body-color)', whiteSpace: 'nowrap' }}>
-                          {fbIdLabel(item)}
+                          {item.fb_label}
                         </td>
                         <td className="p-3">
                           <CBadge color={STATUS_COLORS[item.status]}>
@@ -1038,8 +718,8 @@ function FeedbackAdminContent() {
                         </td>
                         <td className="p-3">
                           {item.category ? (
-                            <CBadge color={CATEGORY_COLORS[item.category]}>
-                              {CATEGORY_LABELS[item.category]}
+                            <CBadge color={CATEGORY_COLORS[item.category] || 'secondary'}>
+                              {CATEGORY_LABELS[item.category] || item.category}
                             </CBadge>
                           ) : (
                             <span className="text-muted">—</span>
@@ -1047,9 +727,9 @@ function FeedbackAdminContent() {
                         </td>
                         <td className="p-3">
                           <div>
-                            {(item.landscaper_summary || item.message).length > 140
-                              ? `${(item.landscaper_summary || item.message).substring(0, 140)}…`
-                              : item.landscaper_summary || item.message}
+                            {(item.message_text || '').length > 140
+                              ? `${(item.message_text || '').substring(0, 140)}…`
+                              : item.message_text}
                           </div>
                         </td>
                       </tr>
