@@ -123,14 +123,34 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
             logger.error(f"Error fetching comp markers: {e}")
 
     # ── 4. Custom markers from tool input ────────────────────────
+    # Each custom marker may carry a rich popup. Precedence:
+    #   1. explicit `popup` HTML string (use verbatim)
+    #   2. assembled from optional detail fields (label + address + any
+    #      `detail` lines: rent, distance, etc.) so rental/expense comps
+    #      plotted as custom markers get informative popups, not a bare
+    #      label. Previously this path emitted label-only popups, which is
+    #      why clicked comp markers showed nothing useful.
     for i, cm in enumerate(custom_markers):
+        label = cm.get('label', f'Point {i + 1}')
+        if cm.get('popup'):
+            popup_html = cm['popup']
+        else:
+            parts = [f"<strong>{label}</strong>"]
+            if cm.get('address'):
+                parts.append(str(cm['address']))
+            details = cm.get('details')
+            if isinstance(details, list):
+                parts.extend(str(d) for d in details if d)
+            elif isinstance(details, str) and details:
+                parts.append(details)
+            popup_html = '<br/>'.join(parts)
         markers.append({
             'id': f'custom_{i}',
             'coordinates': [cm['lng'], cm['lat']],
-            'label': cm.get('label', f'Point {i + 1}'),
+            'label': label,
             'color': cm.get('color', '#3b82f6'),
             'variant': 'pin',
-            'popup': f"<strong>{cm.get('label', f'Point {i + 1}')}</strong>",
+            'popup': popup_html,
         })
 
     # ── 5. Return artifact config ────────────────────────────────

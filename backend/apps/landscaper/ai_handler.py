@@ -81,45 +81,75 @@ def ensure_tool_results_closed(message_history: list) -> list:
         )
 
     # ── Pass 2: Inject placeholder tool_results for orphaned tool_use ───
-    pending_tool_use_ids = set()
-    for msg in message_history:
-        role = msg.get('role', '')
-        content = msg.get('content')
+    # The Claude API requires that every tool_use block be answered by a
+    # tool_result in the message IMMEDIATELY AFTER the assistant message that
+    # contains it. A global "collect unmatched ids, append placeholders at the
+    # end" approach does NOT satisfy this for a tool_use that sits mid-history
+    # (e.g. message 18 of a long thread) — the API still 400s with
+    # "tool_use ids were found without tool_result blocks immediately after".
+    # So we repair positionally: for each assistant message with tool_use
+    # blocks, ensure the very next message answers every one of them, merging
+    # placeholders into an existing following user message or inserting a new
+    # user message right after when needed.
 
-        if role == 'assistant':
-            if isinstance(content, list):
-                for block in content:
-                    if hasattr(block, 'type') and block.type == 'tool_use':
-                        pending_tool_use_ids.add(block.id)
-                    elif isinstance(block, dict) and block.get('type') == 'tool_use':
-                        pending_tool_use_ids.add(block.get('id'))
+    def _tool_use_ids(content) -> list:
+        ids = []
+        if isinstance(content, list):
+            for block in content:
+                if hasattr(block, 'type') and getattr(block, 'type', None) == 'tool_use':
+                    ids.append(getattr(block, 'id', None))
+                elif isinstance(block, dict) and block.get('type') == 'tool_use':
+                    ids.append(block.get('id'))
+        return [i for i in ids if i is not None]
 
-        elif role == 'user':
-            if isinstance(content, list):
-                for block in content:
-                    if isinstance(block, dict) and block.get('type') == 'tool_result':
-                        tool_use_id = block.get('tool_use_id')
-                        pending_tool_use_ids.discard(tool_use_id)
+    def _tool_result_ids(content) -> set:
+        out = set()
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get('type') == 'tool_result':
+                    out.add(block.get('tool_use_id'))
+        return out
 
-    if pending_tool_use_ids:
+    repaired: list = []
+    injected = 0
+    i = 0
+    n = len(message_history)
+    while i < n:
+        msg = message_history[i]
+        repaired.append(msg)
+
+        use_ids = _tool_use_ids(msg.get('content')) if msg.get('role') == 'assistant' else []
+        if use_ids:
+            nxt = message_history[i + 1] if i + 1 < n else None
+            answered = _tool_result_ids(nxt.get('content')) if (nxt and nxt.get('role') == 'user') else set()
+            missing = [tid for tid in use_ids if tid not in answered]
+            if missing:
+                placeholders = [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tid,
+                        "content": "Tool execution completed. No additional result data available.",
+                    }
+                    for tid in missing
+                ]
+                injected += len(placeholders)
+                if nxt is not None and nxt.get('role') == 'user' and isinstance(nxt.get('content'), list):
+                    # Prepend placeholders into the existing following user
+                    # message so the tool_results lead its content block.
+                    nxt['content'] = placeholders + nxt['content']
+                else:
+                    # No usable following user message — insert a fresh one
+                    # immediately after this assistant message.
+                    repaired.append({"role": "user", "content": placeholders})
+        i += 1
+
+    if injected:
         logger.warning(
-            f"[ensure_tool_results_closed] Found {len(pending_tool_use_ids)} orphaned tool_use blocks, "
-            f"injecting placeholder tool_results"
+            f"[ensure_tool_results_closed] Injected {injected} placeholder tool_result(s) "
+            f"positioned immediately after their tool_use to prevent API 400"
         )
-        placeholder_results = [
-            {
-                "type": "tool_result",
-                "tool_use_id": tid,
-                "content": "Tool execution completed. No additional result data available."
-            }
-            for tid in pending_tool_use_ids
-        ]
-        message_history.append({
-            "role": "user",
-            "content": placeholder_results,
-        })
 
-    return message_history
+    return repaired
 
 
 def _truncate_tool_result(result, max_chars=4000, tool_name=None):
