@@ -8,6 +8,15 @@ export interface WrapperProject {
   project_type_code?: string;
   project_type?: string;
   property_subtype?: string;
+  // Location — needed by the Map tab so it centers on the saved location
+  // instead of treating the project as having no home (causes auto-fit zoom-out).
+  location_lat?: number | null;
+  location_lon?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  county?: string | null;
+  state?: string | null;
+  apn_primary?: string | null;
 }
 
 const WrapperProjectContext = createContext<WrapperProject | null>(null);
