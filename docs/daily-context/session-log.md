@@ -4,6 +4,30 @@
 > Trigger: Say **"Document"** in any chat to add an entry.
 > Claude Projects sessions use header: `Session [code] — [date] — Title (Claude Projects)`
 
+## Plugin Eval → Impact-Review Cleanup Cascade (calc fixes, backend tests, branch prune) — 2026-06-09
+
+**What was discussed:**
+
+- **Origin — plugin usefulness eval.** Chat started from an uploaded capability map of Gregg's installed plugins: which are useful for Landscape dev work? Narrowed to `ecc` (code-engineering) + the web-data plugins (Bright Data / Nimble); wrote an adoption plan. The hook was ecc's **change-impact review** capability. ecc runs inside Claude Code only (not Cowork), so the review was run manually from Cowork instead. That review — pointed at the months-old `tbl_container` → `tbl_division` rename (migration 025, Nov 2025) — surfaced a pile of unfinished loose ends and kicked off the whole cascade below.
+- **Container→division cleanup (PRs #32/#36/#37/#40/#41/#42/#46/#47).** 6 cash-flow/budget report generators repointed to `tbl_division`; `rpt_16` Sales Schedule preview + PDF rebuilt on live `tbl_parcel`/`tbl_parcel_sale_assumptions` (was querying nonexistent `tbl_sale_absorption`/`tbl_container` + dead columns); ORM `Container` model remapped to `tbl_division` via `db_column` (Python field names preserved, API contract unchanged); 12 legacy Next.js route columns migrated with `SELECT ... AS` aliases; dead `ContainerType` + `ContainerCostMetadata` models removed; `database.ts` regenerated. Only intentional remaining drift: `management_overhead.container_id`.
+- **Unified proforma cash-flow renderer + chat-driven scoping.** RPT_12/17/18/19 share one `proforma_base.py` renderer; added scope layer (`scope_envelope`) so reports can be scoped by phase / project-year / granularity ("monthly cash flow for Year 2 of Phase 1"). Content-driven orientation rule (landscape w/ repeating left column for many line items; portrait for few) captured in spec.
+- **CI made honest (#38, #44, closes #39).** Root cause of the CI flake was GitHub scrubbing the secret-bearing `DATABASE_URL` job output — fixed by re-deriving it per job (my earlier `--pooled`/`land_v2` diagnosis was wrong; CC found the real cause). Build-and-Test un-skipped; dead deploy/api jobs removed.
+- **TypeScript backlog #43 burned to zero (#45–#58) + typecheck gate re-enabled (#59).** `generate-types.mjs` switched from `@neondatabase/serverless` (couldn't resolve `land_v2`) to the direct `pg` driver; quote-tolerant `.env.local` parsing. `npm run typecheck` now gates every PR.
+- **Backend Django/pytest suites repaired (#62/#63).** Were not running at all (silently validating nothing). Fixed stale-import collection failures; `conftest.py` now provisions the `landscape` schema + unmanaged (`managed=False`) tables in the test DB; green-or-quarantine; new hermetic **Backend Tests** CI job gates going forward. Result: 196 passed, 30 skipped, 0 failed; 10 tests un-skipped vs prior baseline.
+- **Calc-engine fixes (#64).** (1) `convert_project_to_property_data()` read `project.property_type_code` AND `development_type` — neither exists → would crash; repointed to `project_type_code` / `project_type`. (2) `POST /api/calculations/irr/` (and npv/metrics) 500'd because the view called the engine methods with the wrong arity — the endpoints take a single signed cash-flow series but the engine signatures expect `initial_investment`/`cash_flows`/`reversion_value` split out; fixed by computing IRR/NPV directly from the signed series via `numpy_financial` (engine-parity), unchanged request/response shapes, graceful `503` when the lib is absent, `null` for no-solution. (3) **Star Valley revolver test re-baselined to engine output** — Gregg's call: app engine is the source of truth (old Excel fixture diverged ~1–11%); sanity-gated before locking in (origination fee = exactly 1% of commitment, peak < commitment, fully repaid, converged). Two formerly-skipped tests un-skipped + passing.
+- **Branch prune.** ~37 merged/superseded leftover branches cleared (local + remote) after verify-before-delete (merged-PR or clean-ancestor check). Tree down to `main` + two keepers: open reports PR `feat/spec-hidden-and-header-align` (#31) and active feature `feature/dms-previewer`.
+- **Operating-model reinforcement.** Re-confirmed SOP: Cowork writes all code; CC handles only what the sandbox can't (terminal/build/git/DB/running tests/CI). Added a **token-discipline** section to CC handoffs (no idle polling — the biggest avoidable spend; narrow reads; targeted test runs while iterating, full suite once before merge; lean on ecc only if confirmed loaded).
+
+**Open items:**
+
+- **~30 backend tests still quarantined (skipped)** from the cleanup — not broken, set aside to keep moving. Optional later pass to fully restore server-side coverage.
+- **`feature/dms-previewer` — active, in-process feature** (in-app PDF/Excel document preview, ~1,368 lines, never PR'd). Revive/rebase onto current `main` + open PR when Gregg prioritizes. Do NOT branch-cleanup.
+- **`feat/spec-hidden-and-header-align` (#31)** — open reports PR, pending.
+- **Phase-attributed financing for phase-scoped cash flow** — design discussion parked, Gregg-owned. Loans can attach to single phases (`tbl_loan_container`) and A&D vs permanent financing differ; interim keeps all untagged deal-level financing. Needs a modeling decision before build.
+- **ecc usage-minimization** — confirm ecc is actually active/loaded in the Code session and wired into the workflow; couldn't verify from Cowork. The real credit savings this session came from prompt discipline (no idle polling), not the plugin.
+
+---
+
 ## Auth Rollout + Codex Audits + Project Picker Scope — 2026-05-16
 
 **What was discussed:**

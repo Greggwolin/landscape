@@ -554,7 +554,8 @@ Django uses DRF serializers with consistent envelope:
 
 ### Known Technical Debt
 
-- 50 TODO/FIXME markers across 40 files
+- ~~TypeScript type errors~~ — RESOLVED (Jun 9). ~1,040 errors burned down to 0 across 12 batches (#43–#59). `ignoreBuildErrors` removed from `next.config.ts`; CI typecheck gate re-enabled. Dead code excluded via `tsconfig.json` (vendored Materio, `_archive`, `database/` dir).
+- ~~Django pytest suite~~ — RESOLVED (Jun 9). Collection errors fixed (name collisions, dead-subject tests deleted); 226 tests passing, 0 errors. Pytest step added to CI (#63).
 - Multiple grid libraries need consolidation (TanStack preferred for new; AG-Grid retained in rent roll)
 - SWR + React Query both in use (standardize on React Query)
 - Some MUI components mixed with CoreUI
@@ -1049,8 +1050,8 @@ Detailed session-log entries (architectural decisions, schema changes, implement
 
 ---
 
-*Last audit: 2026-06-08 — Container→division cleanup COMPLETED: ORM model remapped (#42), 6 report generators repointed (#32/#40/#41), 12 Next.js API routes column-migrated (#42), dead ContainerType/ContainerCostMetadata models removed (#46), database.ts regenerated (#47). Cash-flow report consolidation: unified proforma_base.py renderer shared by RPT_12/17/18/19 (#34/#36). CI pipeline green (#39/#44). Only remaining container drift: management_overhead.container_id (intentional).*
-*Prior audit: 2026-05-15 — Nightly sync (auth landing cutover to /w/dashboard, report-as-artifact, navigation tools, onboarding cleanup)*
+*Last audit: 2026-06-09 — TypeScript gate re-enabled (1,040→0 errors, 12 batches, #43–#59). Pytest CI gate added (226 tests, #63). Land IRR/NPV calc fixes (#64). Contacts panel data fix (#61). Zonda competitor search frontend wired (#50). Artifact copy-to-clipboard (#65). Feedback batch: FB-295/299/301/302/303 (#66). Dead UsesTab deleted (#60).*
+*Prior audit: 2026-06-08 — Container→division cleanup COMPLETED (#42/#46/#47), cash-flow report consolidation (#34/#36), CI pipeline green (#39/#44).*
 *Landscaper tool count: **276 registered** (+`get_extraction_mappings` 2026-06-09 — read-only extraction-mapping config visibility, FB-303, registered universal + unassigned-safe; +`find_documents` + `summarize_document_library` from DMS restructure 2026-05-04; +`save_user_vocab` from chat DA Phase 1 ship; +`list_project_profiles` + `add_project_profile` 2026-05-18 (FB-281/FB-291 profile-invention guard); +5 artifact tools and `get_operating_statement` added Apr 25–30; 3 LoopNet tools registered but not advertised — gx14 deferral). `get_proforma` was added in `fae31fe` then reverted (chat hx) as not discriminator-aware; superseded by the discriminator-honesty redesign that shipped chat DA. Excel audit phases implemented: 0, 1, 2, 2f, 3, 4, 6, 7-partial. Phase 5 (Python waterfall replication) is the only remaining major piece.*
 *Reports catalog: 20 generators with real SQL (10 rewritten with shared pdf_base module, PDF/Excel export via reportlab + openpyxl)*
 *Maintainer: Update when architecture decisions change. Append session entries to CLAUDE_SESSION_HISTORY.md, not here.*
