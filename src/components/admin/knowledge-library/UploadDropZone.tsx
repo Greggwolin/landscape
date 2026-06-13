@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { CSpinner } from '@coreui/react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface UploadResult {
   doc_id?: number;
@@ -90,6 +91,7 @@ export default function UploadDropZone({ djangoApiUrl, onUploadComplete }: Uploa
 
       const response = await fetch(`${djangoApiUrl}/api/knowledge/library/upload/`, {
         method: 'POST',
+        headers: getAuthHeaders(), // no Content-Type — browser sets multipart boundary for FormData
         body: formData,
       });
 

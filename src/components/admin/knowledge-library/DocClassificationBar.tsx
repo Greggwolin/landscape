@@ -75,7 +75,7 @@ export default function DocClassificationBar({
         `${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/classification/`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ doc_type: newType }),
         },
       );
@@ -95,7 +95,7 @@ export default function DocClassificationBar({
         `${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/classification/`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ property_type: newPt || null }),
         },
       );
@@ -112,7 +112,7 @@ export default function DocClassificationBar({
     try {
       const res = await fetch(
         `${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/geo-tags/${tagId}/`,
-        { method: 'DELETE' },
+        { method: 'DELETE', headers: getAuthHeaders() },
       );
       if (res.ok) {
         setGeoTags((prev) => prev.filter((t) => t.doc_geo_tag_id !== tagId));
@@ -133,7 +133,7 @@ export default function DocClassificationBar({
         `${DJANGO_API_URL}/api/knowledge/library/documents/${docId}/geo-tags/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ geo_level: newGeoLevel, geo_value: value }),
         },
       );

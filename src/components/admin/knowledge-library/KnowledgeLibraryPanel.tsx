@@ -91,7 +91,7 @@ export default function KnowledgeLibraryPanel() {
     try {
       const response = await fetch(`${DJANGO_API_URL}/api/knowledge/library/search/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: '',
           filters: {
