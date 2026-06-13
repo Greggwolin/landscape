@@ -65,7 +65,9 @@ const SUBJECT_PARCEL_LINE_ID = 'la-parcels-subject-line';
 const COMPS_PARCEL_FILL_ID = 'la-parcels-comps-fill';
 const COMPS_PARCEL_LINE_ID = 'la-parcels-comps-line';
 const MARICOPA_PARCEL_OUTLINE_SOURCE_ID = 'maricopa-parcel-outline';
-const MARICOPA_PARCEL_OUTLINE_LAYER_ID = 'maricopa-parcel-outline-layer';
+// Exported so MapTab can drape the site-plan overlay *beneath* the parcel
+// outline (success criterion: parcel outlines render above the drape).
+export const MARICOPA_PARCEL_OUTLINE_LAYER_ID = 'maricopa-parcel-outline-layer';
 const MARICOPA_PARCEL_OUTLINE_TILES =
   'https://gis.mcassessor.maricopa.gov/arcgis/rest/services/ParcelOutline/MapServer/tile/{z}/{y}/{x}';
 
