@@ -39,6 +39,15 @@ export default function WrapperProjectLayout({
             project_type_code: data.project_type_code ?? undefined,
             project_type: data.project_type ?? undefined,
             property_subtype: data.property_subtype ?? undefined,
+            // Pass the saved location through so the Map tab centers on it
+            // (without these, hasResolvedCenter stays false → auto-fit zoom-out).
+            location_lat: data.location_lat ?? null,
+            location_lon: data.location_lon ?? null,
+            latitude: data.latitude ?? null,
+            longitude: data.longitude ?? null,
+            county: data.county ?? undefined,
+            state: data.state ?? undefined,
+            apn_primary: data.apn_primary ?? undefined,
           });
         }
       })
