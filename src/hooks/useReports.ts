@@ -51,7 +51,7 @@ export function useReportTemplates(isActive?: boolean) {
       }
 
       const url = `${DJANGO_API_URL}/api/reports/templates/${params.toString() ? '?' + params.toString() : ''}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error('Failed to fetch report templates');
@@ -77,7 +77,7 @@ export function useReportTemplatesForTab(tabName: string) {
       const url = `${DJANGO_API_URL}/api/reports/templates/for-tab/${encodeURIComponent(tabName)}/`;
       console.log('🔍 [useReportTemplatesForTab] Fetching:', url);
 
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       console.log('🔍 [useReportTemplatesForTab] Response status:', response.status);
 
       if (!response.ok) {
@@ -230,7 +230,7 @@ export function useReportDefinitions(propertyType: string) {
     queryKey: ['reportDefinitions', propertyType],
     queryFn: async () => {
       const url = `${DJANGO_API_URL}/api/report-definitions/by-type/${propertyType}/`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch report definitions');
       return response.json();
     },
@@ -246,7 +246,7 @@ export function useAllReportDefinitions() {
     queryKey: ['reportDefinitions', 'all'],
     queryFn: async () => {
       const url = `${DJANGO_API_URL}/api/report-definitions/`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch report definitions');
       const data = await response.json();
       return data.results || data;
@@ -267,7 +267,7 @@ export function useReportPreview(
     queryKey: ['reportPreview', reportCode, projectId, params],
     queryFn: async () => {
       const url = `${DJANGO_API_URL}/api/reports/preview/${reportCode}/${projectId}/${queryParams}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch report preview');
       return response.json();
     },
@@ -290,7 +290,7 @@ export function useReportPdfPreview(
         `${DJANGO_API_URL}/api/reports/export/${reportCode}/${projectId}/`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ format: 'pdf', parameters: {} }),
         }
       );
@@ -355,7 +355,7 @@ export function useReportHistory(projectId: number | string | null) {
     queryKey: ['reportHistory', projectId],
     queryFn: async () => {
       const url = `${DJANGO_API_URL}/api/reports/history/${projectId}/`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Failed to fetch report history');
       return response.json();
     },
