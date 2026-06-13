@@ -107,7 +107,7 @@ _FORBIDDEN_COLUMN_SUBSTRINGS_T12_ONLY = (
     'pro-forma rent',
 )
 
-# Canonical 3-column shape for any Operating Expenses table. Required keys —
+# Canonical column shape for any Operating Expenses table. Required keys —
 # label / display name can vary, but the column key must be one of these
 # (case-insensitive). Per the spec:
 #   - Rates (e.g., "9.7%" vacancy, "3.0%" management fee) go INLINE in the
@@ -115,7 +115,13 @@ _FORBIDDEN_COLUMN_SUBSTRINGS_T12_ONLY = (
 #   - $/SF is dropped — operating statements are unit-denominated.
 #   - Units count column is dropped — not part of a traditional operating
 #     statement (unit-mix data belongs on a Rent Roll artifact instead).
+#   - OPTIONAL 4th column `pct_egi` (label '% EGI', format 'percent') is
+#     allowed per FB-315 (ARGUS-style expense-ratio column): expense lines,
+#     Total Operating Expenses, and NOI carry % of Effective Gross Income;
+#     income lines above EGI leave it null. Values in percent units (42.1,
+#     not 0.421).
 _OPEX_REQUIRED_COLUMN_KEYS = ('line', 'annual', 'per_unit')
+_OPEX_OPTIONAL_COLUMN_KEYS = ('pct_egi',)
 
 # Columns that are NOT allowed on operating-statement tables.
 #   units    — unit counts belong on a Rent Roll, not an OS
@@ -543,10 +549,12 @@ def _check_top_level_structure(*, subtype: str, schema: Any) -> None:
                     f'{missing}; canonical shape is {list(_OPEX_REQUIRED_COLUMN_KEYS)}'
                 ),
                 guidance=(
-                    'Operating statement tables must have exactly these column '
-                    f'keys: {list(_OPEX_REQUIRED_COLUMN_KEYS)}. The label '
-                    'column has no header text; the numeric columns are '
-                    "labeled 'Annual' and '$/Unit'."
+                    'Operating statement tables must have these column '
+                    f'keys: {list(_OPEX_REQUIRED_COLUMN_KEYS)}, plus an '
+                    "optional 'pct_egi' column (label '% EGI', format "
+                    "'percent') for the ARGUS-style expense-ratio column. "
+                    'The label column has no header text; the numeric '
+                    "columns are labeled 'Annual' and '$/Unit'."
                 ),
             )
         forbidden_extras = [k for k in col_keys if k in _OS_FORBIDDEN_COLUMN_KEYS]

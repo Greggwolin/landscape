@@ -84,46 +84,44 @@ class OperatingStatementGenerator(PreviewBaseGenerator):
             self.make_kpi_card('OpEx Ratio', self.fmt_pct(self.safe_div(total_opex_with_mgmt, egi) * 100)),
         ]))
 
-        # Income waterfall table
+        # Income & expense statement table — ARGUS income-statement shape
+        # (FB-315): Line / Annual / $/Unit / % EGI, matching this report's
+        # own PDF layout. % EGI uses EGI as the base for every line (GPR
+        # renders >100%); vacancy/credit-loss rates stay inline in labels.
         waterfall_cols = [
             {'key': 'line_item', 'label': 'Line Item', 'align': 'left'},
             {'key': 'amount', 'label': 'Annual $', 'align': 'right', 'format': 'currency'},
-            {'key': 'pct_gpr', 'label': '% of GPR', 'align': 'right', 'format': 'percentage'},
+            {'key': 'per_unit', 'label': '$/Unit', 'align': 'right', 'format': 'currency'},
+            {'key': 'pct_egi', 'label': '% EGI', 'align': 'right', 'format': 'percent'},
         ]
 
+        def _row(label, amount):
+            return {
+                'line_item': label,
+                'amount': amount,
+                'per_unit': self.safe_div(amount, total_units),
+                'pct_egi': self.safe_div(amount, egi) * 100,
+            }
+
         waterfall = [
-            {'line_item': 'Gross Potential Rent (GPR)', 'amount': annual_gpr, 'pct_gpr': 100.0},
-            {'line_item': f'Less: Vacancy ({vacancy_rate*100:.1f}%)', 'amount': -vacancy,
-             'pct_gpr': -vacancy_rate * 100},
-            {'line_item': f'Less: Credit Loss ({credit_loss*100:.1f}%)', 'amount': -credit,
-             'pct_gpr': -credit_loss * 100},
-            {'line_item': 'Effective Gross Income (EGI)', 'amount': egi,
-             'pct_gpr': self.safe_div(egi, annual_gpr) * 100},
+            _row('Gross Potential Rent (GPR)', annual_gpr),
+            _row(f'Less: Vacancy ({vacancy_rate*100:.1f}%)', -vacancy),
+            _row(f'Less: Credit Loss ({credit_loss*100:.1f}%)', -credit),
+            _row('Effective Gross Income (EGI)', egi),
         ]
 
         # Expenses
         for r in expense_rows:
             amt = float(r['annual_amount'])
-            waterfall.append({
-                'line_item': r['category'],
-                'amount': -amt,
-                'pct_gpr': -self.safe_div(amt, annual_gpr) * 100,
-            })
+            waterfall.append(_row(r['category'], -amt))
 
         if mgmt_fee > 0:
-            waterfall.append({
-                'line_item': f'Management Fee ({mgmt_fee_pct*100:.1f}% EGI)',
-                'amount': -mgmt_fee,
-                'pct_gpr': -self.safe_div(mgmt_fee, annual_gpr) * 100,
-            })
+            waterfall.append(_row(f'Management Fee ({mgmt_fee_pct*100:.1f}% EGI)', -mgmt_fee))
 
-        waterfall.append({
-            'line_item': 'Net Operating Income (NOI)',
-            'amount': noi,
-            'pct_gpr': self.safe_div(noi, annual_gpr) * 100,
-        })
+        waterfall.append(_row('Total Operating Expenses', -total_opex_with_mgmt))
+        waterfall.append(_row('Net Operating Income (NOI)', noi))
 
-        sections.append(self.make_table_section('Income & Expense Waterfall', waterfall_cols, waterfall))
+        sections.append(self.make_table_section('Income & Expense Statement', waterfall_cols, waterfall))
 
         return {
             'title': 'Operating Statement',

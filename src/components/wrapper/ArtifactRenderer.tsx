@@ -850,7 +850,7 @@ function _formatIsoDateAsMmmYy(s: string): string | null {
  */
 export function formatCellValue(
   value: string | number | null | undefined,
-  format?: 'currency' | 'currency2' | 'number' | 'date',
+  format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent',
 ): string {
   if (value == null) return '—';
 
@@ -865,6 +865,12 @@ export function formatCellValue(
     if (format === 'currency2') {
       if (n < 0) return `(${_CURRENCY2_FORMATTER.format(Math.abs(n))})`;
       return _CURRENCY2_FORMATTER.format(n);
+    }
+    if (format === 'percent') {
+      // FB-315: % of EGI column. Values arrive in percent units (42.1, not
+      // 0.421). One decimal, % suffix, parens negatives, em-dash zero.
+      if (n < 0) return `(${Math.abs(n).toFixed(1)}%)`;
+      return `${n.toFixed(1)}%`;
     }
     return null;
   };
@@ -883,9 +889,12 @@ export function formatCellValue(
   const dateFormatted = _formatIsoDateAsMmmYy(s);
   if (dateFormatted) return dateFormatted;
   if (s === '' || s === '0' || s === '0.00') return '—';
-  // Strip $, commas, surrounding parens for negative detection
+  // Strip $, commas, surrounding parens for negative detection. For percent
+  // columns also strip a trailing % so pre-formatted strings ("42.1%") and
+  // raw numerics ("42.1") both normalize through the same path (FB-315).
   const isParenNeg = /^\(.+\)$/.test(s);
-  const cleaned = s.replace(/[$,\s]/g, '').replace(/^\(/, '-').replace(/\)$/, '');
+  let cleaned = s.replace(/[$,\s]/g, '').replace(/^\(/, '-').replace(/\)$/, '');
+  if (format === 'percent') cleaned = cleaned.replace(/%$/, '');
   const n = Number(cleaned);
   if (Number.isFinite(n) && /^-?\d/.test(cleaned)) {
     if (n === 0) return '—';
@@ -1051,7 +1060,7 @@ interface EditableCellProps {
   /** Column-level format hint (currency, currency2, number, date) from
    *  the schema column metadata. Passed through to formatCellValue so
    *  currency cells include $ + correct decimal precision. */
-  format?: 'currency' | 'currency2' | 'number' | 'date';
+  format?: 'currency' | 'currency2' | 'number' | 'date' | 'percent';
 }
 
 // Status-pill detection — when a cell's value matches one of these

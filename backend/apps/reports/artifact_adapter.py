@@ -131,8 +131,13 @@ def _table_section_to_block(section: dict, counter: dict[str, int]) -> dict | No
         if align in ('left', 'right', 'center'):
             col['align'] = align
         fmt = c.get('format')
-        if fmt in ('currency', 'currency2', 'number', 'date'):
+        if fmt in ('currency', 'currency2', 'number', 'date', 'percent'):
             col['format'] = fmt
+        elif fmt == 'percentage':
+            # Generators use 'percentage'; the renderer's formatCellValue
+            # vocabulary is 'percent' (FB-315). Dropping the hint (the
+            # prior behavior) rendered % columns as bare numbers.
+            col['format'] = 'percent'
         columns.append(col)
     if not columns:
         return None
