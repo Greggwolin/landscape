@@ -226,7 +226,9 @@ export async function DELETE(request: NextRequest) {
     await deleteByProjectId('tbl_extraction_log')
     await deleteByProjectId('tbl_narrative_version')
     await deleteByProjectId('tbl_alpha_feedback')
-    await deleteByProjectId('tester_feedback')
+    // tbl_feedback is the canonical feedback table; tester_feedback was retired
+    // (renamed to tester_feedback_deprecated) in LSCMD-FBUNIFY-0613-qz.
+    await deleteByProjectId('tbl_feedback')
 
     // ============================================================
     // TIER 4: Delete the project itself

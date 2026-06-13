@@ -1,5 +1,5 @@
 // Auto-generated database types
-// Generated on: 2026-06-08T23:47:31.274Z
+// Generated on: 2026-06-13T22:47:23.508Z
 // DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
 
 // Utility types
@@ -2534,14 +2534,7 @@ export type GisTaxParcelRefInsert = {
   updatedAt?: string | null;
 };
 
-// SKIPPED duplicate interface name for landscape.glossary_zoning -> GlossaryZoning (already emitted from land_v2.glossary_zoning)
-// SKIPPED duplicate insert type for landscape.glossary_zoning -> GlossaryZoningInsert (already emitted from land_v2.glossary_zoning)
-// NOTE: the landscape.glossary_zoning table carries 5 extra columns not present on
-// land_v2.glossary_zoning (suggestedFamily, suggestedDensityCode, suggestedTypeCode,
-// aiConfidence, mappingStatus). No code in the repo references the GlossaryZoning type,
-// so dropping the wider declaration is type-safe today. If a consumer ever needs those
-// columns, the generator's first-wins dedup should be changed to prefer the superset
-// (or suffix the schema, e.g. GlossaryZoningLandscape) rather than reinstating a raw duplicate.
+// SKIPPED duplicate interface name for landscape.glossary_zoning -> GlossaryZoning (already emitted)
 
 // landscape.knowledge_embeddings
 // Primary Key: embedding_id
@@ -6715,6 +6708,7 @@ export interface Feedback {
   sourceHelpMessageId: number | null;
   workingSummary: string | null;
   activeChatSlug: string | null;
+  category: string | null;
 }
 
 // Insert type for landscape.tbl_feedback (excludes auto-generated fields)
@@ -6742,6 +6736,7 @@ export type FeedbackInsert = {
   sourceHelpMessageId?: number | null;
   workingSummary?: string | null;
   activeChatSlug?: string | null;
+  category?: string | null;
 };
 
 // landscape.tbl_field_catalog
@@ -10818,6 +10813,11 @@ export interface Project {
   artifactCascadeMode: string;
   /** Default: 'real_estate'::character varying */
   projectKind: string;
+  latitude: number | null;
+  longitude: number | null;
+  geocodingConfidence: number | null;
+  geocodedAt: string | null;
+  geocodedByService: string | null;
 }
 
 // Insert type for landscape.tbl_project (excludes auto-generated fields)
@@ -10957,6 +10957,11 @@ export type ProjectInsert = {
   createdBy?: string | null;
   artifactCascadeMode?: string;
   projectKind?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  geocodingConfidence?: number | null;
+  geocodedAt?: string | null;
+  geocodedByService?: string | null;
 };
 
 // landscape.tbl_project_assumption
@@ -11194,6 +11199,36 @@ export type ProjectMetricsInsert = {
   developmentDurationMonths?: number | null;
   absorptionDurationMonths?: number | null;
   calculationVersion?: number | null;
+};
+
+// landscape.tbl_project_overlay
+// Primary Key: overlay_id
+// Foreign Keys: project_id -> landscape.tbl_project.project_id
+export interface ProjectOverlay {
+  /** Default: nextval('tbl_project_overlay_overlay_id_seq'::regclass) */
+  overlayId: number;
+  projectId: number;
+  title: string | null;
+  sourceUri: string;
+  corners: any;
+  /** Default: 0.7 */
+  opacity: number;
+  /** Default: 0 */
+  rotationDeg: number;
+  /** Default: now() */
+  createdAt: string;
+  /** Default: now() */
+  updatedAt: string;
+}
+
+// Insert type for landscape.tbl_project_overlay (excludes auto-generated fields)
+export type ProjectOverlayInsert = {
+  projectId: number;
+  title?: string | null;
+  sourceUri: string;
+  corners: any;
+  opacity?: number;
+  rotationDeg?: number;
 };
 
 // landscape.tbl_project_settings
@@ -14619,10 +14654,10 @@ export type ZoningControlInsert = {
   validTo?: string | null;
 };
 
-// landscape.tester_feedback
+// landscape.tester_feedback_deprecated
 // Primary Key: id
-// Foreign Keys: duplicate_of_id -> landscape.tester_feedback.id, user_id -> landscape.auth_user.id
-export interface TesterFeedback {
+// Foreign Keys: duplicate_of_id -> landscape.tester_feedback_deprecated.id, user_id -> landscape.auth_user.id
+export interface TesterFeedbackDeprecated {
   id: number;
   pageUrl: string;
   pagePath: string;
@@ -14974,12 +15009,7 @@ export interface AbsorptionWithDependencies {
   dependencySummary: string | null;
 }
 
-// SKIPPED duplicate interface name for landscape.vw_acreage_allocation -> AcreageAllocation
-// (already emitted from landscape.tbl_acreage_allocation; the vw_ prefix strips to the same
-// name). The view typed several columns as nullable (allocationId, projectId, acres: number | null)
-// where the base table types them non-null (acres: number), which is what produced the TS2717
-// interface-merge nullability conflicts. No code references AcreageAllocation, so keeping the
-// base-table declaration is type-safe.
+// SKIPPED duplicate interface name for landscape.vw_acreage_allocation -> AcreageAllocation (already emitted)
 
 // landscape.vw_budget_grid_items
 export interface BudgetGridItems {
@@ -15556,7 +15586,7 @@ export interface RevenueTimeline {
   pctComplete: number | null;
 }
 
-// SKIPPED duplicate interface name for landscape.vw_zoning_glossary_export -> ZoningGlossaryExport (already emitted from land_v2.vw_zoning_glossary_export; shapes identical)
+// SKIPPED duplicate interface name for landscape.vw_zoning_glossary_export -> ZoningGlossaryExport (already emitted)
 
 // landscape.zonda_subdivisions
 // Primary Key: id
@@ -15706,7 +15736,7 @@ export const TABLE_NAMES = {
   GIS_PLAN_PARCEL: 'landscape.gis_plan_parcel' as const,
   GIS_PROJECT_BOUNDARY: 'landscape.gis_project_boundary' as const,
   GIS_TAX_PARCEL_REF: 'landscape.gis_tax_parcel_ref' as const,
-  // SKIPPED duplicate key GLOSSARY_ZONING for landscape.glossary_zoning (already emitted from land_v2.glossary_zoning)
+  // SKIPPED duplicate key GLOSSARY_ZONING for landscape.glossary_zoning (already emitted)
   KNOWLEDGE_EMBEDDINGS: 'landscape.knowledge_embeddings' as const,
   KNOWLEDGE_ENTITIES: 'landscape.knowledge_entities' as const,
   KNOWLEDGE_FACTS: 'landscape.knowledge_facts' as const,
@@ -15915,6 +15945,7 @@ export const TABLE_NAMES = {
   TBL_PROJECT_CONTACT: 'landscape.tbl_project_contact' as const,
   TBL_PROJECT_INVENTORY_COLUMNS: 'landscape.tbl_project_inventory_columns' as const,
   TBL_PROJECT_METRICS: 'landscape.tbl_project_metrics' as const,
+  TBL_PROJECT_OVERLAY: 'landscape.tbl_project_overlay' as const,
   TBL_PROJECT_SETTINGS: 'landscape.tbl_project_settings' as const,
   TBL_PROPERTY_ACQUISITION: 'landscape.tbl_property_acquisition' as const,
   TBL_PROPERTY_APN: 'landscape.tbl_property_apn' as const,
@@ -15984,7 +16015,7 @@ export const TABLE_NAMES = {
   TBL_WATERFALL: 'landscape.tbl_waterfall' as const,
   TBL_WATERFALL_TIER: 'landscape.tbl_waterfall_tier' as const,
   TBL_ZONING_CONTROL: 'landscape.tbl_zoning_control' as const,
-  TESTER_FEEDBACK: 'landscape.tester_feedback' as const,
+  TESTER_FEEDBACK_DEPRECATED: 'landscape.tester_feedback_deprecated' as const,
   TYPE_LOT_PRODUCT: 'landscape.type_lot_product' as const,
   USER_PROFILE: 'landscape.user_profile' as const,
   USER_SETTINGS: 'landscape.user_settings' as const,
@@ -16024,7 +16055,7 @@ export const TABLE_NAMES = {
   VW_PERMIT_MSA_MONTHLY: 'landscape.vw_permit_msa_monthly' as const,
   VW_PROJECT_ACQUISITION_SUMMARY: 'landscape.vw_project_acquisition_summary' as const,
   VW_REVENUE_TIMELINE: 'landscape.vw_revenue_timeline' as const,
-  // SKIPPED duplicate key VW_ZONING_GLOSSARY_EXPORT for landscape.vw_zoning_glossary_export (already emitted from land_v2.vw_zoning_glossary_export)
+  // SKIPPED duplicate key VW_ZONING_GLOSSARY_EXPORT for landscape.vw_zoning_glossary_export (already emitted)
   ZONDA_SUBDIVISIONS: 'landscape.zonda_subdivisions' as const,
 } as const;
 

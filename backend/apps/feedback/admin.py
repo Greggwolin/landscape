@@ -1,65 +1,12 @@
 """
-Django admin configuration for feedback and changelog.
+Django admin configuration for the changelog.
+
+The TesterFeedback admin was retired in LSCMD-FBUNIFY-0613-qz; feedback is now
+managed from the /admin/feedback page backed by landscape.tbl_feedback.
 """
 
 from django.contrib import admin
-from .models import TesterFeedback, Changelog
-
-
-@admin.register(TesterFeedback)
-class TesterFeedbackAdmin(admin.ModelAdmin):
-    list_display = [
-        'id',
-        'user',
-        'category',
-        'affected_module',
-        'message_preview',
-        'status',
-        'report_count',
-        'created_at',
-    ]
-    list_filter = ['status', 'category', 'feedback_type', 'created_at']
-    search_fields = ['user__username', 'message', 'page_path', 'affected_module', 'landscaper_summary']
-    readonly_fields = [
-        'user',
-        'internal_id',
-        'created_at',
-        'updated_at',
-        'admin_responded_at',
-        'report_count',
-        'browser_context',
-        'landscaper_raw_chat',
-    ]
-    ordering = ['-created_at']
-
-    fieldsets = (
-        ('User & Context', {
-            'fields': ('user', 'internal_id', 'page_url', 'page_path', 'project_id', 'project_name')
-        }),
-        ('Feedback Content', {
-            'fields': ('message', 'feedback_type', 'category', 'affected_module', 'landscaper_summary')
-        }),
-        ('Landscaper Data', {
-            'fields': ('landscaper_raw_chat', 'browser_context'),
-            'classes': ('collapse',),
-        }),
-        ('Deduplication', {
-            'fields': ('duplicate_of', 'report_count'),
-        }),
-        ('Status & Response', {
-            'fields': ('status', 'admin_notes', 'admin_response', 'admin_responded_at')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',),
-        }),
-    )
-
-    def message_preview(self, obj):
-        """Show truncated message in list view."""
-        text = obj.landscaper_summary or obj.message
-        return text[:50] + '...' if len(text) > 50 else text
-    message_preview.short_description = 'Summary'
+from .models import Changelog
 
 
 @admin.register(Changelog)
