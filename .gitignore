@@ -212,3 +212,6 @@ logs/
 
 # Health-report nightly snapshots — generated artifact (LSCMD-MERGE-0515-wq1)
 docs/UX/health-reports/
+
+# Screenshot captures — local-only chat/artifact UI shots, regenerable (LSCMD-CW-WTSAVE-0613-GV)
+reference/images/screenshots/capture-*/
