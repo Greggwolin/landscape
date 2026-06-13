@@ -31,7 +31,7 @@ import type {
   MapViewState,
   FeatureCategory,
 } from './types';
-import { MapCanvas } from './MapCanvas';
+import { MapCanvas, MARICOPA_PARCEL_OUTLINE_LAYER_ID } from './MapCanvas';
 import type { MapCanvasRef } from './MapCanvas';
 import { LayerPanel } from './LayerPanel';
 import { DrawToolbar } from './DrawToolbar';
@@ -50,6 +50,11 @@ import {
 import type { RingDemographics } from '@/components/location-intelligence';
 import { fetchParcelsByAPN, fetchParcelsByBbox } from '@/lib/gis/laCountyParcels';
 import { queryParcelsByBounds } from '@/lib/gis/parcelServiceClient';
+import { useUploadThing } from '@/lib/uploadthing';
+import { useSitePlanOverlay } from './overlay/useSitePlanOverlay';
+import { SitePlanOverlayControls } from './overlay/SitePlanOverlayControls';
+import { useSitePlanOverlays } from './hooks/useSitePlanOverlays';
+import { addImageOverlay, type OverlayHandle } from '@/lib/gis/imageOverlay';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
@@ -1640,6 +1645,224 @@ export function MapTab({ project }: MapTabProps) {
   }, [selectedParcelList]);
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Site-Plan Overlay (Phase 1: snap + pin) — LSCMD-CW-OVERLAY-P1-0613-GV
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Editor is active whenever an image URL is held. editingOverlayId === null
+  // means a freshly uploaded (unsaved) overlay; a number means re-editing a
+  // saved row.
+  const [overlayImageUrl, setOverlayImageUrl] = useState<string | null>(null);
+  const [editingOverlayId, setEditingOverlayId] = useState<number | null>(null);
+  const [overlayInitial, setOverlayInitial] = useState<
+    { corners?: [[number, number], [number, number], [number, number], [number, number]]; opacity?: number; rotationDeg?: number } | undefined
+  >(undefined);
+  const [overlaySaving, setOverlaySaving] = useState(false);
+  const [overlaySaveError, setOverlaySaveError] = useState<string | null>(null);
+  const [uploadingPlan, setUploadingPlan] = useState(false);
+  const planFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reuse whatever vector parcel FeatureCollection is already loaded as snap
+  // targets: taxParcels (county vector, incl. Maricopa for Peoria Meadows),
+  // then LA county parcels, then plan parcels. Null → free drag, no snapping.
+  const overlayParcels = useMemo(
+    () => taxParcels ?? parcelCollection ?? planParcels ?? null,
+    [taxParcels, parcelCollection, planParcels]
+  );
+
+  // Drape sits beneath the lowest existing parcel layer so outlines stay on top.
+  const overlayBeneathLayerId = useMemo(() => {
+    const m = mapCanvasRef.current?.getMap();
+    if (!m) return undefined;
+    const candidates = [
+      MARICOPA_PARCEL_OUTLINE_LAYER_ID,
+      'tax-parcels-fill',
+      'la-parcels-all-fill',
+      'plan-parcels-fill',
+    ];
+    return candidates.find((id) => m.getLayer(id)) ?? undefined;
+    // Intentional deps: m.getLayer() reads live map state the linter can't see,
+    // so recompute when parcel data / basemap swaps change which layers exist.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taxParcels, parcelCollection, planParcels, parcelOutlineEnabled, overlayImageUrl, basemap]);
+
+  const overlayEditor = useSitePlanOverlay({
+    map: mapInstance,
+    imageUrl: overlayImageUrl,
+    parcels: overlayParcels,
+    beneathLayerId: overlayBeneathLayerId,
+    initial: overlayInitial,
+  });
+
+  const { startUpload: startPlanUpload } = useUploadThing('documentUploader', {
+    headers: {
+      'x-project-id': String(projectId),
+      'x-workspace-id': '1',
+    },
+  });
+
+  const {
+    overlays: savedOverlays,
+    fetchOverlays,
+    createOverlay,
+    updateOverlay,
+    deleteOverlay,
+  } = useSitePlanOverlays(projectId);
+
+  // Load saved overlays on open.
+  useEffect(() => {
+    fetchOverlays();
+  }, [fetchOverlays]);
+
+  const handleAddSitePlanClick = useCallback(() => {
+    planFileInputRef.current?.click();
+  }, []);
+
+  const handlePlanFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = ''; // allow re-selecting the same file later
+      if (!file) return;
+      if (!/^image\/(png|jpe?g)$/i.test(file.type)) {
+        showToast('Site plan must be a PNG or JPG image');
+        return;
+      }
+      setUploadingPlan(true);
+      setOverlaySaveError(null);
+      try {
+        const res = await startPlanUpload([file]);
+        const first = res?.[0];
+        const serverData = (first as { serverData?: { storage_uri?: string } } | undefined)?.serverData;
+        const url = serverData?.storage_uri ?? (first as { url?: string } | undefined)?.url ?? '';
+        if (!url) throw new Error('Upload returned no URL');
+        // Enter edit mode for a NEW overlay, dropped at map center.
+        setEditingOverlayId(null);
+        setOverlayInitial(undefined);
+        setOverlayImageUrl(url);
+        showToast('Site plan added — drag the corners to fit, then Save');
+      } catch (err) {
+        showToast(`Upload failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+      } finally {
+        setUploadingPlan(false);
+      }
+    },
+    [startPlanUpload, showToast]
+  );
+
+  const handleOverlaySave = useCallback(async () => {
+    if (!overlayImageUrl) return;
+    setOverlaySaving(true);
+    setOverlaySaveError(null);
+    try {
+      const state = overlayEditor.getState();
+      if (editingOverlayId != null) {
+        await updateOverlay(editingOverlayId, {
+          corners: state.corners,
+          opacity: state.opacity,
+          rotation_deg: state.rotationDeg,
+        });
+        showToast('Overlay updated');
+      } else {
+        await createOverlay({
+          title: 'Site Plan',
+          source_uri: overlayImageUrl,
+          corners: state.corners,
+          opacity: state.opacity,
+          rotation_deg: state.rotationDeg,
+        });
+        showToast('Overlay saved');
+      }
+      // Exit edit mode → the saved overlay re-drapes read-only.
+      setOverlayImageUrl(null);
+      setEditingOverlayId(null);
+      setOverlayInitial(undefined);
+    } catch (err) {
+      setOverlaySaveError(err instanceof Error ? err.message : 'Failed to save overlay');
+    } finally {
+      setOverlaySaving(false);
+    }
+  }, [overlayImageUrl, editingOverlayId, overlayEditor, updateOverlay, createOverlay, showToast]);
+
+  const handleOverlayCancel = useCallback(() => {
+    setOverlayImageUrl(null);
+    setEditingOverlayId(null);
+    setOverlayInitial(undefined);
+    setOverlaySaveError(null);
+  }, []);
+
+  const handleEditOverlay = useCallback(
+    (overlay: { overlay_id: number; source_uri: string; corners: [[number, number], [number, number], [number, number], [number, number]]; opacity: number; rotation_deg: number }) => {
+      setOverlaySaveError(null);
+      setEditingOverlayId(overlay.overlay_id);
+      setOverlayInitial({
+        corners: overlay.corners,
+        opacity: overlay.opacity,
+        rotationDeg: overlay.rotation_deg,
+      });
+      setOverlayImageUrl(overlay.source_uri);
+    },
+    []
+  );
+
+  const handleDeleteOverlay = useCallback(
+    async (overlayId: number) => {
+      try {
+        if (editingOverlayId === overlayId) handleOverlayCancel();
+        await deleteOverlay(overlayId);
+        showToast('Overlay removed');
+      } catch {
+        showToast('Failed to remove overlay');
+      }
+    },
+    [deleteOverlay, editingOverlayId, handleOverlayCancel, showToast]
+  );
+
+  // Read-only drapes for every saved overlay NOT currently being edited.
+  const savedDrapeHandlesRef = useRef<Map<number, OverlayHandle>>(new Map());
+  useEffect(() => {
+    const m = mapCanvasRef.current?.getMap();
+    if (!m || !mapIsLoaded) return;
+    const handles = savedDrapeHandlesRef.current;
+    const wanted = new Set<number>();
+
+    for (const ov of savedOverlays) {
+      if (editingOverlayId === ov.overlay_id) continue; // editor owns it (with handles)
+      wanted.add(ov.overlay_id);
+      const existing = handles.get(ov.overlay_id);
+      if (existing) {
+        existing.setCorners(ov.corners);
+        existing.setOpacity(ov.opacity);
+      } else {
+        handles.set(
+          ov.overlay_id,
+          addImageOverlay(m, {
+            id: `saved-${ov.overlay_id}`,
+            url: ov.source_uri,
+            corners: ov.corners,
+            opacity: ov.opacity,
+            beforeId: overlayBeneathLayerId,
+          })
+        );
+      }
+    }
+
+    for (const [id, handle] of handles) {
+      if (!wanted.has(id)) {
+        handle.remove();
+        handles.delete(id);
+      }
+    }
+  }, [savedOverlays, editingOverlayId, mapIsLoaded, overlayBeneathLayerId]);
+
+  // Tear down all read-only drapes on unmount.
+  useEffect(() => {
+    const handles = savedDrapeHandlesRef.current;
+    return () => {
+      handles.forEach((handle) => handle.remove());
+      handles.clear();
+    };
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Loading indicator
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1802,6 +2025,74 @@ export function MapTab({ project }: MapTabProps) {
             onToolChange={handleToolChange}
           />
         </div>
+
+        {/* ─── Site Plan Overlay ─── */}
+        <div className="map-tab-tools">
+          <div className="map-tab-tools-header">Site Plan</div>
+          <input
+            ref={planFileInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: 'none' }}
+            onChange={handlePlanFileChange}
+          />
+          {!overlayImageUrl && (
+            <CButton
+              color="primary"
+              variant="outline"
+              size="sm"
+              disabled={uploadingPlan}
+              onClick={handleAddSitePlanClick}
+            >
+              {uploadingPlan ? 'Uploading…' : 'Add Site Plan'}
+            </CButton>
+          )}
+          {savedOverlays.length > 0 && (
+            <div className="map-tab-parcel-list" style={{ marginTop: 8 }}>
+              {savedOverlays.map((ov) => (
+                <div key={ov.overlay_id} className="map-tab-parcel-item">
+                  <div className="map-tab-parcel-meta">
+                    <div className="map-tab-parcel-id">
+                      {ov.title || `Overlay ${ov.overlay_id}`}
+                    </div>
+                  </div>
+                  <div className="map-tab-parcel-actions">
+                    <button
+                      type="button"
+                      className="map-tab-parcel-remove"
+                      onClick={() => handleEditOverlay(ov)}
+                      disabled={editingOverlayId === ov.overlay_id}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="map-tab-parcel-remove"
+                      onClick={() => handleDeleteOverlay(ov.overlay_id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {overlayImageUrl && (
+          <SitePlanOverlayControls
+            opacity={overlayEditor.opacity}
+            rotationDeg={overlayEditor.rotationDeg}
+            snapping={Boolean(overlayParcels?.features?.length)}
+            lastSnapped={overlayEditor.lastSnapped}
+            saving={overlaySaving}
+            saveError={overlaySaveError}
+            onOpacityChange={overlayEditor.setOpacity}
+            onRotationChange={overlayEditor.setRotation}
+            onSave={handleOverlaySave}
+            onCancel={handleOverlayCancel}
+          />
+        )}
       </div>
 
       {/* ─── Map Content Area ─── */}

@@ -7,6 +7,7 @@ from rest_framework.routers import DefaultRouter
 from .views import ProjectViewSet, AnalysisTypeConfigViewSet, AnalysisDraftViewSet
 from .views_preferences import UserPreferenceViewSet
 from apps.market_intel.views import RentComparableViewSet, MarketRateAnalysisViewSet, MarketCompetitiveProjectViewSet, MarketMacroDataViewSet, ExpenseComparableViewSet
+from apps.gis.views_overlay import ProjectOverlayViewSet
 
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
@@ -55,4 +56,11 @@ urlpatterns = [
     path('projects/<int:project_pk>/market/macro/<int:pk>/',
          MarketMacroDataViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}),
          name='project-market-macro-detail'),
+    # Site-plan image overlays (Phase 1: snap + pin) — LSCMD-CW-OVERLAY-P1-0613-GV
+    path('projects/<int:project_pk>/overlays/',
+         ProjectOverlayViewSet.as_view({'get': 'list', 'post': 'create'}),
+         name='project-overlays-list'),
+    path('overlays/<int:pk>/',
+         ProjectOverlayViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'put': 'partial_update', 'delete': 'destroy'}),
+         name='project-overlays-detail'),
 ]
