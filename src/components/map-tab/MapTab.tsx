@@ -1067,12 +1067,22 @@ export function MapTab({ project }: MapTabProps) {
   }, [bboxParam, resolvedCounty]);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Auto-fit bounds after GIS data loads
+  // Auto-fit bounds after GIS data loads — ONCE per project
   // ─────────────────────────────────────────────────────────────────────────
+
+  // Latch the initial fit so it fires only the first time real data is
+  // available. Without it, move-driven parcel reloads (which mutate taxParcels/
+  // saleComps/rentComps on every pan/zoom) re-run this effect and yank the
+  // camera back out. Resets per project so a new project re-fits once.
+  const didAutoFitRef = useRef(false);
+  useEffect(() => {
+    didAutoFitRef.current = false;
+  }, [projectId]);
 
   useEffect(() => {
     const m = mapCanvasRef.current?.getMap();
     if (!m) return;
+    if (didAutoFitRef.current) return;
     if (hasResolvedCenter) return;
 
     // Collect all loaded GeoJSON features for bounding
@@ -1092,6 +1102,7 @@ export function MapTab({ project }: MapTabProps) {
         [[bbox[0], bbox[1]], [bbox[2], bbox[3]]],
         { padding: 40, maxZoom: 16, duration: 1200 }
       );
+      didAutoFitRef.current = true; // fitted once; later reloads are no-ops
     } catch {
       // ignore bbox calculation errors
     }
