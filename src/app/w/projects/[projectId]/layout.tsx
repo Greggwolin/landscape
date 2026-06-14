@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ProjectContextShell } from '@/components/wrapper/ProjectContextShell';
 import { WrapperChatProvider } from '@/contexts/WrapperChatContext';
@@ -28,7 +28,7 @@ export default function WrapperProjectLayout({
     project_name: '',
   });
 
-  useEffect(() => {
+  const fetchProject = useCallback(() => {
     fetch(`/api/projects/${projectId}`, { headers: getAuthHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -54,13 +54,17 @@ export default function WrapperProjectLayout({
       .catch(() => {});
   }, [projectId]);
 
+  useEffect(() => {
+    fetchProject();
+  }, [fetchProject]);
+
   // ModalProject is structurally compatible with WrapperProject
   const modalProject: ModalProject = project;
 
   return (
     <ProjectContextShell>
       <WrapperChatProvider>
-        <WrapperProjectProvider project={project}>
+        <WrapperProjectProvider project={project} onRefetch={fetchProject}>
           <ModalRegistryProvider project={modalProject}>
             {/* Bridges chat-panel command bus → project-scoped UI surfaces.
                 The chat panel lives in the outer /w/ layout shell, ABOVE

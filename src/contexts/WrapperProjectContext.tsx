@@ -20,16 +20,22 @@ export interface WrapperProject {
 }
 
 const WrapperProjectContext = createContext<WrapperProject | null>(null);
+// Separate context so consumers can re-fetch the project (e.g. after the Map
+// tab moves the subject location) without changing the project value shape.
+const WrapperProjectRefetchContext = createContext<(() => void) | null>(null);
 
 interface WrapperProjectProviderProps {
   project: WrapperProject;
+  onRefetch?: () => void;
   children: React.ReactNode;
 }
 
-export function WrapperProjectProvider({ project, children }: WrapperProjectProviderProps) {
+export function WrapperProjectProvider({ project, onRefetch, children }: WrapperProjectProviderProps) {
   return (
     <WrapperProjectContext.Provider value={project}>
-      {children}
+      <WrapperProjectRefetchContext.Provider value={onRefetch ?? null}>
+        {children}
+      </WrapperProjectRefetchContext.Provider>
     </WrapperProjectContext.Provider>
   );
 }
@@ -40,4 +46,9 @@ export function useWrapperProject(): WrapperProject {
     throw new Error('useWrapperProject must be used within a WrapperProjectProvider');
   }
   return ctx;
+}
+
+/** Re-fetch the wrapper project from the API. No-op if no provider supplied one. */
+export function useWrapperProjectRefetch(): () => void {
+  return useContext(WrapperProjectRefetchContext) ?? (() => {});
 }
