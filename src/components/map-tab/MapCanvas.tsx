@@ -350,6 +350,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onViewStateChange,
     attachMode,
     onParcelAttach,
+    onSubjectDragEnd,
   },
   ref
 ) {
@@ -363,6 +364,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const recentSalesMarkersRef = useRef<maplibregl.Marker[]>([]);
   const competitorMarkersRef = useRef<maplibregl.Marker[]>([]);
   const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const attachDragMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
 
@@ -379,8 +381,10 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const onTaxParcelToggleRef = useRef(onTaxParcelToggle);
   const onViewStateChangeRef = useRef(onViewStateChange);
   const onParcelAttachRef = useRef(onParcelAttach);
+  const onSubjectDragEndRef = useRef(onSubjectDragEnd);
   const attachModeRef = useRef(attachMode);
   useEffect(() => { onParcelAttachRef.current = onParcelAttach; }, [onParcelAttach]);
+  useEffect(() => { onSubjectDragEndRef.current = onSubjectDragEnd; }, [onSubjectDragEnd]);
   useEffect(() => { attachModeRef.current = attachMode; }, [attachMode]);
 
   useEffect(() => {
@@ -1596,6 +1600,48 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       subjectMarkerRef.current = null;
     };
   }, [mapLoaded, styleRevision, center]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Parcel-association (P2 / Gesture B): draggable subject pin.
+  // Only present while in attach mode. On dragend we report the dropped lngLat
+  // and snap the marker back to `center` so it behaves as a one-shot gesture.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear any existing drag marker first.
+    if (attachDragMarkerRef.current) {
+      attachDragMarkerRef.current.remove();
+      attachDragMarkerRef.current = null;
+    }
+
+    if (!attachMode) return;
+
+    const markerEl = document.createElement('div');
+    markerEl.className = 'map-subject-marker map-attach-drag-marker';
+    markerEl.style.cursor = 'grab';
+
+    const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center', draggable: true })
+      .setLngLat([center[0], center[1]])
+      .addTo(map.current);
+
+    marker.on('dragstart', () => { markerEl.style.cursor = 'grabbing'; });
+    marker.on('dragend', () => {
+      markerEl.style.cursor = 'grab';
+      const lngLat = marker.getLngLat();
+      onSubjectDragEndRef.current?.([lngLat.lng, lngLat.lat]);
+      // Snap back to the subject center — this is a gesture tool, not a move.
+      marker.setLngLat([center[0], center[1]]);
+    });
+
+    attachDragMarkerRef.current = marker;
+
+    return () => {
+      attachDragMarkerRef.current?.remove();
+      attachDragMarkerRef.current = null;
+    };
+  }, [mapLoaded, styleRevision, attachMode, center]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Draw Demo Rings (from location intel layers)
