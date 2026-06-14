@@ -3,10 +3,11 @@
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import { MapTab } from '@/components/map-tab/MapTab';
 import type { Project } from '@/components/map-tab/types';
-import { useWrapperProject } from '@/contexts/WrapperProjectContext';
+import { useWrapperProject, useWrapperProjectRefetch } from '@/contexts/WrapperProjectContext';
 
 export default function WrapperMapPage() {
   const project = useWrapperProject();
+  const refetchProject = useWrapperProjectRefetch();
 
   // Adapt WrapperProject to the MapTab Project shape. Project carries an
   // index signature ([key: string]: unknown) that WrapperProject lacks, so
@@ -16,7 +17,7 @@ export default function WrapperMapPage() {
   return (
     <RightContentPanel title="Map" subtitle={project.project_name}>
       <div style={{ flex: 1, minHeight: 0, position: 'relative', display: 'flex' }}>
-        <MapTab project={mapProject} />
+        <MapTab project={mapProject} onProjectUpdated={refetchProject} />
       </div>
     </RightContentPanel>
   );

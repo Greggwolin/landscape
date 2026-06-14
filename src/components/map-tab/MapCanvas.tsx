@@ -348,6 +348,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onFeatureClick,
     onTaxParcelToggle,
     onViewStateChange,
+    attachMode,
+    onParcelAttach,
   },
   ref
 ) {
@@ -376,6 +378,10 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const onFeatureClickRef = useRef(onFeatureClick);
   const onTaxParcelToggleRef = useRef(onTaxParcelToggle);
   const onViewStateChangeRef = useRef(onViewStateChange);
+  const onParcelAttachRef = useRef(onParcelAttach);
+  const attachModeRef = useRef(attachMode);
+  useEffect(() => { onParcelAttachRef.current = onParcelAttach; }, [onParcelAttach]);
+  useEffect(() => { attachModeRef.current = attachMode; }, [attachMode]);
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;
@@ -894,6 +900,18 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       const props = (feature.properties ?? {}) as Record<string, unknown>;
       const parcelId = getParcelIdFromProps(props, feature.id);
       if (!parcelId) return;
+
+      // Parcel-association (P1): in attach mode, a parcel click opens the
+      // attach confirm instead of toggling boundary selection.
+      if (attachModeRef.current && onParcelAttachRef.current) {
+        onParcelAttachRef.current({
+          type: 'Feature',
+          geometry: feature.geometry as GeoJSON.Geometry,
+          properties: props,
+          id: feature.id ?? parcelId,
+        });
+        return;
+      }
 
       if (onTaxParcelToggleRef.current) {
         onTaxParcelToggleRef.current({

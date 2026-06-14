@@ -120,6 +120,9 @@ export interface Project {
 
 export interface MapTabProps {
   project: Project;
+  /** Called after the subject location/parcel is changed so the host can
+   *  refresh its project context (e.g. the chat-first WrapperProject). */
+  onProjectUpdated?: () => void;
 }
 
 export interface MapCanvasProps {
@@ -149,6 +152,10 @@ export interface MapCanvasProps {
   onTaxParcelToggle?: (feature: GeoJSON.Feature) => void;
   onFeatureCreate?: (geometry: GeoJSON.Geometry, type: FeatureType) => void;
   onViewStateChange?: (viewState: MapViewState) => void;
+  /** Parcel-association (P1): when true, a click on a rendered tax parcel
+   *  fires onParcelAttach instead of the boundary-selection toggle. */
+  attachMode?: boolean;
+  onParcelAttach?: (feature: GeoJSON.Feature) => void;
 }
 
 export interface LayerPanelProps {

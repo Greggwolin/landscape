@@ -169,7 +169,7 @@ function normalizeParcelFeatureCollection(collection: FeatureCollection): Featur
 // MapTab Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function MapTab({ project }: MapTabProps) {
+export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   const projectId = project.project_id;
   const initialCountyValue = useMemo(() => {
     const candidate =
@@ -354,6 +354,7 @@ export function MapTab({ project }: MapTabProps) {
     demographics,
     isLoading: demographicsLoading,
     error: demographicsError,
+    refetch: refetchDemographics,
   } = useDemographics({
     lat: resolvedLat ?? 0,
     lon: resolvedLon ?? 0,
@@ -1346,6 +1347,140 @@ export function MapTab({ project }: MapTabProps) {
     });
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Parcel association (P1): click a parcel → confirm → attach APN + boundary + point
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const [attachMode, setAttachMode] = useState(false);
+  const [attachCandidate, setAttachCandidate] = useState<{
+    feature: Feature;
+    apn: string;
+    acres: number | null;
+    centroid: [number, number]; // [lon, lat] — parcel centroid (Gesture A point)
+  } | null>(null);
+  const [attachSaving, setAttachSaving] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+
+  const handleParcelAttach = useCallback((feature: Feature) => {
+    const props = (feature.properties ?? {}) as Record<string, unknown>;
+    const apn = getParcelIdFromProps(props, feature.id);
+    let acres: number | null = null;
+    let centroid: [number, number] | null = null;
+    try {
+      acres = turf.area(feature as turf.AllGeoJSON) / 4046.8564224;
+      const c = turf.centroid(feature as turf.AllGeoJSON);
+      const coords = c.geometry?.coordinates as [number, number] | undefined;
+      if (coords && Number.isFinite(coords[0]) && Number.isFinite(coords[1])) {
+        centroid = [coords[0], coords[1]];
+      }
+    } catch {
+      // ignore geometry errors
+    }
+    if (!centroid) return;
+    setAttachError(null);
+    setAttachCandidate({ feature, apn, acres, centroid });
+  }, []);
+
+  const handleAttachCancel = useCallback(() => {
+    setAttachCandidate(null);
+    setAttachError(null);
+  }, []);
+
+  const handleAttachConfirm = useCallback(async () => {
+    if (!attachCandidate) return;
+    setAttachSaving(true);
+    setAttachError(null);
+    const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
+    const [lon, lat] = attachCandidate.centroid;
+    const countyLabel = resolvedCounty
+      ? resolvedCounty.charAt(0).toUpperCase() + resolvedCounty.slice(1)
+      : null;
+    try {
+      // 1) APN + county + relocated point on the project.
+      const patchRes = await fetch(`${djangoUrl}/api/projects/${projectId}/`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          apn_primary: attachCandidate.apn || null,
+          ...(countyLabel ? { county: countyLabel } : {}),
+          location_lat: lat,
+          location_lon: lon,
+        }),
+      });
+      if (!patchRes.ok) {
+        const payload = await patchRes.text();
+        throw new Error(payload || `Project update failed (${patchRes.status})`);
+      }
+
+      // 2) Boundary: reuse the parcel-ingest write (dissolves into gis_project_boundary).
+      const props = (attachCandidate.feature.properties ?? {}) as Record<string, unknown>;
+      try {
+        const ingestRes = await fetch(`${djangoUrl}/api/gis/parcel-ingest/`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            projectId,
+            county: resolvedCounty,
+            parcels: [
+              {
+                parcelId: attachCandidate.apn,
+                geom: attachCandidate.feature.geometry,
+                properties: { ...props, PARCELID: attachCandidate.apn },
+              },
+            ],
+            source: 'parcel_association',
+          }),
+        });
+        if (ingestRes.ok) {
+          const payload = await ingestRes.json();
+          if (payload?.boundary?.geometry) {
+            setProjectBoundary(
+              buildBoundaryFeature(payload.boundary.geometry, {
+                acres: payload.boundary.acres,
+                source: payload.boundary.source,
+                created_at: payload.boundary.created_at,
+              })
+            );
+          }
+        }
+      } catch (boundaryErr) {
+        // Best-effort: APN + point already persisted; don't fail the whole attach.
+        console.warn('Boundary write failed during attach:', boundaryErr);
+      }
+
+      // 3) Move the subject locally → instant re-center + demographics re-key.
+      setResolvedCenter([lon, lat]);
+      setMapLocationOverride(true);
+
+      // 4) Refresh the project-keyed demographics cache for the new point, then refetch.
+      fetch(`${djangoUrl}/api/v1/location-intelligence/demographics/project/${projectId}/cache/`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ lat, lon }),
+      }).catch(() => {});
+      refetchDemographics();
+
+      // 5) Let the host (chat-first wrapper) re-pull the project.
+      onProjectUpdated?.();
+
+      showToast('Parcel attached');
+      setAttachCandidate(null);
+      setAttachMode(false);
+    } catch (error) {
+      setAttachError(error instanceof Error ? error.message : 'Failed to attach parcel');
+    } finally {
+      setAttachSaving(false);
+    }
+  }, [
+    attachCandidate,
+    getAuthHeaders,
+    projectId,
+    resolvedCounty,
+    refetchDemographics,
+    onProjectUpdated,
+    showToast,
+  ]);
+
   const handleConfirmBoundary = useCallback(async () => {
     if (!resolvedCounty) {
       setIsCountyPromptOpen(true);
@@ -2014,6 +2149,11 @@ export function MapTab({ project }: MapTabProps) {
                 {parcelSelectionError && (
                   <div className="map-tab-panel-error">{parcelSelectionError}</div>
                 )}
+                {attachMode && (
+                  <div className="map-tab-panel-message">
+                    Click a parcel on the map to attach it to {project.project_name || 'the subject'}.
+                  </div>
+                )}
                 <div className="map-tab-panel-actions">
                   <CButton
                     color="primary"
@@ -2022,6 +2162,17 @@ export function MapTab({ project }: MapTabProps) {
                     onClick={handleConfirmBoundary}
                   >
                     {parcelSelectionSaving ? 'Saving...' : 'Confirm Boundary'}
+                  </CButton>
+                  <CButton
+                    color="primary"
+                    variant={attachMode ? undefined : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setAttachMode((v) => !v);
+                      setAttachCandidate(null);
+                    }}
+                  >
+                    {attachMode ? 'Cancel Attach' : 'Attach Parcel'}
                   </CButton>
                 </div>
               </>
@@ -2135,7 +2286,49 @@ export function MapTab({ project }: MapTabProps) {
           onFeatureClick={handleFeatureClick}
           onTaxParcelToggle={handleTaxParcelToggle}
           onViewStateChange={handleViewStateChange}
+          attachMode={attachMode}
+          onParcelAttach={handleParcelAttach}
         />
+
+        {/* ─── Parcel Attach Confirm (P1) ─── */}
+        <CModal visible={attachCandidate !== null} onClose={handleAttachCancel} alignment="center">
+          <CModalHeader>
+            <CModalTitle>Attach parcel to {project.project_name || 'subject'}?</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            {attachCandidate && (
+              <div className="d-flex flex-column gap-2" style={{ fontSize: 14 }}>
+                <div className="d-flex justify-content-between">
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>Parcel (APN)</span>
+                  <strong>{attachCandidate.apn || '— none'}</strong>
+                </div>
+                <div className="d-flex justify-content-between">
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>Site boundary</span>
+                  <strong>
+                    {attachCandidate.acres != null
+                      ? `captured (${attachCandidate.acres.toFixed(2)} ac)`
+                      : 'captured'}
+                  </strong>
+                </div>
+                <div className="d-flex justify-content-between">
+                  <span style={{ color: 'var(--cui-secondary-color)' }}>Subject location</span>
+                  <strong>
+                    {attachCandidate.centroid[1].toFixed(5)}, {attachCandidate.centroid[0].toFixed(5)}
+                  </strong>
+                </div>
+                {attachError && <div style={{ color: 'var(--cui-danger)' }}>{attachError}</div>}
+              </div>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" variant="outline" onClick={handleAttachCancel} disabled={attachSaving}>
+              Cancel
+            </CButton>
+            <CButton color="primary" onClick={handleAttachConfirm} disabled={attachSaving}>
+              {attachSaving ? 'Attaching…' : 'Attach'}
+            </CButton>
+          </CModalFooter>
+        </CModal>
 
         {/* Live measurement overlay during drawing */}
         {isDrawing && liveMeasurement && (
