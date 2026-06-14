@@ -2500,6 +2500,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onTaxParcelToggle={handleTaxParcelToggle}
           onViewStateChange={handleViewStateChange}
           attachMode={attachMode}
+          attachDrawActive={attachDrawActive}
           onParcelAttach={handleParcelAttach}
           onSubjectDragEnd={handleSubjectDragEnd}
         />
