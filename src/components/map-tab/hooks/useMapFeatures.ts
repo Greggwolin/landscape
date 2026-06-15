@@ -56,6 +56,7 @@ interface SaveFeatureParams {
   label: string;
   category: string;
   notes?: string;
+  style?: Record<string, unknown>;
   linked_table?: string;
   linked_id?: number;
   area_sqft?: number;
@@ -154,6 +155,7 @@ export function useMapFeatures(projectId: number | undefined) {
           label: params.label,
           category: params.category,
           notes: params.notes || null,
+          style: params.style || null,
           linked_table: params.linked_table || null,
           linked_id: params.linked_id || null,
           area_sqft: params.area_sqft || null,

@@ -230,7 +230,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 .wrapper-sidebar.collapsed .sb-footer { justify-content: center; padding: 10px 0; }
-.wrapper-sidebar.collapsed .sb-footer .sb-avatar { margin: 0; }
+.wrapper-sidebar.collapsed .sb-footer .sb-avatar { margin: 0 auto; }
 .wrapper-sidebar.collapsed .sb-footer-actions { display: none; }
 
 /* ─── Sidebar Header ─── */

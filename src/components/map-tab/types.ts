@@ -86,7 +86,7 @@ export interface LayerState {
 
 export type BasemapStyle = 'satellite' | 'streets' | 'hybrid' | 'roadmap' | 'terrain';
 
-export type DrawTool = 'point' | 'line' | 'polygon' | 'edit' | 'delete' | null;
+export type DrawTool = 'point' | 'line' | 'polygon' | 'measure' | 'edit' | 'delete' | null;
 
 export interface MapViewState {
   center: [number, number];
@@ -164,6 +164,10 @@ export interface MapCanvasProps {
    *  being drawn. Suppresses the P1 parcel-click handler so draw vertices that
    *  land on a parcel don't prematurely open the attach confirm. */
   attachDrawActive?: boolean;
+  /** FB-323: fires when a competitor marker is clicked, passing its feature id
+   *  ("competitor-<id>"). Optional so non-/w mounts that don't render a detail
+   *  panel are unaffected. */
+  onCompetitorClick?: (competitorFeatureId: string) => void;
 }
 
 export interface LayerPanelProps {

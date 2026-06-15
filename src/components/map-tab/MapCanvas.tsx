@@ -352,6 +352,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onParcelAttach,
     onSubjectDragEnd,
     attachDrawActive,
+    onCompetitorClick,
   },
   ref
 ) {
@@ -385,6 +386,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const onSubjectDragEndRef = useRef(onSubjectDragEnd);
   const attachModeRef = useRef(attachMode);
   const attachDrawActiveRef = useRef(attachDrawActive);
+  const onCompetitorClickRef = useRef(onCompetitorClick);
+  useEffect(() => { onCompetitorClickRef.current = onCompetitorClick; }, [onCompetitorClick]);
   useEffect(() => { onParcelAttachRef.current = onParcelAttach; }, [onParcelAttach]);
   useEffect(() => { onSubjectDragEndRef.current = onSubjectDragEnd; }, [onSubjectDragEnd]);
   useEffect(() => { attachModeRef.current = attachMode; }, [attachMode]);
@@ -636,7 +639,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       source: srcId,
       paint: {
         'line-color': LAYER_COLORS.planParcels,
-        'line-width': 2,
+        'line-width': 1.2,
         'line-opacity': 0.8,
       },
     });
@@ -831,7 +834,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       minzoom: TAX_PARCEL_MIN_ZOOM,
       paint: {
         'line-color': whiteStroke,
-        'line-width': 1.6,
+        'line-width': 1,
         'line-opacity': 1,
       },
     });
@@ -1022,7 +1025,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         minzoom: PARCEL_MIN_ZOOM,
         paint: {
           'line-color': whiteStroke,
-          'line-width': 1.6,
+          'line-width': 1,
           'line-opacity': 0.9,
         },
       });
@@ -1051,7 +1054,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         minzoom: PARCEL_MIN_ZOOM,
         paint: {
           'line-color': colors.compStroke,
-          'line-width': 2.2,
+          'line-width': 1.4,
         },
       });
     }
@@ -1079,7 +1082,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
         minzoom: PARCEL_MIN_ZOOM,
         paint: {
           'line-color': colors.subjectStroke,
-          'line-width': 2.8,
+          'line-width': 1.8,
         },
       });
     }
@@ -1553,7 +1556,16 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
 
       markerEl.addEventListener('click', (event) => {
         event.stopPropagation();
+        // Close any other competitor popups so only one is open at a time
+        competitorMarkersRef.current.forEach((other) => {
+          if (other !== marker) other.getPopup()?.remove();
+        });
         marker.togglePopup();
+        // FB-323: open the in-map detail drawer with the full legacy detail.
+        // Popup stays as the quick/hover view; drawer carries the full record.
+        if (feature.id != null) {
+          onCompetitorClickRef.current?.(String(feature.id));
+        }
       });
 
       competitorMarkersRef.current.push(marker);
@@ -1828,6 +1840,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
           id: f.id,
           label: f.label,
           category: f.category,
+          notes: f.notes,
+          color: f.style?.color ?? null,
           selected: f.id === selectedFeatureId,
         },
         geometry: f.geometry,
@@ -1871,7 +1885,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       filter: ['==', '$type', 'Point'],
       paint: {
         'circle-radius': ['case', ['get', 'selected'], 10, 8],
-        'circle-color': '#06b6d4',
+        // FB-319: honor per-feature color (style.color) with the historical default fallback
+        'circle-color': ['coalesce', ['get', 'color'], '#06b6d4'],
         'circle-stroke-color': '#fff',
         'circle-stroke-width': 2,
       },
@@ -1886,11 +1901,30 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       }
     };
     const handlePointClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-      if (e.features?.[0] && onFeatureClickRef.current) {
-        const featureId = e.features[0].properties?.id;
-        const feature = features.find((f) => f.id === featureId);
-        if (feature) onFeatureClickRef.current(feature);
+      const clicked = e.features?.[0];
+      if (!clicked) return;
+      const featureId = clicked.properties?.id;
+      const feature = features.find((f) => f.id === featureId);
+      if (!feature) return;
+
+      // FB-319: show the saved name / notes / category in a popup on click.
+      if (map.current) {
+        const rows: Array<{ label: string; value: string }> = [];
+        if (feature.category) rows.push({ label: 'Category', value: String(feature.category) });
+        if (feature.notes) rows.push({ label: 'Notes', value: String(feature.notes) });
+        popupRef.current?.remove();
+        popupRef.current = new maplibregl.Popup({
+          closeButton: true,
+          closeOnClick: true,
+          className: 'map-tab-popover',
+          maxWidth: '280px',
+        })
+          .setLngLat(e.lngLat)
+          .setHTML(buildPopoverHtml(feature.label || 'Feature', rows))
+          .addTo(map.current);
       }
+
+      if (onFeatureClickRef.current) onFeatureClickRef.current(feature);
     };
 
     map.current.on('click', 'user-features-fill', handleFillClick);

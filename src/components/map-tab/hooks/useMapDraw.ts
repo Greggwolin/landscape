@@ -34,6 +34,8 @@ interface UseMapDrawOptions {
   onFeatureCreated?: (feature: DrawnFeature) => void;
   onFeatureUpdated?: (feature: DrawnFeature) => void;
   onFeatureDeleted?: (featureId: string) => void;
+  /** Fired when an ephemeral measure-mode draw finishes (no feature persisted). */
+  onMeasureComplete?: () => void;
 }
 
 // Custom draw styles for dark theme
@@ -206,12 +208,19 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
   const onFeatureCreatedRef = useRef(options.onFeatureCreated);
   const onFeatureUpdatedRef = useRef(options.onFeatureUpdated);
   const onFeatureDeletedRef = useRef(options.onFeatureDeleted);
+  const onMeasureCompleteRef = useRef(options.onMeasureComplete);
+
+  // Ephemeral measure mode: reuses line drawing to show running distance but
+  // never persists a feature. Reset on any other mode start / cancel / escape
+  // so a stale flag can't hijack a subsequent real line draw.
+  const measureModeRef = useRef(false);
 
   useEffect(() => {
     onFeatureCreatedRef.current = options.onFeatureCreated;
     onFeatureUpdatedRef.current = options.onFeatureUpdated;
     onFeatureDeletedRef.current = options.onFeatureDeleted;
-  }, [options.onFeatureCreated, options.onFeatureUpdated, options.onFeatureDeleted]);
+    onMeasureCompleteRef.current = options.onMeasureComplete;
+  }, [options.onFeatureCreated, options.onFeatureUpdated, options.onFeatureDeleted, options.onMeasureComplete]);
 
   // Initialize draw control
   const initializeDraw = useCallback(() => {
@@ -233,6 +242,20 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
     const handleDrawCreate = (e: { features: GeoJSON.Feature[] }) => {
       const feature = e.features[0];
       if (!feature) return;
+
+      // Ephemeral measure mode: do NOT persist. Discard the temp geometry and
+      // let the measurement (already shown live during drawing) clear on the
+      // mode change back to simple_select.
+      if (measureModeRef.current) {
+        measureModeRef.current = false;
+        setIsDrawing(false);
+        setCurrentFeature(null);
+        if (drawRef.current) {
+          try { drawRef.current.deleteAll(); } catch { /* ignore */ }
+        }
+        onMeasureCompleteRef.current?.();
+        return;
+      }
 
       const measurements = calculateMeasurements(feature);
       const drawnFeature: DrawnFeature = {
@@ -276,6 +299,9 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
       if (e.mode === 'simple_select') {
         setLiveMeasurement(null);
         setIsDrawing(false);
+        // Escape / finishing a draw returns to simple_select — clear any
+        // lingering measure flag so it can't bleed into the next draw.
+        measureModeRef.current = false;
       }
     };
 
@@ -331,6 +357,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
   // Mode setters
   const startDrawPoint = useCallback(() => {
     if (!drawRef.current) return;
+    measureModeRef.current = false;
     drawRef.current.changeMode('draw_point');
     setActiveMode('draw_point');
     setIsDrawing(true);
@@ -339,6 +366,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
 
   const startDrawLine = useCallback(() => {
     if (!drawRef.current) return;
+    measureModeRef.current = false;
     drawRef.current.changeMode('draw_line_string');
     setActiveMode('draw_line_string');
     setIsDrawing(true);
@@ -348,6 +376,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
 
   const startDrawPolygon = useCallback(() => {
     if (!drawRef.current) return;
+    measureModeRef.current = false;
     drawRef.current.changeMode('draw_polygon');
     setActiveMode('draw_polygon');
     setIsDrawing(true);
@@ -355,8 +384,22 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
     setLiveMeasurement(null);
   }, []);
 
+  // Ephemeral distance measuring: reuse line drawing, show running distance in
+  // the live overlay, but never open the FeatureModal / persist a feature.
+  const startMeasure = useCallback(() => {
+    if (!drawRef.current) return;
+    try { drawRef.current.deleteAll(); } catch { /* ignore */ }
+    measureModeRef.current = true;
+    drawRef.current.changeMode('draw_line_string');
+    setActiveMode('draw_line_string');
+    setIsDrawing(true);
+    setCurrentFeature(null);
+    setLiveMeasurement(null);
+  }, []);
+
   const startEdit = useCallback(() => {
     if (!drawRef.current) return;
+    measureModeRef.current = false;
     drawRef.current.changeMode('simple_select');
     setActiveMode('simple_select');
     setIsDrawing(false);
@@ -373,6 +416,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
 
   const cancelDraw = useCallback(() => {
     if (!drawRef.current) return;
+    measureModeRef.current = false;
     drawRef.current.changeMode('simple_select');
     drawRef.current.deleteAll();
     setCurrentFeature(null);
@@ -421,6 +465,7 @@ export function useMapDraw(map: Map | null, options: UseMapDrawOptions = {}) {
     startDrawPoint,
     startDrawLine,
     startDrawPolygon,
+    startMeasure,
     startEdit,
     deleteSelected,
     cancelDraw,

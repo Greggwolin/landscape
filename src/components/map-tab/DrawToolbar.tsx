@@ -19,6 +19,7 @@ const TOOLS: ToolConfig[] = [
   { id: 'point', label: 'Pt', shortcut: 'P' },
   { id: 'line', label: 'Ln', shortcut: 'L' },
   { id: 'polygon', label: 'Pg', shortcut: 'G' },
+  { id: 'measure', label: 'Ms', shortcut: 'M' },
   { id: 'edit', label: 'Ed', shortcut: 'E' },
   { id: 'delete', label: 'Del', shortcut: 'D' },
 ];
@@ -44,6 +45,16 @@ const ToolIcon = ({ tool }: { tool: DrawTool }) => {
       return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" />
+        </svg>
+      );
+    case 'measure':
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <polyline points="3 9 3 15" />
+          <polyline points="21 9 21 15" />
+          <line x1="9" y1="11" x2="9" y2="13" />
+          <line x1="15" y1="11" x2="15" y2="13" />
         </svg>
       );
     case 'edit':
