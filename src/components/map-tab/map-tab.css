@@ -835,6 +835,100 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Competitor Detail Drawer (FB-323)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.map-tab-competitor-detail {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 300px;
+  max-width: calc(100% - 24px);
+  background: var(--cui-card-bg, var(--cui-body-bg, #1e1e28));
+  border: 1px solid var(--cui-border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  color: var(--cui-body-color);
+}
+
+.map-tab-competitor-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cui-border-color);
+}
+
+.map-tab-competitor-detail-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.map-tab-competitor-detail-builder {
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  margin-top: 2px;
+}
+
+.map-tab-competitor-detail-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--cui-secondary-color);
+  cursor: pointer;
+}
+
+.map-tab-competitor-detail-close:hover {
+  background: var(--cui-tertiary-bg);
+  color: var(--cui-body-color);
+}
+
+.map-tab-competitor-detail-address {
+  padding: 10px 14px 0;
+  font-size: 12px;
+  color: var(--cui-secondary-color);
+  line-height: 1.4;
+}
+
+.map-tab-competitor-detail-grid {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-tab-competitor-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.map-tab-competitor-detail-label {
+  color: var(--cui-secondary-color);
+}
+
+.map-tab-competitor-detail-value {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Feature Modal Measurements Display
    ───────────────────────────────────────────────────────────────────────────── */
 

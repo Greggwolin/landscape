@@ -38,6 +38,7 @@ import { LayerPanel } from './LayerPanel';
 import { DrawToolbar } from './DrawToolbar';
 import { FeatureModal } from './FeatureModal';
 import type { FeatureGeometryType } from './FeatureModal';
+import { CompetitorDetailPanel } from './CompetitorDetailPanel';
 import { useMapDraw } from './hooks/useMapDraw';
 import type { DrawnFeature } from './hooks/useMapDraw';
 import { useMapFeatures } from './hooks/useMapFeatures';
@@ -59,7 +60,7 @@ import { addImageOverlay, type OverlayHandle } from '@/lib/gis/imageOverlay';
 import { COUNTY_PARCEL_SERVICES, type CountyCode } from '@/lib/gis/countyServices';
 import { LAND_DEVELOPMENT_SUBTYPES } from '@/types/project-taxonomy';
 import { useSfComps } from '@/hooks/analysis/useSfComps';
-import { useMarketCompetitors } from '@/hooks/useMarketData';
+import { useMarketCompetitors, type MarketCompetitiveProject } from '@/hooks/useMarketData';
 
 import { getAuthHeaders } from '@/lib/authHeaders';
 import './map-tab.css';
@@ -283,6 +284,8 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // ───── Feature Modal State ─────
   const [featureModalOpen, setFeatureModalOpen] = useState(false);
   const [pendingFeature, setPendingFeature] = useState<DrawnFeature | null>(null);
+  // FB-323: competitor whose in-map detail drawer is open (null = closed).
+  const [selectedCompetitor, setSelectedCompetitor] = useState<MarketCompetitiveProject | null>(null);
   const [featureSaving, setFeatureSaving] = useState(false);
 
   // ───── GIS Data State ─────
@@ -876,6 +879,23 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     return { type: 'FeatureCollection', features };
   }, [competitiveLayerVisible, competitorData]);
 
+  // FB-323: map a clicked competitor marker (feature id "competitor-<id|idx>")
+  // back to its full record and open the in-map detail drawer. Mirrors the
+  // exact filter + indexing used to build competitiveProjects above.
+  const handleCompetitorClick = useCallback(
+    (featureId: string) => {
+      if (!competitorData?.length) return;
+      const valid = competitorData.filter((c) => {
+        const lat = Number(c.latitude);
+        const lon = Number(c.longitude);
+        return Number.isFinite(lat) && Number.isFinite(lon) && lat !== 0 && lon !== 0;
+      });
+      const match = valid.find((c, i) => `competitor-${c.id || i}` === featureId);
+      if (match) setSelectedCompetitor(match);
+    },
+    [competitorData]
+  );
+
   // ─────────────────────────────────────────────────────────────────────────
   // Hooks: useMapFeatures (Django CRUD)
   // ─────────────────────────────────────────────────────────────────────────
@@ -943,12 +963,16 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     startDrawPoint,
     startDrawLine,
     startDrawPolygon,
+    startMeasure,
     startEdit,
     deleteSelected,
     cancelDraw,
     clearCurrentFeature,
   } = useMapDraw(mapInstance, {
     onFeatureCreated: handleFeatureCreated,
+    // Measure mode is ephemeral; once a measurement finishes, drop the tool
+    // back to neutral so the toolbar button doesn't look stuck "active".
+    onMeasureComplete: () => setActiveTool(null),
   });
 
   // Initialize draw control once map is ready
@@ -1261,6 +1285,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         case 'polygon':
           startDrawPolygon();
           break;
+        case 'measure':
+          startMeasure();
+          break;
         case 'edit':
           startEdit();
           break;
@@ -1272,7 +1299,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           break;
       }
     },
-    [activeTool, cancelDraw, startDrawPoint, startDrawLine, startDrawPolygon, startEdit, deleteSelected]
+    [activeTool, cancelDraw, startDrawPoint, startDrawLine, startDrawPolygon, startMeasure, startEdit, deleteSelected]
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1280,7 +1307,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
   // ─────────────────────────────────────────────────────────────────────────
 
   const handleFeatureModalSave = useCallback(
-    async (data: { label: string; category: FeatureCategory; notes: string }) => {
+    async (data: { label: string; category: FeatureCategory; notes: string; color?: string }) => {
       if (!pendingFeature) return;
 
       setFeatureSaving(true);
@@ -1294,6 +1321,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           label: data.label,
           category: data.category,
           notes: data.notes,
+          style: data.color ? { color: data.color } : undefined,
           area_sqft: pendingFeature.properties.area_sqft,
           area_acres: pendingFeature.properties.area_acres,
           perimeter_ft: pendingFeature.properties.perimeter_ft,
@@ -2503,6 +2531,13 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           attachDrawActive={attachDrawActive}
           onParcelAttach={handleParcelAttach}
           onSubjectDragEnd={handleSubjectDragEnd}
+          onCompetitorClick={handleCompetitorClick}
+        />
+
+        {/* FB-323: in-map competitor detail drawer */}
+        <CompetitorDetailPanel
+          competitor={selectedCompetitor}
+          onClose={() => setSelectedCompetitor(null)}
         />
 
         {/* ─── Parcel Attach Confirm (P1 click · P2 drag · P3 draw) ─── */}

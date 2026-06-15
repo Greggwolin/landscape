@@ -16,6 +16,21 @@ export type FeatureGeometryType = 'Point' | 'LineString' | 'Polygon';
 // Map from internal geometry types to our FeatureType for backwards compat
 type LegacyFeatureType = 'point' | 'line' | 'polygon' | 'measurement';
 
+// Preset marker-color palette for custom points (FB-319). Hex values are the
+// swatch values themselves (read by MapLibre); surrounding chrome uses CoreUI
+// tokens. The default matches the historical hardcoded point color.
+export const PRESET_FEATURE_COLORS = [
+  '#06b6d4', // cyan (default)
+  '#ef4444', // red
+  '#f59e0b', // amber
+  '#22c55e', // green
+  '#3b82f6', // blue
+  '#a855f7', // purple
+  '#ec4899', // pink
+  '#64748b', // slate
+];
+export const DEFAULT_FEATURE_COLOR = '#06b6d4';
+
 interface FeatureModalProps {
   isOpen: boolean;
   featureType: FeatureGeometryType | LegacyFeatureType;
@@ -32,6 +47,7 @@ interface FeatureModalProps {
     label: string;
     category: FeatureCategory;
     notes: string;
+    color: string;
   }) => void;
   isSaving?: boolean;
 }
@@ -77,6 +93,7 @@ export function FeatureModal({
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState<FeatureCategory>('annotation');
   const [notes, setNotes] = useState('');
+  const [color, setColor] = useState<string>(DEFAULT_FEATURE_COLOR);
 
   // Normalize the feature type
   const normalizedType = normalizeFeatureType(featureType);
@@ -92,6 +109,7 @@ export function FeatureModal({
     if (isOpen) {
       setLabel('');
       setNotes('');
+      setColor(DEFAULT_FEATURE_COLOR);
       // Set default category for this feature type
       if (categories.length > 0) {
         setCategory(categories[0].value);
@@ -109,6 +127,7 @@ export function FeatureModal({
       label: label.trim(),
       category,
       notes: notes.trim(),
+      color,
     });
   };
 
@@ -245,6 +264,42 @@ export function FeatureModal({
               ))}
             </select>
           </div>
+
+          {/* Color swatches — custom points only (FB-319) */}
+          {normalizedType === 'Point' && (
+            <div className="feature-modal-field">
+              <label>Color</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {PRESET_FEATURE_COLORS.map((c) => {
+                  const selected = c === color;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setColor(c)}
+                      disabled={isSaving}
+                      aria-label={`Marker color ${c}`}
+                      aria-pressed={selected}
+                      title={c}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        backgroundColor: c,
+                        padding: 0,
+                        cursor: isSaving ? 'default' : 'pointer',
+                        border: selected
+                          ? '2px solid var(--cui-body-color)'
+                          : '1px solid var(--cui-border-color)',
+                        outline: selected ? '2px solid var(--cui-primary)' : 'none',
+                        outlineOffset: 1,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="feature-modal-field">
             <label htmlFor="feature-notes">Notes (optional)</label>
