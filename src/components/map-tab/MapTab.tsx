@@ -16,8 +16,9 @@ import {
   CModalHeader,
   CModalTitle,
   CButton,
+  CFormCheck,
 } from '@coreui/react';
-import type { FeatureCollection, Feature, Geometry } from 'geojson';
+import type { FeatureCollection, Feature, Geometry, Polygon, MultiPolygon } from 'geojson';
 import * as turf from '@turf/turf';
 import { escapeHtml, splitAddressLines } from '@/lib/maps/addressFormat';
 
@@ -919,7 +920,18 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   const mapInstance = mapCanvasRef.current?.getMap() ?? null;
 
+  // Parcel-association (P3 / Gesture C): when a "Draw Boundary" gesture is
+  // active, route the created polygon to the attach flow instead of the
+  // FeatureModal. These refs let handleFeatureCreated (wired into useMapDraw
+  // below) reach state/handlers declared further down without forward refs.
+  const attachDrawActiveRef = useRef(false);
+  const handleDrawnAttachRef = useRef<((feature: DrawnFeature) => void) | null>(null);
+
   const handleFeatureCreated = useCallback((feature: DrawnFeature) => {
+    if (attachDrawActiveRef.current && feature.type === 'Polygon') {
+      handleDrawnAttachRef.current?.(feature);
+      return;
+    }
     setPendingFeature(feature);
     setFeatureModalOpen(true);
   }, []);
@@ -1353,13 +1365,23 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
 
   const [attachMode, setAttachMode] = useState(false);
   const [attachCandidate, setAttachCandidate] = useState<{
+    kind: 'parcel' | 'drawn';
     feature: Feature;
     apn: string;
     acres: number | null;
-    centroid: [number, number]; // [lon, lat] — parcel centroid (Gesture A point)
+    centroid: [number, number]; // [lon, lat] — parcel/polygon centroid
+    droppedPoint?: [number, number]; // [lon, lat] — drag landing point (P2)
+    boundaryGeometry?: Geometry; // GeoJSON polygon to write (P3 drawn)
   } | null>(null);
   const [attachSaving, setAttachSaving] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [attachSnapToCenter, setAttachSnapToCenter] = useState(false);
+  const [attachDrawActive, setAttachDrawActive] = useState(false);
+
+  // Keep the ref the draw callback reads in sync with the flag.
+  useEffect(() => {
+    attachDrawActiveRef.current = attachDrawActive;
+  }, [attachDrawActive]);
 
   const handleParcelAttach = useCallback((feature: Feature) => {
     const props = (feature.properties ?? {}) as Record<string, unknown>;
@@ -1378,12 +1400,144 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     }
     if (!centroid) return;
     setAttachError(null);
-    setAttachCandidate({ feature, apn, acres, centroid });
+    setAttachSnapToCenter(false);
+    setAttachCandidate({ kind: 'parcel', feature, apn, acres, centroid });
   }, []);
+
+  // P2 / Gesture B: subject pin dragged onto the map. Find the first parcel
+  // under the drop point; if found, open the same confirm modal pre-filled
+  // from the matched parcel, carrying the dropped point so the modal can offer
+  // a "snap to parcel center" toggle.
+  const handleSubjectDragEnd = useCallback(
+    (lngLat: [number, number]) => {
+      const features = taxParcels?.features;
+      if (!features?.length) {
+        showToast('No parcel under the pin');
+        return;
+      }
+      const pt = turf.point(lngLat);
+      let match: Feature | null = null;
+      for (const f of features) {
+        const geomType = f.geometry?.type;
+        if (geomType !== 'Polygon' && geomType !== 'MultiPolygon') continue;
+        try {
+          if (turf.booleanPointInPolygon(pt, f as Feature<Polygon | MultiPolygon>)) {
+            match = f as Feature;
+            break;
+          }
+        } catch {
+          // ignore malformed geometry
+        }
+      }
+      if (!match) {
+        showToast('No parcel under the pin');
+        return;
+      }
+      const props = (match.properties ?? {}) as Record<string, unknown>;
+      const apn = getParcelIdFromProps(props, match.id);
+      let acres: number | null = null;
+      let centroid: [number, number] | null = null;
+      try {
+        acres = turf.area(match as turf.AllGeoJSON) / 4046.8564224;
+        const c = turf.centroid(match as turf.AllGeoJSON);
+        const coords = c.geometry?.coordinates as [number, number] | undefined;
+        if (coords && Number.isFinite(coords[0]) && Number.isFinite(coords[1])) {
+          centroid = [coords[0], coords[1]];
+        }
+      } catch {
+        // ignore geometry errors
+      }
+      if (!centroid) {
+        showToast('No parcel under the pin');
+        return;
+      }
+      setAttachError(null);
+      setAttachSnapToCenter(false);
+      setAttachCandidate({
+        kind: 'parcel',
+        feature: match,
+        apn,
+        acres,
+        centroid,
+        droppedPoint: lngLat,
+      });
+    },
+    [taxParcels, showToast]
+  );
+
+  // P3 / Gesture C: a polygon drawn while "Draw Boundary" is active. Build the
+  // boundary geometry, best-effort APN from a single intersecting parcel, and
+  // open the confirm modal in 'drawn' mode.
+  const handleDrawnAttach = useCallback(
+    (feature: DrawnFeature) => {
+      const geom: Geometry = {
+        type: 'Polygon',
+        coordinates: feature.coordinates as GeoJSON.Position[][],
+      };
+      let acres: number | null =
+        typeof feature.properties?.area_acres === 'number'
+          ? feature.properties.area_acres
+          : null;
+      let centroid: [number, number] | null = null;
+      const geomFeature: Feature = { type: 'Feature', geometry: geom, properties: {} };
+      try {
+        if (acres == null) acres = turf.area(geomFeature as turf.AllGeoJSON) / 4046.8564224;
+        const c = turf.centroid(geomFeature as turf.AllGeoJSON);
+        const coords = c.geometry?.coordinates as [number, number] | undefined;
+        if (coords && Number.isFinite(coords[0]) && Number.isFinite(coords[1])) {
+          centroid = [coords[0], coords[1]];
+        }
+      } catch {
+        // ignore geometry errors
+      }
+
+      // Best-effort APN: exactly one intersecting parcel → use its parcel_id.
+      let apn = '';
+      const features = taxParcels?.features;
+      if (features?.length) {
+        const hits: Feature[] = [];
+        for (const f of features) {
+          const gt = f.geometry?.type;
+          if (gt !== 'Polygon' && gt !== 'MultiPolygon') continue;
+          try {
+            if (turf.booleanIntersects(geomFeature as Feature, f as Feature)) {
+              hits.push(f as Feature);
+              if (hits.length > 1) break;
+            }
+          } catch {
+            // ignore malformed geometry
+          }
+        }
+        if (hits.length === 1) {
+          apn = getParcelIdFromProps((hits[0].properties ?? {}) as Record<string, unknown>, hits[0].id);
+        }
+      }
+
+      setAttachError(null);
+      setAttachSnapToCenter(false);
+      setAttachCandidate({
+        kind: 'drawn',
+        feature: geomFeature,
+        apn,
+        acres,
+        centroid: centroid ?? [0, 0],
+        boundaryGeometry: geom,
+      });
+      setAttachDrawActive(false);
+      clearCurrentFeature();
+    },
+    [taxParcels, clearCurrentFeature]
+  );
+
+  // Wire the drawn-attach handler into the ref the draw callback reads.
+  useEffect(() => {
+    handleDrawnAttachRef.current = handleDrawnAttach;
+  }, [handleDrawnAttach]);
 
   const handleAttachCancel = useCallback(() => {
     setAttachCandidate(null);
     setAttachError(null);
+    setAttachSnapToCenter(false);
   }, []);
 
   const handleAttachConfirm = useCallback(async () => {
@@ -1391,12 +1545,17 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     setAttachSaving(true);
     setAttachError(null);
     const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-    const [lon, lat] = attachCandidate.centroid;
+    // Effective subject point: a dragged drop point wins unless the user opted
+    // to snap to the parcel center. Gesture A (click) has no droppedPoint →
+    // always the centroid. Drawn boundaries use the polygon centroid.
+    const useDropped = !!attachCandidate.droppedPoint && !attachSnapToCenter;
+    const [lon, lat] = useDropped ? attachCandidate.droppedPoint! : attachCandidate.centroid;
     const countyLabel = resolvedCounty
       ? resolvedCounty.charAt(0).toUpperCase() + resolvedCounty.slice(1)
       : null;
     try {
-      // 1) APN + county + relocated point on the project.
+      // 1) APN + county + relocated point on the project. Blank APN (drawn over
+      //    unparceled ground) is allowed → apn_primary null.
       const patchRes = await fetch(`${djangoUrl}/api/projects/${projectId}/`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -1412,35 +1571,61 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
         throw new Error(payload || `Project update failed (${patchRes.status})`);
       }
 
-      // 2) Boundary: reuse the parcel-ingest write (dissolves into gis_project_boundary).
-      const props = (attachCandidate.feature.properties ?? {}) as Record<string, unknown>;
+      // 2) Boundary write — branches by gesture kind.
       try {
-        const ingestRes = await fetch(`${djangoUrl}/api/gis/parcel-ingest/`, {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
-            projectId,
-            county: resolvedCounty,
-            parcels: [
-              {
-                parcelId: attachCandidate.apn,
-                geom: attachCandidate.feature.geometry,
-                properties: { ...props, PARCELID: attachCandidate.apn },
-              },
-            ],
-            source: 'parcel_association',
-          }),
-        });
-        if (ingestRes.ok) {
-          const payload = await ingestRes.json();
-          if (payload?.boundary?.geometry) {
-            setProjectBoundary(
-              buildBoundaryFeature(payload.boundary.geometry, {
-                acres: payload.boundary.acres,
-                source: payload.boundary.source,
-                created_at: payload.boundary.created_at,
-              })
-            );
+        if (attachCandidate.kind === 'drawn' && attachCandidate.boundaryGeometry) {
+          // P3: write the drawn polygon directly to the boundary endpoint.
+          const boundaryRes = await fetch(`${djangoUrl}/api/gis/boundary-set/`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              projectId,
+              geometry: attachCandidate.boundaryGeometry,
+              source: 'drawn',
+            }),
+          });
+          if (boundaryRes.ok) {
+            const payload = await boundaryRes.json();
+            if (payload?.boundary?.geometry) {
+              setProjectBoundary(
+                buildBoundaryFeature(payload.boundary.geometry, {
+                  acres: payload.boundary.acres,
+                  source: payload.boundary.source,
+                  created_at: payload.boundary.created_at,
+                })
+              );
+            }
+          }
+        } else {
+          // P1/P2: reuse the parcel-ingest write (dissolves into gis_project_boundary).
+          const props = (attachCandidate.feature.properties ?? {}) as Record<string, unknown>;
+          const ingestRes = await fetch(`${djangoUrl}/api/gis/parcel-ingest/`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              projectId,
+              county: resolvedCounty,
+              parcels: [
+                {
+                  parcelId: attachCandidate.apn,
+                  geom: attachCandidate.feature.geometry,
+                  properties: { ...props, PARCELID: attachCandidate.apn },
+                },
+              ],
+              source: 'parcel_association',
+            }),
+          });
+          if (ingestRes.ok) {
+            const payload = await ingestRes.json();
+            if (payload?.boundary?.geometry) {
+              setProjectBoundary(
+                buildBoundaryFeature(payload.boundary.geometry, {
+                  acres: payload.boundary.acres,
+                  source: payload.boundary.source,
+                  created_at: payload.boundary.created_at,
+                })
+              );
+            }
           }
         }
       } catch (boundaryErr) {
@@ -1463,8 +1648,10 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
       // 5) Let the host (chat-first wrapper) re-pull the project.
       onProjectUpdated?.();
 
-      showToast('Parcel attached');
+      showToast(attachCandidate.kind === 'drawn' ? 'Boundary attached' : 'Parcel attached');
       setAttachCandidate(null);
+      setAttachSnapToCenter(false);
+      setAttachDrawActive(false);
       setAttachMode(false);
     } catch (error) {
       setAttachError(error instanceof Error ? error.message : 'Failed to attach parcel');
@@ -1473,6 +1660,7 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
     }
   }, [
     attachCandidate,
+    attachSnapToCenter,
     getAuthHeaders,
     projectId,
     resolvedCounty,
@@ -2151,7 +2339,9 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                 )}
                 {attachMode && (
                   <div className="map-tab-panel-message">
-                    Click a parcel on the map to attach it to {project.project_name || 'the subject'}.
+                    {attachDrawActive
+                      ? 'Draw a polygon on the map to set the boundary.'
+                      : `Click a parcel, or drag the subject pin onto one, to attach it to ${project.project_name || 'the subject'}. Or draw the boundary by hand.`}
                   </div>
                 )}
                 <div className="map-tab-panel-actions">
@@ -2168,12 +2358,35 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                     variant={attachMode ? undefined : 'outline'}
                     size="sm"
                     onClick={() => {
-                      setAttachMode((v) => !v);
+                      setAttachMode((v) => {
+                        const next = !v;
+                        if (!next) {
+                          // Leaving attach mode: clear any in-progress draw.
+                          setAttachDrawActive(false);
+                          cancelDraw();
+                          clearCurrentFeature();
+                        }
+                        return next;
+                      });
                       setAttachCandidate(null);
                     }}
                   >
                     {attachMode ? 'Cancel Attach' : 'Attach Parcel'}
                   </CButton>
+                  {attachMode && (
+                    <CButton
+                      color="primary"
+                      variant={attachDrawActive ? undefined : 'outline'}
+                      size="sm"
+                      disabled={attachDrawActive}
+                      onClick={() => {
+                        setAttachDrawActive(true);
+                        startDrawPolygon();
+                      }}
+                    >
+                      {attachDrawActive ? 'Drawing…' : 'Draw Boundary'}
+                    </CButton>
+                  )}
                 </div>
               </>
             )}
@@ -2287,16 +2500,26 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
           onTaxParcelToggle={handleTaxParcelToggle}
           onViewStateChange={handleViewStateChange}
           attachMode={attachMode}
+          attachDrawActive={attachDrawActive}
           onParcelAttach={handleParcelAttach}
+          onSubjectDragEnd={handleSubjectDragEnd}
         />
 
-        {/* ─── Parcel Attach Confirm (P1) ─── */}
+        {/* ─── Parcel Attach Confirm (P1 click · P2 drag · P3 draw) ─── */}
         <CModal visible={attachCandidate !== null} onClose={handleAttachCancel} alignment="center">
           <CModalHeader>
-            <CModalTitle>Attach parcel to {project.project_name || 'subject'}?</CModalTitle>
+            <CModalTitle>
+              {attachCandidate?.kind === 'drawn' ? 'Set boundary for ' : 'Attach parcel to '}
+              {project.project_name || 'subject'}?
+            </CModalTitle>
           </CModalHeader>
           <CModalBody>
-            {attachCandidate && (
+            {attachCandidate && (() => {
+              const effPoint: [number, number] =
+                attachCandidate.droppedPoint && !attachSnapToCenter
+                  ? attachCandidate.droppedPoint
+                  : attachCandidate.centroid;
+              return (
               <div className="d-flex flex-column gap-2" style={{ fontSize: 14 }}>
                 <div className="d-flex justify-content-between">
                   <span style={{ color: 'var(--cui-secondary-color)' }}>Parcel (APN)</span>
@@ -2313,12 +2536,21 @@ export function MapTab({ project, onProjectUpdated }: MapTabProps) {
                 <div className="d-flex justify-content-between">
                   <span style={{ color: 'var(--cui-secondary-color)' }}>Subject location</span>
                   <strong>
-                    {attachCandidate.centroid[1].toFixed(5)}, {attachCandidate.centroid[0].toFixed(5)}
+                    {effPoint[1].toFixed(5)}, {effPoint[0].toFixed(5)}
                   </strong>
                 </div>
+                {attachCandidate.droppedPoint && (
+                  <CFormCheck
+                    id="attach-snap-to-center"
+                    label="Snap subject to parcel center"
+                    checked={attachSnapToCenter}
+                    onChange={(e) => setAttachSnapToCenter(e.target.checked)}
+                  />
+                )}
                 {attachError && <div style={{ color: 'var(--cui-danger)' }}>{attachError}</div>}
               </div>
-            )}
+              );
+            })()}
           </CModalBody>
           <CModalFooter>
             <CButton color="secondary" variant="outline" onClick={handleAttachCancel} disabled={attachSaving}>

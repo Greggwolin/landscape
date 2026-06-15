@@ -156,6 +156,14 @@ export interface MapCanvasProps {
    *  fires onParcelAttach instead of the boundary-selection toggle. */
   attachMode?: boolean;
   onParcelAttach?: (feature: GeoJSON.Feature) => void;
+  /** Parcel-association (P2 / Gesture B): in attachMode a draggable subject
+   *  marker is rendered at `center`; on dragend the dropped lngLat is reported
+   *  here and the marker snaps back to `center`. */
+  onSubjectDragEnd?: (lngLat: [number, number]) => void;
+  /** Parcel-association (P3 / Gesture C): true while a boundary polygon is
+   *  being drawn. Suppresses the P1 parcel-click handler so draw vertices that
+   *  land on a parcel don't prematurely open the attach confirm. */
+  attachDrawActive?: boolean;
 }
 
 export interface LayerPanelProps {

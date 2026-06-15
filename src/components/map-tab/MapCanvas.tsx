@@ -350,6 +350,8 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
     onViewStateChange,
     attachMode,
     onParcelAttach,
+    onSubjectDragEnd,
+    attachDrawActive,
   },
   ref
 ) {
@@ -363,6 +365,7 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const recentSalesMarkersRef = useRef<maplibregl.Marker[]>([]);
   const competitorMarkersRef = useRef<maplibregl.Marker[]>([]);
   const subjectMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const attachDragMarkerRef = useRef<maplibregl.Marker | null>(null);
   const rasterDimCleanupRef = useRef<(() => void) | null>(null);
   const lastCenterRef = useRef<[number, number] | null>(null);
 
@@ -379,9 +382,13 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
   const onTaxParcelToggleRef = useRef(onTaxParcelToggle);
   const onViewStateChangeRef = useRef(onViewStateChange);
   const onParcelAttachRef = useRef(onParcelAttach);
+  const onSubjectDragEndRef = useRef(onSubjectDragEnd);
   const attachModeRef = useRef(attachMode);
+  const attachDrawActiveRef = useRef(attachDrawActive);
   useEffect(() => { onParcelAttachRef.current = onParcelAttach; }, [onParcelAttach]);
+  useEffect(() => { onSubjectDragEndRef.current = onSubjectDragEnd; }, [onSubjectDragEnd]);
   useEffect(() => { attachModeRef.current = attachMode; }, [attachMode]);
+  useEffect(() => { attachDrawActiveRef.current = attachDrawActive; }, [attachDrawActive]);
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;
@@ -900,6 +907,12 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       const props = (feature.properties ?? {}) as Record<string, unknown>;
       const parcelId = getParcelIdFromProps(props, feature.id);
       if (!parcelId) return;
+
+      // Parcel-association (P3 / Gesture C): while a boundary polygon is being
+      // drawn, let the draw tool consume map clicks. Without this, a vertex
+      // dropped on a parcel also fires the P1 click handler below and opens
+      // the attach confirm before the polygon is finished.
+      if (attachDrawActiveRef.current) return;
 
       // Parcel-association (P1): in attach mode, a parcel click opens the
       // attach confirm instead of toggling boundary selection.
@@ -1596,6 +1609,51 @@ export const MapCanvas = forwardRef<MapCanvasRef, MapCanvasProps>(function MapCa
       subjectMarkerRef.current = null;
     };
   }, [mapLoaded, styleRevision, center]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Parcel-association (P2 / Gesture B): draggable subject pin.
+  // Only present while in attach mode. On dragend we report the dropped lngLat
+  // and snap the marker back to `center` so it behaves as a one-shot gesture.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear any existing drag marker first.
+    if (attachDragMarkerRef.current) {
+      attachDragMarkerRef.current.remove();
+      attachDragMarkerRef.current = null;
+    }
+
+    // Not in attach mode, or a boundary draw is in progress: no drag pin. The
+    // draggable marker is a DOM element over the canvas; leaving it up during a
+    // P3 draw lets it swallow the double-click that closes the polygon.
+    if (!attachMode || attachDrawActive) return;
+
+    const markerEl = document.createElement('div');
+    markerEl.className = 'map-subject-marker map-attach-drag-marker';
+    markerEl.style.cursor = 'grab';
+
+    const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center', draggable: true })
+      .setLngLat([center[0], center[1]])
+      .addTo(map.current);
+
+    marker.on('dragstart', () => { markerEl.style.cursor = 'grabbing'; });
+    marker.on('dragend', () => {
+      markerEl.style.cursor = 'grab';
+      const lngLat = marker.getLngLat();
+      onSubjectDragEndRef.current?.([lngLat.lng, lngLat.lat]);
+      // Snap back to the subject center — this is a gesture tool, not a move.
+      marker.setLngLat([center[0], center[1]]);
+    });
+
+    attachDragMarkerRef.current = marker;
+
+    return () => {
+      attachDragMarkerRef.current?.remove();
+      attachDragMarkerRef.current = null;
+    };
+  }, [mapLoaded, styleRevision, attachMode, attachDrawActive, center]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Draw Demo Rings (from location intel layers)

@@ -354,3 +354,50 @@ def parcel_ingest(request):
             {"error": f"Failed to ingest parcels: {str(error)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def boundary_set(request):
+    """Set a project boundary from a drawn GeoJSON polygon (P3 / Gesture C).
+
+    Accepts GeoJSON in EPSG:4326, transforms to 3857, and UPSERTs into
+    landscape.gis_project_boundary (one row per project, keyed on project_id).
+    """
+    project_id = request.data.get("projectId") or request.data.get("project_id")
+    geometry = request.data.get("geometry")           # GeoJSON (4326)
+    source = request.data.get("source") or "drawn"
+    if not project_id or not geometry:
+        return Response(
+            {"error": "projectId and geometry are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO landscape.gis_project_boundary (project_id, geom, source)
+                VALUES (%s,
+                        ST_Multi(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 3857)),
+                        %s)
+                ON CONFLICT (project_id)
+                DO UPDATE SET geom = EXCLUDED.geom, source = EXCLUDED.source, created_at = now()
+                """,
+                [int(project_id), json.dumps(geometry), source],
+            )
+            cursor.execute(
+                "SELECT ST_Area(geom)/4046.8564224, ST_AsGeoJSON(geom), source, created_at "
+                "FROM landscape.gis_project_boundary WHERE project_id=%s",
+                [int(project_id)],
+            )
+            row = cursor.fetchone()
+        return Response({"success": True, "project_id": int(project_id), "boundary": {
+            "acres": float(row[0]) if row[0] is not None else None,
+            "geometry": json.loads(row[1]) if row[1] else None,
+            "source": row[2], "created_at": row[3],
+        }})
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to set boundary: {e}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
