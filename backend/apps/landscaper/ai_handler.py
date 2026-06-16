@@ -845,8 +845,11 @@ def _needs_user_knowledge(message: str) -> bool:
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Model to use for responses
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# Model to use for responses.
+# Env-driven so a future model retirement is a config change, not a code change.
+# Default is a current, in-service model. (The prior hardcoded Sonnet-4 pin was
+# retired and began returning 404 "model not found", which killed the whole chat.)
+CLAUDE_MODEL = os.environ.get("LANDSCAPER_MODEL", "claude-sonnet-4-5-20250929")
 ANTHROPIC_TIMEOUT_SECONDS = 120
 
 # Maximum tokens for response
