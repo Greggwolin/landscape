@@ -36,6 +36,11 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
     pitch = tool_input.get('pitch', 45)
     bearing = tool_input.get('bearing', 0)
     include_comps = tool_input.get('include_comps', False)
+    # Which comparable set to plot when include_comps is true.
+    # 'sale'  → tbl_market_comparable (sale comps)
+    # 'rent'  → tbl_rental_comparable (rent comps)
+    # Defaults to 'sale' for backward compatibility with prior callers.
+    comp_kind = (tool_input.get('comp_kind') or 'sale').lower()
     custom_markers = tool_input.get('custom_markers', [])
 
     # ── 1. Get project location ──────────────────────────────────
@@ -115,12 +120,19 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
     })
 
     # ── 3. Optional: comparable markers ──────────────────────────
+    # Plot only comps that already have coordinates. Count the ones missing
+    # coordinates so the caller (Landscaper) can OFFER to look them up from
+    # their addresses — never auto-write, never fabricate coordinates.
+    comps_skipped_no_location = 0
     if include_comps and project_id:
         try:
-            comp_markers = _fetch_comp_markers(project_id)
+            if comp_kind == 'rent':
+                comp_markers, comps_skipped_no_location = _fetch_rent_comp_markers(project_id)
+            else:  # 'sale' (default / backward compatible)
+                comp_markers = _fetch_comp_markers(project_id)
             markers.extend(comp_markers)
         except Exception as e:
-            logger.error(f"Error fetching comp markers: {e}")
+            logger.error(f"Error fetching {comp_kind} comp markers: {e}")
 
     # ── 4. Custom markers from tool input ────────────────────────
     # Each custom marker may carry a rich popup. Precedence:
@@ -154,7 +166,7 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
         })
 
     # ── 5. Return artifact config ────────────────────────────────
-    return {
+    result = {
         'success': True,
         'action': 'show_map_artifact',
         'map_config': {
@@ -169,6 +181,20 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
             'location': location_str,
         },
     }
+
+    # If some comps were left off the map for lack of coordinates, tell the
+    # model so it can offer to look them up (conservative UX: plot what's
+    # ready, offer the rest — never geocode or write silently).
+    if comps_skipped_no_location:
+        result['comps_skipped_no_location'] = comps_skipped_no_location
+        result['relay_hint'] = (
+            f"{comps_skipped_no_location} {comp_kind} comparable(s) have no saved map "
+            f"location and were left off the map. Offer to look up their locations from "
+            f"their addresses and add them — only proceed if the user says yes. Do not "
+            f"invent coordinates."
+        )
+
+    return result
 
 
 def _fetch_comp_markers(project_id: int) -> List[Dict[str, Any]]:
@@ -228,6 +254,65 @@ def _fetch_comp_markers(project_id: int) -> List[Dict[str, Any]]:
         logger.error(f"Error fetching comp markers for project {project_id}: {e}")
 
     return markers
+
+
+def _fetch_rent_comp_markers(project_id: int) -> Tuple[List[Dict[str, Any]], int]:
+    """
+    Fetch active rent comparables with coordinates for map overlay.
+
+    Returns (markers, skipped) where `skipped` is the count of active rent
+    comps that have NO saved coordinates and were therefore left off the map.
+    The caller surfaces `skipped` so Landscaper can offer to look them up —
+    coordinates are never invented here.
+    """
+    markers: List[Dict[str, Any]] = []
+    skipped = 0
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    comparable_id, property_name, address,
+                    latitude, longitude,
+                    asking_rent, unit_type, distance_miles
+                FROM landscape.tbl_rental_comparable
+                WHERE project_id = %s
+                  AND is_active = true
+                ORDER BY distance_miles ASC NULLS LAST
+            """, [project_id])
+
+            for row in cursor.fetchall():
+                comp_id, name, address = row[0], row[1], row[2]
+                lat, lon = row[3], row[4]
+                rent, unit_type, distance = row[5], row[6], row[7]
+
+                if lat is None or lon is None:
+                    skipped += 1
+                    continue
+
+                popup_parts = [f"<strong>{name or f'Rent Comp {comp_id}'}</strong>"]
+                if address:
+                    popup_parts.append(str(address))
+                if rent is not None:
+                    popup_parts.append(f"${rent:,.0f}/mo")
+                if unit_type:
+                    popup_parts.append(str(unit_type))
+                if distance is not None:
+                    popup_parts.append(f"{distance} mi")
+
+                markers.append({
+                    'id': f'rent_comp_{comp_id}',
+                    'coordinates': [float(lon), float(lat)],
+                    'label': name or f'Rent Comp {comp_id}',
+                    'color': '#8b5cf6',  # multifamily / rent
+                    'variant': 'numbered',
+                    'popup': '<br/>'.join(popup_parts),
+                })
+
+    except Exception as e:
+        logger.error(f"Error fetching rent comp markers for project {project_id}: {e}")
+
+    return markers, skipped
 
 
 def _geocode_city_state(location_str: Optional[str]) -> Optional[List[float]]:

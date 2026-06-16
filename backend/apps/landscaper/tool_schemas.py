@@ -39,6 +39,29 @@ LANDSCAPER_TOOLS = [
         },
     },
     {
+        "name": "geocode_rent_comps",
+        "description": (
+            "Look up and SAVE map locations for the active rent comps in the "
+            "current project that don't have coordinates yet, so they can be "
+            "plotted. This is the follow-through after generate_map_artifact "
+            "(comp_kind='rent') reports comps with no saved location. Fire ONLY "
+            "after the user agrees to look them up — never speculatively. Comps "
+            "with no stored address are skipped and reported, never invented. "
+            "After it runs, re-call generate_map_artifact with comp_kind='rent' "
+            "to show the now-located comps."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Optional cap on how many comps to look up this call. Omit to process all that are missing coordinates.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "update_project_field",
         "description": "Update a single project field value.",
         "input_schema": {
@@ -4736,7 +4759,8 @@ LANDSCAPER_TOOLS = [
                 "zoom": {"type": "number", "description": "Initial zoom (1-20). Default: 15."},
                 "pitch": {"type": "number", "description": "Camera pitch degrees (0=top-down, 60=oblique). Default: 45."},
                 "bearing": {"type": "number", "description": "Camera bearing degrees (0=north). Default: 0."},
-                "include_comps": {"type": "boolean", "description": "Include comparable properties as markers."},
+                "include_comps": {"type": "boolean", "description": "Include the project's comparable properties as markers. Pair with comp_kind to choose which set."},
+                "comp_kind": {"type": "string", "enum": ["sale", "rent"], "description": "Which comparable set to plot when include_comps is true. Use 'rent' for rental/lease comps, 'sale' for sale comps. Default: 'sale'. Comps without saved coordinates are left off the map and reported back so you can offer to look up their locations — do not pass invented coordinates via custom_markers."},
                 "custom_markers": {
                     "type": "array",
                     "description": (
