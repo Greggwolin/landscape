@@ -124,10 +124,11 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
     # coordinates so the caller (Landscaper) can OFFER to look them up from
     # their addresses — never auto-write, never fabricate coordinates.
     comps_skipped_no_location = 0
+    rent_summary = None  # {'comp_count', 'property_count'} for rent maps; honest counts
     if include_comps and project_id:
         try:
             if comp_kind == 'rent':
-                comp_markers, comps_skipped_no_location = _fetch_rent_comp_markers(project_id)
+                comp_markers, comps_skipped_no_location, rent_summary = _fetch_rent_comp_markers(project_id)
             else:  # 'sale' (default / backward compatible)
                 comp_markers = _fetch_comp_markers(project_id)
             markers.extend(comp_markers)
@@ -181,6 +182,23 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
             'location': location_str,
         },
     }
+
+    # Honest counts so the model narrates "N comps across M properties" instead
+    # of a bare comp count that doesn't match the visible (one-per-property)
+    # pins. Co-located unit-type rows collapse to one marker in
+    # _fetch_rent_comp_markers (LSCMD-MAPCLUSTER-0616-mp5).
+    if rent_summary is not None:
+        n_comps = rent_summary['comp_count']
+        n_props = rent_summary['property_count']
+        result['plotted_comp_count'] = n_comps
+        result['property_count'] = n_props
+        # The MapLibre renderer shows map_config['title'] (it has no subtitle
+        # field), so fold the honest count into the title where it's visible.
+        prop_word = 'property' if n_props == 1 else 'properties'
+        caption = f"{n_comps} rent comps across {n_props} {prop_word}"
+        if n_comps > n_props:
+            caption += " — several share a location"
+        result['map_config']['title'] = caption
 
     # If some comps were left off the map for lack of coordinates, tell the
     # model so it can offer to look them up (conservative UX: plot what's
@@ -317,17 +335,28 @@ def _fetch_comp_markers(project_id: int) -> List[Dict[str, Any]]:
     return markers
 
 
-def _fetch_rent_comp_markers(project_id: int) -> Tuple[List[Dict[str, Any]], int]:
+def _fetch_rent_comp_markers(
+    project_id: int,
+) -> Tuple[List[Dict[str, Any]], int, Dict[str, int]]:
     """
-    Fetch active rent comparables with coordinates for map overlay.
+    Fetch active rent comparables and aggregate them into ONE marker per
+    property location.
 
-    Returns (markers, skipped) where `skipped` is the count of active rent
-    comps that have NO saved coordinates and were therefore left off the map.
-    The caller surfaces `skipped` so Landscaper can offer to look them up —
-    coordinates are never invented here.
+    Most rent comps are the same property with several unit-type rows, all
+    geocoded to that property's single coordinate. Emitting one marker per row
+    stacks them — the map looks like ~7 pins while the narrated count says 45
+    (LSCMD-MAPCLUSTER-0616-mp5). We group rows by rounded coordinate and emit
+    one marker per group whose popup lists each unit type + rent.
+
+    Returns (markers, skipped, summary):
+      - skipped  = active comps with NO coordinates (still offered for geocoding)
+      - summary  = {'comp_count': plotted rows, 'property_count': marker groups}
     """
-    markers: List[Dict[str, Any]] = []
     skipped = 0
+    comp_count = 0
+    # Group by rounded coordinate (5 decimals ≈ ~1m; absorbs float noise).
+    # Plain dict preserves insertion order (distance ASC) on py3.7+.
+    groups: Dict[Tuple[float, float], Dict[str, Any]] = {}
 
     try:
         with connection.cursor() as cursor:
@@ -343,7 +372,7 @@ def _fetch_rent_comp_markers(project_id: int) -> Tuple[List[Dict[str, Any]], int
             """, [project_id])
 
             for row in cursor.fetchall():
-                comp_id, name, address = row[0], row[1], row[2]
+                name = row[1]
                 lat, lon = row[3], row[4]
                 rent, unit_type, distance = row[5], row[6], row[7]
 
@@ -351,29 +380,67 @@ def _fetch_rent_comp_markers(project_id: int) -> Tuple[List[Dict[str, Any]], int
                     skipped += 1
                     continue
 
-                popup_parts = [f"<strong>{name or f'Rent Comp {comp_id}'}</strong>"]
-                if address:
-                    popup_parts.append(str(address))
-                if rent is not None:
-                    popup_parts.append(f"${rent:,.0f}/mo")
-                if unit_type:
-                    popup_parts.append(str(unit_type))
-                if distance is not None:
-                    popup_parts.append(f"{distance} mi")
+                comp_count += 1
+                # One pin per PROPERTY. Rows of a property are sometimes geocoded
+                # a few meters apart, so coordinate-rounding alone would split a
+                # property into 2-3 pins (project 17: 7 properties → 15 distinct
+                # coords). Key on property_name; fall back to rounded coordinate
+                # for any unnamed row. The group keeps the FIRST (nearest, since
+                # ordered by distance) row's coordinate as its pin location.
+                key = (
+                    name.strip().lower()
+                    if name and name.strip()
+                    else (round(float(lat), 5), round(float(lon), 5))
+                )
+                grp = groups.get(key)
+                if grp is None:
+                    grp = {
+                        'lat': float(lat),
+                        'lon': float(lon),
+                        'names': {},      # property_name → frequency
+                        'units': [],      # one line per comp row
+                        'distance': distance,
+                    }
+                    groups[key] = grp
 
-                markers.append({
-                    'id': f'rent_comp_{comp_id}',
-                    'coordinates': [float(lon), float(lat)],
-                    'label': name or f'Rent Comp {comp_id}',
-                    'color': '#8b5cf6',  # multifamily / rent
-                    'variant': 'numbered',
-                    'popup': '<br/>'.join(popup_parts),
-                })
+                if name:
+                    grp['names'][name] = grp['names'].get(name, 0) + 1
+                unit_label = str(unit_type) if unit_type else 'Unit'
+                rent_label = f"${rent:,.0f}/mo" if rent is not None else 'rent n/a'
+                grp['units'].append(f"{unit_label} — {rent_label}")
+                if distance is not None and (
+                    grp['distance'] is None or distance < grp['distance']
+                ):
+                    grp['distance'] = distance
 
     except Exception as e:
         logger.error(f"Error fetching rent comp markers for project {project_id}: {e}")
+        return [], skipped, {'comp_count': comp_count, 'property_count': 0}
 
-    return markers, skipped
+    markers: List[Dict[str, Any]] = []
+    MAX_UNITS = 12
+    for i, grp in enumerate(groups.values()):
+        # Rows in a group normally share property_name; if not, take the most common.
+        prop = max(grp['names'], key=grp['names'].get) if grp['names'] else f'Property {i + 1}'
+        lines = [f"<strong>{prop}</strong>"]
+        units = grp['units']
+        lines.extend(units[:MAX_UNITS])
+        if len(units) > MAX_UNITS:
+            lines.append(f"+{len(units) - MAX_UNITS} more")
+        if grp['distance'] is not None:
+            lines.append(f"{grp['distance']} mi")
+
+        markers.append({
+            'id': f'rent_comp_group_{i}',
+            'coordinates': [grp['lon'], grp['lat']],
+            'label': prop,
+            'color': '#8b5cf6',  # multifamily / rent
+            'variant': 'numbered',
+            'popup': '<br/>'.join(lines),
+        })
+
+    summary = {'comp_count': comp_count, 'property_count': len(markers)}
+    return markers, skipped, summary
 
 
 def _geocode_city_state(location_str: Optional[str]) -> Optional[List[float]]:
