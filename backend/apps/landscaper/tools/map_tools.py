@@ -194,6 +194,67 @@ def generate_map_artifact(tool_input: Dict[str, Any] = None, project_id: int = N
             f"invent coordinates."
         )
 
+    # ── 6. Persist as a durable artifact (Option B) ──────────────
+    # Give the map an artifact_id so it lists in the artifacts panel, surfaces
+    # a chat card, and reopens — without forcing it through the block-document
+    # renderer / operating-statement guard (those assume the four block types).
+    # The real payload (map_config) rides in params_json; the schema is a
+    # minimal valid text block purely to satisfy validate_block_document. The
+    # map still draws live via the unchanged action/map_config keys above.
+    #
+    # Dedup by PURPOSE so distinct maps each keep their own slot and re-running
+    # the same map updates in place: comp maps key on comp_kind ('rent'/'sale');
+    # a non-comp (subject-only) map keys on its title slug.
+    if project_id:
+        try:
+            from apps.artifacts.services import create_artifact_record
+
+            if include_comps:
+                artifact_title = f"Map — {comp_kind.capitalize()} Comps"
+                map_dedup_key = comp_kind
+            else:
+                artifact_title = title or "Map"
+                map_dedup_key = (title or "map").strip().lower().replace(' ', '-')[:60]
+
+            artifact_envelope = create_artifact_record(
+                title=artifact_title,
+                schema={'blocks': [{
+                    'type': 'text',
+                    'id': 'map_note',
+                    'content': 'Interactive map — opens in the map viewer.',
+                }]},
+                project_id=project_id,
+                thread_id=kwargs.get('thread_id'),
+                user_id=kwargs.get('user_id'),
+                tool_name='generate_map_artifact',
+                params_json={
+                    'kind': 'map',
+                    'comp_kind': comp_kind,
+                    'include_comps': bool(include_comps),
+                    # Stash the full config so a click-through from the artifacts
+                    # list / chat card re-hydrates the live map from the record
+                    # alone (read back by ArtifactWorkspacePanel's map branch).
+                    'map_config': result['map_config'],
+                },
+                dedup_key=map_dedup_key,
+            )
+
+            if artifact_envelope.get('success') and 'artifact_id' in artifact_envelope:
+                # Merge artifact_id + title so the frontend's extractArtifactCards
+                # surfaces a chat card and the list shows a titled entry. The
+                # existing action/map_config keys remain → live render unchanged.
+                result = {
+                    **result,
+                    'artifact_id': artifact_envelope['artifact_id'],
+                    'title': artifact_title,
+                }
+        except Exception as inner:
+            # Best-effort: a registry-side failure must not break the live map.
+            logger.warning(
+                f"generate_map_artifact: artifact registration failed (non-fatal): {inner}",
+                exc_info=True,
+            )
+
     return result
 
 

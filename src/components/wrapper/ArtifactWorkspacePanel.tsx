@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight, FileText, Folder, Pin, Clock, Database, Pencil, Trash2 } from 'lucide-react';
-import { useWrapperUI, type LocationBriefArtifactConfig } from '@/contexts/WrapperUIContext';
+import { useWrapperUI, type LocationBriefArtifactConfig, type MapArtifactConfig } from '@/contexts/WrapperUIContext';
 import { useModalRegistrySafe } from '@/contexts/ModalRegistryContext';
 import {
   type ArtifactSummary,
@@ -17,6 +17,7 @@ import {
 import type { EditTarget, JsonPatchOp, SourceRef } from '@/types/artifact';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { LocationBriefArtifact } from './LocationBriefArtifact';
+import { MapArtifactRenderer } from './MapArtifactRenderer';
 import { ReportArtifactView } from '@/components/reports/ReportArtifactView';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
@@ -393,6 +394,20 @@ export function ArtifactWorkspacePanel({
             config={
               (active.params_json as { location_brief_config: LocationBriefArtifactConfig })
                 .location_brief_config
+            }
+            onClose={() => setActiveArtifactId(null)}
+          />
+        ) : active.tool_name === 'generate_map_artifact' &&
+          active.params_json &&
+          (active.params_json as { map_config?: unknown }).map_config ? (
+          // Map artifacts re-hydrate the live MapLibre renderer from the stored
+          // map_config — NOT the block ArtifactRenderer (which only knows
+          // section/table/key_value_grid/text). Mirrors the location-brief
+          // carve-out above so reopening a map from the list/chat card shows the
+          // map, not the placeholder text block. LSCMD-MAPARTIFACT-0616-mp3.
+          <MapArtifactRenderer
+            config={
+              (active.params_json as { map_config: MapArtifactConfig }).map_config
             }
             onClose={() => setActiveArtifactId(null)}
           />
