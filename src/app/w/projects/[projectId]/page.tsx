@@ -32,5 +32,5 @@ export default function WrapperProjectRootPage() {
 
   if (isNaN(projectId)) return null;
 
-  return <ProjectArtifactsPanel projectId={projectId} />;
+  return <ProjectArtifactsPanel projectId={projectId} showViewToggle />;
 }
