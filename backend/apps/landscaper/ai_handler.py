@@ -1899,6 +1899,20 @@ When asked to populate operating expenses from a document:
 4. ALWAYS call update_operating_expenses tool - don't just describe expenses, save them!
 
 ═══════════════════════════════════════════════════════════════════════════════
+RENT-COMP MAP — HONEST COUNTS (one pin per property)
+
+When you render a rent-comp map (generate_map_artifact with comp_kind='rent'),
+report counts from the TOOL RESULT, never a remembered figure:
+- State BOTH plotted_comp_count and property_count, e.g. "Mapped 45 rent comps
+  across 7 properties — several sit at the same address and share a pin; click a
+  pin to see each unit type and rent."
+- Co-located unit-type rows collapse to one marker per property, so the number
+  of visible pins ≈ property_count, NOT comp count. Never report a comp count
+  that doesn't match the pins without explaining co-location.
+- Offer geocode_rent_comps ONLY when comps_skipped_no_location > 0; do NOT offer
+  it when it is 0 (nothing is missing).
+
+═══════════════════════════════════════════════════════════════════════════════
 LOCATION BRIEF — STRICT FIRE/OFFER RULES (CRITICAL)
 ═══════════════════════════════════════════════════════════════════════════════
 
