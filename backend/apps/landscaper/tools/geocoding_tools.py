@@ -135,3 +135,99 @@ def geocode_address_tool(
         'persisted': persisted,
         'error': None,
     }
+
+
+@register_tool('geocode_rent_comps')
+def geocode_rent_comps_tool(
+    tool_input: Dict[str, Any] = None,
+    project_id: int = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """Look up and save map locations for this project's active rent comps that
+    don't have coordinates yet, so they can be plotted on the map.
+
+    Conservative-by-design (Gregg, 2026-06-16): this is the "yes, look them up"
+    follow-through after generate_map_artifact reports comps with no saved
+    location. ONLY call after the user has agreed. Geocodes each comp's stored
+    address and writes the result back to tbl_rental_comparable. Comps with no
+    address are skipped (reported, never invented).
+
+    Args:
+        tool_input: { limit: optional int cap on how many to process this call }
+        project_id: active project (required)
+
+    Returns:
+        {success, located, failed, skipped_no_address, details[], error}
+    """
+    tool_input = tool_input or {}
+    limit = tool_input.get('limit')
+
+    if not project_id:
+        return {'success': False, 'error': 'no project in context'}
+
+    from django.db import connection
+    from apps.location_intelligence.services.geocode_provider import geocode_address
+
+    located = 0
+    failed = 0
+    skipped_no_address = 0
+    details = []
+
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT comparable_id, property_name, address
+                FROM landscape.tbl_rental_comparable
+                WHERE project_id = %s
+                  AND is_active = true
+                  AND (latitude IS NULL OR longitude IS NULL)
+                ORDER BY distance_miles ASC NULLS LAST
+                """,
+                [int(project_id)],
+            )
+            rows = cur.fetchall()
+
+        if isinstance(limit, int) and limit > 0:
+            rows = rows[:limit]
+
+        for comp_id, name, address in rows:
+            if not address or not str(address).strip():
+                skipped_no_address += 1
+                details.append({'comp': name, 'status': 'no_address'})
+                continue
+
+            geo = geocode_address(str(address).strip())
+            if geo.get('latitude') is None:
+                failed += 1
+                details.append({'comp': name, 'status': 'no_match'})
+                continue
+
+            try:
+                with connection.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE landscape.tbl_rental_comparable
+                        SET latitude = %s, longitude = %s, updated_at = NOW()
+                        WHERE comparable_id = %s
+                        """,
+                        [geo['latitude'], geo['longitude'], comp_id],
+                    )
+                located += 1
+                details.append({'comp': name, 'status': 'located'})
+            except Exception as exc:  # noqa: BLE001
+                failed += 1
+                details.append({'comp': name, 'status': f'write_failed: {exc}'})
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception('geocode_rent_comps_tool failed')
+        return {'success': False, 'error': str(exc)}
+
+    return {
+        'success': True,
+        'located': located,
+        'failed': failed,
+        'skipped_no_address': skipped_no_address,
+        'details': details,
+        'error': None,
+    }

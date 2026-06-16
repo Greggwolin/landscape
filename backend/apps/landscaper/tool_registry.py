@@ -99,6 +99,8 @@ UNIVERSAL_TOOLS = [
     "generate_location_brief",
     # Geocoding (FB-317) — universal, address → coordinates
     "geocode_address",
+    # Rent-comp geocoding follow-through (project-scoped; pairs with generate_map_artifact comp_kind='rent')
+    "geocode_rent_comps",
     # P1 Analysis tools (Apr 2026)
     "list_projects_summary",
     "get_deal_summary",
