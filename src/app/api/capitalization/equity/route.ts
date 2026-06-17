@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
         ownership_pct,
         commitment_amount,
         capital_contributed,
+        funded_amount,
         preferred_return_pct,
         unreturned_capital,
         cumulative_distributions,
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
       // Basic Information
       ownership_pct: p.ownership_pct ? Number(p.ownership_pct) : 0,
       capital_contributed: Number(p.capital_contributed || p.commitment_amount || 0),
+      capital_deployed: Number(p.funded_amount || 0),
       preferred_return_pct: p.preferred_return_pct ? Number(p.preferred_return_pct) : 0,
 
       // Capital Tracking
