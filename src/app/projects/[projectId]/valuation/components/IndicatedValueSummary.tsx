@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import type { SalesComparable, ValuationReconciliation } from '@/types/valuation';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface AcquisitionPriceSummary {
   asking_price: number | null;
@@ -71,7 +72,7 @@ export function IndicatedValueSummary({
     const fetchAcquisitionPrice = async () => {
       try {
         const djangoUrl = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${djangoUrl}/api/projects/${projectId}/acquisition/price-summary/`);
+        const response = await fetch(`${djangoUrl}/api/projects/${projectId}/acquisition/price-summary/`, { headers: getAuthHeaders() });
         if (response.ok) {
           const data = await response.json();
           setAcquisitionData(data);

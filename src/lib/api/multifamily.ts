@@ -5,6 +5,8 @@
  * for multifamily rent roll functionality.
  */
 
+import { getAuthHeaders } from '@/lib/authHeaders';
+
 const DJANGO_API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
 
 // SWR-compatible response format (matching legacy Next.js API format)
@@ -145,6 +147,7 @@ async function fetchAPI<T>(url: string, options?: RequestInit): Promise<T> {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options?.headers,
       },
     });

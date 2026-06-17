@@ -302,7 +302,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         const currentRate = vacancyRows.find(r => r.line_item_key === 'physical_vacancy')?.as_is?.rate;
         fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({ vacancy_override_pct: currentRate ?? 0.05 })
         }).then(() => reload());
       } else if (currentSource === 'user_modified') {
@@ -310,7 +310,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         if (window.confirm('Revert physical vacancy to the rent-roll-calculated value?')) {
           fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify({ vacancy_override_pct: null })
           }).then(() => reload());
         }
@@ -330,7 +330,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
 
         fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: JSON.stringify({
             management_fee_pct: derivedPct,
             management_fee_source: 'user_modified'
@@ -341,7 +341,7 @@ function OperationsTab({ project, mode: propMode, onModeChange }: OperationsTabP
         if (window.confirm('Revert management fee to the extracted value?')) {
           fetch(`${DJANGO_API_URL}/api/projects/${project.project_id}/operations/settings/`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify({
               management_fee_source: 'ingestion'
             })

@@ -189,7 +189,7 @@ function ProjectLayoutClientInner({ projectId, children }: ProjectLayoutClientPr
   }[]>({
     queryKey: ['intake-sessions', projectId],
     queryFn: async () => {
-      const res = await fetch(`${djangoApi}/api/intake/start?project_id=${projectId}`);
+      const res = await fetch(`${djangoApi}/api/intake/start?project_id=${projectId}`, { headers: getAuthHeaders() });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.sessions || []).filter((s: { status: string }) => s.status === 'draft');

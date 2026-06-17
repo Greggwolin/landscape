@@ -4,9 +4,10 @@
 
 import useSWR from 'swr';
 import { ProjectMapData, CompsMapData } from './geo';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     throw new Error(`Request failed with status ${res.status}`);
   }

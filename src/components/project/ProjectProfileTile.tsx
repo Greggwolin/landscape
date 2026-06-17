@@ -21,6 +21,7 @@ import useSWR from 'swr';
 import ProfileField from './ProfileField';
 import ProjectProfileEditModal from './ProjectProfileEditModal';
 import { fetchJson } from '@/lib/fetchJson';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatUnits, formatMSADisplay, getUnitCount, getUnitsLabel } from '@/types/project-profile';
 import { useProjectContext } from '@/app/components/ProjectProvider';
@@ -49,7 +50,7 @@ interface ProjectProfileTileProps {
   projectId: number;
 }
 
-const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
+const fetcher = (url: string) => fetchJson<ProjectProfile>(url, { headers: getAuthHeaders() });
 
 /** Format a two-line address: street on line 1, city/state/zip on line 2 */
 function formatAddress(profile: ProjectProfile): React.ReactNode | undefined {
@@ -82,6 +83,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
     queryFn: async () => {
       const res = await fetch(
         `${DJANGO_API_URL}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error('Failed to fetch project media');
       return res.json();
@@ -99,7 +101,7 @@ export const ProjectProfileTile: React.FC<ProjectProfileTileProps> = ({ projectI
   // Fetch acquisition price summary
   const { data: priceSummary, mutate: mutatePriceSummary } = useSWR<AcquisitionPriceSummary>(
     `${DJANGO_API_URL}/api/projects/${projectId}/acquisition/price-summary/`,
-    (url: string) => fetch(url).then(res => res.ok ? res.json() : null),
+    (url: string) => fetch(url, { headers: getAuthHeaders() }).then(res => res.ok ? res.json() : null),
     { revalidateOnFocus: false }
   );
 

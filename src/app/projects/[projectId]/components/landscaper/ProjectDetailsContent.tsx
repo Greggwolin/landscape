@@ -6,6 +6,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import ProjectProfileEditModal from '@/components/project/ProjectProfileEditModal';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { fetchJson } from '@/lib/fetchJson';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
 import { Card } from './Card';
@@ -15,7 +16,7 @@ interface ProjectDetailsContentProps {
   projectId: number;
 }
 
-const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
+const fetcher = (url: string) => fetchJson<ProjectProfile>(url, { headers: getAuthHeaders() });
 
 /**
  * Project details content (profile fields + map) without card wrapper.

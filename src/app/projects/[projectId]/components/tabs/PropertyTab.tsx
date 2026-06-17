@@ -769,7 +769,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
       return;
     }
     // Fetch column definitions
-    fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`)
+    fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/?table_name=multifamily_unit`, { headers: getAuthHeaders() })
       .then(res => res.ok ? res.json() : [])
       .then(data => {
         const allCols = Array.isArray(data) ? data : data.results || [];
@@ -797,7 +797,7 @@ export default function PropertyTab({ project, activeTab = 'details' }: Property
         })));
         // Fetch values for these columns
         if (filtered.length > 0) {
-          fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/with_values/?table_name=multifamily_unit`)
+          fetch(`${backendUrl}/api/projects/${projectId}/dynamic/columns/with_values/?table_name=multifamily_unit`, { headers: getAuthHeaders() })
             .then(r => r.ok ? r.json() : { values: {} })
             .then(vData => setActiveDynValues(vData.values || {}))
             .catch(() => setActiveDynValues({}));
