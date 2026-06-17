@@ -12,6 +12,7 @@ import {
   cilBook,
 } from '@coreui/icons';
 import { useHelpLandscaper, HelpMessage } from '@/contexts/HelpLandscaperContext';
+import { getAuthHeaders } from '@/lib/authHeaders';
 // User Guide opens in a separate OS window via window.open()
 import './help-landscaper-panel.css';
 
@@ -145,7 +146,7 @@ function PageGuide({ currentPage }: { currentPage: string | undefined }) {
       try {
         const res = await fetch(
           `${DJANGO_API_URL}/api/knowledge/platform/alpha-help/?page_context=${encodeURIComponent(currentPage)}`,
-          { signal: controller.signal },
+          { signal: controller.signal, headers: getAuthHeaders() },
         );
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();

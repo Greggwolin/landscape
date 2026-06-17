@@ -33,7 +33,7 @@ export interface DynamicColumnsResponse {
 }
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) {
     const error = new Error(`HTTP ${res.status}`) as Error & { status: number };
     error.status = res.status;

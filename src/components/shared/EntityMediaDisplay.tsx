@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CSpinner } from '@coreui/react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolveMediaUrl } from '@/lib/utils/mediaUtils';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 interface LinkedMedia {
   link_id: number;
@@ -66,6 +67,7 @@ export default function EntityMediaDisplay({
     queryFn: async () => {
       const res = await fetch(
         `${djangoBaseUrl}/api/dms/media/links/?entity_type=${entityType}&entity_id=${entityId}`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error('Failed to fetch entity media');
       return res.json();
@@ -77,6 +79,7 @@ export default function EntityMediaDisplay({
     mutationFn: async (linkId: number) => {
       const res = await fetch(`${djangoBaseUrl}/api/dms/media/links/${linkId}/`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error('Failed to remove link');
       return res.json();

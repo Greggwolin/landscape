@@ -9,6 +9,7 @@
  */
 
 import React, { useState } from 'react';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import {
   CModal,
   CModalHeader,
@@ -74,6 +75,7 @@ export default function ProjectPhotosModal({
     queryFn: async () => {
       const res = await fetch(
         `${djangoBaseUrl}/api/dms/media/links/?entity_type=project&entity_id=${projectId}`,
+        { headers: getAuthHeaders() },
       );
       if (!res.ok) throw new Error('Failed to fetch project media');
       return res.json();
@@ -86,6 +88,7 @@ export default function ProjectPhotosModal({
     mutationFn: async (linkId: number) => {
       const res = await fetch(`${djangoBaseUrl}/api/dms/media/links/${linkId}/`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       if (!res.ok) throw new Error('Failed to remove link');
       return res.json();

@@ -9,6 +9,7 @@ import { useProjectContext } from '@/app/components/ProjectProvider';
 import ProjectProfileEditModal from '@/components/project/ProjectProfileEditModal';
 import ProjectTabMap from '@/components/map/ProjectTabMap';
 import { fetchJson } from '@/lib/fetchJson';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import type { ProjectProfile } from '@/types/project-profile';
 import { formatGrossAcres, formatTargetUnits, formatMSADisplay } from '@/types/project-profile';
 import { getProjectSwitchUrl } from '@/lib/utils/folderTabConfig';
@@ -20,7 +21,7 @@ interface ProjectSelectorCardProps {
   onToggleCollapse?: () => void;
 }
 
-const fetcher = (url: string) => fetchJson<ProjectProfile>(url);
+const fetcher = (url: string) => fetchJson<ProjectProfile>(url, { headers: getAuthHeaders() });
 
 export function ProjectSelectorCard({ projectId, onToggleCollapse }: ProjectSelectorCardProps) {
   const { projects, activeProject, selectProject, refreshProjects } = useProjectContext();
