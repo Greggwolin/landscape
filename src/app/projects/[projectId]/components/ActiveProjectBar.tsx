@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getProjectSwitchUrl, isTwoLineLabel } from '@/lib/utils/folderTabConfig';
 import type { FolderTab } from '@/lib/utils/folderTabConfig';
 import { VersionBadge } from '@/components/changelog';
+import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 import {
   getPropertyTypeTokenRef,
   getPropertyTypeLabel,
@@ -380,8 +381,23 @@ export function ActiveProjectBar({
         ))}
       </div>
 
-      {/* Version badge - right side */}
-      <div style={{ flexShrink: 0, alignSelf: 'center' }}>
+      {/* Right side — view toggle + version badge */}
+      <div style={{ flexShrink: 0, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <ClassicViewToggle
+          projectId={projectId}
+          current="classic"
+          style={{
+            background: '#111827',
+            color: '#e2e8f0',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '4px',
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            padding: '0.3rem 0.6rem',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        />
         <VersionBadge />
       </div>
     </div>

@@ -8,6 +8,7 @@ import { ExcelAuditArtifact } from './ExcelAuditArtifact';
 import { ArtifactWorkspacePanel } from './ArtifactWorkspacePanel';
 import { WrapperHeader } from './WrapperHeader';
 import { ProjectDocumentsBody } from './ProjectDocumentsBody';
+import { ClassicViewToggle } from '@/components/ui/ClassicViewToggle';
 
 const DEFAULT_ARTIFACTS_WIDTH = 420;
 const MIN_ARTIFACTS_WIDTH = 320;
@@ -29,9 +30,13 @@ interface ProjectArtifactsPanelProps {
    *  ones. Transitional flag for the home page — until Phase 3 attaches
    *  dashboard chats to the home project, their artifacts are unassigned. */
   includeUnassigned?: boolean;
+  /** Show the "Classic view" toggle in the header. Only true on the real
+   *  project view (/w/projects/[id]); the dashboard mount leaves it off so the
+   *  toggle doesn't appear in a no-real-project context. */
+  showViewToggle?: boolean;
 }
 
-export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassigned }: ProjectArtifactsPanelProps) {
+export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassigned, showViewToggle }: ProjectArtifactsPanelProps) {
   const {
     artifactsOpen,
     toggleArtifacts,
@@ -175,14 +180,24 @@ export function ProjectArtifactsPanel({ projectId, documentsLabel, includeUnassi
           </div>
         }
         trailing={
-          <button
-            className="w-btn w-btn-ghost w-btn-sm"
-            onClick={toggleArtifacts}
-            title="Collapse panel"
-            style={{ fontSize: '14px', padding: '2px 6px' }}
-          >
-            ☰
-          </button>
+          <>
+            {showViewToggle && (
+              <ClassicViewToggle
+                projectId={projectId}
+                current="unified"
+                className="w-btn w-btn-ghost w-btn-sm"
+                style={{ fontSize: '12px', padding: '2px 8px' }}
+              />
+            )}
+            <button
+              className="w-btn w-btn-ghost w-btn-sm"
+              onClick={toggleArtifacts}
+              title="Collapse panel"
+              style={{ fontSize: '14px', padding: '2px 6px' }}
+            >
+              ☰
+            </button>
+          </>
         }
       />
 
