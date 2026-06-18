@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ContainerNode } from '@/types'
+import { getAuthHeaders } from '@/lib/authHeaders'
 
 interface UseContainersOptions {
   projectId: number
@@ -130,7 +131,7 @@ export function useContainers({
         url.searchParams.set('includeCosts', 'true')
       }
 
-      const response = await fetch(url.toString())
+      const response = await fetch(url.toString(), { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error('Failed to fetch containers')
       }
