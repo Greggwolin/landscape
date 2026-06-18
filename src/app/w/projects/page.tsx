@@ -98,11 +98,16 @@ export default function WrapperProjectsPage() {
     };
   }, []);
 
+  // FB-324: order project tiles by most-recent interaction (updated_at desc).
+  // Sort a copy so the underlying fetch order is untouched.
+  const sorted = [...projects].sort((a, b) =>
+    (b.updated_at || '').localeCompare(a.updated_at || '')
+  );
   const filtered = search
-    ? projects.filter((p) =>
+    ? sorted.filter((p) =>
         (p.project_name || '').toLowerCase().includes(search.toLowerCase())
       )
-    : projects;
+    : sorted;
 
   return (
     <RightContentPanel

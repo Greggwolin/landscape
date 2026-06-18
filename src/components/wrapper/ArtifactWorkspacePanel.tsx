@@ -955,21 +955,18 @@ interface EmptyActiveStateProps {
 }
 
 function EmptyActiveState({ hasArtifacts }: EmptyActiveStateProps) {
+  // FB-325: drop the "No artifact selected" block — when artifacts exist it
+  // wrongly implies there are none. Show nothing when artifacts are present;
+  // a soft hint (no "none selected" framing) only when there genuinely are none.
+  if (hasArtifacts) return null;
   return (
     <div style={emptyStateStyle}>
       <div style={{ maxWidth: 320, lineHeight: 1.5 }}>
         <FileText size={28} style={{ opacity: 0.3, marginBottom: 8 }} />
-        <div style={{ fontWeight: 600, color: 'var(--cui-body-color)', marginBottom: 4 }}>
-          No artifact selected
+        <div>
+          Ask Landscaper to <em>show</em> or <em>summarize</em> something — operating
+          statement, rent roll, comp comparison — and it will appear here.
         </div>
-        {hasArtifacts ? (
-          <div>Pick one from the Pinned or Recent sections above.</div>
-        ) : (
-          <div>
-            Ask Landscaper to <em>show</em> or <em>summarize</em> something — operating
-            statement, rent roll, comp comparison — and it will appear here.
-          </div>
-        )}
       </div>
     </div>
   );
