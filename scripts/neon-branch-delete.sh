@@ -42,10 +42,14 @@ fi
 
 echo "📝 Found branch: $BRANCH_ID"
 
-# Delete branch
-neonctl branches delete \
+# Delete branch.
+# NOTE: `neonctl branches delete` takes the branch id/name as a POSITIONAL
+# argument — `--branch` is not a valid flag here. The old `--branch "$NAME"`
+# form passed zero positional args and failed every run with
+# "Not enough non-option arguments", so PR preview branches were never deleted
+# and 89 accumulated (fixed in LSCMD-NEON-PRSWEEP-0618-dc).
+neonctl branches delete "$BRANCH_ID" \
   --project-id "$NEON_PROJECT" \
-  --branch "$BRANCH_NAME" \
   --yes
 
 echo "✅ Branch $BRANCH_NAME deleted successfully!"
