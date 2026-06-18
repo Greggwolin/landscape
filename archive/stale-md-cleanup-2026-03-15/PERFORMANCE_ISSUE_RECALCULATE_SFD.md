@@ -468,7 +468,7 @@ time curl -s -X POST "http://localhost:8000/api/projects/9/recalculate-sfd/" -H 
 ### Test database connection:
 ```bash
 PGPASSWORD=npg_bps3EShU9WFM /opt/homebrew/bin/psql \
-  -h ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech \
+  -h ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech \
   -U neondb_owner \
   -d land_v2 \
   -c "\timing on" \

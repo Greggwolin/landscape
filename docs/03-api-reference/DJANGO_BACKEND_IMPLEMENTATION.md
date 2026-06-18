@@ -82,7 +82,7 @@ DATABASES = {
         'NAME': 'land_v2',
         'USER': 'neondb_owner',
         'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': 'ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech',
+        'HOST': 'ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech',
         'PORT': '5432',
         'OPTIONS': {
             'sslmode': 'require',

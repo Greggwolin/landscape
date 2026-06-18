@@ -157,7 +157,7 @@ echo "--------------------------------"
 export PGPASSWORD=npg_bps3EShU9WFM
 
 # Check core_doc
-DOC_COUNT=$(psql -h ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech -U neondb_owner -d land_v2 -t -c "SELECT COUNT(*) FROM landscape.core_doc WHERE doc_id = ${DOC_ID}")
+DOC_COUNT=$(psql -h ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech -U neondb_owner -d land_v2 -t -c "SELECT COUNT(*) FROM landscape.core_doc WHERE doc_id = ${DOC_ID}")
 
 if [ $DOC_COUNT -eq 1 ]; then
     echo -e "${GREEN}✓${NC} Document exists in core_doc table"
@@ -166,7 +166,7 @@ else
 fi
 
 # Check ai_ingestion_history
-AI_COUNT=$(psql -h ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech -U neondb_owner -d land_v2 -t -c "SELECT COUNT(*) FROM landscape.ai_ingestion_history WHERE documents::text LIKE '%${DOC_ID}%'")
+AI_COUNT=$(psql -h ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech -U neondb_owner -d land_v2 -t -c "SELECT COUNT(*) FROM landscape.ai_ingestion_history WHERE documents::text LIKE '%${DOC_ID}%'")
 
 if [ $AI_COUNT -ge 1 ]; then
     echo -e "${GREEN}✓${NC} Ingestion history entry exists"

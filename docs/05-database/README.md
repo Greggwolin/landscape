@@ -192,7 +192,7 @@ See [MIGRATION-SUMMARY.md](MIGRATION-SUMMARY.md) for complete history.
 - [CHANGELOG](../../CHANGELOG.md)
 
 ### Database Access
-- Production: Neon (ep-spring-mountain-af3hdne2-pooler)
+- Production: Neon (ep-tiny-lab-af0tg3ps)
 - Connection details: See `.env` file
 - Migrations: `backend/apps/projects/migrations/` folder
 

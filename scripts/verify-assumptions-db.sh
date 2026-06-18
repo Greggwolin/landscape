@@ -10,7 +10,7 @@ echo "========================================"
 echo ""
 
 # Database connection string
-DB_HOST="ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech"
+DB_HOST="ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech"
 DB_USER="neondb_owner"
 DB_NAME="land_v2"
 
