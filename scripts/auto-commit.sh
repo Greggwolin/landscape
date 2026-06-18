@@ -2,6 +2,17 @@
 
 # Auto-commit script for landscape project
 # Saves work every 15 minutes with timestamp
+#
+# ⚠️ FB-304 — MANUAL DEV-CHECKPOINT USE ONLY. DO NOT SCHEDULE.
+# This script runs `git add -A` and commits EVERYTHING in the working tree,
+# including in-flight source code, under the generic message
+# "Auto-commit: Save work progress". That is intentional for an opt-in personal
+# checkpoint you start yourself via scripts/start-auto-commit.sh — but it is the
+# exact `git add -A` hazard that caused FB-304 when an automated job swept code
+# into a mislabeled docs commit. NEVER wire this into launchd/cron or any
+# unattended job. For the nightly documentation commit, use the scoped
+# allowlist committer instead: scripts/nightly/commit-generated-docs.sh
+# (stages generated docs only and refuses to commit code).
 
 # Get the project directory (where this script is located)
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
