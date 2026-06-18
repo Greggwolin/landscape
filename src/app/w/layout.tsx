@@ -290,8 +290,12 @@ function WrapperLayoutInner({ children }: { children: React.ReactNode }) {
       if (page === 'projects') {
         router.push('/w/projects');
       } else if (projectScoped.includes(page)) {
+        // FB-308: a project-scoped page (Reports, Map) needs a project. With one
+        // active, go straight there; with none, send the user to the project
+        // picker carrying the intent so it prompts "pick a project for <page>"
+        // instead of silently dumping them on the bare project list.
         if (pid) router.push(`/w/projects/${pid}/${page}`);
-        else router.push('/w/projects');
+        else router.push(`/w/projects?goto=${page}`);
       } else if (page === 'admin-feedback') {
         // Feedback queue lives outside the /w/ shell on the admin route layer.
         // Direct push (loses chat context); revisit if we wrap the admin pages in /w/ later.

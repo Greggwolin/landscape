@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { RightContentPanel } from '@/components/wrapper/RightContentPanel';
 import { useWrapperUI } from '@/contexts/WrapperUIContext';
@@ -49,6 +49,12 @@ function buildLocation(p: ProjectRow): string {
 
 export default function WrapperProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // FB-308: when arriving here because a project-scoped page (Reports/Map) was
+  // clicked with no active project, `goto` carries that intent so we prompt the
+  // user to pick a project and then open that page for the chosen project.
+  const goto = searchParams.get('goto');
+  const gotoLabel = goto === 'reports' ? 'Reports' : goto === 'map' ? 'Map' : goto;
   const { closeChat } = useWrapperUI();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +115,21 @@ export default function WrapperProjectsPage() {
       }
     >
       <div className="w-projects-body">
+        {goto && (
+          <div
+            style={{
+              padding: '10px 14px',
+              marginBottom: 12,
+              borderRadius: 6,
+              background: 'var(--w-accent-soft, rgba(99,102,241,0.12))',
+              border: '1px solid var(--w-border, rgba(255,255,255,0.12))',
+              color: 'var(--w-text-secondary)',
+              fontSize: '0.875rem',
+            }}
+          >
+            Select a project to open its {gotoLabel}.
+          </div>
+        )}
         <input
           type="text"
           className="w-search-input"
@@ -146,7 +167,13 @@ export default function WrapperProjectsPage() {
               <div
                 key={p.project_id}
                 className="w-project-row"
-                onClick={() => router.push(`/w/projects/${p.project_id}`)}
+                onClick={() =>
+                  router.push(
+                    goto
+                      ? `/w/projects/${p.project_id}/${goto}`
+                      : `/w/projects/${p.project_id}`
+                  )
+                }
               >
                 <span className="w-project-row-name">{p.project_name}</span>
                 {loc && <div className="w-project-row-desc">{loc}</div>}
