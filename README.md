@@ -252,7 +252,7 @@ DATABASE_URL=postgres://... npm run schema:md
 ```
 
 **Database Info**:
-- Host: `ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech`
+- Host: `ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech`
 - Database: `land_v2`
 - Active Schema: `landscape` (359 tables, 41 views)
 - Legacy Schema: `land_v2` (2 tables - unused)

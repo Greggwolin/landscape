@@ -104,7 +104,7 @@ services/financial_engine_py/
 
 ```bash
 # Database - ✅ Configured
-DATABASE_URL=postgresql://neondb_owner:***@ep-spring-mountain-***
+DATABASE_URL=postgresql://neondb_owner:***@ep-tiny-lab-***
 
 # Defaults
 DEFAULT_DISCOUNT_RATE=0.10

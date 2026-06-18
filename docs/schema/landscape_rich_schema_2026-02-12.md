@@ -1,7 +1,7 @@
 # Landscape Rich Schema (Full) - 2026-02-12
 
 - Generated at: 2026-02-12T17:15:45.014698Z
-- Database host: ep-spring-mountain-af3hdne2-pooler.c-2.us-west-2.aws.neon.tech
+- Database host: ep-tiny-lab-af0tg3ps.c-2.us-west-2.aws.neon.tech
 - Schema: landscape
 - Source JSON: `docs/schema/landscape_rich_schema_2026-02-12.json`
 
