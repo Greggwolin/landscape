@@ -15,16 +15,8 @@ import { ExtractionQueueSection } from './ExtractionQueueSection';
 // RentRollUpdateReviewModal retired — delta changes now shown inline in the rent roll grid
 import FieldMappingInterface from './FieldMappingInterface';
 import MediaPreviewModal from '@/components/dms/modals/MediaPreviewModal';
-import { useFileDrop } from '@/contexts/FileDropContext';
-import { useUploadThing } from '@/lib/uploadthing';
-import { getAuthHeaders } from '@/lib/authHeaders';
-
-// File extensions routed to the Excel audit pipeline on Landscaper-panel drop.
-const EXCEL_EXTENSIONS = ['.xlsx', '.xlsm', '.xls'];
-const isExcelFile = (file: File): boolean => {
-  const name = file.name.toLowerCase();
-  return EXCEL_EXTENSIONS.some(ext => name.endsWith(ext));
-};
+import { useChatAttachment } from './useChatAttachment';
+import { ChatDragOverlay } from './ChatDragOverlay';
 
 interface LandscaperPanelProps {
   projectId: number;
@@ -101,121 +93,22 @@ export function LandscaperPanel({
   const { pendingCount: rentRollPendingCount, documentId: pendingDocumentId, refresh: refreshPendingExtractions } = usePendingRentRollExtractions(projectId);
   const [extractionBannerDismissed, setExtractionBannerDismissed] = useState(false);
 
-  // File drop — forward non-Excel files to FileDropContext → triggers UnifiedIntakeModal.
-  // Excel files dropped directly on the Landscaper panel bypass the ingestion
-  // workbench and route through the Excel audit pipeline instead.
-  const { addFiles } = useFileDrop();
-  const [auditUploading, setAuditUploading] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-
-  const { startUpload: startAuditUpload } = useUploadThing('documentUploader', {
-    headers: {
-      'x-project-id': String(projectId),
-      'x-workspace-id': '1',
-      'x-doc-type': 'Financial Model',
-    },
+  // Universal file-attach wiring (FB-298) — drop/paste any file(s) → pending
+  // pills → upload on Send via the shared useChatAttachment hook. Identical
+  // path to the chat-forward CenterChatPanel. A dropped Excel becomes an
+  // attachment the user can ask Landscaper to audit (audit tools unchanged);
+  // it no longer auto-runs the audit or opens the intake modal on drop.
+  const attachment = useChatAttachment({
+    projectId,
+    source: 'landscaper_panel_drop',
   });
 
-  /**
-   * Upload an Excel file via the existing UploadThing + /api/dms/docs path,
-   * then ask Landscaper to run the audit on the resulting doc_id. This does
-   * NOT enqueue the file into the ingestion workbench.
-   */
-  const uploadAndAuditExcel = useCallback(async (file: File) => {
-    setAuditUploading(true);
-    setAuditError(null);
-    try {
-      const uploadResult = await startAuditUpload([file]);
-      if (!uploadResult || uploadResult.length === 0) {
-        throw new Error('UploadThing returned no result');
-      }
-      const uploaded = uploadResult[0] as { serverData?: Record<string, unknown>; url?: string };
-      const storage_uri = (uploaded.serverData?.storage_uri as string) ?? uploaded.url ?? '';
-      const sha256 = (uploaded.serverData?.sha256 as string) ?? '';
-
-      if (!storage_uri || sha256.length !== 64) {
-        throw new Error(`UploadThing response missing storage_uri or sha256 (sha256 len=${sha256.length})`);
-      }
-
-      const createRes = await fetch('/api/dms/docs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({
-          system: {
-            project_id: projectId,
-            workspace_id: 1,
-            doc_name: file.name,
-            doc_type: 'Financial Model',
-            status: 'draft',
-            storage_uri,
-            sha256,
-            file_size_bytes: file.size,
-            mime_type: file.type || 'application/vnd.ms-excel.sheet.macroEnabled.12',
-            version_no: 1,
-            // Route through DMS only; audit is invoked directly by the chat
-            // message below — do not trigger the structured-ingestion pipeline.
-            intent: 'dms_only',
-          },
-          profile: {},
-          ai: { source: 'landscaper_panel_drop' },
-        }),
-      });
-
-      if (!createRes.ok) {
-        const err = await createRes.json().catch(() => ({}));
-        const detail = err.detail || err.error || err.details || createRes.statusText;
-
-        // 403 here means tbl_project.created_by_id for this project doesn't
-        // match the JWT's user_id. This is a project-ownership data problem,
-        // not a bug in the drop wiring. Fall back to the existing ingestion
-        // path so the user still has a way to handle the file, and surface
-        // the real cause in the banner.
-        if (createRes.status === 403) {
-          addFiles([file]);
-          throw new Error(
-            `Project ownership check failed for project_id=${projectId} (${detail}). ` +
-            `Falling back to ingestion workbench — audit pipeline skipped. ` +
-            `Fix: ensure tbl_project.created_by_id for this project matches the logged-in user, or is NULL.`
-          );
-        }
-
-        throw new Error(`Failed to register document [${createRes.status}]: ${detail}`);
-      }
-      const docData = await createRes.json();
-      const docId: number | null =
-        docData.doc?.doc_id ?? docData.existing_doc?.doc_id ?? null;
-      if (!docId) throw new Error('No doc_id returned from /api/dms/docs');
-
-      // Ask Landscaper to run the audit. The four registered audit tools
-      // (classify_excel_file, run_structural_scan, run_formula_integrity,
-      // extract_assumptions) will be invoked by the model.
-      const prompt =
-        `Please audit the Excel model I just uploaded: "${file.name}" (doc_id=${docId}). ` +
-        `Start with classify_excel_file to determine the tier, then run run_structural_scan, ` +
-        `run_formula_integrity, and extract_assumptions as appropriate. Summarize the findings.`;
-      await chatRef.current?.sendMessage(prompt);
-    } catch (e) {
-      console.error('Excel audit drop failed', e);
-      setAuditError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setAuditUploading(false);
-    }
-  }, [projectId, startAuditUpload]);
-
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-    const excelFiles = acceptedFiles.filter(isExcelFile);
-    const otherFiles = acceptedFiles.filter(f => !isExcelFile(f));
-
-    if (otherFiles.length > 0) {
-      // Non-Excel drops on the Landscaper panel fall back to the existing
-      // ingestion workbench flow.
-      addFiles(otherFiles);
-    }
-    for (const f of excelFiles) {
-      void uploadAndAuditExcel(f);
-    }
-  }, [addFiles, uploadAndAuditExcel]);
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      attachment.addFiles(acceptedFiles);
+    },
+    [attachment],
+  );
 
   const {
     getRootProps,
@@ -402,36 +295,13 @@ export function LandscaperPanel({
       {/* Hidden file input for react-dropzone */}
       <input {...getInputProps()} />
 
-      {/* Drag overlay */}
-      {isDragActive && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            zIndex: 50,
-            borderRadius: 'var(--cui-card-border-radius)',
-            backgroundColor: isDragAccept
-              ? 'rgba(34, 197, 94, 0.1)'
-              : isDragReject
-              ? 'rgba(239, 68, 68, 0.1)'
-              : 'rgba(0, 0, 0, 0.05)',
-            color: 'var(--cui-body-color)',
-            pointerEvents: 'none',
-          }}
-        >
-          <div className="fw-semibold" style={{ fontSize: '1.1rem' }}>
-            Drop documents for Landscaper
-          </div>
-          <div className="mt-1" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9rem' }}>
-            Excel (.xlsx / .xlsm) → model audit. Other files → ingestion workbench.
-          </div>
-        </div>
-      )}
+      {/* Drag overlay — shared component so both UIs look identical */}
+      <ChatDragOverlay
+        isDragActive={isDragActive}
+        isDragAccept={isDragAccept}
+        isDragReject={isDragReject}
+        borderRadius="var(--cui-card-border-radius)"
+      />
 
       <div
         ref={splitContainerRef}
@@ -460,6 +330,11 @@ export function LandscaperPanel({
             onToggleExpand={handleActivityToggle}
             onCollapsePanel={onToggleCollapse}
             onReviewMedia={handleReviewMedia}
+            onBeforeSend={attachment.handleBeforeSend}
+            attachments={attachment.pendingAttachments}
+            onRemoveAttachment={attachment.removeAttachment}
+            onAddAttachments={attachment.addFiles}
+            attachmentUploading={attachment.uploading}
           />
         </CCard>
 
@@ -554,17 +429,17 @@ export function LandscaperPanel({
           </CAlert>
         )}
 
-        {/* Excel audit upload status */}
-        {auditUploading && (
+        {/* Attachment upload status (FB-298) — shown while pending files upload on Send */}
+        {attachment.uploading && (
           <CAlert color="info" className="mb-2 d-flex align-items-center gap-2 py-2">
             <CSpinner size="sm" />
-            <span className="small">Uploading Excel model for audit…</span>
+            <span className="small">Uploading attachment…</span>
           </CAlert>
         )}
-        {auditError && (
-          <CAlert color="danger" className="mb-2 d-flex align-items-center gap-2 py-2" dismissible onClose={() => setAuditError(null)}>
+        {attachment.error && (
+          <CAlert color="danger" className="mb-2 d-flex align-items-center gap-2 py-2" dismissible onClose={() => attachment.setError(null)}>
             <CIcon icon={cilWarning} size="sm" />
-            <span className="small">Audit upload failed: {auditError}</span>
+            <span className="small">Attachment upload failed: {attachment.error}</span>
           </CAlert>
         )}
 

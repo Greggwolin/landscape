@@ -14,19 +14,10 @@ import { emitLandscapeCommand } from '@/lib/landscape-command-bus';
 import { ChatSearchOverlay } from '@/components/wrapper/ChatSearchOverlay';
 import { WrapperHeader } from '@/components/wrapper/WrapperHeader';
 import { getPropertyTypeBadgeStyle, getPropertyTypeLabel } from '@/config/propertyTypeTokens';
-import { useFileDrop } from '@/contexts/FileDropContext';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useChatAttachment } from '@/components/landscaper/useChatAttachment';
+import { ChatDragOverlay } from '@/components/landscaper/ChatDragOverlay';
 
 const DJANGO_API_URL = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000';
-
-// File extensions routed to the Excel audit pipeline on chat-panel drop.
-// Mirrors LandscaperPanel's wiring so behavior is identical across the legacy
-// /projects/* surface and the unified /w/* surface.
-const EXCEL_EXTENSIONS = ['.xlsx', '.xlsm', '.xls'];
-const isExcelFile = (file: File): boolean => {
-  const name = file.name.toLowerCase();
-  return EXCEL_EXTENSIONS.some(ext => name.endsWith(ext));
-};
 
 /** Map open_input_modal names → Landscaper page context values. */
 const MODAL_TO_CONTEXT: Record<string, string> = {
@@ -420,20 +411,11 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     setActiveContentContext(null);
   }, [setActiveContentContext]);
 
-  // ── File drop wiring (ported from LandscaperPanel during /w/ migration) ──
-  // Excel files: direct DMS create + Landscaper audit kickoff (no modal step).
-  // Non-Excel files: forwarded to FileDropContext (UnifiedIntakeModal isn't
-  // mounted on /w/* — Stage B will replace this with direct ingest).
-  //
-  // Routing scope: project-scoped uploads use projectId; pre-project uploads
-  // (on /w/chat / /w/chat/[threadId]) attach to the chat thread instead.
-  const { addFiles } = useFileDrop();
-  const [auditUploading, setAuditUploading] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
-  // Pending attachment — set by drop, uploaded on Send via onBeforeSend.
-  // Single-file v1 (multi-file deferred). NOT auto-uploaded — file sits in
-  // state until the user types a prompt + clicks Send.
-  const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  // ── Universal file-attach wiring (FB-298) ──
+  // Drop/paste any file(s) → pending-attachment pills → upload on Send via the
+  // shared useChatAttachment hook (identical path in classic LandscaperPanel).
+  // Project-scoped uploads use projectId; pre-project uploads (on /w/chat /
+  // /w/chat/[threadId]) auto-create + attach to a chat thread.
 
   // Track the active thread id from any source (URL prop, homepage state, or
   // the LandscaperChatThreaded onActiveThreadChange callback).
@@ -455,24 +437,6 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     },
     [handleActiveThreadChange]
   );
-
-  // UploadThing's `headers` option captures values at hook-call time; using
-  // a function here ensures the latest projectId / activeThreadId are sent
-  // for each upload (a static object would freeze on first render).
-  const { startUpload: startAuditUpload } = useUploadThing('documentUploader', {
-    headers: () => {
-      const h: Record<string, string> = {
-        'x-workspace-id': '1',
-        'x-doc-type': 'Financial Model',
-      };
-      if (projectId) {
-        h['x-project-id'] = String(projectId);
-      } else if (activeThreadId) {
-        h['x-thread-id'] = activeThreadId;
-      }
-      return h;
-    },
-  });
 
   /**
    * Ensure we have a thread to attach an unassigned upload to. If the user
@@ -504,132 +468,24 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
     }
   }, [activeThreadId, pathname, router]);
 
-  /**
-   * Upload a pending attachment via UploadThing + /api/dms/docs, returning
-   * { doc_id, doc_name } on success. Throws on failure.
-   *
-   * Called from `onBeforeSend` (which fires when the user clicks Send with a
-   * pending attachment). Does NOT fire any chat message — that's the caller's
-   * job. Does NOT ask Landscaper to do anything with the file — the user's
-   * own typed prompt drives behavior.
-   *
-   * Ownership target resolution:
-   *   1. projectId (explicit project route)
-   *   2. activeThreadId (existing thread)
-   *   3. auto-create a new unassigned thread
-   */
-  const uploadPendingFile = useCallback(async (file: File): Promise<{ doc_id: number; doc_name: string }> => {
-    let threadIdForUpload: string | null = null;
-    if (!projectId) {
-      threadIdForUpload = await ensureUnassignedThread();
-      if (!threadIdForUpload) {
-        throw new Error(
-          'Could not create an unassigned chat thread to attach the file to. Try sending a message first, then drop the file again.'
-        );
-      }
-    }
+  // Shared universal attach hook (FB-298) — owns pending attachments, the
+  // UploadThing + /api/dms/docs upload, and the onBeforeSend contextSuffix.
+  // Identical path is used by the classic LandscaperPanel.
+  const attachment = useChatAttachment({
+    projectId,
+    activeThreadId,
+    ensureThread: ensureUnassignedThread,
+    source: 'center_chat_panel_drop',
+  });
 
-    const uploadResult = await startAuditUpload([file]);
-    if (!uploadResult || uploadResult.length === 0) {
-      throw new Error('UploadThing returned no result');
-    }
-    const uploaded = uploadResult[0] as { serverData?: Record<string, unknown>; url?: string };
-    const storage_uri = (uploaded.serverData?.storage_uri as string) ?? uploaded.url ?? '';
-    const sha256 = (uploaded.serverData?.sha256 as string) ?? '';
-
-    if (!storage_uri || sha256.length !== 64) {
-      throw new Error(`UploadThing response missing storage_uri or sha256 (sha256 len=${sha256.length})`);
-    }
-
-    const systemPayload: Record<string, unknown> = {
-      workspace_id: 1,
-      doc_name: file.name,
-      doc_type: 'Financial Model',
-      status: 'draft',
-      storage_uri,
-      sha256,
-      file_size_bytes: file.size,
-      mime_type: file.type || 'application/vnd.ms-excel.sheet.macroEnabled.12',
-      version_no: 1,
-      // Route through DMS only; the user's typed prompt drives any tool use.
-      intent: 'dms_only',
-    };
-    if (projectId) {
-      systemPayload.project_id = projectId;
-    } else if (threadIdForUpload) {
-      systemPayload.thread_id = threadIdForUpload;
-    }
-
-    const createRes = await fetch('/api/dms/docs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({
-        system: systemPayload,
-        profile: {},
-        ai: { source: 'center_chat_panel_drop' },
-      }),
-    });
-
-    if (!createRes.ok) {
-      const err = await createRes.json().catch(() => ({}));
-      const detail = err.detail || err.error || err.details || createRes.statusText;
-      throw new Error(`Failed to register document [${createRes.status}]: ${detail}`);
-    }
-    const docData = await createRes.json();
-    const docId: number | null =
-      docData.doc?.doc_id ?? docData.existing_doc?.doc_id ?? null;
-    if (!docId) throw new Error('No doc_id returned from /api/dms/docs');
-
-    return { doc_id: docId, doc_name: file.name };
-  }, [projectId, startAuditUpload, ensureUnassignedThread]);
-
-  /**
-   * Pre-send hook handed to LandscaperChatThreaded. If a pending attachment
-   * exists, uploads it and returns a contextSuffix that LandscaperChatThreaded
-   * appends to the user's message. The model sees both the user's prompt
-   * AND the attached doc reference (with doc_id) so it can call audit tools
-   * if the user asked for them.
-   */
-  const handleBeforeSend = useCallback(async (): Promise<{ contextSuffix?: string } | void> => {
-    if (!pendingAttachment) return;
-    setAuditUploading(true);
-    setAuditError(null);
-    try {
-      const { doc_id, doc_name } = await uploadPendingFile(pendingAttachment);
-      setPendingAttachment(null);
-      // Compact reference appended to the user's message — gives the model
-      // doc_id grounding without the user having to mention it explicitly.
-      return {
-        contextSuffix: `[Attached: ${doc_name} — doc_id ${doc_id}]`,
-      };
-    } catch (e) {
-      console.error('Pending attachment upload failed', e);
-      setAuditError(e instanceof Error ? e.message : 'Upload failed');
-      throw e;  // bubble up so handleSend restores the input
-    } finally {
-      setAuditUploading(false);
-    }
-  }, [pendingAttachment, uploadPendingFile]);
-
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-    const excelFiles = acceptedFiles.filter(isExcelFile);
-    const otherFiles = acceptedFiles.filter(f => !isExcelFile(f));
-
-    if (otherFiles.length > 0) {
-      // Non-Excel drops fall back to the existing ingestion workbench flow.
-      // (UnifiedIntakeModal isn't mounted on /w/* — non-Excel will silently
-      // disappear into context state. Stage B / future redesign addresses.)
-      addFiles(otherFiles);
-    }
-    // Excel: store as pending attachment (NOT auto-upload). User types a
-    // prompt + clicks Send → handleBeforeSend uploads + appends doc context.
-    // Single-file v1: latest drop replaces any prior pending attachment.
-    if (excelFiles.length > 0) {
-      setPendingAttachment(excelFiles[excelFiles.length - 1]);
-      setAuditError(null);
-    }
-  }, [addFiles]);
+  // Every dropped file — any type — becomes a pending attachment. No Excel
+  // gate; non-Excel files are no longer routed into the FileDropContext void.
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      attachment.addFiles(acceptedFiles);
+    },
+    [attachment],
+  );
 
   const {
     getRootProps,
@@ -674,38 +530,15 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
       {/* Hidden file input for react-dropzone */}
       <input {...getInputProps()} />
 
-      {/* Drag overlay — shown while a file is being dragged over the panel */}
-      {isDragActive && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            zIndex: 50,
-            backgroundColor: isDragAccept
-              ? 'rgba(34, 197, 94, 0.10)'
-              : isDragReject
-              ? 'rgba(239, 68, 68, 0.10)'
-              : 'rgba(0, 0, 0, 0.05)',
-            color: 'var(--cui-body-color)',
-            pointerEvents: 'none',
-          }}
-        >
-          <div className="fw-semibold" style={{ fontSize: '1.1rem' }}>
-            Drop documents for Landscaper
-          </div>
-          <div className="mt-1" style={{ color: 'var(--cui-secondary-color)', fontSize: '0.9rem' }}>
-            Excel (.xlsx / .xlsm) → model audit. Other files → ingestion workbench.
-          </div>
-        </div>
-      )}
+      {/* Drag overlay — shared component so both UIs look identical */}
+      <ChatDragOverlay
+        isDragActive={isDragActive}
+        isDragAccept={isDragAccept}
+        isDragReject={isDragReject}
+      />
 
       {/* Upload error banner — only shown after a failed upload during Send */}
-      {auditError && (
+      {attachment.error && (
         <div
           style={{
             position: 'absolute',
@@ -723,9 +556,9 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             gap: 8,
           }}
         >
-          <span style={{ flex: 1 }}>{auditError}</span>
+          <span style={{ flex: 1 }}>{attachment.error}</span>
           <button
-            onClick={() => setAuditError(null)}
+            onClick={() => attachment.setError(null)}
             style={{
               background: 'transparent',
               border: 'none',
@@ -859,7 +692,11 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
             onActiveThreadChange={handleActiveThreadChangeWithUpload}
             onThreadCountChange={handleThreadCountChange}
             showThreadList={threadListVisible}
-            onBeforeSend={handleBeforeSend}
+            onBeforeSend={attachment.handleBeforeSend}
+            attachments={attachment.pendingAttachments}
+            onRemoveAttachment={attachment.removeAttachment}
+            onAddAttachments={attachment.addFiles}
+            attachmentUploading={attachment.uploading}
             // Phase 4 — chat-card "Open" → re-activate the artifact in the
             // workspace panel (and re-open the panel if collapsed).
             onOpenArtifact={(artifactId) => {
@@ -880,71 +717,8 @@ export function CenterChatPanel({ projectId, initialThreadId, projectName, proje
         )}
       </div>
 
-      {/* Pending-attachment pill — anchored to bottom of the chat panel so it
-          floats just above the chat input. Single-file v1; latest drop replaces
-          any prior pending attachment. Spinner shown while uploading on Send. */}
-      {pendingAttachment && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 12,
-            right: 12,
-            bottom: 84,  // sits above the LandscaperChatThreaded textarea+send row
-            zIndex: 55,
-            padding: '6px 10px',
-            background: 'var(--cui-tertiary-bg, #2a2f3a)',
-            border: '1px solid var(--cui-border-color, #3a3f4a)',
-            borderRadius: 6,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 12,
-            color: 'var(--cui-body-color)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          }}
-        >
-          {auditUploading ? (
-            <span
-              style={{
-                display: 'inline-block',
-                width: 12,
-                height: 12,
-                border: '2px solid var(--cui-primary, #3b82f6)',
-                borderTopColor: 'transparent',
-                borderRadius: '50%',
-                animation: 'spin 0.8s linear infinite',
-              }}
-            />
-          ) : (
-            <span style={{ fontSize: 14 }}>📎</span>
-          )}
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {pendingAttachment.name}
-          </span>
-          <span style={{ color: 'var(--cui-secondary-color)', fontSize: 11 }}>
-            {(pendingAttachment.size / 1024).toFixed(0)} KB
-          </span>
-          {!auditUploading && (
-            <button
-              onClick={() => setPendingAttachment(null)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--cui-secondary-color)',
-                cursor: 'pointer',
-                padding: 0,
-                fontSize: 16,
-                lineHeight: 1,
-              }}
-              aria-label="Remove attachment"
-              title="Remove attachment"
-            >
-              ×
-            </button>
-          )}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
-      )}
+      {/* Pending-attachment pills now render in LandscaperChatThreaded's
+          composer (FB-298) so both UIs show them identically. */}
 
       <ChatSearchOverlay />
     </div>

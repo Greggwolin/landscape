@@ -98,6 +98,18 @@ interface LandscaperChatThreadedProps {
    */
   onBeforeSend?: () => Promise<{ contextSuffix?: string } | void>;
   /**
+   * Universal drop-zone (FB-298) — pending attachments shown as pills on the
+   * composer. Supplied by the shared `useChatAttachment` hook in the parent
+   * panel so both UIs render identical pills. When omitted, no pill row shows.
+   */
+  attachments?: File[];
+  /** Remove a single pending attachment by index. */
+  onRemoveAttachment?: (index: number) => void;
+  /** Add files captured via composer paste (screenshots, copied files). */
+  onAddAttachments?: (files: File[]) => void;
+  /** True while attachments are uploading on Send (drives pill spinners). */
+  attachmentUploading?: boolean;
+  /**
    * Fires when the URL-pinned `initialThreadId` is permanently missing
    * (404 from the backend). Parent should redirect to /w/chat or similar
    * fallback so the user isn't stranded on a dead URL.
@@ -324,6 +336,10 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
     showThreadList: showThreadListProp,
     onActiveThreadChange,
     onBeforeSend,
+    attachments,
+    onRemoveAttachment,
+    onAddAttachments,
+    attachmentUploading,
     onThreadNotFound,
     onThreadCountChange,
   }, ref) {
@@ -917,6 +933,73 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
         className="border-top p-3"
         style={{ borderColor: 'var(--cui-border-color)', backgroundColor: 'var(--w-panel-bg, #1a1e28)' }}
       >
+        {/* Pending-attachment pills (FB-298) — universal across both UIs.
+            Multiple files supported; spinner shown per-row while uploading on
+            Send. Driven by the shared useChatAttachment hook in the parent. */}
+        {attachments && attachments.length > 0 && (
+          <div className="d-flex flex-wrap gap-2 mb-2">
+            {attachments.map((file, index) => (
+              <div
+                key={`${file.name}-${index}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  maxWidth: 240,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  color: 'var(--cui-body-color)',
+                  background: 'var(--cui-tertiary-bg)',
+                  border: '1px solid var(--cui-border-color)',
+                  borderRadius: 6,
+                }}
+              >
+                {attachmentUploading ? (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 12,
+                      height: 12,
+                      border: '2px solid var(--cui-primary)',
+                      borderTopColor: 'transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 14 }}>📎</span>
+                )}
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {file.name}
+                </span>
+                <span style={{ color: 'var(--cui-secondary-color)', fontSize: 11, flexShrink: 0 }}>
+                  {(file.size / 1024).toFixed(0)} KB
+                </span>
+                {!attachmentUploading && onRemoveAttachment && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAttachment(index)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--cui-secondary-color)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontSize: 16,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                    }}
+                    aria-label={`Remove ${file.name}`}
+                    title="Remove attachment"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
         <div className="d-flex gap-2 align-items-end">
           <textarea
             ref={textareaRef}
@@ -926,6 +1009,22 @@ export const LandscaperChatThreaded = forwardRef<LandscaperChatHandle, Landscape
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSend();
+              }
+            }}
+            onPaste={(e) => {
+              if (!onAddAttachments) return;
+              const items = e.clipboardData?.items;
+              if (!items) return;
+              const files: File[] = [];
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file') {
+                  const f = items[i].getAsFile();
+                  if (f) files.push(f);
+                }
+              }
+              if (files.length > 0) {
+                e.preventDefault();
+                onAddAttachments(files);
               }
             }}
             placeholder={promptCopy}
