@@ -775,6 +775,7 @@ Two distinct failure modes — treat separately:
 - Cross-project search backend exists, no REST endpoint yet
 - Sync processing: `POST /api/knowledge/documents/{doc_id}/process/`
 - CoStar sale comp extractor: `backend/apps/knowledge/services/costar_extractor.py` — specialized extraction pipeline for CoStar export PDFs, routes through `extraction_service.py` with dedicated field mappings and `extraction_writer.py` for DB persistence
+- User Guide corpus: the in-app User Guide is now a `user_guide`-domain document in `tbl_platform_knowledge`, ingested via `python manage.py ingest_guide_corpus` from `backend/data/guide_corpus.json` (regenerate with `scripts/guide/export-guide-corpus.ts` on guide edits)
 
 ### Valuation Engine Status
 
